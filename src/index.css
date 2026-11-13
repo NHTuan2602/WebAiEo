@@ -3,8 +3,17 @@
 @tailwind utilities;
 
 :root {
-  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   color-scheme: light;
+}
+
+@keyframes crewmateBob {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-crewmate-bob {
+  animation: crewmateBob 2.2s ease-in-out infinite;
 }
 
 html.dark {

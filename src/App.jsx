@@ -40,7 +40,23 @@ import {
   Eye,
   Sun,
   Moon,
-  Lightbulb
+  Lightbulb,
+  Users,
+  Rocket,
+  Copy,
+  Check,
+  Wifi,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  Crown,
+  EyeOff,
+  ArrowRight,
+  DoorOpen,
+  Camera,
+  TrendingDown,
+  Heart,
+  Zap
 } from 'lucide-react';
 
 // ==========================================
@@ -392,6 +408,161 @@ function parseRawVocabText(rawText) {
   return parsedItems;
 }
 
+const GEMINI_PREFERRED_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-3.8-flash',
+  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-4-hydrogen',
+  'gemini-2.5-pro',
+  'gemini-flash-latest'
+];
+
+function formatGeminiErrorMessage(status, rawText = '') {
+  let parsedMsg = rawText;
+  try {
+    const parsed = JSON.parse(rawText);
+    parsedMsg = parsed?.error?.message || rawText;
+  } catch (_e) {}
+
+  const lower = String(parsedMsg || '').toLowerCase();
+  if (status === 400 && (lower.includes('api key') || lower.includes('api_key_invalid'))) {
+    return 'API Key không hợp lệ. Vui lòng kiểm tra lại key từ Google AI Studio (aistudio.google.com).';
+  }
+  if (status === 401 || status === 403) {
+    return 'API Key bị từ chối quyền truy cập hoặc chưa bật Generative Language API.';
+  }
+  if (status === 429) {
+    return 'API Key đã vượt giới hạn lượt gọi (Quota). Vui lòng thử lại sau ít phút.';
+  }
+  if (status === 404) {
+    return `Model AI không tồn tại hoặc đã ngừng hỗ trợ (${parsedMsg}).`;
+  }
+  return `Gemini API lỗi (${status}): ${parsedMsg}`;
+}
+
+async function discoverGeminiModels(cleanKey) {
+  const ordered = [];
+  const pushUnique = (id) => {
+    if (id && !ordered.includes(id)) ordered.push(id);
+  };
+
+  try {
+    const listRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`
+    );
+    if (!listRes.ok) {
+      const errText = await listRes.text();
+      if (listRes.status === 400 || listRes.status === 401 || listRes.status === 403) {
+        throw new Error(formatGeminiErrorMessage(listRes.status, errText));
+      }
+    } else {
+      const data = await listRes.json();
+      const validIds = (data?.models || [])
+        .filter(m => {
+          const methods = m?.supportedGenerationMethods || [];
+          const name = (m?.name || '').toLowerCase();
+          return (
+            methods.includes('generateContent') &&
+            !name.includes('embedding') &&
+            !name.includes('imagen') &&
+            !name.includes('tts') &&
+            !name.includes('aqa') &&
+            !name.includes('robotics') &&
+            !name.includes('computer-use')
+          );
+        })
+        .map(m => String(m.name || '').replace(/^models\//, ''));
+
+      GEMINI_PREFERRED_MODELS.forEach(pref => {
+        if (validIds.includes(pref)) pushUnique(pref);
+      });
+      validIds.filter(id => id.includes('flash')).forEach(pushUnique);
+      validIds.filter(id => id.includes('gemini')).forEach(pushUnique);
+      validIds.forEach(pushUnique);
+    }
+  } catch (err) {
+    if (err.message && (err.message.includes('API Key') || err.message.includes('quyền'))) {
+      throw err;
+    }
+  }
+
+  GEMINI_PREFERRED_MODELS.forEach(pushUnique);
+  return ordered;
+}
+
+async function callGeminiGenerateJson({ apiKey, promptText, temperature = 0.2 }) {
+  const cleanKey = (apiKey || '').trim().replace(/^['"]|['"]$/g, '');
+  if (!cleanKey) {
+    throw new Error('Chưa nhập Google Gemini API Key.');
+  }
+
+  const candidates = await discoverGeminiModels(cleanKey);
+  let lastError = null;
+
+  for (const modelId of candidates) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+
+    const attemptRequest = async (useJsonMime) => {
+      const generationConfig = { temperature };
+      if (useJsonMime) generationConfig.responseMimeType = 'application/json';
+      return fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig
+        })
+      });
+    };
+
+    let response = await attemptRequest(true);
+    if (response.status === 400) {
+      const errPreview = await response.clone().text();
+      if (/mime|json/i.test(errPreview)) {
+        response = await attemptRequest(false);
+      }
+    }
+
+    if (response.ok) {
+      const data = await response.json();
+      const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!textContent) {
+        lastError = new Error('AI không trả về nội dung.');
+        continue;
+      }
+      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        lastError = new Error('AI không trả về đúng định dạng JSON.');
+        continue;
+      }
+      return {
+        parsed: JSON.parse(jsonMatch[0]),
+        usedModel: modelId
+      };
+    }
+
+    const errText = await response.text();
+    const formatted = formatGeminiErrorMessage(response.status, errText);
+    if (response.status === 404 || /not found|not supported for generatecontent/i.test(errText)) {
+      lastError = new Error(formatted);
+      continue;
+    }
+    throw new Error(formatted);
+  }
+
+  throw lastError || new Error('Không tìm thấy model Gemini phù hợp cho API Key này.');
+}
+
+async function testGeminiApiConnection(apiKey) {
+  const result = await callGeminiGenerateJson({
+    apiKey,
+    promptText: 'Return strictly valid JSON: {"status":"ok"}',
+    temperature: 0
+  });
+  return result.usedModel;
+}
+
 // Call Google Gemini API for IELTS Writing grading
 async function callGeminiWritingGrader({ apiKey, task1Prompt, task1Text, task2Prompt, task2Text }) {
   const systemPrompt = `You are an official IELTS Writing Senior Examiner (certified by IDP and British Council).
@@ -440,37 +611,130 @@ Return ONLY valid JSON format without markdown code fences or other prose:
   "improvements": ["Điểm cần khắc phục 1", "Điểm cần khắc phục 2"]
 }`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: systemPrompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: 'application/json'
-        }
-      })
+  const { parsed, usedModel } = await callGeminiGenerateJson({
+    apiKey,
+    promptText: systemPrompt,
+    temperature: 0.2
+  });
+  return { ...parsed, _usedModel: usedModel };
+}
+
+function compressAvatarImageFile(file, targetSize = 160) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type?.startsWith('image/')) {
+      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP).'));
+      return;
     }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error('Không thể xử lý định dạng ảnh này.'));
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const ctx = canvas.getContext('2d');
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
+        resolve(canvas.toDataURL('image/jpeg', 0.84));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function UserAvatarBadge({ user, sizeClass = 'w-8 h-8', textClass = 'text-xs', rounded = 'rounded-lg', className = '' }) {
+  const initial = user?.name ? user.name[0] : (user?.username ? user.username[0] : 'U');
+  if (user?.avatarUrl) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt={user?.name || 'Avatar'}
+        className={`${sizeClass} ${rounded} object-cover border border-white/25 shadow-sm shrink-0 ${className}`}
+      />
+    );
+  }
+  return (
+    <div className={`${sizeClass} ${rounded} bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center font-bold ${textClass} text-white uppercase shrink-0 ${className}`}>
+      {initial}
+    </div>
   );
+}
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API lỗi (${response.status}): ${errText}`);
-  }
+const CREWMATE_COLORS = [
+  { id: 'red', label: 'Đỏ', fill: '#ef4444', shade: '#b91c1c' },
+  { id: 'cyan', label: 'Cyan', fill: '#06b6d4', shade: '#0e7490' },
+  { id: 'blue', label: 'Xanh', fill: '#3b82f6', shade: '#1d4ed8' },
+  { id: 'lime', label: 'Lá', fill: '#22c55e', shade: '#15803d' },
+  { id: 'yellow', label: 'Vàng', fill: '#eab308', shade: '#a16207' },
+  { id: 'orange', label: 'Cam', fill: '#f97316', shade: '#c2410c' },
+  { id: 'pink', label: 'Hồng', fill: '#ec4899', shade: '#be185d' },
+  { id: 'purple', label: 'Tím', fill: '#8b5cf6', shade: '#6d28d9' },
+  { id: 'white', label: 'Trắng', fill: '#e2e8f0', shade: '#94a3b8' }
+];
 
-  const data = await response.json();
-  const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!textContent) {
-    throw new Error('AI không trả về nội dung.');
-  }
+function AmongUsCrewmate({ colorId = 'cyan', avatarUrl = '', size = 56, flip = false, animate = true }) {
+  const isAvatarSuit = colorId === 'avatar' && Boolean(avatarUrl);
+  const palette = isAvatarSuit
+    ? { id: 'avatar', label: 'Mặt Avatar', fill: '#4f46e5', shade: '#312e81' }
+    : (CREWMATE_COLORS.find(c => c.id === colorId) || CREWMATE_COLORS[1]);
+  const headDia = Math.round(size * 0.68);
 
-  const jsonMatch = textContent.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('AI không trả về đúng định dạng JSON.');
-  }
-  return JSON.parse(jsonMatch[0]);
+  return (
+    <div
+      className={`relative inline-flex items-end justify-center shrink-0 ${animate ? 'animate-crewmate-bob' : ''}`}
+      style={{ width: size, height: Math.round(size * 1.15) }}
+    >
+      <svg
+        width={size}
+        height={size * 1.15}
+        viewBox="0 0 64 74"
+        className="drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)]"
+        style={flip ? { transform: 'scaleX(-1)' } : undefined}
+      >
+        {/* Oxygen Backpack */}
+        <rect x="6" y="24" width="13" height="27" rx="6" fill={palette.shade} stroke="#0f172a" strokeWidth="3.5" />
+        {/* Body Silhouette */}
+        <path
+          d="M17 24 C17 10, 49 10, 49 24 L49 52 L49 63 C49 67, 45 69, 41 69 C37 69, 36 66, 36 62 L36 55 L29 55 L29 62 C29 66, 27 69, 23 69 C19 69, 17 67, 17 63 Z"
+          fill={palette.fill}
+          stroke="#0f172a"
+          strokeWidth="3.5"
+          strokeLinejoin="round"
+        />
+        {/* Subtle Body Highlight */}
+        <path
+          d="M22 20 C24 14, 39 14, 43 19"
+          stroke="rgba(255,255,255,0.3)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* Visor */}
+        <rect x="27" y="19" width="24" height="14" rx="7" fill="#7dd3fc" stroke="#0f172a" strokeWidth="3.2" />
+        <ellipse cx="42" cy="23.5" rx="6" ry="2.6" fill="#e0f2fe" opacity="0.9" />
+      </svg>
+
+      {/* Avatar Helmet Head Overlay when user selects Avatar Face Suit */}
+      {isAvatarSuit && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 rounded-full overflow-hidden border-[3px] border-cyan-300 bg-slate-900 shadow-[0_0_14px_rgba(34,211,238,0.65)] pointer-events-none"
+          style={{
+            width: headDia,
+            height: headDia,
+            top: -Math.round(headDia * 0.24)
+          }}
+        >
+          <img src={avatarUrl} alt="Avatar nhân vật" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/30" />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Built-in intelligent heuristic engine (offline fallback & instant simulation)
@@ -646,21 +910,52 @@ export default function App() {
     return null; // Forces login screen
   });
 
-  // Room PIN Database for Game Arena
+  // Room PIN Database for Game Arena (Among Us Lobby + Leaderboard)
+  const normalizeRoomObject = (room, pinKey) => ({
+    pin: String(room?.pin || pinKey || ''),
+    name: room?.name || `Phòng Đấu Từ Vựng #${room?.pin || pinKey}`,
+    pass: room?.pass ?? 'ielts',
+    teacher: room?.teacher || 'teacher_ielts',
+    status: room?.status || 'LOBBY', // 'LOBBY' | 'PLAYING' | 'ENDED'
+    maxPlayers: room?.maxPlayers || 30,
+    startedAt: room?.startedAt || null,
+    lobbyPlayers: room?.lobbyPlayers || {},
+    liveMatch: room?.liveMatch || {},
+    chatMessages: Array.isArray(room?.chatMessages) ? room.chatMessages.slice(-50) : [],
+    rawVocab: room?.rawVocab || DEFAULT_VOCAB_TEXT,
+    players: room?.players || {}
+  });
+
   const [roomsDb, setRoomsDb] = useState(() => {
     const saved = localStorage.getItem('ielts_rooms_db_v2');
     if (saved) {
-      try { return JSON.parse(saved); } catch (_e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          const normalized = {};
+          Object.entries(parsed).forEach(([k, v]) => {
+            normalized[k] = normalizeRoomObject(v, k);
+          });
+          if (Object.keys(normalized).length > 0) return normalized;
+        }
+      } catch (_e) {}
     }
     const defaults = {
       '686868': {
         pin: '686868',
+        name: 'Phòng Từ Vựng Academic IELTS #1',
         pass: 'ielts',
         teacher: 'teacher_ielts',
+        status: 'LOBBY',
+        maxPlayers: 30,
+        startedAt: null,
+        lobbyPlayers: {},
+        liveMatch: {},
+        chatMessages: [],
         rawVocab: DEFAULT_VOCAB_TEXT,
         players: {
-          'Nguyễn Văn A': { name: 'Nguyễn Văn A', score: 1850, streak: 8, status: 'Vòng 3: Boss Speller', time: '14:32' },
-          'Trần Thị Mai': { name: 'Trần Thị Mai', score: 1420, streak: 5, status: 'Vòng 2: Gõ từ khuyết', time: '15:10' }
+          'Nguyễn Văn A': { name: 'Nguyễn Văn A', score: 1850, streak: 8, status: 'Vòng 3: Boss Speller', updatedAt: '14:32' },
+          'Trần Thị Mai': { name: 'Trần Thị Mai', score: 1420, streak: 5, status: 'Vòng 2: Gõ từ khuyết', updatedAt: '15:10' }
         }
       }
     };
@@ -668,7 +963,24 @@ export default function App() {
     return defaults;
   });
 
-  const [currentRoomPin] = useState('686868');
+  const [currentRoomPin, setCurrentRoomPin] = useState('686868');
+  const [joinedRoomPin, setJoinedRoomPin] = useState(null);
+  const [roomJoinForm, setRoomJoinForm] = useState({ pin: '', pass: '' });
+  const [roomJoinError, setRoomJoinError] = useState('');
+  const [myCrewColor, setMyCrewColor] = useState('cyan');
+  const [lobbyCountdown, setLobbyCountdown] = useState(null);
+  const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới' });
+  const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts' });
+  const [lobbyChatInput, setLobbyChatInput] = useState('');
+  const [lobbyNowTick, setLobbyNowTick] = useState(() => Date.now());
+  const [serverSyncConnected, setServerSyncConnected] = useState(false);
+  const [copiedRoomPin, setCopiedRoomPin] = useState(false);
+  const [apiTestState, setApiTestState] = useState({ testing: false, ok: null, message: '', model: '' });
+  const [showAuthPass, setShowAuthPass] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [liveRankDeltas, setLiveRankDeltas] = useState({});
+  const prevLiveRanksRef = useRef({});
 
   // App Navigation: 'AUTH', 'HOME', 'EXAM_MODE', 'RESULT_VIEW', 'TEACHER_DASHBOARD', 'EXAM_BUILDER', 'GAME_ARENA', 'STUDENT_PROFILE'
   const [view, setView] = useState(() => {
@@ -767,6 +1079,7 @@ export default function App() {
       });
       return updated;
     });
+    dispatchSyncAction('TOGGLE_TEST_ANSWERS', { testId });
   };
 
   // Exam Mode State
@@ -852,7 +1165,7 @@ export default function App() {
   const [gameCombo, setGameCombo] = useState(0);
   const [gameWordIdx, setGameWordIdx] = useState(0);
   const [gameTypedProgress, setGameTypedProgress] = useState(0);
-  const [gameSubState, setGameSubState] = useState('PLAYING'); // 'PLAYING', 'TRANSITION', 'GAMEOVER'
+  const [gameSubState, setGameSubState] = useState('JOIN'); // 'JOIN' | 'LOBBY' | 'COUNTDOWN' | 'PLAYING' | 'TRANSITION' | 'GAMEOVER'
   const [gameOutcome, setGameOutcome] = useState(null); // 'VICTORY' | 'LOST' | null
   const [gameTimeLeft, setGameTimeLeft] = useState(GAME_ROUND_TIME_LIMITS[1]);
   const [gameTimeLimit, setGameTimeLimit] = useState(GAME_ROUND_TIME_LIMITS[1]);
@@ -864,6 +1177,15 @@ export default function App() {
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [gameQueues, setGameQueues] = useState({ 1: [], 2: [], 3: [] });
 
+  const lastLaunchedAtRef = useRef(null);
+  const lobbyCountdownTimerRef = useRef(null);
+  const syncChannelRef = useRef(null);
+  const skipNextRoomBroadcastRef = useRef(false);
+  const skipNextTestsBroadcastRef = useRef(false);
+  const skipNextAttemptsBroadcastRef = useRef(false);
+  const lastSyncVersionRef = useRef(-1);
+  const chatScrollRef = useRef(null);
+
   const gameRuntimeRef = useRef({
     round: 1,
     score: 0,
@@ -871,7 +1193,7 @@ export default function App() {
     combo: 0,
     wordIdx: 0,
     typedProgress: 0,
-    subState: 'PLAYING',
+    subState: 'JOIN',
     activeQuestion: null,
     queues: { 1: [], 2: [], 3: [] },
     isSandbox: false,
@@ -879,13 +1201,23 @@ export default function App() {
     questionResolved: false
   });
 
-  // Sync state to local storage
+  // Sync state to local storage + cross-tab BroadcastChannel
   useEffect(() => {
     localStorage.setItem('ielts_tests', JSON.stringify(tests));
+    if (skipNextTestsBroadcastRef.current) {
+      skipNextTestsBroadcastRef.current = false;
+      return;
+    }
+    syncChannelRef.current?.postMessage({ key: 'ielts_tests', payload: tests });
   }, [tests]);
 
   useEffect(() => {
     localStorage.setItem('ielts_attempts', JSON.stringify(attempts));
+    if (skipNextAttemptsBroadcastRef.current) {
+      skipNextAttemptsBroadcastRef.current = false;
+      return;
+    }
+    syncChannelRef.current?.postMessage({ key: 'ielts_attempts', payload: attempts });
   }, [attempts]);
 
   useEffect(() => {
@@ -894,6 +1226,11 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('ielts_rooms_db_v2', JSON.stringify(roomsDb));
+    if (skipNextRoomBroadcastRef.current) {
+      skipNextRoomBroadcastRef.current = false;
+      return;
+    }
+    syncChannelRef.current?.postMessage({ key: 'ielts_rooms_db_v2', payload: roomsDb });
   }, [roomsDb]);
 
   useEffect(() => {
@@ -908,6 +1245,288 @@ export default function App() {
     }
   }, [currentUser]);
 
+  // Shared Cross-Browser Sync Dispatch Helpers (/api/sync via Vite Middleware + BroadcastChannel fallback)
+  const applyRemoteSnapshotData = useRef(null);
+  applyRemoteSnapshotData.current = (snap) => {
+    if (!snap || typeof snap !== 'object') return;
+    if (typeof snap.version === 'number') {
+      if (snap.version < lastSyncVersionRef.current) return;
+      lastSyncVersionRef.current = snap.version;
+    }
+    if (snap.rooms && typeof snap.rooms === 'object' && Object.keys(snap.rooms).length > 0) {
+      const normalized = {};
+      Object.entries(snap.rooms).forEach(([k, v]) => {
+        normalized[k] = normalizeRoomObject(v, k);
+      });
+      skipNextRoomBroadcastRef.current = true;
+      setRoomsDb(prev => (JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized));
+    }
+    if (Array.isArray(snap.tests) && snap.tests.length > 0) {
+      skipNextTestsBroadcastRef.current = true;
+      setTests(prev => (JSON.stringify(prev) === JSON.stringify(snap.tests) ? prev : snap.tests));
+    }
+    if (Array.isArray(snap.attempts) && snap.attempts.length > 0) {
+      skipNextAttemptsBroadcastRef.current = true;
+      setAttempts(prev => (JSON.stringify(prev) === JSON.stringify(snap.attempts) ? prev : snap.attempts));
+    }
+    if (snap.teacherNotes && typeof snap.teacherNotes === 'object' && Object.keys(snap.teacherNotes).length > 0) {
+      setTeacherNotes(prev => (JSON.stringify(prev) === JSON.stringify(snap.teacherNotes) ? prev : snap.teacherNotes));
+    }
+    if (snap.users && typeof snap.users === 'object' && Object.keys(snap.users).length > 0) {
+      setUsersDb(prev => {
+        const merged = { ...prev, ...snap.users };
+        return JSON.stringify(prev) === JSON.stringify(merged) ? prev : merged;
+      });
+    }
+  };
+
+  const pullServerSyncState = async (forceApply = false) => {
+    try {
+      const res = await fetch('/api/sync/state', { cache: 'no-store' });
+      if (!res.ok) return null;
+      const snap = await res.json();
+      setServerSyncConnected(true);
+      if (forceApply || (typeof snap?.version === 'number' && snap.version > lastSyncVersionRef.current)) {
+        applyRemoteSnapshotData.current?.(snap);
+      }
+      return snap;
+    } catch (_err) {
+      setServerSyncConnected(false);
+      return null;
+    }
+  };
+
+  const dispatchSyncAction = async (type, payload) => {
+    try {
+      const res = await fetch('/api/sync/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, payload })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      setServerSyncConnected(true);
+      if (data?.snapshot) {
+        applyRemoteSnapshotData.current?.(data.snapshot);
+      }
+      return data?.snapshot || null;
+    } catch (_err) {
+      setServerSyncConnected(false);
+      return null;
+    }
+  };
+
+  // Listen for live multi-browser (SSE + Polling) & multi-tab (BroadcastChannel + storage) updates
+  useEffect(() => {
+    const applyRemoteUpdate = (key, payload) => {
+      if (!payload) return;
+      if (key === 'ielts_rooms_db_v2' && typeof payload === 'object') {
+        const normalized = {};
+        Object.entries(payload).forEach(([k, v]) => {
+          normalized[k] = normalizeRoomObject(v, k);
+        });
+        skipNextRoomBroadcastRef.current = true;
+        setRoomsDb(prev => (JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized));
+      } else if (key === 'ielts_tests' && Array.isArray(payload)) {
+        skipNextTestsBroadcastRef.current = true;
+        setTests(prev => (JSON.stringify(prev) === JSON.stringify(payload) ? prev : payload));
+      } else if (key === 'ielts_attempts' && Array.isArray(payload)) {
+        skipNextAttemptsBroadcastRef.current = true;
+        setAttempts(prev => (JSON.stringify(prev) === JSON.stringify(payload) ? prev : payload));
+      } else if (key === 'ielts_teacher_notes' && typeof payload === 'object') {
+        setTeacherNotes(prev => (JSON.stringify(prev) === JSON.stringify(payload) ? prev : payload));
+      }
+    };
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      const ch = new BroadcastChannel('lexiprep_sync_v1');
+      syncChannelRef.current = ch;
+      ch.onmessage = (e) => {
+        if (e.data?.key) applyRemoteUpdate(e.data.key, e.data.payload);
+      };
+    }
+
+    const handleStorageEvent = (e) => {
+      if (!e.newValue) return;
+      if (['ielts_rooms_db_v2', 'ielts_tests', 'ielts_attempts', 'ielts_teacher_notes'].includes(e.key)) {
+        try {
+          applyRemoteUpdate(e.key, JSON.parse(e.newValue));
+        } catch (_err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+
+    // Bootstrap cross-browser relay server state + SSE stream + 1.5s fallback poll
+    let cancelled = false;
+    let evtSource = null;
+
+    const initServerSync = async () => {
+      const snap = await pullServerSyncState(true);
+      if (cancelled) return;
+      if (snap) {
+        if (!snap.seeded) {
+          await dispatchSyncAction('SEED_DEFAULTS', {
+            rooms: roomsDb,
+            tests,
+            attempts,
+            teacherNotes,
+            users: usersDb
+          });
+        } else {
+          await dispatchSyncAction('SEED_DEFAULTS', { users: usersDb });
+        }
+      }
+
+      if (cancelled || typeof EventSource === 'undefined') return;
+      evtSource = new EventSource('/api/sync/stream');
+      evtSource.addEventListener('sync', (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          setServerSyncConnected(true);
+          applyRemoteSnapshotData.current?.(parsed);
+        } catch (_err) {}
+      });
+      evtSource.onerror = () => {
+        setServerSyncConnected(false);
+      };
+    };
+
+    initServerSync();
+    const pollTimer = setInterval(() => {
+      pullServerSyncState(false);
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollTimer);
+      evtSource?.close();
+      window.removeEventListener('storage', handleStorageEvent);
+      syncChannelRef.current?.close();
+      syncChannelRef.current = null;
+    };
+  }, []);
+
+  // Tick timer for Crewmate speech bubbles + auto-scroll Lobby Chat while in Lobby
+  useEffect(() => {
+    if (view !== 'GAME_ARENA' || gameSubState !== 'LOBBY') return;
+    const t = setInterval(() => setLobbyNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [view, gameSubState]);
+
+  const activeLobbyRoomChatCount = (roomsDb[joinedRoomPin || currentRoomPin]?.chatMessages || []).length;
+  useEffect(() => {
+    if (view === 'GAME_ARENA' && gameSubState === 'LOBBY' && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [view, gameSubState, activeLobbyRoomChatCount]);
+
+  // Keep Teacher inline room draft aligned when selected PIN switches
+  useEffect(() => {
+    const r = roomsDb[currentRoomPin];
+    if (r) {
+      setHostRoomDraft({
+        pin: r.pin || currentRoomPin,
+        name: r.name || `Phòng Từ Vựng #${currentRoomPin}`,
+        pass: r.pass ?? 'ielts'
+      });
+    }
+  }, [currentRoomPin]);
+
+  // Track live ranking changes (Đua Top up/down indicator) for Teacher Spectate screen
+  useEffect(() => {
+    if (view !== 'GAME_ARENA' || gameSubState !== 'HOST_SPECTATE') {
+      prevLiveRanksRef.current = {};
+      return;
+    }
+    const activePin = joinedRoomPin || currentRoomPin;
+    const room = activePin ? normalizeRoomObject(roomsDb[activePin], activePin) : null;
+    if (!room) return;
+
+    const entries = Object.values(room.liveMatch || {});
+    const sorted = [...entries].sort((a, b) => {
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      if ((b.streak || 0) !== (a.streak || 0)) return (b.streak || 0) - (a.streak || 0);
+      return (a.username || '').localeCompare(b.username || '');
+    });
+
+    const nextRanks = {};
+    const deltas = {};
+    let hasChanges = false;
+    sorted.forEach((item, idx) => {
+      nextRanks[item.username] = idx;
+      const oldRank = prevLiveRanksRef.current[item.username];
+      if (typeof oldRank === 'number' && oldRank !== idx) {
+        deltas[item.username] = oldRank - idx; // positive = climbed up, negative = dropped down
+        hasChanges = true;
+      }
+    });
+    prevLiveRanksRef.current = nextRanks;
+    if (hasChanges) {
+      setLiveRankDeltas(deltas);
+      const clearTimer = setTimeout(() => setLiveRankDeltas({}), 2200);
+      return () => clearTimeout(clearTimer);
+    }
+  }, [view, gameSubState, roomsDb, joinedRoomPin, currentRoomPin]);
+
+  // Synchronized Among Us Lobby -> Countdown -> Start Game watcher
+  useEffect(() => {
+    const activePin = joinedRoomPin || currentRoomPin;
+    const room = activePin ? roomsDb[activePin] : null;
+    if (view !== 'GAME_ARENA') return;
+
+    if (room?.status === 'LOBBY') {
+      lastLaunchedAtRef.current = null;
+    }
+    if (gameSubState !== 'LOBBY') return;
+
+    if (!room || room.status === 'ENDED') {
+      if (currentUser?.role !== 'teacher' && joinedRoomPin) {
+        setJoinedRoomPin(null);
+        setGameSubState('JOIN');
+        gameRuntimeRef.current.subState = 'JOIN';
+        setRoomJoinError('Phòng chơi đã kết thúc hoặc bị đóng bởi giáo viên.');
+      }
+      return;
+    }
+
+    const isParticipant =
+      currentUser?.role === 'teacher' ||
+      joinedRoomPin === activePin ||
+      Boolean(room.lobbyPlayers?.[currentUser?.username]);
+
+    if (
+      room.status === 'PLAYING' &&
+      room.startedAt &&
+      lastLaunchedAtRef.current !== room.startedAt &&
+      isParticipant
+    ) {
+      lastLaunchedAtRef.current = room.startedAt;
+      clearInterval(lobbyCountdownTimerRef.current);
+      setLobbyCountdown(3);
+      setGameSubState('COUNTDOWN');
+      gameRuntimeRef.current.subState = 'COUNTDOWN';
+
+      let count = 3;
+      lobbyCountdownTimerRef.current = setInterval(() => {
+        count -= 1;
+        if (count <= 0) {
+          clearInterval(lobbyCountdownTimerRef.current);
+          setLobbyCountdown(null);
+          if (currentUser?.role === 'teacher') {
+            prevLiveRanksRef.current = {};
+            setLiveRankDeltas({});
+            setGameSubState('HOST_SPECTATE');
+            gameRuntimeRef.current.subState = 'HOST_SPECTATE';
+          } else {
+            initGameCampaign(activePin, currentUser);
+          }
+        } else {
+          setLobbyCountdown(count);
+        }
+      }, 900);
+    }
+  }, [view, gameSubState, roomsDb, joinedRoomPin, currentRoomPin, currentUser]);
+
   // Handle Toast in Game
   const triggerGameToast = (text, isSuccess) => {
     clearTimeout(gameToastTimerRef.current);
@@ -917,27 +1536,583 @@ export default function App() {
     }, 3000);
   };
 
-  // Sync Student Game Score to Room Leaderboard
+  // Sync Student Game Score & Real-time Race Progress to Leaderboard
+  const syncLiveMatchProgress = ({
+    scoreVal = 0,
+    streakVal = 0,
+    livesVal = 3,
+    roundNum = 1,
+    progressText = 'Đang chơi',
+    finished = false,
+    outcome = null,
+    missedWords = []
+  }) => {
+    if (!currentUser || currentUser.role === 'teacher' || gameRuntimeRef.current.isSandbox) return;
+    const targetPin = joinedRoomPin || currentRoomPin;
+    const roomObj = roomsDb[targetPin];
+    const lobbyInfo = roomObj?.lobbyPlayers?.[currentUser.username];
+    const liveEntry = {
+      username: currentUser.username,
+      name: currentUser.name || currentUser.username,
+      role: 'student',
+      colorId: lobbyInfo?.colorId || myCrewColor,
+      avatarUrl: currentUser.avatarUrl || '',
+      score: scoreVal,
+      streak: streakVal,
+      lives: livesVal,
+      round: roundNum,
+      progressText,
+      finished,
+      outcome,
+      missed: missedWords,
+      updatedAt: Date.now()
+    };
+
+    setRoomsDb(prev => {
+      const room = normalizeRoomObject(prev[targetPin], targetPin);
+      const nextLiveMatch = { ...(room.liveMatch || {}), [currentUser.username]: liveEntry };
+      const currentPlayers = { ...(room.players || {}) };
+      if (scoreVal > 0 || finished) {
+        const prevRecord = currentPlayers[currentUser.username];
+        const bestScore = prevRecord ? Math.max(prevRecord.score || 0, scoreVal) : scoreVal;
+        currentPlayers[currentUser.username] = {
+          name: currentUser.name || currentUser.username,
+          score: bestScore,
+          status: progressText,
+          streak: streakVal,
+          missed: missedWords,
+          updatedAt: new Date().toLocaleTimeString('vi-VN')
+        };
+      }
+      return {
+        ...prev,
+        [targetPin]: { ...room, liveMatch: nextLiveMatch, players: currentPlayers }
+      };
+    });
+
+    dispatchSyncAction('UPDATE_LIVE_SCORE', {
+      pin: targetPin,
+      username: currentUser.username,
+      entry: liveEntry
+    });
+  };
+
   const syncScoreToLeaderboard = (scoreVal, statusStr, streakVal, missedWords) => {
     if (!currentUser) return;
+    const targetPin = joinedRoomPin || currentRoomPin;
+    const nextRecord = {
+      name: currentUser.name || currentUser.username,
+      score: scoreVal,
+      status: statusStr,
+      streak: streakVal,
+      missed: missedWords,
+      updatedAt: new Date().toLocaleTimeString('vi-VN')
+    };
+
     setRoomsDb(prev => {
-      const room = prev[currentRoomPin] || { pin: currentRoomPin, pass: 'ielts', teacher: 'teacher_ielts', rawVocab: DEFAULT_VOCAB_TEXT, players: {} };
+      const room = normalizeRoomObject(prev[targetPin], targetPin);
       const currentPlayers = { ...(room.players || {}) };
       const prevRecord = currentPlayers[currentUser.username];
       const bestScore = prevRecord ? Math.max(prevRecord.score || 0, scoreVal) : scoreVal;
-
-      currentPlayers[currentUser.username] = {
-        name: currentUser.name || currentUser.username,
-        score: bestScore,
-        status: statusStr,
-        streak: streakVal,
-        missed: missedWords,
-        updatedAt: new Date().toLocaleTimeString('vi-VN')
-      };
-
-      const updated = { ...prev, [currentRoomPin]: { ...room, players: currentPlayers } };
-      return updated;
+      currentPlayers[currentUser.username] = { ...nextRecord, score: bestScore };
+      return { ...prev, [targetPin]: { ...room, players: currentPlayers } };
     });
+
+    dispatchSyncAction('UPDATE_SCORE', { pin: targetPin, username: currentUser.username, record: nextRecord });
+  };
+
+  // Update Account Avatar & propagate to Lobby Character
+  const handleUpdateUserAvatar = (newAvatarUrl) => {
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, avatarUrl: newAvatarUrl || '' };
+    setCurrentUser(updatedUser);
+    setUsersDb(prev => ({ ...prev, [currentUser.username]: updatedUser }));
+
+    const nextColor = newAvatarUrl
+      ? 'avatar'
+      : (myCrewColor === 'avatar' ? 'cyan' : myCrewColor);
+    setMyCrewColor(nextColor);
+
+    const activePin = joinedRoomPin || currentRoomPin;
+    setRoomsDb(prev => {
+      const next = { ...prev };
+      Object.entries(next).forEach(([pin, r]) => {
+        const nr = normalizeRoomObject(r, pin);
+        if (nr.lobbyPlayers?.[currentUser.username]) {
+          nr.lobbyPlayers = {
+            ...nr.lobbyPlayers,
+            [currentUser.username]: {
+              ...nr.lobbyPlayers[currentUser.username],
+              avatarUrl: newAvatarUrl || '',
+              colorId: pin === activePin ? nextColor : nr.lobbyPlayers[currentUser.username].colorId
+            }
+          };
+          next[pin] = nr;
+        }
+      });
+      return next;
+    });
+
+    dispatchSyncAction('UPSERT_USER', { username: currentUser.username, user: updatedUser });
+    if (activePin && roomsDb[activePin]?.lobbyPlayers?.[currentUser.username]) {
+      dispatchSyncAction('UPDATE_LOBBY_PLAYER', {
+        pin: activePin,
+        username: currentUser.username,
+        patch: { avatarUrl: newAvatarUrl || '', colorId: nextColor }
+      });
+    }
+    showToast(newAvatarUrl ? 'Đã cập nhật Avatar & bật chế độ Mặt Avatar cho nhân vật!' : 'Đã gỡ ảnh Avatar tài khoản.');
+  };
+
+  // Lobby & Room Flow Actions
+  const buildLobbyPlayerEntry = (user, overrides = {}) => ({
+    username: user.username,
+    name: user.name || user.username,
+    role: user.role,
+    colorId: overrides.colorId ?? (user.avatarUrl && myCrewColor === 'avatar' ? 'avatar' : myCrewColor),
+    avatarUrl: overrides.avatarUrl ?? user.avatarUrl ?? '',
+    ready: overrides.ready ?? (user.role === 'teacher'),
+    chat: '',
+    chatAt: 0,
+    joinedAt: Date.now()
+  });
+
+  const openStudentGamePortal = () => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+    clearInterval(lobbyCountdownTimerRef.current);
+    setLobbyCountdown(null);
+    setRoomJoinError('');
+
+    if (currentUser?.role === 'teacher') {
+      handleTeacherOpenLobby(currentRoomPin);
+      return;
+    }
+
+    const activeRoom = joinedRoomPin ? roomsDb[joinedRoomPin] : null;
+    const isAlreadyInLobby =
+      activeRoom &&
+      activeRoom.status === 'LOBBY' &&
+      Boolean(activeRoom.lobbyPlayers?.[currentUser?.username]);
+
+    if (isAlreadyInLobby) {
+      setGameSubState('LOBBY');
+      gameRuntimeRef.current.subState = 'LOBBY';
+    } else {
+      setJoinedRoomPin(null);
+      setGameSubState('JOIN');
+      gameRuntimeRef.current.subState = 'JOIN';
+    }
+    setView('GAME_ARENA');
+    pullServerSyncState(true);
+  };
+
+  const handleStudentJoinRoom = async (e) => {
+    if (e) e.preventDefault();
+    const cleanPin = (roomJoinForm.pin || '').trim();
+    const cleanPass = (roomJoinForm.pass || '').trim();
+
+    if (!cleanPin) {
+      setRoomJoinError('Vui lòng nhập Mã Phòng (PIN) do giáo viên cung cấp.');
+      return;
+    }
+
+    // Pull latest server state right before validating so newly created rooms on another browser match immediately
+    const latestSnap = await pullServerSyncState(true);
+    const liveRooms = latestSnap?.rooms && Object.keys(latestSnap.rooms).length > 0 ? latestSnap.rooms : roomsDb;
+    const targetRoom = liveRooms[cleanPin] ? normalizeRoomObject(liveRooms[cleanPin], cleanPin) : null;
+
+    if (!targetRoom) {
+      setRoomJoinError(`Không tìm thấy phòng "${cleanPin}". Hãy kiểm tra lại mã phòng.`);
+      return;
+    }
+    if (targetRoom.status === 'ENDED') {
+      setRoomJoinError('Phòng đấu này đã kết thúc. Vui lòng xin mã phòng mới.');
+      return;
+    }
+    if ((targetRoom.pass || '').trim() !== cleanPass) {
+      setRoomJoinError('Mật khẩu phòng không chính xác. Vui lòng thử lại.');
+      return;
+    }
+    const alreadyJoined = Boolean(targetRoom.lobbyPlayers?.[currentUser?.username]);
+    if (targetRoom.status === 'PLAYING' && !alreadyJoined) {
+      setRoomJoinError('Trận đấu đang diễn ra! Hãy bảo Giáo viên bấm "Mở Sảnh Mới" hoặc "Bắt đầu ván mới" để bạn vào sảnh chờ.');
+      return;
+    }
+
+    setRoomJoinError('');
+    setJoinedRoomPin(cleanPin);
+    lastLaunchedAtRef.current = targetRoom.startedAt || null;
+
+    const studentEntry = buildLobbyPlayerEntry(currentUser, { ready: false });
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[cleanPin] || targetRoom, cleanPin);
+      return {
+        ...prev,
+        [cleanPin]: {
+          ...r,
+          lobbyPlayers: {
+            ...r.lobbyPlayers,
+            [currentUser.username]: studentEntry
+          }
+        }
+      };
+    });
+
+    setLobbyChatInput('');
+    setGameSubState('LOBBY');
+    gameRuntimeRef.current.subState = 'LOBBY';
+    setView('GAME_ARENA');
+
+    await dispatchSyncAction('JOIN_LOBBY', { pin: cleanPin, player: studentEntry });
+  };
+
+  const handleTeacherOpenLobby = (pin = currentRoomPin) => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+    clearInterval(lobbyCountdownTimerRef.current);
+    setLobbyCountdown(null);
+
+    const targetPin = pin || currentRoomPin;
+    setCurrentRoomPin(targetPin);
+    setJoinedRoomPin(targetPin);
+
+    const baseRoom = normalizeRoomObject(roomsDb[targetPin], targetPin);
+    const hasStudentsWaiting = Object.values(baseRoom.lobbyPlayers || {}).some(p => p.role !== 'teacher');
+    // Auto-reopen room to LOBBY if an old match ended or nobody was waiting inside an old PLAYING session
+    const nextStatus = baseRoom.status === 'ENDED' || (baseRoom.status === 'PLAYING' && !hasStudentsWaiting) ? 'LOBBY' : baseRoom.status;
+    const nextStartedAt = nextStatus === 'LOBBY' ? null : baseRoom.startedAt;
+    lastLaunchedAtRef.current = nextStartedAt;
+
+    setHostRoomDraft({
+      pin: baseRoom.pin,
+      name: baseRoom.name,
+      pass: baseRoom.pass
+    });
+
+    const teacherEntry = buildLobbyPlayerEntry(currentUser, {
+      name: currentUser?.name || 'Giáo viên',
+      role: 'teacher',
+      ready: true
+    });
+
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[targetPin], targetPin);
+      return {
+        ...prev,
+        [targetPin]: {
+          ...r,
+          status: nextStatus,
+          startedAt: nextStartedAt,
+          lobbyPlayers: {
+            ...r.lobbyPlayers,
+            [currentUser.username]: teacherEntry
+          }
+        }
+      };
+    });
+
+    setGameSubState('LOBBY');
+    gameRuntimeRef.current.subState = 'LOBBY';
+    setView('GAME_ARENA');
+
+    if (nextStatus === 'LOBBY' && baseRoom.status !== 'LOBBY') {
+      dispatchSyncAction('RESET_LOBBY', { pin: targetPin });
+    }
+    dispatchSyncAction('JOIN_LOBBY', { pin: targetPin, player: teacherEntry });
+  };
+
+  const handleSaveHostRoomSettings = (e) => {
+    if (e) e.preventDefault();
+    const oldPin = joinedRoomPin || currentRoomPin;
+    const newPin = (hostRoomDraft.pin || '').trim() || oldPin;
+    const newName = (hostRoomDraft.name || '').trim() || `Phòng Từ Vựng #${newPin}`;
+    const newPass = (hostRoomDraft.pass || '').trim() || 'ielts';
+
+    if (newPin !== oldPin && roomsDb[newPin]) {
+      showToast(`Mã phòng "${newPin}" đã tồn tại — hãy chọn mã PIN khác hoặc bấm chọn phòng đó!`, 'error');
+      return;
+    }
+
+    setRoomsDb(prev => {
+      const source = normalizeRoomObject(prev[oldPin], oldPin);
+      const updatedRoom = normalizeRoomObject(
+        {
+          ...source,
+          pin: newPin,
+          name: newName,
+          pass: newPass
+        },
+        newPin
+      );
+      const next = { ...prev, [newPin]: updatedRoom };
+      if (oldPin !== newPin) {
+        delete next[oldPin];
+      }
+      return next;
+    });
+
+    setCurrentRoomPin(newPin);
+    setJoinedRoomPin(newPin);
+    setHostRoomDraft({ pin: newPin, name: newName, pass: newPass });
+
+    dispatchSyncAction('UPSERT_ROOM', {
+      pin: newPin,
+      oldPin: oldPin !== newPin ? oldPin : undefined,
+      updates: { name: newName, pass: newPass }
+    });
+    showToast(`Đã cập nhật phòng "${newName}" (PIN: ${newPin} • Pass: ${newPass})!`);
+  };
+
+  const handleTeacherResetLobby = (pin = currentRoomPin) => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+    clearInterval(lobbyCountdownTimerRef.current);
+    setLobbyCountdown(null);
+    lastLaunchedAtRef.current = null;
+    prevLiveRanksRef.current = {};
+    setLiveRankDeltas({});
+
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[pin], pin);
+      return {
+        ...prev,
+        [pin]: {
+          ...r,
+          status: 'LOBBY',
+          startedAt: null,
+          liveMatch: {}
+        }
+      };
+    });
+    setGameSubState('LOBBY');
+    gameRuntimeRef.current.subState = 'LOBBY';
+    dispatchSyncAction('RESET_LOBBY', { pin });
+    showToast(`Đã mở lại Sảnh Chờ cho phòng ${pin}! Học sinh có thể vào sảnh ngay.`);
+  };
+
+  const handleTeacherStartLobbyGame = (pin = currentRoomPin) => {
+    const targetPin = pin || currentRoomPin;
+    const targetRoom = normalizeRoomObject(roomsDb[targetPin], targetPin);
+    const waitingStudents = Object.values(targetRoom.lobbyPlayers || {}).filter(p => p.role !== 'teacher');
+
+    if (waitingStudents.length === 0) {
+      showToast('Chưa có học sinh nào trong sảnh! Bạn chỉ có thể bấm "Chơi Thử GV" khi phòng trống.', 'info');
+      return;
+    }
+
+    const launchTs = Date.now();
+    const freshLive = {};
+    waitingStudents.forEach(lp => {
+      freshLive[lp.username] = {
+        username: lp.username,
+        name: lp.name || lp.username,
+        role: 'student',
+        colorId: lp.colorId || 'cyan',
+        avatarUrl: lp.avatarUrl || usersDb[lp.username]?.avatarUrl || '',
+        score: 0,
+        streak: 0,
+        lives: 3,
+        round: 1,
+        progressText: 'Đang vào Vòng 1',
+        finished: false,
+        outcome: null,
+        updatedAt: launchTs
+      };
+    });
+
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[targetPin], targetPin);
+      return {
+        ...prev,
+        [targetPin]: {
+          ...r,
+          status: 'PLAYING',
+          startedAt: launchTs,
+          liveMatch: freshLive
+        }
+      };
+    });
+    dispatchSyncAction('START_GAME', { pin: targetPin, startedAt: launchTs });
+  };
+
+  const handleLeaveGameLobby = () => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+    clearInterval(lobbyCountdownTimerRef.current);
+    setLobbyCountdown(null);
+    const activePin = joinedRoomPin || currentRoomPin;
+    if (activePin && currentUser) {
+      setRoomsDb(prev => {
+        const r = prev[activePin];
+        if (!r) return prev;
+        const nextLobby = { ...(r.lobbyPlayers || {}) };
+        delete nextLobby[currentUser.username];
+        return {
+          ...prev,
+          [activePin]: { ...r, lobbyPlayers: nextLobby }
+        };
+      });
+      dispatchSyncAction('LEAVE_LOBBY', { pin: activePin, username: currentUser.username });
+    }
+    setJoinedRoomPin(null);
+    setGameSubState('JOIN');
+    gameRuntimeRef.current.subState = 'JOIN';
+    setView(currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME');
+  };
+
+  const handleChangeCrewColor = (colorId) => {
+    if (colorId === 'avatar' && !currentUser?.avatarUrl) {
+      setShowAvatarModal(true);
+      showToast('Hãy tải lên ảnh Avatar trước để dùng làm mặt nhân vật!', 'info');
+      return;
+    }
+    setMyCrewColor(colorId);
+    const activePin = joinedRoomPin || currentRoomPin;
+    if (!activePin || !currentUser) return;
+    const avatarUrl = currentUser.avatarUrl || '';
+    const fallbackPlayer = buildLobbyPlayerEntry(currentUser, { colorId, avatarUrl });
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[activePin], activePin);
+      const currPlayer = r.lobbyPlayers?.[currentUser.username] || fallbackPlayer;
+      return {
+        ...prev,
+        [activePin]: {
+          ...r,
+          lobbyPlayers: {
+            ...r.lobbyPlayers,
+            [currentUser.username]: { ...currPlayer, colorId, avatarUrl }
+          }
+        }
+      };
+    });
+    dispatchSyncAction('UPDATE_LOBBY_PLAYER', {
+      pin: activePin,
+      username: currentUser.username,
+      patch: { colorId, avatarUrl },
+      fallbackPlayer
+    });
+  };
+
+  const handleToggleLobbyReady = () => {
+    const activePin = joinedRoomPin || currentRoomPin;
+    if (!activePin || !currentUser) return;
+    const currentRoom = normalizeRoomObject(roomsDb[activePin], activePin);
+    const me = currentRoom.lobbyPlayers?.[currentUser.username] || buildLobbyPlayerEntry(currentUser, { ready: false });
+    const nextReady = !me.ready;
+
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[activePin], activePin);
+      const curr = r.lobbyPlayers?.[currentUser.username] || me;
+      return {
+        ...prev,
+        [activePin]: {
+          ...r,
+          lobbyPlayers: {
+            ...r.lobbyPlayers,
+            [currentUser.username]: { ...curr, ready: nextReady }
+          }
+        }
+      };
+    });
+    dispatchSyncAction('UPDATE_LOBBY_PLAYER', {
+      pin: activePin,
+      username: currentUser.username,
+      patch: { ready: nextReady },
+      fallbackPlayer: { ...me, ready: nextReady }
+    });
+  };
+
+  const handleSendLobbyChat = (text) => {
+    const activePin = joinedRoomPin || currentRoomPin;
+    const cleanText = (text || '').trim();
+    if (!activePin || !currentUser || !cleanText) return;
+
+    const msgId = Date.now() + Math.floor(Math.random() * 1000);
+    const currentRoom = normalizeRoomObject(roomsDb[activePin], activePin);
+    const me = currentRoom.lobbyPlayers?.[currentUser.username] || buildLobbyPlayerEntry(currentUser);
+    const chatMessage = {
+      id: msgId,
+      username: currentUser.username,
+      name: currentUser.name || currentUser.username,
+      role: currentUser.role,
+      colorId: me.colorId || myCrewColor,
+      text: cleanText,
+      createdAt: Date.now(),
+      timeStr: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[activePin], activePin);
+      const curr = r.lobbyPlayers?.[currentUser.username] || me;
+      const prevChats = Array.isArray(r.chatMessages) ? r.chatMessages : [];
+      return {
+        ...prev,
+        [activePin]: {
+          ...r,
+          chatMessages: [...prevChats, chatMessage].slice(-50),
+          lobbyPlayers: {
+            ...r.lobbyPlayers,
+            [currentUser.username]: { ...curr, chat: cleanText, chatAt: msgId }
+          }
+        }
+      };
+    });
+
+    dispatchSyncAction('SEND_LOBBY_CHAT', {
+      pin: activePin,
+      message: chatMessage,
+      fallbackPlayer: me
+    });
+  };
+
+  const handleCreateRoom = (e) => {
+    if (e) e.preventDefault();
+    const generatedPin = (newRoomForm.pin || '').trim() || String(Math.floor(100000 + Math.random() * 900000));
+    const cleanPass = (newRoomForm.pass || '').trim() || 'ielts';
+    const cleanName = (newRoomForm.name || '').trim() || `Phòng Từ Vựng #${generatedPin}`;
+
+    if (roomsDb[generatedPin] && roomsDb[generatedPin].status !== 'ENDED') {
+      showToast(`Mã phòng ${generatedPin} đang tồn tại. Vui lòng chọn mã phòng khác.`, 'error');
+      return;
+    }
+
+    const teacherEntry = currentUser
+      ? buildLobbyPlayerEntry(currentUser, { name: currentUser.name || 'Giáo viên', role: 'teacher', ready: true })
+      : null;
+
+    const newRoomObj = {
+      pin: generatedPin,
+      name: cleanName,
+      pass: cleanPass,
+      teacher: currentUser?.username || 'teacher_ielts',
+      status: 'LOBBY',
+      maxPlayers: 30,
+      startedAt: null,
+      lobbyPlayers: teacherEntry ? { [currentUser.username]: teacherEntry } : {},
+      chatMessages: [],
+      rawVocab: DEFAULT_VOCAB_TEXT,
+      players: {}
+    };
+
+    setRoomsDb(prev => ({
+      ...prev,
+      [generatedPin]: newRoomObj
+    }));
+    setCurrentRoomPin(generatedPin);
+    setJoinedRoomPin(generatedPin);
+    setHostRoomDraft({ pin: generatedPin, name: cleanName, pass: cleanPass });
+    setShowCreateRoomModal(false);
+    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới' });
+
+    dispatchSyncAction('UPSERT_ROOM', { pin: generatedPin, updates: newRoomObj });
+    showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} • Pass: ${cleanPass})!`);
+
+    if (currentUser?.role === 'teacher') {
+      setGameSubState('LOBBY');
+      gameRuntimeRef.current.subState = 'LOBBY';
+      setView('GAME_ARENA');
+    }
   };
 
   // ==========================================
@@ -1026,6 +2201,7 @@ export default function App() {
         joinedDate: new Date().toISOString().split('T')[0]
       };
       setUsersDb(prev => ({ ...prev, [uname]: newUser }));
+      dispatchSyncAction('UPSERT_USER', { username: uname, user: newUser });
       setCurrentUser(newUser);
       setView('HOME');
       showToast(`Chào mừng học viên ${fname} đến với LexiPrep Academy!`);
@@ -1048,6 +2224,10 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+    clearInterval(lobbyCountdownTimerRef.current);
+    setLobbyCountdown(null);
     if (examAudioRef.current) {
       examAudioRef.current.pause();
       examAudioRef.current = null;
@@ -1055,6 +2235,8 @@ export default function App() {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    setJoinedRoomPin(null);
+    setGameSubState('JOIN');
     setCurrentUser(null);
     setView('AUTH');
     setAuthForm({ username: '', password: '', fullName: '' });
@@ -1185,58 +2367,83 @@ export default function App() {
     };
 
     setAttempts([newAttempt, ...attempts]);
+    dispatchSyncAction('UPSERT_ATTEMPT', { attempt: newAttempt });
     setSelectedAttemptId(newAttempt.id);
     setView('RESULT_VIEW');
   };
 
-  // AI Writing Grading Trigger
-  const handleGradeWritingWithAI = async (targetAttempt) => {
-    if (!targetAttempt) return;
-    const test = tests.find(t => t.id === targetAttempt.testId);
+  const handleTestGeminiKey = async (keyOverride = aiApiKey) => {
+    const cleanKey = (keyOverride || '').trim();
+    if (!cleanKey) {
+      setApiTestState({ testing: false, ok: false, message: 'Vui lòng nhập API Key trước khi kiểm tra.', model: '' });
+      return;
+    }
+    setApiTestState({ testing: true, ok: null, message: 'Đang kết nối Google Gemini API...', model: '' });
+    try {
+      const usedModel = await testGeminiApiConnection(cleanKey);
+      setAiApiKey(cleanKey);
+      localStorage.setItem('ielts_ai_key', cleanKey);
+      setApiTestState({
+        testing: false,
+        ok: true,
+        model: usedModel,
+        message: `Kết nối thành công! Hệ thống đang dùng model "${usedModel}" và đã lưu API Key.`
+      });
+    } catch (err) {
+      setApiTestState({
+        testing: false,
+        ok: false,
+        model: '',
+        message: err?.message || 'Không thể kết nối với Google Gemini API.'
+      });
+    }
+  };
 
+  // Shared Writing AI Grading helper (Teacher-controlled)
+  const runWritingGradingEngine = async (targetAttempt) => {
+    const test = tests.find(t => t.id === targetAttempt.testId);
+    const cleanKey = (aiApiKey || '').trim();
+
+    if (cleanKey) {
+      setAiGradingStep('Đang kết nối Google Gemini API...');
+      try {
+        const res = await callGeminiWritingGrader({
+          apiKey: cleanKey,
+          task1Prompt: test?.writing?.task1?.prompt,
+          task1Text: targetAttempt.answers?.w1,
+          task2Prompt: test?.writing?.task2?.prompt,
+          task2Text: targetAttempt.answers?.w2
+        });
+        return { ...res, _engineLabel: `Google Gemini (${res._usedModel || 'Live API'})` };
+      } catch (apiErr) {
+        console.warn('Gemini API error:', apiErr);
+        showToast(`Gemini API lỗi: ${apiErr.message}`, 'error');
+        setAiGradingStep(`API lỗi (${apiErr.message}) — chuyển sang bộ chấm tích hợp...`);
+        await new Promise(r => setTimeout(r, 900));
+      }
+    } else {
+      await new Promise(r => setTimeout(r, 600));
+      setAiGradingStep('Đang phân tích cấu trúc & đối chiếu 4 tiêu chí IELTS...');
+      await new Promise(r => setTimeout(r, 700));
+    }
+
+    const fallback = simulateAIWritingGrading({
+      _task1Prompt: test?.writing?.task1?.prompt,
+      task1Text: targetAttempt.answers?.w1,
+      _task2Prompt: test?.writing?.task2?.prompt,
+      task2Text: targetAttempt.answers?.w2
+    });
+    return { ...fallback, _engineLabel: 'AI Examiner Tích Hợp (Offline)' };
+  };
+
+  // AI Writing Grading Trigger (Teacher only)
+  const handleGradeWritingWithAI = async (targetAttempt) => {
+    if (!targetAttempt || currentUser?.role !== 'teacher') return;
     setIsGradingAI(true);
     setAiGradingStep('Khởi tạo AI IELTS Senior Examiner...');
 
     try {
-      let aiResult;
-      if (aiApiKey && aiApiKey.trim()) {
-        setAiGradingStep('Đang kết nối Google Gemini API...');
-        try {
-          aiResult = await callGeminiWritingGrader({
-            apiKey: aiApiKey.trim(),
-            task1Prompt: test?.writing?.task1?.prompt,
-            task1Text: targetAttempt.answers?.w1,
-            task2Prompt: test?.writing?.task2?.prompt,
-            task2Text: targetAttempt.answers?.w2
-          });
-        } catch (apiErr) {
-          console.warn('Gemini API call failed, falling back to simulated grader:', apiErr);
-          setAiGradingStep(`API bận (${apiErr.message}), chuyển sang bộ chấm IELTS thông minh tích hợp...`);
-          await new Promise(r => setTimeout(r, 1000));
-          aiResult = simulateAIWritingGrading({
-            _task1Prompt: test?.writing?.task1?.prompt,
-            task1Text: targetAttempt.answers?.w1,
-            _task2Prompt: test?.writing?.task2?.prompt,
-            task2Text: targetAttempt.answers?.w2
-          });
-        }
-      } else {
-        await new Promise(r => setTimeout(r, 700));
-        setAiGradingStep('Đang phân tích độ dài & cấu trúc đoạn văn Task 1 & Task 2...');
-        await new Promise(r => setTimeout(r, 800));
-        setAiGradingStep('Đang đối chiếu 4 tiêu chí IELTS (TA/TR, CC, LR, GRA)...');
-        await new Promise(r => setTimeout(r, 700));
-        setAiGradingStep('Đang tổng hợp band điểm và xuất nhận xét chi tiết...');
-        await new Promise(r => setTimeout(r, 600));
-
-        aiResult = simulateAIWritingGrading({
-          _task1Prompt: test?.writing?.task1?.prompt,
-          task1Text: targetAttempt.answers?.w1,
-          _task2Prompt: test?.writing?.task2?.prompt,
-          task2Text: targetAttempt.answers?.w2
-        });
-      }
-
+      const aiResult = await runWritingGradingEngine(targetAttempt);
       const t1 = parseFloat(aiResult.task1Band) || 0;
       const t2 = parseFloat(aiResult.task2Band) || 0;
       const writingOverall = parseFloat(aiResult.overallBand) || roundIeltsBand((t1 + t2 * 2) / 3);
@@ -1245,29 +2452,21 @@ export default function App() {
       const rBand = targetAttempt.scores?.reading?.band || 0;
       const finalOverall = parseFloat(((lBand + rBand + writingOverall * 2) / 4).toFixed(1));
 
-      const updatedAttempts = attempts.map(att => {
-        if (att.id === targetAttempt.id) {
-          return {
-            ...att,
-            teacherGraded: true,
-            aiGraded: true,
-            aiDetails: aiResult,
-            scores: {
-              ...att.scores,
-              writing: {
-                task1Band: t1,
-                task2Band: t2,
-                overallBand: writingOverall
-              }
-            },
-            overallBand: finalOverall,
-            teacherFeedback: aiResult.feedback
-          };
-        }
-        return att;
-      });
-
-      setAttempts(updatedAttempts);
+      const updatedAiAttempt = {
+        ...targetAttempt,
+        teacherGraded: true,
+        aiGraded: true,
+        aiDetails: aiResult,
+        scores: {
+          ...targetAttempt.scores,
+          writing: { task1Band: t1, task2Band: t2, overallBand: writingOverall }
+        },
+        overallBand: finalOverall,
+        teacherFeedback: aiResult.feedback
+      };
+      setAttempts(prev => prev.map(att => (att.id === targetAttempt.id ? updatedAiAttempt : att)));
+      dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAiAttempt });
+      showToast(`Đã hoàn tất chấm điểm (${aiResult._engineLabel})!`);
     } catch (err) {
       alert('Có lỗi xảy ra trong quá trình chấm điểm: ' + err.message);
     } finally {
@@ -1278,46 +2477,18 @@ export default function App() {
 
   // Teacher AI grading assist in grading modal
   const handleTeacherAIGrade = async (targetAttempt) => {
-    if (!targetAttempt) return;
-    const test = tests.find(t => t.id === targetAttempt.testId);
-
+    if (!targetAttempt || currentUser?.role !== 'teacher') return;
     setIsGradingAI(true);
     setAiGradingStep('AI đang phân tích bài thi và gợi ý band điểm...');
 
     try {
-      let aiResult;
-      if (aiApiKey && aiApiKey.trim()) {
-        try {
-          aiResult = await callGeminiWritingGrader({
-            apiKey: aiApiKey.trim(),
-            task1Prompt: test?.writing?.task1?.prompt,
-            task1Text: targetAttempt.answers?.w1,
-            task2Prompt: test?.writing?.task2?.prompt,
-            task2Text: targetAttempt.answers?.w2
-          });
-        } catch (_apiErr) {
-          aiResult = simulateAIWritingGrading({
-            _task1Prompt: test?.writing?.task1?.prompt,
-            task1Text: targetAttempt.answers?.w1,
-            _task2Prompt: test?.writing?.task2?.prompt,
-            task2Text: targetAttempt.answers?.w2
-          });
-        }
-      } else {
-        await new Promise(r => setTimeout(r, 1200));
-        aiResult = simulateAIWritingGrading({
-          _task1Prompt: test?.writing?.task1?.prompt,
-          task1Text: targetAttempt.answers?.w1,
-          _task2Prompt: test?.writing?.task2?.prompt,
-          task2Text: targetAttempt.answers?.w2
-        });
-      }
-
+      const aiResult = await runWritingGradingEngine(targetAttempt);
       setGradingScores({
         task1Band: aiResult.task1Band,
         task2Band: aiResult.task2Band,
         feedback: aiResult.feedback
       });
+      showToast(`Đã điền gợi ý điểm từ ${aiResult._engineLabel}!`);
     } catch (err) {
       alert('Lỗi chấm AI: ' + err.message);
     } finally {
@@ -1337,27 +2508,24 @@ export default function App() {
     const rBand = gradingAttempt.scores.reading.band || 0;
     const finalOverall = parseFloat(((lBand + rBand + writingOverall * 2) / 4).toFixed(1));
 
-    const updatedAttempts = attempts.map(att => {
-      if (att.id === gradingAttempt.id) {
-        return {
-          ...att,
-          teacherGraded: true,
-          scores: {
-            ...att.scores,
-            writing: {
-              task1Band: t1,
-              task2Band: t2,
-              overallBand: writingOverall
-            }
-          },
-          overallBand: finalOverall,
-          teacherFeedback: gradingScores.feedback
-        };
-      }
-      return att;
-    });
+    const updatedAttemptObj = {
+      ...gradingAttempt,
+      teacherGraded: true,
+      scores: {
+        ...gradingAttempt.scores,
+        writing: {
+          task1Band: t1,
+          task2Band: t2,
+          overallBand: writingOverall
+        }
+      },
+      overallBand: finalOverall,
+      teacherFeedback: gradingScores.feedback
+    };
+    const updatedAttempts = attempts.map(att => (att.id === gradingAttempt.id ? updatedAttemptObj : att));
 
     setAttempts(updatedAttempts);
+    dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAttemptObj });
     setGradingAttempt(null);
   };
 
@@ -1630,6 +2798,7 @@ export default function App() {
       setTests([...tests, testForm]);
       showToast(`Đã tạo mới đề thi "${testForm.title}" thành công!`);
     }
+    dispatchSyncAction('UPSERT_TEST', { test: testForm });
     setEditingTest(null);
     setView('TEACHER_DASHBOARD');
   };
@@ -1679,21 +2848,25 @@ export default function App() {
     });
   };
 
-  const initGameCampaign = (pin = currentRoomPin, _userObj = currentUser) => {
-    clearTimeout(autoNextTimerRef.current);
-    clearInterval(wordTimerRef.current);
-
+  const buildRoundQueuesFromRoom = (pin) => {
     const room = roomsDb[pin] || { rawVocab: DEFAULT_VOCAB_TEXT };
     const vocabList = parseRawVocabText(room.rawVocab || DEFAULT_VOCAB_TEXT);
     const shuffled = [...vocabList].sort(() => Math.random() - 0.5);
     const total = shuffled.length;
     const perRound = Math.max(1, Math.min(4, Math.floor(total / 3)));
+    return {
+      1: shuffled.slice(0, perRound),
+      2: shuffled.slice(perRound, perRound * 2),
+      3: shuffled.slice(perRound * 2, perRound * 3)
+    };
+  };
 
-    const q1 = shuffled.slice(0, perRound);
-    const q2 = shuffled.slice(perRound, perRound * 2);
-    const q3 = shuffled.slice(perRound * 2, perRound * 3);
-    const queues = { 1: q1, 2: q2, 3: q3 };
-    const firstQ = q1[0] || null;
+  const initGameCampaign = (pin = joinedRoomPin || currentRoomPin, _userObj = currentUser) => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+
+    const queues = buildRoundQueuesFromRoom(pin);
+    const firstQ = queues[1][0] || null;
     const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
 
     homingLasersRef.current = [];
@@ -1725,13 +2898,32 @@ export default function App() {
     setGameReviewLog([]);
     setActiveQuestion(firstQ);
     resetWordTimer(1);
+    syncLiveMatchProgress({
+      scoreVal: 0,
+      streakVal: 0,
+      livesVal: 3,
+      roundNum: 1,
+      progressText: `Vòng 1/3 • Câu 1/${Math.max(1, queues[1]?.length || 1)}`
+    });
   };
 
   const jumpToGameSandboxRound = (roundNum) => {
+    if (currentUser?.role !== 'teacher') return;
+    const activePin = joinedRoomPin || currentRoomPin;
+    const activeRoom = roomsDb[activePin];
+    const hasStudents = Object.values(activeRoom?.lobbyPlayers || {}).some((p) => p?.role !== 'teacher');
+    if (hasStudents) {
+      showToast('Phòng đã có học sinh — Giáo viên chỉ giám sát Đua Top, không chơi lúc này!', 'info');
+      return;
+    }
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
 
-    const queues = gameRuntimeRef.current.queues;
+    let queues = gameRuntimeRef.current.queues;
+    if (!queues?.[roundNum]?.length) {
+      queues = buildRoundQueuesFromRoom(joinedRoomPin || currentRoomPin);
+      setGameQueues(queues);
+    }
     const queue = queues[roundNum] || [];
     const firstQ = queue[0] || null;
     const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
@@ -1786,6 +2978,13 @@ export default function App() {
     setGameSubState('PLAYING');
     setActiveQuestion(firstQ);
     resetWordTimer(nextR);
+    syncLiveMatchProgress({
+      scoreVal: gameRuntimeRef.current.score,
+      streakVal: gameRuntimeRef.current.combo,
+      livesVal: gameRuntimeRef.current.lives,
+      roundNum: nextR,
+      progressText: `Vòng ${nextR}/3 • Câu 1/${Math.max(1, queue.length)}`
+    });
 
     if (firstQ && nextR === 3) {
       speakWord(firstQ.word);
@@ -1819,6 +3018,13 @@ export default function App() {
       setActiveQuestion(nextQ);
       setGameTypedProgress(nextTyped);
       resetWordTimer(currentRoundNum);
+      syncLiveMatchProgress({
+        scoreVal: finalScore,
+        streakVal: finalCombo,
+        livesVal: rt.lives,
+        roundNum: currentRoundNum,
+        progressText: `Vòng ${currentRoundNum}/3 • Câu ${nextIdx + 1}/${Math.max(1, currentQueue.length)}`
+      });
 
       if (currentRoundNum === 3) {
         speakWord(nextQ.word);
@@ -1830,6 +3036,13 @@ export default function App() {
         rt.subState = 'TRANSITION';
         setGameSubState('TRANSITION');
         setTransitionCountdown(3);
+        syncLiveMatchProgress({
+          scoreVal: finalScore,
+          streakVal: finalCombo,
+          livesVal: rt.lives,
+          roundNum: currentRoundNum,
+          progressText: `Xong Vòng ${currentRoundNum}/3`
+        });
         let countdown = 3;
         clearTimeout(autoNextTimerRef.current);
         const tick = () => {
@@ -1848,6 +3061,16 @@ export default function App() {
         rt.subState = 'GAMEOVER';
         setGameOutcome('VICTORY');
         setGameSubState('GAMEOVER');
+        syncLiveMatchProgress({
+          scoreVal: finalScore,
+          streakVal: finalCombo,
+          livesVal: rt.lives,
+          roundNum: currentRoundNum,
+          progressText: 'Hoàn thành 3 Vòng',
+          finished: true,
+          outcome: 'VICTORY',
+          missedWords: []
+        });
         syncScoreToLeaderboard(
           finalScore,
           rt.isSandbox ? `Hoàn thành Màn ${currentRoundNum} (GV)` : 'Hoàn thành 3 Vòng',
@@ -1886,6 +3109,16 @@ export default function App() {
       rt.questionResolved = true;
       setGameOutcome('LOST');
       setGameSubState('GAMEOVER');
+      syncLiveMatchProgress({
+        scoreVal: rt.score,
+        streakVal: 0,
+        livesVal: 0,
+        roundNum,
+        progressText: `Hết mạng ở Vòng ${roundNum}`,
+        finished: true,
+        outcome: 'LOST',
+        missedWords: q ? [q.word] : []
+      });
       syncScoreToLeaderboard(
         rt.score,
         `Hết mạng ở Vòng ${roundNum}`,
@@ -1897,6 +3130,14 @@ export default function App() {
 
     if (advanceOnSurvive) {
       handleWordCleared(false, rt.score, 0);
+    } else {
+      syncLiveMatchProgress({
+        scoreVal: rt.score,
+        streakVal: 0,
+        livesVal: nextLives,
+        roundNum,
+        progressText: `Vòng ${roundNum}/3 • Câu ${rt.wordIdx + 1}/${Math.max(1, (rt.queues[roundNum] || []).length)}`
+      });
     }
   };
 
@@ -2468,144 +3709,147 @@ export default function App() {
   // ==========================================
   const renderNavbar = () => {
     if (view === 'AUTH') return null;
+    const isTeacher = currentUser?.role === 'teacher';
 
     return (
-      <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-100 sticky top-0 z-50 transition-all shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-          {/* Logo & Brand Name */}
+      <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-100 sticky top-0 z-50 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          {/* Logo & Brand */}
           <div
-            className="flex items-center gap-3 cursor-pointer group"
-            onClick={() => setView(currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME')}
+            className="flex items-center gap-3 cursor-pointer group shrink-0"
+            onClick={() => setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME')}
           >
-            <div className="bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 p-2.5 rounded-2xl shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
               <GraduationCap className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-slate-900 via-indigo-900 to-blue-700 dark:from-white dark:via-indigo-200 dark:to-cyan-300 bg-clip-text text-transparent">
-                  LexiPrep Academy
+                <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">
+                  LexiPrep
                 </span>
-                <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-extrabold px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-500/30">
-                  EDU PRO
+                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-500/30">
+                  IELTS
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Hệ thống Khảo thí & Luyện thi IELTS Trực tuyến</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block leading-none mt-0.5">
+                Nền tảng Luyện thi & Khảo thí Chuẩn Quốc tế
+              </p>
             </div>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/80 text-xs font-bold">
+          {/* Center Segmented Nav */}
+          <nav className="hidden md:flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/70 text-xs font-semibold">
             <button
               onClick={() => setView('HOME')}
-              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                 view === 'HOME'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm border border-slate-200/60 dark:border-slate-700'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <FileText className="w-3.5 h-3.5" /> Phòng Luyện Đề
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Phòng Luyện Đề</span>
             </button>
             <button
-              onClick={() => {
-                initGameCampaign(currentRoomPin, currentUser);
-                setView('GAME_ARENA');
-              }}
-              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              onClick={openStudentGamePortal}
+              className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                 view === 'GAME_ARENA'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Gamepad2 className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" /> Game Từ Vựng
+              <Gamepad2 className="w-3.5 h-3.5" />
+              <span>Game Từ Vựng</span>
             </button>
             <button
               onClick={() => {
                 setSelectedProfileStudent(currentUser?.username);
                 setView('STUDENT_PROFILE');
               }}
-              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                 view === 'STUDENT_PROFILE'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm border border-slate-200/60 dark:border-slate-700'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Hồ Sơ {currentUser?.role === 'teacher' ? 'Học Viên' : 'Của Tôi'}
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>{isTeacher ? 'Hồ Sơ Học Viên' : 'Tiến Trình Của Tôi'}</span>
             </button>
-            {currentUser?.role === 'teacher' && (
+            {isTeacher && (
               <button
                 onClick={() => setView('TEACHER_DASHBOARD')}
-                className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
                   view === 'TEACHER_DASHBOARD' || view === 'EXAM_BUILDER'
                     ? 'bg-amber-500 text-white shadow-sm'
-                    : 'text-amber-700 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-500/15 hover:bg-amber-100/80 dark:hover:bg-amber-500/25'
+                    : 'text-amber-700 dark:text-amber-300 hover:bg-amber-500/10'
                 }`}
               >
-                <ShieldAlert className="w-3.5 h-3.5" /> Quản Trị Giáo Viên
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>Quản Trị Giáo Viên</span>
               </button>
             )}
           </nav>
 
-          {/* Right Header: Dark Mode, AI Key, User Profile, Logout */}
-          <div className="flex items-center gap-2">
+          {/* Right Utility Controls */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setDarkMode(d => !d)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition border border-slate-200/80 dark:border-slate-700"
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition border border-slate-200/80 dark:border-slate-700"
               title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
               aria-label={darkMode ? 'Chế độ sáng' : 'Chế độ tối'}
             >
-              {darkMode ? (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden xl:inline">Sáng</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="hidden xl:inline">Tối</span>
-                </>
-              )}
+              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
+              <span className="hidden xl:inline">{darkMode ? 'Sáng' : 'Tối'}</span>
             </button>
 
-            <button
-              onClick={() => setShowApiKeyModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition border border-slate-200/80 dark:border-slate-700"
-              title="Cấu hình Google Gemini API Key"
-            >
-              <Key className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden lg:inline">AI Examiner</span>
-              <span className={`w-2 h-2 rounded-full ${aiApiKey ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-            </button>
+            {/* AI Key config button strictly for Teacher */}
+            {isTeacher && (
+              <button
+                onClick={() => {
+                  setApiTestState({ testing: false, ok: null, message: '', model: '' });
+                  setShowApiKeyModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition border border-slate-200/80 dark:border-slate-700"
+                title="Cấu hình Google Gemini API Key"
+              >
+                <Key className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden lg:inline">Gemini Key</span>
+                <span className={`w-2 h-2 rounded-full ${aiApiKey?.trim() ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+              </button>
+            )}
 
-            {/* User Profile Pill */}
-            <div
-              onClick={() => {
-                setSelectedProfileStudent(currentUser?.username);
-                setView('STUDENT_PROFILE');
-              }}
-              className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 py-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 cursor-pointer transition"
-              title="Xem hồ sơ học tập và lịch sử thi"
-            >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center font-extrabold text-xs text-white uppercase shadow-sm">
-                {currentUser?.name ? currentUser.name[0] : 'U'}
+            <div className="flex items-center gap-1.5">
+              <div
+                onClick={() => {
+                  setSelectedProfileStudent(currentUser?.username);
+                  setView('STUDENT_PROFILE');
+                }}
+                className="flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                title="Xem hồ sơ học tập"
+              >
+                <UserAvatarBadge user={currentUser} sizeClass="w-8 h-8" textClass="text-xs" rounded="rounded-lg" />
+                <div className="text-left text-xs hidden sm:block">
+                  <p className="font-bold text-slate-800 dark:text-slate-100 leading-tight truncate max-w-[130px]">{currentUser?.name}</p>
+                  <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                    {isTeacher ? 'Giáo viên' : 'Học viên'}
+                  </p>
+                </div>
               </div>
-              <div className="text-left text-xs hidden sm:block">
-                <p className="font-bold text-slate-800 dark:text-slate-100 leading-tight truncate max-w-[130px]">{currentUser?.name}</p>
-                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                  currentUser?.role === 'teacher'
-                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300'
-                    : 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
-                }`}>
-                  {currentUser?.role === 'teacher' ? 'Giáo viên' : 'Học viên'}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowAvatarModal(true)}
+                className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 hover:text-indigo-600 dark:hover:text-indigo-300 transition border border-slate-200/70 dark:border-slate-700/70"
+                title="Cài đặt ảnh đại diện & đầu nhân vật Game"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Logout button */}
             <button
               onClick={handleLogout}
-              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 dark:text-slate-400 transition border border-slate-200/80 dark:border-slate-700"
-              title="Đăng xuất khỏi hệ thống"
+              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 hover:text-rose-600 dark:hover:text-rose-400 transition"
+              title="Đăng xuất"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -2613,53 +3857,50 @@ export default function App() {
         </div>
 
         {/* Mobile Quick Nav Strip */}
-        <div className="md:hidden border-t border-slate-200/70 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto text-[11px] font-bold">
+        <div className="md:hidden border-t border-slate-200/70 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto text-xs font-semibold">
           <button
             onClick={() => setView('HOME')}
-            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
               view === 'HOME'
                 ? 'bg-indigo-600 text-white'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
             }`}
           >
-            <FileText className="w-3 h-3" /> Phòng Đề
+            <BookOpen className="w-3.5 h-3.5" /> Luyện Đề
           </button>
           <button
-            onClick={() => {
-              initGameCampaign(currentRoomPin, currentUser);
-              setView('GAME_ARENA');
-            }}
-            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition flex items-center gap-1 ${
+            onClick={openStudentGamePortal}
+            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
               view === 'GAME_ARENA'
-                ? 'bg-purple-600 text-white'
+                ? 'bg-indigo-600 text-white'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
             }`}
           >
-            <Gamepad2 className="w-3 h-3" /> Game Từ Vựng
+            <Gamepad2 className="w-3.5 h-3.5" /> Game Từ Vựng
           </button>
           <button
             onClick={() => {
               setSelectedProfileStudent(currentUser?.username);
               setView('STUDENT_PROFILE');
             }}
-            className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
               view === 'STUDENT_PROFILE'
                 ? 'bg-indigo-600 text-white'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
             }`}
           >
-            <UserCheck className="w-3 h-3" /> Hồ Sơ
+            <UserCheck className="w-3.5 h-3.5" /> Tiến Trình
           </button>
-          {currentUser?.role === 'teacher' && (
+          {isTeacher && (
             <button
               onClick={() => setView('TEACHER_DASHBOARD')}
-              className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition flex items-center gap-1 ${
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
                 view === 'TEACHER_DASHBOARD' || view === 'EXAM_BUILDER'
                   ? 'bg-amber-500 text-white'
                   : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300'
               }`}
             >
-              <ShieldAlert className="w-3 h-3" /> Giáo Viên
+              <ShieldAlert className="w-3.5 h-3.5" /> Giáo Viên
             </button>
           )}
         </div>
@@ -2668,133 +3909,113 @@ export default function App() {
   };
 
   // ==========================================
-  // RENDER AUTH SCREEN (STUDENT-FOCUSED EDTECH PORTAL)
+  // RENDER AUTH SCREEN (MODERN EDTECH PORTAL)
   // ==========================================
   const renderAuthScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-100/50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between p-4 sm:p-8 select-none relative overflow-hidden">
-      {/* Soft Background Accents */}
-      <div className="absolute top-[-8%] left-[-5%] w-[450px] h-[450px] bg-indigo-400/15 dark:bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-[-8%] right-[-5%] w-[450px] h-[450px] bg-cyan-400/15 dark:bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none" />
-
-      {/* Top Brand Header */}
-      <div className="max-w-6xl w-full mx-auto flex items-center justify-between pt-2 z-10">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 p-2.5 rounded-2xl shadow-lg shadow-indigo-500/20 flex items-center justify-center">
-            <GraduationCap className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">LexiPrep Academy</span>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Nền tảng Học tập & Khảo thí IELTS Thế hệ mới</p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between p-4 sm:p-8 select-none transition-colors">
+      {/* Top Bar */}
+      <div className="max-w-6xl w-full mx-auto flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setDarkMode(d => !d)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-white/90 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm"
-            title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
-          >
-            {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-indigo-600" />}
-            <span>{darkMode ? 'Chế độ Sáng' : 'Chế độ Tối'}</span>
-          </button>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200/80 dark:border-indigo-500/30 px-3.5 py-1.5 rounded-full">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Chuẩn Khảo Thí Quốc Tế
-          </span>
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
+            <GraduationCap className="w-5 h-5 text-white" />
+          </div>
+          <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">LexiPrep Academy</span>
         </div>
+        <button
+          type="button"
+          onClick={() => setDarkMode(d => !d)}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition shadow-sm"
+          title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+        >
+          {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
+          <span>{darkMode ? 'Giao diện Sáng' : 'Giao diện Tối'}</span>
+        </button>
       </div>
 
-      {/* Main Split Portal Card */}
-      <div className="max-w-5xl w-full mx-auto my-auto py-6 z-10">
-        <div className="bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl shadow-indigo-950/10 dark:shadow-black/50 border border-slate-200/80 dark:border-slate-800 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-          {/* Left Showcase Column (7 cols) */}
-          <div className="lg:col-span-7 bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 text-white p-8 sm:p-12 flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
-
-            <div>
-              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/15 px-3.5 py-1.5 rounded-full text-xs font-bold text-cyan-300 mb-6 backdrop-blur-sm">
-                <Award className="w-4 h-4 text-amber-300" /> Hệ Thống Đào Tạo & Thi Thử Toàn Diện
+      {/* Main Centered Split Card */}
+      <div className="max-w-5xl w-full mx-auto my-auto py-6">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/60 dark:shadow-black/40 border border-slate-200/80 dark:border-slate-800 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+          {/* Left Educational Intro */}
+          <div className="lg:col-span-6 bg-slate-900 dark:bg-slate-950 text-white p-8 sm:p-11 flex flex-col justify-between relative overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-800">
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 bg-indigo-500/15 border border-indigo-400/30 px-3 py-1 rounded-full text-xs font-semibold text-indigo-300 mb-6">
+                <Award className="w-3.5 h-3.5" /> Hệ thống Khảo thí IELTS trên Máy tính
               </div>
 
-              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight mb-4">
-                Chinh phục mục tiêu <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-amber-300">IELTS Band 8.0+</span> dễ dàng hơn mỗi ngày.
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug mb-4">
+                Luyện thi chuẩn quốc tế, theo dõi lộ trình tăng Band mỗi ngày.
               </h1>
 
-              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-8">
-                Tham gia phòng thi mô phỏng máy tính chuẩn quốc tế, nhận chấm điểm & sửa bài Writing chi tiết từ AI Examiner, theo dõi tiến trình hồ sơ học tập và rèn luyện phản xạ từ vựng qua trò chơi tương tác sau khi đăng nhập.
+              <p className="text-slate-400 text-sm leading-relaxed mb-8">
+                Môi trường làm bài thi thử tách đôi màn hình mượt mà như phòng thi thật, kèm kho từ vựng tương tác theo lớp học.
               </p>
 
-              {/* Feature Highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                  <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-cyan-300 flex items-center justify-center mb-2.5">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-300 flex items-center justify-center shrink-0 border border-blue-500/20">
                     <Headphones className="w-4 h-4" />
                   </div>
-                  <h3 className="font-bold text-sm text-white">Thi Thử 3 Kỹ Năng</h3>
-                  <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                    Giao diện chia đôi màn hình Reading, Highlight ghi chú & đếm từ tự động.
-                  </p>
-                </div>
-
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                  <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center mb-2.5">
-                    <Bot className="w-4 h-4" />
+                  <div>
+                    <h3 className="font-bold text-sm text-white">Thi thử Listening, Reading & Writing</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Highlight trực tiếp trên đoạn văn, giới hạn lượt nghe và bộ đếm từ tự động.
+                    </p>
                   </div>
-                  <h3 className="font-bold text-sm text-white">AI Writing Examiner</h3>
-                  <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                    Phân tích chi tiết 4 tiêu chí chấm thi chuẩn quốc tế chỉ trong vài giây.
-                  </p>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center mb-2.5">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-500/20">
                     <TrendingUp className="w-4 h-4" />
                   </div>
-                  <h3 className="font-bold text-sm text-white">Hồ Sơ Học Tập Cá Nhân</h3>
-                  <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                    Lưu trữ toàn bộ lịch sử các lần thi, biểu đồ tăng trưởng & nhận xét từ giáo viên.
-                  </p>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">Biểu đồ tiến trình & nhận xét chi tiết</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Lưu lịch sử làm bài theo từng kỹ năng và phản hồi sát sao từ giáo viên.
+                    </p>
+                  </div>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center mb-2.5">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/20">
                     <Gamepad2 className="w-4 h-4" />
                   </div>
-                  <h3 className="font-bold text-sm text-white">Đấu Trường Từ Vựng</h3>
-                  <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                    Ôn luyện từ vựng học thuật qua 3 vòng thử thách không gian đầy kịch tính.
-                  </p>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">Đấu trường Từ Vựng theo phòng lớp</h3>
+                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Vào sảnh chờ trực tiếp cùng giáo viên và bạn học qua mã PIN phòng đấu.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 pt-5 border-t border-white/10 flex items-center justify-between text-xs text-slate-300">
-              <span>✨ Hơn 1,500+ học viên đang luyện tập</span>
-              <span className="font-semibold text-cyan-300">Bảo mật & Chống gian lận thông minh</span>
+            <div className="mt-8 pt-5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 relative z-10">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" /> Chế độ thi bảo mật
+              </span>
+              <span>Cambridge / IDP Format</span>
             </div>
           </div>
 
-          {/* Right Form Column (5 cols) — Student Login & Registration */}
-          <div className="lg:col-span-5 p-8 sm:p-10 flex flex-col justify-between bg-white dark:bg-slate-900">
+          {/* Right Form Panel */}
+          <div className="lg:col-span-6 p-8 sm:p-11 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                    {authMode === 'login' ? 'Đăng Nhập Học Viên' : 'Đăng Ký Tài Khoản'}
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {authMode === 'login'
-                      ? 'Nhập thông tin tài khoản để bắt đầu học & làm bài'
-                      : 'Tạo tài khoản học sinh mới hoàn toàn miễn phí'}
-                  </p>
-                </div>
-              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
+                {authMode === 'login' ? 'Đăng nhập tài khoản' : 'Tạo tài khoản học viên'}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-6">
+                {authMode === 'login'
+                  ? 'Sử dụng tài khoản học viên hoặc giáo viên để tiếp tục.'
+                  : 'Đăng ký nhanh để bắt đầu làm bài thi thử và tham gia lớp học.'}
+              </p>
 
-              {/* Mode Switcher Tabs (Login / Register) */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/70 dark:border-slate-700 text-xs font-bold mb-6">
+              {/* Auth Mode Toggle */}
+              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold mb-6">
                 <button
                   type="button"
                   onClick={() => { setAuthMode('login'); setAuthError(''); }}
-                  className={`py-2.5 rounded-xl transition ${
+                  className={`py-2 rounded-lg transition ${
                     authMode === 'login'
                       ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -2805,19 +4026,19 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => { setAuthMode('register'); setAuthError(''); }}
-                  className={`py-2.5 rounded-xl transition ${
+                  className={`py-2 rounded-lg transition ${
                     authMode === 'register'
                       ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  Tạo Tài Khoản Mới
+                  Đăng Ký Mới
                 </button>
               </div>
 
               {authError && (
-                <div className="p-3.5 bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 rounded-2xl text-xs text-rose-700 dark:text-rose-300 mb-5 flex items-center gap-2 font-medium">
-                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" />
+                <div className="p-3 bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 rounded-xl text-xs text-rose-700 dark:text-rose-300 mb-4 flex items-center gap-2 font-medium">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>{authError}</span>
                 </div>
               )}
@@ -2825,65 +4046,75 @@ export default function App() {
               <form onSubmit={handleAuthSubmit} className="space-y-4">
                 {authMode === 'register' && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Họ và Tên học sinh:</label>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Họ và tên</label>
                     <input
                       type="text"
                       required
                       placeholder="VD: Nguyễn Minh Anh"
                       value={authForm.fullName}
                       onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Tên đăng nhập (Username):</label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Tên đăng nhập</label>
                   <input
                     type="text"
                     required
-                    placeholder="Nhập tên đăng nhập..."
+                    placeholder="Nhập username..."
                     value={authForm.username}
                     onChange={e => setAuthForm({ ...authForm, username: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Mật khẩu:</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Nhập mật khẩu..."
-                    value={authForm.password}
-                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
-                  />
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Mật khẩu</label>
+                  <div className="relative">
+                    <input
+                      type={showAuthPass ? 'text' : 'password'}
+                      required
+                      placeholder="Nhập mật khẩu..."
+                      value={authForm.password}
+                      onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthPass(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      tabIndex={-1}
+                    >
+                      {showAuthPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-extrabold py-3.5 rounded-xl transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 text-xs tracking-wide mt-2 active:scale-98"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-2 text-sm mt-2"
                 >
-                  {authMode === 'login' ? 'ĐĂNG NHẬP VÀO HỆ THỐNG' : 'ĐĂNG KÝ TÀI KHOẢN HỌC VIÊN'}
+                  <span>{authMode === 'login' ? 'Đăng Nhập' : 'Tạo Tài Khoản'}</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             </div>
 
-            {/* Quick Credential Pre-fill Helpers */}
-            <div className="mt-8 pt-5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
-              <p className="font-bold text-slate-700 dark:text-slate-300 mb-2">⚡ Chọn nhanh tài khoản có sẵn để trải nghiệm:</p>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="mt-7 pt-5 border-t border-slate-200/80 dark:border-slate-800">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2.5">Tài khoản dùng thử nhanh:</p>
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
                     setAuthMode('login');
                     setAuthForm({ username: 'hocsinh_01', password: '123456', fullName: '' });
                   }}
-                  className="px-3 py-2 bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 rounded-xl transition font-semibold text-left"
+                  className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 border border-slate-200 dark:border-slate-700 rounded-xl transition text-left"
                 >
-                  <span className="block font-extrabold text-indigo-900 dark:text-indigo-200">🎓 Học sinh mẫu</span>
-                  <span className="font-mono text-[10px]">hocsinh_01 / 123456</span>
+                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-100">Học viên mẫu</span>
+                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">hocsinh_01 / 123456</span>
                 </button>
                 <button
                   type="button"
@@ -2891,241 +4122,230 @@ export default function App() {
                     setAuthMode('login');
                     setAuthForm({ username: 'teacher_ielts', password: '123456', fullName: '' });
                   }}
-                  className="px-3 py-2 bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 rounded-xl transition font-semibold text-left"
+                  className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-amber-50 dark:hover:bg-amber-500/15 border border-slate-200 dark:border-slate-700 rounded-xl transition text-left"
                 >
-                  <span className="block font-extrabold text-amber-900 dark:text-amber-200">👩‍🏫 TK Giáo viên</span>
-                  <span className="font-mono text-[10px]">teacher_ielts / 123456</span>
+                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-100">Giáo viên</span>
+                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">teacher_ielts / 123456</span>
                 </button>
               </div>
-              <p className="text-[10px] text-slate-400 mt-2 italic">
-                * Lưu ý: Khi đăng nhập bằng tài khoản Giáo viên, hệ thống sẽ tự động chuyển thẳng sang giao diện Quản trị Giáo viên.
-              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="text-center py-2 text-xs text-slate-500 dark:text-slate-400 font-medium z-10">
-        LexiPrep Academy • Hệ thống Luyện thi & Khảo thí IELTS Trực tuyến • © 2026
-      </div>
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+        LexiPrep Academy • Hệ thống Luyện thi IELTS • 2026
+      </p>
     </div>
   );
 
   // ==========================================
-  // RENDER STUDENT HOME PAGE (EDUCATIONAL DASHBOARD)
+  // RENDER STUDENT HOME PAGE (CLEAN EDTECH DASHBOARD)
   // ==========================================
   const renderStudentHome = () => {
     const studentAttempts = attempts.filter(a => a.studentId === currentUser?.username);
+    const gradedBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number' && b > 0);
+    const bestOverallBand = gradedBands.length > 0 ? Math.max(...gradedBands) : null;
 
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Hero Welcome Banner */}
-        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-10 text-white shadow-xl mb-8 border border-slate-800 relative overflow-hidden">
-          <div className="max-w-2xl z-10 relative">
-            <div className="inline-flex items-center gap-2 bg-blue-500/20 text-cyan-300 border border-blue-400/30 px-3.5 py-1 rounded-full text-xs font-bold mb-3 backdrop-blur">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Trung Tâm Luyện Thi Toàn Diện
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {/* Clean Modern Hero Banner */}
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-9 text-white border border-slate-800 shadow-lg relative overflow-hidden">
+          <div className="absolute -right-12 -top-12 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-1.5 bg-white/10 text-indigo-200 border border-white/15 px-3 py-1 rounded-full text-xs font-semibold mb-3">
+                <BookOpen className="w-3.5 h-3.5" /> Không gian học tập cá nhân
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                Chào {currentUser?.name || 'Học viên'}, sẵn sàng luyện đề hôm nay?
+              </h1>
+              <p className="text-slate-300 text-sm leading-relaxed mt-2">
+                Trải nghiệm phòng thi Computer-Delivered IELTS chuẩn quốc tế với chia đôi màn hình đọc hiểu, ghi chú highlight và theo dõi kết quả từ giáo viên.
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold mb-3 tracking-tight">
-              Xin chào, {currentUser?.name || 'Học viên'}! 👋
-            </h1>
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-6">
-              Bạn đang ở chế độ làm bài thi thử chuẩn <b>Computer-Delivered IELTS</b>. Hệ thống hỗ trợ chia đôi màn hình, highlight đoạn văn, đếm từ tự động và tích hợp sẵn <b>AI Examiner</b> chấm điểm Writing tức thì!
-            </p>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              {tests.length > 0 && (
+                <button
+                  onClick={() => startExam(tests[0].id)}
+                  className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-xl shadow-md transition flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-white" /> Làm Đề Thi Thử
+                </button>
+              )}
               <button
-                onClick={() => {
-                  setSelectedProfileStudent(currentUser?.username);
-                  setView('STUDENT_PROFILE');
-                }}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95"
+                onClick={openStudentGamePortal}
+                className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-xs sm:text-sm px-5 py-3 rounded-xl transition flex items-center gap-2 backdrop-blur"
               >
-                <GraduationCap className="w-4 h-4 text-cyan-300" /> Xem Hồ Sơ & Lịch Sử Thi
-              </button>
-              <button
-                onClick={() => {
-                  initGameCampaign(currentRoomPin, currentUser);
-                  setView('GAME_ARENA');
-                }}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 active:scale-95"
-              >
-                <Gamepad2 className="w-4 h-4" /> Đấu Trường Game (3 Vòng)
-              </button>
-              <button
-                onClick={() => {
-                  if (tests.length > 0) startExam(tests[0].id);
-                }}
-                className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 backdrop-blur"
-              >
-                <Play className="w-4 h-4 fill-white" /> Thi Thử Ngay (Test 01)
+                <Gamepad2 className="w-4 h-4 text-cyan-300" /> Vào Phòng Game Từ Vựng
               </button>
             </div>
           </div>
         </div>
 
-        {/* Quick Stat Highlights */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
-            <div className="p-3 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-xl">
-              <FileText className="w-5 h-5" />
+        {/* Clean 4-Card Learning Metrics (No Room PIN / No Self-AI clutter) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Bài thi đã làm</p>
-              <p className="text-xl font-extrabold text-slate-900 dark:text-white">{studentAttempts.length}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Đề thi khả dụng</p>
+              <p className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">{tests.length}</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Bài thi đã nộp</p>
+              <p className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">{studentAttempts.length}</p>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <Award className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Band điểm cao nhất</p>
-              <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                {studentAttempts.length > 0
-                  ? Math.max(...studentAttempts.map(a => a.overallBand || 0)) || 'Chờ chấm'
-                  : '8.5'}
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Band cao nhất</p>
+              <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                {bestOverallBand !== null ? bestOverallBand : '--'}
               </p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
-            <div className="p-3 bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 rounded-xl">
-              <Gamepad2 className="w-5 h-5" />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Target className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase">Phòng Game PIN</p>
-              <p className="text-xl font-extrabold text-purple-600 dark:text-purple-400 font-mono">{currentRoomPin}</p>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
-            <div className="p-3 bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-xl">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase">AI Chấm Điểm</p>
-              <p className="text-xl font-extrabold text-amber-600 dark:text-amber-400">Sẵn sàng</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mục tiêu Band</p>
+              <p className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">{currentUser?.targetBand || '8.0'}</p>
             </div>
           </div>
         </div>
 
-        {/* Available Tests List */}
-        <div className="mb-10">
+        {/* Available Mock Tests */}
+        <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              Danh Sách Đề Thi Khả Dụng
-            </h2>
-            <span className="text-xs text-slate-500 dark:text-slate-400">Chuẩn hóa cấu trúc Cambridge & IDP</span>
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Bộ Đề Thi Thử IELTS</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Chọn một đề thi để bắt đầu làm bài theo chuẩn thời gian</p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {tests.map(test => (
-              <div key={test.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col justify-between hover:shadow-md transition">
+              <div
+                key={test.id}
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col justify-between hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all"
+              >
                 <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 text-[11px] font-bold px-2.5 py-1 rounded-md border border-blue-100 dark:border-blue-500/30">
-                      Academic Full Mock
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold px-2.5 py-1 rounded-lg">
+                      IELTS Academic
                     </span>
-                    <span className="text-xs text-slate-400 font-medium">{test.createdAt}</span>
+                    <span className="text-xs text-slate-400">{test.createdAt}</span>
                   </div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base mb-2 leading-snug">{test.title}</h3>
-                  <p className="text-slate-600 dark:text-slate-400 text-xs mb-4 line-clamp-2 leading-relaxed">{test.description}</p>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5 leading-snug">{test.title}</h3>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs mb-5 line-clamp-2 leading-relaxed">{test.description}</p>
 
-                  <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 mb-4 text-center">
+                  <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800 text-xs mb-5 text-center">
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Listening</p>
-                      <p className="font-bold text-slate-800 dark:text-slate-100">{test.listening?.questions?.length || 0} câu</p>
+                      <p className="text-[11px] text-slate-400 font-medium">Listening</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">{test.listening?.questions?.length || 0} câu</p>
+                    </div>
+                    <div className="border-x border-slate-100 dark:border-slate-800">
+                      <p className="text-[11px] text-slate-400 font-medium">Reading</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">{test.reading?.questions?.length || 0} câu</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Reading</p>
-                      <p className="font-bold text-slate-800 dark:text-slate-100">{test.reading?.questions?.length || 0} câu</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Writing</p>
-                      <p className="font-bold text-slate-800 dark:text-slate-100">2 Tasks (AI)</p>
+                      <p className="text-[11px] text-slate-400 font-medium">Writing</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">2 Tasks</p>
                     </div>
                   </div>
                 </div>
 
                 <button
                   onClick={() => startExam(test.id)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm"
                 >
                   <Play className="w-3.5 h-3.5 fill-white" />
-                  Bắt Đầu Làm Bài Thi
+                  <span>Bắt Đầu Làm Bài</span>
                 </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Student Attempts & AI Report History */}
+        {/* Clean Student Attempt History */}
         <div>
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Award className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              Lịch Sử Làm Bài & Báo Cáo AI Examiner
-            </h2>
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Lịch Sử Làm Bài</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Theo dõi các bài thi bạn đã hoàn thành</p>
+            </div>
             <button
               onClick={() => {
                 setSelectedProfileStudent(currentUser?.username);
                 setView('STUDENT_PROFILE');
               }}
-              className="text-xs font-bold text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 flex items-center gap-1.5 transition bg-blue-50 dark:bg-blue-500/15 hover:bg-blue-100 dark:hover:bg-blue-500/25 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-500/30"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 flex items-center gap-1.5 transition px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
             >
-              <TrendingUp className="w-4 h-4" /> Xem Tiến Trình & Hồ Sơ Toàn Diện →
+              <TrendingUp className="w-4 h-4" /> Xem Hồ Sơ & Biểu Đồ Tiến Độ
             </button>
           </div>
 
           {studentAttempts.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
-              Bạn chưa tham gia bài thi nào. Hãy chọn một đề thi ở trên để bắt đầu!
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-10 text-center text-slate-500 dark:text-slate-400 text-sm">
+              Bạn chưa hoàn thành bài thi nào. Hãy chọn một đề thi ở phía trên để bắt đầu!
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-                  <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
+                  <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 font-semibold">
                     <tr>
-                      <th className="px-6 py-3.5">Tên Bài Thi</th>
+                      <th className="px-6 py-3.5">Tên Đề Thi</th>
                       <th className="px-6 py-3.5">Thời Gian Nộp</th>
                       <th className="px-6 py-3.5 text-center">Listening</th>
                       <th className="px-6 py-3.5 text-center">Reading</th>
                       <th className="px-6 py-3.5 text-center">Writing</th>
-                      <th className="px-6 py-3.5 text-center">Band Overall</th>
-                      <th className="px-6 py-3.5 text-right">Thao Tác</th>
+                      <th className="px-6 py-3.5 text-center">Overall</th>
+                      <th className="px-6 py-3.5 text-right">Chi Tiết</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {studentAttempts.map(att => (
-                      <tr key={att.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                      <tr key={att.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
                         <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{att.testTitle}</td>
                         <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{att.submittedAt}</td>
-                        <td className="px-6 py-4 text-center font-bold text-slate-800 dark:text-slate-100">
+                        <td className="px-6 py-4 text-center font-bold text-slate-800 dark:text-slate-100 tabular-nums">
                           {att.scores.listening.band !== null ? att.scores.listening.band : '-'}
                         </td>
-                        <td className="px-6 py-4 text-center font-bold text-slate-800 dark:text-slate-100">
+                        <td className="px-6 py-4 text-center font-bold text-slate-800 dark:text-slate-100 tabular-nums">
                           {att.scores.reading.band !== null ? att.scores.reading.band : '-'}
                         </td>
                         <td className="px-6 py-4 text-center">
                           {att.teacherGraded ? (
-                            <span className="font-bold text-slate-800 dark:text-slate-100 inline-flex items-center gap-1">
-                              {att.aiGraded && <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" title="Đã chấm bằng AI" />}
+                            <span className="font-bold text-slate-800 dark:text-slate-100 tabular-nums">
                               {att.scores.writing.overallBand}
                             </span>
                           ) : (
-                            <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-500/30">Chờ chấm</span>
+                            <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2.5 py-0.5 rounded-full font-semibold">Chờ chấm</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-center">
                           {att.overallBand ? (
-                            <span className="text-sm font-extrabold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/15 px-2.5 py-1 rounded-lg">
+                            <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-2.5 py-1 rounded-lg tabular-nums">
                               {att.overallBand}
                             </span>
                           ) : (
-                            <span className="text-xs text-slate-400">Đang chấm</span>
+                            <span className="text-xs text-slate-400">Chờ chấm</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -3135,9 +4355,9 @@ export default function App() {
                               setPreviousView('HOME');
                               setView('RESULT_VIEW');
                             }}
-                            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-3 py-1.5 rounded-lg font-semibold transition"
+                            className="bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-slate-700 dark:text-slate-200 text-xs px-3.5 py-1.5 rounded-lg font-semibold transition"
                           >
-                            Chi Tiết & AI
+                            Xem Bài Làm
                           </button>
                         </td>
                       </tr>
@@ -3153,20 +4373,915 @@ export default function App() {
   };
 
   // ==========================================
-  // RENDER GAME ARENA VIEW (CHICKEN INVADERS 3 ROUNDS)
+  // RENDER GAME ARENA VIEW (AMONG US LOBBY + 3-ROUND SPACE ARENA)
   // ==========================================
   const renderGameArena = () => {
     const isTeacher = currentUser?.role === 'teacher';
-    const room = roomsDb[currentRoomPin] || { pin: currentRoomPin, pass: 'ielts', players: {} };
+    const activePin = joinedRoomPin || currentRoomPin;
+    const room = normalizeRoomObject(roomsDb[activePin], activePin);
+    const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin));
+    const roomChatMessages = Array.isArray(room.chatMessages) ? room.chatMessages : [];
     const leaderboardPlayers = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
+    const lobbyPlayersList = Object.values(room.lobbyPlayers || {}).sort((a, b) => {
+      if (a.role === 'teacher' && b.role !== 'teacher') return -1;
+      if (b.role === 'teacher' && a.role !== 'teacher') return 1;
+      return (a.joinedAt || 0) - (b.joinedAt || 0);
+    });
+    const myLobbyEntry = currentUser?.username ? room.lobbyPlayers?.[currentUser.username] : null;
+    const roomVocabCount = parseRawVocabText(room.rawVocab || DEFAULT_VOCAB_TEXT).length;
+    const readyCount = lobbyPlayersList.filter(p => p.ready || p.role === 'teacher').length;
+    const studentLobbyPlayers = lobbyPlayersList.filter(p => p.role !== 'teacher');
+    const hasStudentsInLobby = studentLobbyPlayers.length > 0;
+    const activeCrewColorId = myLobbyEntry?.colorId || myCrewColor;
+    const myAvatarUrl = currentUser?.avatarUrl || '';
     const timePct = Math.max(0, Math.min(100, (gameTimeLeft / Math.max(1, gameTimeLimit)) * 100));
     const isLowTime = gameTimeLeft <= 5;
     const isMidTime = gameTimeLeft <= 10 && gameTimeLeft > 5;
+
     const exitGame = () => {
       clearTimeout(autoNextTimerRef.current);
       clearInterval(wordTimerRef.current);
+      clearInterval(lobbyCountdownTimerRef.current);
+      setLobbyCountdown(null);
       setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
     };
+
+    const renderCrewColorPicker = (compact = false) => {
+      const swatchSize = compact ? 'w-5 h-5' : 'w-7 h-7';
+      const applyColor = (colorId) => {
+        if (gameSubState === 'JOIN') {
+          setMyCrewColor(colorId);
+        } else {
+          handleChangeCrewColor(colorId);
+        }
+      };
+
+      return (
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          {CREWMATE_COLORS.map(c => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => applyColor(c.id)}
+              className={`${swatchSize} rounded-full border-2 transition ${
+                activeCrewColorId === c.id ? 'border-white scale-115 shadow-lg' : 'border-slate-700 opacity-75 hover:opacity-100'
+              }`}
+              style={{ backgroundColor: c.fill }}
+              title={c.label}
+            />
+          ))}
+          {myAvatarUrl ? (
+            <div className="flex items-center gap-1.5 pl-1 border-l border-slate-700/80">
+              <button
+                type="button"
+                onClick={() => applyColor('avatar')}
+                className={`${compact ? 'w-6 h-6' : 'w-8 h-8'} rounded-full overflow-hidden border-2 transition bg-slate-800 ${
+                  activeCrewColorId === 'avatar'
+                    ? 'border-cyan-300 ring-2 ring-cyan-400/60 scale-115 shadow-lg'
+                    : 'border-slate-600 opacity-85 hover:opacity-100'
+                }`}
+                title="Dùng Ảnh Avatar trên đầu nhân vật"
+              >
+                <img src={myAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAvatarModal(true)}
+                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-bold text-cyan-300 transition flex items-center gap-1"
+                title="Đổi ảnh Avatar khuôn mặt"
+              >
+                <Camera className="w-3 h-3" /> Đổi ảnh
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowAvatarModal(true)}
+              className="ml-1 px-2.5 py-1 rounded-full border border-dashed border-cyan-500/60 bg-cyan-500/10 hover:bg-cyan-500/20 text-[10px] font-bold text-cyan-300 transition flex items-center gap-1"
+              title="Tải ảnh khuôn mặt để gắn lên đầu nhân vật"
+            >
+              <Camera className="w-3 h-3" /> + Avatar
+            </button>
+          )}
+        </div>
+      );
+    };
+
+    const renderLobbyChatPanel = (heightClass = 'h-[270px] lg:h-[360px]', titleLabel = 'Chat Phòng Chờ') => (
+      <div className={`lg:col-span-5 xl:col-span-4 bg-slate-900/85 border border-slate-700/80 rounded-3xl p-4 flex flex-col ${heightClass} shadow-xl backdrop-blur-md`}>
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 mb-2.5 shrink-0">
+          <span className="text-xs font-extrabold text-white flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-cyan-400" /> {titleLabel}
+          </span>
+          <span className="text-[11px] font-semibold text-slate-400">
+            {roomChatMessages.length} tin nhắn
+          </span>
+        </div>
+
+        <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1">
+          {roomChatMessages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 text-xs px-3">
+              <MessageSquare className="w-7 h-7 mb-1.5 opacity-40" />
+              <p>Chưa có tin nhắn nào. Hãy nhắn chào cả phòng hoặc chọn câu chat nhanh bên dưới!</p>
+            </div>
+          ) : (
+            roomChatMessages.map(msg => {
+              const isMine = msg.username === currentUser?.username;
+              const swatch = CREWMATE_COLORS.find(c => c.id === msg.colorId)?.fill || '#06b6d4';
+              const msgAvatar = msg.avatarUrl || usersDb[msg.username]?.avatarUrl || '';
+              return (
+                <div key={msg.id} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                  <div className="flex items-center gap-1.5 mb-0.5 text-[10px] text-slate-400">
+                    {msgAvatar ? (
+                      <img src={msgAvatar} alt="" className="w-4 h-4 rounded-full object-cover border border-slate-600 shrink-0" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: swatch }} />
+                    )}
+                    <span className="font-bold text-slate-200">{msg.name}</span>
+                    {msg.role === 'teacher' && <Crown className="w-3 h-3 text-amber-400" />}
+                    <span>• {msg.timeStr}</span>
+                  </div>
+                  <div className={`px-3 py-1.5 rounded-2xl text-xs max-w-[88%] break-words ${
+                    isMine
+                      ? 'bg-cyan-600/30 border border-cyan-500/40 text-cyan-100 rounded-tr-sm'
+                      : 'bg-slate-800 border border-slate-700 text-slate-100 rounded-tl-sm'
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="pt-2.5 mt-2 border-t border-slate-800 space-y-2 shrink-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['Sẵn sàng!', 'Bắt đầu thôi!', 'Cố lên cả lớp!'].map(q => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => handleSendLobbyChat(q)}
+                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-semibold text-slate-300 transition"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!lobbyChatInput.trim()) return;
+              handleSendLobbyChat(lobbyChatInput);
+              setLobbyChatInput('');
+            }}
+            className="flex gap-2"
+          >
+            <input
+              type="text"
+              value={lobbyChatInput}
+              onChange={e => setLobbyChatInput(e.target.value)}
+              placeholder="Nhập tin nhắn chat..."
+              maxLength={140}
+              className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition flex items-center gap-1 shrink-0"
+            >
+              <Send className="w-3.5 h-3.5" /> Gửi
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+
+    // 1. JOIN ROOM SCREEN (Students must enter Teacher's Room PIN & Password)
+    if (gameSubState === 'JOIN' && !isTeacher) {
+      return (
+        <div className="min-h-screen bg-[#070b14] text-white flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden">
+          <div className="absolute top-[-10%] left-[20%] w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-[-10%] right-[15%] w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="max-w-5xl w-full mx-auto flex items-center justify-between relative z-10">
+            <button
+              onClick={exitGame}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 transition"
+            >
+              <ChevronLeft className="w-4 h-4" /> Quay lại
+            </button>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold border ${
+                serverSyncConnected
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+              }`}>
+                <Wifi className="w-3.5 h-3.5" />
+                {serverSyncConnected ? 'Đã đồng bộ Live' : 'Local Mode'}
+              </span>
+              <span className="hidden sm:inline-flex text-slate-400 font-medium items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-cyan-400" /> Xác thực phòng thi đấu trực tiếp
+              </span>
+            </div>
+          </div>
+
+          <div className="max-w-xl w-full mx-auto my-auto py-6 relative z-10">
+            <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-7 sm:p-9 shadow-2xl">
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="mb-3">
+                  <AmongUsCrewmate colorId={myCrewColor} avatarUrl={myAvatarUrl} size={64} />
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1 rounded-full mb-2">
+                  Sảnh Chờ Phi Hành Đoàn
+                </span>
+                <h1 className="text-2xl font-extrabold text-white">Tham Gia Phòng Đấu Từ Vựng</h1>
+                <p className="text-xs text-slate-400 mt-1.5 max-w-md leading-relaxed">
+                  Nhập <b>Mã Phòng (PIN)</b> và <b>Mật Khẩu</b> do giáo viên tạo để bước vào Sảnh Chờ. Trận đấu sẽ chỉ bắt đầu khi giáo viên bấm khởi hành!
+                </p>
+              </div>
+
+              {/* Pick Suit Color before entering */}
+              <div className="mb-6">
+                <p className="text-[11px] font-semibold text-slate-400 text-center mb-2">Chọn màu phi hành gia hoặc đầu Avatar:</p>
+                {renderCrewColorPicker(false)}
+              </div>
+
+              {roomJoinError && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-200 flex items-center gap-2 font-medium">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{roomJoinError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleStudentJoinRoom} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Mã Phòng (PIN)</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 686868"
+                    value={roomJoinForm.pin}
+                    onChange={e => {
+                      setRoomJoinForm({ ...roomJoinForm, pin: e.target.value });
+                      if (roomJoinError) setRoomJoinError('');
+                    }}
+                    className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-center font-mono text-lg font-extrabold tracking-widest text-cyan-300 placeholder:text-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Mật Khẩu Phòng</label>
+                  <input
+                    type="password"
+                    placeholder="Nhập mật khẩu phòng..."
+                    value={roomJoinForm.pass}
+                    onChange={e => {
+                      setRoomJoinForm({ ...roomJoinForm, pass: e.target.value });
+                      if (roomJoinError) setRoomJoinError('');
+                    }}
+                    className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-center text-sm font-semibold text-white placeholder:text-slate-600 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold text-sm shadow-lg shadow-cyan-500/20 transition flex items-center justify-center gap-2"
+                >
+                  <DoorOpen className="w-4 h-4" /> VÀO SẢNH CHỜ NGAY
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div className="text-center text-[11px] text-slate-500 relative z-10">
+            Mẹo: Nếu giáo viên mở phòng trong một tab/cửa sổ trình duyệt khác, danh sách người chơi sẽ đồng bộ trực tiếp.
+          </div>
+        </div>
+      );
+    }
+
+    // 2. AMONG US DROPSHIP WAITING LOBBY + LAUNCH COUNTDOWN
+    if (gameSubState === 'LOBBY' || gameSubState === 'COUNTDOWN') {
+      const canHostLaunch = isTeacher && gameSubState === 'LOBBY' && hasStudentsInLobby;
+      const isRoomAlreadyPlayingWithoutLaunch = !isTeacher && room.status === 'PLAYING' && gameSubState === 'LOBBY';
+
+      return (
+        <div className="h-[100dvh] w-full overflow-hidden bg-[#070b15] text-white flex flex-col select-none relative">
+          {/* Top Lobby Header */}
+          <header className="shrink-0 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-2.5 flex items-center justify-between gap-2.5 flex-wrap z-30">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleLeaveGameLobby}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold transition"
+              >
+                <ChevronLeft className="w-4 h-4" /> Rời Sảnh
+              </button>
+              <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-bold text-slate-200 max-w-[180px] truncate">{room.name}</span>
+              </div>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border ${
+                serverSyncConnected
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+              }`}>
+                <Wifi className="w-3 h-3" /> {serverSyncConnected ? 'Live' : 'Local'}
+              </span>
+              {isTeacher && (
+                <div className="flex items-center gap-2 bg-indigo-500/15 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs">
+                  <span className="text-slate-300">PIN: <b className="font-mono text-amber-300">{room.pin}</b></span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-300">Pass: <b className="font-mono text-cyan-300">{room.pass}</b></span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(`Mã phòng Game Từ Vựng: ${room.pin} | Mật khẩu: ${room.pass}`);
+                      setCopiedRoomPin(true);
+                      setTimeout(() => setCopiedRoomPin(false), 1800);
+                      showToast(`Đã sao chép PIN ${room.pin} & Pass "${room.pass}"!`);
+                    }}
+                    className="ml-1 text-indigo-300 hover:text-white"
+                    title="Sao chép thông tin phòng"
+                  >
+                    {copiedRoomPin ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-cyan-300">
+                <Users className="w-3.5 h-3.5" /> {lobbyPlayersList.length}/{room.maxPlayers}
+              </span>
+              {isTeacher && (
+                <>
+                  <button
+                    onClick={() => setShowCreateRoomModal(true)}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Tạo Phòng
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
+                      setShowVocabModal(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-amber-300 transition"
+                  >
+                    Kho Từ ({roomVocabCount})
+                  </button>
+                  {!hasStudentsInLobby ? (
+                    <button
+                      onClick={() => jumpToGameSandboxRound(1)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 transition hidden sm:inline-flex items-center gap-1"
+                      title="Chỉ khả dụng khi phòng chưa có học sinh"
+                    >
+                      Chơi Thử GV
+                    </button>
+                  ) : room.status === 'PLAYING' ? (
+                    <button
+                      onClick={() => setGameSubState('HOST_SPECTATE')}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-xs font-bold text-amber-300 transition inline-flex items-center gap-1"
+                    >
+                      <Trophy className="w-3.5 h-3.5" /> Bảng Đua Top
+                    </button>
+                  ) : (
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-[11px] font-bold text-cyan-300">
+                      <Trophy className="w-3.5 h-3.5" /> Giám Sát Đua Top
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          </header>
+
+          {/* Main Lobby Content Area */}
+          <div className="flex-1 min-h-0 flex flex-col justify-between gap-3 p-3 sm:p-5 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_rgba(30,58,138,0.28),_rgba(7,11,21,1)_70%)]">
+            <div className="max-w-6xl w-full mx-auto space-y-3">
+              {/* TEACHER INLINE ROOM NAME / PIN / PASSWORD EDITOR */}
+              {isTeacher && (
+                <div className="bg-slate-900/90 border border-indigo-500/30 rounded-2xl p-3.5 backdrop-blur-md shadow-lg space-y-3">
+                  {allRoomsList.length > 1 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-slate-400">Chuyển phòng:</span>
+                      {allRoomsList.map(r => (
+                        <button
+                          key={r.pin}
+                          type="button"
+                          onClick={() => handleTeacherOpenLobby(r.pin)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                            r.pin === activePin
+                              ? 'bg-indigo-600 border-indigo-500 text-white'
+                              : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500'
+                          }`}
+                        >
+                          #{r.pin} • {r.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSaveHostRoomSettings} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                    <div className="sm:col-span-5">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-indigo-300 mb-1">
+                        Tên phòng hiển thị
+                      </label>
+                      <input
+                        type="text"
+                        value={hostRoomDraft.name}
+                        onChange={e => setHostRoomDraft(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Nhập tên phòng..."
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-semibold text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
+                        Mã PIN
+                      </label>
+                      <input
+                        type="text"
+                        value={hostRoomDraft.pin}
+                        onChange={e => setHostRoomDraft(prev => ({ ...prev, pin: e.target.value }))}
+                        placeholder="686868"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-300 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-cyan-300 mb-1">
+                        Mật khẩu phòng (Pass)
+                      </label>
+                      <input
+                        type="text"
+                        value={hostRoomDraft.pass}
+                        onChange={e => setHostRoomDraft(prev => ({ ...prev, pass: e.target.value }))}
+                        placeholder="Mật khẩu vào sảnh..."
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono font-bold text-cyan-300 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <button
+                        type="submit"
+                        className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow"
+                      >
+                        <Save className="w-3.5 h-3.5" /> Lưu Phòng
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Console Banner */}
+              <div className="bg-slate-900/75 border border-slate-700/80 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 backdrop-blur-md">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-300 shrink-0">
+                    <Rocket className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="font-extrabold text-sm text-white">Khoang Chờ Tàu Vũ Trụ (Dropship Lobby)</h2>
+                    <p className="text-[11px] text-slate-400">
+                      {isTeacher
+                        ? 'Học sinh nhập Mã PIN & Mật khẩu để vào khoang. Nhấn Bắt Đầu Trận Đấu để tất cả cùng vào game.'
+                        : isRoomAlreadyPlayingWithoutLaunch
+                        ? 'Lượt chơi trước đang chạy hoặc đã xong — chờ Giáo viên bấm Bắt Đầu / Mở Sảnh Mới để cùng khởi hành.'
+                        : 'Bạn đã ở trong Sảnh Chờ! Bấm Sẵn Sàng và chờ Chủ phòng (Giáo viên) bấm khởi hành.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-semibold">
+                    {roomVocabCount} từ • 3 vòng
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+                    {readyCount}/{lobbyPlayersList.length} Sẵn sàng
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2-Column Stage: Dropship Crewmates Grid + Persistent Lobby Chat */}
+            <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 my-auto py-1">
+              {/* Left: Crewmates Deck */}
+              <div className="lg:col-span-7 xl:col-span-8 relative rounded-3xl border-2 border-slate-700/70 bg-slate-900/60 backdrop-blur-sm pt-12 pb-6 px-5 sm:px-8 shadow-2xl min-h-[260px] flex flex-col justify-center">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center">
+                  {lobbyPlayersList.length === 0 ? (
+                    <div className="col-span-full py-10 text-center text-slate-400 text-sm">
+                      Chưa có thành viên nào trong khoang chờ...
+                    </div>
+                  ) : (
+                    lobbyPlayersList.map((player, idx) => {
+                      const isHost = player.role === 'teacher';
+                      const isSelf = player.username === currentUser?.username;
+                      const showBubble = Boolean(player.chat && player.chatAt && Math.abs(lobbyNowTick - player.chatAt) < 5500);
+
+                      return (
+                        <div key={player.username} className="flex flex-col items-center relative group">
+                          {/* Speech Bubble above Crewmate */}
+                          {showBubble && (
+                            <div className="absolute -top-10 z-20 bg-white text-slate-900 text-[11px] font-bold px-2.5 py-1 rounded-xl shadow-lg max-w-[150px] truncate border border-slate-200">
+                              {player.chat}
+                            </div>
+                          )}
+
+                          {/* Host Crown */}
+                          {isHost ? (
+                            <div className="mb-0.5 text-amber-400 flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider">
+                              <Crown className="w-3.5 h-3.5" /> Chủ Phòng
+                            </div>
+                          ) : (
+                            <div className={`mb-0.5 text-[10px] font-bold uppercase tracking-wider ${player.ready ? 'text-emerald-400' : 'text-amber-400'}`}>
+                              {player.ready ? 'Sẵn sàng' : 'Đang chờ'}
+                            </div>
+                          )}
+
+                          <AmongUsCrewmate
+                            colorId={player.colorId || 'cyan'}
+                            avatarUrl={player.avatarUrl || usersDb[player.username]?.avatarUrl || ''}
+                            size={56}
+                            flip={idx % 2 === 1}
+                            animate={true}
+                          />
+
+                          {/* Floor Shadow */}
+                          <div className="w-11 h-2 bg-black/50 rounded-full blur-[2px] -mt-1 mb-2" />
+
+                          {/* Nameplate */}
+                          <div className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 border ${
+                            isSelf
+                              ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200'
+                              : 'bg-slate-800/90 border-slate-700 text-slate-200'
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full ${
+                              player.ready || isHost ? 'bg-emerald-400' : 'bg-amber-400'
+                            }`} />
+                            <span className="truncate max-w-[105px]">{player.name}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Persistent Live Lobby Chat Box */}
+              {renderLobbyChatPanel('h-[270px] lg:h-[360px]', 'Chat Phòng Chờ')}
+            </div>
+
+            {/* Bottom Controls Bar (Suit Customize + Ready / Host Launch) */}
+            <div className="max-w-6xl w-full mx-auto bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3.5 flex flex-col md:flex-row items-center justify-between gap-3 backdrop-blur-md">
+              <div className="flex items-center gap-2 bg-slate-950/70 px-3 py-2 rounded-xl border border-slate-800 flex-wrap justify-center">
+                <span className="text-[11px] text-slate-400 font-semibold mr-1">Phi hành gia:</span>
+                {renderCrewColorPicker(true)}
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap justify-center shrink-0">
+                {!isTeacher ? (
+                  <button
+                    type="button"
+                    onClick={handleToggleLobbyReady}
+                    className={`px-5 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition flex items-center gap-2 shadow-lg ${
+                      myLobbyEntry?.ready
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                    }`}
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    {myLobbyEntry?.ready ? 'Đã Sẵn Sàng (Bấm để Hủy)' : 'Bấm Sẵn Sàng'}
+                  </button>
+                ) : (
+                  <>
+                    {room.status === 'PLAYING' && (
+                      <button
+                        type="button"
+                        onClick={() => handleTeacherResetLobby(activePin)}
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Mở Lại Sảnh (Cho HS Vào)
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleTeacherStartLobbyGame(activePin)}
+                      disabled={!canHostLaunch}
+                      title={hasStudentsInLobby ? 'Khởi động trận đấu & mở bảng Đua Top cho Giáo viên' : 'Cần ít nhất 1 học sinh vào sảnh mới có thể bắt đầu'}
+                      className={`px-6 py-2.5 rounded-xl font-extrabold text-sm transition flex items-center gap-2 shadow-xl ${
+                        canHostLaunch
+                          ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 shadow-emerald-500/25'
+                          : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <Rocket className="w-4 h-4" />
+                      {hasStudentsInLobby
+                        ? `BẮT ĐẦU ĐUA TOP (${studentLobbyPlayers.length} HS)`
+                        : 'CHỜ HỌC SINH VÀO SẢNH (0 HS)'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Synchronized 3-2-1 Rocket Launch Countdown Overlay */}
+          {gameSubState === 'COUNTDOWN' && (
+            <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-cyan-400 mb-3">
+                Tất cả phi hành gia chuẩn bị
+              </p>
+              <div className="text-7xl sm:text-8xl font-black text-white font-mono animate-bounce">
+                {lobbyCountdown ?? 1}
+              </div>
+              <p className="text-sm text-slate-300 mt-4 font-semibold">
+                {isTeacher ? 'Đang mở Bảng Xếp Hạng Đua Top Trực Tiếp...' : 'Đang khởi động Đấu Trường Từ Vựng 3 Vòng...'}
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 2B. TEACHER HOST LIVE "ĐUA TOP" SPECTATE LEADERBOARD (No Teacher Gameplay When Students Exist)
+    if (gameSubState === 'HOST_SPECTATE' && isTeacher) {
+      const mergedMap = {};
+      studentLobbyPlayers.forEach(lp => {
+        mergedMap[lp.username] = {
+          username: lp.username,
+          name: lp.name || lp.username,
+          role: 'student',
+          colorId: lp.colorId || 'cyan',
+          avatarUrl: lp.avatarUrl || usersDb[lp.username]?.avatarUrl || '',
+          score: 0,
+          streak: 0,
+          lives: 3,
+          round: 1,
+          progressText: 'Đang vào trận...',
+          finished: false,
+          outcome: null
+        };
+      });
+      Object.values(room.liveMatch || {}).forEach(lm => {
+        if (!lm?.username || lm.role === 'teacher') return;
+        mergedMap[lm.username] = {
+          ...(mergedMap[lm.username] || {}),
+          ...lm,
+          avatarUrl: lm.avatarUrl || mergedMap[lm.username]?.avatarUrl || usersDb[lm.username]?.avatarUrl || ''
+        };
+      });
+
+      const rankedPlayers = Object.values(mergedMap).sort((a, b) => {
+        if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+        if ((b.streak || 0) !== (a.streak || 0)) return (b.streak || 0) - (a.streak || 0);
+        if ((b.lives ?? 3) !== (a.lives ?? 3)) return (b.lives ?? 3) - (a.lives ?? 3);
+        return (a.name || a.username).localeCompare(b.name || b.username);
+      });
+
+      const rankIndexMap = {};
+      rankedPlayers.forEach((p, idx) => {
+        rankIndexMap[p.username] = idx;
+      });
+      const stableDomPlayers = [...rankedPlayers].sort((a, b) => a.username.localeCompare(b.username));
+      const finishedCount = rankedPlayers.filter(p => p.finished).length;
+      const leaderScore = Math.max(150, rankedPlayers[0]?.score || 0);
+      const ROW_STRIDE = 88;
+      const podiumOrder = rankedPlayers.length >= 2 ? [1, 0, 2] : [0];
+
+      return (
+        <div className="min-h-[100dvh] w-full bg-[#060914] text-white flex flex-col select-none relative overflow-x-hidden">
+          <div className="absolute top-[-10%] left-[15%] w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-[-10%] right-[10%] w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Host Spectate Header */}
+          <header className="shrink-0 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-2.5 flex items-center justify-between gap-2.5 flex-wrap z-30">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={exitGame}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold transition"
+              >
+                <ChevronLeft className="w-4 h-4" /> Thoát Ra Bảng Tin
+              </button>
+              <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-400/40 px-3 py-1.5 rounded-xl">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-extrabold text-amber-200 uppercase tracking-wide">Đua Top Trực Tiếp</span>
+              </div>
+              <span className="text-xs font-bold text-slate-300 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
+                PIN: <b className="font-mono text-cyan-300">{room.pin}</b> • {room.name}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border ${
+                serverSyncConnected
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+              }`}>
+                <Wifi className="w-3.5 h-3.5" /> {serverSyncConnected ? 'Live Sync' : 'Local'}
+              </span>
+              <span className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> {finishedCount}/{rankedPlayers.length} Đã xong
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  handleTeacherResetLobby(activePin);
+                  setGameSubState('LOBBY');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/20"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Mở Sảnh Ván Mới
+              </button>
+            </div>
+          </header>
+
+          {/* Main Spectate Race Body */}
+          <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 relative z-10">
+            {/* Left 8 Cols: Live Top-3 Podium + Animated Rank Tracks */}
+            <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+              {/* Top 3 Live Podium */}
+              {rankedPlayers.length > 0 && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 sm:p-5 backdrop-blur-md shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xs font-extrabold uppercase tracking-widest text-amber-300 flex items-center gap-1.5">
+                      <Crown className="w-4 h-4" /> Top 3 Dẫn Đầu Hiện Tại
+                    </h2>
+                    <span className="text-[11px] text-slate-400">Giáo viên chỉ giám sát • Tự động cập nhật</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    {podiumOrder.map((rankIdx) => {
+                      const p = rankedPlayers[rankIdx];
+                      if (!p) return null;
+                      const isFirst = rankIdx === 0;
+                      const medalStyles =
+                        rankIdx === 0
+                          ? 'bg-gradient-to-b from-amber-500/25 to-slate-900/90 border-amber-400/60 sm:py-5 shadow-lg shadow-amber-500/10'
+                          : rankIdx === 1
+                          ? 'bg-gradient-to-b from-slate-400/15 to-slate-900/90 border-slate-400/40'
+                          : 'bg-gradient-to-b from-orange-500/15 to-slate-900/90 border-orange-500/40';
+                      const rankLabel = rankIdx === 0 ? 'HẠNG #1' : rankIdx === 1 ? 'HẠNG #2' : 'HẠNG #3';
+
+                      return (
+                        <div key={`pod-${p.username}`} className={`rounded-2xl border p-3.5 flex flex-col items-center text-center transition-all duration-300 ${medalStyles}`}>
+                          <span className={`text-[10px] font-black tracking-widest px-2.5 py-0.5 rounded-full mb-2 ${
+                            isFirst ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-200 border border-slate-700'
+                          }`}>
+                            {rankLabel}
+                          </span>
+                          <AmongUsCrewmate
+                            colorId={p.colorId || 'cyan'}
+                            avatarUrl={p.avatarUrl}
+                            size={isFirst ? 54 : 44}
+                            animate={!p.finished && (p.lives ?? 3) > 0}
+                          />
+                          <p className="font-extrabold text-sm text-white mt-1.5 truncate max-w-full">{p.name}</p>
+                          <p className="font-mono text-lg font-black text-amber-300 tabular-nums">{p.score || 0}đ</p>
+                          <p className="text-[10px] text-slate-400 truncate max-w-full mt-0.5">{p.progressText || 'Đang đua'}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Smoothly Animated Live Leaderboard Tracks */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 sm:p-5 backdrop-blur-md shadow-xl flex-1">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                  <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-cyan-400" /> Bảng Xếp Hạng Biến Động Thời Gian Thực
+                  </h3>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    {rankedPlayers.length} thí sinh
+                  </span>
+                </div>
+
+                {rankedPlayers.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-sm">
+                    Chưa có học sinh nào tham gia phòng này. Nhấn <b>Mở Sảnh Ván Mới</b> để học sinh vào phòng!
+                  </div>
+                ) : (
+                  <div className="relative" style={{ height: `${rankedPlayers.length * ROW_STRIDE}px` }}>
+                    {stableDomPlayers.map((p) => {
+                      const rankIdx = rankIndexMap[p.username] ?? 0;
+                      const delta = liveRankDeltas[p.username] || 0;
+                      const livesLeft = Math.max(0, Math.min(3, p.lives ?? 3));
+                      const barPct = Math.max(6, Math.min(100, Math.round(((p.score || 0) / leaderScore) * 100)));
+                      const rowBorder =
+                        rankIdx === 0
+                          ? 'border-amber-400/60 bg-amber-500/10'
+                          : rankIdx === 1
+                          ? 'border-slate-500/60 bg-slate-800/80'
+                          : rankIdx === 2
+                          ? 'border-orange-500/50 bg-orange-500/10'
+                          : 'border-slate-800 bg-slate-950/75';
+
+                      return (
+                        <div
+                          key={p.username}
+                          style={{ transform: `translateY(${rankIdx * ROW_STRIDE}px)` }}
+                          className={`absolute inset-x-0 top-0 h-[78px] px-3.5 rounded-2xl border ${rowBorder} flex items-center gap-3 transition-transform duration-500 ease-out shadow-md`}
+                        >
+                          {/* Rank Number + Delta Badge */}
+                          <div className="w-12 shrink-0 flex flex-col items-center justify-center">
+                            <span className={`w-8 h-8 rounded-xl font-black text-sm flex items-center justify-center tabular-nums ${
+                              rankIdx === 0
+                                ? 'bg-amber-400 text-slate-950'
+                                : rankIdx === 1
+                                ? 'bg-slate-300 text-slate-950'
+                                : rankIdx === 2
+                                ? 'bg-orange-400 text-slate-950'
+                                : 'bg-slate-800 text-slate-300 border border-slate-700'
+                            }`}>
+                              #{rankIdx + 1}
+                            </span>
+                            {delta !== 0 && (
+                              <span className={`mt-0.5 text-[9px] font-extrabold inline-flex items-center gap-0.5 ${
+                                delta > 0 ? 'text-emerald-400' : 'text-rose-400'
+                              }`}>
+                                {delta > 0 ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                                {delta > 0 ? `+${delta}` : delta}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Crewmate / Avatar Character */}
+                          <div className="shrink-0">
+                            <AmongUsCrewmate
+                              colorId={p.colorId || 'cyan'}
+                              avatarUrl={p.avatarUrl}
+                              size={42}
+                              animate={!p.finished && livesLeft > 0}
+                            />
+                          </div>
+
+                          {/* Name, Progress Bar, Hearts & Combo */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-extrabold text-sm text-white truncate max-w-[150px] sm:max-w-[210px]">
+                                {p.name}
+                              </span>
+                              {p.finished ? (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  p.outcome === 'VICTORY'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                }`}>
+                                  {p.outcome === 'VICTORY' ? 'Hoàn thành!' : 'Hết mạng'}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 truncate max-w-[145px]">
+                                  {p.progressText || `Vòng ${p.round || 1}/3`}
+                                </span>
+                              )}
+                              {(p.streak || 0) > 0 && (
+                                <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-extrabold text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded-md">
+                                  <Zap className="w-3 h-3" /> x{p.streak}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-300 ${
+                                    rankIdx === 0
+                                      ? 'bg-gradient-to-r from-amber-400 to-yellow-300'
+                                      : p.finished && p.outcome === 'LOST'
+                                      ? 'bg-rose-500'
+                                      : 'bg-gradient-to-r from-cyan-500 to-indigo-500'
+                                  }`}
+                                  style={{ width: `${barPct}%` }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0" title={`Còn ${livesLeft}/3 mạng`}>
+                                {[0, 1, 2].map(i => (
+                                  <Heart
+                                    key={i}
+                                    className={`w-3 h-3 ${
+                                      i < livesLeft ? 'text-rose-500 fill-rose-500' : 'text-slate-700'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Live Score */}
+                          <div className="text-right shrink-0 pl-2">
+                            <p className={`font-mono text-lg sm:text-xl font-black tabular-nums ${
+                              rankIdx === 0 ? 'text-amber-300' : 'text-cyan-300'
+                            }`}>
+                              {p.score || 0}<span className="text-xs font-bold ml-0.5">đ</span>
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right 4 Cols: Live Lobby Chat during Match */}
+            {renderLobbyChatPanel('h-[340px] lg:h-[520px]', 'Chat Trực Tiếp')}
+          </div>
+        </div>
+      );
+    }
 
     const passedWordsCount = gameReviewLog.filter(i => i.passed).length;
 
@@ -3181,41 +5296,41 @@ export default function App() {
             >
               <ChevronLeft className="w-4 h-4" /> Thoát Game
             </button>
-            <span className="bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2.5 py-1 rounded-full font-bold">
-              🔑 Phòng: {currentRoomPin}
+            <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2.5 py-1 rounded-full font-bold">
+              Phòng: {activePin}
             </span>
             <span className="hidden sm:inline-flex bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-full font-bold">
-              👤 {currentUser?.name || currentUser?.username}
+              {currentUser?.name || currentUser?.username}
             </span>
           </div>
 
           {/* Teacher Sandbox Controls */}
           {isTeacher && (
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <span className="text-slate-400 font-bold hidden sm:inline">⚡ GV Sandbox:</span>
+              <span className="text-slate-400 font-bold hidden sm:inline">GV Sandbox:</span>
               <button
                 onClick={() => jumpToGameSandboxRound(1)}
                 className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 1 ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                🛸 Màn 1
+                Màn 1
               </button>
               <button
                 onClick={() => jumpToGameSandboxRound(2)}
                 className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 2 ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                ⌨️ Màn 2
+                Màn 2
               </button>
               <button
                 onClick={() => jumpToGameSandboxRound(3)}
                 className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 3 ? 'bg-pink-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
               >
-                👑 Màn 3
+                Màn 3
               </button>
               <button
                 onClick={() => setShowVocabModal(true)}
                 className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded font-bold transition"
               >
-                📝 Sửa Kho Từ
+                Sửa Kho Từ
               </button>
             </div>
           )}
@@ -3229,7 +5344,7 @@ export default function App() {
                 <span className={`px-2.5 py-1 rounded-lg text-white font-extrabold text-[11px] sm:text-xs ${
                   gameRound === 1 ? 'bg-gradient-to-r from-blue-600 to-cyan-500' : gameRound === 2 ? 'bg-gradient-to-r from-amber-600 to-orange-500' : 'bg-gradient-to-r from-pink-600 to-purple-600'
                 }`}>
-                  {gameRound === 1 ? '🛸 VÒNG 1/3: NHẬN DIỆN' : gameRound === 2 ? '⌨️ VÒNG 2/3: GÕ TỪ KHUYẾT' : '👑 VÒNG 3/3: BOSS IPA'}
+                  {gameRound === 1 ? 'VÒNG 1/3: NHẬN DIỆN' : gameRound === 2 ? 'VÒNG 2/3: GÕ TỪ KHUYẾT' : 'VÒNG 3/3: BOSS IPA'}
                 </span>
                 <span className="bg-slate-800 px-2 py-1 rounded-lg text-slate-300 text-xs">
                   Từ: {gameWordIdx + 1}/{gameQueues[gameRound]?.length || 1}
@@ -3251,8 +5366,8 @@ export default function App() {
                 >
                   <Clock className="w-3.5 h-3.5" /> {gameTimeLeft}s
                 </span>
-                <span className="text-amber-400 font-extrabold text-xs sm:text-sm">🔥 {gameCombo}</span>
-                <span className="text-cyan-400 font-extrabold text-xs sm:text-sm">Điểm: {gameScore}</span>
+                <span className="text-amber-400 font-extrabold text-xs sm:text-sm">Combo: {gameCombo}</span>
+                <span className="text-cyan-400 font-extrabold text-xs sm:text-sm tabular-nums">Điểm: {gameScore}</span>
               </div>
             </div>
 
@@ -3293,7 +5408,7 @@ export default function App() {
                         onClick={() => setShowMobileKeyboard(v => !v)}
                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[11px] font-bold transition"
                       >
-                        ⌨️ {showMobileKeyboard ? 'Ẩn phím' : 'Phím ảo'}
+                        {showMobileKeyboard ? 'Ẩn phím' : 'Phím ảo'}
                       </button>
                     </>
                   )}
@@ -3338,7 +5453,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Optional On-Screen Keyboard for Touch / Mobile Users */}
+                {/* Optional On-Screen Keyboard */}
                 {(gameRound === 2 || gameRound === 3) && showMobileKeyboard && gameSubState === 'PLAYING' && (
                   <div className="mt-2.5 space-y-1">
                     {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map(rowStr => (
@@ -3362,7 +5477,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Game Canvas Container — locked to exact remaining viewport height */}
+        {/* Game Canvas Container */}
         <div className="flex-1 min-h-0 w-full max-w-4xl mx-auto px-2 sm:px-0 py-1.5">
           <div className="relative w-full h-full rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden shadow-2xl">
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full cursor-crosshair block touch-none" />
@@ -3379,9 +5494,9 @@ export default function App() {
             {/* Round Transition Screen */}
             {gameSubState === 'TRANSITION' && (
               <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-amber-400 mb-2">🎉 HOÀN THÀNH VÒNG {gameRound}/3!</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-amber-400 mb-2">HOÀN THÀNH VÒNG {gameRound}/3!</h2>
                 <p className="text-xs sm:text-sm text-slate-300 max-w-md mb-3 leading-relaxed">
-                  Chuẩn bị bước sang <b>Vòng {gameRound + 1}</b> với <b>bộ từ vựng hoàn toàn mới</b> (giới hạn {GAME_ROUND_TIME_LIMITS[gameRound + 1] || 25} giây/từ)!
+                  Chuẩn bị bước sang <b>Vòng {gameRound + 1}</b> với <b>bộ từ vựng mới</b> (giới hạn {GAME_ROUND_TIME_LIMITS[gameRound + 1] || 25} giây/từ)!
                 </p>
                 <p className="text-xs font-mono text-cyan-300 mb-5">
                   Tự động bắt đầu sau {transitionCountdown} giây...
@@ -3390,7 +5505,7 @@ export default function App() {
                   onClick={advanceNextGameRound}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-6 py-3 rounded-xl transition shadow-lg"
                 >
-                  VÀO NGAY VÒNG TIẾP THEO ➔
+                  VÀO NGAY VÒNG TIẾP THEO
                 </button>
               </div>
             )}
@@ -3402,10 +5517,10 @@ export default function App() {
                   gameOutcome === 'LOST' ? 'text-rose-400' : 'text-cyan-300'
                 }`}>
                   {gameOutcome === 'LOST'
-                    ? `💀 HẾT MẠNG TẠI VÒNG ${gameRound}`
+                    ? `HẾT MẠNG TẠI VÒNG ${gameRound}`
                     : isSandboxRound
-                    ? `🏆 HOÀN THÀNH MÀN ${gameRound} (GV)`
-                    : '🏆 TỔNG KẾT KẾT QUẢ ĐẤU TRƯỜNG'}
+                    ? `HOÀN THÀNH MÀN ${gameRound} (GV)`
+                    : 'TỔNG KẾT KẾT QUẢ ĐẤU TRƯỜNG'}
                 </h2>
                 <p className="text-xs text-slate-300 mb-4">
                   Điểm số: <b className="text-amber-400 text-base">{gameScore} điểm</b> • Đạt: <b className="text-emerald-400">{passedWordsCount}/{gameReviewLog.length} từ</b> • Đã lưu vào Bảng Xếp Hạng!
@@ -3421,7 +5536,7 @@ export default function App() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-bold">V{item.round}</span>
                           <span className={item.passed ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                            {item.passed ? '✅ Đạt' : '⚠️ Cần ôn'}
+                            {item.passed ? 'Đạt' : 'Cần ôn'}
                           </span>
                           <b className="text-cyan-300">{item.word}</b>
                           <span className="text-slate-400 font-mono">{item.ipa}</span>
@@ -3434,17 +5549,37 @@ export default function App() {
                 </div>
 
                 <div className="flex gap-3 flex-wrap justify-center">
-                  <button
-                    onClick={() => initGameCampaign(currentRoomPin, currentUser)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow"
-                  >
-                    🔄 Chơi Lại Lượt Mới
-                  </button>
+                  {isTeacher ? (
+                    <>
+                      <button
+                        onClick={() => handleTeacherResetLobby(activePin)}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl transition shadow flex items-center gap-2"
+                      >
+                        <RefreshCw className="w-4 h-4" /> Mở Sảnh Chờ Ván Mới
+                      </button>
+                      <button
+                        onClick={() => initGameCampaign(activePin, currentUser)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow"
+                      >
+                        Chơi Thử Lại (GV)
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setGameSubState('LOBBY');
+                        gameRuntimeRef.current.subState = 'LOBBY';
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl transition shadow flex items-center gap-2"
+                    >
+                      <Rocket className="w-4 h-4" /> Quay Lại Sảnh Chờ Phòng
+                    </button>
+                  )}
                   <button
                     onClick={exitGame}
                     className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2.5 rounded-xl transition border border-slate-700"
                   >
-                    🏠 Về Trang Chủ
+                    {isTeacher ? 'Về Quản Trị' : 'Về Trang Chủ'}
                   </button>
                 </div>
               </div>
@@ -3829,6 +5964,33 @@ export default function App() {
     const isAllowedByTeacher = Boolean(targetTest?.allowViewAnswers);
     const canShowCorrectAnswers = isTeacher || isAllowedByTeacher;
 
+    const renderWritingCriteriaBox = (label, band, criteria, colorClass, firstCriterionKey, firstCriterionLabel) => (
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="flex justify-between items-center mb-2">
+          <span className={`font-bold text-xs flex items-center gap-1.5 ${colorClass}`}>
+            <PenTool className="w-3.5 h-3.5" /> {label}: Band {band}
+          </span>
+          <span className="text-[10px] text-slate-400 font-semibold uppercase">4 Tiêu chí IELTS</span>
+        </div>
+        {criteria && (
+          <div className="grid grid-cols-4 gap-1 text-center py-2 bg-slate-50 dark:bg-slate-800 rounded text-[11px] mb-2 font-mono text-slate-900 dark:text-slate-100">
+            <div><span className="text-[9px] text-slate-400 block font-sans">{firstCriterionLabel}</span><strong>{criteria[firstCriterionKey]}</strong></div>
+            <div><span className="text-[9px] text-slate-400 block font-sans">CC</span><strong>{criteria.cc}</strong></div>
+            <div><span className="text-[9px] text-slate-400 block font-sans">LR</span><strong>{criteria.lr}</strong></div>
+            <div><span className="text-[9px] text-slate-400 block font-sans">GRA</span><strong>{criteria.gra}</strong></div>
+          </div>
+        )}
+        <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed italic">{criteria?.comment}</p>
+      </div>
+    );
+
+    const writingCriteriaGrid = attempt.aiDetails ? (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {renderWritingCriteriaBox('Task 1', attempt.scores.writing.task1Band, attempt.aiDetails.task1Criteria, 'text-blue-700 dark:text-blue-400', 'ta', 'TA')}
+        {renderWritingCriteriaBox('Task 2', attempt.scores.writing.task2Band, attempt.aiDetails.task2Criteria, 'text-indigo-700 dark:text-indigo-400', 'tr', 'TR')}
+      </div>
+    ) : null;
+
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
@@ -3880,7 +6042,7 @@ export default function App() {
                 <span className="text-xs bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold px-3 py-1 rounded-full">
                   Hoàn Thành Bài Thi
                 </span>
-                {attempt.aiGraded && (
+                {isTeacher && attempt.aiGraded && (
                   <span className="text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30">
                     <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> AI Graded
                   </span>
@@ -3939,120 +6101,117 @@ export default function App() {
             </div>
           </div>
 
-          {/* AI WRITING GRADING CARD WITH SPINNER */}
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-indigo-950/60 dark:via-slate-900 dark:to-purple-950/50 rounded-2xl border border-indigo-100 dark:border-indigo-500/30 p-6 mb-8 shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-indigo-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                    <Sparkles className="w-3 h-3 text-amber-300" /> AI Examiner
-                  </span>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Hệ Thống Chấm Điểm Writing Tự Động Bằng AI</h3>
+          {/* WRITING EVALUATION CARD (TEACHER AI CONTROLS VS CLEAN STUDENT VIEW) */}
+          {isTeacher ? (
+            <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-indigo-950/60 dark:via-slate-900 dark:to-purple-950/50 rounded-2xl border border-indigo-100 dark:border-indigo-500/30 p-6 mb-8 shadow-sm">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="bg-indigo-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                      <Sparkles className="w-3 h-3 text-amber-300" /> AI Examiner (GV)
+                    </span>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">Công Cụ Chấm Điểm Writing Tự Động Bằng AI</h3>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
+                    Dành riêng cho Giáo viên: Đánh giá nhanh bài viết theo 4 tiêu chí chuẩn IDP/BC (TA/TR, CC, LR, GRA) qua Gemini API.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
-                  Đánh giá tự động theo 4 tiêu chí chuẩn IDP/BC (Task Achievement/Response, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy).
-                </p>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => { setApiTestState({ testing: false, ok: null, message: '', model: '' }); setShowApiKeyModal(true); }}
+                    className="px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5 shadow-sm"
+                    title="Cài đặt API Key (Gemini)"
+                  >
+                    <Key className="w-3.5 h-3.5 text-amber-500" />
+                    <span>{aiApiKey ? 'API Key (Đã lưu)' : 'Cấu hình API Key'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleGradeWritingWithAI(attempt)}
+                    disabled={isGradingAI}
+                    className={`px-5 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-md ${
+                      isGradingAI
+                        ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white active:scale-95'
+                    }`}
+                  >
+                    {isGradingAI ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Đang Chấm Điểm...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>{attempt.scores.writing.overallBand ? 'Chấm Lại Bằng AI' : 'Chấm Điểm Bằng AI Ngay'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
-                <button
-                  onClick={() => setShowApiKeyModal(true)}
-                  className="px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5 shadow-sm"
-                  title="Cài đặt API Key (Gemini)"
-                >
-                  <Key className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{aiApiKey ? 'API Key (Đã lưu)' : 'Cấu hình API Key'}</span>
-                </button>
+              {/* AI Grading Loading Spinner View */}
+              {isGradingAI && (
+                <div className="mt-6 pt-6 border-t border-indigo-200/60 dark:border-indigo-500/30 flex flex-col items-center justify-center py-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-xl shadow-inner">
+                  <div className="relative mb-3">
+                    <Loader2 className="w-10 h-10 text-indigo-600 dark:text-indigo-400 animate-spin" />
+                    <Sparkles className="w-4 h-4 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
+                  </div>
+                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 animate-pulse">{aiGradingStep || 'AI Examiner đang tiến hành chấm bài...'}</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Đang phân tích cấu trúc ngữ pháp, từ vựng và tiêu chí chấm điểm IELTS...</p>
+                </div>
+              )}
 
-                <button
-                  onClick={() => handleGradeWritingWithAI(attempt)}
-                  disabled={isGradingAI}
-                  className={`px-5 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-md ${
-                    isGradingAI
-                      ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white active:scale-95'
-                  }`}
-                >
-                  {isGradingAI ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Đang Chấm Điểm...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 text-amber-300" />
-                      <span>{attempt.scores.writing.overallBand ? 'Chấm Lại Bằng AI' : 'Chấm Điểm Bằng AI Ngay'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              {/* Detailed Criteria Breakdown */}
+              {writingCriteriaGrid && !isGradingAI && (
+                <div className="mt-6 pt-6 border-t border-indigo-200/60 dark:border-indigo-500/30 space-y-4">
+                  {writingCriteriaGrid}
+                </div>
+              )}
             </div>
-
-            {/* AI Grading Loading Spinner View */}
-            {isGradingAI && (
-              <div className="mt-6 pt-6 border-t border-indigo-200/60 dark:border-indigo-500/30 flex flex-col items-center justify-center py-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-xl shadow-inner">
-                <div className="relative mb-3">
-                  <Loader2 className="w-10 h-10 text-indigo-600 dark:text-indigo-400 animate-spin" />
-                  <Sparkles className="w-4 h-4 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
-                </div>
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 animate-pulse">{aiGradingStep || 'AI Examiner đang tiến hành chấm bài...'}</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Đang phân tích cấu trúc ngữ pháp, từ vựng và tiêu chí chấm điểm IELTS...</p>
-              </div>
-            )}
-
-            {/* Detailed AI Criteria Breakdown */}
-            {attempt.aiDetails && !isGradingAI && (
-              <div className="mt-6 pt-6 border-t border-indigo-200/60 dark:border-indigo-500/30 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/30 shadow-sm">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-bold text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
-                        <PenTool className="w-3.5 h-3.5" /> Task 1: Band {attempt.scores.writing.task1Band}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase">4 Tiêu chí IELTS</span>
-                    </div>
-                    {attempt.aiDetails.task1Criteria && (
-                      <div className="grid grid-cols-4 gap-1 text-center py-2 bg-slate-50 dark:bg-slate-800 rounded text-[11px] mb-2 font-mono text-slate-900 dark:text-slate-100">
-                        <div><span className="text-[9px] text-slate-400 block font-sans">TA</span><strong>{attempt.aiDetails.task1Criteria.ta}</strong></div>
-                        <div><span className="text-[9px] text-slate-400 block font-sans">CC</span><strong>{attempt.aiDetails.task1Criteria.cc}</strong></div>
-                        <div><span className="text-[9px] text-slate-400 block font-sans">LR</span><strong>{attempt.aiDetails.task1Criteria.lr}</strong></div>
-                        <div><span className="text-[9px] text-slate-400 block font-sans">GRA</span><strong>{attempt.aiDetails.task1Criteria.gra}</strong></div>
-                      </div>
-                    )}
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed italic">
-                      {attempt.aiDetails.task1Criteria?.comment}
-                    </p>
+          ) : (
+            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
+              {!attempt.scores.writing.overallBand ? (
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
                   </div>
-
-                  <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/30 shadow-sm">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-bold text-xs text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
-                        <PenTool className="w-3.5 h-3.5" /> Task 2: Band {attempt.scores.writing.task2Band}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase">4 Tiêu chí IELTS</span>
-                    </div>
-                    {attempt.aiDetails.task2Criteria && (
-                      <div className="grid grid-cols-4 gap-1 text-center py-2 bg-slate-50 dark:bg-slate-800 rounded text-[11px] mb-2 font-mono text-slate-900 dark:text-slate-100">
-                        <div><span className="text-[9px] text-slate-400 block font-sans">TR</span><strong>{attempt.aiDetails.task2Criteria.tr}</strong></div>
-                        <div><span className="text-[9px] text-slate-400 block font-sans">CC</span><strong>{attempt.aiDetails.task2Criteria.cc}</strong></div>
-                        <div><span className="text-[9px] text-slate-400 block font-sans">LR</span><strong>{attempt.aiDetails.task2Criteria.lr}</strong></div>
-                        <div><span className="text-[9px] text-slate-400 block font-sans">GRA</span><strong>{attempt.aiDetails.task2Criteria.gra}</strong></div>
-                      </div>
-                    )}
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed italic">
-                      {attempt.aiDetails.task2Criteria?.comment}
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Phần thi Writing đang chờ Giáo viên chấm điểm</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Bài viết Task 1 & Task 2 của bạn đã được lưu lại an toàn. Điểm và nhận xét sẽ hiển thị sau khi Giáo viên hoàn tất chấm bài.
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              ) : writingCriteriaGrid ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                      <PenTool className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Bảng Điểm Chi Tiết Phần Thi Writing
+                    </h3>
+                    <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-500/30">
+                      Đã công bố điểm
+                    </span>
+                  </div>
+                  {writingCriteriaGrid}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    Phần thi Writing đã được chấm: Overall Writing Band <strong>{attempt.scores.writing.overallBand}</strong>.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Feedback */}
           {attempt.teacherFeedback && (
             <div className="bg-amber-50 dark:bg-amber-500/10 rounded-2xl p-6 border border-amber-200 dark:border-amber-500/30 mb-8">
               <h3 className="font-bold text-amber-900 dark:text-amber-300 text-sm mb-2 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" /> {attempt.aiGraded ? 'Nhận Xét Từ AI Examiner' : 'Nhận Xét Từ Giáo Viên'}
+                <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" /> {isTeacher && attempt.aiGraded ? 'Nhận Xét Từ AI Examiner' : 'Nhận Xét Từ Giáo Viên'}
               </h3>
               <p className="text-xs text-amber-950 dark:text-amber-100 leading-relaxed whitespace-pre-line font-medium">
                 {attempt.teacherFeedback}
@@ -4087,7 +6246,7 @@ export default function App() {
                   ) : (
                     <>
                       <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                      <span>Đáp án đúng đang khóa (Chờ Giáo viên bật cho phép)</span>
+                      <span>Đáp án đúng & kết quả đúng/sai từng câu đang khóa (Chờ Giáo viên bật cho phép)</span>
                     </>
                   )}
                 </div>
@@ -4145,7 +6304,9 @@ export default function App() {
                     <div
                       key={q.id}
                       className={`p-5 rounded-2xl border transition ${
-                        isCorrect
+                        !canShowCorrectAnswers
+                          ? 'bg-slate-50/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                          : isCorrect
                           ? 'bg-emerald-50/40 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30'
                           : 'bg-rose-50/40 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30'
                       }`}
@@ -4154,21 +6315,27 @@ export default function App() {
                         <span className="font-bold text-slate-900 dark:text-white text-sm">
                           Câu {idx + 1}: {q.question}
                         </span>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold w-fit ${
-                          isCorrect
-                            ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40'
-                            : 'bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40'
-                        }`}>
-                          {isCorrect ? (
-                            <>
-                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Chính xác
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Chưa chính xác
-                            </>
-                          )}
-                        </span>
+                        {canShowCorrectAnswers ? (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold w-fit ${
+                            isCorrect
+                              ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40'
+                              : 'bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40'
+                          }`}>
+                            {isCorrect ? (
+                              <>
+                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Chính xác
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" /> Chưa chính xác
+                              </>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold w-fit bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <EyeOff className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Đã ghi nhận câu trả lời
+                          </span>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
@@ -4177,7 +6344,13 @@ export default function App() {
                           <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
                             Câu trả lời của thí sinh:
                           </span>
-                          <span className={`font-bold ${isCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+                          <span className={`font-bold ${
+                            !canShowCorrectAnswers
+                              ? 'text-slate-800 dark:text-slate-100'
+                              : isCorrect
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : 'text-rose-700 dark:text-rose-400'
+                          }`}>
                             {userAns || '(Bỏ trống - Không trả lời)'}
                           </span>
                         </div>
@@ -4196,7 +6369,7 @@ export default function App() {
                           <div className="bg-slate-100 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-slate-500 dark:text-slate-400">
                             <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                             <span className="font-semibold italic">
-                              Đáp án đúng đang được bảo mật bởi Giáo viên
+                              Giáo viên chưa bật hiển thị đáp án & kết quả đúng/sai
                             </span>
                           </div>
                         )}
@@ -4395,8 +6568,17 @@ export default function App() {
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl mb-8 relative overflow-hidden">
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="flex items-center gap-5">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-500 via-blue-500 to-cyan-400 text-white font-extrabold text-3xl flex items-center justify-center shadow-lg border-2 border-white/20">
-                {student.name ? student.name[0] : 'S'}
+              <div className="shrink-0 flex flex-col items-center">
+                <UserAvatarBadge user={student} sizeClass="w-20 h-20" textClass="text-3xl" rounded="rounded-2xl" />
+                {student.username === currentUser?.username && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAvatarModal(true)}
+                    className="mt-2 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-[11px] font-bold text-white flex items-center gap-1 transition"
+                  >
+                    <Camera className="w-3 h-3" /> Đổi Avatar
+                  </button>
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -4765,7 +6947,7 @@ export default function App() {
                             }}
                             className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold transition shadow-sm"
                           >
-                            Xem Bài Làm & AI
+                            Xem Chi Tiết
                           </button>
                         </td>
                       </tr>
@@ -4806,6 +6988,7 @@ export default function App() {
                   onClick={() => {
                     const textToSave = tempNoteText !== '' ? tempNoteText : (teacherNotes[activeUsername] || '');
                     setTeacherNotes(prev => ({ ...prev, [activeUsername]: textToSave }));
+                    dispatchSyncAction('UPSERT_NOTE', { username: activeUsername, text: textToSave });
                     showToast('Đã lưu nhận xét hồ sơ học viên thành công!');
                   }}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow flex items-center gap-2"
@@ -4835,12 +7018,15 @@ export default function App() {
             </div>
             <button
               onClick={() => {
-                initGameCampaign(currentRoomPin, currentUser);
-                setView('GAME_ARENA');
+                if (isTeacherViewer) {
+                  handleTeacherOpenLobby(currentRoomPin);
+                } else {
+                  openStudentGamePortal();
+                }
               }}
               className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow flex items-center gap-1.5"
             >
-              <Play className="w-3.5 h-3.5 fill-white" /> Vào Đấu Trường Game
+              <Play className="w-3.5 h-3.5 fill-white" /> Vào Sảnh Chờ Đấu Trường
             </button>
           </div>
 
@@ -4848,21 +7034,21 @@ export default function App() {
             <div className="bg-purple-950/60 rounded-2xl p-4 border border-purple-700/50">
               <p className="text-[11px] text-purple-300 font-bold uppercase">Điểm Kỷ Lục Phòng Game</p>
               <p className="text-2xl font-black text-amber-300 font-mono mt-1">
-                {playerGameRecord?.score || (activeUsername === 'hocsinh_01' ? 1850 : 1200)} pts
+                {playerGameRecord ? `${playerGameRecord.score} pts` : '0 pts'}
               </p>
             </div>
 
             <div className="bg-purple-950/60 rounded-2xl p-4 border border-purple-700/50">
               <p className="text-[11px] text-purple-300 font-bold uppercase">Cấp Độ Cao Nhất Đạt Được</p>
               <p className="text-sm font-extrabold text-cyan-300 mt-1">
-                {playerGameRecord?.status || 'Vòng 3: Boss Speller (Hoàn thành)'}
+                {playerGameRecord?.status || 'Chưa tham gia trận đấu nào'}
               </p>
             </div>
 
             <div className="bg-purple-950/60 rounded-2xl p-4 border border-purple-700/50">
               <p className="text-[11px] text-purple-300 font-bold uppercase">Chuỗi Combo Từ Đúng</p>
               <p className="text-2xl font-black text-pink-400 font-mono mt-1">
-                {playerGameRecord?.streak || (activeUsername === 'hocsinh_01' ? 8 : 4)}x Combo
+                {playerGameRecord ? `${playerGameRecord.streak}x Combo` : '0x Combo'}
               </p>
             </div>
           </div>
@@ -4875,7 +7061,9 @@ export default function App() {
   // RENDER TEACHER DASHBOARD HUB
   // ==========================================
   const renderTeacherDashboard = () => {
-    const room = roomsDb[currentRoomPin] || { pin: currentRoomPin, pass: 'ielts', players: {} };
+    const room = normalizeRoomObject(roomsDb[currentRoomPin] || { pin: currentRoomPin, pass: 'ielts', players: {} }, currentRoomPin);
+    const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin));
+    const lobbyPlayersList = Object.values(room.lobbyPlayers || {});
     const leaderboardPlayers = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
     const studentList = Object.values(usersDb).filter(u => u.role === 'student');
     const filteredStudents = studentList.filter(s =>
@@ -4894,7 +7082,7 @@ export default function App() {
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quản lý kho đề thi, chấm điểm bài làm với AI, giám sát chống gian lận và điều phối phòng Game PIN.</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => openExamBuilder()}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
@@ -4902,7 +7090,16 @@ export default function App() {
               <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
             </button>
             <button
-              onClick={() => setShowVocabModal(true)}
+              onClick={() => handleTeacherOpenLobby(currentRoomPin)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+            >
+              <Rocket className="w-4 h-4" /> Sảnh Chờ Game PIN ({currentRoomPin})
+            </button>
+            <button
+              onClick={() => {
+                setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
+                setShowVocabModal(true);
+              }}
               className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
             >
               <Edit className="w-4 h-4" /> Sửa Bộ Từ Game
@@ -5101,31 +7298,161 @@ export default function App() {
         {/* Tab 3: Phòng Đấu Game PIN & Leaderboard */}
         {teacherHubTab === 'game_room' && (
           <div className="space-y-6">
-            <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-2xl p-6 text-white border border-purple-800 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <p className="text-xs text-purple-300 font-bold uppercase">Mã Phòng Hiện Tại (PIN):</p>
-                <p className="text-3xl font-extrabold text-amber-300 font-mono tracking-wider">{currentRoomPin}</p>
-                <p className="text-xs text-slate-300 mt-1">Mật khẩu phòng: <b className="text-cyan-300">{room.pass}</b></p>
+            {/* Room Switcher + Create Room */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 mr-1">Danh sách phòng:</span>
+                {allRoomsList.map(r => {
+                  const isActiveRoom = r.pin === currentRoomPin;
+                  const rLobbyCount = Object.keys(r.lobbyPlayers || {}).length;
+                  return (
+                    <button
+                      key={r.pin}
+                      onClick={() => {
+                        setCurrentRoomPin(r.pin);
+                        setCustomVocabInput(r.rawVocab || DEFAULT_VOCAB_TEXT);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-2 ${
+                        isActiveRoom
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                      }`}
+                    >
+                      <span className="font-mono">#{r.pin}</span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${r.status === 'PLAYING' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                      {rLobbyCount > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActiveRoom ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'}`}>
+                          {rLobbyCount} chờ
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="flex gap-2">
+              <button
+                onClick={() => setShowCreateRoomModal(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" /> Tạo Phòng Mới
+              </button>
+            </div>
+
+            {/* Dropship Room Hero */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 rounded-3xl p-6 sm:p-7 text-white border border-indigo-500/30 shadow-xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider border ${
+                    room.status === 'LOBBY'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                      : room.status === 'PLAYING'
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                      : 'bg-slate-700/60 text-slate-300 border-slate-600'
+                  }`}>
+                    <Wifi className="w-3 h-3" />
+                    {room.status === 'LOBBY' ? 'Đang Mở Sảnh Chờ (Lobby)' : room.status === 'PLAYING' ? 'Trận Đấu Đang Diễn Ra' : 'Đã Kết Thúc'}
+                  </span>
+                  <span className="text-xs font-bold text-indigo-200">{room.name}</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div>
+                    <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider">Mã Phòng (PIN)</p>
+                    <p className="text-3xl font-black text-amber-300 font-mono tracking-widest">{currentRoomPin}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(currentRoomPin);
+                      setCopiedRoomPin(true);
+                      setTimeout(() => setCopiedRoomPin(false), 1800);
+                      showToast(`Đã sao chép mã phòng ${currentRoomPin}!`);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold border border-white/15 flex items-center gap-1.5 transition"
+                    title="Sao chép mã phòng"
+                  >
+                    {copiedRoomPin ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedRoomPin ? 'Đã chép' : 'Copy PIN'}</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 mt-2.5">
+                  <span>Mật khẩu: <b className="text-cyan-300 font-mono">{room.pass}</b></span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-emerald-400" />
+                    <b>{lobbyPlayersList.length}</b> học sinh trong Sảnh Chờ
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  onClick={() => handleTeacherOpenLobby(currentRoomPin)}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl transition shadow-lg flex items-center gap-2"
+                >
+                  <Rocket className="w-4 h-4" /> Mở Sảnh Chờ (Among Us)
+                </button>
+                {room.status !== 'LOBBY' && (
+                  <button
+                    onClick={() => handleTeacherResetLobby(currentRoomPin)}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Mở Lại Sảnh Mới
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     initGameCampaign(currentRoomPin, currentUser);
                     setView('GAME_ARENA');
                   }}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl transition shadow flex items-center gap-2"
+                  className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/40 font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
                 >
-                  <Gamepad2 className="w-4 h-4" /> Mở Màn Hình Game
+                  <Gamepad2 className="w-4 h-4" /> Chơi Thử GV
                 </button>
                 <button
-                  onClick={() => setShowVocabModal(true)}
-                  className="bg-purple-700 hover:bg-purple-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition border border-purple-500"
+                  onClick={() => {
+                    setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
+                    setShowVocabModal(true);
+                  }}
+                  className="bg-purple-600/80 hover:bg-purple-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition border border-purple-400/40 flex items-center gap-1.5"
                 >
-                  📝 Sửa Bộ 12 Từ Của Phòng
+                  <Edit className="w-3.5 h-3.5" /> Sửa Bộ Từ Vựng
                 </button>
               </div>
             </div>
+
+            {/* Live Lobby Crewmates Preview */}
+            {lobbyPlayersList.length > 0 && (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-500" /> Phi Hành Đoàn Đang Chờ Trong Sảnh ({lobbyPlayersList.length})
+                  </h3>
+                  <button
+                    onClick={() => handleTeacherOpenLobby(currentRoomPin)}
+                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                  >
+                    Vào Sảnh Điều Phối <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {lobbyPlayersList.map(lp => (
+                    <div key={lp.username} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <AmongUsCrewmate colorId={lp.colorId} size={28} />
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                          {lp.name}
+                          {lp.role === 'teacher' && <Crown className="w-3 h-3 text-amber-500" />}
+                        </p>
+                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          {lp.ready ? 'Đã sẵn sàng' : 'Đang chuẩn bị'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Leaderboard Table */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -6266,13 +8593,13 @@ export default function App() {
       {view === 'TEACHER_DASHBOARD' && renderTeacherDashboard()}
       {view === 'EXAM_BUILDER' && renderExamBuilder()}
 
-      {/* AI Key Configuration Modal */}
-      {showApiKeyModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+      {/* AI Key Configuration Modal (Strictly Teacher Only) */}
+      {showApiKeyModal && currentUser?.role === 'teacher' && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Key className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Cấu Hình AI Grader API Key
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Key className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Cấu Hình Google Gemini API Key
               </h3>
               <button onClick={() => setShowApiKeyModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
                 <X className="w-5 h-5" />
@@ -6281,33 +8608,72 @@ export default function App() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Google Gemini API Key
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Google Gemini API Key (Chỉ dành cho Giáo viên)
                 </label>
-                <input
-                  type="password"
-                  placeholder="AIzaSy..."
-                  value={aiApiKey}
-                  onChange={e => setAiApiKey(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
-                  Lấy API Key miễn phí tại <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline font-semibold">Google AI Studio</a>. Nếu để trống, hệ thống sẽ sử dụng thuật toán AI Examiner mô phỏng tiêu chí IELTS có sẵn.
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="AIzaSy..."
+                    value={aiApiKey}
+                    onChange={e => {
+                      setAiApiKey(e.target.value);
+                      if (apiTestState.ok !== null) setApiTestState({ testing: false, ok: null, message: '', model: '' });
+                    }}
+                    className="flex-1 px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleTestGeminiKey(aiApiKey)}
+                    disabled={apiTestState.testing}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-900 dark:bg-indigo-600 hover:bg-slate-800 dark:hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60 shrink-0"
+                  >
+                    {apiTestState.testing ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang thử...</>
+                    ) : (
+                      <><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Kiểm Tra Key</>
+                    )}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                  Tạo Key miễn phí tại <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline font-semibold">Google AI Studio</a>. Hệ thống tự động dò model khả dụng mới nhất (Gemini 2.5 Flash / 2.0 Flash...) cho API Key của bạn.
                 </p>
               </div>
 
+              {apiTestState.ok !== null && (
+                <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+                  apiTestState.ok
+                    ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                    : 'bg-rose-50 dark:bg-rose-500/15 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200'
+                }`}>
+                  {apiTestState.ok ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <p className="font-bold">{apiTestState.ok ? 'Key hoạt động bình thường!' : 'Không thể xác thực API Key'}</p>
+                    <p className="mt-0.5 text-[11px] opacity-90">{apiTestState.message}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
+                  type="button"
                   onClick={() => setShowApiKeyModal(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
                 >
                   Đóng
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
-                    localStorage.setItem('ielts_ai_key', aiApiKey);
+                    const trimmed = (aiApiKey || '').trim();
+                    setAiApiKey(trimmed);
+                    localStorage.setItem('ielts_ai_key', trimmed);
                     setShowApiKeyModal(false);
-                    alert('Đã lưu cấu hình API Key!');
+                    showToast(trimmed ? 'Đã lưu Google Gemini API Key!' : 'Đã xóa API Key (sẽ dùng bộ chấm tích hợp).');
                   }}
                   className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm"
                 >
@@ -6316,6 +8682,74 @@ export default function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Teacher Create Game Room Modal */}
+      {showCreateRoomModal && currentUser?.role === 'teacher' && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleCreateRoom} className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Rocket className="w-4 h-4 text-emerald-500" /> Tạo Phòng Đấu Từ Vựng Mới
+              </h3>
+              <button type="button" onClick={() => setShowCreateRoomModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tên phòng đấu</label>
+                <input
+                  type="text"
+                  value={newRoomForm.name}
+                  onChange={e => setNewRoomForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="VD: Phòng Ôn Từ Vựng Band 7.0"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mã PIN (Để trống = Tự tạo)</label>
+                  <input
+                    type="text"
+                    value={newRoomForm.pin}
+                    onChange={e => setNewRoomForm(prev => ({ ...prev, pin: e.target.value }))}
+                    placeholder="6 số ngẫu nhiên"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mật khẩu phòng</label>
+                  <input
+                    type="text"
+                    value={newRoomForm.pass}
+                    onChange={e => setNewRoomForm(prev => ({ ...prev, pass: e.target.value }))}
+                    placeholder="ielts"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateRoomModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Tạo Phòng & Mở Lobby
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       )}
 
@@ -6364,12 +8798,16 @@ export default function App() {
                     setRoomsDb(prev => ({
                       ...prev,
                       [currentRoomPin]: {
-                        ...prev[currentRoomPin],
+                        ...normalizeRoomObject(prev[currentRoomPin], currentRoomPin),
                         rawVocab: customVocabInput
                       }
                     }));
+                    dispatchSyncAction('UPSERT_ROOM', {
+                      pin: currentRoomPin,
+                      updates: { rawVocab: customVocabInput }
+                    });
                     setShowVocabModal(false);
-                    alert(`Đã lưu ${parsed.length} từ vựng cho phòng ${currentRoomPin}!`);
+                    showToast(`Đã lưu ${parsed.length} từ vựng cho phòng ${currentRoomPin}!`);
                   }}
                   className="px-4 py-2 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow"
                 >
@@ -6380,10 +8818,115 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Account Avatar Upload & In-Game Head Preview Modal */}
+      {showAvatarModal && currentUser && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Camera className="w-4 h-4 text-indigo-500" /> Ảnh Đại Diện & Nhân Vật Game
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAvatarModal(false)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center text-center">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2">Avatar Tài Khoản</p>
+                <UserAvatarBadge user={currentUser} sizeClass="w-20 h-20" textClass="text-2xl" rounded="rounded-2xl" />
+              </div>
+              <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 flex flex-col items-center text-center">
+                <p className="text-[11px] font-bold text-cyan-300 mb-2">Trong Game</p>
+                <AmongUsCrewmate
+                  colorId={currentUser.avatarUrl ? 'avatar' : myCrewColor}
+                  avatarUrl={currentUser.avatarUrl}
+                  size={68}
+                  animate={true}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+              Tải ảnh khuôn mặt lên để dùng làm Avatar tài khoản và mở khóa tùy chọn <b>Đầu Avatar</b> trên phi hành gia trong Sảnh Chờ &amp; Bảng Đua Top.
+            </p>
+
+            <div className="space-y-2.5">
+              <label className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold cursor-pointer transition flex items-center justify-center gap-2 shadow-sm">
+                <Upload className="w-4 h-4" />
+                <span>{currentUser.avatarUrl ? 'Chọn Ảnh Khác' : 'Tải Ảnh Khuôn Mặt Lên'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    try {
+                      const compressed = await compressAvatarImageFile(file, 160);
+                      handleUpdateUserAvatar(compressed);
+                    } catch (err) {
+                      showToast(err.message || 'Không thể xử lý ảnh này!', 'error');
+                    }
+                  }}
+                />
+              </label>
+
+              {currentUser.avatarUrl && (
+                <div className="flex items-center gap-2">
+                  {myCrewColor !== 'avatar' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleChangeCrewColor('avatar');
+                        showToast('Đã chọn đầu Avatar làm nhân vật Game!');
+                      }}
+                      className="flex-1 py-2 px-3 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-700 dark:text-cyan-300 text-xs font-bold transition"
+                    >
+                      Đặt làm nhân vật Game
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateUserAvatar('')}
+                    className="flex-1 py-2 px-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 dark:hover:bg-rose-500/25 border border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs font-bold transition"
+                  >
+                    Gỡ Ảnh Avatar
+                  </button>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Global Floating Toast */}
       {globalToast.visible && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 dark:bg-slate-800 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-emerald-400" />
+        <div className={`fixed bottom-6 right-6 z-50 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2 max-w-md ${
+          globalToast.type === 'error'
+            ? 'bg-rose-900 dark:bg-rose-950 border-rose-500'
+            : 'bg-slate-900 dark:bg-slate-800 border-slate-700'
+        }`}>
+          {globalToast.type === 'error' ? (
+            <AlertTriangle className="w-4 h-4 text-rose-300 shrink-0" />
+          ) : (
+            <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
           <span>{globalToast.text}</span>
         </div>
       )}
