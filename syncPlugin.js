@@ -1,7 +1,9 @@
-// Built-in Realtime Sync Relay Middleware for Vite Dev & Preview Servers
-// Enables cross-browser sync (Chrome <-> Edge <-> Incognito <-> LAN devices) for Game Lobby, Chat, Scores, and Exams.
+// Built-in Realtime Sync Relay Middleware for Vite Dev & Production Node Server
+// Enables cross-browser & cross-device sync (Lobby, Chat, Đua Top Scores, Exams, Avatars).
+import fs from 'node:fs';
+import path from 'node:path';
 
-function normalizeServerRoom(raw = {}, pinKey = '') {
+export function normalizeServerRoom(raw = {}, pinKey = '') {
   const pin = String(raw?.pin || pinKey || '').trim();
   const baseChats = Array.isArray(raw?.chatMessages) ? raw.chatMessages : [];
   return {
@@ -30,6 +32,61 @@ function createInitialStore() {
     teacherNotes: {},
     users: {}
   };
+}
+
+/**
+ * Create a sync store optionally backed by a JSON file on disk (debounced writes).
+ * Keeps existing in-memory behavior when `persistFile` is empty.
+ */
+export function createPersistentSyncStore(persistFile = '') {
+  const store = createInitialStore();
+
+  if (persistFile) {
+    try {
+      if (fs.existsSync(persistFile)) {
+        const parsed = JSON.parse(fs.readFileSync(persistFile, 'utf8'));
+        if (parsed && typeof parsed === 'object') {
+          store.version = Number(parsed.version) || 0;
+          store.seeded = Boolean(parsed.seeded);
+          if (parsed.rooms && typeof parsed.rooms === 'object') {
+            Object.entries(parsed.rooms).forEach(([pin, r]) => {
+              store.rooms[pin] = normalizeServerRoom(r, pin);
+            });
+          }
+          if (Array.isArray(parsed.tests)) store.tests = parsed.tests;
+          if (Array.isArray(parsed.attempts)) store.attempts = parsed.attempts;
+          if (parsed.teacherNotes && typeof parsed.teacherNotes === 'object') {
+            store.teacherNotes = parsed.teacherNotes;
+          }
+          if (parsed.users && typeof parsed.users === 'object') {
+            store.users = parsed.users;
+          }
+        }
+      }
+    } catch {
+      // Fall back cleanly to a fresh in-memory store if state file is corrupt or unreadable
+    }
+  }
+
+  let writeTimer = null;
+  const schedulePersist = () => {
+    if (!persistFile) return;
+    if (writeTimer) clearTimeout(writeTimer);
+    writeTimer = setTimeout(() => {
+      writeTimer = null;
+      try {
+        fs.mkdirSync(path.dirname(persistFile), { recursive: true });
+        const tmpFile = `${persistFile}.tmp`;
+        fs.writeFileSync(tmpFile, JSON.stringify(store), 'utf8');
+        fs.renameSync(tmpFile, persistFile);
+      } catch {
+        // Ignore read-only filesystem errors so realtime relay never crashes
+      }
+    }, 200);
+    writeTimer.unref?.();
+  };
+
+  return { store, schedulePersist };
 }
 
 function readJsonBody(req) {
@@ -388,7 +445,7 @@ function applySyncAction(store, type, payload = {}) {
   return changed;
 }
 
-function attachSyncMiddleware(middlewares, store, sseClients) {
+export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null) {
   const broadcast = () => {
     const dataStr = `event: sync\ndata: ${JSON.stringify(getSnapshot(store))}\n\n`;
     for (const res of sseClients) {
@@ -416,6 +473,7 @@ function attachSyncMiddleware(middlewares, store, sseClients) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders?.();
 
       sseClients.add(res);
@@ -441,7 +499,10 @@ function attachSyncMiddleware(middlewares, store, sseClients) {
       try {
         const body = await readJsonBody(req);
         const changed = applySyncAction(store, body.type, body.payload);
-        if (changed) broadcast();
+        if (changed) {
+          onChanged?.(store);
+          broadcast();
+        }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify({ ok: true, snapshot: getSnapshot(store) }));
@@ -457,17 +518,17 @@ function attachSyncMiddleware(middlewares, store, sseClients) {
   });
 }
 
-export function lexiprepSyncPlugin() {
-  const store = createInitialStore();
+export function lexiprepSyncPlugin({ persistFile = process.env.SYNC_STATE_FILE || '' } = {}) {
+  const { store, schedulePersist } = createPersistentSyncStore(persistFile);
   const sseClients = new Set();
 
   return {
     name: 'lexiprep-realtime-sync',
     configureServer(server) {
-      attachSyncMiddleware(server.middlewares, store, sseClients);
+      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist);
     },
     configurePreviewServer(server) {
-      attachSyncMiddleware(server.middlewares, store, sseClients);
+      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist);
     }
   };
 }
