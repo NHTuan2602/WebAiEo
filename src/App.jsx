@@ -56,7 +56,11 @@ import {
   Camera,
   TrendingDown,
   Heart,
-  Zap
+  Zap,
+  Globe,
+  ArrowUp,
+  ArrowDown,
+  SlidersHorizontal
 } from 'lucide-react';
 
 // ==========================================
@@ -78,12 +82,66 @@ RESILIENT | Kiên cường, có khả năng phục hồi nhanh | /rɪˈzɪl.i.ə
 const FALLBACK_DISTRACTORS = ["ABUNDANT", "OBSOLETE", "FLOURISH", "STAGNANT", "CONDUCIVE", "SPORADIC", "EMPIRICAL", "TRIVIAL"];
 const GAME_ROUND_TIME_LIMITS = { 1: 20, 2: 25, 3: 25 };
 
+const DEFAULT_SECTION_ORDER = ['listening', 'reading', 'writing'];
+const DEFAULT_SECTION_DURATIONS = { listening: 15, reading: 20, writing: 25 };
+
+const normalizeExamConfig = (test) => {
+  const rawOrder = Array.isArray(test?.sectionOrder) ? test.sectionOrder : DEFAULT_SECTION_ORDER;
+  const validSkills = new Set(DEFAULT_SECTION_ORDER);
+  const deduped = rawOrder.filter((s, idx) => validSkills.has(s) && rawOrder.indexOf(s) === idx);
+  const missing = DEFAULT_SECTION_ORDER.filter(s => !deduped.includes(s));
+  const order = [...deduped, ...missing];
+
+  const rawDurations = test?.sectionDurations || {};
+  const durations = {
+    listening: Math.max(1, Number(rawDurations.listening ?? DEFAULT_SECTION_DURATIONS.listening) || 15),
+    reading: Math.max(1, Number(rawDurations.reading ?? DEFAULT_SECTION_DURATIONS.reading) || 20),
+    writing: Math.max(1, Number(rawDurations.writing ?? DEFAULT_SECTION_DURATIONS.writing) || 25)
+  };
+
+  return {
+    visibility: test?.visibility === 'private' ? 'private' : 'public',
+    maxAttempts: Math.max(0, Number(test?.maxAttempts ?? 0) || 0),
+    sequentialMode: test?.sequentialMode !== false,
+    allowEarlyNextSection: !!test?.allowEarlyNextSection,
+    order,
+    durations
+  };
+};
+
+const getReadingPassages = (readingObj) => {
+  if (Array.isArray(readingObj?.passages) && readingObj.passages.length > 0) {
+    return readingObj.passages.map((p, idx) => ({
+      id: p.id || `passage-${idx + 1}`,
+      title: p.title || `Bài đọc ${idx + 1}`,
+      imageUrl: p.imageUrl || '',
+      imageFileName: p.imageFileName || '',
+      passageText: p.passageText || ''
+    }));
+  }
+  return [
+    {
+      id: 'passage-1',
+      title: readingObj?.passageTitle || 'Reading Passage 1',
+      imageUrl: readingObj?.imageUrl || '',
+      imageFileName: readingObj?.imageFileName || '',
+      passageText: readingObj?.passageText || ''
+    }
+  ];
+};
+
 const DEFAULT_TESTS = [
   {
     id: 'test-1',
     title: 'IELTS Academic Practice Test 01 - Full Simulation',
     description: 'Đề thi thử Academic 3 kỹ năng Listening, Reading, Writing chuẩn cấu trúc IDP/BC.',
     createdAt: '2026-03-01',
+    visibility: 'public',
+    maxAttempts: 0,
+    sequentialMode: true,
+    allowEarlyNextSection: false,
+    sectionOrder: ['listening', 'reading', 'writing'],
+    sectionDurations: { listening: 15, reading: 20, writing: 25 },
     maxAudioPlays: 1,
     shuffleOptions: true,
     allowViewAnswers: false, // Quản lý bởi Giáo viên: Mặc định KHÓA đáp án đúng
@@ -1082,16 +1140,61 @@ export default function App() {
     dispatchSyncAction('TOGGLE_TEST_ANSWERS', { testId });
   };
 
+  // Teacher Action: Toggle Exam Visibility (public <-> private)
+  const toggleTestVisibility = (testId) => {
+    let nextVisibility = 'public';
+    setTests(prev =>
+      prev.map(t => {
+        if (t.id === testId) {
+          nextVisibility = (t.visibility || 'public') === 'private' ? 'public' : 'private';
+          return { ...t, visibility: nextVisibility };
+        }
+        return t;
+      })
+    );
+    showToast(
+      nextVisibility === 'private'
+        ? 'Đã chuyển đề thi sang chế độ Ẩn (Chỉ mình giáo viên thấy).'
+        : 'Đã công khai đề thi — Học viên có thể nhìn thấy & làm bài.'
+    );
+    dispatchSyncAction('TOGGLE_TEST_VISIBILITY', { testId });
+  };
+
+  // Update User Target Band / Display Name / Goal (Teacher or Student)
+  const handleUpdateUserProfileFields = (username, patch) => {
+    if (!username || !usersDb[username]) return;
+    const targetUser = usersDb[username];
+    const cleanBand =
+      patch.targetBand !== undefined
+        ? Math.min(9.0, Math.max(4.0, Math.round((Number(patch.targetBand) || 7.0) * 2) / 2))
+        : targetUser.targetBand;
+    const updatedUser = {
+      ...targetUser,
+      ...(patch.name !== undefined ? { name: patch.name.trim() || targetUser.name } : {}),
+      ...(patch.targetBand !== undefined ? { targetBand: cleanBand } : {}),
+      ...(patch.studyGoal !== undefined ? { studyGoal: patch.studyGoal.trim() } : {})
+    };
+    setUsersDb(prev => ({ ...prev, [username]: updatedUser }));
+    if (currentUser?.username === username) {
+      setCurrentUser(updatedUser);
+    }
+    dispatchSyncAction('UPSERT_USER', { username, user: updatedUser });
+    showToast(`Đã cập nhật mục tiêu cho ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`);
+  };
+
   // Exam Mode State
   const [examState, setExamState] = useState({
     skill: 'listening',
-    timeRemaining: 1800,
+    sectionIdx: 0,
+    timeRemaining: 900,
     answers: {},
     audioPlays: {},
     highlights: [],
     notes: [],
     antiCheatLogs: [],
-    tabSwitchCount: 0
+    tabSwitchCount: 0,
+    readingPassageIdx: 0,
+    showAllReadingQs: false
   });
 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -1109,14 +1212,30 @@ export default function App() {
   // Exam Builder State
   const [editingTest, setEditingTest] = useState(null);
   const [builderTab, setBuilderTab] = useState('general'); // 'general', 'listening', 'reading', 'writing'
+  const [builderReadingIdx, setBuilderReadingIdx] = useState(0);
+  const [zoomedReadingImg, setZoomedReadingImg] = useState('');
+  const [editingTargetUser, setEditingTargetUser] = useState(null);
   const [testForm, setTestForm] = useState({
     title: '',
     description: '',
+    visibility: 'private',
+    maxAttempts: 0,
+    sequentialMode: true,
+    allowEarlyNextSection: false,
+    sectionOrder: [...DEFAULT_SECTION_ORDER],
+    sectionDurations: { ...DEFAULT_SECTION_DURATIONS },
     maxAudioPlays: 1,
     shuffleOptions: true,
     allowViewAnswers: false,
     listening: { audioUrl: '', audioFileName: '', transcript: '', questions: [] },
-    reading: { passageTitle: '', passageText: '', imageUrl: '', imageFileName: '', questions: [] },
+    reading: {
+      passageTitle: '',
+      passageText: '',
+      imageUrl: '',
+      imageFileName: '',
+      passages: [{ id: 'passage-1', title: 'Bài đọc 1', imageUrl: '', imageFileName: '', passageText: '' }],
+      questions: []
+    },
     writing: {
       task1: { prompt: '', minWords: 150, imageUrl: '', modelAnswer: '' },
       task2: { prompt: '', minWords: 250, modelAnswer: '' }
@@ -1276,6 +1395,11 @@ export default function App() {
       setUsersDb(prev => {
         const merged = { ...prev, ...snap.users };
         return JSON.stringify(prev) === JSON.stringify(merged) ? prev : merged;
+      });
+      setCurrentUser(prev => {
+        if (!prev || !snap.users[prev.username]) return prev;
+        const remote = snap.users[prev.username];
+        return JSON.stringify(prev) === JSON.stringify(remote) ? prev : { ...prev, ...remote };
       });
     }
   };
@@ -2154,22 +2278,30 @@ export default function App() {
     };
   }, [view]);
 
-  // Exam Countdown Timer
+  const examAutoAdvanceHandledRef = useRef(null);
+  const autoAdvanceFnRef = useRef(null);
+
+  // Exam Countdown Timer (only decrements safely; timeout triggers separate effect below)
   useEffect(() => {
     if (view !== 'EXAM_MODE') return;
 
     const timer = setInterval(() => {
-      setExamState(prev => {
-        if (prev.timeRemaining <= 1) {
-          clearInterval(timer);
-          return { ...prev, timeRemaining: 0 };
-        }
-        return { ...prev, timeRemaining: prev.timeRemaining - 1 };
-      });
+      setExamState(prev => ({
+        ...prev,
+        timeRemaining: prev.timeRemaining > 0 ? prev.timeRemaining - 1 : 0
+      }));
     }, 1000);
 
     return () => clearInterval(timer);
   }, [view]);
+
+  useEffect(() => {
+    if (view !== 'EXAM_MODE' || examState.timeRemaining > 0) return;
+    const key = `${selectedTestId}:${examState.sectionIdx}`;
+    if (examAutoAdvanceHandledRef.current === key) return;
+    examAutoAdvanceHandledRef.current = key;
+    autoAdvanceFnRef.current?.();
+  }, [view, examState.timeRemaining, examState.sectionIdx, selectedTestId]);
 
   // ==========================================
   // AUTHENTICATION HANDLERS
@@ -2246,20 +2378,53 @@ export default function App() {
   // ==========================================
   // EXAM HANDLERS
   // ==========================================
+  const stopExamAudio = () => {
+    if (examAudioRef.current) {
+      examAudioRef.current.pause();
+      examAudioRef.current = null;
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsPlayingAudio(false);
+  };
+
   const startExam = (testId) => {
     const test = tests.find(t => t.id === testId);
     if (!test) return;
-    
+
+    const cfg = normalizeExamConfig(test);
+    if (cfg.visibility === 'private' && currentUser?.role !== 'teacher') {
+      showToast('Đề thi này đang ở chế độ riêng tư (Giáo viên chưa công khai).');
+      return;
+    }
+
+    if (currentUser?.role !== 'teacher' && cfg.maxAttempts > 0) {
+      const usedCount = attempts.filter(
+        a => (a.studentId === currentUser?.username || a.studentUsername === currentUser?.username) && a.testId === testId
+      ).length;
+      if (usedCount >= cfg.maxAttempts) {
+        showToast(`Bạn đã dùng hết ${cfg.maxAttempts} lượt làm đề thi này!`);
+        return;
+      }
+    }
+
+    const firstSkill = cfg.order[0] || 'listening';
+    examAutoAdvanceHandledRef.current = null;
+    stopExamAudio();
     setSelectedTestId(testId);
     setExamState({
-      skill: 'listening',
-      timeRemaining: 1800,
+      skill: firstSkill,
+      sectionIdx: 0,
+      timeRemaining: (cfg.durations[firstSkill] || 15) * 60,
       answers: {},
       audioPlays: { mainAudio: 0 },
       highlights: [],
       notes: [],
       antiCheatLogs: [],
-      tabSwitchCount: 0
+      tabSwitchCount: 0,
+      readingPassageIdx: 0,
+      showAllReadingQs: false
     });
     setView('EXAM_MODE');
   };
@@ -2315,14 +2480,7 @@ export default function App() {
   };
 
   const handleFinalExamSubmit = () => {
-    if (examAudioRef.current) {
-      examAudioRef.current.pause();
-      examAudioRef.current = null;
-    }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    setIsPlayingAudio(false);
+    stopExamAudio();
     const activeTest = tests.find(t => t.id === selectedTestId);
     if (!activeTest) return;
 
@@ -2371,6 +2529,46 @@ export default function App() {
     setSelectedAttemptId(newAttempt.id);
     setView('RESULT_VIEW');
   };
+
+  const advanceToNextExamSection = (isAutoTimeout = false) => {
+    const activeTest = tests.find(t => t.id === selectedTestId);
+    if (!activeTest) return;
+    const cfg = normalizeExamConfig(activeTest);
+    const currentIdx =
+      typeof examState.sectionIdx === 'number'
+        ? examState.sectionIdx
+        : Math.max(0, cfg.order.indexOf(examState.skill));
+    const nextIdx = currentIdx + 1;
+
+    stopExamAudio();
+
+    if (nextIdx >= cfg.order.length) {
+      if (isAutoTimeout) {
+        showToast('Hết giờ kỹ năng cuối cùng! Hệ thống đã tự động nộp bài.');
+      }
+      handleFinalExamSubmit();
+      return;
+    }
+
+    const nextSkill = cfg.order[nextIdx];
+    const nextDurationSecs = (cfg.durations[nextSkill] || 15) * 60;
+    const skillNames = { listening: 'Listening', reading: 'Reading', writing: 'Writing' };
+
+    setExamState(prev => ({
+      ...prev,
+      sectionIdx: nextIdx,
+      skill: nextSkill,
+      timeRemaining: nextDurationSecs,
+      readingPassageIdx: 0
+    }));
+    showToast(
+      isAutoTimeout
+        ? `Hết giờ phần trước — Tự động chuyển sang ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
+        : `Đã chuyển sang phần ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
+    );
+  };
+
+  autoAdvanceFnRef.current = () => advanceToNextExamSection(true);
 
   const handleTestGeminiKey = async (keyOverride = aiApiKey) => {
     const cleanKey = (keyOverride || '').trim();
@@ -2561,10 +2759,19 @@ export default function App() {
   // Exam Builder
   const openExamBuilder = (testToEdit = null) => {
     setEditingTest(testToEdit || null);
+    setBuilderReadingIdx(0);
     if (testToEdit) {
       const cloned = JSON.parse(JSON.stringify(testToEdit));
+      const cfg = normalizeExamConfig(cloned);
+      const passages = getReadingPassages(cloned.reading);
       setTestForm({
         ...cloned,
+        visibility: cfg.visibility,
+        maxAttempts: cfg.maxAttempts,
+        sequentialMode: cfg.sequentialMode,
+        allowEarlyNextSection: cfg.allowEarlyNextSection,
+        sectionOrder: cfg.order,
+        sectionDurations: cfg.durations,
         allowViewAnswers: cloned.allowViewAnswers ?? false,
         listening: {
           audioUrl: '',
@@ -2574,12 +2781,13 @@ export default function App() {
           ...(cloned.listening || {})
         },
         reading: {
-          passageTitle: '',
-          passageText: '',
-          imageUrl: '',
-          imageFileName: '',
+          passageTitle: passages[0]?.title || '',
+          passageText: passages[0]?.passageText || '',
+          imageUrl: passages[0]?.imageUrl || '',
+          imageFileName: passages[0]?.imageFileName || '',
           questions: [],
-          ...(cloned.reading || {})
+          ...(cloned.reading || {}),
+          passages
         },
         writing: {
           task1: { prompt: '', minWords: 150, imageUrl: '', modelAnswer: '', ...(cloned.writing?.task1 || {}) },
@@ -2592,6 +2800,12 @@ export default function App() {
         title: 'Đề Thi Thử IELTS Academic Mới',
         description: 'Đề thi chuẩn cấu trúc 3 kỹ năng Listening, Reading, Writing.',
         createdAt: new Date().toISOString().split('T')[0],
+        visibility: 'private',
+        maxAttempts: 0,
+        sequentialMode: true,
+        allowEarlyNextSection: false,
+        sectionOrder: [...DEFAULT_SECTION_ORDER],
+        sectionDurations: { ...DEFAULT_SECTION_DURATIONS },
         maxAudioPlays: 1,
         shuffleOptions: true,
         allowViewAnswers: false,
@@ -2615,14 +2829,24 @@ export default function App() {
           ]
         },
         reading: {
-          passageTitle: 'Reading Passage 1: Urban Architecture & Sustainability',
+          passageTitle: 'Bài 1: Urban Architecture & Sustainability',
           passageText: 'Modern cities are increasingly adopting sustainable architectural practices to reduce carbon footprints and improve residents\' quality of life...',
           imageUrl: '',
           imageFileName: '',
+          passages: [
+            {
+              id: 'passage-1',
+              title: 'Bài 1: Urban Architecture & Sustainability',
+              imageUrl: '',
+              imageFileName: '',
+              passageText: 'Modern cities are increasingly adopting sustainable architectural practices to reduce carbon footprints and improve residents\' quality of life...'
+            }
+          ],
           questions: [
             {
               id: 'rq-' + (Date.now() + 1),
               type: 'tfng',
+              passageIdx: 0,
               question: '1. Sustainable architecture helps lower carbon emissions in urban areas.',
               options: ['TRUE', 'FALSE', 'NOT GIVEN'],
               correctAnswer: 'TRUE'
@@ -2671,21 +2895,36 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Upload Image for Reading Passage (Teacher Builder)
-  const handleReadingImageUpload = (e) => {
+  // Upload Image for Reading Passage (Teacher Builder — supports multiple passages)
+  const updateReadingPassageField = (idx, patch) => {
+    setTestForm(prev => {
+      const passages = getReadingPassages(prev.reading);
+      const updatedPassages = passages.map((p, i) => (i === idx ? { ...p, ...patch } : p));
+      const first = updatedPassages[0] || {};
+      return {
+        ...prev,
+        reading: {
+          ...prev.reading,
+          passages: updatedPassages,
+          passageTitle: first.title || '',
+          passageText: first.passageText || '',
+          imageUrl: first.imageUrl || '',
+          imageFileName: first.imageFileName || ''
+        }
+      };
+    });
+  };
+
+  const handleReadingImageUpload = (e, targetIdx = builderReadingIdx) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setTestForm(prev => ({
-        ...prev,
-        reading: {
-          ...prev.reading,
-          imageUrl: ev.target.result,
-          imageFileName: file.name
-        }
-      }));
-      showToast(`Đã thêm ảnh minh họa bài đọc: ${file.name}`);
+      updateReadingPassageField(targetIdx, {
+        imageUrl: ev.target.result,
+        imageFileName: file.name
+      });
+      showToast(`Đã thêm ảnh bài đọc số ${targetIdx + 1}: ${file.name}`);
     };
     reader.readAsDataURL(file);
   };
@@ -2720,7 +2959,8 @@ export default function App() {
       type: 'mcq',
       question: `${nextNum}. Nhập nội dung câu hỏi số ${nextNum}...`,
       options: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'],
-      correctAnswer: 'A. Đáp án A'
+      correctAnswer: 'A. Đáp án A',
+      ...(skill === 'reading' ? { passageIdx: builderReadingIdx } : {})
     };
     setTestForm(prev => ({
       ...prev,
@@ -2788,17 +3028,37 @@ export default function App() {
       alert('Vui lòng nhập tên đề thi!');
       return;
     }
-    const existingIndex = tests.findIndex(t => t.id === testForm.id);
+    const cfg = normalizeExamConfig(testForm);
+    const passages = getReadingPassages(testForm.reading);
+    const firstPassage = passages[0] || {};
+    const normalizedTest = {
+      ...testForm,
+      visibility: cfg.visibility,
+      maxAttempts: cfg.maxAttempts,
+      sequentialMode: cfg.sequentialMode,
+      allowEarlyNextSection: cfg.allowEarlyNextSection,
+      sectionOrder: cfg.order,
+      sectionDurations: cfg.durations,
+      reading: {
+        ...testForm.reading,
+        passages,
+        passageTitle: firstPassage.title || '',
+        passageText: firstPassage.passageText || '',
+        imageUrl: firstPassage.imageUrl || '',
+        imageFileName: firstPassage.imageFileName || ''
+      }
+    };
+    const existingIndex = tests.findIndex(t => t.id === normalizedTest.id);
     if (existingIndex >= 0) {
       const updated = [...tests];
-      updated[existingIndex] = testForm;
+      updated[existingIndex] = normalizedTest;
       setTests(updated);
-      showToast(`Đã cập nhật đề thi "${testForm.title}" thành công!`);
+      showToast(`Đã cập nhật đề thi "${normalizedTest.title}" thành công!`);
     } else {
-      setTests([...tests, testForm]);
-      showToast(`Đã tạo mới đề thi "${testForm.title}" thành công!`);
+      setTests([...tests, normalizedTest]);
+      showToast(`Đã tạo mới đề thi "${normalizedTest.title}" thành công!`);
     }
-    dispatchSyncAction('UPSERT_TEST', { test: testForm });
+    dispatchSyncAction('UPSERT_TEST', { test: normalizedTest });
     setEditingTest(null);
     setView('TEACHER_DASHBOARD');
   };
@@ -4143,7 +4403,8 @@ export default function App() {
   // RENDER STUDENT HOME PAGE (CLEAN EDTECH DASHBOARD)
   // ==========================================
   const renderStudentHome = () => {
-    const studentAttempts = attempts.filter(a => a.studentId === currentUser?.username);
+    const visibleTests = tests.filter(t => normalizeExamConfig(t).visibility !== 'private');
+    const studentAttempts = attempts.filter(a => a.studentId === currentUser?.username || a.studentUsername === currentUser?.username);
     const gradedBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number' && b > 0);
     const bestOverallBand = gradedBands.length > 0 ? Math.max(...gradedBands) : null;
 
@@ -4166,9 +4427,9 @@ export default function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 shrink-0">
-              {tests.length > 0 && (
+              {visibleTests.length > 0 && (
                 <button
-                  onClick={() => startExam(tests[0].id)}
+                  onClick={() => startExam(visibleTests[0].id)}
                   className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-xl shadow-md transition flex items-center gap-2"
                 >
                   <Play className="w-4 h-4 fill-white" /> Làm Đề Thi Thử
@@ -4192,7 +4453,7 @@ export default function App() {
             </div>
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Đề thi khả dụng</p>
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">{tests.length}</p>
+              <p className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">{visibleTests.length}</p>
             </div>
           </div>
 
@@ -4218,14 +4479,37 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Target className="w-5 h-5" />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Target className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mục tiêu Band</p>
+                <p className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">{currentUser?.targetBand || '8.0'}</p>
+                {currentUser?.studyGoal && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[140px]" title={currentUser.studyGoal}>
+                    {currentUser.studyGoal}
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Mục tiêu Band</p>
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">{currentUser?.targetBand || '8.0'}</p>
-            </div>
+            {currentUser && (
+              <button
+                onClick={() =>
+                  setEditingTargetUser({
+                    username: currentUser.username,
+                    name: currentUser.name || '',
+                    targetBand: currentUser.targetBand || 7.5,
+                    studyGoal: currentUser.studyGoal || ''
+                  })
+                }
+                title="Chỉnh sửa mục tiêu Band"
+                className="p-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 transition shrink-0"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -4234,52 +4518,101 @@ export default function App() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Bộ Đề Thi Thử IELTS</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Chọn một đề thi để bắt đầu làm bài theo chuẩn thời gian</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Chọn một đề thi công khai để bắt đầu làm bài theo chuẩn thời gian từng kỹ năng</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {tests.map(test => (
-              <div
-                key={test.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col justify-between hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all"
-              >
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold px-2.5 py-1 rounded-lg">
-                      IELTS Academic
-                    </span>
-                    <span className="text-xs text-slate-400">{test.createdAt}</span>
-                  </div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5 leading-snug">{test.title}</h3>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs mb-5 line-clamp-2 leading-relaxed">{test.description}</p>
+          {visibleTests.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400 text-sm">
+              Hiện chưa có đề thi công khai nào. Giáo viên sẽ mở đề khi bắt đầu buổi kiểm tra.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {visibleTests.map(test => {
+                const cfg = normalizeExamConfig(test);
+                const myUsedCount = studentAttempts.filter(a => a.testId === test.id).length;
+                const isExhausted = cfg.maxAttempts > 0 && myUsedCount >= cfg.maxAttempts;
+                const skillShort = { listening: 'L', reading: 'R', writing: 'W' };
+                const totalMins = cfg.order.reduce((sum, s) => sum + (cfg.durations[s] || 0), 0);
 
-                  <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800 text-xs mb-5 text-center">
+                return (
+                  <div
+                    key={test.id}
+                    className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col justify-between hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all"
+                  >
                     <div>
-                      <p className="text-[11px] text-slate-400 font-medium">Listening</p>
-                      <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">{test.listening?.questions?.length || 0} câu</p>
-                    </div>
-                    <div className="border-x border-slate-100 dark:border-slate-800">
-                      <p className="text-[11px] text-slate-400 font-medium">Reading</p>
-                      <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">{test.reading?.questions?.length || 0} câu</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-slate-400 font-medium">Writing</p>
-                      <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">2 Tasks</p>
-                    </div>
-                  </div>
-                </div>
+                      <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+                        <span className="bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold px-2.5 py-1 rounded-lg">
+                          IELTS Academic • {totalMins}p
+                        </span>
+                        <span
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+                            cfg.maxAttempts === 0
+                              ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                              : isExhausted
+                              ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                              : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                          }`}
+                        >
+                          {cfg.maxAttempts === 0
+                            ? `Không giới hạn (${myUsedCount} lượt)`
+                            : `Giới hạn ${myUsedCount}/${cfg.maxAttempts} lượt`}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5 leading-snug">{test.title}</h3>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs mb-4 line-clamp-2 leading-relaxed">{test.description}</p>
 
-                <button
-                  onClick={() => startExam(test.id)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <Play className="w-3.5 h-3.5 fill-white" />
-                  <span>Bắt Đầu Làm Bài</span>
-                </button>
-              </div>
-            ))}
-          </div>
+                      <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800 text-xs mb-3 text-center">
+                        <div>
+                          <p className="text-[11px] text-slate-400 font-medium">Listening ({cfg.durations.listening}p)</p>
+                          <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">{test.listening?.questions?.length || 0} câu</p>
+                        </div>
+                        <div className="border-x border-slate-100 dark:border-slate-800">
+                          <p className="text-[11px] text-slate-400 font-medium">Reading ({cfg.durations.reading}p)</p>
+                          <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">{test.reading?.questions?.length || 0} câu</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-slate-400 font-medium">Writing ({cfg.durations.writing}p)</p>
+                          <p className="font-bold text-slate-800 dark:text-slate-100 mt-0.5">2 Tasks</p>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 flex items-center justify-between gap-2">
+                        <span>Thứ tự: {cfg.order.map(s => skillShort[s]).join(' → ')}</span>
+                        {cfg.sequentialMode && (
+                          <span className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold">
+                            <Lock className="w-3 h-3" /> Tuần tự
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => startExam(test.id)}
+                      disabled={isExhausted}
+                      className={`w-full font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm ${
+                        isExhausted
+                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      }`}
+                    >
+                      {isExhausted ? (
+                        <>
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Đã hết lượt làm bài ({myUsedCount}/{cfg.maxAttempts})</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 fill-white" />
+                          <span>{myUsedCount > 0 ? 'Làm Lại Đề Thi' : 'Bắt Đầu Làm Bài'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Clean Student Attempt History */}
@@ -5609,6 +5942,26 @@ export default function App() {
     const activeTest = tests.find(t => t.id === selectedTestId);
     if (!activeTest) return null;
 
+    const cfg = normalizeExamConfig(activeTest);
+    const currentSectionIdx =
+      typeof examState.sectionIdx === 'number'
+        ? Math.min(Math.max(0, examState.sectionIdx), cfg.order.length - 1)
+        : Math.max(0, cfg.order.indexOf(examState.skill));
+    const skillMeta = {
+      listening: { label: 'Listening', icon: Headphones },
+      reading: { label: 'Reading', icon: BookOpen },
+      writing: { label: 'Writing', icon: PenTool }
+    };
+    const readingPassages = getReadingPassages(activeTest.reading);
+    const safePassageIdx = Math.min(Math.max(0, examState.readingPassageIdx || 0), readingPassages.length - 1);
+    const activePassage = readingPassages[safePassageIdx];
+    const allReadingQs = activeTest.reading?.questions || [];
+    const hasScopedReadingQs = allReadingQs.some(q => typeof q.passageIdx === 'number');
+    const displayedReadingQs =
+      readingPassages.length > 1 && hasScopedReadingQs && !examState.showAllReadingQs
+        ? allReadingQs.filter(q => typeof q.passageIdx !== 'number' || q.passageIdx === safePassageIdx)
+        : allReadingQs;
+
     const formatTime = (seconds) => {
       const m = Math.floor(seconds / 60);
       const s = seconds % 60;
@@ -5619,42 +5972,74 @@ export default function App() {
       <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col justify-between select-none">
         {/* Exam Header */}
         <header className="bg-slate-900 dark:bg-slate-950 text-white px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shadow sticky top-0 z-50">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="font-bold text-sm md:text-base text-slate-100">{activeTest.title}</h2>
-            <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-slate-700 uppercase">
-              Kỹ Năng: {examState.skill}
+            <span className="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-slate-700 uppercase font-bold">
+              Phần {currentSectionIdx + 1}/{cfg.order.length}: {examState.skill}
             </span>
           </div>
 
-          {/* Skill Selector Tabs */}
-          <div className="flex bg-slate-800 p-1 rounded-lg text-xs">
-            <button
-              onClick={() => setExamState(prev => ({ ...prev, skill: 'listening' }))}
-              className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition ${
-                examState.skill === 'listening' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Headphones className="w-3.5 h-3.5" /> Listening
-            </button>
-            <button
-              onClick={() => setExamState(prev => ({ ...prev, skill: 'reading' }))}
-              className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition ${
-                examState.skill === 'reading' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" /> Reading
-            </button>
-            <button
-              onClick={() => setExamState(prev => ({ ...prev, skill: 'writing' }))}
-              className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition ${
-                examState.skill === 'writing' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <PenTool className="w-3.5 h-3.5" /> Writing
-            </button>
+          {/* Skill Selector Tabs (Sequential order respected when enabled) */}
+          <div className="flex bg-slate-800 p-1 rounded-xl text-xs gap-1 flex-wrap">
+            {cfg.order.map((sId, idx) => {
+              const meta = skillMeta[sId] || { label: sId, icon: BookOpen };
+              const IconComp = meta.icon;
+              const isCurrent = examState.skill === sId && idx === currentSectionIdx;
+              const isDone = cfg.sequentialMode && idx < currentSectionIdx;
+              const isLocked = cfg.sequentialMode && idx !== currentSectionIdx;
+
+              return (
+                <button
+                  key={sId}
+                  type="button"
+                  disabled={isLocked}
+                  title={
+                    isLocked
+                      ? `Chế độ làm tuần tự: Hết giờ ${skillMeta[examState.skill]?.label || ''} hệ thống sẽ tự động chuyển phần.`
+                      : `Kỹ năng ${meta.label} (${cfg.durations[sId]} phút)`
+                  }
+                  onClick={() => {
+                    if (isLocked || isCurrent) return;
+                    stopExamAudio();
+                    setExamState(prev => ({
+                      ...prev,
+                      skill: sId,
+                      sectionIdx: idx
+                    }));
+                  }}
+                  className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition ${
+                    isCurrent
+                      ? 'bg-blue-600 text-white shadow'
+                      : isDone
+                      ? 'text-emerald-400/80 bg-slate-900/50 cursor-not-allowed'
+                      : isLocked
+                      ? 'text-slate-500 cursor-not-allowed'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  }`}
+                >
+                  <span className="text-[10px] font-mono opacity-80">{idx + 1}.</span>
+                  <IconComp className="w-3.5 h-3.5" />
+                  <span>{meta.label}</span>
+                  <span className="text-[10px] opacity-75">({cfg.durations[sId]}p)</span>
+                  {isLocked && !isDone && <Lock className="w-3 h-3 text-slate-500" />}
+                  {isDone && <Check className="w-3 h-3 text-emerald-400" />}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+            {cfg.sequentialMode && cfg.allowEarlyNextSection && currentSectionIdx < cfg.order.length - 1 && (
+              <button
+                type="button"
+                onClick={() => advanceToNextExamSection(false)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-2 rounded-lg transition shadow flex items-center gap-1"
+              >
+                <span>Sang Phần Tiếp Theo</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setDarkMode(d => !d)}
@@ -5665,8 +6050,15 @@ export default function App() {
               {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-300" />}
             </button>
 
-            <div className="flex items-center gap-2 text-amber-400 font-mono font-bold text-lg bg-slate-800 px-3 py-1 rounded-lg border border-slate-700">
-              <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
+            <div
+              className={`flex items-center gap-2 font-mono font-bold text-lg bg-slate-800 px-3 py-1 rounded-lg border ${
+                examState.timeRemaining <= 60
+                  ? 'text-rose-400 border-rose-500/60'
+                  : 'text-amber-400 border-slate-700'
+              }`}
+              title={cfg.sequentialMode ? 'Hết giờ kỹ năng sẽ tự động chuyển sang phần tiếp theo' : 'Thời gian còn lại'}
+            >
+              <Clock className="w-4 h-4 animate-pulse" />
               <span>{formatTime(examState.timeRemaining)}</span>
             </div>
 
@@ -5773,8 +6165,29 @@ export default function App() {
           {examState.skill === 'reading' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[78vh]">
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">{activeTest.reading?.passageTitle}</h3>
+                {/* Multi-Passage Switcher Buttons (1, 2, 3...) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800 mb-3">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {readingPassages.map((p, pIdx) => (
+                      <button
+                        key={p.id || pIdx}
+                        type="button"
+                        onClick={() => setExamState(prev => ({ ...prev, readingPassageIdx: pIdx }))}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 border ${
+                          pIdx === safePassageIdx
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-500/15'
+                        }`}
+                      >
+                        <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
+                          pIdx === safePassageIdx ? 'bg-white text-indigo-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                        }`}>
+                          {pIdx + 1}
+                        </span>
+                        <span className="max-w-[140px] truncate">{p.title || `Bài ${pIdx + 1}`}</span>
+                      </button>
+                    ))}
+                  </div>
 
                   {selectedPassageText && (
                     <div className="flex items-center gap-1.5 bg-slate-900 text-white px-3 py-1 rounded-full text-xs animate-bounce shadow-lg">
@@ -5788,20 +6201,32 @@ export default function App() {
                   )}
                 </div>
 
+                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-3">
+                  {readingPassages.length > 1 ? `Bài ${safePassageIdx + 1}: ` : ''}{activePassage?.title}
+                </h3>
+
                 <div
                   onMouseUp={handlePassageTextSelect}
                   className="flex-1 overflow-y-auto pr-3 text-slate-700 dark:text-slate-200 text-sm leading-relaxed whitespace-pre-line select-text font-serif"
                 >
-                  {activeTest.reading?.imageUrl && (
-                    <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2">
+                  {activePassage?.imageUrl && (
+                    <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 relative group">
                       <img
-                        src={activeTest.reading.imageUrl}
-                        alt="Reading Visual Illustration"
-                        className="w-full max-h-64 object-contain rounded-lg mx-auto"
+                        src={activePassage.imageUrl}
+                        alt={`Reading Passage ${safePassageIdx + 1}`}
+                        onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
+                        className="w-full max-h-[52vh] object-contain rounded-lg mx-auto cursor-zoom-in"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
+                        className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Phóng to ảnh bài đọc #{safePassageIdx + 1}
+                      </button>
                     </div>
                   )}
-                  {activeTest.reading?.passageText}
+                  {activePassage?.passageText}
                 </div>
 
                 {(examState.highlights.length > 0 || examState.notes.length > 0) && (
@@ -5821,48 +6246,78 @@ export default function App() {
                 )}
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col overflow-y-auto shadow-sm space-y-6">
-                <h3 className="font-bold text-slate-800 dark:text-white text-base border-b border-slate-200 dark:border-slate-800 pb-3">Câu Hỏi Phần Reading</h3>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col overflow-y-auto shadow-sm space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                    Câu Hỏi Phần Reading {readingPassages.length > 1 && hasScopedReadingQs && !examState.showAllReadingQs ? `(Bài ${safePassageIdx + 1})` : ''}
+                  </h3>
+                  {readingPassages.length > 1 && hasScopedReadingQs && (
+                    <button
+                      type="button"
+                      onClick={() => setExamState(prev => ({ ...prev, showAllReadingQs: !prev.showAllReadingQs }))}
+                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                    >
+                      {examState.showAllReadingQs ? `Chỉ xem Bài ${safePassageIdx + 1}` : `Xem tất cả (${allReadingQs.length})`}
+                    </button>
+                  )}
+                </div>
 
-                {(activeTest.reading?.questions || []).map(q => (
-                  <div key={q.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                    <p className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-3">{q.question}</p>
-
-                    {(q.type === 'mcq' || q.type === 'tfng') && (
-                      <div className="space-y-2">
-                        {(q.options || []).map((opt, optIdx) => (
-                          <label key={optIdx} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                            <input
-                              type="radio"
-                              name={`rq_${q.id}`}
-                              value={opt}
-                              checked={examState.answers[q.id] === opt}
-                              onChange={e => setExamState(prev => ({
-                                ...prev,
-                                answers: { ...prev.answers, [q.id]: e.target.value }
-                              }))}
-                              className="mt-0.5 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">{opt}</span>
-                          </label>
-                        ))}
+                {displayedReadingQs.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 italic py-6 text-center">
+                    Chưa có câu hỏi gắn riêng cho Bài {safePassageIdx + 1}. Hãy chuyển bài đọc hoặc bấm "Xem tất cả".
+                  </p>
+                ) : (
+                  displayedReadingQs.map(q => (
+                    <div key={q.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">{q.question}</p>
+                        {typeof q.passageIdx === 'number' && readingPassages.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setExamState(prev => ({ ...prev, readingPassageIdx: q.passageIdx }))}
+                            className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30"
+                          >
+                            Bài {q.passageIdx + 1}
+                          </button>
+                        )}
                       </div>
-                    )}
 
-                    {q.type === 'fill' && (
-                      <input
-                        type="text"
-                        placeholder="Nhập câu trả lời..."
-                        value={examState.answers[q.id] || ''}
-                        onChange={e => setExamState(prev => ({
-                          ...prev,
-                          answers: { ...prev.answers, [q.id]: e.target.value }
-                        }))}
-                        className="w-full max-w-md px-3.5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      />
-                    )}
-                  </div>
-                ))}
+                      {(q.type === 'mcq' || q.type === 'tfng') && (
+                        <div className="space-y-2">
+                          {(q.options || []).map((opt, optIdx) => (
+                            <label key={optIdx} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                              <input
+                                type="radio"
+                                name={`rq_${q.id}`}
+                                value={opt}
+                                checked={examState.answers[q.id] === opt}
+                                onChange={e => setExamState(prev => ({
+                                  ...prev,
+                                  answers: { ...prev.answers, [q.id]: e.target.value }
+                                }))}
+                                className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {q.type === 'fill' && (
+                        <input
+                          type="text"
+                          placeholder="Nhập câu trả lời..."
+                          value={examState.answers[q.id] || ''}
+                          onChange={e => setExamState(prev => ({
+                            ...prev,
+                            answers: { ...prev.answers, [q.id]: e.target.value }
+                          }))}
+                          className="w-full max-w-md px-3.5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -6594,9 +7049,30 @@ export default function App() {
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-slate-400" /> Ngày gia nhập: <b>{student.joinedDate || '01/02/2026'}</b>
                   </span>
-                  <span className="flex items-center gap-1 text-amber-300">
+                  <span className="flex items-center gap-1.5 text-amber-300">
                     <Target className="w-3.5 h-3.5 text-amber-400" /> Mục tiêu Target: <b>Band {student.targetBand || '8.0'}</b>
+                    {(isTeacherViewer || student.username === currentUser?.username) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingTargetUser({
+                            username: student.username,
+                            name: student.name || '',
+                            targetBand: student.targetBand || 7.5,
+                            studyGoal: student.studyGoal || ''
+                          })
+                        }
+                        className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 border border-amber-300/40 text-amber-200 text-[11px] font-bold transition"
+                      >
+                        <Edit className="w-3 h-3" /> Chỉnh
+                      </button>
+                    )}
                   </span>
+                  {student.studyGoal && (
+                    <span className="text-xs text-cyan-200 bg-white/10 px-2.5 py-0.5 rounded-full border border-white/15">
+                      🎯 {student.studyGoal}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -7146,17 +7622,49 @@ export default function App() {
         {/* Tab 1: Kho Đề Thi */}
         {teacherHubTab === 'tests' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {tests.map(t => (
+            {tests.map(t => {
+              const cfg = normalizeExamConfig(t);
+              const passagesCount = getReadingPassages(t.reading).length;
+              const isPrivate = cfg.visibility === 'private';
+              const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
+
+              return (
               <div key={t.id} className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md transition flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
                       Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
                     </span>
-                    <span className="text-[11px] text-slate-400 font-medium">{t.createdAt}</span>
+                    <button
+                      onClick={() => toggleTestVisibility(t.id)}
+                      title="Bấm để chuyển Công khai / Chỉ mình tôi thấy"
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
+                        isPrivate
+                          ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100'
+                          : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100'
+                      }`}
+                    >
+                      {isPrivate ? <EyeOff className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+                      {isPrivate ? 'Chỉ mình tôi' : 'Công khai'}
+                    </button>
                   </div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-base mb-2 leading-snug">{t.title}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2 leading-relaxed">{t.description}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 line-clamp-2 leading-relaxed">{t.description}</p>
+
+                  {/* Exam Config Summary Badges */}
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
+                      ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
+                    </span>
+                    <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
+                      {cfg.maxAttempts === 0 ? '∞ Làm tự do' : `🔒 Tối đa ${cfg.maxAttempts} lần`}
+                    </span>
+                    {cfg.sequentialMode && (
+                      <span className="text-[10px] bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-md">
+                        Tuần tự: {cfg.order.map(s => s[0].toUpperCase()).join('→')}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Media Badges */}
                   <div className="flex flex-wrap gap-1.5 mb-4">
@@ -7169,9 +7677,9 @@ export default function App() {
                         🔊 Dùng AI Voice (TTS)
                       </span>
                     )}
-                    {t.reading?.imageUrl && (
+                    {(hasReadingImg || passagesCount > 1) && (
                       <span className="text-[10px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30">
-                        🖼️ Có ảnh Reading
+                        🖼️ {passagesCount} bài Reading
                       </span>
                     )}
                     {t.writing?.task1?.imageUrl && (
@@ -7220,7 +7728,8 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -7575,10 +8084,28 @@ export default function App() {
                               </div>
                             </td>
                             <td className="px-6 py-4 text-center">
-                              <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingTargetUser({
+                                    username: student.username,
+                                    name: student.name || '',
+                                    targetBand: student.targetBand || 7.5,
+                                    studyGoal: student.studyGoal || ''
+                                  })
+                                }
+                                title="Bấm để chỉnh sửa mục tiêu Target & ghi chú học viên"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full transition"
+                              >
                                 <Target className="w-3.5 h-3.5 text-amber-500" />
                                 Band {student.targetBand || '7.5'}
-                              </span>
+                                <Edit className="w-3 h-3 opacity-70" />
+                              </button>
+                              {student.studyGoal && (
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 max-w-[140px] mx-auto truncate" title={student.studyGoal}>
+                                  {student.studyGoal}
+                                </p>
+                              )}
                             </td>
                             <td className="px-6 py-4 text-center font-bold text-slate-800 dark:text-slate-100">
                               {studentAttempts.length > 0 ? (
@@ -7885,8 +8412,23 @@ export default function App() {
         </button>
       </div>
 
-      {/* TAB 1: GENERAL SETTINGS & ALLOW VIEW ANSWERS */}
-      {builderTab === 'general' && (
+      {/* TAB 1: GENERAL SETTINGS, VISIBILITY, ATTEMPT LIMITS, SECTION TIMERS & ANSWER PERMISSIONS */}
+      {builderTab === 'general' && (() => {
+        const cfg = normalizeExamConfig(testForm);
+        const skillLabels = {
+          listening: { name: 'Listening', icon: Headphones, color: 'text-blue-600 dark:text-blue-400' },
+          reading: { name: 'Reading', icon: BookOpen, color: 'text-indigo-600 dark:text-indigo-400' },
+          writing: { name: 'Writing', icon: PenTool, color: 'text-purple-600 dark:text-purple-400' }
+        };
+        const moveSectionOrder = (idx, dir) => {
+          const nextIdx = idx + dir;
+          if (nextIdx < 0 || nextIdx >= cfg.order.length) return;
+          const nextOrder = [...cfg.order];
+          [nextOrder[idx], nextOrder[nextIdx]] = [nextOrder[nextIdx], nextOrder[idx]];
+          setTestForm(prev => ({ ...prev, sectionOrder: nextOrder }));
+        };
+
+        return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
@@ -7922,12 +8464,202 @@ export default function App() {
               Mô Tả Chi Tiết Đề Thi
             </label>
             <textarea
-              rows={3}
+              rows={2}
               value={testForm.description}
               onChange={e => setTestForm({ ...testForm, description: e.target.value })}
               className="w-full px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               placeholder="Mô tả nội dung các phần thi để học viên nắm rõ trước khi bắt đầu..."
             />
+          </div>
+
+          {/* Visibility & Max Attempts Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Visibility Setting */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  {cfg.visibility === 'private' ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Globe className="w-4 h-4 text-emerald-500" />}
+                  Chế Độ Hiển Thị Đề Thi
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Chọn <b>Chỉ mình tôi</b> khi đang soạn thảo để học viên không nhìn thấy hoặc bấm nhầm.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTestForm(prev => ({ ...prev, visibility: 'public' }))}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition ${
+                    cfg.visibility === 'public'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" /> Công khai (HS thấy)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTestForm(prev => ({ ...prev, visibility: 'private' }))}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition ${
+                    cfg.visibility === 'private'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <EyeOff className="w-3.5 h-3.5" /> Chỉ mình tôi (Ẩn)
+                </button>
+              </div>
+            </div>
+
+            {/* Attempt Limit Setting */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-indigo-500" /> Số Lần Học Viên Được Làm Bài
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Đặt <b>0</b> để ôn tập tự do không giới hạn, hoặc <b>1</b> nếu dùng để kiểm tra / thi thật.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTestForm(prev => ({ ...prev, maxAttempts: 0 }))}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition ${
+                    cfg.maxAttempts === 0
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  ∞ Không giới hạn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTestForm(prev => ({ ...prev, maxAttempts: 1 }))}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition ${
+                    cfg.maxAttempts === 1
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  1 Lần (Thi thật)
+                </button>
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Tùy chỉnh:</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={cfg.maxAttempts}
+                    onChange={e => setTestForm(prev => ({ ...prev, maxAttempts: Math.max(0, Number(e.target.value) || 0) }))}
+                    className="w-16 px-2.5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-center"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-Skill Durations & Sequential Section Order */}
+          <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Thời Gian Từng Kỹ Năng & Thứ Tự Thi Luân Phiên
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Đặt số phút riêng cho mỗi kỹ năng (VD: Reading 30p, Listening 15p) và sắp xếp thứ tự làm bài từ trên xuống dưới.
+                </p>
+              </div>
+              <span className="text-xs font-bold bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full shrink-0">
+                Tổng thời gian: {cfg.order.reduce((acc, s) => acc + cfg.durations[s], 0)} phút
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
+              {cfg.order.map((sId, idx) => {
+                const meta = skillLabels[sId];
+                const IconComp = meta.icon;
+                return (
+                  <div
+                    key={sId}
+                    className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-black text-xs flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <IconComp className={`w-4 h-4 ${meta.color}`} />
+                      <span className="font-extrabold text-xs text-slate-900 dark:text-white">{meta.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={1}
+                          max={180}
+                          value={cfg.durations[sId]}
+                          onChange={e => {
+                            const mins = Math.max(1, Number(e.target.value) || 1);
+                            setTestForm(prev => ({
+                              ...prev,
+                              sectionDurations: { ...normalizeExamConfig(prev).durations, [sId]: mins }
+                            }));
+                          }}
+                          className="w-16 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-extrabold text-center"
+                        />
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">phút</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-3">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => moveSectionOrder(idx, -1)}
+                          title="Đưa lên trước"
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 text-slate-700 dark:text-slate-200 transition"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === cfg.order.length - 1}
+                          onClick={() => moveSectionOrder(idx, 1)}
+                          title="Đưa xuống sau"
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 text-slate-700 dark:text-slate-200 transition"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-100">
+                <input
+                  type="checkbox"
+                  checked={cfg.sequentialMode}
+                  onChange={e => setTestForm(prev => ({ ...prev, sequentialMode: e.target.checked }))}
+                  className="w-4 h-4 rounded text-indigo-600"
+                />
+                <span>Khóa tuần tự theo từng phần (Hết giờ mới tự động sang kỹ năng kế tiếp)</span>
+              </label>
+
+              {cfg.sequentialMode && (
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={cfg.allowEarlyNextSection}
+                    onChange={e => setTestForm(prev => ({ ...prev, allowEarlyNextSection: e.target.checked }))}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <span>Cho phép nộp sớm để sang phần sau</span>
+                </label>
+              )}
+            </div>
           </div>
 
           {/* Permission Control Card */}
@@ -7967,7 +8699,8 @@ export default function App() {
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* TAB 2: LISTENING BUILDER (AUDIO UPLOAD + QUESTIONS CRUD) */}
       {builderTab === 'listening' && (
@@ -8202,33 +8935,122 @@ export default function App() {
         </div>
       )}
 
-      {/* TAB 3: READING BUILDER (PASSAGE + IMAGE UPLOAD + QUESTIONS CRUD) */}
-      {builderTab === 'reading' && (
+      {/* TAB 3: READING BUILDER (MULTI-PASSAGE NUMBERED TOPICS + IMAGE UPLOAD + QUESTIONS CRUD) */}
+      {builderTab === 'reading' && (() => {
+        const passages = getReadingPassages(testForm.reading);
+        const activeIdx = Math.min(Math.max(0, builderReadingIdx), passages.length - 1);
+        const activePassage = passages[activeIdx];
+
+        const addReadingPassage = () => {
+          const nextNum = passages.length + 1;
+          const newP = {
+            id: `passage-${Date.now()}`,
+            title: `Bài ${nextNum}: Chủ đề mới`,
+            imageUrl: '',
+            imageFileName: '',
+            passageText: ''
+          };
+          setTestForm(prev => ({
+            ...prev,
+            reading: {
+              ...prev.reading,
+              passages: [...getReadingPassages(prev.reading), newP]
+            }
+          }));
+          setBuilderReadingIdx(passages.length);
+        };
+
+        const removeReadingPassage = (removeIdx) => {
+          if (passages.length <= 1) return;
+          const nextPassages = passages.filter((_, i) => i !== removeIdx);
+          const first = nextPassages[0] || {};
+          setTestForm(prev => ({
+            ...prev,
+            reading: {
+              ...prev.reading,
+              passages: nextPassages,
+              passageTitle: first.title || '',
+              passageText: first.passageText || '',
+              imageUrl: first.imageUrl || '',
+              imageFileName: first.imageFileName || '',
+              questions: (prev.reading?.questions || []).map(q => {
+                if (typeof q.passageIdx !== 'number') return q;
+                if (q.passageIdx === removeIdx) return { ...q, passageIdx: 0 };
+                if (q.passageIdx > removeIdx) return { ...q, passageIdx: q.passageIdx - 1 };
+                return q;
+              })
+            }
+          }));
+          setBuilderReadingIdx(Math.max(0, Math.min(activeIdx, nextPassages.length - 1)));
+        };
+
+        return (
         <div className="space-y-6">
           {/* Reading Passage & Image Upload Card */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm space-y-6">
-            <div>
-              <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Nội Dung Bài Đọc (Reading Passage) & Hình Ảnh Minh Họa
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Nhập văn bản bài đọc và tải lên hình ảnh minh họa, sơ đồ hoặc biểu đồ cho phần Reading.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Nội Dung Bài Đọc Reading ({passages.length} Chủ Đề / Bài)
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Tạo nhiều bài đọc / chủ đề đánh số 1, 2, 3... để học sinh chuyển qua lại dễ dàng khi có nhiều ảnh hoặc nhiều đoạn đọc.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={addReadingPassage}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Thêm Chủ Đề / Bài Đọc #{passages.length + 1}
+              </button>
+            </div>
+
+            {/* Numbered Passage Selector Bar (1, 2, 3...) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/70 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <div className="flex flex-wrap items-center gap-2">
+                {passages.map((p, pIdx) => (
+                  <button
+                    key={p.id || pIdx}
+                    type="button"
+                    onClick={() => setBuilderReadingIdx(pIdx)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 border transition ${
+                      pIdx === activeIdx
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-500/15'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
+                      pIdx === activeIdx ? 'bg-white text-indigo-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                    }`}>
+                      {pIdx + 1}
+                    </span>
+                    <span className="max-w-[160px] truncate">{p.title || `Bài đọc ${pIdx + 1}`}</span>
+                  </button>
+                ))}
+              </div>
+
+              {passages.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeReadingPassage(activeIdx)}
+                  className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/20 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-500/30 transition flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Xóa Bài #{activeIdx + 1}
+                </button>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Tiêu Đề Bài Đọc (Passage Title)</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Tiêu Đề Bài Đọc / Chủ Đề #{activeIdx + 1}
+              </label>
               <input
                 type="text"
-                value={testForm.reading?.passageTitle || ''}
-                onChange={e =>
-                  setTestForm(prev => ({
-                    ...prev,
-                    reading: { ...prev.reading, passageTitle: e.target.value }
-                  }))
-                }
+                value={activePassage?.title || ''}
+                onChange={e => updateReadingPassageField(activeIdx, { title: e.target.value })}
                 className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="VD: READING PASSAGE 1: The Evolution of Urban Architecture"
+                placeholder={`VD: Bài ${activeIdx + 1}: The Evolution of Urban Architecture`}
               />
             </div>
 
@@ -8236,33 +9058,28 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/40 dark:bg-indigo-500/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/30">
               <div className="space-y-3">
                 <span className="text-xs font-extrabold text-indigo-950 dark:text-indigo-200 uppercase flex items-center gap-1.5">
-                  <Image className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Thêm Ảnh Cho Phần Reading
+                  <Image className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Ảnh Minh Họa / Đề Chụp Bài #{activeIdx + 1}
                 </span>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Tải ảnh từ máy tính (.png, .jpg, .webp) hoặc dán đường dẫn URL hình ảnh minh họa cho bài đọc.
+                  Tải ảnh từ máy tính (.png, .jpg, .webp) hoặc dán link URL hình ảnh riêng cho bài đọc số {activeIdx + 1}.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <label className="cursor-pointer inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
                     <Upload className="w-4 h-4" />
-                    <span>Tải Ảnh Lên Từ Máy Tính</span>
+                    <span>Tải Ảnh Cho Bài #{activeIdx + 1}</span>
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={handleReadingImageUpload}
+                      onChange={e => handleReadingImageUpload(e, activeIdx)}
                       className="hidden"
                     />
                   </label>
 
-                  {testForm.reading?.imageUrl && (
+                  {activePassage?.imageUrl && (
                     <button
                       type="button"
-                      onClick={() =>
-                        setTestForm(prev => ({
-                          ...prev,
-                          reading: { ...prev.reading, imageUrl: '' }
-                        }))
-                      }
+                      onClick={() => updateReadingPassageField(activeIdx, { imageUrl: '', imageFileName: '' })}
                       className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl border border-rose-200 dark:border-rose-500/30 transition"
                     >
                       Xóa Ảnh
@@ -8276,13 +9093,8 @@ export default function App() {
                   </label>
                   <input
                     type="text"
-                    value={testForm.reading?.imageUrl?.startsWith('data:') ? '' : (testForm.reading?.imageUrl || '')}
-                    onChange={e =>
-                      setTestForm(prev => ({
-                        ...prev,
-                        reading: { ...prev.reading, imageUrl: e.target.value }
-                      }))
-                    }
+                    value={activePassage?.imageUrl?.startsWith('data:') ? '' : (activePassage?.imageUrl || '')}
+                    onChange={e => updateReadingPassageField(activeIdx, { imageUrl: e.target.value })}
                     placeholder="https://example.com/reading-diagram.png"
                     className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
@@ -8290,16 +9102,17 @@ export default function App() {
               </div>
 
               <div className="flex items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 min-h-[160px]">
-                {testForm.reading?.imageUrl ? (
+                {activePassage?.imageUrl ? (
                   <img
-                    src={testForm.reading.imageUrl}
-                    alt="Reading Preview"
-                    className="max-h-44 object-contain rounded-lg"
+                    src={activePassage.imageUrl}
+                    alt={`Reading Preview ${activeIdx + 1}`}
+                    onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
+                    className="max-h-48 object-contain rounded-lg cursor-zoom-in"
                   />
                 ) : (
                   <div className="text-center text-xs text-slate-400">
                     <Image className="w-8 h-8 mx-auto mb-1.5 text-slate-300 dark:text-slate-600" />
-                    <span>Chưa có hình ảnh đính kèm cho bài Reading</span>
+                    <span>Chưa có hình ảnh cho Bài #{activeIdx + 1}</span>
                   </div>
                 )}
               </div>
@@ -8308,19 +9121,14 @@ export default function App() {
             {/* Passage Text */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nội Dung Văn Bản Bài Đọc (Passage Text)
+                Nội Dung Văn Bản Bài Đọc #{activeIdx + 1} (Nếu chỉ dùng ảnh có thể bỏ trống)
               </label>
               <textarea
-                rows={8}
-                value={testForm.reading?.passageText || ''}
-                onChange={e =>
-                  setTestForm(prev => ({
-                    ...prev,
-                    reading: { ...prev.reading, passageText: e.target.value }
-                  }))
-                }
+                rows={7}
+                value={activePassage?.passageText || ''}
+                onChange={e => updateReadingPassageField(activeIdx, { passageText: e.target.value })}
                 className="w-full p-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-2xl text-xs leading-relaxed font-serif focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="Nhập toàn bộ nội dung bài đọc Reading tại đây..."
+                placeholder={`Nhập nội dung văn bản cho Bài đọc số ${activeIdx + 1}...`}
               />
             </div>
           </div>
@@ -8333,7 +9141,7 @@ export default function App() {
                   Danh Sách Câu Hỏi Reading ({testForm.reading?.questions?.length || 0} câu)
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Hỗ trợ câu hỏi True/False/Not Given, Trắc nghiệm (MCQ) và Điền từ vào chỗ trống.
+                  Hỗ trợ True/False/Not Given, Trắc nghiệm (MCQ), Điền từ — và gắn câu hỏi vào Bài số 1, 2, 3... tương ứng.
                 </p>
               </div>
 
@@ -8342,7 +9150,7 @@ export default function App() {
                 onClick={() => addQuestionToSkill('reading')}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
               >
-                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Reading
+                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Reading {passages.length > 1 ? `(Bài #${activeIdx + 1})` : ''}
               </button>
             </div>
 
@@ -8354,7 +9162,29 @@ export default function App() {
                       Câu hỏi Reading #{idx + 1}
                     </span>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {passages.length > 1 && (
+                        <select
+                          value={typeof q.passageIdx === 'number' ? String(q.passageIdx) : ''}
+                          onChange={e =>
+                            updateQuestionInSkill(
+                              'reading',
+                              q.id,
+                              'passageIdx',
+                              e.target.value === '' ? null : Number(e.target.value)
+                            )
+                          }
+                          className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/40 rounded-xl text-xs font-bold text-indigo-800 dark:text-indigo-200"
+                        >
+                          <option value="">Hiện ở tất cả bài</option>
+                          {passages.map((p, pIdx) => (
+                            <option key={p.id || pIdx} value={String(pIdx)}>
+                              Thuộc Bài {pIdx + 1} ({(p.title || '').slice(0, 18)})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
                       <select
                         value={q.type}
                         onChange={e => updateQuestionInSkill('reading', q.id, 'type', e.target.value)}
@@ -8441,7 +9271,8 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* TAB 4: WRITING BUILDER (PROMPTS, CHART IMAGE & MODEL ANSWERS) */}
       {builderTab === 'writing' && (
@@ -8682,6 +9513,131 @@ export default function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Shared Modal: Edit Student/User Target Band & Study Goal */}
+      {editingTargetUser && (currentUser?.role === 'teacher' || editingTargetUser.username === currentUser?.username) && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              handleUpdateUserProfileFields(editingTargetUser.username, {
+                name: editingTargetUser.name,
+                targetBand: editingTargetUser.targetBand,
+                studyGoal: editingTargetUser.studyGoal
+              });
+              setEditingTargetUser(null);
+            }}
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6"
+          >
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Target className="w-4 h-4 text-amber-500" /> Chỉnh Sửa Mục Tiêu Target
+              </h3>
+              <button type="button" onClick={() => setEditingTargetUser(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Tên hiển thị (@{editingTargetUser.username})
+                </label>
+                <input
+                  type="text"
+                  value={editingTargetUser.name}
+                  onChange={e => setEditingTargetUser(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Target IELTS Band (4.0 – 9.0)
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[6.0, 6.5, 7.0, 7.5, 8.0, 8.5].map(bandVal => (
+                    <button
+                      key={bandVal}
+                      type="button"
+                      onClick={() => setEditingTargetUser(prev => ({ ...prev, targetBand: bandVal }))}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                        Number(editingTargetUser.targetBand) === bandVal
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {bandVal.toFixed(1)}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="4.0"
+                  max="9.0"
+                  value={editingTargetUser.targetBand}
+                  onChange={e => setEditingTargetUser(prev => ({ ...prev, targetBand: e.target.value }))}
+                  className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Ghi chú mục tiêu học tập / Kỳ thi
+                </label>
+                <input
+                  type="text"
+                  value={editingTargetUser.studyGoal || ''}
+                  onChange={e => setEditingTargetUser(prev => ({ ...prev, studyGoal: e.target.value }))}
+                  placeholder="VD: Thi IELTS Academic tháng 12 - Ưu tiên Reading 8.0"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTargetUser(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-sm flex items-center gap-1.5"
+                >
+                  <Save className="w-3.5 h-3.5" /> Lưu Mục Tiêu
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Zoomed Reading Passage Image Lightbox */}
+      {zoomedReadingImg && (
+        <div
+          onClick={() => setZoomedReadingImg('')}
+          className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] flex flex-col items-center justify-center p-4"
+        >
+          <div className="max-w-5xl w-full flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={() => setZoomedReadingImg('')}
+              className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 border border-slate-700"
+            >
+              <X className="w-4 h-4" /> Đóng ảnh
+            </button>
+          </div>
+          <img
+            src={zoomedReadingImg}
+            alt="Zoomed Reading Passage"
+            onClick={e => e.stopPropagation()}
+            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl bg-white dark:bg-slate-900 p-2"
+          />
         </div>
       )}
 

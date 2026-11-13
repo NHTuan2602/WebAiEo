@@ -391,6 +391,18 @@ function applySyncAction(store, type, payload = {}) {
       break;
     }
 
+    case 'TOGGLE_TEST_VISIBILITY': {
+      const testId = payload.testId;
+      if (!testId) break;
+      store.tests = store.tests.map(t =>
+        t.id === testId
+          ? { ...t, visibility: (t.visibility || 'public') === 'private' ? 'public' : 'private' }
+          : t
+      );
+      changed = true;
+      break;
+    }
+
     case 'UPSERT_ATTEMPT': {
       const attempt = payload.attempt;
       if (!attempt?.id) break;
@@ -412,22 +424,23 @@ function applySyncAction(store, type, payload = {}) {
     }
 
     case 'UPSERT_USER': {
-      if (!payload.username || !payload.user) break;
-      store.users[payload.username] = payload.user;
+      const uname = payload.username || payload.user?.username;
+      if (!uname || !payload.user) break;
+      store.users[uname] = payload.user;
       // Propagate updated avatarUrl & display name into any active room lobbies / live races
       Object.entries(store.rooms).forEach(([_pin, r]) => {
-        if (r?.lobbyPlayers?.[payload.username]) {
-          r.lobbyPlayers[payload.username] = {
-            ...r.lobbyPlayers[payload.username],
-            name: payload.user.name || r.lobbyPlayers[payload.username].name,
-            avatarUrl: payload.user.avatarUrl ?? r.lobbyPlayers[payload.username].avatarUrl
+        if (r?.lobbyPlayers?.[uname]) {
+          r.lobbyPlayers[uname] = {
+            ...r.lobbyPlayers[uname],
+            name: payload.user.name || r.lobbyPlayers[uname].name,
+            avatarUrl: payload.user.avatarUrl ?? r.lobbyPlayers[uname].avatarUrl
           };
         }
-        if (r?.liveMatch?.[payload.username]) {
-          r.liveMatch[payload.username] = {
-            ...r.liveMatch[payload.username],
-            name: payload.user.name || r.liveMatch[payload.username].name,
-            avatarUrl: payload.user.avatarUrl ?? r.liveMatch[payload.username].avatarUrl
+        if (r?.liveMatch?.[uname]) {
+          r.liveMatch[uname] = {
+            ...r.liveMatch[uname],
+            name: payload.user.name || r.liveMatch[uname].name,
+            avatarUrl: payload.user.avatarUrl ?? r.liveMatch[uname].avatarUrl
           };
         }
       });
