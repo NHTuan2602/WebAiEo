@@ -1160,6 +1160,56 @@ export default function App() {
     dispatchSyncAction('TOGGLE_TEST_VISIBILITY', { testId });
   };
 
+  // Shared helper to update quick exam settings on Teacher Dashboard and sync across browsers
+  const updateTestQuickConfig = (testId, transformFn, toastMessage) => {
+    let updatedTest = null;
+    setTests(prev =>
+      prev.map(t => {
+        if (t.id !== testId) return t;
+        updatedTest = transformFn(t);
+        return updatedTest;
+      })
+    );
+    if (updatedTest) {
+      dispatchSyncAction('UPSERT_TEST', { test: updatedTest });
+      if (toastMessage) showToast(toastMessage);
+    }
+  };
+
+  // Teacher Action: Toggle Exam Mode (Thi thử nhiều lần <-> Thi thật 1 lần)
+  const toggleTestExamMode = (testId) => {
+    const target = tests.find(t => t.id === testId);
+    if (!target) return;
+    const cfg = normalizeExamConfig(target);
+    const nextMaxAttempts = cfg.maxAttempts === 1 ? 0 : 1;
+    updateTestQuickConfig(
+      testId,
+      t => ({ ...t, maxAttempts: nextMaxAttempts }),
+      nextMaxAttempts === 1
+        ? `Đã bật THI THẬT cho "${target.title}" — Học sinh chỉ được làm 1 lần!`
+        : `Đã bật THI THỬ cho "${target.title}" — Học sinh được làm nhiều lần để ôn thi!`
+    );
+  };
+
+  // Teacher Action: Quick-update single skill duration (minutes) on Teacher Dashboard
+  const updateTestQuickDuration = (testId, skill, minsValue) => {
+    const cleanMins = Math.max(1, Math.min(180, Number(minsValue) || 1));
+    const skillLabel = { listening: 'Listening', reading: 'Reading', writing: 'Writing' }[skill] || skill;
+    updateTestQuickConfig(
+      testId,
+      t => {
+        const cfg = normalizeExamConfig(t);
+        return {
+          ...t,
+          sectionDurations: { ...cfg.durations, [skill]: cleanMins },
+          sectionOrder: cfg.order,
+          sequentialMode: cfg.sequentialMode
+        };
+      },
+      `Đã lưu thời gian ${skillLabel}: ${cleanMins} phút!`
+    );
+  };
+
   // Update User Target Band / Display Name / Goal (Teacher or Student)
   const handleUpdateUserProfileFields = (username, patch) => {
     if (!username || !usersDb[username]) return;
@@ -2757,7 +2807,7 @@ export default function App() {
   };
 
   // Exam Builder
-  const openExamBuilder = (testToEdit = null) => {
+  const openExamBuilder = (testToEdit = null, initialTab = 'general') => {
     setEditingTest(testToEdit || null);
     setBuilderReadingIdx(0);
     if (testToEdit) {
@@ -2868,7 +2918,7 @@ export default function App() {
         }
       });
     }
-    setBuilderTab('general');
+    setBuilderTab(initialTab || 'general');
     setView('EXAM_BUILDER');
   };
 
@@ -7689,6 +7739,103 @@ export default function App() {
                     )}
                   </div>
 
+                  {/* Inline Quick Controls: Per-Skill Durations */}
+                  <div className="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-500/10 border border-indigo-200/80 dark:border-indigo-500/30 mb-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-extrabold text-indigo-900 dark:text-indigo-200 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Thời gian từng phần (phút)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openExamBuilder(t, 'general')}
+                        className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 hover:underline"
+                      >
+                        Thứ tự & Tuần tự →
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {cfg.order.map((sId, sIdx) => (
+                        <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-indigo-100 dark:border-slate-700 text-center">
+                          <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                            {sIdx + 1}. {sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : 'Viết'}
+                          </span>
+                          <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                            <input
+                              key={`${t.id}-${sId}-${cfg.durations[sId]}`}
+                              type="number"
+                              min={1}
+                              max={180}
+                              defaultValue={cfg.durations[sId]}
+                              onBlur={e => {
+                                const parsed = Math.max(1, Math.min(180, Number(e.target.value) || cfg.durations[sId]));
+                                e.target.value = String(parsed);
+                                if (parsed !== cfg.durations[sId]) {
+                                  updateTestQuickDuration(t.id, sId, parsed);
+                                }
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') e.currentTarget.blur();
+                              }}
+                              title="Nhập số phút rồi bấm ra ngoài hoặc nhấn Enter để lưu"
+                              className="w-12 px-1 py-0.5 text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-extrabold text-slate-900 dark:text-white"
+                            />
+                            <span className="text-[10px] text-slate-400 font-bold">p</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-indigo-700/80 dark:text-indigo-300/80 font-medium">
+                      {cfg.sequentialMode
+                        ? 'Hết giờ từng phần sẽ tự động chuyển sang phần tiếp theo.'
+                        : 'Đang cho phép chuyển tự do giữa các phần.'}
+                    </p>
+                  </div>
+
+                  {/* Quick Toggle Visibility (Ẩn / Công khai) */}
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-2.5 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Hiển thị đề cho học sinh</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {isPrivate ? 'Đang ẩn — HS chưa thấy để tránh làm nhầm' : 'Công khai — HS thấy đề & làm bài được'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => toggleTestVisibility(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                        isPrivate
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                      {isPrivate ? 'Đang Ẩn' : 'Công Khai'}
+                    </button>
+                  </div>
+
+                  {/* Quick Toggle Practice vs Real Exam (Thi thử nhiều lần / Thi thật 1 lần) */}
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-2.5 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chế độ Thi thử / Thi thật</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {cfg.maxAttempts === 1
+                          ? 'Thi thật: Học sinh chỉ được làm 1 lần'
+                          : cfg.maxAttempts === 0
+                          ? 'Thi thử: Được làm nhiều lần để ôn thi'
+                          : `Giới hạn tối đa ${cfg.maxAttempts} lần làm`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => toggleTestExamMode(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                        cfg.maxAttempts === 1
+                          ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      }`}
+                    >
+                      {cfg.maxAttempts === 1 ? 'Thi Thật (1 lần)' : cfg.maxAttempts === 0 ? 'Thi Thử (Nhiều lần)' : `Tối đa ${cfg.maxAttempts} lần`}
+                    </button>
+                  </div>
+
                   {/* Quick Toggle Allow View Correct Answers */}
                   <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-4 flex items-center justify-between gap-2">
                     <div>
@@ -7718,13 +7865,18 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
-                  <span className="text-slate-400 font-medium">Giới hạn nghe: {t.maxAudioPlays} lần</span>
+                <div className="flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
                   <button
-                    onClick={() => openExamBuilder(t)}
+                    onClick={() => openExamBuilder(t, 'general')}
+                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5"
+                  >
+                    <Clock className="w-3.5 h-3.5" /> Cài Giờ & Thứ Tự
+                  </button>
+                  <button
+                    onClick={() => openExamBuilder(t, 'reading')}
                     className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-500/30"
                   >
-                    <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi & Media
+                    <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi & Ảnh
                   </button>
                 </div>
               </div>
@@ -8378,7 +8530,7 @@ export default function App() {
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
-          <FileText className="w-4 h-4" /> 1. Cài Đặt Chung & Quyền Xem Đáp Án
+          <FileText className="w-4 h-4" /> 1. Thời Gian Từng Phần, Ẩn/Hiện & Thi Thử/Thi Thật
         </button>
         <button
           onClick={() => setBuilderTab('listening')}
@@ -8531,7 +8683,7 @@ export default function App() {
                       : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  ∞ Không giới hạn
+                  ∞ Thi Thử (Nhiều lần)
                 </button>
                 <button
                   type="button"
@@ -8542,7 +8694,7 @@ export default function App() {
                       : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  1 Lần (Thi thật)
+                  🔒 Thi Thật (1 lần)
                 </button>
                 <div className="flex items-center gap-1.5 ml-auto">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Tùy chỉnh:</span>
