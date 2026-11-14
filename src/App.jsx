@@ -19,6 +19,7 @@ import {
   calculateAutoBand,
   calculateOverallIeltsBand,
   calculateWritingBand,
+  getWordCount,
   roundIeltsBand,
   getSpeedAdjustedTimeLimit,
   isObjectiveAnswerCorrect,
@@ -626,7 +627,15 @@ export default function App() {
 
   // Teacher Grading Modal
   const [gradingAttempt, setGradingAttempt] = useState(null);
-  const [gradingScores, setGradingScores] = useState({ task1Band: 6.0, task2Band: 6.5, feedback: '' });
+  const [gradingScores, setGradingScores] = useState({
+    listeningRaw: 0,
+    listeningBand: 0,
+    readingRaw: 0,
+    readingBand: 0,
+    task1Band: 6.0,
+    task2Band: 6.5,
+    feedback: ''
+  });
 
   // AI Grading states
   const [isGradingAI, setIsGradingAI] = useState(false);
@@ -2221,6 +2230,82 @@ export default function App() {
     }
   };
 
+  const sanitizeBandScore = (val) => {
+    const parsed = parseFloat(val);
+    return Number.isFinite(parsed) ? roundIeltsBand(Math.max(0, Math.min(9.0, parsed))) : 0;
+  };
+
+  const openTeacherGradingModal = (att) => {
+    if (!att || currentUser?.role !== 'teacher') return;
+    const w1Empty = getWordCount(att.answers?.w1) === 0;
+    const w2Empty = getWordCount(att.answers?.w2) === 0;
+    const lRaw = Number.isFinite(Number(att.scores?.listening?.raw)) ? Number(att.scores.listening.raw) : 0;
+    const lTotal = Number.isFinite(Number(att.scores?.listening?.total)) ? Number(att.scores.listening.total) : 0;
+    const lBand = att.scores?.listening?.band ?? calculateAutoBand(lRaw, lTotal, 'listening');
+    const rRaw = Number.isFinite(Number(att.scores?.reading?.raw)) ? Number(att.scores.reading.raw) : 0;
+    const rTotal = Number.isFinite(Number(att.scores?.reading?.total)) ? Number(att.scores.reading.total) : 0;
+    const rBand = att.scores?.reading?.band ?? calculateAutoBand(rRaw, rTotal, 'reading');
+
+    setGradingAttempt(att);
+    setGradingScores({
+      listeningRaw: lRaw,
+      listeningBand: lBand,
+      readingRaw: rRaw,
+      readingBand: rBand,
+      task1Band: att.scores?.writing?.task1Band ?? (w1Empty ? 0 : 6.0),
+      task2Band: att.scores?.writing?.task2Band ?? (w2Empty ? 0 : 6.5),
+      feedback: att.teacherFeedback || ''
+    });
+  };
+
+  const recalculateObjectiveScores = () => {
+    if (!gradingAttempt || currentUser?.role !== 'teacher') return;
+    const linkedTest = tests.find(t => t.id === gradingAttempt.testId);
+    let nextLRaw = Number(gradingScores.listeningRaw);
+    let lTotal = Number(gradingAttempt.scores?.listening?.total) || 0;
+    let nextRRaw = Number(gradingScores.readingRaw);
+    let rTotal = Number(gradingAttempt.scores?.reading?.total) || 0;
+
+    if (linkedTest) {
+      const lQuestions = linkedTest.listening?.questions || [];
+      const rQuestions = linkedTest.reading?.questions || [];
+      if (lQuestions.length > 0) {
+        let calcLRaw = 0;
+        lQuestions.forEach(q => {
+          if (isObjectiveAnswerCorrect(q, gradingAttempt.answers?.[q.id])) calcLRaw++;
+        });
+        nextLRaw = calcLRaw;
+        lTotal = lQuestions.length;
+      }
+      if (rQuestions.length > 0) {
+        let calcRRaw = 0;
+        rQuestions.forEach(q => {
+          if (isObjectiveAnswerCorrect(q, gradingAttempt.answers?.[q.id])) calcRRaw++;
+        });
+        nextRRaw = calcRRaw;
+        rTotal = rQuestions.length;
+      }
+    }
+
+    const cleanLRaw = Number.isFinite(nextLRaw)
+      ? Math.max(0, lTotal > 0 ? Math.min(lTotal, Math.round(nextLRaw)) : Math.round(nextLRaw))
+      : 0;
+    const cleanRRaw = Number.isFinite(nextRRaw)
+      ? Math.max(0, rTotal > 0 ? Math.min(rTotal, Math.round(nextRRaw)) : Math.round(nextRRaw))
+      : 0;
+    const nextLBand = calculateAutoBand(cleanLRaw, lTotal, 'listening');
+    const nextRBand = calculateAutoBand(cleanRRaw, rTotal, 'reading');
+
+    setGradingScores(prev => ({
+      ...prev,
+      listeningRaw: cleanLRaw,
+      listeningBand: nextLBand,
+      readingRaw: cleanRRaw,
+      readingBand: nextRBand
+    }));
+    showToast(`Đã quy đổi chuẩn IELTS: Listening ${nextLBand} (${cleanLRaw}/${lTotal}) • Reading ${nextRBand} (${cleanRRaw}/${rTotal})`);
+  };
+
   // Teacher AI grading assist in grading modal
   const handleTeacherAIGrade = async (targetAttempt) => {
     if (!targetAttempt || currentUser?.role !== 'teacher') return;
@@ -2229,11 +2314,12 @@ export default function App() {
 
     try {
       const aiResult = await runWritingGradingEngine(targetAttempt);
-      setGradingScores({
+      setGradingScores(prev => ({
+        ...prev,
         task1Band: aiResult.task1Band,
         task2Band: aiResult.task2Band,
         feedback: aiResult.feedback
-      });
+      }));
       showToast(`Đã điền gợi ý điểm từ ${aiResult._engineLabel}!`);
     } catch (err) {
       alert('Lỗi chấm AI: ' + err.message);
@@ -2243,35 +2329,84 @@ export default function App() {
     }
   };
 
-  const saveTeacherGrading = () => {
-    if (!gradingAttempt) return;
+  const saveTeacherGrading = ({ includeWriting = true } = {}) => {
+    if (!gradingAttempt || currentUser?.role !== 'teacher') return;
 
-    const rawT1 = parseFloat(gradingScores.task1Band);
-    const rawT2 = parseFloat(gradingScores.task2Band);
-    const t1 = Number.isFinite(rawT1) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT1))) : 0;
-    const t2 = Number.isFinite(rawT2) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT2))) : 0;
-    const writingOverall = calculateWritingBand(t1, t2);
-    const finalOverall = computeAttemptFinalOverall(gradingAttempt.scores, writingOverall);
+    const lTotal = Number(gradingAttempt.scores?.listening?.total) || 0;
+    const rawLRaw = parseInt(gradingScores.listeningRaw, 10);
+    const cleanLRaw = Number.isFinite(rawLRaw)
+      ? Math.max(0, lTotal > 0 ? Math.min(lTotal, rawLRaw) : rawLRaw)
+      : (gradingAttempt.scores?.listening?.raw || 0);
+    const lBand = sanitizeBandScore(gradingScores.listeningBand);
 
-    const updatedAttemptObj = {
-      ...gradingAttempt,
-      teacherGraded: true,
-      scores: {
-        ...gradingAttempt.scores,
+    const rTotal = Number(gradingAttempt.scores?.reading?.total) || 0;
+    const rawRRaw = parseInt(gradingScores.readingRaw, 10);
+    const cleanRRaw = Number.isFinite(rawRRaw)
+      ? Math.max(0, rTotal > 0 ? Math.min(rTotal, rawRRaw) : rawRRaw)
+      : (gradingAttempt.scores?.reading?.raw || 0);
+    const rBand = sanitizeBandScore(gradingScores.readingBand);
+
+    const baseScores = {
+      ...gradingAttempt.scores,
+      listening: {
+        ...(gradingAttempt.scores?.listening || {}),
+        raw: cleanLRaw,
+        total: lTotal,
+        band: lBand
+      },
+      reading: {
+        ...(gradingAttempt.scores?.reading || {}),
+        raw: cleanRRaw,
+        total: rTotal,
+        band: rBand
+      }
+    };
+
+    let updatedAttemptObj;
+    if (includeWriting) {
+      const t1 = sanitizeBandScore(gradingScores.task1Band);
+      const t2 = sanitizeBandScore(gradingScores.task2Band);
+      const writingOverall = calculateWritingBand(t1, t2);
+      const nextScores = {
+        ...baseScores,
         writing: {
           task1Band: t1,
           task2Band: t2,
           overallBand: writingOverall
         }
-      },
-      overallBand: finalOverall,
-      teacherFeedback: gradingScores.feedback
-    };
+      };
+      const finalOverall = computeAttemptFinalOverall(nextScores, writingOverall);
+      updatedAttemptObj = {
+        ...gradingAttempt,
+        teacherGraded: true,
+        scores: nextScores,
+        overallBand: finalOverall,
+        teacherFeedback: gradingScores.feedback
+      };
+    } else {
+      const existingWritingOverall = gradingAttempt.scores?.writing?.overallBand;
+      const hasWritingBand = typeof existingWritingOverall === 'number';
+      const nextOverall = hasWritingBand
+        ? computeAttemptFinalOverall(baseScores, existingWritingOverall)
+        : null;
+      updatedAttemptObj = {
+        ...gradingAttempt,
+        scores: baseScores,
+        overallBand: nextOverall,
+        teacherFeedback: gradingScores.feedback
+      };
+    }
+
     const updatedAttempts = attempts.map(att => (att.id === gradingAttempt.id ? updatedAttemptObj : att));
 
     setAttempts(updatedAttempts);
     dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAttemptObj });
     setGradingAttempt(null);
+    showToast(
+      includeWriting
+        ? `Đã lưu điểm: Listening ${lBand} · Reading ${rBand} · Overall ${updatedAttemptObj.overallBand}`
+        : `Đã cập nhật điểm Listening ${lBand} & Reading ${rBand}!`
+    );
   };
 
   // Highlighter and Notes
@@ -4044,6 +4179,7 @@ export default function App() {
           currentUser={currentUser}
           handleGradeWritingWithAI={handleGradeWritingWithAI}
           isGradingAI={isGradingAI}
+          openTeacherGradingModal={openTeacherGradingModal}
           previousView={previousView}
           resultReviewTab={resultReviewTab}
           selectedAttemptId={selectedAttemptId}
@@ -4058,15 +4194,12 @@ export default function App() {
 
       {view === 'TEACHER_DASHBOARD' && (
         <TeacherDashboard
-          aiGradingStep={aiGradingStep}
           attempts={attempts}
           copiedRoomPin={copiedRoomPin}
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
           expandedTeacherTestId={expandedTeacherTestId}
-          gradingAttempt={gradingAttempt}
           gradingFilters={gradingFilters}
-          gradingScores={gradingScores}
           handleCopyInviteLink={handleCopyInviteLink}
           handleDeleteAccount={handleDeleteAccount}
           handleDeleteAttempt={handleDeleteAttempt}
@@ -4074,14 +4207,12 @@ export default function App() {
           handleDeleteTest={handleDeleteTest}
           handleDuplicateTest={handleDuplicateTest}
           handleKickLobbyPlayer={handleKickLobbyPlayer}
-          handleTeacherAIGrade={handleTeacherAIGrade}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
           handleTeacherResetLobby={handleTeacherResetLobby}
           initGameCampaign={initGameCampaign}
-          isGradingAI={isGradingAI}
           openExamBuilder={openExamBuilder}
+          openTeacherGradingModal={openTeacherGradingModal}
           roomsDb={roomsDb}
-          saveTeacherGrading={saveTeacherGrading}
           setAddStudentMode={setAddStudentMode}
           setCopiedRoomPin={setCopiedRoomPin}
           setCurrentRoomPin={setCurrentRoomPin}
@@ -4089,9 +4220,9 @@ export default function App() {
           setEditingStudentAccount={setEditingStudentAccount}
           setEditingTargetUser={setEditingTargetUser}
           setExpandedTeacherTestId={setExpandedTeacherTestId}
-          setGradingAttempt={setGradingAttempt}
           setGradingFilters={setGradingFilters}
-          setGradingScores={setGradingScores}
+          setPreviousView={setPreviousView}
+          setSelectedAttemptId={setSelectedAttemptId}
           setShowAddStudentModal={setShowAddStudentModal}
           setShowCreateRoomModal={setShowCreateRoomModal}
           setShowVocabModal={setShowVocabModal}
@@ -4148,6 +4279,7 @@ export default function App() {
       <GlobalModals
         addStudentMode={addStudentMode}
         aiApiKey={aiApiKey}
+        aiGradingStep={aiGradingStep}
         apiTestState={apiTestState}
         bulkStudentsText={bulkStudentsText}
         currentRoomPin={currentRoomPin}
@@ -4157,16 +4289,22 @@ export default function App() {
         editingStudentAccount={editingStudentAccount}
         editingTargetUser={editingTargetUser}
         globalToast={globalToast}
+        gradingAttempt={gradingAttempt}
+        gradingScores={gradingScores}
         handleChangeCrewColor={handleChangeCrewColor}
         handleCreateRoom={handleCreateRoom}
         handleResetStudentPassword={handleResetStudentPassword}
         handleSaveNewStudents={handleSaveNewStudents}
+        handleTeacherAIGrade={handleTeacherAIGrade}
         handleTestGeminiKey={handleTestGeminiKey}
         handleUpdateUserAvatar={handleUpdateUserAvatar}
         handleUpdateUserProfileFields={handleUpdateUserProfileFields}
+        isGradingAI={isGradingAI}
         myCrewColor={myCrewColor}
         newRoomForm={newRoomForm}
         newStudentForm={newStudentForm}
+        recalculateObjectiveScores={recalculateObjectiveScores}
+        saveTeacherGrading={saveTeacherGrading}
         setAddStudentMode={setAddStudentMode}
         setAiApiKey={setAiApiKey}
         setApiTestState={setApiTestState}
@@ -4174,6 +4312,8 @@ export default function App() {
         setCustomVocabInput={setCustomVocabInput}
         setEditingStudentAccount={setEditingStudentAccount}
         setEditingTargetUser={setEditingTargetUser}
+        setGradingAttempt={setGradingAttempt}
+        setGradingScores={setGradingScores}
         setNewRoomForm={setNewRoomForm}
         setNewStudentForm={setNewStudentForm}
         setRoomsDb={setRoomsDb}

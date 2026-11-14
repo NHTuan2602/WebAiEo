@@ -3,6 +3,7 @@ import {
   CheckCircle,
   ChevronLeft,
   Clock,
+  Edit,
   Eye,
   EyeOff,
   Headphones,
@@ -24,6 +25,7 @@ export default function ResultView({
   currentUser,
   handleGradeWritingWithAI,
   isGradingAI,
+  openTeacherGradingModal,
   previousView,
   resultReviewTab,
   selectedAttemptId,
@@ -169,7 +171,19 @@ export default function ResultView({
               <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
                 <Headphones className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Listening
               </span>
-              <span className="text-lg font-bold text-[#007A7A] dark:text-[#1EE1D6]">{attempt.scores.listening.band}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-[#007A7A] dark:text-[#1EE1D6]">{attempt.scores.listening.band}</span>
+                {isTeacher && (
+                  <button
+                    type="button"
+                    onClick={() => openTeacherGradingModal?.(attempt)}
+                    className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] hover:border-[#007A7A] transition flex items-center gap-1"
+                    title="Chỉnh sửa điểm Listening"
+                  >
+                    <Edit className="w-3 h-3" /> Sửa
+                  </button>
+                )}
+              </div>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores.listening.raw}</span> / {attempt.scores.listening.total} câu
@@ -181,7 +195,19 @@ export default function ResultView({
               <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-[#1447E6] dark:text-blue-400" /> Reading
               </span>
-              <span className="text-lg font-bold text-[#1447E6] dark:text-blue-400">{attempt.scores.reading.band}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-[#1447E6] dark:text-blue-400">{attempt.scores.reading.band}</span>
+                {isTeacher && (
+                  <button
+                    type="button"
+                    onClick={() => openTeacherGradingModal?.(attempt)}
+                    className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500 transition flex items-center gap-1"
+                    title="Chỉnh sửa điểm Reading"
+                  >
+                    <Edit className="w-3 h-3" /> Sửa
+                  </button>
+                )}
+              </div>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores.reading.raw}</span> / {attempt.scores.reading.total} câu
@@ -193,9 +219,21 @@ export default function ResultView({
               <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
                 <PenTool className="w-4 h-4 text-[#059271] dark:text-emerald-400" /> Writing
               </span>
-              <span className="text-lg font-bold text-[#059271] dark:text-emerald-400">
-                {attempt.scores.writing.overallBand ?? 'Chờ Chấm'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-[#059271] dark:text-emerald-400">
+                  {attempt.scores.writing.overallBand ?? 'Chờ Chấm'}
+                </span>
+                {isTeacher && (
+                  <button
+                    type="button"
+                    onClick={() => openTeacherGradingModal?.(attempt)}
+                    className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500 transition flex items-center gap-1"
+                    title="Chấm hoặc chỉnh sửa điểm Writing"
+                  >
+                    <Edit className="w-3 h-3" /> Sửa
+                  </button>
+                )}
+              </div>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Task 1: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores.writing.task1Band ?? '-'}</span> | Task 2: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores.writing.task2Band ?? '-'}</span>
@@ -212,14 +250,23 @@ export default function ResultView({
                   <span className="bg-[#007A7A] text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                     <Sparkles className="w-3 h-3 text-amber-300" /> AI Examiner (GV)
                   </span>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Công Cụ Chấm Điểm Writing Tự Động Bằng AI</h3>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Công Cụ Chấm & Chỉnh Sửa Điểm (L · R · W)</h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
-                  Dành riêng cho Giáo viên: Đánh giá nhanh bài viết theo 4 tiêu chí chuẩn IDP/BC (TA/TR, CC, LR, GRA) qua Gemini API.
+                  Dành riêng cho Giáo viên: Chấm nhanh Writing qua Gemini API hoặc chỉnh sửa trực tiếp điểm Listening, Reading và Writing theo thang chuẩn IELTS 0.0 – 9.0.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => openTeacherGradingModal?.(attempt)}
+                  className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span>Chỉnh Sửa Điểm L / R / W</span>
+                </button>
+
                 <button
                   onClick={() => { setApiTestState({ testing: false, ok: null, message: '', model: '' }); setShowApiKeyModal(true); }}
                   className="px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5 shadow-sm"

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
-  Bot,
   Check,
   ChevronDown,
   Clock,
@@ -10,19 +9,18 @@ import {
   Crown,
   Download,
   Edit,
+  Eye,
   EyeOff,
   Filter,
   Gamepad2,
   Globe,
   GraduationCap,
   Key,
-  Loader2,
   Lock,
   PenTool,
   Plus,
   RefreshCw,
   Rocket,
-  Save,
   Share2,
   ShieldAlert,
   ShieldCheck,
@@ -34,23 +32,19 @@ import {
   UserMinus,
   UserPlus,
   Users,
-  Wifi,
-  X
+  Wifi
 } from 'lucide-react';
 import { DEFAULT_VOCAB_TEXT, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
-import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, getWordCount, normalizeRoomObject } from '../utils/examHelpers';
+import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
 import AmongUsCrewmate from '../components/common/AmongUsCrewmate';
 
 export default function TeacherDashboard({
-  aiGradingStep,
   attempts,
   copiedRoomPin,
   currentRoomPin,
   currentUser,
   expandedTeacherTestId,
-  gradingAttempt,
   gradingFilters,
-  gradingScores,
   handleCopyInviteLink,
   handleDeleteAccount,
   handleDeleteAttempt,
@@ -58,14 +52,12 @@ export default function TeacherDashboard({
   handleDeleteTest,
   handleDuplicateTest,
   handleKickLobbyPlayer,
-  handleTeacherAIGrade,
   handleTeacherOpenLobby,
   handleTeacherResetLobby,
   initGameCampaign,
-  isGradingAI,
   openExamBuilder,
+  openTeacherGradingModal,
   roomsDb,
-  saveTeacherGrading,
   setAddStudentMode,
   setCopiedRoomPin,
   setCurrentRoomPin,
@@ -73,9 +65,9 @@ export default function TeacherDashboard({
   setEditingStudentAccount,
   setEditingTargetUser,
   setExpandedTeacherTestId,
-  setGradingAttempt,
   setGradingFilters,
-  setGradingScores,
+  setPreviousView,
+  setSelectedAttemptId,
   setShowAddStudentModal,
   setShowCreateRoomModal,
   setShowVocabModal,
@@ -696,25 +688,34 @@ export default function TeacherDashboard({
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center font-bold text-blue-600 dark:text-blue-400">
-                        {att.overallBand ?? '-'}
+                      <td className="px-6 py-4 text-center">
+                        <div className="font-extrabold text-blue-600 dark:text-blue-400">
+                          {att.overallBand ?? '-'}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
+                          L {att.scores?.listening?.band ?? '-'} · R {att.scores?.reading?.band ?? '-'} · W {att.scores?.writing?.overallBand ?? '-'}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-1.5">
                           <button
-                            onClick={() => {
-                              setGradingAttempt(att);
-                              const w1Empty = getWordCount(att.answers?.w1) === 0;
-                              const w2Empty = getWordCount(att.answers?.w2) === 0;
-                              setGradingScores({
-                                task1Band: att.scores.writing.task1Band ?? (w1Empty ? 0 : 6.0),
-                                task2Band: att.scores.writing.task2Band ?? (w2Empty ? 0 : 6.5),
-                                feedback: att.teacherFeedback || ''
-                              });
-                            }}
+                            type="button"
+                            onClick={() => openTeacherGradingModal(att)}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm"
                           >
-                            Chấm Bài & Chi Tiết
+                            Chấm & Sửa Điểm (L/R/W)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedAttemptId(att.id);
+                              setPreviousView('TEACHER_DASHBOARD');
+                              setView('RESULT_VIEW');
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-teal-500/15 text-slate-600 hover:text-[#007A7A] dark:text-slate-300 dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition"
+                            title="Xem chi tiết từng câu & bài làm"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
@@ -1254,192 +1255,6 @@ export default function TeacherDashboard({
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TEACHER GRADING MODAL WITH AI ASSIST */}
-      {gradingAttempt && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-200 dark:border-slate-800 mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>Chấm Bài: {gradingAttempt.studentName}</span>
-                  {gradingAttempt.aiGraded && (
-                    <span className="text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 px-2 py-0.5 rounded-full flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30">
-                      <Bot className="w-3 h-3 text-indigo-600 dark:text-indigo-400" /> AI Graded
-                    </span>
-                  )}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{gradingAttempt.testTitle} - {gradingAttempt.submittedAt}</p>
-              </div>
-              <button onClick={() => setGradingAttempt(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Anti-Cheat Log Detail */}
-            {(() => {
-              const logsList = gradingAttempt.antiCheatLogs || [];
-              const extSignalsCount = countExtensionCheatSignals(logsList);
-              return (
-                <div className="bg-slate-900 dark:bg-slate-950 text-white p-4 rounded-2xl mb-6 border border-slate-800">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-                    <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4" /> Nhật Ký Vi Phạm Chống Gian Lận (Stealth Log)
-                    </h4>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs bg-slate-800 px-2.5 py-1 rounded font-mono">
-                        Lượt rời màn hình: {gradingAttempt.tabSwitchCount}
-                      </span>
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded font-mono border ${
-                          extSignalsCount > 0
-                            ? 'bg-rose-950/80 text-rose-300 border-rose-700'
-                            : 'bg-slate-800 text-slate-300 border-slate-700'
-                        }`}
-                      >
-                        Dấu hiệu Extension / Lách luật: {extSignalsCount}
-                      </span>
-                    </div>
-                  </div>
-                  {logsList.length === 0 ? (
-                    <p className="text-xs text-emerald-400">Không ghi nhận vi phạm rời màn hình, khóa tương tác hay dấu hiệu Extension/lách luật nào trong suốt quá trình làm bài.</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-2 text-xs text-slate-300">
-                      {logsList.map((log, idx) => {
-                        const isExtOrHigh = log?.category === 'extension' || log?.severity === 'high';
-                        const isInteraction = log?.category === 'interaction';
-                        const skillColor = isExtOrHigh
-                          ? 'text-rose-300'
-                          : isInteraction
-                            ? 'text-sky-300'
-                            : 'text-amber-300';
-                        const rowClass = isExtOrHigh
-                          ? 'border-rose-900/60 bg-rose-950/30 px-2 py-1 rounded text-rose-100'
-                          : 'border-slate-800 pb-1';
-                        return (
-                          <div key={idx} className={`flex justify-between border-b ${rowClass}`}>
-                            <span>
-                              [{log.timestamp}] Skill: <strong className={`${skillColor} uppercase`}>{log.skill}</strong> - {log.event}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Student Writing Submissions */}
-            <div className="space-y-4 mb-6">
-              <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">Bài Viết Của Học Sinh</h4>
-
-              <div className="bg-slate-50 dark:bg-slate-800/70 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                <p className="font-bold text-xs text-slate-700 dark:text-slate-200 mb-2">Writing Task 1 ({getWordCount(gradingAttempt.answers.w1)} từ)</p>
-                <div className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                  {gradingAttempt.answers.w1 || 'Không có bài làm'}
-                </div>
-              </div>
-
-              <div className="bg-slate-50 dark:bg-slate-800/70 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                <p className="font-bold text-xs text-slate-700 dark:text-slate-200 mb-2">Writing Task 2 ({getWordCount(gradingAttempt.answers.w2)} từ)</p>
-                <div className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                  {gradingAttempt.answers.w2 || 'Không có bài làm'}
-                </div>
-              </div>
-            </div>
-
-            {/* Grading input and AI suggestion */}
-            <div className="bg-[#EDFFFD]/50 dark:bg-[#003538]/30 border border-[#B5F5F1] dark:border-teal-500/30 rounded-2xl p-5 mb-6 space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <h4 className="font-bold text-sm text-slate-800 dark:text-white">Nhập Điểm Chấm Kỹ Năng Writing (Band 0 - 9.0)</h4>
-                
-                <button
-                  type="button"
-                  onClick={() => handleTeacherAIGrade(gradingAttempt)}
-                  disabled={isGradingAI}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition shadow-sm ${
-                    isGradingAI ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed' : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
-                  }`}
-                >
-                  {isGradingAI ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>AI Đang Chấm...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                      <span>✨ AI Gợi Ý Chấm Điểm</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {isGradingAI && (
-                <div className="p-3 bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 rounded-lg flex items-center gap-3 text-xs text-[#003538] dark:text-[#1EE1D6]">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#007A7A] dark:text-[#1EE1D6] flex-shrink-0" />
-                  <span>{aiGradingStep || 'AI đang phân tích bài thi và điền tự động điểm số & nhận xét...'}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Task 1 Band Score</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="9"
-                    value={gradingScores.task1Band}
-                    onChange={e => setGradingScores({ ...gradingScores, task1Band: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Task 2 Band Score</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="9"
-                    value={gradingScores.task2Band}
-                    onChange={e => setGradingScores({ ...gradingScores, task2Band: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nhận Xét & Ghi Chú Của Giáo Viên</label>
-                <textarea
-                  rows={4}
-                  placeholder="Viết nhận xét chi tiết cho học sinh..."
-                  value={gradingScores.feedback}
-                  onChange={e => setGradingScores({ ...gradingScores, feedback: e.target.value })}
-                  className="w-full p-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none font-sans"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-              <button
-                onClick={() => setGradingAttempt(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={saveTeacherGrading}
-                className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" /> Lưu Kết Quả & Chấm Điểm
-              </button>
             </div>
           </div>
         </div>

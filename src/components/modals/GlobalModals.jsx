@@ -19,10 +19,12 @@ import { DEFAULT_VOCAB_TEXT, VOCAB_PRESETS } from '../../constants/seedData';
 import { compressAvatarImageFile, normalizeRoomObject, parseBulkStudentsText, parseRawVocabText } from '../../utils/examHelpers';
 import UserAvatarBadge from '../../components/common/UserAvatarBadge';
 import AmongUsCrewmate from '../../components/common/AmongUsCrewmate';
+import TeacherGradingModal from './TeacherGradingModal';
 
 export default function GlobalModals({
   addStudentMode,
   aiApiKey,
+  aiGradingStep,
   apiTestState,
   bulkStudentsText,
   currentRoomPin,
@@ -32,16 +34,22 @@ export default function GlobalModals({
   editingStudentAccount,
   editingTargetUser,
   globalToast,
+  gradingAttempt,
+  gradingScores,
   handleChangeCrewColor,
   handleCreateRoom,
   handleResetStudentPassword,
   handleSaveNewStudents,
+  handleTeacherAIGrade,
   handleTestGeminiKey,
   handleUpdateUserAvatar,
   handleUpdateUserProfileFields,
+  isGradingAI,
   myCrewColor,
   newRoomForm,
   newStudentForm,
+  recalculateObjectiveScores,
+  saveTeacherGrading,
   setAddStudentMode,
   setAiApiKey,
   setApiTestState,
@@ -49,6 +57,8 @@ export default function GlobalModals({
   setCustomVocabInput,
   setEditingStudentAccount,
   setEditingTargetUser,
+  setGradingAttempt,
+  setGradingScores,
   setNewRoomForm,
   setNewStudentForm,
   setRoomsDb,
@@ -823,6 +833,21 @@ export default function GlobalModals({
           </div>
         </div>
       </div>
+    )}
+
+    {/* Teacher Grading Modal (Listening, Reading & Writing) */}
+    {currentUser?.role === 'teacher' && (
+      <TeacherGradingModal
+        aiGradingStep={aiGradingStep}
+        gradingAttempt={gradingAttempt}
+        gradingScores={gradingScores}
+        handleTeacherAIGrade={handleTeacherAIGrade}
+        isGradingAI={isGradingAI}
+        recalculateObjectiveScores={recalculateObjectiveScores}
+        saveTeacherGrading={saveTeacherGrading}
+        setGradingAttempt={setGradingAttempt}
+        setGradingScores={setGradingScores}
+      />
     )}
 
     {/* Global Floating Toast */}
