@@ -1,14 +1,27 @@
 import { useEffect, useRef } from 'react';
 
-const EXTENSION_SIGNATURES = [
-  { key: 'ext-grammarly', selector: 'grammarly-desktop-integration, grammarly-extension, [data-grammarly-shadow-root]', label: 'Grammarly (Hỗ trợ viết)' },
-  { key: 'ext-quillbot', selector: '[id*="quillbot" i], [class*="quillbot" i], quillbot-extension', label: 'QuillBot (Paraphrase / Viết lại)' },
-  { key: 'ext-ai-sidebar', selector: 'monica-root, [id*="monica-" i], sider-app, [id*="sider-" i], chatgpt-sidebar, [id*="chatgpt-extension" i], merlin-root, harpa-container, [id*="liner-extension" i]', label: 'Tiện ích AI Sidebar / ChatGPT' },
-  { key: 'ext-translate', selector: '#gtx-trans, .goog-te-banner-frame, .goog-te-gadget, deepl-inline-translate, [id*="deepl-" i]', label: 'Tiện ích Dịch thuật (Google Translate / DeepL)' },
-  { key: 'ext-rightclick', selector: '[id*="enable-right-click" i], [id*="allow-copy" i], [class*="enable-copy" i], [data-allow-copy]', label: 'Tiện ích Bỏ Khóa Chuột Phải / Copy' }
+// Chỉ nhận diện nhóm tiện ích hỗ trợ Copy/Paste hoặc mở khóa chuột phải
+const COPY_PASTE_EXTENSION_SIGNATURES = [
+  {
+    key: 'ext-rightclick-copy',
+    selector: [
+      '[id*="enable-right-click" i]',
+      '[id*="allow-copy" i]',
+      '[id*="supercopy" i]',
+      '[id*="simple-allow-copy" i]',
+      '[id*="absolute-enable-right-click" i]',
+      '[class*="enable-copy" i]',
+      '[class*="allow-copy" i]',
+      '[class*="supercopy" i]',
+      '[data-allow-copy]',
+      '[data-supercopy]'
+    ].join(', '),
+    label: 'Tiện ích Mở Khóa Chuột Phải / Hỗ trợ Copy-Paste'
+  }
 ];
 
-const isNativeFn = (fn) => typeof fn === 'function' && Function.prototype.toString.call(fn).includes('[native code]');
+const isNativeFn = (fn) =>
+  typeof fn === 'function' && Function.prototype.toString.call(fn).includes('[native code]');
 
 export function useExamAntiCheat({ enabled, setExamState, showToast }) {
   const antiCheatToastRef = useRef(null);
@@ -23,10 +36,21 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
     if (!enabled) return;
 
     const seenSignatures = new Map();
+    const pendingTimers = new Set();
     let lastTabCountedAt = 0;
     let lastToastAt = 0;
-    let wasWindowFocused = document.hasFocus();
-    let lastBeatTime = performance.now();
+    let blurConfirmTimer = null;
+    let awayAlreadyRecorded = document.visibilityState === 'hidden' || !document.hasFocus();
+    let unfocusedStreak = 0;
+
+    const trackTimer = (fn, delayMs) => {
+      const id = setTimeout(() => {
+        pendingTimers.delete(id);
+        fn();
+      }, delayMs);
+      pendingTimers.add(id);
+      return id;
+    };
 
     const notifyRestricted = (msg) => {
       const now = Date.now();
@@ -59,21 +83,50 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
       }));
     };
 
-    const handleBlur = () => {
-      recordViolation('Rời khỏi màn hình làm bài (Mất focus)', {
-        countTabSwitch: true,
-        category: 'focus',
-        severity: 'medium'
-      });
+    const markReturnedToExam = () => {
+      if (blurConfirmTimer) {
+        clearTimeout(blurConfirmTimer);
+        pendingTimers.delete(blurConfirmTimer);
+        blurConfirmTimer = null;
+      }
+      if (!document.hidden && document.hasFocus()) {
+        awayAlreadyRecorded = false;
+        unfocusedStreak = 0;
+      }
+    };
+
+    // Chỉ đếm khi cửa sổ trình duyệt thực sự mất focus (không dùng capture=true để tránh bắt nhầm click nút/input bên trong bài thi)
+    const handleWindowBlur = (e) => {
+      if (e?.target && e.target !== window) return;
+      if (blurConfirmTimer) {
+        clearTimeout(blurConfirmTimer);
+        pendingTimers.delete(blurConfirmTimer);
+      }
+      blurConfirmTimer = trackTimer(() => {
+        blurConfirmTimer = null;
+        if (awayAlreadyRecorded) return;
+        if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+          awayAlreadyRecorded = true;
+          recordViolation('Rời khỏi màn hình làm bài (Mất focus cửa sổ)', {
+            countTabSwitch: true,
+            category: 'focus',
+            severity: 'medium'
+          });
+        }
+      }, 180);
     };
 
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
-        recordViolation('Rời khỏi màn hình làm bài (Ẩn tab)', {
+        if (awayAlreadyRecorded) return;
+        awayAlreadyRecorded = true;
+        recordViolation('Rời khỏi màn hình làm bài (Chuyển tab / Ẩn trình duyệt)', {
           countTabSwitch: true,
           category: 'focus',
           severity: 'medium'
         });
+      } else {
+        markReturnedToExam();
       }
     };
 
@@ -89,9 +142,9 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
         dedupKey: 'ctxmenu-blocked',
         cooldownMs: 3000
       });
-      setTimeout(() => {
+      trackTimer(() => {
         if (!e.defaultPrevented) {
-          recordViolation('Cảnh báo: Thao tác chuột phải đã vượt qua khóa bảo vệ (Extension bypass)', {
+          recordViolation('Cảnh báo: Thao tác chuột phải đã vượt qua khóa bảo vệ (Extension hỗ trợ Copy/Chuột phải)', {
             category: 'extension',
             severity: 'high',
             dedupKey: 'bypass-ctxmenu',
@@ -113,34 +166,62 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
         dedupKey: `clip-${e.type}`,
         cooldownMs: 3000
       });
+      trackTimer(() => {
+        if (!e.defaultPrevented) {
+          recordViolation(`Cảnh báo: Thao tác ${actionMap[e.type] || e.type} đã vượt khóa bảo vệ (Extension hỗ trợ Copy/Paste)`, {
+            category: 'extension',
+            severity: 'high',
+            dedupKey: `bypass-clip-${e.type}`,
+            cooldownMs: 5000
+          });
+        }
+      }, 0);
     };
 
     const handleKeyDownCapture = (e) => {
       const keyLower = (e.key || '').toLowerCase();
       const hasMod = e.ctrlKey || e.metaKey;
-      const isDevTools =
-        e.key === 'F12' || (hasMod && e.shiftKey && ['i', 'j', 'c'].includes(keyLower));
-      const isBlockedShortcut = isDevTools || (hasMod && ['u', 'c', 'v', 'x'].includes(keyLower));
-      if (!isBlockedShortcut) return;
+      const isClipboardShortcut = hasMod && ['c', 'v', 'x'].includes(keyLower);
+      const isDevToolsOrSource =
+        e.key === 'F12' ||
+        (hasMod && e.shiftKey && ['i', 'j', 'c'].includes(keyLower)) ||
+        (hasMod && keyLower === 'u');
+      if (!isClipboardShortcut && !isDevToolsOrSource) return;
 
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      const label = isDevTools ? 'mở DevTools / Kiểm tra trang' : `phím tắt (${e.key.toUpperCase()})`;
+      const label = isDevToolsOrSource ? 'mở DevTools / Kiểm tra mã nguồn' : `phím tắt (${e.key.toUpperCase()})`;
       notifyRestricted('Phím tắt này đã bị khóa trong khi làm bài thi!');
       recordViolation(`Thử dùng ${label} (Đã chặn)`, {
-        category: isDevTools ? 'extension' : 'interaction',
-        severity: isDevTools ? 'high' : 'medium',
+        category: isDevToolsOrSource ? 'extension' : 'interaction',
+        severity: isDevToolsOrSource ? 'high' : 'medium',
         dedupKey: `key-${label}`,
         cooldownMs: 3000
       });
     };
 
-    const inspectExtensionAndApiIntegrity = () => {
+    // Chặn dự phòng nếu extension lách sự kiện paste để chèn thẳng dữ liệu vào ô nhập (giữ nguyên bộ gõ tiếng Việt)
+    const handleBeforeInputCapture = (e) => {
+      if (e.inputType !== 'insertFromPaste') return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      notifyRestricted('Chức năng dán văn bản (Paste) đã bị khóa trong khi thi!');
+      recordViolation('Cảnh báo: Phát hiện thao tác dán văn bản vượt khóa clipboard (Extension hỗ trợ Paste)', {
+        category: 'extension',
+        severity: 'high',
+        dedupKey: 'bypass-beforeinput-paste',
+        cooldownMs: 4000
+      });
+    };
+
+    // Chỉ kiểm tra 2 nhóm: (1) Extension mở khóa Copy/Paste/Chuột phải, (2) Extension giả mạo/chặn đếm out-tab
+    const inspectAntiCheatTampering = () => {
       try {
-        EXTENSION_SIGNATURES.forEach(sig => {
+        COPY_PASTE_EXTENSION_SIGNATURES.forEach(sig => {
           if (document.querySelector(sig.selector)) {
-            recordViolation(`Phát hiện tiện ích hỗ trợ đang hoạt động: ${sig.label}`, {
+            recordViolation(`Phát hiện tiện ích lách luật: ${sig.label}`, {
               category: 'extension',
               severity: 'high',
               dedupKey: sig.key
@@ -148,62 +229,43 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
           }
         });
 
-        const extAssets = document.querySelectorAll('script[src], link[href], iframe[src]');
-        for (let i = 0; i < extAssets.length; i++) {
-          const url = extAssets[i].src || extAssets[i].href || '';
-          if (/^(chrome|moz|safari|edge)-extension:\/\//i.test(url)) {
-            recordViolation('Phát hiện tài nguyên/mã tiêm từ Extension trình duyệt (extension://)', {
-              category: 'extension',
-              severity: 'high',
-              dedupKey: `ext-url-${url.slice(0, 48)}`
-            });
-            break;
-          }
-        }
-
-        const rootEl = document.getElementById('root');
-        const checkForeignChildren = (container) => {
-          if (!container) return;
-          Array.from(container.children).forEach(child => {
-            if (child === rootEl) return;
-            const tag = (child.tagName || '').toLowerCase();
-            if (child.shadowRoot || (tag.includes('-') && tag !== 'vite-error-overlay')) {
-              recordViolation(`Phát hiện thành phần giao diện ngoài do Extension chèn vào (<${tag}>)`, {
-                category: 'extension',
-                severity: 'high',
-                dedupKey: `ext-tag-${tag}`
-              });
-            }
-          });
-        };
-        checkForeignChildren(document.documentElement);
-        checkForeignChildren(document.body);
-
+        // Kiểm tra ghi đè trực tiếp API theo dõi out-tab trên document (Extension chặn đọc số lần out tab)
         if (
           Object.getOwnPropertyDescriptor(document, 'hidden') ||
           Object.getOwnPropertyDescriptor(document, 'visibilityState') ||
           Object.getOwnPropertyDescriptor(document, 'hasFocus')
         ) {
-          recordViolation('Cảnh báo: Phát hiện mã/Extension ghi đè API trạng thái tab (hidden / visibilityState / hasFocus)', {
+          recordViolation('Cảnh báo: Phát hiện Extension/mã can thiệp API đếm out-tab (hidden / visibilityState / hasFocus)', {
             category: 'extension',
             severity: 'high',
             dedupKey: 'tamper-doc-ownprop'
           });
         }
 
+        // Kiểm tra sửa Prototype trình duyệt nhằm chặn đếm out-tab hoặc mở khóa Copy/Paste/Chuột phải
         const hiddenGetter = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden')?.get;
         const visGetter = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState')?.get;
         if (
           (hiddenGetter && !isNativeFn(hiddenGetter)) ||
           (visGetter && !isNativeFn(visGetter)) ||
-          !isNativeFn(Document.prototype.hasFocus) ||
-          !isNativeFn(Event.prototype.preventDefault) ||
-          !isNativeFn(Event.prototype.stopImmediatePropagation)
+          !isNativeFn(Document.prototype.hasFocus)
         ) {
-          recordViolation('Cảnh báo: Prototype trình duyệt bị sửa đổi (Nghi vấn Extension lách chống gian lận)', {
+          recordViolation('Cảnh báo: API đếm rời tab (Document.prototype) bị sửa đổi (Nghi vấn Extension chống đếm out-tab)', {
             category: 'extension',
             severity: 'high',
-            dedupKey: 'tamper-proto-native'
+            dedupKey: 'tamper-focus-proto'
+          });
+        }
+
+        if (
+          !isNativeFn(Event.prototype.preventDefault) ||
+          !isNativeFn(Event.prototype.stopPropagation) ||
+          !isNativeFn(Event.prototype.stopImmediatePropagation)
+        ) {
+          recordViolation('Cảnh báo: Prototype chặn Copy/Paste/Chuột phải (Event.prototype) bị sửa đổi bởi Extension', {
+            category: 'extension',
+            severity: 'high',
+            dedupKey: 'tamper-copy-proto'
           });
         }
       } catch (_err) {
@@ -212,7 +274,7 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
     };
 
     const observer = new MutationObserver(() => {
-      inspectExtensionAndApiIntegrity();
+      inspectAntiCheatTampering();
     });
     try {
       observer.observe(document.documentElement, { childList: true, subtree: false });
@@ -221,58 +283,57 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
       }
     } catch (_err) {}
 
+    // Fallback phát hiện mất focus liên tục nếu Extension chặn sự kiện blur/visibilitychange
     let tickCounter = 0;
     const heartbeatTimer = setInterval(() => {
-      const nowFocused = document.hasFocus();
-      if (wasWindowFocused && !nowFocused) {
-        recordViolation('Mất focus cửa sổ làm bài (Kiểm tra định kỳ / có thể bị Extension chặn blur)', {
-          countTabSwitch: true,
-          category: 'focus',
-          severity: 'medium'
-        });
-      }
-      wasWindowFocused = nowFocused;
-
-      const nowPerf = performance.now();
-      const delta = nowPerf - lastBeatTime;
-      lastBeatTime = nowPerf;
-      if (delta > 2800 && document.hidden === false) {
-        recordViolation('Nghi vấn tab bị treo/ẩn nền dù trạng thái hiển thị bị giữ visible (Extension/Throttling)', {
-          countTabSwitch: true,
-          category: 'extension',
-          severity: 'high',
-          dedupKey: 'timer-drift',
-          cooldownMs: 8000
-        });
+      if (!document.hidden && document.hasFocus()) {
+        awayAlreadyRecorded = false;
+        unfocusedStreak = 0;
+      } else if (!awayAlreadyRecorded) {
+        unfocusedStreak += 1;
+        if (unfocusedStreak >= 2) {
+          awayAlreadyRecorded = true;
+          recordViolation('Rời khỏi màn hình làm bài (Phát hiện mất focus định kỳ)', {
+            countTabSwitch: true,
+            category: 'focus',
+            severity: 'medium'
+          });
+        }
       }
 
       tickCounter += 1;
       if (tickCounter % 4 === 0) {
-        inspectExtensionAndApiIntegrity();
+        inspectAntiCheatTampering();
       }
-    }, 900);
+    }, 1000);
 
-    inspectExtensionAndApiIntegrity();
+    inspectAntiCheatTampering();
 
-    window.addEventListener('blur', handleBlur, true);
-    document.addEventListener('visibilitychange', handleVisibility, true);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', markReturnedToExam);
+    document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('contextmenu', handleContextMenuCapture, true);
     document.addEventListener('contextmenu', handleContextMenuCapture, true);
     window.addEventListener('copy', handleClipboardCapture, true);
     window.addEventListener('cut', handleClipboardCapture, true);
     window.addEventListener('paste', handleClipboardCapture, true);
+    window.addEventListener('beforeinput', handleBeforeInputCapture, true);
     window.addEventListener('keydown', handleKeyDownCapture, true);
 
     return () => {
       clearInterval(heartbeatTimer);
+      pendingTimers.forEach(id => clearTimeout(id));
+      pendingTimers.clear();
       observer.disconnect();
-      window.removeEventListener('blur', handleBlur, true);
-      document.removeEventListener('visibilitychange', handleVisibility, true);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', markReturnedToExam);
+      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('contextmenu', handleContextMenuCapture, true);
       document.removeEventListener('contextmenu', handleContextMenuCapture, true);
       window.removeEventListener('copy', handleClipboardCapture, true);
       window.removeEventListener('cut', handleClipboardCapture, true);
       window.removeEventListener('paste', handleClipboardCapture, true);
+      window.removeEventListener('beforeinput', handleBeforeInputCapture, true);
       window.removeEventListener('keydown', handleKeyDownCapture, true);
     };
   }, [enabled]);
