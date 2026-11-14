@@ -18,6 +18,7 @@ import {
   X,
   AlertTriangle,
   ChevronLeft,
+  ChevronDown,
   Award,
   Loader2,
   Bot,
@@ -1725,6 +1726,7 @@ export default function App() {
 
   // Teacher Hub Sub-Tab ('tests', 'grading', 'game_room', 'students')
   const [teacherHubTab, setTeacherHubTab] = useState('tests');
+  const [expandedTeacherTestId, setExpandedTeacherTestId] = useState(null);
   const [gradingFilters, setGradingFilters] = useState({ testId: 'all', status: 'all', risk: 'all', search: '' });
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [addStudentMode, setAddStudentMode] = useState('single'); // 'single' | 'bulk'
@@ -9290,275 +9292,336 @@ export default function App() {
 
         {/* Tab 1: Kho Đề Thi */}
         {teacherHubTab === 'tests' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {tests.map(t => {
+          <div className="space-y-3">
+            {tests.length === 0 ? (
+              <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
+                Chưa có đề thi nào. Bấm <strong>Tạo Đề Thi Mới</strong> để bắt đầu.
+              </div>
+            ) : tests.map(t => {
               const cfg = normalizeExamConfig(t);
-              const listeningTracks = getListeningTracks(t.listening);
-              const listeningTracksCount = listeningTracks.length;
-              const hasListeningAudio = listeningTracks.some(tr => !!tr.audioUrl);
-              const hasListeningImg = listeningTracks.some(tr => !!tr.imageUrl);
-              const passagesCount = getReadingPassages(t.reading).length;
               const isPrivate = cfg.visibility === 'private';
-              const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
+              const isExpanded = expandedTeacherTestId === t.id;
 
               return (
-              <div key={t.id} className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md transition flex flex-col justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
-                      Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
-                    </span>
-                    <button
-                      onClick={() => toggleTestVisibility(t.id)}
-                      title="Bấm để chuyển Công khai / Chỉ mình tôi thấy"
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
-                        isPrivate
-                          ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100'
-                          : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {isPrivate ? <EyeOff className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
-                      {isPrivate ? 'Chỉ mình tôi' : 'Công khai'}
-                    </button>
-                  </div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base mb-2 leading-snug">{t.title}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 line-clamp-2 leading-relaxed">{t.description}</p>
+                <div
+                  key={t.id}
+                  className={`bg-white dark:bg-slate-900 rounded-2xl border transition ${
+                    isExpanded
+                      ? 'border-blue-500/60 dark:border-blue-500/40 shadow-md p-5 sm:p-6'
+                      : 'border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  {/* Minimal Header Row: Title + Công khai / Chỉ mình tôi */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id));
+                      }
+                    }}
+                    aria-expanded={isExpanded}
+                    className={`w-full flex items-center justify-between gap-3 text-left cursor-pointer select-none ${
+                      isExpanded ? '' : 'px-5 py-4'
+                    }`}
+                  >
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
+                      {t.title}
+                    </h3>
 
-                  {/* Exam Config Summary Badges */}
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
-                      ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
-                    </span>
-                    <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
-                      {cfg.maxAttempts === 0 ? '∞ Làm tự do' : `🔒 Tối đa ${cfg.maxAttempts} lần`}
-                    </span>
-                    {cfg.sequentialMode && (
-                      <span className="text-[10px] bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-md">
-                        Tuần tự: {cfg.order.map(s => s[0].toUpperCase()).join('→')}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Media Badges */}
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {hasListeningAudio ? (
-                      <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} chủ đề nghe` : 'Đã đính kèm Audio'}
-                      </span>
-                    ) : listeningTracksCount > 1 || hasListeningImg ? (
-                      <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        🎧 {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
-                        🔊 Dùng AI Voice (TTS)
-                      </span>
-                    )}
-                    {(hasReadingImg || passagesCount > 1) && (
-                      <span className="text-[10px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30">
-                        🖼️ {passagesCount} bài Reading
-                      </span>
-                    )}
-                    {t.writing?.task1?.imageUrl && (
-                      <span className="text-[10px] bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-500/30">
-                        📊 Có biểu đồ Task 1
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Inline Quick Controls: Per-Skill Durations */}
-                  <div className="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-500/10 border border-indigo-200/80 dark:border-indigo-500/30 mb-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-extrabold text-indigo-900 dark:text-indigo-200 flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Thời gian từng phần (phút)
-                      </span>
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
                       <button
                         type="button"
-                        onClick={() => openExamBuilder(t, 'general')}
-                        className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 hover:underline"
+                        onClick={e => {
+                          e.stopPropagation();
+                          toggleTestVisibility(t.id);
+                        }}
+                        title="Bấm để chuyển Công khai / Chỉ mình tôi thấy"
+                        className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
+                          isPrivate
+                            ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/25'
+                            : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
+                        }`}
                       >
-                        Thứ tự & Tuần tự →
+                        {isPrivate ? <EyeOff className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+                        {isPrivate ? 'Chỉ mình tôi' : 'Công khai'}
                       </button>
+
+                      <ChevronDown
+                        className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                          isExpanded ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+                        }`}
+                      />
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {cfg.order.map((sId, sIdx) => (
-                        <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-indigo-100 dark:border-slate-700 text-center">
-                          <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                            {sIdx + 1}. {sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : 'Viết'}
-                          </span>
-                          <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                            <input
-                              key={`${t.id}-${sId}-${cfg.durations[sId]}`}
-                              type="number"
-                              min={1}
-                              max={180}
-                              defaultValue={cfg.durations[sId]}
-                              onBlur={e => {
-                                const parsed = Math.max(1, Math.min(180, Number(e.target.value) || cfg.durations[sId]));
-                                e.target.value = String(parsed);
-                                if (parsed !== cfg.durations[sId]) {
-                                  updateTestQuickDuration(t.id, sId, parsed);
-                                }
-                              }}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') e.currentTarget.blur();
-                              }}
-                              title="Nhập số phút rồi bấm ra ngoài hoặc nhấn Enter để lưu"
-                              className="w-12 px-1 py-0.5 text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-extrabold text-slate-900 dark:text-white"
-                            />
-                            <span className="text-[10px] text-slate-400 font-bold">p</span>
+                  </div>
+
+                  {/* Expanded Details Panel (Visible only when clicked) */}
+                  {isExpanded && (() => {
+                    const listeningTracks = getListeningTracks(t.listening);
+                    const listeningTracksCount = listeningTracks.length;
+                    const hasListeningAudio = listeningTracks.some(tr => !!tr.audioUrl);
+                    const hasListeningImg = listeningTracks.some(tr => !!tr.imageUrl);
+                    const passagesCount = getReadingPassages(t.reading).length;
+                    const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
+
+                    return (
+                      <div className="mt-4 pt-5 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                        <div className="space-y-2.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
+                              Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
+                            </span>
+                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
+                              ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
+                            </span>
+                            <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
+                              {cfg.maxAttempts === 0 ? '∞ Làm tự do' : `🔒 Tối đa ${cfg.maxAttempts} lần`}
+                            </span>
+                            {cfg.sequentialMode && (
+                              <span className="text-[10px] bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-md">
+                                Tuần tự: {cfg.order.map(s => s[0].toUpperCase()).join('→')}
+                              </span>
+                            )}
+                            {hasListeningAudio ? (
+                              <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
+                                🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} chủ đề nghe` : 'Đã đính kèm Audio'}
+                              </span>
+                            ) : listeningTracksCount > 1 || hasListeningImg ? (
+                              <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
+                                🎧 {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
+                                🔊 Dùng AI Voice (TTS)
+                              </span>
+                            )}
+                            {(hasReadingImg || passagesCount > 1) && (
+                              <span className="text-[10px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30">
+                                🖼️ {passagesCount} bài Reading
+                              </span>
+                            )}
+                            {t.writing?.task1?.imageUrl && (
+                              <span className="text-[10px] bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-500/30">
+                                📊 Có biểu đồ Task 1
+                              </span>
+                            )}
+                          </div>
+                          {t.description && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t.description}</p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                          {/* Inline Quick Controls: Per-Skill Durations */}
+                          <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-500/10 border border-indigo-200/80 dark:border-indigo-500/30 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-extrabold text-indigo-900 dark:text-indigo-200 flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Thời gian từng phần (phút)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => openExamBuilder(t, 'general')}
+                                className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 hover:underline"
+                              >
+                                Thứ tự &amp; Tuần tự →
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {cfg.order.map((sId, sIdx) => (
+                                <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-indigo-100 dark:border-slate-700 text-center">
+                                  <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                    {sIdx + 1}. {sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : 'Viết'}
+                                  </span>
+                                  <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                                    <input
+                                      key={`${t.id}-${sId}-${cfg.durations[sId]}`}
+                                      type="number"
+                                      min={1}
+                                      max={180}
+                                      defaultValue={cfg.durations[sId]}
+                                      onBlur={e => {
+                                        const parsed = Math.max(1, Math.min(180, Number(e.target.value) || cfg.durations[sId]));
+                                        e.target.value = String(parsed);
+                                        if (parsed !== cfg.durations[sId]) {
+                                          updateTestQuickDuration(t.id, sId, parsed);
+                                        }
+                                      }}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter') e.currentTarget.blur();
+                                      }}
+                                      title="Nhập số phút rồi bấm ra ngoài hoặc nhấn Enter để lưu"
+                                      className="w-12 px-1 py-0.5 text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-extrabold text-slate-900 dark:text-white"
+                                    />
+                                    <span className="text-[10px] text-slate-400 font-bold">p</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-indigo-700/80 dark:text-indigo-300/80 font-medium">
+                              {cfg.sequentialMode
+                                ? 'Hết giờ từng phần sẽ tự động chuyển sang phần tiếp theo.'
+                                : 'Đang cho phép chuyển tự do giữa các phần.'}
+                            </p>
+                          </div>
+
+                          {/* Right column: 4 Quick Toggles */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {/* Quick Toggle Visibility (Ẩn / Công khai) */}
+                            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Hiển thị đề cho học sinh</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  {isPrivate ? 'Đang ẩn — HS chưa thấy' : 'Công khai — HS làm được'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleTestVisibility(t.id)}
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                                  isPrivate
+                                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                }`}
+                              >
+                                {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                                {isPrivate ? 'Đang Ẩn' : 'Công Khai'}
+                              </button>
+                            </div>
+
+                            {/* Quick Toggle Practice vs Real Exam (Thi thử nhiều lần / Thi thật 1 lần) */}
+                            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chế độ Thi thử / Thi thật</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  {cfg.maxAttempts === 1
+                                    ? 'Thi thật: Chỉ làm 1 lần'
+                                    : cfg.maxAttempts === 0
+                                    ? 'Thi thử: Làm nhiều lần'
+                                    : `Giới hạn ${cfg.maxAttempts} lần`}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleTestExamMode(t.id)}
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                                  cfg.maxAttempts === 1
+                                    ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                }`}
+                              >
+                                {cfg.maxAttempts === 1 ? 'Thi Thật' : cfg.maxAttempts === 0 ? 'Thi Thử' : `Tối đa ${cfg.maxAttempts}`}
+                              </button>
+                            </div>
+
+                            {/* Quick Toggle Allow View Correct Answers */}
+                            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Xem đáp án đúng</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  {t.allowViewAnswers ? 'HS xem được sau khi nộp' : 'Đang ẩn đáp án đúng'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleTestAllowViewAnswers(t.id)}
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                                  t.allowViewAnswers
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
+                                }`}
+                              >
+                                {t.allowViewAnswers ? (
+                                  <>
+                                    <Unlock className="w-3.5 h-3.5" /> Đã Mở
+                                  </>
+                                ) : (
+                                  <>
+                                    <Lock className="w-3.5 h-3.5" /> Đang Khóa
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Quick Toggle Stealth Anti-Cheat (Hidden from Students) */}
+                            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chống gian lận (Ẩn với HS)</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  {cfg.antiCheatEnabled ? 'Đếm tab, khóa chuột phải & Extension' : 'Đang tắt — làm tự do'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleTestAntiCheat(t.id)}
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                                  cfg.antiCheatEnabled
+                                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
+                                }`}
+                              >
+                                {cfg.antiCheatEnabled ? (
+                                  <>
+                                    <ShieldCheck className="w-3.5 h-3.5" /> Đang Bật
+                                  </>
+                                ) : (
+                                  <>
+                                    <EyeOff className="w-3.5 h-3.5" /> Đang Tắt
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-indigo-700/80 dark:text-indigo-300/80 font-medium">
-                      {cfg.sequentialMode
-                        ? 'Hết giờ từng phần sẽ tự động chuyển sang phần tiếp theo.'
-                        : 'Đang cho phép chuyển tự do giữa các phần.'}
-                    </p>
-                  </div>
 
-                  {/* Quick Toggle Visibility (Ẩn / Công khai) */}
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-2.5 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Hiển thị đề cho học sinh</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {isPrivate ? 'Đang ẩn — HS chưa thấy để tránh làm nhầm' : 'Công khai — HS thấy đề & làm bài được'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => toggleTestVisibility(t.id)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                        isPrivate
-                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      }`}
-                    >
-                      {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
-                      {isPrivate ? 'Đang Ẩn' : 'Công Khai'}
-                    </button>
-                  </div>
-
-                  {/* Quick Toggle Practice vs Real Exam (Thi thử nhiều lần / Thi thật 1 lần) */}
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-2.5 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chế độ Thi thử / Thi thật</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {cfg.maxAttempts === 1
-                          ? 'Thi thật: Học sinh chỉ được làm 1 lần'
-                          : cfg.maxAttempts === 0
-                          ? 'Thi thử: Được làm nhiều lần để ôn thi'
-                          : `Giới hạn tối đa ${cfg.maxAttempts} lần làm`}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => toggleTestExamMode(t.id)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                        cfg.maxAttempts === 1
-                          ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                      }`}
-                    >
-                      {cfg.maxAttempts === 1 ? 'Thi Thật (1 lần)' : cfg.maxAttempts === 0 ? 'Thi Thử (Nhiều lần)' : `Tối đa ${cfg.maxAttempts} lần`}
-                    </button>
-                  </div>
-
-                  {/* Quick Toggle Allow View Correct Answers */}
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-2.5 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Cho phép HS xem đáp án đúng</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {t.allowViewAnswers ? 'Học sinh xem được đáp án sau khi nộp' : 'Đang ẩn đáp án đúng với học sinh'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => toggleTestAllowViewAnswers(t.id)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                        t.allowViewAnswers
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
-                      }`}
-                    >
-                      {t.allowViewAnswers ? (
-                        <>
-                          <Unlock className="w-3.5 h-3.5" /> Đã Mở
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="w-3.5 h-3.5" /> Đang Khóa
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Quick Toggle Stealth Anti-Cheat (Hidden from Students) */}
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-4 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                        Chống gian lận (Ẩn với HS)
-                      </p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                        {cfg.antiCheatEnabled
-                          ? 'Đếm tab, khóa chuột phải & quét Extension'
-                          : 'Đang tắt — học sinh làm bài tự do'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => toggleTestAntiCheat(t.id)}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                        cfg.antiCheatEnabled
-                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
-                      }`}
-                    >
-                      {cfg.antiCheatEnabled ? (
-                        <>
-                          <ShieldCheck className="w-3.5 h-3.5" /> Đang Bật
-                        </>
-                      ) : (
-                        <>
-                          <EyeOff className="w-3.5 h-3.5" /> Đang Tắt
-                        </>
-                      )}
-                    </button>
-                  </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => openExamBuilder(t, 'general')}
+                              className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1"
+                            >
+                              <Clock className="w-3.5 h-3.5" /> Cài Giờ &amp; Thứ Tự
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openExamBuilder(t, 'reading')}
+                              className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30"
+                            >
+                              <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi &amp; Ảnh
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateTest(t)}
+                              className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-500/15 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 transition"
+                              title="Nhân bản đề thi (Bản sao tự động ở chế độ Riêng tư)"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTest(t)}
+                              className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
+                              title="Xóa đề thi này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedTeacherTestId(null)}
+                              className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold transition"
+                            >
+                              Thu gọn
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      onClick={() => openExamBuilder(t, 'general')}
-                      className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1"
-                    >
-                      <Clock className="w-3.5 h-3.5" /> Cài Giờ & Thứ Tự
-                    </button>
-                    <button
-                      onClick={() => openExamBuilder(t, 'reading')}
-                      className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30"
-                    >
-                      <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi & Ảnh
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleDuplicateTest(t)}
-                      className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-500/15 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 transition"
-                      title="Nhân bản đề thi (Bản sao tự động ở chế độ Riêng tư)"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTest(t)}
-                      className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
-                      title="Xóa đề thi này"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
               );
             })}
           </div>
