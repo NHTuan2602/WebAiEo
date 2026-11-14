@@ -117,13 +117,13 @@ export default function TeacherDashboard({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => openExamBuilder()}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
           </button>
           <button
             onClick={() => handleTeacherOpenLobby(currentRoomPin)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+            className="bg-[#059271] hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
           >
             <Rocket className="w-4 h-4" /> Sảnh Chờ Game PIN ({currentRoomPin})
           </button>
@@ -132,7 +132,7 @@ export default function TeacherDashboard({
               setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
               setShowVocabModal(true);
             }}
-            className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+            className="bg-[#F25220] hover:bg-[#d94417] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
           >
             <Edit className="w-4 h-4" /> Sửa Bộ Từ Game
           </button>
@@ -144,7 +144,7 @@ export default function TeacherDashboard({
         <button
           onClick={() => setTeacherHubTab('tests')}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'tests' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            teacherHubTab === 'tests' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <BookOpen className="w-4 h-4" /> 1. Kho Đề Thi ({tests.length})
@@ -152,7 +152,7 @@ export default function TeacherDashboard({
         <button
           onClick={() => setTeacherHubTab('grading')}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'grading' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            teacherHubTab === 'grading' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <PenTool className="w-4 h-4" /> 2. Chấm Bài & Giám Sát Chống Gian Lận ({attempts.length})
@@ -160,7 +160,7 @@ export default function TeacherDashboard({
         <button
           onClick={() => setTeacherHubTab('game_room')}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'game_room' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            teacherHubTab === 'game_room' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <Trophy className="w-4 h-4 text-amber-500" /> 3. Phòng Đấu Game PIN & Bảng Xếp Hạng ({leaderboardPlayers.length})
@@ -168,10 +168,10 @@ export default function TeacherDashboard({
         <button
           onClick={() => setTeacherHubTab('students')}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'students' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            teacherHubTab === 'students' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <GraduationCap className="w-4 h-4 text-indigo-500 dark:text-indigo-400" /> 4. Hồ Sơ & Quản Lý Học Sinh ({studentList.length})
+          <GraduationCap className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> 4. Hồ Sơ & Quản Lý Học Sinh ({studentList.length})
         </button>
       </div>
 
@@ -300,22 +300,22 @@ export default function TeacherDashboard({
 
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                         {/* Inline Quick Controls: Per-Skill Durations */}
-                        <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-500/10 border border-indigo-200/80 dark:border-indigo-500/30 space-y-2.5">
+                        <div className="p-3.5 rounded-2xl bg-[#EDFFFD]/65 dark:bg-teal-500/10 border border-[#B5F5F1] dark:border-teal-500/30 space-y-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-extrabold text-indigo-900 dark:text-indigo-200 flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Thời gian từng phần (phút)
+                            <span className="text-[11px] font-extrabold text-[#003538] dark:text-[#1EE1D6] flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Thời gian từng phần (phút)
                             </span>
                             <button
                               type="button"
                               onClick={() => openExamBuilder(t, 'general')}
-                              className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 hover:underline"
+                              className="text-[10px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
                             >
                               Thứ tự &amp; Tuần tự →
                             </button>
                           </div>
                           <div className="grid grid-cols-3 gap-1.5">
                             {cfg.order.map((sId, sIdx) => (
-                              <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-indigo-100 dark:border-slate-700 text-center">
+                              <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-[#B5F5F1]/80 dark:border-slate-700 text-center">
                                 <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                                   {sIdx + 1}. {sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : 'Viết'}
                                 </span>
@@ -770,7 +770,7 @@ export default function TeacherDashboard({
           </div>
 
           {/* Dropship Room Hero */}
-          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 rounded-3xl p-6 sm:p-7 text-white border border-indigo-500/30 shadow-xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
+          <div className="bg-gradient-to-br from-[#0F172B] via-[#003538] to-[#065B5B] rounded-3xl p-6 sm:p-7 text-white border border-[#007A7A]/40 shadow-xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider border ${
@@ -783,12 +783,12 @@ export default function TeacherDashboard({
                   <Wifi className="w-3 h-3" />
                   {room.status === 'LOBBY' ? 'Đang Mở Sảnh Chờ (Lobby)' : room.status === 'PLAYING' ? 'Trận Đấu Đang Diễn Ra' : 'Đã Kết Thúc'}
                 </span>
-                <span className="text-xs font-bold text-indigo-200">{room.name}</span>
+                <span className="text-xs font-bold text-[#B5F5F1]">{room.name}</span>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <div>
-                  <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider">Mã Phòng (PIN)</p>
+                  <p className="text-[10px] text-[#1EE1D6] font-bold uppercase tracking-wider">Mã Phòng (PIN)</p>
                   <p className="text-3xl font-black text-amber-300 font-mono tracking-widest">{currentRoomPin}</p>
                 </div>
                 <button
@@ -978,7 +978,7 @@ export default function TeacherDashboard({
           <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <GraduationCap className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
                 Danh Sách & Hồ Sơ Học Viên Trong Hệ Thống ({studentList.length})
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -992,12 +992,12 @@ export default function TeacherDashboard({
                 placeholder="🔍 Tìm kiếm theo tên hoặc username..."
                 value={studentSearchQuery}
                 onChange={e => setStudentSearchQuery(e.target.value)}
-                className="w-full sm:w-64 px-4 py-2.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium"
+                className="w-full sm:w-64 px-4 py-2.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none font-medium"
               />
               <button
                 type="button"
                 onClick={() => setShowAddStudentModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5 shrink-0"
+                className="px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5 shrink-0"
               >
                 <UserPlus className="w-4 h-4" /> + Thêm Học Viên
               </button>
@@ -1241,7 +1241,7 @@ export default function TeacherDashboard({
             </div>
 
             {/* Grading input and AI suggestion */}
-            <div className="bg-blue-50/50 dark:bg-indigo-950/30 border border-blue-100 dark:border-indigo-500/30 rounded-2xl p-5 mb-6 space-y-4">
+            <div className="bg-[#EDFFFD]/50 dark:bg-[#003538]/30 border border-[#B5F5F1] dark:border-teal-500/30 rounded-2xl p-5 mb-6 space-y-4">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <h4 className="font-bold text-sm text-slate-800 dark:text-white">Nhập Điểm Chấm Kỹ Năng Writing (Band 0 - 9.0)</h4>
                 
@@ -1250,7 +1250,7 @@ export default function TeacherDashboard({
                   onClick={() => handleTeacherAIGrade(gradingAttempt)}
                   disabled={isGradingAI}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition shadow-sm ${
-                    isGradingAI ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                    isGradingAI ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed' : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                   }`}
                 >
                   {isGradingAI ? (
@@ -1268,8 +1268,8 @@ export default function TeacherDashboard({
               </div>
 
               {isGradingAI && (
-                <div className="p-3 bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 rounded-lg flex items-center gap-3 text-xs text-indigo-900 dark:text-indigo-200">
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                <div className="p-3 bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 rounded-lg flex items-center gap-3 text-xs text-[#003538] dark:text-[#1EE1D6]">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#007A7A] dark:text-[#1EE1D6] flex-shrink-0" />
                   <span>{aiGradingStep || 'AI đang phân tích bài thi và điền tự động điểm số & nhận xét...'}</span>
                 </div>
               )}

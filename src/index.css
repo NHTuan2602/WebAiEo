@@ -5,6 +5,74 @@
 :root {
   font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   color-scheme: light;
+  --lexi-primary: #007A7A;
+  --lexi-primary-dark: #065B5B;
+  --lexi-primary-deep: #003538;
+  --lexi-cyan: #00B2AD;
+  --lexi-mint-bg: #EDFFFD;
+  --lexi-mint-border: #B5F5F1;
+  --lexi-navy: #0F172B;
+  --lexi-slate: #314158;
+  --lexi-muted: #62748E;
+  --lexi-emerald: #059271;
+  --lexi-coral: #F25220;
+  --lexi-royal: #1447E6;
+  --lexi-amber: #E17100;
+}
+
+.lexi-underlined {
+  position: relative;
+  display: inline-block;
+  z-index: 1;
+}
+
+.lexi-underlined::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 2px;
+  height: 0.34em;
+  background: linear-gradient(90deg, rgba(0, 178, 173, 0.35), rgba(30, 225, 214, 0.45));
+  border-radius: 9999px;
+  z-index: -1;
+}
+
+html.dark .lexi-underlined::after {
+  background: linear-gradient(90deg, rgba(0, 178, 173, 0.42), rgba(5, 146, 113, 0.45));
+}
+
+.lexi-hero-surface {
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(at 88% 12%, rgba(0, 178, 173, 0.14) 0px, transparent 48%),
+    radial-gradient(at 10% 85%, rgba(20, 71, 230, 0.08) 0px, transparent 45%),
+    linear-gradient(to right, rgba(202, 213, 226, 0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(202, 213, 226, 0.25) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+}
+
+html.dark .lexi-hero-surface {
+  background-color: #020618;
+  background-image:
+    radial-gradient(at 88% 12%, rgba(0, 178, 173, 0.18) 0px, transparent 50%),
+    radial-gradient(at 10% 85%, rgba(20, 71, 230, 0.14) 0px, transparent 48%),
+    linear-gradient(to right, rgba(51, 65, 85, 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(51, 65, 85, 0.2) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+}
+
+.lexi-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.lexi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -8px rgba(0, 122, 122, 0.14);
+}
+
+html.dark .lexi-card:hover {
+  box-shadow: 0 12px 28px -8px rgba(0, 178, 173, 0.2);
 }
 
 @keyframes crewmateBob {

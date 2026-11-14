@@ -52,7 +52,7 @@ export default function ResultView({
           <button
             type="button"
             onClick={() => setView(previousView && previousView !== 'RESULT_VIEW' ? previousView : fallbackView)}
-            className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-sm font-bold transition"
           >
             Quay Lại
           </button>
@@ -154,9 +154,9 @@ export default function ResultView({
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Thí sinh: <b>{attempt.studentName}</b> • Nộp ngày: {attempt.submittedAt}</p>
           </div>
 
-          <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[150px] shadow border border-slate-800 dark:border-slate-700">
+          <div className="bg-[#0F172B] dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[150px] shadow border border-slate-800 dark:border-slate-700">
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">BAND TỔNG OVERALL</p>
-            <p className="text-4xl font-extrabold text-amber-400 mt-1">
+            <p className="text-4xl font-extrabold text-[#1EE1D6] mt-1">
               {attempt.overallBand ? attempt.overallBand : 'Chờ Chấm'}
             </p>
           </div>
@@ -167,9 +167,9 @@ export default function ResultView({
           <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between mb-3">
               <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
-                <Headphones className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Listening
+                <Headphones className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Listening
               </span>
-              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{attempt.scores.listening.band}</span>
+              <span className="text-lg font-bold text-[#007A7A] dark:text-[#1EE1D6]">{attempt.scores.listening.band}</span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores.listening.raw}</span> / {attempt.scores.listening.total} câu
@@ -179,9 +179,9 @@ export default function ResultView({
           <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between mb-3">
               <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Reading
+                <BookOpen className="w-4 h-4 text-[#1447E6] dark:text-blue-400" /> Reading
               </span>
-              <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{attempt.scores.reading.band}</span>
+              <span className="text-lg font-bold text-[#1447E6] dark:text-blue-400">{attempt.scores.reading.band}</span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores.reading.raw}</span> / {attempt.scores.reading.total} câu
@@ -191,9 +191,9 @@ export default function ResultView({
           <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between mb-3">
               <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
-                <PenTool className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Writing
+                <PenTool className="w-4 h-4 text-[#059271] dark:text-emerald-400" /> Writing
               </span>
-              <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-lg font-bold text-[#059271] dark:text-emerald-400">
                 {attempt.scores.writing.overallBand ?? 'Chờ Chấm'}
               </span>
             </div>
@@ -205,11 +205,11 @@ export default function ResultView({
 
         {/* WRITING EVALUATION CARD (TEACHER AI CONTROLS VS CLEAN STUDENT VIEW) */}
         {isTeacher ? (
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-indigo-950/60 dark:via-slate-900 dark:to-purple-950/50 rounded-2xl border border-indigo-100 dark:border-indigo-500/30 p-6 mb-8 shadow-sm">
+          <div className="bg-gradient-to-r from-[#EDFFFD] via-white to-[#EFF6FF] dark:from-[#003538]/60 dark:via-[#0F172B] dark:to-slate-900 rounded-2xl border border-[#B5F5F1] dark:border-teal-500/30 p-6 mb-8 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-indigo-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                  <span className="bg-[#007A7A] text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                     <Sparkles className="w-3 h-3 text-amber-300" /> AI Examiner (GV)
                   </span>
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">Công Cụ Chấm Điểm Writing Tự Động Bằng AI</h3>
@@ -235,7 +235,7 @@ export default function ResultView({
                   className={`px-5 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-md ${
                     isGradingAI
                       ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white active:scale-95'
+                      : 'bg-[#007A7A] hover:bg-[#065B5B] text-white active:scale-95'
                   }`}
                 >
                   {isGradingAI ? (
@@ -326,7 +326,7 @@ export default function ResultView({
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>
               <h3 className="font-extrabold text-slate-900 dark:text-white text-lg flex items-center gap-2">
-                <Eye className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Xem Lại Bài Làm & Đáp Án Chi Tiết
+                <Eye className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" /> Xem Lại Bài Làm & Đáp Án Chi Tiết
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Đối chiếu câu trả lời đã nộp của thí sinh với đáp án chuẩn của đề thi.
@@ -353,8 +353,8 @@ export default function ResultView({
                 )}
               </div>
             ) : (
-              <div className="px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-300 text-xs font-bold flex items-center gap-2">
-                <Eye className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <div className="px-3.5 py-2 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold flex items-center gap-2">
+                <Eye className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
                 <span>Chế độ Giáo viên: Luôn hiển thị toàn bộ đáp án đúng</span>
               </div>
             )}
@@ -366,7 +366,7 @@ export default function ResultView({
               onClick={() => setResultReviewTab('listening')}
               className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition ${
                 resultReviewTab === 'listening'
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                  ? 'bg-white dark:bg-slate-900 text-[#007A7A] dark:text-[#1EE1D6] shadow-sm'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -376,7 +376,7 @@ export default function ResultView({
               onClick={() => setResultReviewTab('reading')}
               className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition ${
                 resultReviewTab === 'reading'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  ? 'bg-white dark:bg-slate-900 text-[#1447E6] dark:text-blue-400 shadow-sm'
                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
             >

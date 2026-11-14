@@ -44,21 +44,21 @@ export default function ExamMode({
   const activeTest = tests.find(t => t.id === selectedTestId);
   if (!activeTest) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 text-center shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#020618] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 text-center shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/60 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center mx-auto mb-4">
             <BookOpen className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-extrabold text-slate-900 dark:text-white mb-2">
+          <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white mb-2">
             Đang khôi phục phiên làm bài...
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
+          <p className="text-xs text-[#62748E] dark:text-slate-400 leading-relaxed mb-5">
             Dữ liệu đáp án của bạn đã được lưu tạm an toàn trên trình duyệt. Nếu đề thi chưa tự hiển thị sau vài giây đồng bộ, hãy quay về trang chính để chọn lại đề và tiếp tục từ vị trí cũ.
           </p>
           <button
             type="button"
             onClick={onExitMissingTest}
-            className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition shadow-md"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-sm font-bold transition shadow-md"
           >
             Quay về Trang Chủ
           </button>
@@ -121,8 +121,8 @@ export default function ExamMode({
       onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
       className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col justify-between select-none"
     >
-      {/* Exam Header */}
-      <header className="bg-slate-900 dark:bg-slate-950 text-white px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shadow sticky top-0 z-50">
+      {/* Exam Header (LexiPrep Computer-Delivered Shell) */}
+      <header className="bg-[#0F172B] dark:bg-[#020618] text-white px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shadow sticky top-0 z-50">
         <div className="flex items-center gap-3 flex-wrap">
           <h2 className="font-bold text-sm md:text-base text-slate-100">{activeTest.title}</h2>
           <span className="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-slate-700 uppercase font-bold">
@@ -162,7 +162,7 @@ export default function ExamMode({
                 }}
                 className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition ${
                   isCurrent
-                    ? 'bg-blue-600 text-white shadow'
+                    ? 'bg-[#007A7A] text-white shadow'
                     : isDone
                     ? 'text-emerald-400/80 bg-slate-900/50 cursor-not-allowed'
                     : isLocked
@@ -186,7 +186,7 @@ export default function ExamMode({
             <button
               type="button"
               onClick={() => advanceToNextExamSection(false)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-2 rounded-lg transition shadow flex items-center gap-1"
+              className="bg-[#007A7A] hover:bg-[#065B5B] text-white font-bold text-xs px-3 py-2 rounded-lg transition shadow flex items-center gap-1"
             >
               <span>Sang Phần Tiếp Theo</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -495,12 +495,12 @@ export default function ExamMode({
                       onClick={() => setExamState(prev => ({ ...prev, readingPassageIdx: pIdx }))}
                       className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 border ${
                         pIdx === safePassageIdx
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-500/15'
+                          ? 'bg-[#007A7A] text-white border-[#007A7A] shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15'
                       }`}
                     >
                       <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
-                        pIdx === safePassageIdx ? 'bg-white text-indigo-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                        pIdx === safePassageIdx ? 'bg-white text-[#007A7A]' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
                       }`}>
                         {pIdx + 1}
                       </span>
@@ -540,7 +540,7 @@ export default function ExamMode({
                     <button
                       type="button"
                       onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
-                      className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                      className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
                     >
                       <Eye className="w-3.5 h-3.5" /> Phóng to ảnh bài đọc #{safePassageIdx + 1}
                     </button>

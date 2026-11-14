@@ -127,7 +127,7 @@ export default function StudentProfile({
                   }}
                   className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
                     activeUsername === s.username
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-[#007A7A] text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                 >
@@ -140,7 +140,7 @@ export default function StudentProfile({
       </div>
 
       {/* Profile Hero Card */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl mb-8 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#0F172B] via-[#003538] to-[#065B5B] rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl mb-8 relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex items-center gap-5">
             <div className="shrink-0 flex flex-col items-center">
@@ -158,7 +158,7 @@ export default function StudentProfile({
             <div>
               <div className="flex items-center gap-2 flex-wrap mb-1.5">
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">{student.name}</h1>
-                <span className="text-xs font-mono bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 px-2.5 py-0.5 rounded-full font-bold">
+                <span className="text-xs font-mono bg-[#00B2AD]/25 text-[#1EE1D6] border border-[#00B2AD]/40 px-2.5 py-0.5 rounded-full font-bold">
                   @{student.username}
                 </span>
                 <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
@@ -241,12 +241,12 @@ export default function StudentProfile({
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 rounded-xl">
+          <div className="p-3 bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] rounded-xl">
             <BarChart2 className="w-6 h-6" />
           </div>
           <div>
             <p className="text-[11px] text-slate-400 dark:text-slate-400 font-bold uppercase">Điểm Overall Trung Bình</p>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{overallAvg || '-'}</p>
+            <p className="text-2xl font-black text-[#007A7A] dark:text-[#1EE1D6]">{overallAvg || '-'}</p>
             {totalAttempts > 0 && (
               <span className="text-[11px] block font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
                 L: {avgListening} • R: {avgReading} • W: {avgWriting}
@@ -295,7 +295,7 @@ export default function StudentProfile({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <TrendingUp className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
               Tiến Trình & Đột Phá Điểm Số Qua Các Lần Thi
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -324,14 +324,14 @@ export default function StudentProfile({
                   key={att.id}
                   className={`rounded-2xl p-5 border transition ${
                     idx === chronologicalAttempts.length - 1
-                      ? 'bg-gradient-to-b from-indigo-50/50 to-white dark:from-indigo-950/40 dark:to-slate-900 border-indigo-200 dark:border-indigo-500/40 shadow-md ring-2 ring-indigo-500/20'
+                      ? 'bg-gradient-to-b from-[#EDFFFD]/70 to-white dark:from-[#003538]/40 dark:to-slate-900 border-[#B5F5F1] dark:border-teal-500/40 shadow-md ring-2 ring-[#007A7A]/20'
                       : 'bg-slate-50/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/80 shadow-sm'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-3">
                     <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg ${
                       idx === chronologicalAttempts.length - 1
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-[#007A7A] text-white'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
                     }`}>
                       Lần thi #{idx + 1} {idx === chronologicalAttempts.length - 1 ? '(Gần nhất)' : ''}
