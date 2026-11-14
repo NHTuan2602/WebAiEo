@@ -62,10 +62,11 @@ export default function StudentProfile({
   // Sort chronologically ascending (oldest to newest) for progression calculations
   const chronologicalAttempts = [...studentAttempts].reverse();
   const totalAttempts = studentAttempts.length;
-  const highestBand = totalAttempts > 0 ? Math.max(...studentAttempts.map(a => a.overallBand || 0)) : null;
+  const gradedOverallBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
+  const highestBand = gradedOverallBands.length > 0 ? Math.max(...gradedOverallBands) : null;
   const latestAttempt = studentAttempts[0];
   const firstAttempt = chronologicalAttempts[0];
-  const bandGrowth = (latestAttempt?.overallBand && firstAttempt?.overallBand && totalAttempts > 1)
+  const bandGrowth = (typeof latestAttempt?.overallBand === 'number' && typeof firstAttempt?.overallBand === 'number' && totalAttempts > 1)
     ? (latestAttempt.overallBand - firstAttempt.overallBand).toFixed(1)
     : null;
 
@@ -75,11 +76,12 @@ export default function StudentProfile({
   const avgReading = totalAttempts > 0
     ? (studentAttempts.reduce((acc, a) => acc + (a.scores.reading.band || 0), 0) / totalAttempts).toFixed(1)
     : null;
-  const avgWriting = totalAttempts > 0
-    ? (studentAttempts.reduce((acc, a) => acc + (a.scores.writing.overallBand || 0), 0) / totalAttempts).toFixed(1)
+  const gradedWritingAttempts = studentAttempts.filter(a => typeof a.scores?.writing?.overallBand === 'number');
+  const avgWriting = gradedWritingAttempts.length > 0
+    ? (gradedWritingAttempts.reduce((acc, a) => acc + a.scores.writing.overallBand, 0) / gradedWritingAttempts.length).toFixed(1)
     : null;
-  const overallAvg = totalAttempts > 0
-    ? (studentAttempts.reduce((acc, a) => acc + (a.overallBand || 0), 0) / totalAttempts).toFixed(1)
+  const overallAvg = gradedOverallBands.length > 0
+    ? (gradedOverallBands.reduce((acc, b) => acc + b, 0) / gradedOverallBands.length).toFixed(1)
     : null;
 
   const totalTabSwitches = isTeacherViewer
@@ -344,7 +346,7 @@ export default function StudentProfile({
                   <div className="flex items-center justify-between py-2 border-y border-slate-200/60 dark:border-slate-700/70 mb-3">
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Band Overall:</span>
                     <span className="text-xl font-black text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-2.5 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
-                      {att.overallBand || 'Chờ'}
+                      {att.overallBand ?? 'Chờ'}
                     </span>
                   </div>
 
@@ -524,7 +526,7 @@ export default function StudentProfile({
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className="text-base font-black text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 rounded-xl border border-indigo-100 dark:border-indigo-500/30">
-                          {att.overallBand || 'Chờ'}
+                          {att.overallBand ?? 'Chờ'}
                         </span>
                       </td>
                       {isTeacherViewer && risk && (

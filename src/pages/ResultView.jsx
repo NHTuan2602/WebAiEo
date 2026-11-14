@@ -157,7 +157,7 @@ export default function ResultView({
           <div className="bg-[#0F172B] dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[150px] shadow border border-slate-800 dark:border-slate-700">
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">BAND TỔNG OVERALL</p>
             <p className="text-4xl font-extrabold text-[#1EE1D6] mt-1">
-              {attempt.overallBand ? attempt.overallBand : 'Chờ Chấm'}
+              {attempt.overallBand !== null && attempt.overallBand !== undefined ? attempt.overallBand : 'Chờ Chấm'}
             </p>
           </div>
         </div>
@@ -246,7 +246,11 @@ export default function ResultView({
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-amber-300" />
-                      <span>{attempt.scores.writing.overallBand ? 'Chấm Lại Bằng AI' : 'Chấm Điểm Bằng AI Ngay'}</span>
+                      <span>
+                        {attempt.teacherGraded || (attempt.scores.writing.overallBand !== null && attempt.scores.writing.overallBand !== undefined)
+                          ? 'Chấm Lại Bằng AI'
+                          : 'Chấm Điểm Bằng AI Ngay'}
+                      </span>
                     </>
                   )}
                 </button>
@@ -274,7 +278,7 @@ export default function ResultView({
           </div>
         ) : (
           <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
-            {!attempt.scores.writing.overallBand ? (
+            {!(attempt.teacherGraded || (attempt.scores.writing.overallBand !== null && attempt.scores.writing.overallBand !== undefined)) ? (
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                   <Clock className="w-5 h-5" />

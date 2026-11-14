@@ -17,6 +17,8 @@ import {
 } from './constants/seedData';
 import {
   calculateAutoBand,
+  calculateOverallIeltsBand,
+  calculateWritingBand,
   roundIeltsBand,
   getSpeedAdjustedTimeLimit,
   isObjectiveAnswerCorrect,
@@ -2029,8 +2031,8 @@ export default function App() {
 
     clearExamDraft(currentUser?.username, activeTest.id);
 
-    const lBand = calculateAutoBand(listeningRaw, lQuestions.length);
-    const rBand = calculateAutoBand(readingRaw, rQuestions.length);
+    const lBand = calculateAutoBand(listeningRaw, lQuestions.length, 'listening');
+    const rBand = calculateAutoBand(readingRaw, rQuestions.length, 'reading');
 
     const newAttempt = {
       id: 'att-' + Date.now(),
@@ -2165,6 +2167,18 @@ export default function App() {
     return { ...fallback, _engineLabel: 'AI Examiner Tích Hợp (Offline)' };
   };
 
+  const computeAttemptFinalOverall = (attemptScores, writingOverall) => {
+    const activeSkillBands = [];
+    if ((attemptScores?.listening?.total || 0) > 0) {
+      activeSkillBands.push(Number(attemptScores.listening.band) || 0);
+    }
+    if ((attemptScores?.reading?.total || 0) > 0) {
+      activeSkillBands.push(Number(attemptScores.reading.band) || 0);
+    }
+    activeSkillBands.push(writingOverall);
+    return calculateOverallIeltsBand(activeSkillBands);
+  };
+
   // AI Writing Grading Trigger (Teacher only)
   const handleGradeWritingWithAI = async (targetAttempt) => {
     if (!targetAttempt || currentUser?.role !== 'teacher') return;
@@ -2173,13 +2187,16 @@ export default function App() {
 
     try {
       const aiResult = await runWritingGradingEngine(targetAttempt);
-      const t1 = parseFloat(aiResult.task1Band) || 0;
-      const t2 = parseFloat(aiResult.task2Band) || 0;
-      const writingOverall = parseFloat(aiResult.overallBand) || roundIeltsBand((t1 + t2 * 2) / 3);
+      const rawT1 = parseFloat(aiResult.task1Band);
+      const rawT2 = parseFloat(aiResult.task2Band);
+      const rawOverallW = parseFloat(aiResult.overallBand);
+      const t1 = Number.isFinite(rawT1) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT1))) : 0;
+      const t2 = Number.isFinite(rawT2) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT2))) : 0;
+      const writingOverall = Number.isFinite(rawOverallW)
+        ? roundIeltsBand(Math.max(0, Math.min(9.0, rawOverallW)))
+        : calculateWritingBand(t1, t2);
 
-      const lBand = targetAttempt.scores?.listening?.band || 0;
-      const rBand = targetAttempt.scores?.reading?.band || 0;
-      const finalOverall = parseFloat(((lBand + rBand + writingOverall * 2) / 4).toFixed(1));
+      const finalOverall = computeAttemptFinalOverall(targetAttempt.scores, writingOverall);
 
       const updatedAiAttempt = {
         ...targetAttempt,
@@ -2229,13 +2246,12 @@ export default function App() {
   const saveTeacherGrading = () => {
     if (!gradingAttempt) return;
 
-    const t1 = parseFloat(gradingScores.task1Band) || 0;
-    const t2 = parseFloat(gradingScores.task2Band) || 0;
-    const writingOverall = parseFloat(((t1 + t2 * 2) / 3).toFixed(1));
-
-    const lBand = gradingAttempt.scores.listening.band || 0;
-    const rBand = gradingAttempt.scores.reading.band || 0;
-    const finalOverall = parseFloat(((lBand + rBand + writingOverall * 2) / 4).toFixed(1));
+    const rawT1 = parseFloat(gradingScores.task1Band);
+    const rawT2 = parseFloat(gradingScores.task2Band);
+    const t1 = Number.isFinite(rawT1) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT1))) : 0;
+    const t2 = Number.isFinite(rawT2) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT2))) : 0;
+    const writingOverall = calculateWritingBand(t1, t2);
+    const finalOverall = computeAttemptFinalOverall(gradingAttempt.scores, writingOverall);
 
     const updatedAttemptObj = {
       ...gradingAttempt,

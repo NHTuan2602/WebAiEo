@@ -46,7 +46,7 @@ export default function StudentHome({
   const studentAttempts = attempts.filter(
     a => a.studentId === currentUser?.username || a.studentUsername === currentUser?.username
   );
-  const gradedBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number' && b > 0);
+  const gradedBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number' && b >= 0);
   const bestOverallBand = gradedBands.length > 0 ? Math.max(...gradedBands) : null;
 
   const firstPlayableTest = visibleTests.find(t => {
@@ -557,13 +557,13 @@ export default function StudentHome({
                         <td className="px-6 py-4 font-bold text-[#0F172B] dark:text-white">{att.testTitle}</td>
                         <td className="px-6 py-4 text-xs text-[#62748E] dark:text-slate-400">{att.submittedAt}</td>
                         <td className="px-6 py-4 text-center font-bold text-[#0F172B] dark:text-slate-100 tabular-nums">
-                          {att.scores.listening.band !== null ? att.scores.listening.band : '-'}
+                          {att.scores.listening.band ?? '-'}
                         </td>
                         <td className="px-6 py-4 text-center font-bold text-[#0F172B] dark:text-slate-100 tabular-nums">
-                          {att.scores.reading.band !== null ? att.scores.reading.band : '-'}
+                          {att.scores.reading.band ?? '-'}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {att.teacherGraded ? (
+                          {att.teacherGraded || (att.scores.writing.overallBand !== null && att.scores.writing.overallBand !== undefined) ? (
                             <span className="font-bold text-[#0F172B] dark:text-slate-100 tabular-nums">
                               {att.scores.writing.overallBand}
                             </span>
@@ -574,7 +574,7 @@ export default function StudentHome({
                           )}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {att.overallBand ? (
+                          {att.overallBand !== null && att.overallBand !== undefined ? (
                             <span className="text-sm font-extrabold text-[#007A7A] dark:text-[#1EE1D6] bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 px-2.5 py-1 rounded-lg tabular-nums">
                               {att.overallBand}
                             </span>

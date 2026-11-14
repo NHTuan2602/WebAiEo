@@ -704,9 +704,11 @@ export default function TeacherDashboard({
                           <button
                             onClick={() => {
                               setGradingAttempt(att);
+                              const w1Empty = getWordCount(att.answers?.w1) === 0;
+                              const w2Empty = getWordCount(att.answers?.w2) === 0;
                               setGradingScores({
-                                task1Band: att.scores.writing.task1Band || 6.0,
-                                task2Band: att.scores.writing.task2Band || 6.5,
+                                task1Band: att.scores.writing.task1Band ?? (w1Empty ? 0 : 6.0),
+                                task2Band: att.scores.writing.task2Band ?? (w2Empty ? 0 : 6.5),
                                 feedback: att.teacherFeedback || ''
                               });
                             }}
@@ -1104,8 +1106,9 @@ export default function TeacherDashboard({
                       const isTeacherAccount = account.role === 'teacher';
                       const isSelfAccount = account.username === currentUser?.username;
                       const studentAttempts = attempts.filter(a => a.studentId === account.username);
-                      const bestBand = studentAttempts.length > 0
-                        ? Math.max(...studentAttempts.map(a => a.overallBand || 0))
+                      const gradedStudentBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
+                      const bestBand = gradedStudentBands.length > 0
+                        ? Math.max(...gradedStudentBands)
                         : null;
 
                       return (
@@ -1188,7 +1191,7 @@ export default function TeacherDashboard({
                                 <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-2.5 py-1 rounded-md font-extrabold">
                                   {studentAttempts.length} bài
                                 </span>
-                                {bestBand ? (
+                                {bestBand !== null ? (
                                   <span className="font-black text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2.5 py-1 rounded-md">
                                     Best {bestBand}
                                   </span>

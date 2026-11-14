@@ -6,17 +6,59 @@ import {
   GAME_SPEED_OFFSETS
 } from '../constants/seedData';
 
-export function calculateAutoBand(raw, total) {
-  if (total === 0) return 0;
-  const percentage = raw / total;
-  if (percentage >= 0.9) return 9.0;
-  if (percentage >= 0.8) return 8.0;
-  if (percentage >= 0.7) return 7.0;
-  if (percentage >= 0.6) return 6.5;
-  if (percentage >= 0.5) return 6.0;
-  if (percentage >= 0.4) return 5.5;
-  if (percentage >= 0.3) return 5.0;
-  return 4.0;
+const LISTENING_40_THRESHOLDS = [
+  [39, 9.0], [37, 8.5], [35, 8.0], [32, 7.5], [30, 7.0],
+  [26, 6.5], [23, 6.0], [18, 5.5], [16, 5.0], [13, 4.5],
+  [10, 4.0], [6, 3.5], [4, 3.0], [2, 2.0], [1, 1.0]
+];
+
+const ACADEMIC_READING_40_THRESHOLDS = [
+  [39, 9.0], [37, 8.5], [35, 8.0], [33, 7.5], [30, 7.0],
+  [27, 6.5], [23, 6.0], [19, 5.5], [15, 5.0], [13, 4.5],
+  [10, 4.0], [8, 3.5], [6, 3.0], [4, 2.5], [2, 2.0], [1, 1.0]
+];
+
+/**
+ * Convert raw objective score to official IELTS 0.0 - 9.0 band scale (in 0.5 steps).
+ * Returns 0 when 0 answers are correct (did not attempt / blank submission).
+ */
+export function calculateAutoBand(raw, total, skill = 'reading') {
+  const cleanTotal = Number(total);
+  const cleanRaw = Number(raw);
+  if (!Number.isFinite(cleanTotal) || cleanTotal <= 0 || !Number.isFinite(cleanRaw) || cleanRaw <= 0) {
+    return 0;
+  }
+  const equiv40 = (Math.min(cleanRaw, cleanTotal) / cleanTotal) * 40 + 1e-9;
+  const table = skill === 'listening' ? LISTENING_40_THRESHOLDS : ACADEMIC_READING_40_THRESHOLDS;
+  for (const [minRaw, band] of table) {
+    if (equiv40 >= minRaw) return band;
+  }
+  return 1.0;
+}
+
+/** Round an IELTS score to the nearest 0.5 band (.25 -> .5, .75 -> next integer). */
+export function roundIeltsBand(score) {
+  const num = Number(score);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return Math.min(9.0, Math.round((num + 1e-9) * 2) / 2);
+}
+
+/** Compute official IELTS Writing band (Task 2 weighted 2x Task 1, rounded to 0.5). */
+export function calculateWritingBand(task1Band, task2Band) {
+  const t1 = Math.min(9.0, Math.max(0, Number(task1Band) || 0));
+  const t2 = Math.min(9.0, Math.max(0, Number(task2Band) || 0));
+  if (t1 === 0 && t2 === 0) return 0;
+  return roundIeltsBand((t1 + t2 * 2) / 3);
+}
+
+/** Compute official IELTS Overall band from active tested skill bands (rounded to 0.5). */
+export function calculateOverallIeltsBand(skillBands = []) {
+  const valid = skillBands
+    .map(b => Number(b))
+    .filter(b => Number.isFinite(b) && b >= 0);
+  if (valid.length === 0) return 0;
+  const avg = valid.reduce((sum, b) => sum + Math.min(9.0, b), 0) / valid.length;
+  return roundIeltsBand(avg);
 }
 
 export function countExtensionCheatSignals(antiCheatLogs = []) {
@@ -42,10 +84,6 @@ export function getRiskAssessment(tabSwitchCount = 0, antiCheatLogs = []) {
 export function getWordCount(text) {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-export function roundIeltsBand(score) {
-  return Math.round(score * 2) / 2;
 }
 
 export function getSpeedAdjustedTimeLimit(roundNum, speedMode = 'normal') {

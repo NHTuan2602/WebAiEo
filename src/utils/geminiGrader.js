@@ -1,4 +1,4 @@
-import { getWordCount, roundIeltsBand } from './examHelpers';
+import { calculateWritingBand, getWordCount, roundIeltsBand } from './examHelpers';
 
 export const GEMINI_PREFERRED_MODELS = [
   'gemini-2.5-flash',
@@ -179,8 +179,26 @@ export async function testGeminiApiConnection(apiKey) {
 }
 
 export async function callGeminiWritingGrader({ apiKey, task1Prompt, task1Text, task2Prompt, task2Text }) {
+  const w1Count = getWordCount(task1Text);
+  const w2Count = getWordCount(task2Text);
+
+  if (w1Count === 0 && w2Count === 0) {
+    return {
+      task1Band: 0,
+      task2Band: 0,
+      overallBand: 0,
+      task1Criteria: { ta: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 1 (0 từ) → Band 0.0.' },
+      task2Criteria: { tr: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 2 (0 từ) → Band 0.0.' },
+      feedback: 'Thí sinh bỏ trống cả Task 1 và Task 2 (0 từ), không có nội dung để chấm điểm → Band Writing 0.0.',
+      strengths: [],
+      improvements: ['Cần viết đầy đủ bài làm Task 1 (tối thiểu 150 từ) và Task 2 (tối thiểu 250 từ) trước khi nộp bài.'],
+      _usedModel: 'empty-submission-guard'
+    };
+  }
+
   const systemPrompt = `You are an official IELTS Writing Senior Examiner (certified by IDP and British Council).
-Your task is to evaluate the candidate's IELTS Writing Task 1 and Task 2 submissions strictly according to the official IELTS Band Descriptors (scale 0 to 9.0, increments of 0.5):
+Your task is to evaluate the candidate's IELTS Writing Task 1 and Task 2 submissions strictly according to the official IELTS Band Descriptors (scale 0.0 to 9.0, increments of 0.5):
+- CRITICAL RULE: Band 4.0 is NOT the minimum. If a task is "(No submission)", empty, or contains zero meaningful English writing, you MUST assign Band 0.0 for that task and 0.0 for all its criteria (ta/tr, cc, lr, gra).
 - Task 1 Criteria: Task Achievement (TA), Coherence & Cohesion (CC), Lexical Resource (LR), Grammatical Range & Accuracy (GRA).
 - Task 2 Criteria: Task Response (TR), Coherence & Cohesion (CC), Lexical Resource (LR), Grammatical Range & Accuracy (GRA).
 
@@ -197,8 +215,8 @@ ${task2Text || '(No submission)'}
 """
 
 Calculate:
-- task1Band: float (0.0 - 9.0)
-- task2Band: float (0.0 - 9.0)
+- task1Band: float (0.0 - 9.0, increments of 0.5)
+- task2Band: float (0.0 - 9.0, increments of 0.5)
 - overallBand: float = round to nearest 0.5 of ((task1Band + 2 * task2Band) / 3)
 
 Return ONLY valid JSON format without markdown code fences or other prose:
@@ -230,15 +248,31 @@ Return ONLY valid JSON format without markdown code fences or other prose:
     promptText: systemPrompt,
     temperature: 0.2
   });
-  return { ...parsed, _usedModel: usedModel };
+
+  const t1Band = w1Count === 0 ? 0 : roundIeltsBand(parsed?.task1Band ?? 0);
+  const t2Band = w2Count === 0 ? 0 : roundIeltsBand(parsed?.task2Band ?? 0);
+  const zeroCriteria = { ta: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 1 (0 từ) → Band 0.0.' };
+  const zeroCriteria2 = { tr: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 2 (0 từ) → Band 0.0.' };
+
+  return {
+    ...parsed,
+    task1Band: t1Band,
+    task2Band: t2Band,
+    overallBand: calculateWritingBand(t1Band, t2Band),
+    task1Criteria: w1Count === 0 ? zeroCriteria : parsed?.task1Criteria,
+    task2Criteria: w2Count === 0 ? zeroCriteria2 : parsed?.task2Criteria,
+    _usedModel: usedModel
+  };
 }
 
 export function simulateAIWritingGrading({ _task1Prompt, task1Text, _task2Prompt, task2Text }) {
   const w1Count = getWordCount(task1Text);
   const w2Count = getWordCount(task2Text);
 
-  let t1Band = 5.0;
+  let t1Band = 0;
   if (w1Count === 0) t1Band = 0;
+  else if (w1Count < 20) t1Band = 1.5;
+  else if (w1Count < 50) t1Band = 3.0;
   else if (w1Count < 80) t1Band = 4.0;
   else if (w1Count < 120) t1Band = 5.0;
   else if (w1Count < 150) t1Band = 5.5;
@@ -249,8 +283,10 @@ export function simulateAIWritingGrading({ _task1Prompt, task1Text, _task2Prompt
   const t1HasKeywords = t1BonusWords.filter(w => (task1Text || '').toLowerCase().includes(w)).length;
   if (w1Count >= 140 && t1HasKeywords >= 3) t1Band = Math.min(9.0, t1Band + 0.5);
 
-  let t2Band = 5.0;
+  let t2Band = 0;
   if (w2Count === 0) t2Band = 0;
+  else if (w2Count < 20) t2Band = 1.5;
+  else if (w2Count < 80) t2Band = 3.0;
   else if (w2Count < 150) t2Band = 4.5;
   else if (w2Count < 200) t2Band = 5.5;
   else if (w2Count < 250) t2Band = 6.0;
@@ -261,25 +297,30 @@ export function simulateAIWritingGrading({ _task1Prompt, task1Text, _task2Prompt
   const t2HasKeywords = t2BonusWords.filter(w => (task2Text || '').toLowerCase().includes(w)).length;
   if (w2Count >= 240 && t2HasKeywords >= 3) t2Band = Math.min(9.0, t2Band + 0.5);
 
-  const overall = (t1Band === 0 && t2Band === 0) ? 0 : roundIeltsBand((t1Band + t2Band * 2) / 3);
+  const overall = calculateWritingBand(t1Band, t2Band);
 
   const strengths = [];
   const improvements = [];
 
-  if (w1Count >= 150) strengths.push(`Task 1 đạt yêu cầu độ dài tiêu chuẩn (${w1Count} từ >= 150 từ).`);
-  else if (w1Count > 0) improvements.push(`Task 1 chưa đủ 150 từ (${w1Count} từ), bị giảm điểm tiêu chí Task Achievement.`);
+  if (w1Count === 0) improvements.push('Task 1 bị bỏ trống (0 từ) → Band 0.0.');
+  else if (w1Count >= 150) strengths.push(`Task 1 đạt yêu cầu độ dài tiêu chuẩn (${w1Count} từ >= 150 từ).`);
+  else improvements.push(`Task 1 chưa đủ 150 từ (${w1Count} từ), bị giảm điểm tiêu chí Task Achievement.`);
 
-  if (w2Count >= 250) strengths.push(`Task 2 độ dài tốt (${w2Count} từ >= 250 từ), phát triển ý khá đầy đủ.`);
-  else if (w2Count > 0) improvements.push(`Task 2 chưa đạt 250 từ (${w2Count} từ), cần mở rộng thêm luận cứ.`);
+  if (w2Count === 0) improvements.push('Task 2 bị bỏ trống (0 từ) → Band 0.0.');
+  else if (w2Count >= 250) strengths.push(`Task 2 độ dài tốt (${w2Count} từ >= 250 từ), phát triển ý khá đầy đủ.`);
+  else improvements.push(`Task 2 chưa đạt 250 từ (${w2Count} từ), cần mở rộng thêm luận cứ.`);
 
-  if (t2HasKeywords >= 3) strengths.push('Sử dụng tốt các liên từ nối học thuật (Coherence & Cohesion).');
-  else improvements.push('Cần đa dạng hóa cấu trúc câu phức và từ vựng học thuật (Lexical Resource).');
+  if (w1Count > 0 || w2Count > 0) {
+    if (t2HasKeywords >= 3) strengths.push('Sử dụng tốt các liên từ nối học thuật (Coherence & Cohesion).');
+    else improvements.push('Cần đa dạng hóa cấu trúc câu phức và từ vựng học thuật (Lexical Resource).');
+  }
 
-  const feedback = `[AI Examiner - Đánh Giá Writing Tự Động]:
-• Tổng quan: Thí sinh duy trì mạch văn mạch lạc, lập luận tương đối chặt chẽ.
-• Task 1 (Band ${t1Band}): ${w1Count >= 150 ? 'Nêu được xu hướng tổng quát, phân bổ số liệu hợp lý.' : 'Cần bổ sung thêm câu Overview và mô tả chi tiết các điểm dữ liệu then chốt.'}
-• Task 2 (Band ${t2Band}): ${w2Count >= 250 ? 'Cấu trúc bài cân đối giữa các đoạn thân bài, quan điểm được bảo vệ nhất quán.' : 'Cần phân tích sâu hơn hậu quả và giải pháp bằng các ví dụ thực tiễn.'}
-• Khuyến nghị: Rèn luyện thêm các cấu trúc đảo ngữ (Inversion), câu điều kiện nâng cao và từ vựng Collocation C1/C2 để bứt phá lên Band 8.0+.`;
+  const feedback = (w1Count === 0 && w2Count === 0)
+    ? '[AI Examiner - Đánh Giá Writing Tự Động]:\n• Thí sinh bỏ trống cả Task 1 và Task 2 (0 từ) → Writing Band 0.0.'
+    : `[AI Examiner - Đánh Giá Writing Tự Động]:
+• Task 1 (Band ${t1Band}): ${w1Count === 0 ? 'Bỏ trống (0 từ).' : w1Count >= 150 ? 'Nêu được xu hướng tổng quát, phân bổ số liệu hợp lý.' : 'Cần bổ sung thêm câu Overview và đạt tối thiểu 150 từ.'}
+• Task 2 (Band ${t2Band}): ${w2Count === 0 ? 'Bỏ trống (0 từ).' : w2Count >= 250 ? 'Cấu trúc bài cân đối giữa các đoạn thân bài, quan điểm được bảo vệ nhất quán.' : 'Cần mở rộng lập luận, ví dụ thực tiễn và đạt tối thiểu 250 từ.'}
+• Khuyến nghị: Hoàn thiện cả 2 Task và dùng cấu trúc câu phức + Collocation chuẩn học thuật.`;
 
   return {
     task1Band: t1Band,
@@ -290,14 +331,18 @@ export function simulateAIWritingGrading({ _task1Prompt, task1Text, _task2Prompt
       cc: t1Band,
       lr: t1Band,
       gra: t1Band,
-      comment: `Task 1: Độ dài ${w1Count} từ. Đạt mức độ hoàn thành nhiệm vụ tương ứng Band ${t1Band}.`
+      comment: w1Count === 0
+        ? 'Task 1 bỏ trống (0 từ) → Band 0.'
+        : `Task 1: Độ dài ${w1Count} từ. Đạt mức độ hoàn thành nhiệm vụ tương ứng Band ${t1Band}.`
     },
     task2Criteria: {
       tr: t2Band,
       cc: t2Band,
       lr: t2Band,
       gra: t2Band,
-      comment: `Task 2: Độ dài ${w2Count} từ. Đạt mức độ phản hồi đề tài tương ứng Band ${t2Band}.`
+      comment: w2Count === 0
+        ? 'Task 2 bỏ trống (0 từ) → Band 0.'
+        : `Task 2: Độ dài ${w2Count} từ. Đạt mức độ phản hồi đề tài tương ứng Band ${t2Band}.`
     },
     feedback,
     strengths,
