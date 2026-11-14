@@ -160,6 +160,7 @@ const normalizeExamConfig = (test) => {
     maxAttempts: Math.max(0, Number(test?.maxAttempts ?? 0) || 0),
     sequentialMode: test?.sequentialMode !== false,
     allowEarlyNextSection: !!test?.allowEarlyNextSection,
+    antiCheatEnabled: test?.antiCheatEnabled !== false,
     order,
     durations
   };
@@ -495,10 +496,24 @@ function calculateAutoBand(raw, total) {
   return 4.0;
 }
 
-function getRiskAssessment(tabSwitchCount) {
-  if (tabSwitchCount === 0) return { label: 'An toàn', color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30', icon: CheckCircle };
-  if (tabSwitchCount <= 2) return { label: 'Nghi vấn nhẹ', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30', icon: AlertTriangle };
-  return { label: 'Gian lận cao', color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30', icon: ShieldAlert };
+function countExtensionCheatSignals(antiCheatLogs = []) {
+  if (!Array.isArray(antiCheatLogs)) return 0;
+  return antiCheatLogs.filter(l => l?.category === 'extension' || l?.severity === 'high').length;
+}
+
+function getRiskAssessment(tabSwitchCount = 0, antiCheatLogs = []) {
+  const extCount = countExtensionCheatSignals(antiCheatLogs);
+  if (extCount > 0 || tabSwitchCount >= 3) {
+    return {
+      label: extCount > 0 ? 'Phát hiện lách luật / Extension' : 'Gian lận cao',
+      color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30',
+      icon: ShieldAlert
+    };
+  }
+  if (tabSwitchCount === 0 && (!Array.isArray(antiCheatLogs) || antiCheatLogs.length === 0)) {
+    return { label: 'An toàn', color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30', icon: CheckCircle };
+  }
+  return { label: 'Nghi vấn nhẹ', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30', icon: AlertTriangle };
 }
 
 function getWordCount(text) {
@@ -1368,6 +1383,21 @@ export default function App() {
     );
   };
 
+  // Teacher Action: Toggle Stealth Anti-Cheat (Đếm tab + Khóa chuột phải + Quét Extension)
+  const toggleTestAntiCheat = (testId) => {
+    const target = tests.find(t => t.id === testId);
+    if (!target) return;
+    const cfg = normalizeExamConfig(target);
+    const nextEnabled = !cfg.antiCheatEnabled;
+    updateTestQuickConfig(
+      testId,
+      t => ({ ...t, antiCheatEnabled: nextEnabled }),
+      nextEnabled
+        ? `Đã BẬT chống gian lận cho "${target.title}" (Đếm tab, khóa chuột phải & quét extension).`
+        : `Đã TẮT chống gian lận cho "${target.title}" (Học sinh làm bài tự do).`
+    );
+  };
+
   // Teacher Action: Quick-update single skill duration (minutes) on Teacher Dashboard
   const updateTestQuickDuration = (testId, skill, minsValue) => {
     const cleanMins = Math.max(1, Math.min(180, Number(minsValue) || 1));
@@ -1600,6 +1630,7 @@ export default function App() {
     notes: [],
     antiCheatLogs: [],
     tabSwitchCount: 0,
+    visitedSkills: ['listening'],
     listeningTrackIdx: 0,
     showAllListeningQs: false,
     readingPassageIdx: 0,
@@ -1608,6 +1639,7 @@ export default function App() {
 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [playingAudioKey, setPlayingAudioKey] = useState(null);
+  const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState(false);
   const [selectedPassageText, setSelectedPassageText] = useState('');
   const examAudioRef = useRef(null);
 
@@ -1633,6 +1665,7 @@ export default function App() {
     maxAttempts: 0,
     sequentialMode: true,
     allowEarlyNextSection: false,
+    antiCheatEnabled: true,
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     sectionDurations: { ...DEFAULT_SECTION_DURATIONS },
     maxAudioPlays: 1,
@@ -2735,43 +2768,286 @@ export default function App() {
   };
 
   // ==========================================
-  // STEALTH ANTI-CHEAT EVENT LISTENERS
+  // STEALTH ANTI-CHEAT, RIGHT-CLICK LOCK & EXTENSION DETECTOR
   // ==========================================
-  useEffect(() => {
-    if (view !== 'EXAM_MODE') return;
+  const activeExamTestForAntiCheat = tests.find(t => t.id === selectedTestId);
+  const isExamAntiCheatEnabled =
+    view === 'EXAM_MODE' && normalizeExamConfig(activeExamTestForAntiCheat).antiCheatEnabled;
+  const antiCheatToastRef = useRef(null);
+  antiCheatToastRef.current = showToast;
 
-    const handleVisibilityOrBlur = () => {
-      const now = new Date();
-      const timeStr = now.toTimeString().split(' ')[0];
-      
-      setExamState(prev => {
-        const newCount = prev.tabSwitchCount + 1;
-        const newLog = {
-          timestamp: timeStr,
-          skill: prev.skill,
-          event: `Rời khỏi màn hình làm bài (${document.visibilityState === 'hidden' ? 'Ẩn tab' : 'Mất focus'})`
-        };
-        return {
-          ...prev,
-          tabSwitchCount: newCount,
-          antiCheatLogs: [...prev.antiCheatLogs, newLog]
-        };
+  useEffect(() => {
+    if (!isExamAntiCheatEnabled) return;
+
+    const seenSignatures = new Map();
+    let lastTabCountedAt = 0;
+    let lastToastAt = 0;
+    let wasWindowFocused = document.hasFocus();
+    let lastBeatTime = performance.now();
+
+    const notifyRestricted = (msg) => {
+      const now = Date.now();
+      if (now - lastToastAt < 2500) return;
+      lastToastAt = now;
+      antiCheatToastRef.current?.(msg, 'info');
+    };
+
+    const recordViolation = (
+      event,
+      { countTabSwitch = false, category = 'focus', severity = 'medium', dedupKey = null, cooldownMs = 0 } = {}
+    ) => {
+      const nowMs = Date.now();
+      if (countTabSwitch && nowMs - lastTabCountedAt < 1200) return;
+      if (dedupKey) {
+        const lastSeen = seenSignatures.get(dedupKey);
+        if (lastSeen && (cooldownMs === 0 || nowMs - lastSeen < cooldownMs)) return;
+        seenSignatures.set(dedupKey, nowMs);
+      }
+      if (countTabSwitch) lastTabCountedAt = nowMs;
+
+      const timeStr = new Date(nowMs).toTimeString().split(' ')[0];
+      setExamState(prev => ({
+        ...prev,
+        tabSwitchCount: countTabSwitch ? prev.tabSwitchCount + 1 : prev.tabSwitchCount,
+        antiCheatLogs: [
+          ...prev.antiCheatLogs,
+          { timestamp: timeStr, skill: prev.skill, event, category, severity }
+        ]
+      }));
+    };
+
+    const handleBlur = () => {
+      recordViolation('Rời khỏi màn hình làm bài (Mất focus)', {
+        countTabSwitch: true,
+        category: 'focus',
+        severity: 'medium'
       });
     };
 
-    const handleBlur = () => handleVisibilityOrBlur();
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') handleVisibilityOrBlur();
+      if (document.visibilityState === 'hidden') {
+        recordViolation('Rời khỏi màn hình làm bài (Ẩn tab)', {
+          countTabSwitch: true,
+          category: 'focus',
+          severity: 'medium'
+        });
+      }
     };
 
-    window.addEventListener('blur', handleBlur);
-    document.addEventListener('visibilitychange', handleVisibility);
+    // Capture-phase blockers defeat bubble-phase extension overrides
+    const handleContextMenuCapture = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      notifyRestricted('Chức năng chuột phải đã bị khóa trong khi thi!');
+      recordViolation('Thử mở menu chuột phải (Đã chặn)', {
+        category: 'interaction',
+        severity: 'medium',
+        dedupKey: 'ctxmenu-blocked',
+        cooldownMs: 3000
+      });
+      setTimeout(() => {
+        if (!e.defaultPrevented) {
+          recordViolation('Cảnh báo: Thao tác chuột phải đã vượt qua khóa bảo vệ (Extension bypass)', {
+            category: 'extension',
+            severity: 'high',
+            dedupKey: 'bypass-ctxmenu',
+            cooldownMs: 5000
+          });
+        }
+      }, 0);
+    };
+
+    const handleClipboardCapture = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const actionMap = { paste: 'dán (Paste)', cut: 'cắt (Cut)', copy: 'sao chép (Copy)' };
+      notifyRestricted('Sao chép / dán đã bị khóa khi bật chống gian lận!');
+      recordViolation(`Thử ${actionMap[e.type] || e.type} nội dung (Đã chặn)`, {
+        category: 'interaction',
+        severity: 'medium',
+        dedupKey: `clip-${e.type}`,
+        cooldownMs: 3000
+      });
+    };
+
+    const handleKeyDownCapture = (e) => {
+      const keyLower = (e.key || '').toLowerCase();
+      const hasMod = e.ctrlKey || e.metaKey;
+      const isDevTools =
+        e.key === 'F12' || (hasMod && e.shiftKey && ['i', 'j', 'c'].includes(keyLower));
+      const isBlockedShortcut = isDevTools || (hasMod && ['u', 'c', 'v', 'x'].includes(keyLower));
+      if (!isBlockedShortcut) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const label = isDevTools ? 'mở DevTools / Kiểm tra trang' : `phím tắt (${e.key.toUpperCase()})`;
+      notifyRestricted('Phím tắt này đã bị khóa trong khi làm bài thi!');
+      recordViolation(`Thử dùng ${label} (Đã chặn)`, {
+        category: isDevTools ? 'extension' : 'interaction',
+        severity: isDevTools ? 'high' : 'medium',
+        dedupKey: `key-${label}`,
+        cooldownMs: 3000
+      });
+    };
+
+    // Detect extension DOM injections, foreign shadow hosts, and API spoofing (e.g. Always Active Window)
+    const EXTENSION_SIGNATURES = [
+      { key: 'ext-grammarly', selector: 'grammarly-desktop-integration, grammarly-extension, [data-grammarly-shadow-root]', label: 'Grammarly (Hỗ trợ viết)' },
+      { key: 'ext-quillbot', selector: '[id*="quillbot" i], [class*="quillbot" i], quillbot-extension', label: 'QuillBot (Paraphrase / Viết lại)' },
+      { key: 'ext-ai-sidebar', selector: 'monica-root, [id*="monica-" i], sider-app, [id*="sider-" i], chatgpt-sidebar, [id*="chatgpt-extension" i], merlin-root, harpa-container, [id*="liner-extension" i]', label: 'Tiện ích AI Sidebar / ChatGPT' },
+      { key: 'ext-translate', selector: '#gtx-trans, .goog-te-banner-frame, .goog-te-gadget, deepl-inline-translate, [id*="deepl-" i]', label: 'Tiện ích Dịch thuật (Google Translate / DeepL)' },
+      { key: 'ext-rightclick', selector: '[id*="enable-right-click" i], [id*="allow-copy" i], [class*="enable-copy" i], [data-allow-copy]', label: 'Tiện ích Bỏ Khóa Chuột Phải / Copy' }
+    ];
+
+    const isNativeFn = (fn) => typeof fn === 'function' && Function.prototype.toString.call(fn).includes('[native code]');
+
+    const inspectExtensionAndApiIntegrity = () => {
+      try {
+        EXTENSION_SIGNATURES.forEach(sig => {
+          if (document.querySelector(sig.selector)) {
+            recordViolation(`Phát hiện tiện ích hỗ trợ đang hoạt động: ${sig.label}`, {
+              category: 'extension',
+              severity: 'high',
+              dedupKey: sig.key
+            });
+          }
+        });
+
+        // Scan injected extension URLs
+        const extAssets = document.querySelectorAll('script[src], link[href], iframe[src]');
+        for (let i = 0; i < extAssets.length; i++) {
+          const url = extAssets[i].src || extAssets[i].href || '';
+          if (/^(chrome|moz|safari|edge)-extension:\/\//i.test(url)) {
+            recordViolation('Phát hiện tài nguyên/mã tiêm từ Extension trình duyệt (extension://)', {
+              category: 'extension',
+              severity: 'high',
+              dedupKey: `ext-url-${url.slice(0, 48)}`
+            });
+            break;
+          }
+        }
+
+        // Scan foreign custom web components / shadow DOM overlays injected outside #root
+        const rootEl = document.getElementById('root');
+        const checkForeignChildren = (container) => {
+          if (!container) return;
+          Array.from(container.children).forEach(child => {
+            if (child === rootEl) return;
+            const tag = (child.tagName || '').toLowerCase();
+            if (child.shadowRoot || (tag.includes('-') && tag !== 'vite-error-overlay')) {
+              recordViolation(`Phát hiện thành phần giao diện ngoài do Extension chèn vào (<${tag}>)`, {
+                category: 'extension',
+                severity: 'high',
+                dedupKey: `ext-tag-${tag}`
+              });
+            }
+          });
+        };
+        checkForeignChildren(document.documentElement);
+        checkForeignChildren(document.body);
+
+        // API Tampering check (catches Disable Page Visibility API / Always Active Window / Allow Right Click)
+        if (
+          Object.getOwnPropertyDescriptor(document, 'hidden') ||
+          Object.getOwnPropertyDescriptor(document, 'visibilityState') ||
+          Object.getOwnPropertyDescriptor(document, 'hasFocus')
+        ) {
+          recordViolation('Cảnh báo: Phát hiện mã/Extension ghi đè API trạng thái tab (hidden / visibilityState / hasFocus)', {
+            category: 'extension',
+            severity: 'high',
+            dedupKey: 'tamper-doc-ownprop'
+          });
+        }
+
+        const hiddenGetter = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden')?.get;
+        const visGetter = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState')?.get;
+        if (
+          (hiddenGetter && !isNativeFn(hiddenGetter)) ||
+          (visGetter && !isNativeFn(visGetter)) ||
+          !isNativeFn(Document.prototype.hasFocus) ||
+          !isNativeFn(Event.prototype.preventDefault) ||
+          !isNativeFn(Event.prototype.stopImmediatePropagation)
+        ) {
+          recordViolation('Cảnh báo: Prototype trình duyệt bị sửa đổi (Nghi vấn Extension lách chống gian lận)', {
+            category: 'extension',
+            severity: 'high',
+            dedupKey: 'tamper-proto-native'
+          });
+        }
+      } catch (_err) {
+        // Ignore restricted browser descriptor read errors
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      inspectExtensionAndApiIntegrity();
+    });
+    try {
+      observer.observe(document.documentElement, { childList: true, subtree: false });
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: false });
+      }
+    } catch (_err) {}
+
+    // Periodic focus + timer-drift + API integrity heartbeat
+    let tickCounter = 0;
+    const heartbeatTimer = setInterval(() => {
+      const nowFocused = document.hasFocus();
+      if (wasWindowFocused && !nowFocused) {
+        recordViolation('Mất focus cửa sổ làm bài (Kiểm tra định kỳ / có thể bị Extension chặn blur)', {
+          countTabSwitch: true,
+          category: 'focus',
+          severity: 'medium'
+        });
+      }
+      wasWindowFocused = nowFocused;
+
+      const nowPerf = performance.now();
+      const delta = nowPerf - lastBeatTime;
+      lastBeatTime = nowPerf;
+      if (delta > 2800 && document.hidden === false) {
+        recordViolation('Nghi vấn tab bị treo/ẩn nền dù trạng thái hiển thị bị giữ visible (Extension/Throttling)', {
+          countTabSwitch: true,
+          category: 'extension',
+          severity: 'high',
+          dedupKey: 'timer-drift',
+          cooldownMs: 8000
+        });
+      }
+
+      tickCounter += 1;
+      if (tickCounter % 4 === 0) {
+        inspectExtensionAndApiIntegrity();
+      }
+    }, 900);
+
+    inspectExtensionAndApiIntegrity();
+
+    window.addEventListener('blur', handleBlur, true);
+    document.addEventListener('visibilitychange', handleVisibility, true);
+    window.addEventListener('contextmenu', handleContextMenuCapture, true);
+    document.addEventListener('contextmenu', handleContextMenuCapture, true);
+    window.addEventListener('copy', handleClipboardCapture, true);
+    window.addEventListener('cut', handleClipboardCapture, true);
+    window.addEventListener('paste', handleClipboardCapture, true);
+    window.addEventListener('keydown', handleKeyDownCapture, true);
 
     return () => {
-      window.removeEventListener('blur', handleBlur);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(heartbeatTimer);
+      observer.disconnect();
+      window.removeEventListener('blur', handleBlur, true);
+      document.removeEventListener('visibilitychange', handleVisibility, true);
+      window.removeEventListener('contextmenu', handleContextMenuCapture, true);
+      document.removeEventListener('contextmenu', handleContextMenuCapture, true);
+      window.removeEventListener('copy', handleClipboardCapture, true);
+      window.removeEventListener('cut', handleClipboardCapture, true);
+      window.removeEventListener('paste', handleClipboardCapture, true);
+      window.removeEventListener('keydown', handleKeyDownCapture, true);
     };
-  }, [view]);
+  }, [isExamAntiCheatEnabled]);
 
   const examAutoAdvanceHandledRef = useRef(null);
   const autoAdvanceFnRef = useRef(null);
@@ -2908,6 +3184,7 @@ export default function App() {
     const firstSkill = cfg.order[0] || 'listening';
     examAutoAdvanceHandledRef.current = null;
     stopExamAudio();
+    setShowSubmitConfirmModal(false);
     setSelectedTestId(testId);
 
     const draftKey = `ielts_exam_draft_${currentUser?.username || 'guest'}_${testId}`;
@@ -2924,19 +3201,24 @@ export default function App() {
 
     if (restoredDraft) {
       const validIdx = Math.max(0, cfg.order.indexOf(restoredDraft.skill));
+      const restoredSkill = cfg.order[validIdx];
+      const restoredVisited = Array.isArray(restoredDraft.visitedSkills)
+        ? Array.from(new Set([...restoredDraft.visitedSkills.filter(s => cfg.order.includes(s)), restoredSkill]))
+        : [restoredSkill];
       setExamState({
-        skill: cfg.order[validIdx],
+        skill: restoredSkill,
         sectionIdx: validIdx,
         timeRemaining:
           typeof restoredDraft.timeRemaining === 'number' && restoredDraft.timeRemaining > 0
             ? restoredDraft.timeRemaining
-            : (cfg.durations[cfg.order[validIdx]] || 15) * 60,
+            : (cfg.durations[restoredSkill] || 15) * 60,
         answers: restoredDraft.answers || {},
         audioPlays: restoredDraft.audioPlays || { mainAudio: 0 },
         highlights: Array.isArray(restoredDraft.highlights) ? restoredDraft.highlights : [],
         notes: Array.isArray(restoredDraft.notes) ? restoredDraft.notes : [],
         antiCheatLogs: Array.isArray(restoredDraft.antiCheatLogs) ? restoredDraft.antiCheatLogs : [],
         tabSwitchCount: Number(restoredDraft.tabSwitchCount) || 0,
+        visitedSkills: restoredVisited,
         listeningTrackIdx: Number(restoredDraft.listeningTrackIdx) || 0,
         showAllListeningQs: Boolean(restoredDraft.showAllListeningQs),
         readingPassageIdx: Number(restoredDraft.readingPassageIdx) || 0,
@@ -2954,6 +3236,7 @@ export default function App() {
         notes: [],
         antiCheatLogs: [],
         tabSwitchCount: 0,
+        visitedSkills: [firstSkill],
         listeningTrackIdx: 0,
         showAllListeningQs: false,
         readingPassageIdx: 0,
@@ -3029,6 +3312,7 @@ export default function App() {
 
   const handleFinalExamSubmit = () => {
     stopExamAudio();
+    setShowSubmitConfirmModal(false);
     const activeTest = tests.find(t => t.id === selectedTestId);
     if (!activeTest) return;
 
@@ -3106,6 +3390,7 @@ export default function App() {
       sectionIdx: nextIdx,
       skill: nextSkill,
       timeRemaining: nextDurationSecs,
+      visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), nextSkill])),
       listeningTrackIdx: 0,
       readingPassageIdx: 0
     }));
@@ -3320,6 +3605,7 @@ export default function App() {
         maxAttempts: cfg.maxAttempts,
         sequentialMode: cfg.sequentialMode,
         allowEarlyNextSection: cfg.allowEarlyNextSection,
+        antiCheatEnabled: cfg.antiCheatEnabled,
         sectionOrder: cfg.order,
         sectionDurations: cfg.durations,
         allowViewAnswers: cloned.allowViewAnswers ?? false,
@@ -3358,6 +3644,7 @@ export default function App() {
         maxAttempts: 0,
         sequentialMode: true,
         allowEarlyNextSection: false,
+        antiCheatEnabled: true,
         sectionOrder: [...DEFAULT_SECTION_ORDER],
         sectionDurations: { ...DEFAULT_SECTION_DURATIONS },
         maxAudioPlays: 1,
@@ -3640,6 +3927,7 @@ export default function App() {
       maxAttempts: cfg.maxAttempts,
       sequentialMode: cfg.sequentialMode,
       allowEarlyNextSection: cfg.allowEarlyNextSection,
+      antiCheatEnabled: cfg.antiCheatEnabled,
       sectionOrder: cfg.order,
       sectionDurations: cfg.durations,
       listening: {
@@ -7062,8 +7350,23 @@ export default function App() {
       return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    const visitedSkillsList = Array.from(new Set([...(examState.visitedSkills || []), examState.skill]));
+    const visitedInOrderCount = cfg.order.filter(sId => visitedSkillsList.includes(sId)).length;
+    const allSkillsVisited = cfg.order.every(sId => visitedSkillsList.includes(sId));
+    const unvisitedLabels = cfg.order
+      .filter(sId => !visitedSkillsList.includes(sId))
+      .map(sId => skillMeta[sId]?.label || sId);
+
+    const answeredListeningCount = allListeningQs.filter(q => String(examState.answers[q.id] || '').trim().length > 0).length;
+    const answeredReadingCount = allReadingQs.filter(q => String(examState.answers[q.id] || '').trim().length > 0).length;
+    const w1Words = getWordCount(examState.answers.w1);
+    const w2Words = getWordCount(examState.answers.w2);
+
     return (
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col justify-between select-none">
+      <div
+        onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
+        className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col justify-between select-none"
+      >
         {/* Exam Header */}
         <header className="bg-slate-900 dark:bg-slate-950 text-white px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shadow sticky top-0 z-50">
           <div className="flex items-center gap-3 flex-wrap">
@@ -7081,6 +7384,7 @@ export default function App() {
               const isCurrent = examState.skill === sId && idx === currentSectionIdx;
               const isDone = cfg.sequentialMode && idx < currentSectionIdx;
               const isLocked = cfg.sequentialMode && idx !== currentSectionIdx;
+              const isVisited = visitedSkillsList.includes(sId);
 
               return (
                 <button
@@ -7090,7 +7394,7 @@ export default function App() {
                   title={
                     isLocked
                       ? `Chế độ làm tuần tự: Hết giờ ${skillMeta[examState.skill]?.label || ''} hệ thống sẽ tự động chuyển phần.`
-                      : `Kỹ năng ${meta.label} (${cfg.durations[sId]} phút)`
+                      : `Kỹ năng ${meta.label} (${cfg.durations[sId]} phút)${isVisited ? ' • Đã xem' : ' • Chưa xem'}`
                   }
                   onClick={() => {
                     if (isLocked || isCurrent) return;
@@ -7098,7 +7402,8 @@ export default function App() {
                     setExamState(prev => ({
                       ...prev,
                       skill: sId,
-                      sectionIdx: idx
+                      sectionIdx: idx,
+                      visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), sId]))
                     }));
                   }}
                   className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition ${
@@ -7116,7 +7421,7 @@ export default function App() {
                   <span>{meta.label}</span>
                   <span className="text-[10px] opacity-75">({cfg.durations[sId]}p)</span>
                   {isLocked && !isDone && <Lock className="w-3 h-3 text-slate-500" />}
-                  {isDone && <Check className="w-3 h-3 text-emerald-400" />}
+                  {(isDone || (!isLocked && !isCurrent && isVisited)) && <Check className="w-3 h-3 text-emerald-400" />}
                 </button>
               );
             })}
@@ -7157,10 +7462,29 @@ export default function App() {
             </div>
 
             <button
-              onClick={handleFinalExamSubmit}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition shadow"
+              type="button"
+              disabled={!allSkillsVisited}
+              onClick={() => {
+                if (!allSkillsVisited) return;
+                setShowSubmitConfirmModal(true);
+              }}
+              title={
+                allSkillsVisited
+                  ? 'Bấm để xác nhận nộp bài thi'
+                  : `Bạn cần xem hết cả ${cfg.order.length} kỹ năng (${unvisitedLabels.join(', ')}) mới có thể nộp bài.`
+              }
+              className={`font-bold text-xs px-4 py-2 rounded-lg transition shadow flex items-center gap-1.5 ${
+                allSkillsVisited
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                  : 'bg-slate-700/70 text-slate-400 border border-slate-600 cursor-not-allowed opacity-60'
+              }`}
             >
-              Nộp Bài Thi (Finish)
+              {!allSkillsVisited && <Lock className="w-3.5 h-3.5" />}
+              <span>
+                {allSkillsVisited
+                  ? 'Nộp Bài Thi (Finish)'
+                  : `Nộp Bài (${visitedInOrderCount}/${cfg.order.length} kỹ năng)`}
+              </span>
             </button>
           </div>
         </header>
@@ -7645,6 +7969,101 @@ export default function App() {
             </div>
           )}
         </main>
+
+        {/* Modal Xác Nhận Nộp Bài Thi (In-app modal để không kích hoạt window blur chống gian lận) */}
+        {showSubmitConfirmModal && (
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowSubmitConfirmModal(false)}
+          >
+            <div
+              className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 flex items-center justify-center flex-shrink-0 border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
+                      Bạn có chắc chắn muốn nộp bài không?
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Sau khi xác nhận nộp bài, hệ thống sẽ lưu kết quả ngay và bạn sẽ không thể chỉnh sửa lại bài làm.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSubmitConfirmModal(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  aria-label="Đóng hộp thoại xác nhận nộp bài"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Listening</p>
+                    <p className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                      {answeredListeningCount}/{allListeningQs.length} câu
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Reading</p>
+                    <p className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                      {answeredReadingCount}/{allReadingQs.length} câu
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Writing Task 1</p>
+                    <p className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                      {w1Words} từ
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Writing Task 2</p>
+                    <p className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
+                      {w2Words} từ
+                    </p>
+                  </div>
+                </div>
+
+                {(answeredListeningCount < allListeningQs.length ||
+                  answeredReadingCount < allReadingQs.length ||
+                  w1Words === 0 ||
+                  w2Words === 0) && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <span>
+                      Một số câu hỏi hoặc phần Writing hiện vẫn còn trống. Bạn có thể bấm <strong>Quay lại làm tiếp</strong> để rà soát trước khi nộp bài.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSubmitConfirmModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                >
+                  Quay lại làm tiếp
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFinalExamSubmit}
+                  className="px-5 py-2.5 rounded-xl text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 flex items-center gap-2 transition"
+                >
+                  <Check className="w-4 h-4" /> Xác nhận Nộp Bài
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -8621,7 +9040,8 @@ export default function App() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {studentAttempts.map((att, idx) => {
-                    const risk = isTeacherViewer ? getRiskAssessment(att.tabSwitchCount) : null;
+                    const risk = isTeacherViewer ? getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs) : null;
+                    const extSignals = isTeacherViewer ? countExtensionCheatSignals(att.antiCheatLogs) : 0;
                     const RiskIcon = risk?.icon;
 
                     return (
@@ -8650,10 +9070,17 @@ export default function App() {
                         </td>
                         {isTeacherViewer && risk && (
                           <td className="px-6 py-4 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${risk.color}`}>
-                              <RiskIcon className="w-3 h-3" />
-                              {risk.label} ({att.tabSwitchCount})
-                            </span>
+                            <div className="inline-flex flex-col items-center gap-1">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${risk.color}`}>
+                                <RiskIcon className="w-3 h-3" />
+                                {risk.label} ({att.tabSwitchCount})
+                              </span>
+                              {extSignals > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                                  Extension / Bypass: {extSignals}
+                                </span>
+                              )}
+                            </div>
                           </td>
                         )}
                         <td className="px-6 py-4 text-right">
@@ -9037,7 +9464,7 @@ export default function App() {
                   </div>
 
                   {/* Quick Toggle Allow View Correct Answers */}
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-4 flex items-center justify-between gap-2">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-2.5 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Cho phép HS xem đáp án đúng</p>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">
@@ -9059,6 +9486,38 @@ export default function App() {
                       ) : (
                         <>
                           <Lock className="w-3.5 h-3.5" /> Đang Khóa
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Quick Toggle Stealth Anti-Cheat (Hidden from Students) */}
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 mb-4 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                        Chống gian lận (Ẩn với HS)
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {cfg.antiCheatEnabled
+                          ? 'Đếm tab, khóa chuột phải & quét Extension'
+                          : 'Đang tắt — học sinh làm bài tự do'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => toggleTestAntiCheat(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                        cfg.antiCheatEnabled
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {cfg.antiCheatEnabled ? (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5" /> Đang Bật
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5" /> Đang Tắt
                         </>
                       )}
                     </button>
@@ -9108,7 +9567,7 @@ export default function App() {
         {/* Tab 2: Giám Sát Gian Lận & Chấm Điểm */}
         {teacherHubTab === 'grading' && (() => {
           const pendingCount = attempts.filter(a => !a.teacherGraded).length;
-          const highRiskCount = attempts.filter(a => (a.tabSwitchCount || 0) >= 3).length;
+          const highRiskCount = attempts.filter(a => (a.tabSwitchCount || 0) >= 3 || countExtensionCheatSignals(a.antiCheatLogs) > 0).length;
           const gradedBands = attempts.filter(a => typeof a.overallBand === 'number').map(a => a.overallBand);
           const avgBandDisplay = gradedBands.length > 0
             ? (gradedBands.reduce((acc, b) => acc + b, 0) / gradedBands.length).toFixed(1)
@@ -9118,7 +9577,7 @@ export default function App() {
             if (gradingFilters.testId !== 'all' && att.testId !== gradingFilters.testId) return false;
             if (gradingFilters.status === 'pending' && att.teacherGraded) return false;
             if (gradingFilters.status === 'graded' && !att.teacherGraded) return false;
-            if (gradingFilters.risk === 'risk' && (att.tabSwitchCount || 0) < 3) return false;
+            if (gradingFilters.risk === 'risk' && (att.tabSwitchCount || 0) < 3 && countExtensionCheatSignals(att.antiCheatLogs) === 0) return false;
             if (gradingFilters.search.trim()) {
               const q = gradingFilters.search.trim().toLowerCase();
               const hay = `${att.studentName || ''} ${att.studentId || ''} ${att.testTitle || ''}`.toLowerCase();
@@ -9235,7 +9694,8 @@ export default function App() {
                       </td>
                     </tr>
                   ) : filteredAttempts.map(att => {
-                    const risk = getRiskAssessment(att.tabSwitchCount);
+                    const risk = getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs);
+                    const extSignals = countExtensionCheatSignals(att.antiCheatLogs);
                     const RiskIcon = risk.icon;
 
                     return (
@@ -9244,10 +9704,17 @@ export default function App() {
                         <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">{att.testTitle}</td>
                         <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{att.submittedAt}</td>
                         <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${risk.color}`}>
-                            <RiskIcon className="w-3.5 h-3.5" />
-                            {risk.label} ({att.tabSwitchCount} lần)
-                          </span>
+                          <div className="inline-flex flex-col items-center gap-1">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${risk.color}`}>
+                              <RiskIcon className="w-3.5 h-3.5" />
+                              {risk.label} ({att.tabSwitchCount} lần)
+                            </span>
+                            {extSignals > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                                Extension / Bypass: {extSignals}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-center">
                           {att.teacherGraded ? (
@@ -9753,27 +10220,58 @@ export default function App() {
               </div>
 
               {/* Anti-Cheat Log Detail */}
-              <div className="bg-slate-900 dark:bg-slate-950 text-white p-4 rounded-2xl mb-6 border border-slate-800">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4" /> Nhật Ký Vi Phạm Chống Gian Lận (Stealth Log)
-                  </h4>
-                  <span className="text-xs bg-slate-800 px-2.5 py-1 rounded font-mono">
-                    Lượt rời màn hình: {gradingAttempt.tabSwitchCount}
-                  </span>
-                </div>
-                {gradingAttempt.antiCheatLogs.length === 0 ? (
-                  <p className="text-xs text-emerald-400">Không ghi nhận bất kỳ vi phạm rời màn hình nào trong suốt quá trình làm bài.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2 text-xs text-slate-300">
-                    {gradingAttempt.antiCheatLogs.map((log, idx) => (
-                      <div key={idx} className="flex justify-between border-b border-slate-800 pb-1">
-                        <span>[{log.timestamp}] Skill: <strong className="text-amber-300 uppercase">{log.skill}</strong> - {log.event}</span>
+              {(() => {
+                const logsList = gradingAttempt.antiCheatLogs || [];
+                const extSignalsCount = countExtensionCheatSignals(logsList);
+                return (
+                  <div className="bg-slate-900 dark:bg-slate-950 text-white p-4 rounded-2xl mb-6 border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                      <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4" /> Nhật Ký Vi Phạm Chống Gian Lận (Stealth Log)
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs bg-slate-800 px-2.5 py-1 rounded font-mono">
+                          Lượt rời màn hình: {gradingAttempt.tabSwitchCount}
+                        </span>
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded font-mono border ${
+                            extSignalsCount > 0
+                              ? 'bg-rose-950/80 text-rose-300 border-rose-700'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          Dấu hiệu Extension / Lách luật: {extSignalsCount}
+                        </span>
                       </div>
-                    ))}
+                    </div>
+                    {logsList.length === 0 ? (
+                      <p className="text-xs text-emerald-400">Không ghi nhận vi phạm rời màn hình, khóa tương tác hay dấu hiệu Extension/lách luật nào trong suốt quá trình làm bài.</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto pr-2 text-xs text-slate-300">
+                        {logsList.map((log, idx) => {
+                          const isExtOrHigh = log?.category === 'extension' || log?.severity === 'high';
+                          const isInteraction = log?.category === 'interaction';
+                          const skillColor = isExtOrHigh
+                            ? 'text-rose-300'
+                            : isInteraction
+                              ? 'text-sky-300'
+                              : 'text-amber-300';
+                          const rowClass = isExtOrHigh
+                            ? 'border-rose-900/60 bg-rose-950/30 px-2 py-1 rounded text-rose-100'
+                            : 'border-slate-800 pb-1';
+                          return (
+                            <div key={idx} className={`flex justify-between border-b ${rowClass}`}>
+                              <span>
+                                [{log.timestamp}] Skill: <strong className={`${skillColor} uppercase`}>{log.skill}</strong> - {log.event}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Student Writing Submissions */}
               <div className="space-y-4 mb-6">
@@ -10258,6 +10756,46 @@ export default function App() {
               ) : (
                 <>
                   <Lock className="w-4 h-4" /> Đang Khóa Đáp Án Với Học Sinh
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Stealth Anti-Cheat Control Card (Hidden from Student UI) */}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-rose-50 via-amber-50/70 to-slate-50 dark:from-rose-950/35 dark:via-slate-800/80 dark:to-slate-900 border border-rose-200 dark:border-rose-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className={`p-3 rounded-2xl ${cfg.antiCheatEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                {cfg.antiCheatEnabled ? <ShieldCheck className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
+                  Chế Độ Chống Gian Lận &amp; Kiểm Tra Extension
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 dark:bg-slate-800 border border-slate-700">
+                    Ẩn với học sinh
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed max-w-xl">
+                  Khi bật, hệ thống đếm số lần rời tab/mất focus, khóa chuột phải &amp; copy/paste/DevTools (vẫn giữ tính năng Highlight Reading/Listening), đồng thời quét DOM và tính toàn vẹn API trình duyệt để phát hiện Extension hỗ trợ hoặc lách luật. Tắt đi nếu muốn cho học sinh luyện tập tự do. Trạng thái này hoàn toàn ẩn ở màn hình danh sách đề của học sinh.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setTestForm(prev => ({ ...prev, antiCheatEnabled: !cfg.antiCheatEnabled }))}
+              className={`px-5 py-3 rounded-xl text-xs font-extrabold flex items-center gap-2 transition shadow-sm flex-shrink-0 ${
+                cfg.antiCheatEnabled
+                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700'
+              }`}
+            >
+              {cfg.antiCheatEnabled ? (
+                <>
+                  <ShieldCheck className="w-4 h-4" /> Đang Bật Chống Gian Lận
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-4 h-4" /> Đang Tắt (Luyện Tập Tự Do)
                 </>
               )}
             </button>
