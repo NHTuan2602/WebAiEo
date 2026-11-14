@@ -190,18 +190,24 @@ const getListeningTracks = (listeningObj) => {
   if (Array.isArray(listeningObj?.tracks) && listeningObj.tracks.length > 0) {
     return listeningObj.tracks.map((tr, idx) => ({
       id: tr.id || `track-${idx + 1}`,
-      title: tr.title || `Phần nghe ${idx + 1}`,
+      title: tr.title || `Chủ đề ${idx + 1}`,
       audioUrl: tr.audioUrl || '',
       audioFileName: tr.audioFileName || '',
+      imageUrl: tr.imageUrl || '',
+      imageFileName: tr.imageFileName || '',
+      contextText: tr.contextText || tr.passageText || '',
       transcript: tr.transcript || ''
     }));
   }
   return [
     {
       id: 'track-1',
-      title: listeningObj?.audioTitle || 'Phần nghe 1',
+      title: listeningObj?.audioTitle || 'Chủ đề 1',
       audioUrl: listeningObj?.audioUrl || '',
       audioFileName: listeningObj?.audioFileName || '',
+      imageUrl: listeningObj?.imageUrl || '',
+      imageFileName: listeningObj?.imageFileName || '',
+      contextText: listeningObj?.contextText || '',
       transcript: listeningObj?.transcript || ''
     }
   ];
@@ -1635,8 +1641,22 @@ export default function App() {
     listening: {
       audioUrl: '',
       audioFileName: '',
+      imageUrl: '',
+      imageFileName: '',
+      contextText: '',
       transcript: '',
-      tracks: [{ id: 'track-1', title: 'Phần nghe 1', audioUrl: '', audioFileName: '', transcript: '' }],
+      tracks: [
+        {
+          id: 'track-1',
+          title: 'Chủ đề 1',
+          audioUrl: '',
+          audioFileName: '',
+          imageUrl: '',
+          imageFileName: '',
+          contextText: '',
+          transcript: ''
+        }
+      ],
       questions: []
     },
     reading: {
@@ -3306,6 +3326,9 @@ export default function App() {
         listening: {
           audioUrl: tracks[0]?.audioUrl || '',
           audioFileName: tracks[0]?.audioFileName || '',
+          imageUrl: tracks[0]?.imageUrl || '',
+          imageFileName: tracks[0]?.imageFileName || '',
+          contextText: tracks[0]?.contextText || '',
           transcript: tracks[0]?.transcript || '',
           questions: [],
           ...(cloned.listening || {}),
@@ -3343,13 +3366,19 @@ export default function App() {
         listening: {
           audioUrl: '',
           audioFileName: '',
+          imageUrl: '',
+          imageFileName: '',
+          contextText: '',
           transcript: 'Welcome to the lecture. Today we will discuss key developments in modern education...',
           tracks: [
             {
               id: 'track-1',
-              title: 'Phần 1: Lecture Introduction',
+              title: 'Chủ đề 1: Lecture Introduction',
               audioUrl: '',
               audioFileName: '',
+              imageUrl: '',
+              imageFileName: '',
+              contextText: '',
               transcript: 'Welcome to the lecture. Today we will discuss key developments in modern education...'
             }
           ],
@@ -3413,7 +3442,14 @@ export default function App() {
     setView('EXAM_BUILDER');
   };
 
-  // Upload Audio File for Listening (Teacher Builder — supports multiple audio parts)
+  // Upload Audio & Optional Media for Listening (Teacher Builder — supports multiple topics)
+  const readFileAsDataUrl = (file, onLoad) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => onLoad(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
   const updateListeningTrackField = (idx, patch) => {
     setTestForm(prev => {
       const tracks = getListeningTracks(prev.listening);
@@ -3426,6 +3462,9 @@ export default function App() {
           tracks: updatedTracks,
           audioUrl: first.audioUrl || '',
           audioFileName: first.audioFileName || '',
+          imageUrl: first.imageUrl || '',
+          imageFileName: first.imageFileName || '',
+          contextText: first.contextText || '',
           transcript: first.transcript || ''
         }
       };
@@ -3439,15 +3478,24 @@ export default function App() {
       alert('File âm thanh quá lớn (vui lòng chọn file dưới 15MB để lưu trữ mượt mà trên trình duyệt, hoặc dùng Link URL ngoài)!');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+    readFileAsDataUrl(file, (dataUrl) => {
       updateListeningTrackField(targetIdx, {
-        audioUrl: ev.target.result,
+        audioUrl: dataUrl,
         audioFileName: file.name
       });
-      showToast(`Đã tải lên file ghi âm Phần ${targetIdx + 1}: ${file.name}`);
-    };
-    reader.readAsDataURL(file);
+      showToast(`Đã tải lên file ghi âm Chủ đề ${targetIdx + 1}: ${file.name}`);
+    });
+  };
+
+  const handleListeningImageUpload = (e, targetIdx = builderListeningIdx) => {
+    const file = e.target.files?.[0];
+    readFileAsDataUrl(file, (dataUrl) => {
+      updateListeningTrackField(targetIdx, {
+        imageUrl: dataUrl,
+        imageFileName: file.name
+      });
+      showToast(`Đã thêm ảnh Chủ đề nghe số ${targetIdx + 1}: ${file.name}`);
+    });
   };
 
   // Upload Image for Reading Passage (Teacher Builder — supports multiple passages)
@@ -3472,16 +3520,13 @@ export default function App() {
 
   const handleReadingImageUpload = (e, targetIdx = builderReadingIdx) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+    readFileAsDataUrl(file, (dataUrl) => {
       updateReadingPassageField(targetIdx, {
-        imageUrl: ev.target.result,
+        imageUrl: dataUrl,
         imageFileName: file.name
       });
       showToast(`Đã thêm ảnh bài đọc số ${targetIdx + 1}: ${file.name}`);
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   // Upload Chart Image for Writing Task 1 (Teacher Builder)
@@ -3602,6 +3647,9 @@ export default function App() {
         tracks,
         audioUrl: firstTrack.audioUrl || '',
         audioFileName: firstTrack.audioFileName || '',
+        imageUrl: firstTrack.imageUrl || '',
+        imageFileName: firstTrack.imageFileName || '',
+        contextText: firstTrack.contextText || '',
         transcript: firstTrack.transcript || ''
       },
       reading: {
@@ -7121,90 +7169,96 @@ export default function App() {
         <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 overflow-hidden">
           {/* Listening */}
           {examState.skill === 'listening' && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm h-full flex flex-col justify-between space-y-5">
-              <div>
-                {/* Multi-Track Switcher Bar (when test has 2+ listening tracks/parts) */}
-                {listeningTracks.length > 1 && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {listeningTracks.map((tr, trIdx) => {
-                        const trKey = getListeningAudioKey(tr, trIdx);
-                        const trPlays = examState.audioPlays[trKey] || 0;
-                        const maxPlays = activeTest.maxAudioPlays || 1;
-                        const isPlayingThis = isPlayingAudio && playingAudioKey === trKey;
-                        const isSelected = trIdx === safeTrackIdx;
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[78vh]">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col overflow-hidden shadow-sm">
+                {/* Multi-Topic Switcher Buttons (1, 2, 3...) matching Reading */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800 mb-3">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {listeningTracks.map((tr, trIdx) => {
+                      const trKey = getListeningAudioKey(tr, trIdx);
+                      const trPlays = examState.audioPlays[trKey] || 0;
+                      const maxPlays = activeTest.maxAudioPlays || 1;
+                      const isPlayingThis = isPlayingAudio && playingAudioKey === trKey;
+                      const isSelected = trIdx === safeTrackIdx;
 
-                        return (
-                          <button
-                            key={tr.id || trIdx}
-                            type="button"
-                            onClick={() => setExamState(prev => ({ ...prev, listeningTrackIdx: trIdx }))}
-                            className={`px-3 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 border ${
-                              isSelected
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-500/15'
-                            }`}
-                          >
-                            <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
-                              isSelected ? 'bg-white text-blue-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
-                            }`}>
-                              {trIdx + 1}
-                            </span>
-                            <span className="max-w-[150px] truncate">{tr.title || `Phần ${trIdx + 1}`}</span>
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                              isPlayingThis
-                                ? 'bg-amber-400 text-slate-900 animate-pulse'
-                                : trPlays >= maxPlays
-                                ? isSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-                                : isSelected ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
-                            }`}>
-                              {isPlayingThis ? '▶' : `${trPlays}/${maxPlays}`}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                      {listeningTracks.length} file / phần nghe
-                    </span>
+                      return (
+                        <button
+                          key={tr.id || trIdx}
+                          type="button"
+                          onClick={() => setExamState(prev => ({ ...prev, listeningTrackIdx: trIdx }))}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 border ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-500/15'
+                          }`}
+                        >
+                          <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
+                            isSelected ? 'bg-white text-blue-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                          }`}>
+                            {trIdx + 1}
+                          </span>
+                          <span className="max-w-[140px] truncate">{tr.title || `Chủ đề ${trIdx + 1}`}</span>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            isPlayingThis
+                              ? 'bg-amber-400 text-slate-900 animate-pulse'
+                              : trPlays >= maxPlays
+                              ? isSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                              : isSelected ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+                          }`}>
+                            {isPlayingThis ? '▶' : `${trPlays}/${maxPlays}`}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
 
-                <div className="bg-slate-50 dark:bg-slate-800/70 rounded-xl p-4 border border-slate-200 dark:border-slate-700 mb-6 flex flex-wrap items-center justify-between gap-3">
+                  {selectedPassageText && (
+                    <div className="flex items-center gap-1.5 bg-slate-900 text-white px-3 py-1 rounded-full text-xs animate-bounce shadow-lg">
+                      <span className="text-[10px] text-slate-300 mr-1">Highlight:</span>
+                      <button onClick={() => addHighlight('#fef08a')} className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition" title="Vàng" />
+                      <button onClick={() => addHighlight('#bbf7d0')} className="w-4 h-4 rounded-full bg-emerald-300 hover:scale-110 transition" title="Xanh lá" />
+                      <button onClick={addNote} className="ml-2 flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-[10px] text-cyan-300">
+                        <MessageSquare className="w-3 h-3" /> Ghi chú
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-3">
+                  {listeningTracks.length > 1 ? `Chủ đề ${safeTrackIdx + 1}: ` : ''}{activeTrack?.title}
+                </h3>
+
+                {/* Audio Player Box for Active Topic */}
+                <div className="bg-slate-50 dark:bg-slate-800/70 rounded-xl p-4 border border-slate-200 dark:border-slate-700 mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-bold text-slate-800 dark:text-white text-base flex items-center gap-2">
-                      <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      {listeningTracks.length > 1
-                        ? `Phần ${safeTrackIdx + 1}/${listeningTracks.length}: ${activeTrack?.title || `File nghe ${safeTrackIdx + 1}`}`
-                        : 'Listening Audio (Chuẩn No-Rewind IDP)'}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-3 mt-1">
+                    <div className="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-2">
+                      <Headphones className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Listening Audio (Chuẩn No-Rewind IDP)
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2.5 mt-1">
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Giới hạn nghe tối đa mỗi phần: <span className="font-bold text-slate-700 dark:text-slate-200">{activeTest.maxAudioPlays} lần</span>.
+                        Giới hạn: <span className="font-bold text-slate-700 dark:text-slate-200">{activeTest.maxAudioPlays} lần</span>
                       </p>
                       {activeTrack?.audioFileName ? (
                         <span className="text-[11px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-semibold px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-500/30">
-                          🎵 File Audio: {activeTrack.audioFileName}
+                          🎵 {activeTrack.audioFileName}
                         </span>
                       ) : activeTrack?.transcript ? (
                         <span className="text-[11px] bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold px-2.5 py-0.5 rounded-full">
-                          🔊 AI Voice (TTS Transcript)
+                          🔊 AI Voice (TTS)
                         </span>
                       ) : null}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <span className="text-xs text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded font-mono font-bold">
-                      {listeningTracks.length > 1 ? `Phần ${safeTrackIdx + 1}: ` : 'Đã phát: '}
                       {examState.audioPlays[activeTrackPlayKey] || 0} / {activeTest.maxAudioPlays}
                     </span>
 
                     <button
                       onClick={() => handlePlayListeningAudio(activeTrackPlayKey, activeTrack?.transcript || '', activeTrack?.audioUrl || '')}
                       disabled={(examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays || isPlayingAudio}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition ${
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition ${
                         (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
                           ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
                           : isPlayingAudio
@@ -7216,88 +7270,135 @@ export default function App() {
                       {isPlayingAudio && playingAudioKey === activeTrackPlayKey
                         ? 'Đang Phát Audio...'
                         : isPlayingAudio
-                        ? 'Đang Phát Phần Khác...'
+                        ? 'Đang Phát Khác...'
                         : listeningTracks.length > 1
-                        ? `Phát Phần ${safeTrackIdx + 1}`
+                        ? `Phát Chủ đề ${safeTrackIdx + 1}`
                         : 'Phát Bài Nghe'}
                     </button>
                   </div>
                 </div>
 
-                {/* Listening Questions Header + Scope Toggle */}
-                {listeningTracks.length > 1 && hasScopedListeningQs && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
-                    <h4 className="font-bold text-slate-800 dark:text-white text-sm">
-                      Câu Hỏi Listening {!examState.showAllListeningQs ? `(Phần ${safeTrackIdx + 1})` : `(Tất cả ${allListeningQs.length} câu)`}
-                    </h4>
+                {/* Optional Diagram / Sheet Image & Topic Context Text (mirroring Reading) */}
+                <div
+                  onMouseUp={handlePassageTextSelect}
+                  className="flex-1 overflow-y-auto pr-2 text-slate-700 dark:text-slate-200 text-sm leading-relaxed whitespace-pre-line select-text font-serif"
+                >
+                  {activeTrack?.imageUrl && (
+                    <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 relative group">
+                      <img
+                        src={activeTrack.imageUrl}
+                        alt={`Listening Topic ${safeTrackIdx + 1}`}
+                        onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                        className="w-full max-h-[48vh] object-contain rounded-lg mx-auto cursor-zoom-in"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                        className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline font-sans"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Phóng to ảnh / sơ đồ chủ đề #{safeTrackIdx + 1}
+                      </button>
+                    </div>
+                  )}
+
+                  {activeTrack?.contextText ? (
+                    activeTrack.contextText
+                  ) : !activeTrack?.imageUrl ? (
+                    <div className="font-sans text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-xl p-4 border border-dashed border-slate-200 dark:border-slate-700">
+                      🎧 Nhấn nút <strong className="text-slate-700 dark:text-slate-200">Phát</strong> ở trên để bắt đầu nghe âm thanh và chọn/điền đáp án ở khung câu hỏi bên phải.
+                    </div>
+                  ) : null}
+                </div>
+
+                {(examState.highlights.length > 0 || examState.notes.length > 0) && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 text-xs overflow-x-auto">
+                    <span className="text-slate-400 text-[10px] uppercase font-bold">Đã lưu:</span>
+                    {examState.highlights.map(h => (
+                      <span key={h.id} style={{ backgroundColor: h.color }} className="px-2 py-0.5 rounded text-[11px] truncate max-w-[120px] text-slate-900">
+                        {h.text}
+                      </span>
+                    ))}
+                    {examState.notes.map(n => (
+                      <span key={n.id} className="bg-cyan-100 dark:bg-cyan-500/20 text-cyan-900 dark:text-cyan-200 px-2 py-0.5 rounded text-[11px] truncate max-w-[140px] border border-cyan-200 dark:border-cyan-500/30">
+                        📝 {n.note}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col overflow-y-auto shadow-sm space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                    Câu Hỏi Phần Listening {listeningTracks.length > 1 && hasScopedListeningQs && !examState.showAllListeningQs ? `(Chủ đề ${safeTrackIdx + 1})` : ''}
+                  </h3>
+                  {listeningTracks.length > 1 && hasScopedListeningQs && (
                     <button
                       type="button"
                       onClick={() => setExamState(prev => ({ ...prev, showAllListeningQs: !prev.showAllListeningQs }))}
                       className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
                     >
-                      {examState.showAllListeningQs ? `Chỉ xem Phần ${safeTrackIdx + 1}` : `Xem tất cả (${allListeningQs.length})`}
+                      {examState.showAllListeningQs ? `Chỉ xem Chủ đề ${safeTrackIdx + 1}` : `Xem tất cả (${allListeningQs.length})`}
                     </button>
-                  </div>
-                )}
-
-                <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-2">
-                  {displayedListeningQs.length === 0 ? (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 italic py-8 text-center">
-                      Chưa có câu hỏi gắn riêng cho Phần {safeTrackIdx + 1}. Hãy chọn phần nghe khác hoặc bấm &quot;Xem tất cả&quot;.
-                    </p>
-                  ) : (
-                    displayedListeningQs.map(q => (
-                      <div key={q.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-start justify-between gap-2 mb-3">
-                          <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">{q.question}</p>
-                          {typeof q.trackIdx === 'number' && listeningTracks.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setExamState(prev => ({ ...prev, listeningTrackIdx: Math.min(q.trackIdx, listeningTracks.length - 1) }))}
-                              className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
-                            >
-                              Phần {q.trackIdx + 1}
-                            </button>
-                          )}
-                        </div>
-
-                        {(q.type === 'mcq' || q.type === 'tfng') && (
-                          <div className="space-y-2">
-                            {(q.options || []).map((opt, optIdx) => (
-                              <label key={optIdx} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                                <input
-                                  type="radio"
-                                  name={`q_${q.id}`}
-                                  value={opt}
-                                  checked={examState.answers[q.id] === opt}
-                                  onChange={e => setExamState(prev => ({
-                                    ...prev,
-                                    answers: { ...prev.answers, [q.id]: e.target.value }
-                                  }))}
-                                  className="mt-0.5 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">{opt}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-
-                        {q.type === 'fill' && (
-                          <input
-                            type="text"
-                            placeholder="Nhập câu trả lời..."
-                            value={examState.answers[q.id] || ''}
-                            onChange={e => setExamState(prev => ({
-                              ...prev,
-                              answers: { ...prev.answers, [q.id]: e.target.value }
-                            }))}
-                            className="w-full max-w-md px-3.5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                          />
-                        )}
-                      </div>
-                    ))
                   )}
                 </div>
+
+                {displayedListeningQs.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 italic py-6 text-center">
+                    Chưa có câu hỏi gắn riêng cho Chủ đề {safeTrackIdx + 1}. Hãy chuyển chủ đề khác hoặc bấm &quot;Xem tất cả&quot;.
+                  </p>
+                ) : (
+                  displayedListeningQs.map(q => (
+                    <div key={q.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">{q.question}</p>
+                        {typeof q.trackIdx === 'number' && listeningTracks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setExamState(prev => ({ ...prev, listeningTrackIdx: Math.min(q.trackIdx, listeningTracks.length - 1) }))}
+                            className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
+                          >
+                            Chủ đề {q.trackIdx + 1}
+                          </button>
+                        )}
+                      </div>
+
+                      {(q.type === 'mcq' || q.type === 'tfng') && (
+                        <div className="space-y-2">
+                          {(q.options || []).map((opt, optIdx) => (
+                            <label key={optIdx} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                              <input
+                                type="radio"
+                                name={`q_${q.id}`}
+                                value={opt}
+                                checked={examState.answers[q.id] === opt}
+                                onChange={e => setExamState(prev => ({
+                                  ...prev,
+                                  answers: { ...prev.answers, [q.id]: e.target.value }
+                                }))}
+                                className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {q.type === 'fill' && (
+                        <input
+                          type="text"
+                          placeholder="Nhập câu trả lời..."
+                          value={examState.answers[q.id] || ''}
+                          onChange={e => setExamState(prev => ({
+                            ...prev,
+                            answers: { ...prev.answers, [q.id]: e.target.value }
+                          }))}
+                          className="w-full max-w-md px-3.5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -8768,6 +8869,7 @@ export default function App() {
               const listeningTracks = getListeningTracks(t.listening);
               const listeningTracksCount = listeningTracks.length;
               const hasListeningAudio = listeningTracks.some(tr => !!tr.audioUrl);
+              const hasListeningImg = listeningTracks.some(tr => !!tr.imageUrl);
               const passagesCount = getReadingPassages(t.reading).length;
               const isPrivate = cfg.visibility === 'private';
               const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
@@ -8814,11 +8916,11 @@ export default function App() {
                   <div className="flex flex-wrap gap-1.5 mb-4">
                     {hasListeningAudio ? (
                       <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} file Audio` : 'Đã đính kèm Audio'}
+                        🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} chủ đề nghe` : 'Đã đính kèm Audio'}
                       </span>
-                    ) : listeningTracksCount > 1 ? (
+                    ) : listeningTracksCount > 1 || hasListeningImg ? (
                       <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        🎧 {listeningTracksCount} phần nghe (AI Voice)
+                        🎧 {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
                       </span>
                     ) : (
                       <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
@@ -9850,7 +9952,7 @@ export default function App() {
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
-          <Headphones className="w-4 h-4" /> 2. Phần Listening & File Ghi Âm ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} file • ` : ''}{testForm.listening?.questions?.length || 0} câu)
+          <Headphones className="w-4 h-4" /> 2. Phần Listening & Chủ Đề ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} chủ đề • ` : ''}{testForm.listening?.questions?.length || 0} câu)
         </button>
         <button
           onClick={() => setBuilderTab('reading')}
@@ -10164,7 +10266,7 @@ export default function App() {
         );
       })()}
 
-      {/* TAB 2: LISTENING BUILDER (MULTI-TRACK AUDIO UPLOAD + QUESTIONS CRUD) */}
+      {/* TAB 2: LISTENING BUILDER (MULTI-TOPIC LIKE READING + AUDIO + IMAGE + CONTEXT + QUESTIONS) */}
       {builderTab === 'listening' && (() => {
         const tracks = getListeningTracks(testForm.listening);
         const activeIdx = Math.min(Math.max(0, builderListeningIdx), tracks.length - 1);
@@ -10174,9 +10276,12 @@ export default function App() {
           const nextNum = tracks.length + 1;
           const newTrack = {
             id: `track-${Date.now()}`,
-            title: `Phần ${nextNum}: Đoạn ghi âm mới`,
+            title: `Chủ đề ${nextNum}: Nội dung mới`,
             audioUrl: '',
             audioFileName: '',
+            imageUrl: '',
+            imageFileName: '',
+            contextText: '',
             transcript: ''
           };
           setTestForm(prev => ({
@@ -10200,6 +10305,9 @@ export default function App() {
               tracks: nextTracks,
               audioUrl: first.audioUrl || '',
               audioFileName: first.audioFileName || '',
+              imageUrl: first.imageUrl || '',
+              imageFileName: first.imageFileName || '',
+              contextText: first.contextText || '',
               transcript: first.transcript || '',
               questions: (prev.listening?.questions || []).map(q => {
                 if (typeof q.trackIdx !== 'number') return q;
@@ -10214,15 +10322,15 @@ export default function App() {
 
         return (
         <div className="space-y-6">
-          {/* Audio Upload & Transcript Card */}
+          {/* Listening Topics, Audio & Optional Diagram Card (mirroring Reading) */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
                 <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Cấu Hình File Ghi Âm (Audio) Phần Listening ({tracks.length} Phần / File)
+                  <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Nội Dung Bài Nghe Listening ({tracks.length} Chủ Đề / Bài)
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Thêm nhiều file ghi âm đánh số 1, 2, 3, 4... (hoặc dán Link URL) để khớp từng Part của đề Listening. Nếu để trống, AI Voice sẽ đọc Transcript tương ứng.
+                  Mặc định có 1 chủ đề. Bấm &quot;Thêm Chủ Đề&quot; nếu cần chia nhiều chủ đề / file ghi âm đánh số 1, 2, 3... kèm ảnh sơ đồ/đề chụp hoặc đoạn đề dẫn giống phần Reading.
                 </p>
               </div>
               <button
@@ -10230,11 +10338,11 @@ export default function App() {
                 onClick={addListeningTrack}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0"
               >
-                <Plus className="w-4 h-4" /> Thêm File Nghe / Phần #{tracks.length + 1}
+                <Plus className="w-4 h-4" /> Thêm Chủ Đề / Bài Nghe #{tracks.length + 1}
               </button>
             </div>
 
-            {/* Numbered Track Selector Bar (1, 2, 3...) */}
+            {/* Numbered Topic Selector Bar (1, 2, 3...) */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/70 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
               <div className="flex flex-wrap items-center gap-2">
                 {tracks.map((tr, trIdx) => (
@@ -10253,8 +10361,9 @@ export default function App() {
                     }`}>
                       {trIdx + 1}
                     </span>
-                    <span className="max-w-[160px] truncate">{tr.title || `Phần nghe ${trIdx + 1}`}</span>
+                    <span className="max-w-[160px] truncate">{tr.title || `Chủ đề ${trIdx + 1}`}</span>
                     {tr.audioUrl && <span title="Đã có file audio">🎵</span>}
+                    {tr.imageUrl && <span title="Đã có ảnh minh họa">🖼️</span>}
                   </button>
                 ))}
               </div>
@@ -10265,30 +10374,31 @@ export default function App() {
                   onClick={() => removeListeningTrack(activeIdx)}
                   className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/20 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-500/30 transition flex items-center gap-1"
                 >
-                  <Trash2 className="w-3.5 h-3.5" /> Xóa Phần #{activeIdx + 1}
+                  <Trash2 className="w-3.5 h-3.5" /> Xóa Chủ Đề #{activeIdx + 1}
                 </button>
               )}
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Tiêu Đề File Nghe / Phần #{activeIdx + 1}
+                Tiêu Đề Chủ Đề / Bài Nghe #{activeIdx + 1}
               </label>
               <input
                 type="text"
                 value={activeTrack?.title || ''}
                 onChange={e => updateListeningTrackField(activeIdx, { title: e.target.value })}
                 className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder={`VD: Phần ${activeIdx + 1}: Everyday Conversation (Q1–Q10)`}
+                placeholder={`VD: Chủ đề ${activeIdx + 1}: Everyday Conversation / Campus Map`}
               />
             </div>
 
+            {/* Audio Upload & URL */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Upload File Box */}
               <div className="border-2 border-dashed border-blue-200 dark:border-blue-500/40 bg-blue-50/40 dark:bg-blue-500/10 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <span className="text-xs font-extrabold text-blue-900 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                    <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Tải File Ghi Âm Phần #{activeIdx + 1} Từ Máy Tính
+                    <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Tải File Ghi Âm Chủ Đề #{activeIdx + 1} Từ Máy Tính
                   </span>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4">
                     Hỗ trợ MP3, WAV, OGG, M4A (Tối đa 15MB/file; nếu có nhiều file dung lượng lớn nên dùng Link URL ngoài để tránh đầy bộ nhớ trình duyệt).
@@ -10329,7 +10439,7 @@ export default function App() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Hoặc Dán Đường Dẫn URL File Audio Phần #{activeIdx + 1} (.mp3)
+                    Hoặc Dán Đường Dẫn URL File Audio Chủ Đề #{activeIdx + 1} (.mp3)
                   </label>
                   <input
                     type="text"
@@ -10340,7 +10450,7 @@ export default function App() {
                         audioFileName: e.target.value ? 'External Audio URL' : ''
                       })
                     }
-                    placeholder={`https://example.com/ielts-listening-part-${activeIdx + 1}.mp3`}
+                    placeholder={`https://example.com/ielts-listening-topic-${activeIdx + 1}.mp3`}
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
@@ -10348,7 +10458,7 @@ export default function App() {
                 {activeTrack?.audioUrl && (
                   <div className="bg-slate-50 dark:bg-slate-800/70 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                     <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">
-                      Nghe thử file ghi âm Phần #{activeIdx + 1}:
+                      Nghe thử file ghi âm Chủ đề #{activeIdx + 1}:
                     </p>
                     <audio key={`preview-${activeIdx}-${activeTrack.audioUrl.slice(0, 32)}`} controls src={activeTrack.audioUrl} className="w-full h-9" />
                   </div>
@@ -10356,18 +10466,98 @@ export default function App() {
               </div>
             </div>
 
-            {/* Transcript */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nội Dung Transcript Phần #{activeIdx + 1} (Dùng cho giọng đọc AI nếu không tải file MP3)
-              </label>
-              <textarea
-                rows={4}
-                value={activeTrack?.transcript || ''}
-                onChange={e => updateListeningTrackField(activeIdx, { transcript: e.target.value })}
-                className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder={`Nhập lời thoại bài nghe cho Phần ${activeIdx + 1}...`}
-              />
+            {/* Optional Diagram / Question Sheet Image Upload & URL (like Reading) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/40 dark:bg-blue-500/10 p-5 rounded-2xl border border-blue-100 dark:border-blue-500/30">
+              <div className="space-y-3">
+                <span className="text-xs font-extrabold text-blue-950 dark:text-blue-200 uppercase flex items-center gap-1.5">
+                  <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Ảnh Sơ Đồ / Đề Chụp Chủ Đề #{activeIdx + 1} (Tùy chọn)
+                </span>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Dùng khi có bản đồ (Map), biểu đồ (Diagram) hoặc ảnh đề chụp riêng cho chủ đề số {activeIdx + 1} giống phần Reading.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <label className="cursor-pointer inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
+                    <Upload className="w-4 h-4" />
+                    <span>Tải Ảnh Chủ Đề #{activeIdx + 1}</span>
+                    <input
+                      key={`listening-img-upload-${activeIdx}`}
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handleListeningImageUpload(e, activeIdx)}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {activeTrack?.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => updateListeningTrackField(activeIdx, { imageUrl: '', imageFileName: '' })}
+                      className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl border border-rose-200 dark:border-rose-500/30 transition"
+                    >
+                      Xóa Ảnh
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Hoặc dán Link URL hình ảnh:
+                  </label>
+                  <input
+                    type="text"
+                    value={activeTrack?.imageUrl?.startsWith('data:') ? '' : (activeTrack?.imageUrl || '')}
+                    onChange={e => updateListeningTrackField(activeIdx, { imageUrl: e.target.value })}
+                    placeholder="https://example.com/listening-map.png"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 min-h-[160px]">
+                {activeTrack?.imageUrl ? (
+                  <img
+                    src={activeTrack.imageUrl}
+                    alt={`Listening Preview ${activeIdx + 1}`}
+                    onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                    className="max-h-48 object-contain rounded-lg cursor-zoom-in"
+                  />
+                ) : (
+                  <div className="text-center text-xs text-slate-400">
+                    <Image className="w-8 h-8 mx-auto mb-1.5 text-slate-300 dark:text-slate-600" />
+                    <span>Chưa có hình ảnh cho Chủ đề #{activeIdx + 1}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Optional Context / Prompt Text & Transcript */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Văn Bản Đề Dẫn / Ghi Chú Chủ Đề #{activeIdx + 1} (Tùy chọn)
+                </label>
+                <textarea
+                  rows={4}
+                  value={activeTrack?.contextText || ''}
+                  onChange={e => updateListeningTrackField(activeIdx, { contextText: e.target.value })}
+                  className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed font-serif focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder={`VD: Questions 1–10: Complete the notes below... (Bỏ trống nếu không cần)`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Transcript Audio Chủ Đề #{activeIdx + 1} (Dùng cho AI Voice nếu không tải MP3)
+                </label>
+                <textarea
+                  rows={4}
+                  value={activeTrack?.transcript || ''}
+                  onChange={e => updateListeningTrackField(activeIdx, { transcript: e.target.value })}
+                  className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder={`Nhập lời thoại bài nghe cho Chủ đề ${activeIdx + 1}...`}
+                />
+              </div>
             </div>
           </div>
 
@@ -10379,7 +10569,7 @@ export default function App() {
                   Danh Sách Câu Hỏi Listening ({testForm.listening?.questions?.length || 0} câu)
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Thêm câu hỏi Trắc nghiệm (MCQ), Điền từ, True/False/Not Given — và gắn vào Phần 1, 2, 3... tương ứng.
+                  Thêm câu hỏi Trắc nghiệm (MCQ), Điền từ, True/False/Not Given — và gắn vào Chủ đề 1, 2, 3... tương ứng.
                 </p>
               </div>
 
@@ -10388,7 +10578,7 @@ export default function App() {
                 onClick={() => addQuestionToSkill('listening')}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
               >
-                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Listening {tracks.length > 1 ? `(Phần #${activeIdx + 1})` : ''}
+                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Listening {tracks.length > 1 ? `(Chủ đề #${activeIdx + 1})` : ''}
               </button>
             </div>
 
@@ -10414,10 +10604,10 @@ export default function App() {
                           }
                           className="px-3 py-1.5 bg-blue-50 dark:bg-blue-500/20 border border-blue-200 dark:border-blue-500/40 rounded-xl text-xs font-bold text-blue-800 dark:text-blue-200"
                         >
-                          <option value="">Hiện ở tất cả phần</option>
+                          <option value="">Hiện ở tất cả chủ đề</option>
                           {tracks.map((tr, tIdx) => (
                             <option key={tr.id || tIdx} value={String(tIdx)}>
-                              Thuộc Phần {tIdx + 1} ({(tr.title || '').slice(0, 18)})
+                              Thuộc Chủ đề {tIdx + 1} ({(tr.title || '').slice(0, 18)})
                             </option>
                           ))}
                         </select>
