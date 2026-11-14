@@ -186,6 +186,32 @@ const getReadingPassages = (readingObj) => {
   ];
 };
 
+const getListeningTracks = (listeningObj) => {
+  if (Array.isArray(listeningObj?.tracks) && listeningObj.tracks.length > 0) {
+    return listeningObj.tracks.map((tr, idx) => ({
+      id: tr.id || `track-${idx + 1}`,
+      title: tr.title || `Phần nghe ${idx + 1}`,
+      audioUrl: tr.audioUrl || '',
+      audioFileName: tr.audioFileName || '',
+      transcript: tr.transcript || ''
+    }));
+  }
+  return [
+    {
+      id: 'track-1',
+      title: listeningObj?.audioTitle || 'Phần nghe 1',
+      audioUrl: listeningObj?.audioUrl || '',
+      audioFileName: listeningObj?.audioFileName || '',
+      transcript: listeningObj?.transcript || ''
+    }
+  ];
+};
+
+const getListeningAudioKey = (track, idx) =>
+  idx === 0 && (!track?.id || track.id === 'track-1')
+    ? 'mainAudio'
+    : `track_${track?.id || idx}`;
+
 const DEFAULT_TESTS = [
   {
     id: 'test-1',
@@ -1568,11 +1594,14 @@ export default function App() {
     notes: [],
     antiCheatLogs: [],
     tabSwitchCount: 0,
+    listeningTrackIdx: 0,
+    showAllListeningQs: false,
     readingPassageIdx: 0,
     showAllReadingQs: false
   });
 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [playingAudioKey, setPlayingAudioKey] = useState(null);
   const [selectedPassageText, setSelectedPassageText] = useState('');
   const examAudioRef = useRef(null);
 
@@ -1587,6 +1616,7 @@ export default function App() {
   // Exam Builder State
   const [editingTest, setEditingTest] = useState(null);
   const [builderTab, setBuilderTab] = useState('general'); // 'general', 'listening', 'reading', 'writing'
+  const [builderListeningIdx, setBuilderListeningIdx] = useState(0);
   const [builderReadingIdx, setBuilderReadingIdx] = useState(0);
   const [zoomedReadingImg, setZoomedReadingImg] = useState('');
   const [editingTargetUser, setEditingTargetUser] = useState(null);
@@ -1602,7 +1632,13 @@ export default function App() {
     maxAudioPlays: 1,
     shuffleOptions: true,
     allowViewAnswers: false,
-    listening: { audioUrl: '', audioFileName: '', transcript: '', questions: [] },
+    listening: {
+      audioUrl: '',
+      audioFileName: '',
+      transcript: '',
+      tracks: [{ id: 'track-1', title: 'Phần nghe 1', audioUrl: '', audioFileName: '', transcript: '' }],
+      questions: []
+    },
     reading: {
       passageTitle: '',
       passageText: '',
@@ -2826,6 +2862,7 @@ export default function App() {
       window.speechSynthesis.cancel();
     }
     setIsPlayingAudio(false);
+    setPlayingAudioKey(null);
   };
 
   const startExam = (testId) => {
@@ -2880,6 +2917,8 @@ export default function App() {
         notes: Array.isArray(restoredDraft.notes) ? restoredDraft.notes : [],
         antiCheatLogs: Array.isArray(restoredDraft.antiCheatLogs) ? restoredDraft.antiCheatLogs : [],
         tabSwitchCount: Number(restoredDraft.tabSwitchCount) || 0,
+        listeningTrackIdx: Number(restoredDraft.listeningTrackIdx) || 0,
+        showAllListeningQs: Boolean(restoredDraft.showAllListeningQs),
         readingPassageIdx: Number(restoredDraft.readingPassageIdx) || 0,
         showAllReadingQs: Boolean(restoredDraft.showAllReadingQs)
       });
@@ -2895,6 +2934,8 @@ export default function App() {
         notes: [],
         antiCheatLogs: [],
         tabSwitchCount: 0,
+        listeningTrackIdx: 0,
+        showAllListeningQs: false,
         readingPassageIdx: 0,
         showAllReadingQs: false
       });
@@ -2902,7 +2943,7 @@ export default function App() {
     setView('EXAM_MODE');
   };
 
-  const handlePlayListeningAudio = (audioKey = 'mainAudio', transcript = '') => {
+  const handlePlayListeningAudio = (audioKey = 'mainAudio', transcript = '', customUrlOverride = undefined) => {
     const activeTest = tests.find(t => t.id === selectedTestId);
     const maxPlays = activeTest?.maxAudioPlays || 1;
     const currentPlays = examState.audioPlays[audioKey] || 0;
@@ -2912,29 +2953,34 @@ export default function App() {
       return;
     }
 
+    stopExamAudio();
+
     setExamState(prev => ({
       ...prev,
       audioPlays: { ...prev.audioPlays, [audioKey]: currentPlays + 1 }
     }));
 
-    const customAudioUrl = activeTest?.listening?.audioUrl;
+    const customAudioUrl = customUrlOverride !== undefined ? customUrlOverride : activeTest?.listening?.audioUrl;
     if (customAudioUrl) {
       try {
-        if (examAudioRef.current) {
-          examAudioRef.current.pause();
-        }
         const audio = new Audio(customAudioUrl);
         examAudioRef.current = audio;
         setIsPlayingAudio(true);
-        audio.onended = () => setIsPlayingAudio(false);
+        setPlayingAudioKey(audioKey);
+        audio.onended = () => {
+          setIsPlayingAudio(false);
+          setPlayingAudioKey(null);
+        };
         audio.onerror = () => {
           setIsPlayingAudio(false);
+          setPlayingAudioKey(null);
           alert('Không thể phát file âm thanh này. Vui lòng kiểm tra lại định dạng file.');
         };
         audio.play();
         return;
       } catch (_err) {
         setIsPlayingAudio(false);
+        setPlayingAudioKey(null);
       }
     }
 
@@ -2943,12 +2989,21 @@ export default function App() {
       const utterance = new SpeechSynthesisUtterance(transcript);
       utterance.rate = 0.9;
       utterance.lang = 'en-US';
-      utterance.onstart = () => setIsPlayingAudio(true);
-      utterance.onend = () => setIsPlayingAudio(false);
-      utterance.onerror = () => setIsPlayingAudio(false);
+      utterance.onstart = () => {
+        setIsPlayingAudio(true);
+        setPlayingAudioKey(audioKey);
+      };
+      utterance.onend = () => {
+        setIsPlayingAudio(false);
+        setPlayingAudioKey(null);
+      };
+      utterance.onerror = () => {
+        setIsPlayingAudio(false);
+        setPlayingAudioKey(null);
+      };
       window.speechSynthesis.speak(utterance);
     } else {
-      alert('Đang phát âm thanh bài thi nghe...');
+      alert('Phần nghe này chưa có file âm thanh hoặc transcript.');
     }
   };
 
@@ -3031,6 +3086,7 @@ export default function App() {
       sectionIdx: nextIdx,
       skill: nextSkill,
       timeRemaining: nextDurationSecs,
+      listeningTrackIdx: 0,
       readingPassageIdx: 0
     }));
     showToast(
@@ -3231,10 +3287,12 @@ export default function App() {
   // Exam Builder
   const openExamBuilder = (testToEdit = null, initialTab = 'general') => {
     setEditingTest(testToEdit || null);
+    setBuilderListeningIdx(0);
     setBuilderReadingIdx(0);
     if (testToEdit) {
       const cloned = JSON.parse(JSON.stringify(testToEdit));
       const cfg = normalizeExamConfig(cloned);
+      const tracks = getListeningTracks(cloned.listening);
       const passages = getReadingPassages(cloned.reading);
       setTestForm({
         ...cloned,
@@ -3246,11 +3304,12 @@ export default function App() {
         sectionDurations: cfg.durations,
         allowViewAnswers: cloned.allowViewAnswers ?? false,
         listening: {
-          audioUrl: '',
-          audioFileName: '',
-          transcript: '',
+          audioUrl: tracks[0]?.audioUrl || '',
+          audioFileName: tracks[0]?.audioFileName || '',
+          transcript: tracks[0]?.transcript || '',
           questions: [],
-          ...(cloned.listening || {})
+          ...(cloned.listening || {}),
+          tracks
         },
         reading: {
           passageTitle: passages[0]?.title || '',
@@ -3285,10 +3344,20 @@ export default function App() {
           audioUrl: '',
           audioFileName: '',
           transcript: 'Welcome to the lecture. Today we will discuss key developments in modern education...',
+          tracks: [
+            {
+              id: 'track-1',
+              title: 'Phần 1: Lecture Introduction',
+              audioUrl: '',
+              audioFileName: '',
+              transcript: 'Welcome to the lecture. Today we will discuss key developments in modern education...'
+            }
+          ],
           questions: [
             {
               id: 'lq-' + Date.now(),
               type: 'mcq',
+              trackIdx: 0,
               question: '1. What is the main topic of the speaker\'s presentation?',
               options: [
                 'A. Modern educational technology',
@@ -3344,25 +3413,39 @@ export default function App() {
     setView('EXAM_BUILDER');
   };
 
-  // Upload Audio File for Listening (Teacher Builder)
-  const handleAudioFileUpload = (e) => {
+  // Upload Audio File for Listening (Teacher Builder — supports multiple audio parts)
+  const updateListeningTrackField = (idx, patch) => {
+    setTestForm(prev => {
+      const tracks = getListeningTracks(prev.listening);
+      const updatedTracks = tracks.map((tr, i) => (i === idx ? { ...tr, ...patch } : tr));
+      const first = updatedTracks[0] || {};
+      return {
+        ...prev,
+        listening: {
+          ...prev.listening,
+          tracks: updatedTracks,
+          audioUrl: first.audioUrl || '',
+          audioFileName: first.audioFileName || '',
+          transcript: first.transcript || ''
+        }
+      };
+    });
+  };
+
+  const handleAudioFileUpload = (e, targetIdx = builderListeningIdx) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 15 * 1024 * 1024) {
-      alert('File âm thanh quá lớn (vui lòng chọn file dưới 15MB để lưu trữ mượt mà trên trình duyệt)!');
+      alert('File âm thanh quá lớn (vui lòng chọn file dưới 15MB để lưu trữ mượt mà trên trình duyệt, hoặc dùng Link URL ngoài)!');
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setTestForm(prev => ({
-        ...prev,
-        listening: {
-          ...prev.listening,
-          audioUrl: ev.target.result,
-          audioFileName: file.name
-        }
-      }));
-      showToast(`Đã tải lên file ghi âm: ${file.name}`);
+      updateListeningTrackField(targetIdx, {
+        audioUrl: ev.target.result,
+        audioFileName: file.name
+      });
+      showToast(`Đã tải lên file ghi âm Phần ${targetIdx + 1}: ${file.name}`);
     };
     reader.readAsDataURL(file);
   };
@@ -3432,7 +3515,8 @@ export default function App() {
       question: `${nextNum}. Nhập nội dung câu hỏi số ${nextNum}...`,
       options: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'],
       correctAnswer: 'A. Đáp án A',
-      ...(skill === 'reading' ? { passageIdx: builderReadingIdx } : {})
+      ...(skill === 'reading' ? { passageIdx: builderReadingIdx } : {}),
+      ...(skill === 'listening' ? { trackIdx: builderListeningIdx } : {})
     };
     setTestForm(prev => ({
       ...prev,
@@ -3501,6 +3585,8 @@ export default function App() {
       return;
     }
     const cfg = normalizeExamConfig(testForm);
+    const tracks = getListeningTracks(testForm.listening);
+    const firstTrack = tracks[0] || {};
     const passages = getReadingPassages(testForm.reading);
     const firstPassage = passages[0] || {};
     const normalizedTest = {
@@ -3511,6 +3597,13 @@ export default function App() {
       allowEarlyNextSection: cfg.allowEarlyNextSection,
       sectionOrder: cfg.order,
       sectionDurations: cfg.durations,
+      listening: {
+        ...testForm.listening,
+        tracks,
+        audioUrl: firstTrack.audioUrl || '',
+        audioFileName: firstTrack.audioFileName || '',
+        transcript: firstTrack.transcript || ''
+      },
       reading: {
         ...testForm.reading,
         passages,
@@ -6904,6 +6997,17 @@ export default function App() {
         ? allReadingQs.filter(q => typeof q.passageIdx !== 'number' || q.passageIdx === safePassageIdx)
         : allReadingQs;
 
+    const listeningTracks = getListeningTracks(activeTest.listening);
+    const safeTrackIdx = Math.min(Math.max(0, examState.listeningTrackIdx || 0), listeningTracks.length - 1);
+    const activeTrack = listeningTracks[safeTrackIdx];
+    const activeTrackPlayKey = getListeningAudioKey(activeTrack, safeTrackIdx);
+    const allListeningQs = activeTest.listening?.questions || [];
+    const hasScopedListeningQs = allListeningQs.some(q => typeof q.trackIdx === 'number');
+    const displayedListeningQs =
+      listeningTracks.length > 1 && hasScopedListeningQs && !examState.showAllListeningQs
+        ? allListeningQs.filter(q => typeof q.trackIdx !== 'number' || q.trackIdx === safeTrackIdx)
+        : allListeningQs;
+
     const formatTime = (seconds) => {
       const m = Math.floor(seconds / 60);
       const s = seconds % 60;
@@ -7017,87 +7121,182 @@ export default function App() {
         <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 overflow-hidden">
           {/* Listening */}
           {examState.skill === 'listening' && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm h-full flex flex-col justify-between">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm h-full flex flex-col justify-between space-y-5">
               <div>
+                {/* Multi-Track Switcher Bar (when test has 2+ listening tracks/parts) */}
+                {listeningTracks.length > 1 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {listeningTracks.map((tr, trIdx) => {
+                        const trKey = getListeningAudioKey(tr, trIdx);
+                        const trPlays = examState.audioPlays[trKey] || 0;
+                        const maxPlays = activeTest.maxAudioPlays || 1;
+                        const isPlayingThis = isPlayingAudio && playingAudioKey === trKey;
+                        const isSelected = trIdx === safeTrackIdx;
+
+                        return (
+                          <button
+                            key={tr.id || trIdx}
+                            type="button"
+                            onClick={() => setExamState(prev => ({ ...prev, listeningTrackIdx: trIdx }))}
+                            className={`px-3 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 border ${
+                              isSelected
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-500/15'
+                            }`}
+                          >
+                            <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
+                              isSelected ? 'bg-white text-blue-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                            }`}>
+                              {trIdx + 1}
+                            </span>
+                            <span className="max-w-[150px] truncate">{tr.title || `Phần ${trIdx + 1}`}</span>
+                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                              isPlayingThis
+                                ? 'bg-amber-400 text-slate-900 animate-pulse'
+                                : trPlays >= maxPlays
+                                ? isSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                : isSelected ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+                            }`}>
+                              {isPlayingThis ? '▶' : `${trPlays}/${maxPlays}`}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                      {listeningTracks.length} file / phần nghe
+                    </span>
+                  </div>
+                )}
+
                 <div className="bg-slate-50 dark:bg-slate-800/70 rounded-xl p-4 border border-slate-200 dark:border-slate-700 mb-6 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="font-bold text-slate-800 dark:text-white text-base flex items-center gap-2">
-                      <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Listening Audio (Chuẩn No-Rewind IDP)
+                      <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      {listeningTracks.length > 1
+                        ? `Phần ${safeTrackIdx + 1}/${listeningTracks.length}: ${activeTrack?.title || `File nghe ${safeTrackIdx + 1}`}`
+                        : 'Listening Audio (Chuẩn No-Rewind IDP)'}
                     </h3>
                     <div className="flex flex-wrap items-center gap-3 mt-1">
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Giới hạn nghe tối đa: <span className="font-bold text-slate-700 dark:text-slate-200">{activeTest.maxAudioPlays} lần</span>.
+                        Giới hạn nghe tối đa mỗi phần: <span className="font-bold text-slate-700 dark:text-slate-200">{activeTest.maxAudioPlays} lần</span>.
                       </p>
-                      {activeTest.listening?.audioFileName && (
+                      {activeTrack?.audioFileName ? (
                         <span className="text-[11px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-semibold px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-500/30">
-                          🎵 File Audio: {activeTest.listening.audioFileName}
+                          🎵 File Audio: {activeTrack.audioFileName}
                         </span>
-                      )}
+                      ) : activeTrack?.transcript ? (
+                        <span className="text-[11px] bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold px-2.5 py-0.5 rounded-full">
+                          🔊 AI Voice (TTS Transcript)
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 px-2.5 py-1 rounded font-mono font-bold">
-                      Đã phát: {examState.audioPlays['mainAudio'] || 0} / {activeTest.maxAudioPlays}
+                      {listeningTracks.length > 1 ? `Phần ${safeTrackIdx + 1}: ` : 'Đã phát: '}
+                      {examState.audioPlays[activeTrackPlayKey] || 0} / {activeTest.maxAudioPlays}
                     </span>
 
                     <button
-                      onClick={() => handlePlayListeningAudio('mainAudio', activeTest.listening?.transcript)}
-                      disabled={(examState.audioPlays['mainAudio'] || 0) >= activeTest.maxAudioPlays || isPlayingAudio}
+                      onClick={() => handlePlayListeningAudio(activeTrackPlayKey, activeTrack?.transcript || '', activeTrack?.audioUrl || '')}
+                      disabled={(examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays || isPlayingAudio}
                       className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition ${
-                        (examState.audioPlays['mainAudio'] || 0) >= activeTest.maxAudioPlays
+                        (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
                           ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
                           : isPlayingAudio
-                          ? 'bg-amber-500 text-white animate-pulse'
+                          ? 'bg-amber-500 text-white animate-pulse cursor-not-allowed'
                           : 'bg-blue-600 hover:bg-blue-700 text-white shadow'
                       }`}
                     >
                       {isPlayingAudio ? <Volume2 className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
-                      {isPlayingAudio ? 'Đang Phát Audio...' : 'Phát Bài Nghe'}
+                      {isPlayingAudio && playingAudioKey === activeTrackPlayKey
+                        ? 'Đang Phát Audio...'
+                        : isPlayingAudio
+                        ? 'Đang Phát Phần Khác...'
+                        : listeningTracks.length > 1
+                        ? `Phát Phần ${safeTrackIdx + 1}`
+                        : 'Phát Bài Nghe'}
                     </button>
                   </div>
                 </div>
 
+                {/* Listening Questions Header + Scope Toggle */}
+                {listeningTracks.length > 1 && hasScopedListeningQs && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+                    <h4 className="font-bold text-slate-800 dark:text-white text-sm">
+                      Câu Hỏi Listening {!examState.showAllListeningQs ? `(Phần ${safeTrackIdx + 1})` : `(Tất cả ${allListeningQs.length} câu)`}
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setExamState(prev => ({ ...prev, showAllListeningQs: !prev.showAllListeningQs }))}
+                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                    >
+                      {examState.showAllListeningQs ? `Chỉ xem Phần ${safeTrackIdx + 1}` : `Xem tất cả (${allListeningQs.length})`}
+                    </button>
+                  </div>
+                )}
+
                 <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-2">
-                  {(activeTest.listening?.questions || []).map(q => (
-                    <div key={q.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                      <p className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-3">{q.question}</p>
-
-                      {(q.type === 'mcq' || q.type === 'tfng') && (
-                        <div className="space-y-2">
-                          {(q.options || []).map((opt, optIdx) => (
-                            <label key={optIdx} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                              <input
-                                type="radio"
-                                name={`q_${q.id}`}
-                                value={opt}
-                                checked={examState.answers[q.id] === opt}
-                                onChange={e => setExamState(prev => ({
-                                  ...prev,
-                                  answers: { ...prev.answers, [q.id]: e.target.value }
-                                }))}
-                                className="mt-0.5 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">{opt}</span>
-                            </label>
-                          ))}
+                  {displayedListeningQs.length === 0 ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic py-8 text-center">
+                      Chưa có câu hỏi gắn riêng cho Phần {safeTrackIdx + 1}. Hãy chọn phần nghe khác hoặc bấm &quot;Xem tất cả&quot;.
+                    </p>
+                  ) : (
+                    displayedListeningQs.map(q => (
+                      <div key={q.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">{q.question}</p>
+                          {typeof q.trackIdx === 'number' && listeningTracks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setExamState(prev => ({ ...prev, listeningTrackIdx: Math.min(q.trackIdx, listeningTracks.length - 1) }))}
+                              className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
+                            >
+                              Phần {q.trackIdx + 1}
+                            </button>
+                          )}
                         </div>
-                      )}
 
-                      {q.type === 'fill' && (
-                        <input
-                          type="text"
-                          placeholder="Nhập câu trả lời..."
-                          value={examState.answers[q.id] || ''}
-                          onChange={e => setExamState(prev => ({
-                            ...prev,
-                            answers: { ...prev.answers, [q.id]: e.target.value }
-                          }))}
-                          className="w-full max-w-md px-3.5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
-                      )}
-                    </div>
-                  ))}
+                        {(q.type === 'mcq' || q.type === 'tfng') && (
+                          <div className="space-y-2">
+                            {(q.options || []).map((opt, optIdx) => (
+                              <label key={optIdx} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                                <input
+                                  type="radio"
+                                  name={`q_${q.id}`}
+                                  value={opt}
+                                  checked={examState.answers[q.id] === opt}
+                                  onChange={e => setExamState(prev => ({
+                                    ...prev,
+                                    answers: { ...prev.answers, [q.id]: e.target.value }
+                                  }))}
+                                  className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+
+                        {q.type === 'fill' && (
+                          <input
+                            type="text"
+                            placeholder="Nhập câu trả lời..."
+                            value={examState.answers[q.id] || ''}
+                            onChange={e => setExamState(prev => ({
+                              ...prev,
+                              answers: { ...prev.answers, [q.id]: e.target.value }
+                            }))}
+                            className="w-full max-w-md px-3.5 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          />
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -8566,6 +8765,9 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {tests.map(t => {
               const cfg = normalizeExamConfig(t);
+              const listeningTracks = getListeningTracks(t.listening);
+              const listeningTracksCount = listeningTracks.length;
+              const hasListeningAudio = listeningTracks.some(tr => !!tr.audioUrl);
               const passagesCount = getReadingPassages(t.reading).length;
               const isPrivate = cfg.visibility === 'private';
               const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
@@ -8610,9 +8812,13 @@ export default function App() {
 
                   {/* Media Badges */}
                   <div className="flex flex-wrap gap-1.5 mb-4">
-                    {t.listening?.audioUrl ? (
+                    {hasListeningAudio ? (
                       <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        🎵 Đã đính kèm Audio
+                        🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} file Audio` : 'Đã đính kèm Audio'}
+                      </span>
+                    ) : listeningTracksCount > 1 ? (
+                      <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
+                        🎧 {listeningTracksCount} phần nghe (AI Voice)
                       </span>
                     ) : (
                       <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
@@ -9644,7 +9850,7 @@ export default function App() {
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
-          <Headphones className="w-4 h-4" /> 2. Phần Listening & File Ghi Âm ({testForm.listening?.questions?.length || 0} câu)
+          <Headphones className="w-4 h-4" /> 2. Phần Listening & File Ghi Âm ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} file • ` : ''}{testForm.listening?.questions?.length || 0} câu)
         </button>
         <button
           onClick={() => setBuilderTab('reading')}
@@ -9958,20 +10164,123 @@ export default function App() {
         );
       })()}
 
-      {/* TAB 2: LISTENING BUILDER (AUDIO UPLOAD + QUESTIONS CRUD) */}
-      {builderTab === 'listening' && (
+      {/* TAB 2: LISTENING BUILDER (MULTI-TRACK AUDIO UPLOAD + QUESTIONS CRUD) */}
+      {builderTab === 'listening' && (() => {
+        const tracks = getListeningTracks(testForm.listening);
+        const activeIdx = Math.min(Math.max(0, builderListeningIdx), tracks.length - 1);
+        const activeTrack = tracks[activeIdx];
+
+        const addListeningTrack = () => {
+          const nextNum = tracks.length + 1;
+          const newTrack = {
+            id: `track-${Date.now()}`,
+            title: `Phần ${nextNum}: Đoạn ghi âm mới`,
+            audioUrl: '',
+            audioFileName: '',
+            transcript: ''
+          };
+          setTestForm(prev => ({
+            ...prev,
+            listening: {
+              ...prev.listening,
+              tracks: [...getListeningTracks(prev.listening), newTrack]
+            }
+          }));
+          setBuilderListeningIdx(tracks.length);
+        };
+
+        const removeListeningTrack = (removeIdx) => {
+          if (tracks.length <= 1) return;
+          const nextTracks = tracks.filter((_, i) => i !== removeIdx);
+          const first = nextTracks[0] || {};
+          setTestForm(prev => ({
+            ...prev,
+            listening: {
+              ...prev.listening,
+              tracks: nextTracks,
+              audioUrl: first.audioUrl || '',
+              audioFileName: first.audioFileName || '',
+              transcript: first.transcript || '',
+              questions: (prev.listening?.questions || []).map(q => {
+                if (typeof q.trackIdx !== 'number') return q;
+                if (q.trackIdx === removeIdx) return { ...q, trackIdx: 0 };
+                if (q.trackIdx > removeIdx) return { ...q, trackIdx: q.trackIdx - 1 };
+                return q;
+              })
+            }
+          }));
+          setBuilderListeningIdx(Math.max(0, Math.min(activeIdx, nextTracks.length - 1)));
+        };
+
+        return (
         <div className="space-y-6">
           {/* Audio Upload & Transcript Card */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
                 <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Cấu Hình File Ghi Âm (Audio) Phần Listening
+                  <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Cấu Hình File Ghi Âm (Audio) Phần Listening ({tracks.length} Phần / File)
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Tải lên file âm thanh (.mp3, .wav, .ogg) từ máy tính hoặc dán link URL. Nếu để trống, hệ thống sẽ tự động đọc Transcript bằng giọng AI.
+                  Thêm nhiều file ghi âm đánh số 1, 2, 3, 4... (hoặc dán Link URL) để khớp từng Part của đề Listening. Nếu để trống, AI Voice sẽ đọc Transcript tương ứng.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={addListeningTrack}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Thêm File Nghe / Phần #{tracks.length + 1}
+              </button>
+            </div>
+
+            {/* Numbered Track Selector Bar (1, 2, 3...) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/70 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <div className="flex flex-wrap items-center gap-2">
+                {tracks.map((tr, trIdx) => (
+                  <button
+                    key={tr.id || trIdx}
+                    type="button"
+                    onClick={() => setBuilderListeningIdx(trIdx)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 border transition ${
+                      trIdx === activeIdx
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-500/15'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
+                      trIdx === activeIdx ? 'bg-white text-blue-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                    }`}>
+                      {trIdx + 1}
+                    </span>
+                    <span className="max-w-[160px] truncate">{tr.title || `Phần nghe ${trIdx + 1}`}</span>
+                    {tr.audioUrl && <span title="Đã có file audio">🎵</span>}
+                  </button>
+                ))}
+              </div>
+
+              {tracks.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeListeningTrack(activeIdx)}
+                  className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/20 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-500/30 transition flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Xóa Phần #{activeIdx + 1}
+                </button>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Tiêu Đề File Nghe / Phần #{activeIdx + 1}
+              </label>
+              <input
+                type="text"
+                value={activeTrack?.title || ''}
+                onChange={e => updateListeningTrackField(activeIdx, { title: e.target.value })}
+                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder={`VD: Phần ${activeIdx + 1}: Everyday Conversation (Q1–Q10)`}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -9979,10 +10288,10 @@ export default function App() {
               <div className="border-2 border-dashed border-blue-200 dark:border-blue-500/40 bg-blue-50/40 dark:bg-blue-500/10 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <span className="text-xs font-extrabold text-blue-900 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                    <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Tải File Ghi Âm Từ Máy Tính
+                    <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Tải File Ghi Âm Phần #{activeIdx + 1} Từ Máy Tính
                   </span>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4">
-                    Hỗ trợ định dạng MP3, WAV, OGG, M4A (Tối đa 15MB).
+                    Hỗ trợ MP3, WAV, OGG, M4A (Tối đa 15MB/file; nếu có nhiều file dung lượng lớn nên dùng Link URL ngoài để tránh đầy bộ nhớ trình duyệt).
                   </p>
                 </div>
 
@@ -9991,27 +10300,23 @@ export default function App() {
                     <Upload className="w-4 h-4" />
                     <span>Chọn File Ghi Âm (.mp3 / .wav)</span>
                     <input
+                      key={`audio-upload-${activeIdx}`}
                       type="file"
                       accept="audio/*"
-                      onChange={handleAudioFileUpload}
+                      onChange={e => handleAudioFileUpload(e, activeIdx)}
                       className="hidden"
                     />
                   </label>
 
-                  {testForm.listening?.audioFileName && (
+                  {activeTrack?.audioFileName && (
                     <div className="flex items-center justify-between bg-white dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-blue-200 dark:border-blue-500/30 text-xs">
                       <span className="font-bold text-blue-800 dark:text-blue-300 truncate">
-                        🎵 {testForm.listening.audioFileName}
+                        🎵 {activeTrack.audioFileName}
                       </span>
                       <button
                         type="button"
-                        onClick={() =>
-                          setTestForm(prev => ({
-                            ...prev,
-                            listening: { ...prev.listening, audioUrl: '', audioFileName: '' }
-                          }))
-                        }
-                        className="text-rose-600 dark:text-rose-400 hover:underline font-bold ml-2"
+                        onClick={() => updateListeningTrackField(activeIdx, { audioUrl: '', audioFileName: '' })}
+                        className="text-rose-600 dark:text-rose-400 hover:underline font-bold ml-2 shrink-0"
                       >
                         Xóa file
                       </button>
@@ -10024,30 +10329,28 @@ export default function App() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Hoặc Dán Đường Dẫn URL File Audio (.mp3)
+                    Hoặc Dán Đường Dẫn URL File Audio Phần #{activeIdx + 1} (.mp3)
                   </label>
                   <input
                     type="text"
-                    value={testForm.listening?.audioUrl?.startsWith('data:') ? '' : (testForm.listening?.audioUrl || '')}
+                    value={activeTrack?.audioUrl?.startsWith('data:') ? '' : (activeTrack?.audioUrl || '')}
                     onChange={e =>
-                      setTestForm(prev => ({
-                        ...prev,
-                        listening: {
-                          ...prev.listening,
-                          audioUrl: e.target.value,
-                          audioFileName: e.target.value ? 'External Audio URL' : ''
-                        }
-                      }))
+                      updateListeningTrackField(activeIdx, {
+                        audioUrl: e.target.value,
+                        audioFileName: e.target.value ? 'External Audio URL' : ''
+                      })
                     }
-                    placeholder="https://example.com/ielts-listening-section1.mp3"
+                    placeholder={`https://example.com/ielts-listening-part-${activeIdx + 1}.mp3`}
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
 
-                {testForm.listening?.audioUrl && (
+                {activeTrack?.audioUrl && (
                   <div className="bg-slate-50 dark:bg-slate-800/70 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">Nghe thử file ghi âm đã tải lên:</p>
-                    <audio controls src={testForm.listening.audioUrl} className="w-full h-9" />
+                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">
+                      Nghe thử file ghi âm Phần #{activeIdx + 1}:
+                    </p>
+                    <audio key={`preview-${activeIdx}-${activeTrack.audioUrl.slice(0, 32)}`} controls src={activeTrack.audioUrl} className="w-full h-9" />
                   </div>
                 )}
               </div>
@@ -10056,19 +10359,14 @@ export default function App() {
             {/* Transcript */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nội Dung Transcript Bài Nghe (Dùng cho giọng đọc AI nếu không tải file MP3)
+                Nội Dung Transcript Phần #{activeIdx + 1} (Dùng cho giọng đọc AI nếu không tải file MP3)
               </label>
               <textarea
                 rows={4}
-                value={testForm.listening?.transcript || ''}
-                onChange={e =>
-                  setTestForm(prev => ({
-                    ...prev,
-                    listening: { ...prev.listening, transcript: e.target.value }
-                  }))
-                }
+                value={activeTrack?.transcript || ''}
+                onChange={e => updateListeningTrackField(activeIdx, { transcript: e.target.value })}
                 className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="Nhập lời thoại bài nghe tại đây..."
+                placeholder={`Nhập lời thoại bài nghe cho Phần ${activeIdx + 1}...`}
               />
             </div>
           </div>
@@ -10081,7 +10379,7 @@ export default function App() {
                   Danh Sách Câu Hỏi Listening ({testForm.listening?.questions?.length || 0} câu)
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Thêm câu hỏi Trắc nghiệm (MCQ), Điền từ vào chỗ trống (Fill-in-the-blank) hoặc True/False/Not Given.
+                  Thêm câu hỏi Trắc nghiệm (MCQ), Điền từ, True/False/Not Given — và gắn vào Phần 1, 2, 3... tương ứng.
                 </p>
               </div>
 
@@ -10090,7 +10388,7 @@ export default function App() {
                 onClick={() => addQuestionToSkill('listening')}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
               >
-                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Listening
+                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Listening {tracks.length > 1 ? `(Phần #${activeIdx + 1})` : ''}
               </button>
             </div>
 
@@ -10102,7 +10400,29 @@ export default function App() {
                       Câu hỏi #{idx + 1}
                     </span>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {tracks.length > 1 && (
+                        <select
+                          value={typeof q.trackIdx === 'number' ? String(q.trackIdx) : ''}
+                          onChange={e =>
+                            updateQuestionInSkill(
+                              'listening',
+                              q.id,
+                              'trackIdx',
+                              e.target.value === '' ? null : Number(e.target.value)
+                            )
+                          }
+                          className="px-3 py-1.5 bg-blue-50 dark:bg-blue-500/20 border border-blue-200 dark:border-blue-500/40 rounded-xl text-xs font-bold text-blue-800 dark:text-blue-200"
+                        >
+                          <option value="">Hiện ở tất cả phần</option>
+                          {tracks.map((tr, tIdx) => (
+                            <option key={tr.id || tIdx} value={String(tIdx)}>
+                              Thuộc Phần {tIdx + 1} ({(tr.title || '').slice(0, 18)})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
                       <select
                         value={q.type}
                         onChange={e => updateQuestionInSkill('listening', q.id, 'type', e.target.value)}
@@ -10194,7 +10514,8 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* TAB 3: READING BUILDER (MULTI-PASSAGE NUMBERED TOPICS + IMAGE UPLOAD + QUESTIONS CRUD) */}
       {builderTab === 'reading' && (() => {
