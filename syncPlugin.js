@@ -6,6 +6,7 @@ import path from 'node:path';
 export function normalizeServerRoom(raw = {}, pinKey = '') {
   const pin = String(raw?.pin || pinKey || '').trim();
   const baseChats = Array.isArray(raw?.chatMessages) ? raw.chatMessages : [];
+  const rawRoundSize = Number(raw?.roundSize);
   return {
     pin,
     name: raw?.name || `Phòng Từ Vựng #${pin || '686868'}`,
@@ -13,6 +14,8 @@ export function normalizeServerRoom(raw = {}, pinKey = '') {
     teacher: raw?.teacher || 'teacher_ielts',
     status: raw?.status === 'PLAYING' || raw?.status === 'ENDED' ? raw.status : 'LOBBY',
     maxPlayers: Number(raw?.maxPlayers) || 30,
+    roundSize: Number.isFinite(rawRoundSize) && rawRoundSize >= 2 ? Math.min(8, Math.round(rawRoundSize)) : 4,
+    speedMode: ['relaxed', 'normal', 'turbo'].includes(raw?.speedMode) ? raw.speedMode : 'normal',
     startedAt: raw?.startedAt || null,
     lobbyPlayers: raw?.lobbyPlayers && typeof raw.lobbyPlayers === 'object' ? { ...raw.lobbyPlayers } : {},
     liveMatch: raw?.liveMatch && typeof raw.liveMatch === 'object' ? { ...raw.liveMatch } : {},
@@ -292,12 +295,52 @@ function applySyncAction(store, type, payload = {}) {
             progressText: 'Đang vào Vòng 1',
             finished: false,
             outcome: null,
+            missed: [],
             updatedAt: Date.now()
           };
         }
       });
       base.liveMatch = freshLive;
       store.rooms[cleanPin] = base;
+      changed = true;
+      break;
+    }
+
+    case 'FINISH_ROOM_MATCH': {
+      const cleanPin = String(payload.pin || '').trim();
+      if (!cleanPin || !store.rooms[cleanPin]) break;
+      const base = normalizeServerRoom(store.rooms[cleanPin], cleanPin);
+      base.status = 'ENDED';
+      store.rooms[cleanPin] = base;
+      changed = true;
+      break;
+    }
+
+    case 'KICK_LOBBY_PLAYER': {
+      const cleanPin = String(payload.pin || '').trim();
+      const username = payload.username;
+      if (!cleanPin || !username || !store.rooms[cleanPin]) break;
+      const base = normalizeServerRoom(store.rooms[cleanPin], cleanPin);
+      let touched = false;
+      if (base.lobbyPlayers[username]) {
+        delete base.lobbyPlayers[username];
+        touched = true;
+      }
+      if (base.liveMatch[username]) {
+        delete base.liveMatch[username];
+        touched = true;
+      }
+      if (touched) {
+        store.rooms[cleanPin] = base;
+        changed = true;
+      }
+      break;
+    }
+
+    case 'DELETE_ROOM': {
+      const cleanPin = String(payload.pin || '').trim();
+      if (!cleanPin || !store.rooms[cleanPin] || Object.keys(store.rooms).length <= 1) break;
+      delete store.rooms[cleanPin];
       changed = true;
       break;
     }
@@ -413,6 +456,17 @@ function applySyncAction(store, type, payload = {}) {
         store.attempts = [attempt, ...store.attempts];
       }
       changed = true;
+      break;
+    }
+
+    case 'DELETE_ATTEMPT': {
+      const attemptId = payload.attemptId;
+      if (!attemptId) break;
+      const prevLen = store.attempts.length;
+      store.attempts = store.attempts.filter(a => a.id !== attemptId);
+      if (store.attempts.length !== prevLen) {
+        changed = true;
+      }
       break;
     }
 

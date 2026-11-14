@@ -60,7 +60,15 @@ import {
   Globe,
   ArrowUp,
   ArrowDown,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Download,
+  VolumeX,
+  Snowflake,
+  UserPlus,
+  UserMinus,
+  Filter,
+  Share2,
+  Pause
 } from 'lucide-react';
 
 // ==========================================
@@ -81,6 +89,54 @@ RESILIENT | Kiên cường, có khả năng phục hồi nhanh | /rɪˈzɪl.i.ə
 
 const FALLBACK_DISTRACTORS = ["ABUNDANT", "OBSOLETE", "FLOURISH", "STAGNANT", "CONDUCIVE", "SPORADIC", "EMPIRICAL", "TRIVIAL"];
 const GAME_ROUND_TIME_LIMITS = { 1: 20, 2: 25, 3: 25 };
+const GAME_SPEED_OFFSETS = { relaxed: 6, normal: 0, turbo: -5 };
+
+const VOCAB_PRESETS = {
+  environment: {
+    label: 'Môi trường & Khí hậu',
+    text: `SUSTAINABLE | Bền vững, không gây cạn kiệt tài nguyên | /səˈsteɪ.nə.bəl/ | Sustainable energy sources reduce long-term carbon emissions.
+BIODIVERSITY | Đa dạng sinh học | /ˌbaɪ.əʊ.daɪˈvɜː.sə.ti/ | Deforestation poses a severe threat to global biodiversity.
+ECOSYSTEM | Hệ sinh thái | /ˈiː.kəʊ.sɪs.təm/ | Plastic pollution disrupts fragile marine ecosystems.
+EMISSION | Khí thải, sự phát thải | /iˈmɪʃ.ən/ | Governments agreed to cut greenhouse gas emissions by 2030.
+CONTAMINATE | Làm ô nhiễm, làm nhiễm bẩn | /kənˈtæm.ɪ.neɪt/ | Industrial waste can easily contaminate local drinking water.
+CONSERVATION | Sự bảo tồn thiên nhiên | /ˌkɒn.səˈveɪ.ʃən/ | Wildlife conservation programs help endangered species recover.
+DEPLETE | Làm cạn kiệt, rút cạn | /dɪˈpliːt/ | Overfishing continues to deplete global fish stocks.
+RENEWABLE | Có thể tái tạo | /rɪˈnjuː.ə.bəl/ | Solar and wind power are rapidly growing renewable resources.`
+  },
+  technology: {
+    label: 'Công nghệ & AI',
+    text: `AUTOMATION | Tự động hóa | /ˌɔː.təˈmeɪ.ʃən/ | Factory automation improves efficiency but reshapes labor markets.
+ALGORITHM | Thuật toán | /ˈæl.ɡə.rɪ.ðəm/ | Social media platforms rely on algorithms to personalize feeds.
+DISRUPTIVE | Mang tính đột phá, làm thay đổi cuộc chơi | /dɪsˈrʌp.tɪv/ | Generative AI has proved to be a disruptive innovation.
+OBSOLETE | Lỗi thời, không còn được dùng | /ˌɒb.səlˈiːt/ | Smartphones rendered many standalone cameras obsolete.
+CYBERSECURITY | An ninh mạng | /ˌsaɪ.bə.sɪˈkjʊə.rə.ti/ | Banks invest heavily in cybersecurity to protect customer data.
+CONNECTIVITY | Khả năng kết nối mạng | /ˌkɒn.ekˈtɪv.ə.ti/ | High-speed connectivity enables remote work across rural regions.
+INNOVATE | Đổi mới, sáng tạo | /ˈɪn.ə.veɪt/ | Startups must constantly innovate to survive fierce competition.
+SYNTHETIC | Tổng hợp, nhân tạo | /sɪnˈθet.ɪk/ | Synthetic data helps train models without compromising privacy.`
+  },
+  education: {
+    label: 'Giáo dục & Nghiên cứu',
+    text: `CURRICULUM | Chương trình giảng dạy | /kəˈrɪk.jə.ləm/ | Digital literacy should be integrated into the school curriculum.
+PEDAGOGY | Phương pháp sư phạm | /ˈped.ə.ɡɒdʒ.i/ | Interactive pedagogy encourages active student participation.
+LITERACY | Trình độ đọc viết / kiến thức nền | /ˈlɪt.ər.ə.si/ | Financial literacy empowers young adults to manage savings.
+EMPIRICAL | Dựa trên thực nghiệm, bằng chứng | /ɪmˈpɪr.ɪ.kəl/ | Policy reforms should be backed by empirical evidence.
+CRITICAL | Mang tính phản biện, then chốt | /ˈkrɪt.ɪ.kəl/ | Universities aim to foster critical thinking skills.
+SCHOLARLY | Mang tính học thuật | /ˈskɒl.ə.li/ | Citations are mandatory in scholarly research papers.
+MENTORSHIP | Sự cố vấn, hướng dẫn | /ˈmen.tɔː.ʃɪp/ | Peer mentorship reduces dropout rates among first-year students.
+APTITUDE | Năng khiếu, khả năng tiếp thu | /ˈæp.tɪ.tjuːd/ | Admission tests evaluate analytical aptitude alongside memory.`
+  },
+  health: {
+    label: 'Y tế & Đời sống',
+    text: `SEDENTARY | Ít vận động, ngồi nhiều | /ˈsed.ən.tər.i/ | A sedentary lifestyle increases the risk of heart disease.
+PREVALENT | Phổ biến, thịnh hành rộng rãi | /ˈprev.əl.ənt/ | Burnout has become increasingly prevalent among office workers.
+IMMUNITY | Hệ miễn dịch, khả năng miễn nhiễm | /ɪˈmjuː.nə.ti/ | Balanced nutrition supports natural immunity against illness.
+WELLBEING | Sức khỏe toàn diện & hạnh phúc | /ˈwel.biː.ɪŋ/ | Green urban parks significantly improve resident wellbeing.
+NUTRITION | Dinh dưỡng | /njuːˈtrɪʃ.ən/ | Poor nutrition affects both physical growth and concentration.
+CHRONIC | Mãn tính, kéo dài | /ˈkrɒn.ɪk/ | Stress is a major contributor to chronic sleep disorders.
+THERAPEUTIC | Mang tính trị liệu, chữa lành | /ˌθer.əˈpjuː.tɪk/ | Gardening offers strong therapeutic benefits for mental health.
+SANITATION | Hệ thống vệ sinh công cộng | /ˌsæn.ɪˈteɪ.ʃən/ | Clean sanitation drastically lowers waterborne infections.`
+  }
+};
 
 const DEFAULT_SECTION_ORDER = ['listening', 'reading', 'writing'];
 const DEFAULT_SECTION_DURATIONS = { listening: 15, reading: 20, writing: 25 };
@@ -420,6 +476,86 @@ function getWordCount(text) {
 
 function roundIeltsBand(score) {
   return Math.round(score * 2) / 2;
+}
+
+function getSpeedAdjustedTimeLimit(roundNum, speedMode = 'normal') {
+  const base = GAME_ROUND_TIME_LIMITS[roundNum] || 20;
+  const offset = GAME_SPEED_OFFSETS[speedMode] ?? 0;
+  return Math.max(8, base + offset);
+}
+
+// Shared answer checker supporting multi-variant IELTS fill-in-the-blank keys (e.g. "15 | fifteen" or "color / colour")
+function isObjectiveAnswerCorrect(question, userRaw) {
+  const normalizedUser = String(userRaw ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizedKey = String(question?.correctAnswer ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (!normalizedUser || !normalizedKey) return false;
+  if (question?.type === 'mcq' || question?.type === 'tfng' || !/[|/]/.test(normalizedKey)) {
+    return normalizedUser === normalizedKey;
+  }
+  const acceptedVariants = normalizedKey
+    .split(/[|/]/)
+    .map(part => part.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);
+  return acceptedVariants.includes(normalizedUser);
+}
+
+function buildRoomInviteLink(pin) {
+  const cleanPin = String(pin || '').trim();
+  if (!cleanPin || typeof window === 'undefined') return '';
+  const url = new URL(window.location.href);
+  url.searchParams.set('pin', cleanPin);
+  return url.toString();
+}
+
+function exportAttemptsToCsv(attemptRows = []) {
+  const headers = ['Học viên', 'Tài khoản', 'Đề thi', 'Ngày nộp', 'Listening', 'Reading', 'Writing', 'Overall', 'Chuyển Tab', 'Trạng thái'];
+  const csvEscape = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+  const lines = [
+    headers.map(csvEscape).join(','),
+    ...attemptRows.map(att => {
+      const lBand = att.scores?.listening?.band ?? '-';
+      const rBand = att.scores?.reading?.band ?? '-';
+      const wBand = att.scores?.writing?.overallBand ?? '-';
+      const overall = att.overallBand ?? '-';
+      const statusLabel = att.teacherGraded ? (att.aiGraded ? 'AI Đã Chấm' : 'GV Đã Chấm') : 'Chờ Chấm Writing';
+      return [
+        att.studentName || '',
+        att.studentId || '',
+        att.testTitle || '',
+        att.submittedAt || '',
+        lBand,
+        rBand,
+        wBand,
+        overall,
+        att.tabSwitchCount || 0,
+        statusLabel
+      ].map(csvEscape).join(',');
+    })
+  ];
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const objectUrl = URL.createObjectURL(blob);
+  link.href = objectUrl;
+  link.download = `lexiprep-bang-diem-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(objectUrl);
+}
+
+function parseBulkStudentsText(rawText) {
+  const lines = String(rawText || '').split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+  return lines.map(line => {
+    const parts = line.includes('|') ? line.split('|') : line.split(',');
+    const username = (parts[0] || '').trim().replace(/\s+/g, '_');
+    const name = (parts[1] || username).trim();
+    const pass = (parts[2] || '123').trim();
+    const rawBand = parseFloat((parts[3] || '7.0').trim());
+    const targetBand = Number.isFinite(rawBand)
+      ? Math.min(9.0, Math.max(4.0, Math.round(rawBand * 2) / 2))
+      : 7.0;
+    return { username, name, pass, targetBand };
+  }).filter(u => u.username && u.pass);
 }
 
 // Parse Raw Vocab text for Chicken Invaders
@@ -870,6 +1006,7 @@ function simulateAIWritingGrading({ _task1Prompt, task1Text, _task2Prompt, task2
 
 // Speech synthesis helper
 function speakWord(word) {
+  if (typeof window !== 'undefined' && window.__lexiprepMuted) return;
   if ('speechSynthesis' in window && word) {
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(word.toLowerCase());
@@ -882,6 +1019,7 @@ function speakWord(word) {
 // Sound effects synth
 let audioCtx = null;
 function playSound(type) {
+  if (typeof window !== 'undefined' && window.__lexiprepMuted) return;
   try {
     if (!audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -976,6 +1114,8 @@ export default function App() {
     teacher: room?.teacher || 'teacher_ielts',
     status: room?.status || 'LOBBY', // 'LOBBY' | 'PLAYING' | 'ENDED'
     maxPlayers: room?.maxPlayers || 30,
+    roundSize: Math.max(2, Math.min(8, Number(room?.roundSize) || 4)),
+    speedMode: ['relaxed', 'normal', 'turbo'].includes(room?.speedMode) ? room.speedMode : 'normal',
     startedAt: room?.startedAt || null,
     lobbyPlayers: room?.lobbyPlayers || {},
     liveMatch: room?.liveMatch || {},
@@ -1006,6 +1146,8 @@ export default function App() {
         teacher: 'teacher_ielts',
         status: 'LOBBY',
         maxPlayers: 30,
+        roundSize: 4,
+        speedMode: 'normal',
         startedAt: null,
         lobbyPlayers: {},
         liveMatch: {},
@@ -1023,13 +1165,16 @@ export default function App() {
 
   const [currentRoomPin, setCurrentRoomPin] = useState('686868');
   const [joinedRoomPin, setJoinedRoomPin] = useState(null);
-  const [roomJoinForm, setRoomJoinForm] = useState({ pin: '', pass: '' });
+  const [roomJoinForm, setRoomJoinForm] = useState(() => {
+    const pinFromUrl = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('pin') || '') : '';
+    return { pin: pinFromUrl.trim(), pass: '' };
+  });
   const [roomJoinError, setRoomJoinError] = useState('');
   const [myCrewColor, setMyCrewColor] = useState('cyan');
   const [lobbyCountdown, setLobbyCountdown] = useState(null);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
-  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới' });
-  const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts' });
+  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal' });
+  const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal' });
   const [lobbyChatInput, setLobbyChatInput] = useState('');
   const [lobbyNowTick, setLobbyNowTick] = useState(() => Date.now());
   const [serverSyncConnected, setServerSyncConnected] = useState(false);
@@ -1232,6 +1377,186 @@ export default function App() {
     showToast(`Đã cập nhật mục tiêu cho ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`);
   };
 
+  // Teacher Action: Duplicate Test (defaults copy to private so students can't accidentally open it)
+  const handleDuplicateTest = (testObj) => {
+    if (!testObj) return;
+    const copyId = `test-copy-${Date.now()}`;
+    const duplicated = {
+      ...JSON.parse(JSON.stringify(testObj)),
+      id: copyId,
+      title: `${testObj.title} (Bản sao)`,
+      visibility: 'private',
+      allowViewAnswers: false,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    setTests(prev => [duplicated, ...prev]);
+    dispatchSyncAction('UPSERT_TEST', { test: duplicated });
+    showToast(`Đã nhân bản đề "${testObj.title}" ở chế độ Riêng tư!`);
+  };
+
+  // Teacher Action: Delete Test
+  const handleDeleteTest = (testObj) => {
+    if (!testObj?.id) return;
+    if (!window.confirm(`Bạn có chắc muốn xóa đề thi "${testObj.title}"? Dữ liệu bài nộp cũ vẫn được giữ trong bảng điểm.`)) {
+      return;
+    }
+    setTests(prev => prev.filter(t => t.id !== testObj.id));
+    dispatchSyncAction('DELETE_TEST', { testId: testObj.id });
+    showToast(`Đã xóa đề thi "${testObj.title}".`, 'info');
+  };
+
+  // Teacher Action: Delete Attempt (unlock student on 1-attempt exam / reset attempt)
+  const handleDeleteAttempt = (attemptObj) => {
+    if (!attemptObj?.id) return;
+    if (!window.confirm(`Xóa lượt làm bài của "${attemptObj.studentName}" cho đề "${attemptObj.testTitle}" để học viên có thể thi lại?`)) {
+      return;
+    }
+    setAttempts(prev => prev.filter(a => a.id !== attemptObj.id));
+    dispatchSyncAction('DELETE_ATTEMPT', { attemptId: attemptObj.id });
+    showToast(`Đã mở khóa lượt làm lại cho học viên ${attemptObj.studentName}.`);
+  };
+
+  // Teacher Action: Create Single or Bulk Student Accounts
+  const handleSaveNewStudents = (e) => {
+    if (e) e.preventDefault();
+    const today = new Date().toISOString().split('T')[0];
+
+    if (addStudentMode === 'single') {
+      const uname = (newStudentForm.username || '').trim().replace(/\s+/g, '_');
+      const pass = (newStudentForm.password || '').trim();
+      const name = (newStudentForm.name || '').trim() || uname;
+      const band = Math.min(9.0, Math.max(4.0, roundIeltsBand(Number(newStudentForm.targetBand) || 7.0)));
+      if (!uname || !pass) {
+        showToast('Vui lòng nhập tên đăng nhập và mật khẩu học viên!', 'error');
+        return;
+      }
+      if (usersDb[uname]) {
+        showToast(`Tài khoản "${uname}" đã tồn tại!`, 'error');
+        return;
+      }
+      const userObj = { username: uname, pass, name, role: 'student', targetBand: band, joinedDate: today };
+      setUsersDb(prev => ({ ...prev, [uname]: userObj }));
+      dispatchSyncAction('UPSERT_USER', { username: uname, user: userObj });
+      setNewStudentForm({ username: '', name: '', password: '123', targetBand: 7.0 });
+      setShowAddStudentModal(false);
+      showToast(`Đã tạo tài khoản học viên "${name}" (@${uname})!`);
+      return;
+    }
+
+    const parsedList = parseBulkStudentsText(bulkStudentsText);
+    if (parsedList.length === 0) {
+      showToast('Không có dòng hợp lệ. Định dạng: username | Họ tên | mật khẩu | targetBand', 'error');
+      return;
+    }
+    const createdUsers = {};
+    let skipped = 0;
+    parsedList.forEach(item => {
+      if (usersDb[item.username] || createdUsers[item.username]) {
+        skipped++;
+        return;
+      }
+      createdUsers[item.username] = {
+        username: item.username,
+        pass: item.pass,
+        name: item.name,
+        role: 'student',
+        targetBand: item.targetBand,
+        joinedDate: today
+      };
+    });
+    const addedEntries = Object.entries(createdUsers);
+    if (addedEntries.length === 0) {
+      showToast('Tất cả tên tài khoản trong danh sách đều đã tồn tại!', 'error');
+      return;
+    }
+    setUsersDb(prev => ({ ...prev, ...createdUsers }));
+    addedEntries.forEach(([username, user]) => {
+      dispatchSyncAction('UPSERT_USER', { username, user });
+    });
+    setShowAddStudentModal(false);
+    showToast(`Đã thêm ${addedEntries.length} học viên${skipped > 0 ? ` (bỏ qua ${skipped} tài khoản trùng)` : ''}!`);
+  };
+
+  // Teacher Action: Reset Student Password
+  const handleResetStudentPassword = (e) => {
+    if (e) e.preventDefault();
+    if (!editingStudentAccount) return;
+    const nextPass = (studentPasswordDraft || '').trim();
+    if (!nextPass) {
+      showToast('Mật khẩu mới không được để trống!', 'error');
+      return;
+    }
+    const uname = editingStudentAccount.username;
+    const baseUser = usersDb[uname] || editingStudentAccount;
+    const updatedUser = { ...baseUser, pass: nextPass };
+    setUsersDb(prev => ({ ...prev, [uname]: updatedUser }));
+    dispatchSyncAction('UPSERT_USER', { username: uname, user: updatedUser });
+    setEditingStudentAccount(null);
+    setStudentPasswordDraft('');
+    showToast(`Đã đặt lại mật khẩu mới cho học viên ${updatedUser.name}!`);
+  };
+
+  // Teacher Action: Copy Room Invite Link (?pin=...)
+  const handleCopyInviteLink = (pin = currentRoomPin) => {
+    const url = buildRoomInviteLink(pin);
+    if (!url) return;
+    navigator.clipboard?.writeText(url).catch(() => {});
+    showToast(`Đã sao chép Link mời vào phòng PIN ${pin}!`);
+  };
+
+  // Teacher Action: Kick player out of lobby / live room
+  const handleKickLobbyPlayer = (pin, username, displayName) => {
+    if (!pin || !username) return;
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[pin], pin);
+      const nextLobby = { ...r.lobbyPlayers };
+      const nextLive = { ...r.liveMatch };
+      delete nextLobby[username];
+      delete nextLive[username];
+      return {
+        ...prev,
+        [pin]: { ...r, lobbyPlayers: nextLobby, liveMatch: nextLive }
+      };
+    });
+    dispatchSyncAction('KICK_LOBBY_PLAYER', { pin, username });
+    showToast(`Đã mời "${displayName || username}" rời khỏi phòng ${pin}.`, 'info');
+  };
+
+  // Teacher Action: End active match & freeze standings
+  const handleFinishRoomMatch = (pin = currentRoomPin) => {
+    if (!pin) return;
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[pin], pin);
+      return { ...prev, [pin]: { ...r, status: 'ENDED' } };
+    });
+    dispatchSyncAction('FINISH_ROOM_MATCH', { pin });
+    showToast(`Đã chốt bảng xếp hạng & kết thúc trận đấu phòng ${pin}!`);
+  };
+
+  // Teacher Action: Delete extra game room
+  const handleDeleteRoom = (pin) => {
+    const allPins = Object.keys(roomsDb);
+    if (allPins.length <= 1) {
+      showToast('Cần giữ lại ít nhất 1 phòng đấu mặc định!', 'info');
+      return;
+    }
+    const target = roomsDb[pin];
+    if (!window.confirm(`Xóa phòng "${target?.name || pin}" (PIN: ${pin})?`)) return;
+    const fallbackPin = allPins.find(p => p !== pin) || '';
+    setRoomsDb(prev => {
+      const next = { ...prev };
+      delete next[pin];
+      return next;
+    });
+    if (currentRoomPin === pin && fallbackPin) setCurrentRoomPin(fallbackPin);
+    if (joinedRoomPin === pin) {
+      setJoinedRoomPin(null);
+      setGameSubState('JOIN');
+    }
+    dispatchSyncAction('DELETE_ROOM', { pin });
+    showToast(`Đã xóa phòng PIN ${pin}.`, 'info');
+  };
+
   // Exam Mode State
   const [examState, setExamState] = useState({
     skill: 'listening',
@@ -1311,6 +1636,13 @@ export default function App() {
 
   // Teacher Hub Sub-Tab ('tests', 'grading', 'game_room', 'students')
   const [teacherHubTab, setTeacherHubTab] = useState('tests');
+  const [gradingFilters, setGradingFilters] = useState({ testId: 'all', status: 'all', risk: 'all', search: '' });
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [addStudentMode, setAddStudentMode] = useState('single'); // 'single' | 'bulk'
+  const [newStudentForm, setNewStudentForm] = useState({ username: '', name: '', password: '123', targetBand: 7.0 });
+  const [bulkStudentsText, setBulkStudentsText] = useState('hocsinh_04 | Lê Minh Tuấn | 123 | 7.0\nhocsinh_05 | Phạm Thảo Vy | 123 | 7.5');
+  const [editingStudentAccount, setEditingStudentAccount] = useState(null);
+  const [studentPasswordDraft, setStudentPasswordDraft] = useState('');
 
   // Vocab Modal in Teacher View
   const [showVocabModal, setShowVocabModal] = useState(false);
@@ -1341,6 +1673,16 @@ export default function App() {
   const [transitionCountdown, setTransitionCountdown] = useState(3);
   const [isSandboxRound, setIsSandboxRound] = useState(false);
   const [showMobileKeyboard, setShowMobileKeyboard] = useState(false);
+  const [gameMuted, setGameMuted] = useState(false);
+  const [gamePaused, setGamePaused] = useState(false);
+  const [freezeCharges, setFreezeCharges] = useState(2);
+  const [isFrozenBoost, setIsFrozenBoost] = useState(false);
+  const freezeUntilRef = useRef(0);
+  const bonusTimeSecRef = useRef(0);
+  const pausedStartedAtRef = useRef(0);
+  const justJoinedLobbyAtRef = useRef(0);
+  const particlesRef = useRef([]);
+  const missedWordsMatchRef = useRef([]);
   const [gameToast, setGameToast] = useState({ text: '', isSuccess: true, visible: false });
   const [gameReviewLog, setGameReviewLog] = useState([]);
   const [activeQuestion, setActiveQuestion] = useState(null);
@@ -1366,6 +1708,7 @@ export default function App() {
     activeQuestion: null,
     queues: { 1: [], 2: [], 3: [] },
     isSandbox: false,
+    paused: false,
     timeLimit: GAME_ROUND_TIME_LIMITS[1],
     questionResolved: false
   });
@@ -1601,10 +1944,27 @@ export default function App() {
       setHostRoomDraft({
         pin: r.pin || currentRoomPin,
         name: r.name || `Phòng Từ Vựng #${currentRoomPin}`,
-        pass: r.pass ?? 'ielts'
+        pass: r.pass ?? 'ielts',
+        roundSize: Math.max(2, Math.min(8, Number(r.roundSize) || 4)),
+        speedMode: ['relaxed', 'normal', 'turbo'].includes(r.speedMode) ? r.speedMode : 'normal'
       });
     }
   }, [currentRoomPin]);
+
+  // Auto-save active exam progress so refreshing / closing tab won't lose answers
+  useEffect(() => {
+    if (view !== 'EXAM_MODE' || !selectedTestId) return;
+    const draftKey = `ielts_exam_draft_${currentUser?.username || 'guest'}_${selectedTestId}`;
+    try {
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          ...examState,
+          savedAt: Date.now()
+        })
+      );
+    } catch (_err) {}
+  }, [view, selectedTestId, examState, currentUser?.username]);
 
   // Track live ranking changes (Đua Top up/down indicator) for Teacher Spectate screen
   useEffect(() => {
@@ -1660,6 +2020,20 @@ export default function App() {
         gameRuntimeRef.current.subState = 'JOIN';
         setRoomJoinError('Phòng chơi đã kết thúc hoặc bị đóng bởi giáo viên.');
       }
+      return;
+    }
+
+    if (
+      currentUser?.role !== 'teacher' &&
+      joinedRoomPin === activePin &&
+      room.status === 'LOBBY' &&
+      !room.lobbyPlayers?.[currentUser?.username] &&
+      Date.now() - justJoinedLobbyAtRef.current > 2500
+    ) {
+      setJoinedRoomPin(null);
+      setGameSubState('JOIN');
+      gameRuntimeRef.current.subState = 'JOIN';
+      setRoomJoinError('Bạn đã được giáo viên mời ra khỏi sảnh chờ.');
       return;
     }
 
@@ -1933,6 +2307,7 @@ export default function App() {
       };
     });
 
+    justJoinedLobbyAtRef.current = Date.now();
     setLobbyChatInput('');
     setGameSubState('LOBBY');
     gameRuntimeRef.current.subState = 'LOBBY';
@@ -1961,7 +2336,9 @@ export default function App() {
     setHostRoomDraft({
       pin: baseRoom.pin,
       name: baseRoom.name,
-      pass: baseRoom.pass
+      pass: baseRoom.pass,
+      roundSize: baseRoom.roundSize || 4,
+      speedMode: baseRoom.speedMode || 'normal'
     });
 
     const teacherEntry = buildLobbyPlayerEntry(currentUser, {
@@ -2002,6 +2379,8 @@ export default function App() {
     const newPin = (hostRoomDraft.pin || '').trim() || oldPin;
     const newName = (hostRoomDraft.name || '').trim() || `Phòng Từ Vựng #${newPin}`;
     const newPass = (hostRoomDraft.pass || '').trim() || 'ielts';
+    const cleanRoundSize = Math.max(2, Math.min(8, Number(hostRoomDraft.roundSize) || 4));
+    const cleanSpeedMode = ['relaxed', 'normal', 'turbo'].includes(hostRoomDraft.speedMode) ? hostRoomDraft.speedMode : 'normal';
 
     if (newPin !== oldPin && roomsDb[newPin]) {
       showToast(`Mã phòng "${newPin}" đã tồn tại — hãy chọn mã PIN khác hoặc bấm chọn phòng đó!`, 'error');
@@ -2015,7 +2394,9 @@ export default function App() {
           ...source,
           pin: newPin,
           name: newName,
-          pass: newPass
+          pass: newPass,
+          roundSize: cleanRoundSize,
+          speedMode: cleanSpeedMode
         },
         newPin
       );
@@ -2028,14 +2409,14 @@ export default function App() {
 
     setCurrentRoomPin(newPin);
     setJoinedRoomPin(newPin);
-    setHostRoomDraft({ pin: newPin, name: newName, pass: newPass });
+    setHostRoomDraft({ pin: newPin, name: newName, pass: newPass, roundSize: cleanRoundSize, speedMode: cleanSpeedMode });
 
     dispatchSyncAction('UPSERT_ROOM', {
       pin: newPin,
       oldPin: oldPin !== newPin ? oldPin : undefined,
-      updates: { name: newName, pass: newPass }
+      updates: { name: newName, pass: newPass, roundSize: cleanRoundSize, speedMode: cleanSpeedMode }
     });
-    showToast(`Đã cập nhật phòng "${newName}" (PIN: ${newPin} • Pass: ${newPass})!`);
+    showToast(`Đã cập nhật phòng "${newName}" (PIN: ${newPin} • ${cleanRoundSize} từ/vòng • ${cleanSpeedMode})!`);
   };
 
   const handleTeacherResetLobby = (pin = currentRoomPin) => {
@@ -2262,6 +2643,8 @@ export default function App() {
       teacher: currentUser?.username || 'teacher_ielts',
       status: 'LOBBY',
       maxPlayers: 30,
+      roundSize: Math.max(2, Math.min(8, Number(newRoomForm.roundSize) || 4)),
+      speedMode: ['relaxed', 'normal', 'turbo'].includes(newRoomForm.speedMode) ? newRoomForm.speedMode : 'normal',
       startedAt: null,
       lobbyPlayers: teacherEntry ? { [currentUser.username]: teacherEntry } : {},
       chatMessages: [],
@@ -2275,9 +2658,15 @@ export default function App() {
     }));
     setCurrentRoomPin(generatedPin);
     setJoinedRoomPin(generatedPin);
-    setHostRoomDraft({ pin: generatedPin, name: cleanName, pass: cleanPass });
+    setHostRoomDraft({
+      pin: generatedPin,
+      name: cleanName,
+      pass: cleanPass,
+      roundSize: newRoomObj.roundSize,
+      speedMode: newRoomObj.speedMode
+    });
     setShowCreateRoomModal(false);
-    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới' });
+    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal' });
 
     dispatchSyncAction('UPSERT_ROOM', { pin: generatedPin, updates: newRoomObj });
     showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} • Pass: ${cleanPass})!`);
@@ -2463,19 +2852,53 @@ export default function App() {
     examAutoAdvanceHandledRef.current = null;
     stopExamAudio();
     setSelectedTestId(testId);
-    setExamState({
-      skill: firstSkill,
-      sectionIdx: 0,
-      timeRemaining: (cfg.durations[firstSkill] || 15) * 60,
-      answers: {},
-      audioPlays: { mainAudio: 0 },
-      highlights: [],
-      notes: [],
-      antiCheatLogs: [],
-      tabSwitchCount: 0,
-      readingPassageIdx: 0,
-      showAllReadingQs: false
-    });
+
+    const draftKey = `ielts_exam_draft_${currentUser?.username || 'guest'}_${testId}`;
+    let restoredDraft = null;
+    try {
+      const rawDraft = localStorage.getItem(draftKey);
+      if (rawDraft) {
+        const parsed = JSON.parse(rawDraft);
+        if (parsed && typeof parsed === 'object' && cfg.order.includes(parsed.skill)) {
+          restoredDraft = parsed;
+        }
+      }
+    } catch (_err) {}
+
+    if (restoredDraft) {
+      const validIdx = Math.max(0, cfg.order.indexOf(restoredDraft.skill));
+      setExamState({
+        skill: cfg.order[validIdx],
+        sectionIdx: validIdx,
+        timeRemaining:
+          typeof restoredDraft.timeRemaining === 'number' && restoredDraft.timeRemaining > 0
+            ? restoredDraft.timeRemaining
+            : (cfg.durations[cfg.order[validIdx]] || 15) * 60,
+        answers: restoredDraft.answers || {},
+        audioPlays: restoredDraft.audioPlays || { mainAudio: 0 },
+        highlights: Array.isArray(restoredDraft.highlights) ? restoredDraft.highlights : [],
+        notes: Array.isArray(restoredDraft.notes) ? restoredDraft.notes : [],
+        antiCheatLogs: Array.isArray(restoredDraft.antiCheatLogs) ? restoredDraft.antiCheatLogs : [],
+        tabSwitchCount: Number(restoredDraft.tabSwitchCount) || 0,
+        readingPassageIdx: Number(restoredDraft.readingPassageIdx) || 0,
+        showAllReadingQs: Boolean(restoredDraft.showAllReadingQs)
+      });
+      showToast('Đã tự động khôi phục bài làm dở trước đó của bạn!', 'info');
+    } else {
+      setExamState({
+        skill: firstSkill,
+        sectionIdx: 0,
+        timeRemaining: (cfg.durations[firstSkill] || 15) * 60,
+        answers: {},
+        audioPlays: { mainAudio: 0 },
+        highlights: [],
+        notes: [],
+        antiCheatLogs: [],
+        tabSwitchCount: 0,
+        readingPassageIdx: 0,
+        showAllReadingQs: false
+      });
+    }
     setView('EXAM_MODE');
   };
 
@@ -2537,18 +2960,17 @@ export default function App() {
     let listeningRaw = 0;
     const lQuestions = activeTest.listening?.questions || [];
     lQuestions.forEach(q => {
-      const studentAns = (examState.answers[q.id] || '').trim().toLowerCase();
-      const correctAns = (q.correctAnswer || '').trim().toLowerCase();
-      if (studentAns && studentAns === correctAns) listeningRaw++;
+      if (isObjectiveAnswerCorrect(q, examState.answers[q.id])) listeningRaw++;
     });
 
     let readingRaw = 0;
     const rQuestions = activeTest.reading?.questions || [];
     rQuestions.forEach(q => {
-      const studentAns = (examState.answers[q.id] || '').trim().toLowerCase();
-      const correctAns = (q.correctAnswer || '').trim().toLowerCase();
-      if (studentAns && studentAns === correctAns) readingRaw++;
+      if (isObjectiveAnswerCorrect(q, examState.answers[q.id])) readingRaw++;
     });
+
+    const draftKey = `ielts_exam_draft_${currentUser?.username || 'guest'}_${activeTest.id}`;
+    try { localStorage.removeItem(draftKey); } catch (_err) {}
 
     const lBand = calculateAutoBand(listeningRaw, lQuestions.length);
     const rBand = calculateAutoBand(readingRaw, rQuestions.length);
@@ -3125,9 +3547,44 @@ export default function App() {
     return idx;
   };
 
-  const resetWordTimer = (roundNum) => {
-    const limit = GAME_ROUND_TIME_LIMITS[roundNum] || 25;
+  // Sync mutable color id for Canvas spaceship rendering
+  useEffect(() => {
+    gameRuntimeRef.current.crewColorId = myCrewColor;
+  }, [myCrewColor]);
+
+  // Helper to spawn particle bursts inside Space Arena Canvas
+  const pushGameParticles = (x, y, color = '#00f2fe', count = 18) => {
+    const arr = particlesRef.current;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const speed = 1.6 + Math.random() * 4.2;
+      arr.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 2 + Math.random() * 3,
+        color,
+        alpha: 1
+      });
+    }
+  };
+
+  const recordMissedWordInMatch = (word) => {
+    const clean = String(word || '').trim().toUpperCase();
+    if (!clean) return;
+    if (!missedWordsMatchRef.current.includes(clean)) {
+      missedWordsMatchRef.current = [...missedWordsMatchRef.current, clean];
+    }
+  };
+
+  const resetWordTimer = (roundNum, speedModeOverride = null) => {
+    const mode = speedModeOverride || gameRuntimeRef.current.speedMode || 'normal';
+    const limit = getSpeedAdjustedTimeLimit(roundNum, mode);
     wordStartedAtRef.current = Date.now();
+    bonusTimeSecRef.current = 0;
+    freezeUntilRef.current = 0;
+    setIsFrozenBoost(false);
     timeRemainingFloatRef.current = limit;
     gameRuntimeRef.current.timeLimit = limit;
     gameRuntimeRef.current.questionResolved = false;
@@ -3159,11 +3616,12 @@ export default function App() {
   };
 
   const buildRoundQueuesFromRoom = (pin) => {
-    const room = roomsDb[pin] || { rawVocab: DEFAULT_VOCAB_TEXT };
+    const room = normalizeRoomObject(roomsDb[pin] || { rawVocab: DEFAULT_VOCAB_TEXT }, pin);
     const vocabList = parseRawVocabText(room.rawVocab || DEFAULT_VOCAB_TEXT);
     const shuffled = [...vocabList].sort(() => Math.random() - 0.5);
     const total = shuffled.length;
-    const perRound = Math.max(1, Math.min(4, Math.floor(total / 3)));
+    const desiredPerRound = Math.max(2, Math.min(8, Number(room.roundSize) || 4));
+    const perRound = Math.max(1, Math.min(desiredPerRound, Math.floor(total / 3) || 1));
     return {
       1: shuffled.slice(0, perRound),
       2: shuffled.slice(perRound, perRound * 2),
@@ -3175,11 +3633,19 @@ export default function App() {
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
 
+    const roomObj = normalizeRoomObject(roomsDb[pin] || {}, pin);
+    const speedMode = roomObj.speedMode || 'normal';
     const queues = buildRoundQueuesFromRoom(pin);
     const firstQ = queues[1][0] || null;
     const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
 
     homingLasersRef.current = [];
+    particlesRef.current = [];
+    missedWordsMatchRef.current = [];
+    bonusTimeSecRef.current = 0;
+    freezeUntilRef.current = 0;
+
+    const r1Limit = getSpeedAdjustedTimeLimit(1, speedMode);
     gameRuntimeRef.current = {
       round: 1,
       score: 0,
@@ -3191,7 +3657,10 @@ export default function App() {
       activeQuestion: firstQ,
       queues,
       isSandbox: false,
-      timeLimit: GAME_ROUND_TIME_LIMITS[1],
+      paused: false,
+      speedMode,
+      crewColorId: myCrewColor,
+      timeLimit: r1Limit,
       questionResolved: false
     };
 
@@ -3203,24 +3672,28 @@ export default function App() {
     setGameWordIdx(0);
     setGameTypedProgress(initialProgress);
     setGameSubState('PLAYING');
+    setGamePaused(false);
+    setFreezeCharges(2);
+    setIsFrozenBoost(false);
     setGameOutcome(null);
     setIsSandboxRound(false);
     setGameReviewLog([]);
     setActiveQuestion(firstQ);
-    resetWordTimer(1);
+    resetWordTimer(1, speedMode);
     syncLiveMatchProgress({
       scoreVal: 0,
       streakVal: 0,
       livesVal: 3,
       roundNum: 1,
-      progressText: `Vòng 1/3 • Câu 1/${Math.max(1, queues[1]?.length || 1)}`
+      progressText: `Vòng 1/3 • Câu 1/${Math.max(1, queues[1]?.length || 1)}`,
+      missedWords: []
     });
   };
 
   const jumpToGameSandboxRound = (roundNum) => {
     if (currentUser?.role !== 'teacher') return;
     const activePin = joinedRoomPin || currentRoomPin;
-    const activeRoom = roomsDb[activePin];
+    const activeRoom = normalizeRoomObject(roomsDb[activePin] || {}, activePin);
     const hasStudents = Object.values(activeRoom?.lobbyPlayers || {}).some((p) => p?.role !== 'teacher');
     if (hasStudents) {
       showToast('Phòng đã có học sinh — Giáo viên chỉ giám sát Đua Top, không chơi lúc này!', 'info');
@@ -3231,14 +3704,20 @@ export default function App() {
 
     let queues = gameRuntimeRef.current.queues;
     if (!queues?.[roundNum]?.length) {
-      queues = buildRoundQueuesFromRoom(joinedRoomPin || currentRoomPin);
+      queues = buildRoundQueuesFromRoom(activePin);
       setGameQueues(queues);
     }
+    const speedMode = activeRoom.speedMode || 'normal';
     const queue = queues[roundNum] || [];
     const firstQ = queue[0] || null;
     const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
 
     homingLasersRef.current = [];
+    particlesRef.current = [];
+    missedWordsMatchRef.current = [];
+    bonusTimeSecRef.current = 0;
+    freezeUntilRef.current = 0;
+
     gameRuntimeRef.current = {
       ...gameRuntimeRef.current,
       round: roundNum,
@@ -3248,7 +3727,10 @@ export default function App() {
       subState: 'PLAYING',
       activeQuestion: firstQ,
       isSandbox: true,
-      timeLimit: GAME_ROUND_TIME_LIMITS[roundNum] || 25,
+      paused: false,
+      speedMode,
+      crewColorId: myCrewColor,
+      timeLimit: getSpeedAdjustedTimeLimit(roundNum, speedMode),
       questionResolved: false
     };
 
@@ -3257,10 +3739,13 @@ export default function App() {
     setGameWordIdx(0);
     setGameTypedProgress(initialProgress);
     setGameSubState('PLAYING');
+    setGamePaused(false);
+    setFreezeCharges(2);
+    setIsFrozenBoost(false);
     setGameOutcome(null);
     setIsSandboxRound(true);
     setActiveQuestion(firstQ);
-    resetWordTimer(roundNum);
+    resetWordTimer(roundNum, speedMode);
 
     if (roundNum === 3 && firstQ) {
       speakWord(firstQ.word);
@@ -3293,7 +3778,8 @@ export default function App() {
       streakVal: gameRuntimeRef.current.combo,
       livesVal: gameRuntimeRef.current.lives,
       roundNum: nextR,
-      progressText: `Vòng ${nextR}/3 • Câu 1/${Math.max(1, queue.length)}`
+      progressText: `Vòng ${nextR}/3 • Câu 1/${Math.max(1, queue.length)}`,
+      missedWords: [...missedWordsMatchRef.current]
     });
 
     if (firstQ && nextR === 3) {
@@ -3312,6 +3798,9 @@ export default function App() {
     const finalCombo = latestComboOverride !== null ? latestComboOverride : rt.combo;
 
     recordGameWordReview(q, currentRoundNum, isCorrect);
+    if (!isCorrect) {
+      recordMissedWordInMatch(q.word);
+    }
 
     const currentQueue = rt.queues[currentRoundNum] || [];
     const nextIdx = rt.wordIdx + 1;
@@ -3333,7 +3822,8 @@ export default function App() {
         streakVal: finalCombo,
         livesVal: rt.lives,
         roundNum: currentRoundNum,
-        progressText: `Vòng ${currentRoundNum}/3 • Câu ${nextIdx + 1}/${Math.max(1, currentQueue.length)}`
+        progressText: `Vòng ${currentRoundNum}/3 • Câu ${nextIdx + 1}/${Math.max(1, currentQueue.length)}`,
+        missedWords: [...missedWordsMatchRef.current]
       });
 
       if (currentRoundNum === 3) {
@@ -3351,7 +3841,8 @@ export default function App() {
           streakVal: finalCombo,
           livesVal: rt.lives,
           roundNum: currentRoundNum,
-          progressText: `Xong Vòng ${currentRoundNum}/3`
+          progressText: `Xong Vòng ${currentRoundNum}/3`,
+          missedWords: [...missedWordsMatchRef.current]
         });
         let countdown = 3;
         clearTimeout(autoNextTimerRef.current);
@@ -3371,6 +3862,7 @@ export default function App() {
         rt.subState = 'GAMEOVER';
         setGameOutcome('VICTORY');
         setGameSubState('GAMEOVER');
+        const allMissed = [...missedWordsMatchRef.current];
         syncLiveMatchProgress({
           scoreVal: finalScore,
           streakVal: finalCombo,
@@ -3379,13 +3871,13 @@ export default function App() {
           progressText: 'Hoàn thành 3 Vòng',
           finished: true,
           outcome: 'VICTORY',
-          missedWords: []
+          missedWords: allMissed
         });
         syncScoreToLeaderboard(
           finalScore,
           rt.isSandbox ? `Hoàn thành Màn ${currentRoundNum} (GV)` : 'Hoàn thành 3 Vòng',
           finalCombo,
-          []
+          allMissed
         );
       }
     }
@@ -3410,7 +3902,9 @@ export default function App() {
 
     if (q) {
       recordGameWordReview(q, roundNum, false);
+      recordMissedWordInMatch(q.word);
     }
+    const allMissed = [...missedWordsMatchRef.current];
 
     if (nextLives <= 0) {
       clearTimeout(autoNextTimerRef.current);
@@ -3427,13 +3921,13 @@ export default function App() {
         progressText: `Hết mạng ở Vòng ${roundNum}`,
         finished: true,
         outcome: 'LOST',
-        missedWords: q ? [q.word] : []
+        missedWords: allMissed
       });
       syncScoreToLeaderboard(
         rt.score,
         `Hết mạng ở Vòng ${roundNum}`,
         0,
-        q ? [q.word] : []
+        allMissed
       );
       return;
     }
@@ -3446,7 +3940,8 @@ export default function App() {
         streakVal: 0,
         livesVal: nextLives,
         roundNum,
-        progressText: `Vòng ${roundNum}/3 • Câu ${rt.wordIdx + 1}/${Math.max(1, (rt.queues[roundNum] || []).length)}`
+        progressText: `Vòng ${roundNum}/3 • Câu ${rt.wordIdx + 1}/${Math.max(1, (rt.queues[roundNum] || []).length)}`,
+        missedWords: allMissed
       });
     }
   };
@@ -3480,9 +3975,10 @@ export default function App() {
 
       if (nextProgress >= target.length) {
         rt.questionResolved = true;
+        const feverMult = rt.combo >= 3 ? 2 : 1;
         const bonus = rt.round === 2 ? 150 : 250;
         const streakBonus = rt.combo * 25;
-        const totalGain = bonus + streakBonus;
+        const totalGain = (bonus + streakBonus) * feverMult;
         const nextScore = rt.score + totalGain;
         const nextCombo = rt.combo + 1;
 
@@ -3491,9 +3987,13 @@ export default function App() {
         setGameScore(nextScore);
         setGameCombo(nextCombo);
 
+        pushGameParticles(w / 2, Math.max(80, h * 0.3), feverMult > 1 ? '#fbbf24' : '#34d399', 26);
         playSound('word_clear');
         speakWord(q.word);
-        triggerGameToast(`🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ`, true);
+        triggerGameToast(
+          `🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+          true
+        );
         handleWordCleared(true, nextScore, nextCombo);
       }
     } else {
@@ -3506,7 +4006,7 @@ export default function App() {
 
   const handleGameHint = () => {
     const rt = gameRuntimeRef.current;
-    if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 3) || !rt.activeQuestion) return;
+    if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 3) || !rt.activeQuestion || rt.paused) return;
     const nextChar = rt.activeQuestion.word.toUpperCase()[rt.typedProgress];
     if (!nextChar) return;
     const nextScore = Math.max(0, rt.score - 15);
@@ -3515,28 +4015,82 @@ export default function App() {
     handleGameTypingInput(nextChar);
   };
 
+  const handleUseFreezePowerup = () => {
+    const rt = gameRuntimeRef.current;
+    if (rt.subState !== 'PLAYING' || rt.paused || freezeCharges <= 0 || !rt.activeQuestion) return;
+    bonusTimeSecRef.current += 8;
+    freezeUntilRef.current = Date.now() + 4500;
+    setFreezeCharges(prev => Math.max(0, prev - 1));
+    setIsFrozenBoost(true);
+    setGameTimeLeft(prev => prev + 8);
+    const canvas = canvasRef.current;
+    pushGameParticles((canvas?.width || 800) / 2, Math.max(90, (canvas?.height || 460) * 0.35), '#38bdf8', 24);
+    playSound('word_clear');
+    triggerGameToast('❄️ Đóng băng mục tiêu +8 giây!', true);
+    setTimeout(() => {
+      if (Date.now() >= freezeUntilRef.current - 50) {
+        setIsFrozenBoost(false);
+      }
+    }, 4500);
+  };
+
+  const handleToggleGamePause = () => {
+    const rt = gameRuntimeRef.current;
+    if (rt.subState !== 'PLAYING' || !rt.isSandbox) return;
+    if (!rt.paused) {
+      pausedStartedAtRef.current = Date.now();
+      rt.paused = true;
+      setGamePaused(true);
+      showToast('Đã tạm dừng màn demo để giảng giải từ vựng.', 'info');
+    } else {
+      if (pausedStartedAtRef.current > 0) {
+        bonusTimeSecRef.current += (Date.now() - pausedStartedAtRef.current) / 1000;
+        pausedStartedAtRef.current = 0;
+      }
+      rt.paused = false;
+      setGamePaused(false);
+    }
+  };
+
+  const handleToggleGameMute = () => {
+    const nextMuted = !gameMuted;
+    setGameMuted(nextMuted);
+    if (typeof window !== 'undefined') {
+      window.__lexiprepMuted = nextMuted;
+      if (nextMuted && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+    showToast(nextMuted ? 'Đã tắt âm thanh hiệu ứng & giọng đọc.' : 'Đã bật lại âm thanh Game.', 'info');
+  };
+
   // Per-Word Countdown Timer for Game Arena (Round 1, Round 2, Round 3)
   useEffect(() => {
     clearInterval(wordTimerRef.current);
     if (view !== 'GAME_ARENA' || gameSubState !== 'PLAYING' || !activeQuestion) return;
 
-    const limit = GAME_ROUND_TIME_LIMITS[gameRound] || 25;
+    const speedMode = gameRuntimeRef.current.speedMode || 'normal';
+    const limit = getSpeedAdjustedTimeLimit(gameRound, speedMode);
     wordStartedAtRef.current = Date.now();
+    bonusTimeSecRef.current = 0;
+    pausedStartedAtRef.current = 0;
     timeRemainingFloatRef.current = limit;
     gameRuntimeRef.current.timeLimit = limit;
     gameRuntimeRef.current.questionResolved = false;
 
     wordTimerRef.current = setInterval(() => {
-      if (gameRuntimeRef.current.subState !== 'PLAYING') return;
+      const rt = gameRuntimeRef.current;
+      if (rt.subState !== 'PLAYING' || rt.paused) return;
       const elapsedSec = (Date.now() - wordStartedAtRef.current) / 1000;
-      const remaining = Math.max(0, limit - elapsedSec);
+      const effectiveLimit = limit + bonusTimeSecRef.current;
+      const remaining = Math.max(0, effectiveLimit - elapsedSec);
       timeRemainingFloatRef.current = remaining;
       setGameTimeLeft(Math.ceil(remaining));
 
-      if (remaining <= 0 && !gameRuntimeRef.current.questionResolved) {
-        gameRuntimeRef.current.questionResolved = true;
+      if (remaining <= 0 && !rt.questionResolved) {
+        rt.questionResolved = true;
         clearInterval(wordTimerRef.current);
-        const currentWord = gameRuntimeRef.current.activeQuestion?.word || '';
+        const currentWord = rt.activeQuestion?.word || '';
         handleGameLifeLoss(`⏰ Hết thời gian! Từ đúng là "${currentWord}"`, true);
       }
     }, 100);
@@ -3555,6 +4109,12 @@ export default function App() {
         speakWord(rt.activeQuestion.word);
         return;
       }
+      if (e.code === 'Digit2') {
+        e.preventDefault();
+        handleUseFreezePowerup();
+        return;
+      }
+      if (rt.paused) return;
       if (rt.round === 2 || rt.round === 3) {
         if (e.code === 'Digit1') {
           e.preventDefault();
@@ -3570,7 +4130,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [view, gameSubState]);
+  }, [view, gameSubState, freezeCharges, gamePaused]);
 
   // Canvas Animation Game Loop (Space-Shooter Canvas with ResizeObserver)
   useEffect(() => {
@@ -3680,7 +4240,7 @@ export default function App() {
     };
 
     const fireBullet = () => {
-      if (gameRuntimeRef.current.round === 1 && gameRuntimeRef.current.subState === 'PLAYING') {
+      if (gameRuntimeRef.current.round === 1 && gameRuntimeRef.current.subState === 'PLAYING' && !gameRuntimeRef.current.paused) {
         bullets.push({ x: playerX, y: height - 52, speed: 13 });
         playSound('shoot');
       }
@@ -3726,9 +4286,10 @@ export default function App() {
       ctx.clearRect(0, 0, width, height);
 
       const rt = gameRuntimeRef.current;
+      const isFrozen = Date.now() < freezeUntilRef.current;
 
       // Keyboard ship steering for Round 1
-      if (rt.round === 1 && rt.subState === 'PLAYING') {
+      if (rt.round === 1 && rt.subState === 'PLAYING' && !rt.paused) {
         if (pressedKeys['ArrowLeft'] || pressedKeys['KeyA']) {
           playerX = Math.max(36, playerX - 7);
         }
@@ -3740,10 +4301,12 @@ export default function App() {
       // Starfield
       ctx.fillStyle = '#ffffff';
       stars.forEach(s => {
-        s.y += s.speed;
-        if (s.y > height) {
-          s.y = 0;
-          s.x = Math.random() * width;
+        if (!rt.paused) {
+          s.y += s.speed * (isFrozen ? 0.35 : 1);
+          if (s.y > height) {
+            s.y = 0;
+            s.x = Math.random() * width;
+          }
         }
         ctx.globalAlpha = 0.5;
         ctx.beginPath();
@@ -3755,17 +4318,31 @@ export default function App() {
       const limit = Math.max(1, rt.timeLimit || 25);
       const elapsedRatio = Math.min(1, Math.max(0, 1 - timeRemainingFloatRef.current / limit));
 
+      // Subtle Danger Warning Line near ship when time <= 6s
+      if (rt.subState === 'PLAYING' && timeRemainingFloatRef.current <= 6) {
+        const dangerY = height - 82;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(244, 63, 94, 0.45)';
+        ctx.setLineDash([8, 8]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(20, dangerY);
+        ctx.lineTo(width - 20, dangerY);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Bullets & Hit detection (Round 1)
       ctx.fillStyle = '#00f2fe';
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
-        b.y -= b.speed;
+        if (!rt.paused) b.y -= b.speed;
         ctx.beginPath();
         ctx.roundRect(b.x - 3, b.y, 6, 16, 3);
         ctx.fill();
 
         let bulletRemoved = false;
-        if (rt.round === 1 && rt.subState === 'PLAYING' && !rt.questionResolved) {
+        if (rt.round === 1 && rt.subState === 'PLAYING' && !rt.questionResolved && !rt.paused) {
           for (let j = chickens.length - 1; j >= 0; j--) {
             const c = chickens[j];
             if (
@@ -3779,21 +4356,28 @@ export default function App() {
 
               if (c.isCorrect) {
                 rt.questionResolved = true;
+                const feverMult = rt.combo >= 3 ? 2 : 1;
+                const gain = (120 + rt.combo * 20) * feverMult;
                 const nextCombo = rt.combo + 1;
-                const nextScore = rt.score + 120 + rt.combo * 20;
+                const nextScore = rt.score + gain;
                 rt.score = nextScore;
                 rt.combo = nextCombo;
                 setGameScore(nextScore);
                 setGameCombo(nextCombo);
 
+                pushGameParticles(c.x, c.y, feverMult > 1 ? '#fbbf24' : '#22d3ee', 26);
                 playSound('word_clear');
                 speakWord(rt.activeQuestion.word);
-                triggerGameToast(`✅ Xuất sắc! ${rt.activeQuestion.word} (${rt.activeQuestion.ipa})`, true);
+                triggerGameToast(
+                  `✅ Xuất sắc! ${rt.activeQuestion.word} (${rt.activeQuestion.ipa}) +${gain}đ${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+                  true
+                );
                 handleWordCleared(true, nextScore, nextCombo);
               } else {
+                pushGameParticles(c.x, c.y, '#fb7185', 16);
                 chickens.splice(j, 1);
                 handleGameLifeLoss(
-                  `❌ Bắn nhầm từ "${c.word}". Đáp án đúng là "${rt.activeQuestion.word}"`,
+                  `❌ Bắn nhầm "${c.word}"! Hãy nhìn kỹ nghĩa tiếng Việt & bắn mục tiêu đúng!`,
                   false
                 );
               }
@@ -3811,7 +4395,7 @@ export default function App() {
       const lasers = homingLasersRef.current;
       for (let i = lasers.length - 1; i >= 0; i--) {
         const hl = lasers[i];
-        hl.progress += 0.22;
+        if (!rt.paused) hl.progress += 0.22;
         ctx.strokeStyle = '#10b981';
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -3823,17 +4407,51 @@ export default function App() {
         if (hl.progress >= 1) lasers.splice(i, 1);
       }
 
+      // Particle explosions & Freeze crystal sparks
+      const particles = particlesRef.current;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        if (!rt.paused) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.96;
+          p.vy *= 0.96;
+          p.alpha -= 0.028;
+        }
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
       // Draw Chickens (Round 1) — smoothly descend with timer
       if (rt.round === 1 && rt.subState === 'PLAYING') {
         const topBaseY = Math.max(46, height * 0.14);
         const maxDescendY = Math.max(topBaseY + 20, height - 155);
         chickens.forEach(c => {
-          c.wingPhase += 0.1;
-          c.x = c.baseX + Math.sin(c.wingPhase * 0.5) * c.swayRange;
+          if (!rt.paused) {
+            c.wingPhase += isFrozen ? 0.03 : 0.1;
+            c.x = c.baseX + Math.sin(c.wingPhase * 0.5) * c.swayRange;
+          }
           c.y = topBaseY + c.rowOffset + elapsedRatio * (maxDescendY - topBaseY - c.rowOffset);
 
           ctx.save();
           ctx.translate(c.x, c.y);
+
+          if (isFrozen) {
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 26, 0, Math.PI * 2);
+            ctx.stroke();
+          }
 
           // Wings
           const wingY = Math.sin(c.wingPhase) * 6;
@@ -3899,8 +4517,14 @@ export default function App() {
         ctx.save();
         ctx.translate(bossX, bossY);
 
-        // Danger halo when time <= 6s
-        if (timeRemainingFloatRef.current <= 6) {
+        // Freeze crystal aura or Danger halo
+        if (isFrozen) {
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.arc(0, 0, 44 + Math.sin(Date.now() * 0.015) * 3, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (timeRemainingFloatRef.current <= 6) {
           ctx.strokeStyle = 'rgba(244, 63, 94, 0.65)';
           ctx.lineWidth = 3;
           ctx.beginPath();
@@ -3982,18 +4606,48 @@ export default function App() {
         ctx.restore();
       }
 
-      // Draw Player Spaceship
+      // Draw Player Spaceship with Crewmate cockpit visor & glowing thruster
       const shipX = rt.round === 1 ? playerX : width / 2;
+      const crewPalette = CREWMATE_COLORS.find(c => c.id === rt.crewColorId);
+      const hullColor = crewPalette ? crewPalette.fill : (rt.round === 1 ? '#00f2fe' : '#a855f7');
       ctx.save();
       ctx.translate(shipX, height - 34);
-      ctx.fillStyle = rt.round === 1 ? '#00f2fe' : '#a855f7';
+
+      // Animated Thruster Flame
+      if (!rt.paused) {
+        const flameLen = 14 + Math.random() * 8;
+        ctx.fillStyle = rt.combo >= 3 ? '#fbbf24' : '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(-6, 10);
+        ctx.lineTo(0, 10 + flameLen);
+        ctx.lineTo(6, 10);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Main Hull + Wings
+      ctx.fillStyle = hullColor;
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(0, -20);
-      ctx.lineTo(18, 14);
+      ctx.moveTo(0, -22);
+      ctx.lineTo(20, 14);
       ctx.lineTo(0, 8);
-      ctx.lineTo(-18, 14);
+      ctx.lineTo(-20, 14);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
+
+      // Crewmate Visor Cockpit
+      ctx.fillStyle = '#bae6fd';
+      ctx.beginPath();
+      ctx.roundRect(-6, -9, 12, 8, 4);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(-2, -6.5, 2.5, 1.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
 
       animFrameRef.current = requestAnimationFrame(renderLoop);
@@ -5031,6 +5685,34 @@ export default function App() {
                   <DoorOpen className="w-4 h-4" /> VÀO SẢNH CHỜ NGAY
                 </button>
               </form>
+
+              {allRoomsList.filter(r => r.status === 'LOBBY').length > 0 && (
+                <div className="mt-5 pt-4 border-t border-slate-800/90">
+                  <p className="text-[11px] font-semibold text-slate-400 mb-2 text-center">
+                    Phòng đang mở sảnh chờ (bấm để chọn nhanh mã PIN):
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {allRoomsList.filter(r => r.status === 'LOBBY').map(r => (
+                      <button
+                        key={r.pin}
+                        type="button"
+                        onClick={() => {
+                          setRoomJoinForm(prev => ({ ...prev, pin: r.pin }));
+                          setRoomJoinError('');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition flex items-center gap-1.5 ${
+                          roomJoinForm.pin === r.pin
+                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                            : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-cyan-500/50'
+                        }`}
+                      >
+                        <span className="font-mono text-amber-300">#{r.pin}</span>
+                        <span className="truncate max-w-[140px]">{r.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -5081,9 +5763,17 @@ export default function App() {
                       showToast(`Đã sao chép PIN ${room.pin} & Pass "${room.pass}"!`);
                     }}
                     className="ml-1 text-indigo-300 hover:text-white"
-                    title="Sao chép thông tin phòng"
+                    title="Sao chép mã PIN & Mật khẩu"
                   >
                     {copiedRoomPin ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyInviteLink(room.pin)}
+                    className="text-cyan-300 hover:text-white pl-1 border-l border-indigo-500/30"
+                    title="Sao chép Link mời tự điền PIN (?pin=...)"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
@@ -5145,24 +5835,33 @@ export default function App() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[11px] font-bold text-slate-400">Chuyển phòng:</span>
                       {allRoomsList.map(r => (
-                        <button
-                          key={r.pin}
-                          type="button"
-                          onClick={() => handleTeacherOpenLobby(r.pin)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
-                            r.pin === activePin
-                              ? 'bg-indigo-600 border-indigo-500 text-white'
-                              : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500'
-                          }`}
-                        >
-                          #{r.pin} • {r.name}
-                        </button>
+                        <div key={r.pin} className="inline-flex items-center rounded-lg overflow-hidden border border-slate-700">
+                          <button
+                            type="button"
+                            onClick={() => handleTeacherOpenLobby(r.pin)}
+                            className={`px-2.5 py-1 text-[11px] font-bold transition ${
+                              r.pin === activePin
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            #{r.pin} • {r.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRoom(r.pin)}
+                            className="px-1.5 py-1 bg-slate-900 hover:bg-rose-600 text-slate-400 hover:text-white text-[11px] transition border-l border-slate-700"
+                            title={`Xóa phòng #${r.pin}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
 
                   <form onSubmit={handleSaveHostRoomSettings} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
-                    <div className="sm:col-span-5">
+                    <div className="sm:col-span-4">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-indigo-300 mb-1">
                         Tên phòng hiển thị
                       </label>
@@ -5186,17 +5885,45 @@ export default function App() {
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-300 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                       />
                     </div>
-                    <div className="sm:col-span-3">
+                    <div className="sm:col-span-2">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-cyan-300 mb-1">
-                        Mật khẩu phòng (Pass)
+                        Mật khẩu
                       </label>
                       <input
                         type="text"
                         value={hostRoomDraft.pass}
                         onChange={e => setHostRoomDraft(prev => ({ ...prev, pass: e.target.value }))}
-                        placeholder="Mật khẩu vào sảnh..."
+                        placeholder="Mật khẩu..."
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono font-bold text-cyan-300 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                       />
+                    </div>
+                    <div className="sm:col-span-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1">
+                        Từ/vòng
+                      </label>
+                      <select
+                        value={hostRoomDraft.roundSize || 4}
+                        onChange={e => setHostRoomDraft(prev => ({ ...prev, roundSize: Number(e.target.value) }))}
+                        className="w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-emerald-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      >
+                        {[2, 3, 4, 5, 6, 8].map(num => (
+                          <option key={num} value={num}>{num}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-pink-300 mb-1">
+                        Tốc độ
+                      </label>
+                      <select
+                        value={hostRoomDraft.speedMode || 'normal'}
+                        onChange={e => setHostRoomDraft(prev => ({ ...prev, speedMode: e.target.value }))}
+                        className="w-full px-1.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-pink-300 focus:ring-2 focus:ring-pink-500 focus:outline-none"
+                      >
+                        <option value="relaxed">Chậm</option>
+                        <option value="normal">Chuẩn</option>
+                        <option value="turbo">Nhanh</option>
+                      </select>
                     </div>
                     <div className="sm:col-span-2">
                       <button
@@ -5229,7 +5956,7 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-semibold">
-                    {roomVocabCount} từ • 3 vòng
+                    {roomVocabCount} từ • {room.roundSize || 4}/vòng • {room.speedMode === 'relaxed' ? 'Chậm (+6s)' : room.speedMode === 'turbo' ? 'Siêu tốc (-5s)' : 'Chuẩn'}
                   </span>
                   <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
                     {readyCount}/{lobbyPlayersList.length} Sẵn sàng
@@ -5260,6 +5987,18 @@ export default function App() {
                             <div className="absolute -top-10 z-20 bg-white text-slate-900 text-[11px] font-bold px-2.5 py-1 rounded-xl shadow-lg max-w-[150px] truncate border border-slate-200">
                               {player.chat}
                             </div>
+                          )}
+
+                          {/* Kick Button for Teacher */}
+                          {isTeacher && !isHost && (
+                            <button
+                              type="button"
+                              onClick={() => handleKickLobbyPlayer(activePin, player.username, player.name)}
+                              className="absolute -top-2 -right-2 z-20 w-6 h-6 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition"
+                              title={`Mời ${player.name} rời sảnh`}
+                            >
+                              <UserMinus className="w-3 h-3" />
+                            </button>
                           )}
 
                           {/* Host Crown */}
@@ -5422,6 +6161,16 @@ export default function App() {
       const leaderScore = Math.max(150, rankedPlayers[0]?.score || 0);
       const ROW_STRIDE = 88;
       const podiumOrder = rankedPlayers.length >= 2 ? [1, 0, 2] : [0];
+      const missedFreqMap = {};
+      rankedPlayers.forEach(p => {
+        (p.missed || []).forEach(wordStr => {
+          const w = String(wordStr || '').trim().toUpperCase();
+          if (w) missedFreqMap[w] = (missedFreqMap[w] || 0) + 1;
+        });
+      });
+      const topMissedWords = Object.entries(missedFreqMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
 
       return (
         <div className="min-h-[100dvh] w-full bg-[#060914] text-white flex flex-col select-none relative overflow-x-hidden">
@@ -5459,6 +6208,15 @@ export default function App() {
               <span className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-cyan-300 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5" /> {finishedCount}/{rankedPlayers.length} Đã xong
               </span>
+              {room.status !== 'ENDED' && (
+                <button
+                  type="button"
+                  onClick={() => handleFinishRoomMatch(activePin)}
+                  className="px-3.5 py-1.5 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white text-xs font-extrabold transition flex items-center gap-1.5 shadow"
+                >
+                  <Trophy className="w-3.5 h-3.5" /> Chốt BXH & Kết Thúc
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -5657,6 +6415,32 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* Classroom Most-Missed Words Analytics for Live Review */}
+              {topMissedWords.length > 0 && (
+                <div className="bg-slate-900/80 border border-rose-500/30 rounded-3xl p-4 sm:p-5 backdrop-blur-md shadow-xl">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-rose-400" /> Từ Cả Lớp Hay Sai Nhất (Bấm Để Đọc Mẫu)
+                    </h3>
+                    <span className="text-[11px] text-slate-400">Phục vụ ôn tập ngay sau trận</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {topMissedWords.map(([wordStr, errCount]) => (
+                      <button
+                        key={wordStr}
+                        type="button"
+                        onClick={() => speakWord(wordStr)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-xs font-bold text-rose-200 flex items-center gap-1.5 transition"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 text-cyan-300" />
+                        <span className="font-mono">{wordStr}</span>
+                        <span className="bg-rose-500/30 text-white text-[10px] px-1.5 py-0.5 rounded-md">{errCount} lượt sai</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right 4 Cols: Live Lobby Chat during Match */}
@@ -5685,6 +6469,33 @@ export default function App() {
             <span className="hidden sm:inline-flex bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-full font-bold">
               {currentUser?.name || currentUser?.username}
             </span>
+            <button
+              type="button"
+              onClick={handleToggleGameMute}
+              className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center gap-1 ${
+                gameMuted
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                  : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-cyan-300'
+              }`}
+              title={gameMuted ? 'Bật âm thanh Game' : 'Tắt âm thanh Game'}
+            >
+              {gameMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+              <span className="hidden md:inline">{gameMuted ? 'Đang tắt tiếng' : 'Âm thanh'}</span>
+            </button>
+            {isTeacher && isSandboxRound && gameSubState === 'PLAYING' && (
+              <button
+                type="button"
+                onClick={handleToggleGamePause}
+                className={`px-2.5 py-1 rounded-lg font-bold border transition flex items-center gap-1 ${
+                  gamePaused
+                    ? 'bg-amber-500 text-slate-950 border-amber-400'
+                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300'
+                }`}
+              >
+                {gamePaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                <span>{gamePaused ? 'Tiếp tục' : 'Tạm dừng'}</span>
+              </button>
+            )}
           </div>
 
           {/* Teacher Sandbox Controls */}
@@ -5740,7 +6551,9 @@ export default function App() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <span
                   className={`px-2.5 py-1 rounded-lg font-mono font-extrabold text-xs flex items-center gap-1 border ${
-                    isLowTime
+                    isFrozenBoost
+                      ? 'bg-sky-500/25 text-sky-200 border-sky-400 animate-pulse'
+                      : isLowTime
                       ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse'
                       : isMidTime
                       ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
@@ -5749,6 +6562,11 @@ export default function App() {
                 >
                   <Clock className="w-3.5 h-3.5" /> {gameTimeLeft}s
                 </span>
+                {gameCombo >= 3 && (
+                  <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 font-black text-[11px] animate-pulse">
+                    🔥 FEVER x2
+                  </span>
+                )}
                 <span className="text-amber-400 font-extrabold text-xs sm:text-sm">Combo: {gameCombo}</span>
                 <span className="text-cyan-400 font-extrabold text-xs sm:text-sm tabular-nums">Điểm: {gameScore}</span>
               </div>
@@ -5778,6 +6596,19 @@ export default function App() {
                     className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 transition"
                   >
                     <Volume2 className="w-3.5 h-3.5" /> Nghe (TAB)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseFreezePowerup}
+                    disabled={freezeCharges <= 0 || gamePaused}
+                    className={`px-2.5 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 transition border ${
+                      freezeCharges > 0 && !gamePaused
+                        ? 'bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border-sky-400/40'
+                        : 'bg-slate-800/60 text-slate-500 border-slate-700 cursor-not-allowed'
+                    }`}
+                    title="Đóng băng thời gian & làm chậm Boss (+8 giây) — Phím tắt [2]"
+                  >
+                    <Snowflake className="w-3 h-3" /> Đóng băng +8s [2] ({freezeCharges})
                   </button>
                   {(gameRound === 2 || gameRound === 3) && (
                     <>
@@ -5865,6 +6696,21 @@ export default function App() {
           <div className="relative w-full h-full rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden shadow-2xl">
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full cursor-crosshair block touch-none" />
 
+            {/* Sandbox Pause Overlay */}
+            {gamePaused && gameSubState === 'PLAYING' && (
+              <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center">
+                <p className="text-xs font-extrabold uppercase tracking-widest text-amber-400 mb-2">Chế độ Giảng Bài GV</p>
+                <h3 className="text-2xl font-black text-white mb-4">ĐANG TẠM DỪNG</h3>
+                <button
+                  type="button"
+                  onClick={handleToggleGamePause}
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm transition flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4" /> Tiếp Tục Chơi
+                </button>
+              </div>
+            )}
+
             {/* Feedback Toast Overlay */}
             {gameToast.visible && (
               <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-2xl transition-all border z-30 max-w-[90%] text-center ${
@@ -5879,7 +6725,7 @@ export default function App() {
               <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40">
                 <h2 className="text-xl sm:text-2xl font-extrabold text-amber-400 mb-2">HOÀN THÀNH VÒNG {gameRound}/3!</h2>
                 <p className="text-xs sm:text-sm text-slate-300 max-w-md mb-3 leading-relaxed">
-                  Chuẩn bị bước sang <b>Vòng {gameRound + 1}</b> với <b>bộ từ vựng mới</b> (giới hạn {GAME_ROUND_TIME_LIMITS[gameRound + 1] || 25} giây/từ)!
+                  Chuẩn bị bước sang <b>Vòng {gameRound + 1}</b> với <b>bộ từ vựng mới</b> (giới hạn {getSpeedAdjustedTimeLimit(gameRound + 1, room.speedMode || 'normal')} giây/từ)!
                 </p>
                 <p className="text-xs font-mono text-cyan-300 mb-5">
                   Tự động bắt đầu sau {transitionCountdown} giây...
@@ -5909,6 +6755,44 @@ export default function App() {
                   Điểm số: <b className="text-amber-400 text-base">{gameScore} điểm</b> • Đạt: <b className="text-emerald-400">{passedWordsCount}/{gameReviewLog.length} từ</b> • Đã lưu vào Bảng Xếp Hạng!
                 </p>
 
+                {/* Live Room Top 5 Standings at End of Match */}
+                {(() => {
+                  const matchEntries = Object.values(room.liveMatch || {});
+                  const topStandings = (
+                    matchEntries.length > 0
+                      ? [...matchEntries].sort((a, b) => (b.score || 0) - (a.score || 0))
+                      : leaderboardPlayers
+                  ).slice(0, 5);
+                  if (topStandings.length === 0) return null;
+                  return (
+                    <div className="max-w-xl w-full bg-slate-900/90 border border-indigo-500/30 rounded-xl p-3 mb-3 text-left text-xs">
+                      <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-300 mb-2 flex items-center gap-1.5">
+                        <Trophy className="w-3.5 h-3.5" /> Bảng Xếp Hạng Phòng #{activePin} (Top {topStandings.length})
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {topStandings.map((st, sIdx) => {
+                          const isMe = st.username === currentUser?.username || st.name === currentUser?.name;
+                          return (
+                            <div
+                              key={st.username || st.name || sIdx}
+                              className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border ${
+                                isMe
+                                  ? 'bg-cyan-500/15 border-cyan-400/50 text-cyan-200'
+                                  : 'bg-slate-950/70 border-slate-800 text-slate-200'
+                              }`}
+                            >
+                              <span className="truncate font-semibold">
+                                #{sIdx + 1} {st.name || st.username} {isMe ? '(Bạn)' : ''}
+                              </span>
+                              <span className="font-mono font-extrabold text-amber-300 ml-2 shrink-0">{st.score || 0}đ</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Review List of Words */}
                 <div className="max-w-xl w-full max-h-48 sm:max-h-56 overflow-y-auto bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-left space-y-2 mb-4 text-xs">
                   {gameReviewLog.length === 0 ? (
@@ -5923,6 +6807,14 @@ export default function App() {
                           </span>
                           <b className="text-cyan-300">{item.word}</b>
                           <span className="text-slate-400 font-mono">{item.ipa}</span>
+                          <button
+                            type="button"
+                            onClick={() => speakWord(item.word)}
+                            className="ml-auto p-1 rounded-md bg-slate-800 hover:bg-cyan-500/20 text-cyan-300 transition"
+                            title={`Nghe phát âm "${item.word}"`}
+                          >
+                            <Volume2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                         <p className="text-slate-300 mt-0.5">{item.prompt}</p>
                         <p className="text-[11px] text-slate-500 italic mt-0.5">"{item.example}"</p>
@@ -6803,7 +7695,7 @@ export default function App() {
                 {((resultReviewTab === 'listening' ? targetTest?.listening?.questions : targetTest?.reading?.questions) || []).map((q, idx) => {
                   const userAns = (attempt.answers?.[q.id] || '').trim();
                   const correctAns = (q.correctAnswer || '').trim();
-                  const isCorrect = userAns.toLowerCase() === correctAns.toLowerCase() && correctAns !== '';
+                  const isCorrect = isObjectiveAnswerCorrect(q, userAns);
 
                   return (
                     <div
@@ -7865,19 +8757,39 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
-                  <button
-                    onClick={() => openExamBuilder(t, 'general')}
-                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5"
-                  >
-                    <Clock className="w-3.5 h-3.5" /> Cài Giờ & Thứ Tự
-                  </button>
-                  <button
-                    onClick={() => openExamBuilder(t, 'reading')}
-                    className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-500/30"
-                  >
-                    <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi & Ảnh
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => openExamBuilder(t, 'general')}
+                      className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1"
+                    >
+                      <Clock className="w-3.5 h-3.5" /> Cài Giờ & Thứ Tự
+                    </button>
+                    <button
+                      onClick={() => openExamBuilder(t, 'reading')}
+                      className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30"
+                    >
+                      <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi & Ảnh
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleDuplicateTest(t)}
+                      className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-500/15 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 transition"
+                      title="Nhân bản đề thi (Bản sao tự động ở chế độ Riêng tư)"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTest(t)}
+                      className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
+                      title="Xóa đề thi này"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
               );
@@ -7886,7 +8798,106 @@ export default function App() {
         )}
 
         {/* Tab 2: Giám Sát Gian Lận & Chấm Điểm */}
-        {teacherHubTab === 'grading' && (
+        {teacherHubTab === 'grading' && (() => {
+          const pendingCount = attempts.filter(a => !a.teacherGraded).length;
+          const highRiskCount = attempts.filter(a => (a.tabSwitchCount || 0) >= 3).length;
+          const gradedBands = attempts.filter(a => typeof a.overallBand === 'number').map(a => a.overallBand);
+          const avgBandDisplay = gradedBands.length > 0
+            ? (gradedBands.reduce((acc, b) => acc + b, 0) / gradedBands.length).toFixed(1)
+            : '-';
+
+          const filteredAttempts = attempts.filter(att => {
+            if (gradingFilters.testId !== 'all' && att.testId !== gradingFilters.testId) return false;
+            if (gradingFilters.status === 'pending' && att.teacherGraded) return false;
+            if (gradingFilters.status === 'graded' && !att.teacherGraded) return false;
+            if (gradingFilters.risk === 'risk' && (att.tabSwitchCount || 0) < 3) return false;
+            if (gradingFilters.search.trim()) {
+              const q = gradingFilters.search.trim().toLowerCase();
+              const hay = `${att.studentName || ''} ${att.studentId || ''} ${att.testTitle || ''}`.toLowerCase();
+              if (!hay.includes(q)) return false;
+            }
+            return true;
+          });
+
+          const uniqueAttemptTests = Array.from(
+            new Map(attempts.map(a => [a.testId, a.testTitle || a.testId])).entries()
+          );
+
+          return (
+          <div className="space-y-4">
+            {/* 4 Analytics KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tổng bài đã nộp</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">{attempts.length}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-amber-200 dark:border-amber-500/30 p-4 shadow-sm">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Chờ chấm Writing</p>
+                <p className="text-2xl font-black text-amber-600 dark:text-amber-300 mt-1 tabular-nums">{pendingCount}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-500/30 p-4 shadow-sm">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Band TB toàn lớp</p>
+                <p className="text-2xl font-black text-blue-600 dark:text-blue-300 mt-1 tabular-nums">{avgBandDisplay}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-rose-200 dark:border-rose-500/30 p-4 shadow-sm">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Cảnh báo tab (≥3)</p>
+                <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1 tabular-nums">{highRiskCount}</p>
+              </div>
+            </div>
+
+            {/* Filter & CSV Export Bar */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 mr-1">
+                  <Filter className="w-3.5 h-3.5" /> Lọc:
+                </span>
+                <select
+                  value={gradingFilters.testId}
+                  onChange={e => setGradingFilters(prev => ({ ...prev, testId: e.target.value }))}
+                  className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 max-w-[200px]"
+                >
+                  <option value="all">Tất cả đề thi</option>
+                  {uniqueAttemptTests.map(([tid, title]) => (
+                    <option key={tid} value={tid}>{title}</option>
+                  ))}
+                </select>
+                <select
+                  value={gradingFilters.status}
+                  onChange={e => setGradingFilters(prev => ({ ...prev, status: e.target.value }))}
+                  className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                >
+                  <option value="all">Tất cả trạng thái</option>
+                  <option value="pending">Chờ chấm Writing</option>
+                  <option value="graded">Đã chấm xong</option>
+                </select>
+                <select
+                  value={gradingFilters.risk}
+                  onChange={e => setGradingFilters(prev => ({ ...prev, risk: e.target.value }))}
+                  className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                >
+                  <option value="all">Mọi mức độ tab</option>
+                  <option value="risk">Nghi gian lận (≥3 tab)</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="🔍 Tên học viên..."
+                  value={gradingFilters.search}
+                  onChange={e => setGradingFilters(prev => ({ ...prev, search: e.target.value }))}
+                  className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 w-44 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  exportAttemptsToCsv(filteredAttempts);
+                  showToast(`Đã xuất file CSV bảng điểm (${filteredAttempts.length} dòng)!`);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
+              >
+                <Download className="w-3.5 h-3.5" /> Xuất CSV Excel ({filteredAttempts.length})
+              </button>
+            </div>
+
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
@@ -7902,7 +8913,20 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {attempts.map(att => {
+                  {filteredAttempts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-10 text-center text-xs text-slate-400">
+                        Không có bài nộp nào khớp bộ lọc hiện tại.{' '}
+                        <button
+                          type="button"
+                          onClick={() => setGradingFilters({ testId: 'all', status: 'all', risk: 'all', search: '' })}
+                          className="text-blue-600 dark:text-blue-400 font-bold underline ml-1"
+                        >
+                          Đặt lại bộ lọc
+                        </button>
+                      </td>
+                    </tr>
+                  ) : filteredAttempts.map(att => {
                     const risk = getRiskAssessment(att.tabSwitchCount);
                     const RiskIcon = risk.icon;
 
@@ -7933,19 +8957,29 @@ export default function App() {
                           {att.overallBand ?? '-'}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => {
-                              setGradingAttempt(att);
-                              setGradingScores({
-                                task1Band: att.scores.writing.task1Band || 6.0,
-                                task2Band: att.scores.writing.task2Band || 6.5,
-                                feedback: att.teacherFeedback || ''
-                              });
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold transition shadow-sm"
-                          >
-                            Chấm Bài & Chi Tiết
-                          </button>
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setGradingAttempt(att);
+                                setGradingScores({
+                                  task1Band: att.scores.writing.task1Band || 6.0,
+                                  task2Band: att.scores.writing.task2Band || 6.5,
+                                  feedback: att.teacherFeedback || ''
+                                });
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm"
+                            >
+                              Chấm Bài & Chi Tiết
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAttempt(att)}
+                              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
+                              title="Xóa lượt thi này để mở khóa cho học viên thi lại"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -7954,7 +8988,9 @@ export default function App() {
               </table>
             </div>
           </div>
-        )}
+          </div>
+          );
+        })()}
 
         {/* Tab 3: Phòng Đấu Game PIN & Leaderboard */}
         {teacherHubTab === 'game_room' && (
@@ -7967,26 +9003,37 @@ export default function App() {
                   const isActiveRoom = r.pin === currentRoomPin;
                   const rLobbyCount = Object.keys(r.lobbyPlayers || {}).length;
                   return (
-                    <button
-                      key={r.pin}
-                      onClick={() => {
-                        setCurrentRoomPin(r.pin);
-                        setCustomVocabInput(r.rawVocab || DEFAULT_VOCAB_TEXT);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-2 ${
-                        isActiveRoom
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
-                      }`}
-                    >
-                      <span className="font-mono">#{r.pin}</span>
-                      <span className={`w-1.5 h-1.5 rounded-full ${r.status === 'PLAYING' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                      {rLobbyCount > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActiveRoom ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'}`}>
-                          {rLobbyCount} chờ
-                        </span>
+                    <div key={r.pin} className="inline-flex items-center rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                      <button
+                        onClick={() => {
+                          setCurrentRoomPin(r.pin);
+                          setCustomVocabInput(r.rawVocab || DEFAULT_VOCAB_TEXT);
+                        }}
+                        className={`px-3 py-1.5 text-xs font-bold transition flex items-center gap-2 ${
+                          isActiveRoom
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className="font-mono">#{r.pin}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${r.status === 'PLAYING' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                        {rLobbyCount > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActiveRoom ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'}`}>
+                            {rLobbyCount} chờ
+                          </span>
+                        )}
+                      </button>
+                      {allRoomsList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRoom(r.pin)}
+                          className="px-2 py-1.5 bg-slate-100 dark:bg-slate-900 hover:bg-rose-600 text-slate-400 hover:text-white border-l border-slate-200 dark:border-slate-700 transition"
+                          title={`Xóa phòng #${r.pin}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -8034,14 +9081,27 @@ export default function App() {
                     {copiedRoomPin ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copiedRoomPin ? 'Đã chép' : 'Copy PIN'}</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyInviteLink(currentRoomPin)}
+                    className="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 text-xs font-bold border border-cyan-400/30 flex items-center gap-1.5 transition"
+                    title="Sao chép Link mời học viên tự điền mã PIN"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Copy Link Mời</span>
+                  </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 mt-2.5">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 mt-2.5">
                   <span>Mật khẩu: <b className="text-cyan-300 font-mono">{room.pass}</b></span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5 text-emerald-400" />
                     <b>{lobbyPlayersList.length}</b> học sinh trong Sảnh Chờ
+                  </span>
+                  <span>•</span>
+                  <span className="bg-white/10 px-2 py-0.5 rounded-md font-semibold text-[11px] text-amber-200">
+                    {room.roundSize || 4} từ/vòng • {room.speedMode === 'relaxed' ? 'Chậm (+6s)' : room.speedMode === 'turbo' ? 'Siêu tốc (-5s)' : 'Chuẩn'}
                   </span>
                 </div>
               </div>
@@ -8099,7 +9159,7 @@ export default function App() {
                 <div className="flex flex-wrap gap-3">
                   {lobbyPlayersList.map(lp => (
                     <div key={lp.username} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                      <AmongUsCrewmate colorId={lp.colorId} size={28} />
+                      <AmongUsCrewmate colorId={lp.colorId} avatarUrl={lp.avatarUrl || usersDb[lp.username]?.avatarUrl || ''} size={28} />
                       <div>
                         <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
                           {lp.name}
@@ -8109,6 +9169,16 @@ export default function App() {
                           {lp.ready ? 'Đã sẵn sàng' : 'Đang chuẩn bị'}
                         </p>
                       </div>
+                      {lp.role !== 'teacher' && (
+                        <button
+                          type="button"
+                          onClick={() => handleKickLobbyPlayer(currentRoomPin, lp.username, lp.name)}
+                          className="ml-1 p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition"
+                          title={`Mời ${lp.name} rời sảnh`}
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -8150,7 +9220,21 @@ export default function App() {
                             {idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`}
                           </td>
                           <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">{p.name}</td>
-                          <td className="px-6 py-3.5 text-xs text-slate-600 dark:text-slate-300">{p.status}</td>
+                          <td className="px-6 py-3.5 text-xs text-slate-600 dark:text-slate-300">
+                            <div>{p.status}</div>
+                            {Array.isArray(p.missed) && p.missed.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {p.missed.slice(0, 4).map((mw, mIdx) => (
+                                  <span
+                                    key={mIdx}
+                                    className="px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 font-mono text-[10px] font-bold"
+                                  >
+                                    {mw}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-6 py-3.5 text-center font-extrabold text-blue-600 dark:text-blue-400">{p.score}đ</td>
                           <td className="px-6 py-3.5 text-center font-bold text-amber-600 dark:text-amber-400">🔥 {p.streak}</td>
                           <td className="px-6 py-3.5 text-right text-xs text-slate-400">{p.updatedAt}</td>
@@ -8179,14 +9263,21 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="w-full md:w-80">
+              <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                 <input
                   type="text"
                   placeholder="🔍 Tìm kiếm theo tên hoặc username..."
                   value={studentSearchQuery}
                   onChange={e => setStudentSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium"
+                  className="w-full sm:w-64 px-4 py-2.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowAddStudentModal(true)}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <UserPlus className="w-4 h-4" /> + Thêm Học Viên
+                </button>
               </div>
             </div>
 
@@ -8297,16 +9388,29 @@ export default function App() {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <button
-                                onClick={() => {
-                                  setSelectedProfileStudent(student.username);
-                                  setPreviousView('TEACHER_DASHBOARD');
-                                  setView('STUDENT_PROFILE');
-                                }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition shadow-sm inline-flex items-center gap-1.5"
-                              >
-                                <GraduationCap className="w-3.5 h-3.5" /> Xem Hồ Sơ & Lịch Sử
-                              </button>
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingStudentAccount(student);
+                                    setStudentPasswordDraft('');
+                                  }}
+                                  className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-500/15 text-slate-700 dark:text-slate-200 hover:text-amber-700 dark:hover:text-amber-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition inline-flex items-center gap-1"
+                                  title="Đặt lại mật khẩu đăng nhập cho học viên"
+                                >
+                                  <Key className="w-3.5 h-3.5" /> Đổi MK
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedProfileStudent(student.username);
+                                    setPreviousView('TEACHER_DASHBOARD');
+                                    setView('STUDENT_PROFILE');
+                                  }}
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition shadow-sm inline-flex items-center gap-1.5"
+                                >
+                                  <GraduationCap className="w-3.5 h-3.5" /> Xem Hồ Sơ & Lịch Sử
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -9071,13 +10175,18 @@ export default function App() {
                         ))}
                       </select>
                     ) : (
-                      <input
-                        type="text"
-                        value={q.correctAnswer}
-                        onChange={e => updateQuestionInSkill('listening', q.id, 'correctAnswer', e.target.value)}
-                        className="w-full sm:w-80 px-3.5 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
-                        placeholder="Nhập từ/cụm từ đáp án đúng..."
-                      />
+                      <div>
+                        <input
+                          type="text"
+                          value={q.correctAnswer}
+                          onChange={e => updateQuestionInSkill('listening', q.id, 'correctAnswer', e.target.value)}
+                          className="w-full sm:w-96 px-3.5 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
+                          placeholder="VD: 15 | fifteen hoặc color / colour"
+                        />
+                        <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
+                          Mẹo: Dùng dấu <code className="font-bold">|</code> hoặc <code className="font-bold">/</code> nếu chấp nhận nhiều đáp án tương đương.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -9409,13 +10518,18 @@ export default function App() {
                         ))}
                       </select>
                     ) : (
-                      <input
-                        type="text"
-                        value={q.correctAnswer}
-                        onChange={e => updateQuestionInSkill('reading', q.id, 'correctAnswer', e.target.value)}
-                        className="w-full sm:w-80 px-3.5 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
-                        placeholder="Nhập từ/cụm từ đáp án đúng..."
-                      />
+                      <div>
+                        <input
+                          type="text"
+                          value={q.correctAnswer}
+                          onChange={e => updateQuestionInSkill('reading', q.id, 'correctAnswer', e.target.value)}
+                          className="w-full sm:w-96 px-3.5 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
+                          placeholder="VD: 15 | fifteen hoặc color / colour"
+                        />
+                        <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
+                          Mẹo: Dùng dấu <code className="font-bold">|</code> hoặc <code className="font-bold">/</code> nếu chấp nhận nhiều đáp án tương đương.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -9841,6 +10955,33 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Số từ mỗi vòng</label>
+                  <select
+                    value={newRoomForm.roundSize || 4}
+                    onChange={e => setNewRoomForm(prev => ({ ...prev, roundSize: Number(e.target.value) }))}
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  >
+                    {[2, 3, 4, 5, 6, 8].map(n => (
+                      <option key={n} value={n}>{n} từ / vòng</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tốc độ giới hạn giờ</label>
+                  <select
+                    value={newRoomForm.speedMode || 'normal'}
+                    onChange={e => setNewRoomForm(prev => ({ ...prev, speedMode: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  >
+                    <option value="relaxed">Chậm rãi (+6 giây/từ)</option>
+                    <option value="normal">Tốc độ chuẩn</option>
+                    <option value="turbo">Siêu tốc (-5 giây/từ)</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -9862,8 +11003,12 @@ export default function App() {
       )}
 
       {/* Teacher Vocab Modal for Game */}
-      {showVocabModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      {showVocabModal && (() => {
+        const rawLines = customVocabInput.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        const parsedPreview = parseRawVocabText(customVocabInput);
+        const badLinesCount = Math.max(0, rawLines.length - parsedPreview.length);
+        return (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -9874,15 +11019,51 @@ export default function App() {
               </button>
             </div>
 
+            {/* Quick-Load IELTS Topic Presets */}
+            <div className="mb-3">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">
+                Nạp nhanh bộ từ vựng mẫu theo chủ đề IELTS:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(VOCAB_PRESETS).map(([presetKey, preset]) => (
+                  <button
+                    key={presetKey}
+                    type="button"
+                    onClick={() => {
+                      setCustomVocabInput(preset.text);
+                      showToast(`Đã nạp bộ từ vựng "${preset.label}"! Bấm Lưu để áp dụng.`);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-500/15 hover:bg-purple-100 dark:hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 text-[11px] font-bold transition"
+                  >
+                    + {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Live Format Validation Status */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] mb-2">
+              <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle className="w-3.5 h-3.5" /> Hợp lệ: {parsedPreview.length} từ
+              </span>
+              {badLinesCount > 0 ? (
+                <span className="inline-flex items-center gap-1 font-bold text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="w-3.5 h-3.5" /> {badLinesCount} dòng thiếu dấu | hoặc trùng từ
+                </span>
+              ) : (
+                <span className="text-slate-400">Định dạng: TỪ | Nghĩa tiếng Việt | /IPA/ | Ví dụ</span>
+              )}
+            </div>
+
             <textarea
-              rows={10}
+              rows={9}
               value={customVocabInput}
               onChange={e => setCustomVocabInput(e.target.value)}
               className="w-full p-3 font-mono text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none mb-4"
               placeholder="TỪ | Nghĩa tiếng Việt | /Phiên âm/ | Ví dụ câu..."
             />
 
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-2">
               <button
                 onClick={() => setCustomVocabInput(DEFAULT_VOCAB_TEXT)}
                 className="text-xs text-slate-500 dark:text-slate-400 hover:underline"
@@ -9898,8 +11079,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
-                    const parsed = parseRawVocabText(customVocabInput);
-                    if (parsed.length < 3) {
+                    if (parsedPreview.length < 3) {
                       alert('Vui lòng nhập tối thiểu 3 từ vựng!');
                       return;
                     }
@@ -9915,7 +11095,7 @@ export default function App() {
                       updates: { rawVocab: customVocabInput }
                     });
                     setShowVocabModal(false);
-                    showToast(`Đã lưu ${parsed.length} từ vựng cho phòng ${currentRoomPin}!`);
+                    showToast(`Đã lưu ${parsedPreview.length} từ vựng cho phòng ${currentRoomPin}!`);
                   }}
                   className="px-4 py-2 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow"
                 >
@@ -9924,6 +11104,176 @@ export default function App() {
               </div>
             </div>
           </div>
+        </div>
+        );
+      })()}
+
+      {/* Teacher Add / Bulk Import Student Account Modal */}
+      {showAddStudentModal && currentUser?.role === 'teacher' && (() => {
+        const bulkParsedCount = parseBulkStudentsText(bulkStudentsText).length;
+        return (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <form onSubmit={handleSaveNewStudents} className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Thêm Tài Khoản Học Viên Mới
+              </h3>
+              <button type="button" onClick={() => setShowAddStudentModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 mb-4">
+              <button
+                type="button"
+                onClick={() => setAddStudentMode('single')}
+                className={`py-2 rounded-lg text-xs font-bold transition ${
+                  addStudentMode === 'single' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Thêm 1 Học Viên
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddStudentMode('bulk')}
+                className={`py-2 rounded-lg text-xs font-bold transition ${
+                  addStudentMode === 'bulk' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Nhập Hàng Loạt ({bulkParsedCount})
+              </button>
+            </div>
+
+            {addStudentMode === 'single' ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tên đăng nhập</label>
+                    <input
+                      type="text"
+                      value={newStudentForm.username}
+                      onChange={e => setNewStudentForm(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="VD: hocsinh_04"
+                      className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mật khẩu ban đầu</label>
+                    <input
+                      type="text"
+                      value={newStudentForm.password}
+                      onChange={e => setNewStudentForm(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="123"
+                      className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Họ và tên</label>
+                    <input
+                      type="text"
+                      value={newStudentForm.name}
+                      onChange={e => setNewStudentForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="VD: Nguyễn Minh Khôi"
+                      className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Target Band</label>
+                    <select
+                      value={newStudentForm.targetBand}
+                      onChange={e => setNewStudentForm(prev => ({ ...prev, targetBand: Number(e.target.value) }))}
+                      className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold"
+                    >
+                      {[5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0].map(b => (
+                        <option key={b} value={b}>Band {b}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Mỗi dòng 1 học viên theo định dạng: <code className="font-bold text-indigo-600 dark:text-indigo-300">username | Họ tên | mật khẩu | TargetBand</code>
+                </p>
+                <textarea
+                  rows={6}
+                  value={bulkStudentsText}
+                  onChange={e => setBulkStudentsText(e.target.value)}
+                  className="w-full p-3 font-mono text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  Nhận diện hợp lệ: {bulkParsedCount} tài khoản học viên
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-5">
+              <button
+                type="button"
+                onClick={() => setShowAddStudentModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow flex items-center gap-1.5"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Lưu Tài Khoản
+              </button>
+            </div>
+          </form>
+        </div>
+        );
+      })()}
+
+      {/* Teacher Reset Student Password Modal */}
+      {editingStudentAccount && currentUser?.role === 'teacher' && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleResetStudentPassword} className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Key className="w-4 h-4 text-amber-500" /> Đặt Lại Mật Khẩu Học Viên
+              </h3>
+              <button type="button" onClick={() => setEditingStudentAccount(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Học viên: <b className="text-slate-900 dark:text-white">{editingStudentAccount.name}</b> (<code className="font-mono">@{editingStudentAccount.username}</code>)
+            </p>
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mật khẩu mới</label>
+              <input
+                type="text"
+                value={studentPasswordDraft}
+                onChange={e => setStudentPasswordDraft(e.target.value)}
+                placeholder="Nhập mật khẩu mới..."
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingStudentAccount(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl shadow"
+              >
+                Lưu Mật Khẩu
+              </button>
+            </div>
+          </form>
         </div>
       )}
       {/* Account Avatar Upload & In-Game Head Preview Modal */}
