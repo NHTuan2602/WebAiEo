@@ -1,13 +1,17 @@
+import { useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
   BookOpen,
+  ChevronDown,
   ChevronLeft,
+  ChevronUp,
   Clock,
   EyeOff,
   FileText,
   Globe,
   Headphones,
+  HelpCircle,
   Image,
   Lock,
   PenTool,
@@ -15,6 +19,7 @@ import {
   Save,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   Unlock,
   Upload
@@ -23,6 +28,7 @@ import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../
 import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../utils/clozeHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
 import AiExamExtractorPanel from '../components/teacher/AiExamExtractorPanel';
+import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
 import ClozeEditorBox from '../components/teacher/ClozeEditorBox';
 
 export default function ExamBuilder({
@@ -55,6 +61,190 @@ export default function ExamBuilder({
   updateQuestionInSkill,
   updateReadingPassageField
 }) {
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showAdvancedListeningExtras, setShowAdvancedListeningExtras] = useState(false);
+  const [showAdvancedReadingImg, setShowAdvancedReadingImg] = useState(false);
+
+  const handleLoadSampleTemplate = () => {
+    const hasExistingData =
+      Boolean(testForm.title?.trim()) ||
+      (testForm.listening?.questions?.length || 0) > 0 ||
+      (testForm.reading?.questions?.length || 0) > 0;
+    if (
+      hasExistingData &&
+      !window.confirm(
+        'Bạn muốn nạp bộ khung đề mẫu để tham khảo và chỉnh sửa? Dữ liệu bạn đang soạn trên màn hình này sẽ được thay bằng đề mẫu.'
+      )
+    ) {
+      return;
+    }
+    const stamp = Date.now();
+    const sampleCloze = `Questions 1-2
+Complete the notes below.
+Write ONE WORD AND/OR A NUMBER for each answer.
+
+**CLINIC APPOINTMENT BOOKING**
+• Patient surname: {{1}}
+• Preferred morning: {{2}}`;
+
+    setTestForm(prev => ({
+      ...prev,
+      title: 'Đề Tập Soạn IELTS Mini (Mẫu Hướng Dẫn)',
+      description: 'Đề mẫu 3 kỹ năng ngắn gọn giúp giáo viên dễ xem cấu trúc và sửa lại nội dung.',
+      visibility: 'private',
+      maxAttempts: 0,
+      sequentialMode: false,
+      allowEarlyNextSection: true,
+      antiCheatEnabled: false,
+      sectionOrder: ['listening', 'reading', 'writing'],
+      sectionDurations: { listening: 20, reading: 30, writing: 30 },
+      maxAudioPlays: 2,
+      allowViewAnswers: true,
+      listening: {
+        ...prev.listening,
+        audioUrl: '',
+        audioFileName: '',
+        imageUrl: '',
+        imageFileName: '',
+        contextText: '',
+        clozeText: sampleCloze,
+        transcript:
+          'Receptionist: Good morning, Greenfield Clinic. Could I confirm your appointment details? Caller: Yes, my surname is Miller, M-I-L-L-E-R, and I prefer Tuesday morning if available.',
+        tracks: [
+          {
+            id: `track_tpl_${stamp}`,
+            title: 'Part 1: Clinic Booking (Mẫu)',
+            audioUrl: '',
+            audioFileName: '',
+            imageUrl: '',
+            imageFileName: '',
+            contextText: '',
+            clozeText: sampleCloze,
+            transcript:
+              'Receptionist: Good morning, Greenfield Clinic. Could I confirm your appointment details? Caller: Yes, my surname is Miller, M-I-L-L-E-R, and I prefer Tuesday morning if available.'
+          }
+        ],
+        questions: [
+          {
+            id: `lq_tpl_1_${stamp}`,
+            type: 'fill',
+            blankNum: 1,
+            trackIdx: 0,
+            question: '1. Patient surname: ______',
+            options: [],
+            correctAnswer: 'Miller|miller'
+          },
+          {
+            id: `lq_tpl_2_${stamp}`,
+            type: 'fill',
+            blankNum: 2,
+            trackIdx: 0,
+            question: '2. Preferred morning: ______',
+            options: [],
+            correctAnswer: 'Tuesday|tuesday'
+          }
+        ]
+      },
+      reading: {
+        ...prev.reading,
+        passageTitle: 'Bài 1: Urban Rooftop Gardens (Mẫu)',
+        passageText:
+          'Many modern cities are turning flat building rooftops into productive green gardens. These spaces cool concrete roofs by several degrees in summer and provide fresh herbs and vegetables directly to nearby restaurants while absorbing rainwater during heavy storms.',
+        clozeText: '',
+        imageUrl: '',
+        imageFileName: '',
+        passages: [
+          {
+            id: `pass_tpl_${stamp}`,
+            title: 'Bài 1: Urban Rooftop Gardens (Mẫu)',
+            imageUrl: '',
+            imageFileName: '',
+            passageText:
+              'Many modern cities are turning flat building rooftops into productive green gardens. These spaces cool concrete roofs by several degrees in summer and provide fresh herbs and vegetables directly to nearby restaurants while absorbing rainwater during heavy storms.',
+            clozeText: ''
+          }
+        ],
+        questions: [
+          {
+            id: `rq_tpl_1_${stamp}`,
+            type: 'tfng',
+            passageIdx: 0,
+            question: '1. Rooftop gardens help lower building roof temperatures during summer.',
+            options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+            correctAnswer: 'TRUE'
+          },
+          {
+            id: `rq_tpl_2_${stamp}`,
+            type: 'mcq',
+            passageIdx: 0,
+            question: '2. What environmental benefit is mentioned besides cooling?',
+            options: [
+              'A. Absorbing heavy storm rainwater',
+              'B. Generating wind electricity',
+              'C. Filtering underground metro air',
+              'D. Eliminating street traffic noise'
+            ],
+            correctAnswer: 'A. Absorbing heavy storm rainwater'
+          }
+        ]
+      },
+      writing: {
+        task1: {
+          prompt:
+            'Task 1: The chart below shows the percentage of households recycling plastic waste between 2015 and 2025. Summarise the main features.',
+          minWords: 150,
+          imageUrl: '',
+          modelAnswer: ''
+        },
+        task2: {
+          prompt:
+            'Task 2: Some people believe public transport should be free for all residents in major cities. Do you agree or disagree?',
+          minWords: 250,
+          modelAnswer: ''
+        }
+      }
+    }));
+    setBuilderListeningIdx(0);
+    setBuilderReadingIdx(0);
+    showToast?.('Đã nạp bộ khung đề mẫu! Hãy bấm xem từng Tab 1–4 rồi sửa chữ theo ý bạn.');
+  };
+
+  const applyQuickPreset = (presetType) => {
+    if (presetType === 'practice') {
+      setTestForm(prev => ({
+        ...prev,
+        visibility: 'public',
+        maxAttempts: 0,
+        sequentialMode: false,
+        allowEarlyNextSection: true,
+        antiCheatEnabled: false,
+        allowViewAnswers: true,
+        maxAudioPlays: 3,
+        sectionDurations: { listening: 20, reading: 30, writing: 30 }
+      }));
+      showToast?.('Đã áp dụng cấu hình: Ôn Tập Tự Do (làm nhiều lần, mở đáp án).');
+    } else if (presetType === 'official') {
+      setTestForm(prev => ({
+        ...prev,
+        visibility: 'public',
+        maxAttempts: 1,
+        sequentialMode: true,
+        allowEarlyNextSection: false,
+        antiCheatEnabled: true,
+        allowViewAnswers: false,
+        maxAudioPlays: 1,
+        sectionDurations: { listening: 30, reading: 60, writing: 60 }
+      }));
+      showToast?.('Đã áp dụng cấu hình: Thi Thật Nghiêm Ngặt (1 lượt, bật chống gian lận).');
+    } else {
+      setTestForm(prev => ({
+        ...prev,
+        visibility: 'private',
+        antiCheatEnabled: false
+      }));
+      showToast?.('Đã đặt về Nháp Chỉ Mình Tôi (học sinh chưa nhìn thấy đề này).', 'info');
+    }
+  };
   const handleSyncClozeQuestions = (skill, scopeField, scopeIdx, clozeText) => {
     setTestForm(prev => {
       const synced = syncClozeBlanksWithQuestions({
@@ -204,7 +394,14 @@ export default function ExamBuilder({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setShowGuideModal(true)}
+            className="px-3.5 py-2.5 text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6] bg-[#EDFFFD] dark:bg-teal-950/50 hover:bg-[#B5F5F1]/60 rounded-xl border border-[#B5F5F1] dark:border-teal-500/40 transition flex items-center gap-1.5"
+          >
+            <HelpCircle className="w-4 h-4" /> Hướng Dẫn Cách Tạo
+          </button>
           <button
             onClick={() => {
               clearBuilderDraft(currentUser?.username);
@@ -224,6 +421,21 @@ export default function ExamBuilder({
         </div>
       </div>
 
+      {/* Step-by-Step Interactive Guide Banner & Modal */}
+      <BuilderGuideBanner
+        builderTab={builderTab}
+        onJumpToTab={setBuilderTab}
+        onLoadSampleTemplate={handleLoadSampleTemplate}
+        onOpenGuideModal={() => setShowGuideModal(true)}
+        testForm={testForm}
+      />
+
+      <BuilderGuideModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        onJumpToTab={setBuilderTab}
+      />
+
       {/* Builder Sub-Navigation Tabs */}
       <div className="flex flex-wrap gap-2 mb-6 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <button
@@ -234,7 +446,7 @@ export default function ExamBuilder({
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
-          <FileText className="w-4 h-4" /> 1. Thời Gian Từng Phần, Ẩn/Hiện & Thi Thử/Thi Thật
+          <FileText className="w-4 h-4" /> 1. Tên Đề &amp; Cài Đặt Chung
         </button>
         <button
           onClick={() => setBuilderTab('listening')}
@@ -244,7 +456,7 @@ export default function ExamBuilder({
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
-          <Headphones className="w-4 h-4" /> 2. Phần Listening & Chủ Đề ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} chủ đề • ` : ''}{testForm.listening?.questions?.length || 0} câu)
+          <Headphones className="w-4 h-4" /> 2. Phần Listening ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} Part • ` : ''}{testForm.listening?.questions?.length || 0} câu)
         </button>
         <button
           onClick={() => setBuilderTab('reading')}
@@ -254,7 +466,7 @@ export default function ExamBuilder({
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
-          <BookOpen className="w-4 h-4" /> 3. Phần Reading & Hình Ảnh ({testForm.reading?.questions?.length || 0} câu)
+          <BookOpen className="w-4 h-4" /> 3. Phần Reading ({testForm.reading?.questions?.length || 0} câu)
         </button>
         <button
           onClick={() => setBuilderTab('writing')}
@@ -264,7 +476,7 @@ export default function ExamBuilder({
               : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
-          <PenTool className="w-4 h-4" /> 4. Phần Writing & Bài Mẫu
+          <PenTool className="w-4 h-4" /> 4. Phần Writing &amp; Bài Mẫu
         </button>
       </div>
 
@@ -286,23 +498,75 @@ export default function ExamBuilder({
 
         return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
+          {/* 1-Click Quick Configuration Presets for Non-Tech Users */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#EDFFFD]/80 dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-500/30 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-[#007A7A] dark:text-[#1EE1D6] flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" /> Chọn Nhanh Chế Độ Đề Thi (1 Chạm — Khỏi Chỉnh Nhiều)
+                </h3>
+                <p className="text-[11px] text-[#314158] dark:text-slate-300 mt-0.5">
+                  Chọn 1 mục phù hợp nhất bên dưới, hệ thống tự điền sẵn thời gian &amp; quyền xem đáp án giúp bạn:
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => applyQuickPreset('practice')}
+                className="text-left p-3 rounded-xl bg-white dark:bg-slate-900 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 transition shadow-xs"
+              >
+                <div className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">⚡ Ôn Tập Tự Do</div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Công khai • Làm nhiều lần • Mở xem đáp án ngay
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyQuickPreset('official')}
+                className="text-left p-3 rounded-xl bg-white dark:bg-slate-900 hover:border-indigo-500 border border-slate-200 dark:border-slate-700 transition shadow-xs"
+              >
+                <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">🎓 Thi Thật Nghiêm Ngặt</div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  1 lượt làm • Khóa tuần tự • Bật chống gian lận
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyQuickPreset('draft')}
+                className="text-left p-3 rounded-xl bg-white dark:bg-slate-900 hover:border-amber-500 border border-slate-200 dark:border-slate-700 transition shadow-xs"
+              >
+                <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400">🔒 Lưu Nháp Soạn Dở</div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Chỉ mình tôi thấy • Học sinh chưa nhìn thấy đề
+                </p>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
-              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                Tên Đề Thi IELTS
+              <label className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                <span>Tên Đề Thi IELTS</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 font-extrabold normal-case">
+                  Bắt buộc
+                </span>
               </label>
               <input
                 type="text"
                 value={testForm.title}
                 onChange={e => setTestForm({ ...testForm, title: e.target.value })}
-                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                placeholder="VD: IELTS Academic Practice Test 05 - Cambridge Format"
+                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                placeholder="VD: Đề kiểm tra tuần 1 - Lớp IELTS Cơ Bản"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                Giới Hạn Số Lần Nghe Audio
+              <label className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                <span>Số Lần Nghe Audio</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold normal-case">
+                  Mặc định 1
+                </span>
               </label>
               <input
                 type="number"
@@ -310,21 +574,24 @@ export default function ExamBuilder({
                 max={10}
                 value={testForm.maxAudioPlays}
                 onChange={e => setTestForm({ ...testForm, maxAudioPlays: Number(e.target.value) || 1 })}
-                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-              Mô Tả Chi Tiết Đề Thi
+            <label className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+              <span>Mô Tả Ngắn Về Đề Thi</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold normal-case">
+                Tùy chọn (bỏ trống cũng được)
+              </span>
             </label>
             <textarea
               rows={2}
               value={testForm.description}
               onChange={e => setTestForm({ ...testForm, description: e.target.value })}
-              className="w-full px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              placeholder="Mô tả nội dung các phần thi để học viên nắm rõ trước khi bắt đầu..."
+              className="w-full px-4 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+              placeholder="VD: Gồm Listening Part 1 + Reading Passage 1, làm trong 45 phút... (không bắt buộc)"
             />
           </div>
 
@@ -798,98 +1065,126 @@ export default function ExamBuilder({
               </div>
             </div>
 
-            {/* Optional Diagram / Question Sheet Image Upload & URL (like Reading) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/40 dark:bg-blue-500/10 p-5 rounded-2xl border border-blue-100 dark:border-blue-500/30">
-              <div className="space-y-3">
-                <span className="text-xs font-extrabold text-blue-950 dark:text-blue-200 uppercase flex items-center gap-1.5">
-                  <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Ảnh Sơ Đồ / Đề Chụp Chủ Đề #{activeIdx + 1} (Tùy chọn)
-                </span>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Dùng khi có bản đồ (Map), biểu đồ (Diagram) hoặc ảnh đề chụp riêng cho chủ đề số {activeIdx + 1} giống phần Reading.
-                </p>
+            {/* Optional Diagram & Context Text Collapsible Drawer */}
+            {(() => {
+              const hasListeningExtras = Boolean(activeTrack?.imageUrl || activeTrack?.contextText?.trim());
+              const isExtrasOpen = hasListeningExtras || showAdvancedListeningExtras;
+              return (
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedListeningExtras(v => !v)}
+                    className="w-full px-4 py-3 flex items-center justify-between gap-2 text-left hover:bg-slate-100/80 dark:hover:bg-slate-800 transition"
+                  >
+                    <div className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-200">
+                      <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Tùy chọn phụ: Ảnh Sơ Đồ / Bản Đồ &amp; Đề Dẫn Riêng Cho Chủ Đề #{activeIdx + 1}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold">
+                        {hasListeningExtras ? 'Đang có dữ liệu' : 'Bỏ qua nếu không có'}
+                      </span>
+                    </div>
+                    {isExtrasOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                  </button>
 
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <label className="cursor-pointer inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
-                    <Upload className="w-4 h-4" />
-                    <span>Tải Ảnh Chủ Đề #{activeIdx + 1}</span>
-                    <input
-                      key={`listening-img-upload-${activeIdx}`}
-                      type="file"
-                      accept="image/*"
-                      onChange={e => handleListeningImageUpload(e, activeIdx)}
-                      className="hidden"
-                    />
-                  </label>
+                  {isExtrasOpen && (
+                    <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-700 space-y-5 bg-white/70 dark:bg-slate-900/50">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/40 dark:bg-blue-500/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-500/30">
+                        <div className="space-y-3">
+                          <span className="text-xs font-extrabold text-blue-950 dark:text-blue-200 uppercase flex items-center gap-1.5">
+                            <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Ảnh Sơ Đồ / Map Chủ Đề #{activeIdx + 1}
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Chỉ cần tải lên khi bài nghe có hình bản đồ (Map), sơ đồ máy móc (Diagram)...
+                          </p>
 
-                  {activeTrack?.imageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => updateListeningTrackField(activeIdx, { imageUrl: '', imageFileName: '' })}
-                      className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl border border-rose-200 dark:border-rose-500/30 transition"
-                    >
-                      Xóa Ảnh
-                    </button>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <label className="cursor-pointer inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
+                              <Upload className="w-4 h-4" />
+                              <span>Tải Ảnh Chủ Đề #{activeIdx + 1}</span>
+                              <input
+                                key={`listening-img-upload-${activeIdx}`}
+                                type="file"
+                                accept="image/*"
+                                onChange={e => handleListeningImageUpload(e, activeIdx)}
+                                className="hidden"
+                              />
+                            </label>
+
+                            {activeTrack?.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => updateListeningTrackField(activeIdx, { imageUrl: '', imageFileName: '' })}
+                                className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl border border-rose-200 dark:border-rose-500/30 transition"
+                              >
+                                Xóa Ảnh
+                              </button>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                              Hoặc dán Link URL hình ảnh:
+                            </label>
+                            <input
+                              type="text"
+                              value={activeTrack?.imageUrl?.startsWith('data:') ? '' : (activeTrack?.imageUrl || '')}
+                              onChange={e => updateListeningTrackField(activeIdx, { imageUrl: e.target.value })}
+                              placeholder="https://example.com/listening-map.png"
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 min-h-[140px]">
+                          {activeTrack?.imageUrl ? (
+                            <img
+                              src={activeTrack.imageUrl}
+                              alt={`Listening Preview ${activeIdx + 1}`}
+                              onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                              className="max-h-44 object-contain rounded-lg cursor-zoom-in"
+                            />
+                          ) : (
+                            <div className="text-center text-xs text-slate-400">
+                              <Image className="w-7 h-7 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
+                              <span>Chưa có hình ảnh cho Chủ đề #{activeIdx + 1}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                          Văn Bản Đề Dẫn Phụ Cho Chủ Đề #{activeIdx + 1} (Tùy chọn)
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={activeTrack?.contextText || ''}
+                          onChange={e => updateListeningTrackField(activeIdx, { contextText: e.target.value })}
+                          className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed font-serif focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          placeholder="Chỉ điền nếu muốn hiển thị thêm đoạn hướng dẫn dài ở cột trái..."
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
+              );
+            })()}
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Hoặc dán Link URL hình ảnh:
-                  </label>
-                  <input
-                    type="text"
-                    value={activeTrack?.imageUrl?.startsWith('data:') ? '' : (activeTrack?.imageUrl || '')}
-                    onChange={e => updateListeningTrackField(activeIdx, { imageUrl: e.target.value })}
-                    placeholder="https://example.com/listening-map.png"
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 min-h-[160px]">
-                {activeTrack?.imageUrl ? (
-                  <img
-                    src={activeTrack.imageUrl}
-                    alt={`Listening Preview ${activeIdx + 1}`}
-                    onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
-                    className="max-h-48 object-contain rounded-lg cursor-zoom-in"
-                  />
-                ) : (
-                  <div className="text-center text-xs text-slate-400">
-                    <Image className="w-8 h-8 mx-auto mb-1.5 text-slate-300 dark:text-slate-600" />
-                    <span>Chưa có hình ảnh cho Chủ đề #{activeIdx + 1}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Optional Context / Prompt Text & Transcript */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Văn Bản Đề Dẫn / Ghi Chú Chủ Đề #{activeIdx + 1} (Tùy chọn)
-                </label>
-                <textarea
-                  rows={4}
-                  value={activeTrack?.contextText || ''}
-                  onChange={e => updateListeningTrackField(activeIdx, { contextText: e.target.value })}
-                  className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed font-serif focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder={`VD: Questions 1–10: Complete the notes below... (Bỏ trống nếu không cần)`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Transcript Audio Chủ Đề #{activeIdx + 1} (Dùng cho AI Voice nếu không tải MP3)
-                </label>
-                <textarea
-                  rows={4}
-                  value={activeTrack?.transcript || ''}
-                  onChange={e => updateListeningTrackField(activeIdx, { transcript: e.target.value })}
-                  className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder={`Nhập lời thoại bài nghe cho Chủ đề ${activeIdx + 1}...`}
-                />
-              </div>
+            {/* Transcript Box (Clear Standalone Explanation for Teachers without MP3) */}
+            <div>
+              <label className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <span>Lời Thoại Audio / Transcript Chủ Đề #{activeIdx + 1}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold">
+                  Không có file MP3? Chỉ cần dán đoạn văn vào đây máy tự đọc!
+                </span>
+              </label>
+              <textarea
+                rows={4}
+                value={activeTrack?.transcript || ''}
+                onChange={e => updateListeningTrackField(activeIdx, { transcript: e.target.value })}
+                className="w-full p-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs leading-relaxed focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder={`Dán lời thoại bài nghe tiếng Anh cho Chủ đề ${activeIdx + 1} tại đây (hoặc bỏ trống nếu đã tải file MP3 ở trên)...`}
+              />
             </div>
 
             {/* Inline Cloze / Note Completion Editor for Active Listening Topic */}
@@ -1184,81 +1479,109 @@ export default function ExamBuilder({
               />
             </div>
 
-            {/* Reading Image Upload & URL */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/40 dark:bg-indigo-500/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/30">
-              <div className="space-y-3">
-                <span className="text-xs font-extrabold text-indigo-950 dark:text-indigo-200 uppercase flex items-center gap-1.5">
-                  <Image className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Ảnh Minh Họa / Đề Chụp Bài #{activeIdx + 1}
-                </span>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Tải ảnh từ máy tính (.png, .jpg, .webp) hoặc dán link URL hình ảnh riêng cho bài đọc số {activeIdx + 1}.
-                </p>
+            {/* Collapsible Reading Image Upload & URL */}
+            {(() => {
+              const hasReadingImg = Boolean(activePassage?.imageUrl);
+              const isImgOpen = hasReadingImg || showAdvancedReadingImg;
+              return (
+                <div className="rounded-2xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50/35 dark:bg-indigo-500/10 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedReadingImg(v => !v)}
+                    className="w-full px-4 py-3 flex items-center justify-between gap-2 text-left hover:bg-indigo-50/80 dark:hover:bg-indigo-500/15 transition"
+                  >
+                    <div className="flex items-center gap-2 text-xs font-extrabold text-indigo-950 dark:text-indigo-200">
+                      <Image className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span>Tùy chọn phụ: Ảnh Minh Họa / Đề Chụp Kèm Bài Đọc #{activeIdx + 1}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                        {hasReadingImg ? 'Đang có ảnh' : 'Bỏ qua nếu bạn nhập chữ'}
+                      </span>
+                    </div>
+                    {isImgOpen ? <ChevronUp className="w-4 h-4 text-indigo-500" /> : <ChevronDown className="w-4 h-4 text-indigo-500" />}
+                  </button>
 
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <label className="cursor-pointer inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
-                    <Upload className="w-4 h-4" />
-                    <span>Tải Ảnh Cho Bài #{activeIdx + 1}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={e => handleReadingImageUpload(e, activeIdx)}
-                      className="hidden"
-                    />
-                  </label>
+                  {isImgOpen && (
+                    <div className="p-4 sm:p-5 border-t border-indigo-100 dark:border-indigo-500/30 grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/75 dark:bg-slate-900/50">
+                      <div className="space-y-3">
+                        <span className="text-xs font-extrabold text-indigo-950 dark:text-indigo-200 uppercase flex items-center gap-1.5">
+                          <Image className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Tải Ảnh Kèm Bài #{activeIdx + 1}
+                        </span>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Chỉ dùng khi muốn học sinh nhìn ảnh gốc thay cho đoạn chữ. (Nếu muốn AI chép chữ từ ảnh, hãy dùng khung <strong>Tạo Đề Tự Động Từ Ảnh</strong> ngay bên dưới!).
+                        </p>
 
-                  {activePassage?.imageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => updateReadingPassageField(activeIdx, { imageUrl: '', imageFileName: '' })}
-                      className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl border border-rose-200 dark:border-rose-500/30 transition"
-                    >
-                      Xóa Ảnh
-                    </button>
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <label className="cursor-pointer inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition">
+                            <Upload className="w-4 h-4" />
+                            <span>Tải Ảnh Cho Bài #{activeIdx + 1}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={e => handleReadingImageUpload(e, activeIdx)}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {activePassage?.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => updateReadingPassageField(activeIdx, { imageUrl: '', imageFileName: '' })}
+                              className="px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl border border-rose-200 dark:border-rose-500/30 transition"
+                            >
+                              Xóa Ảnh
+                            </button>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                            Hoặc dán Link URL hình ảnh:
+                          </label>
+                          <input
+                            type="text"
+                            value={activePassage?.imageUrl?.startsWith('data:') ? '' : (activePassage?.imageUrl || '')}
+                            onChange={e => updateReadingPassageField(activeIdx, { imageUrl: e.target.value })}
+                            placeholder="https://example.com/reading-diagram.png"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 min-h-[140px]">
+                        {activePassage?.imageUrl ? (
+                          <img
+                            src={activePassage.imageUrl}
+                            alt={`Reading Preview ${activeIdx + 1}`}
+                            onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
+                            className="max-h-44 object-contain rounded-lg cursor-zoom-in"
+                          />
+                        ) : (
+                          <div className="text-center text-xs text-slate-400">
+                            <Image className="w-7 h-7 mx-auto mb-1 text-slate-300 dark:text-slate-600" />
+                            <span>Chưa có hình ảnh cho Bài #{activeIdx + 1}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Hoặc dán Link URL hình ảnh:
-                  </label>
-                  <input
-                    type="text"
-                    value={activePassage?.imageUrl?.startsWith('data:') ? '' : (activePassage?.imageUrl || '')}
-                    onChange={e => updateReadingPassageField(activeIdx, { imageUrl: e.target.value })}
-                    placeholder="https://example.com/reading-diagram.png"
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 min-h-[160px]">
-                {activePassage?.imageUrl ? (
-                  <img
-                    src={activePassage.imageUrl}
-                    alt={`Reading Preview ${activeIdx + 1}`}
-                    onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
-                    className="max-h-48 object-contain rounded-lg cursor-zoom-in"
-                  />
-                ) : (
-                  <div className="text-center text-xs text-slate-400">
-                    <Image className="w-8 h-8 mx-auto mb-1.5 text-slate-300 dark:text-slate-600" />
-                    <span>Chưa có hình ảnh cho Bài #{activeIdx + 1}</span>
-                  </div>
-                )}
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Passage Text */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nội Dung Văn Bản Bài Đọc #{activeIdx + 1} (Nếu chỉ dùng ảnh có thể bỏ trống)
+              <label className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <span>Nội Dung Văn Bản Bài Đọc #{activeIdx + 1}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold">
+                  Copy/Dán bài đọc từ Word/PDF hoặc dùng AI bên dưới tự chép giúp bạn
+                </span>
               </label>
               <textarea
                 rows={7}
                 value={activePassage?.passageText || ''}
                 onChange={e => updateReadingPassageField(activeIdx, { passageText: e.target.value })}
                 className="w-full p-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-2xl text-xs leading-relaxed font-serif focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
-                placeholder={`Nhập nội dung văn bản cho Bài đọc số ${activeIdx + 1}...`}
+                placeholder={`Dán đoạn văn Reading Bài ${activeIdx + 1} tại đây...`}
               />
             </div>
 
