@@ -83,11 +83,34 @@ export async function discoverGeminiModels(cleanKey) {
   return ordered;
 }
 
-export async function callGeminiGenerateJson({ apiKey, promptText, temperature = 0.2 }) {
+function dataUrlToGeminiPart(input) {
+  if (!input) return null;
+  if (typeof input === 'object' && input.inlineData?.data) return input;
+  if (typeof input === 'object' && input.data && input.mimeType) {
+    return { inlineData: { mimeType: input.mimeType, data: input.data } };
+  }
+  const str = String(input);
+  const match = str.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    inlineData: {
+      mimeType: match[1],
+      data: match[2]
+    }
+  };
+}
+
+export async function callGeminiGenerateJson({ apiKey, promptText, images = [], temperature = 0.2 }) {
   const cleanKey = (apiKey || '').trim().replace(/^['"]|['"]$/g, '');
   if (!cleanKey) {
     throw new Error('Chưa nhập Google Gemini API Key.');
   }
+
+  const parts = [{ text: promptText }];
+  (Array.isArray(images) ? images : []).forEach(img => {
+    const part = dataUrlToGeminiPart(img);
+    if (part) parts.push(part);
+  });
 
   const candidates = await discoverGeminiModels(cleanKey);
   let lastError = null;
@@ -102,7 +125,7 @@ export async function callGeminiGenerateJson({ apiKey, promptText, temperature =
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
+          contents: [{ parts }],
           generationConfig
         })
       });
@@ -279,5 +302,113 @@ export function simulateAIWritingGrading({ _task1Prompt, task1Text, _task2Prompt
     feedback,
     strengths,
     improvements
+  };
+}
+
+export async function extractExamFromImages({
+  apiKey,
+  skill = 'listening',
+  questionImages = [],
+  answerKeyImages = [],
+  preferCloze = true,
+  extraInstructions = ''
+}) {
+  if (!Array.isArray(questionImages) || questionImages.length === 0) {
+    throw new Error('Vui lòng tải lên ít nhất 1 ảnh đề thi trước khi chạy AI.');
+  }
+
+  const allImages = [...questionImages, ...answerKeyImages];
+  const hasAnswerKeyImages = answerKeyImages.length > 0;
+  const skillLabel = skill === 'reading' ? 'IELTS Reading' : 'IELTS Listening';
+
+  const extractionPrompt = `You are a precision ${skillLabel} exam digitization engine.
+I am providing ${questionImages.length} exam question/sheet image(s) FIRST, followed by ${answerKeyImages.length} separate Answer Key image(s) (if > 0).
+
+YOUR GOAL:
+Convert the visual exam sheet accurately into structured JSON without missing text, numbers, bullet points, or questions.
+
+RULES FOR INLINE CLOZE / NOTE / FORM / SUMMARY COMPLETION ("Đục Lỗ"):
+- ${preferCloze ? 'Whenever the exam has Note Completion, Form Completion, Table/Flowchart Completion, or Summary Fill-in-the-blank (like "Questions 1-10: Complete the notes below", numbered gaps "1 .....", "(1)", inline blanks inside sentences/bullets):' : 'If the exam contains inline Note/Form/Summary Completion:'}
+  1. Preserve the EXACT instruction header (e.g. "Questions 1-10\\nComplete the notes below.\\nWrite ONE WORD AND/OR A NUMBER for each answer."), the main uppercase box title (e.g. "**HIRING A PUBLIC ROOM**"), section subheadings (e.g. "**Room and cost**"), Example lines, and bullet lines prefixed with "• ".
+  2. Replace EVERY answer gap in "clozeText" with the exact token "{{N}}" where N is the question number (example: "• the {{1}} Room – seats 100", "• Cost of Main Hall for Saturday evening: £{{2}}"). Keep all surrounding words intact!
+  3. Also create a corresponding entry in "questions" with:
+     - "blankNum": N (integer)
+     - "type": "fill"
+     - "question": "N. <short surrounding phrase with ____>"
+     - "options": []
+     - "correctAnswer": exact answer from Answer Key if known, otherwise ""
+
+RULES FOR MCQ / TRUE-FALSE-NOT GIVEN / STANDALONE QUESTIONS:
+- For Multiple Choice questions: set "type": "mcq", extract full question text into "question", and put clean array of options (e.g. ["A. ...", "B. ...", "C. ..."]) into "options".
+- For True/False/Not Given: set "type": "tfng", "options": ["TRUE", "FALSE", "NOT GIVEN"], and match "correctAnswer" cleanly.
+- If there are ONLY MCQ/TFNG questions and no note/summary cloze text, set "clozeText": "".
+
+RULES FOR READING PASSAGES & TITLES:
+- If ${skillLabel} includes a reading passage in the image(s), extract the full readable passage text cleanly into "passageText" (with paragraph breaks) and the title into "title". If not present, leave "passageText": "".
+- For Listening, extract a clean concise topic title into "title" (if visible in image), and put any non-cloze context notes in "contextText" if helpful.
+
+RULES FOR CORRECT ANSWERS ("correctAnswer"):
+- ${hasAnswerKeyImages ? 'You MUST match answers carefully from the Answer Key image(s) provided at the end! If alternative acceptable answers are shown in the key (e.g. "15 / fifteen" or "(the) park"), format them using " | " or exact key.' : skill === 'reading' ? 'If the full reading passage text is visible in the image(s), carefully solve each question accurately and populate "correctAnswer"; otherwise leave "correctAnswer": "".' : 'Do NOT guess or invent answers for Listening gaps if no Answer Key image is provided; set "correctAnswer": "" cleanly unless an answer is explicitly printed on the sheet.'}
+${extraInstructions ? `\nADDITIONAL TEACHER NOTES:\n${extraInstructions}` : ''}
+
+Return ONLY strictly valid JSON matching this schema:
+{
+  "title": "Topic or test sheet title (or empty string)",
+  "passageText": "Full reading passage text if present, else empty string",
+  "clozeText": "Formatted Note/Summary/Cloze template with {{1}}, {{2}} inline placeholders, or empty string if only MCQ/TFNG",
+  "questions": [
+    {
+      "blankNum": 1,
+      "type": "fill",
+      "question": "1. the ____ Room – seats 100",
+      "options": [],
+      "correctAnswer": ""
+    }
+  ]
+}`;
+
+  const { parsed, usedModel } = await callGeminiGenerateJson({
+    apiKey,
+    promptText: extractionPrompt,
+    images: allImages,
+    temperature: 0.1
+  });
+
+  const rawQuestions = Array.isArray(parsed?.questions) ? parsed.questions : [];
+  const normalizedQuestions = rawQuestions.map((q, idx) => {
+    const rawType = String(q?.type || 'fill').toLowerCase().trim();
+    let type = 'fill';
+    if (rawType === 'mcq' || rawType === 'multiple_choice' || (Array.isArray(q?.options) && q.options.length >= 2 && rawType !== 'tfng')) {
+      type = 'mcq';
+    } else if (rawType === 'tfng' || rawType === 'true_false_not_given' || rawType === 'ynng') {
+      type = 'tfng';
+    }
+
+    const options =
+      type === 'tfng'
+        ? (Array.isArray(q?.options) && q.options.length > 0 ? q.options : ['TRUE', 'FALSE', 'NOT GIVEN'])
+        : type === 'mcq'
+        ? (Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [])
+        : [];
+
+    const blankNum = Number.isFinite(Number(q?.blankNum)) && Number(q.blankNum) > 0
+      ? Number(q.blankNum)
+      : undefined;
+
+    return {
+      blankNum,
+      type,
+      question: String(q?.question || `${blankNum || idx + 1}. Câu hỏi`).trim(),
+      options,
+      correctAnswer: String(q?.correctAnswer ?? '').trim()
+    };
+  });
+
+  return {
+    title: String(parsed?.title || '').trim(),
+    passageText: String(parsed?.passageText || '').trim(),
+    clozeText: String(parsed?.clozeText || '').trim(),
+    questions: normalizedQuestions,
+    usedModel
   };
 }

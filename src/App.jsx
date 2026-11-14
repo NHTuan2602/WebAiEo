@@ -31,6 +31,7 @@ import {
   simulateAIWritingGrading
 } from './utils/geminiGrader';
 import { speakWord, playSound } from './utils/mediaHelpers';
+import { syncClozeBlanksWithQuestions } from './utils/clozeHelpers';
 import {
   buildInitialExamState,
   loadExamDraft,
@@ -523,6 +524,7 @@ export default function App() {
 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [playingAudioKey, setPlayingAudioKey] = useState(null);
+  const [audioProgress, setAudioProgress] = useState({ currentTime: 0, duration: 0 });
   const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState(false);
   const [selectedPassageText, setSelectedPassageText] = useState('');
   const examAudioRef = useRef(null);
@@ -1819,6 +1821,7 @@ export default function App() {
     }
     setIsPlayingAudio(false);
     setPlayingAudioKey(null);
+    setAudioProgress({ currentTime: 0, duration: 0 });
   };
 
   const startExam = (testId) => {
@@ -1880,13 +1883,28 @@ export default function App() {
         examAudioRef.current = audio;
         setIsPlayingAudio(true);
         setPlayingAudioKey(audioKey);
+        setAudioProgress({ currentTime: 0, duration: 0 });
+        audio.onloadedmetadata = () => {
+          setAudioProgress({
+            currentTime: audio.currentTime || 0,
+            duration: Number.isFinite(audio.duration) ? audio.duration : 0
+          });
+        };
+        audio.ontimeupdate = () => {
+          setAudioProgress({
+            currentTime: audio.currentTime || 0,
+            duration: Number.isFinite(audio.duration) ? audio.duration : 0
+          });
+        };
         audio.onended = () => {
           setIsPlayingAudio(false);
           setPlayingAudioKey(null);
+          setAudioProgress({ currentTime: 0, duration: 0 });
         };
         audio.onerror = () => {
           setIsPlayingAudio(false);
           setPlayingAudioKey(null);
+          setAudioProgress({ currentTime: 0, duration: 0 });
           alert('Không thể phát file âm thanh này. Vui lòng kiểm tra lại định dạng file.');
         };
         audio.play();
@@ -2530,6 +2548,33 @@ export default function App() {
     const firstTrack = tracks[0] || {};
     const passages = getReadingPassages(testForm.reading);
     const firstPassage = passages[0] || {};
+
+    let syncedListeningQs = Array.isArray(testForm.listening?.questions) ? [...testForm.listening.questions] : [];
+    tracks.forEach((tr, idx) => {
+      if (String(tr.clozeText || '').trim()) {
+        syncedListeningQs = syncClozeBlanksWithQuestions({
+          clozeText: tr.clozeText,
+          existingQuestions: syncedListeningQs,
+          scopeField: 'trackIdx',
+          scopeIdx: idx,
+          skill: 'listening'
+        });
+      }
+    });
+
+    let syncedReadingQs = Array.isArray(testForm.reading?.questions) ? [...testForm.reading.questions] : [];
+    passages.forEach((ps, idx) => {
+      if (String(ps.clozeText || '').trim()) {
+        syncedReadingQs = syncClozeBlanksWithQuestions({
+          clozeText: ps.clozeText,
+          existingQuestions: syncedReadingQs,
+          scopeField: 'passageIdx',
+          scopeIdx: idx,
+          skill: 'reading'
+        });
+      }
+    });
+
     const normalizedTest = {
       ...testForm,
       visibility: cfg.visibility,
@@ -2542,18 +2587,22 @@ export default function App() {
       listening: {
         ...testForm.listening,
         tracks,
+        questions: syncedListeningQs,
         audioUrl: firstTrack.audioUrl || '',
         audioFileName: firstTrack.audioFileName || '',
         imageUrl: firstTrack.imageUrl || '',
         imageFileName: firstTrack.imageFileName || '',
         contextText: firstTrack.contextText || '',
+        clozeText: firstTrack.clozeText || '',
         transcript: firstTrack.transcript || ''
       },
       reading: {
         ...testForm.reading,
         passages,
+        questions: syncedReadingQs,
         passageTitle: firstPassage.title || '',
         passageText: firstPassage.passageText || '',
+        clozeText: firstPassage.clozeText || '',
         imageUrl: firstPassage.imageUrl || '',
         imageFileName: firstPassage.imageFileName || ''
       }
@@ -3876,6 +3925,7 @@ export default function App() {
           addHighlight={addHighlight}
           addNote={addNote}
           advanceToNextExamSection={advanceToNextExamSection}
+          audioProgress={audioProgress}
           darkMode={darkMode}
           examState={examState}
           handleFinalExamSubmit={handleFinalExamSubmit}
@@ -3978,6 +4028,7 @@ export default function App() {
       {view === 'EXAM_BUILDER' && (
         <ExamBuilder
           addQuestionToSkill={addQuestionToSkill}
+          aiApiKey={aiApiKey}
           builderListeningIdx={builderListeningIdx}
           builderReadingIdx={builderReadingIdx}
           builderTab={builderTab}
@@ -3989,13 +4040,16 @@ export default function App() {
           handleSaveTestBuilder={handleSaveTestBuilder}
           handleWritingTask1ImageUpload={handleWritingTask1ImageUpload}
           removeQuestionFromSkill={removeQuestionFromSkill}
+          setApiTestState={setApiTestState}
           setBuilderListeningIdx={setBuilderListeningIdx}
           setBuilderReadingIdx={setBuilderReadingIdx}
           setBuilderTab={setBuilderTab}
           setEditingTest={setEditingTest}
+          setShowApiKeyModal={setShowApiKeyModal}
           setTestForm={setTestForm}
           setView={setView}
           setZoomedReadingImg={setZoomedReadingImg}
+          showToast={showToast}
           testForm={testForm}
           updateListeningTrackField={updateListeningTrackField}
           updateOptionInSkill={updateOptionInSkill}

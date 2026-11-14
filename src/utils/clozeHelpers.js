@@ -1,0 +1,260 @@
+// Helpers for Inline Cloze / Note Completion ("Đục Lỗ") and Question Mapping
+
+const BLANK_TOKEN_REGEX = /(\{\{\s*\d+\s*\}\}|\[\s*\d+\s*\]|\(__+\s*\d+\s*__+\))/g;
+const BLANK_NUM_CAPTURE = /(?:\{\{\s*(\d+)\s*\}\}|\[\s*(\d+)\s*\]|\(__+\s*(\d+)\s*__+\))/;
+
+export function parseBlankNumberFromToken(token = '') {
+  const match = String(token).match(BLANK_NUM_CAPTURE);
+  if (!match) return null;
+  const rawNum = match[1] || match[2] || match[3];
+  const parsed = Number(rawNum);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function extractBlankNumbers(clozeText = '') {
+  if (!clozeText) return [];
+  const matches = String(clozeText).match(BLANK_TOKEN_REGEX) || [];
+  const seen = new Set();
+  const ordered = [];
+  for (const token of matches) {
+    const num = parseBlankNumberFromToken(token);
+    if (num && !seen.has(num)) {
+      seen.add(num);
+      ordered.push(num);
+    }
+  }
+  return ordered;
+}
+
+export function splitLineIntoClozeSegments(line = '') {
+  const segments = [];
+  const str = String(line);
+  let lastIdx = 0;
+  const regex = new RegExp(BLANK_TOKEN_REGEX.source, 'g');
+  let match;
+
+  while ((match = regex.exec(str)) !== null) {
+    if (match.index > lastIdx) {
+      segments.push({ type: 'text', value: str.slice(lastIdx, match.index) });
+    }
+    const blankNum = parseBlankNumberFromToken(match[0]);
+    if (blankNum !== null) {
+      segments.push({ type: 'blank', blankNum, raw: match[0] });
+    } else {
+      segments.push({ type: 'text', value: match[0] });
+    }
+    lastIdx = match.index + match[0].length;
+  }
+
+  if (lastIdx < str.length) {
+    segments.push({ type: 'text', value: str.slice(lastIdx) });
+  }
+  return segments;
+}
+
+export function parseClozeLines(clozeText = '') {
+  if (!clozeText) return [];
+  const rawLines = String(clozeText).replace(/\r\n/g, '\n').split('\n');
+  return rawLines.map((rawLine, lineIdx) => {
+    const trimmed = rawLine.trim();
+    if (!trimmed) {
+      return { id: lineIdx, kind: 'spacer', segments: [] };
+    }
+
+    // Markdown bold heading: **HIRING A PUBLIC ROOM** or clean heading without blanks
+    const boldHeadingMatch = trimmed.match(/^\*\*(.+)\*\*$/);
+    if (boldHeadingMatch) {
+      return {
+        id: lineIdx,
+        kind: 'heading',
+        segments: splitLineIntoClozeSegments(boldHeadingMatch[1].trim())
+      };
+    }
+
+    if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
+      return {
+        id: lineIdx,
+        kind: 'subheading',
+        segments: splitLineIntoClozeSegments(trimmed.replace(/^#{2,3}\s+/, ''))
+      };
+    }
+
+    if (/^[•\-*]\s+/.test(trimmed)) {
+      return {
+        id: lineIdx,
+        kind: 'bullet',
+        segments: splitLineIntoClozeSegments(trimmed.replace(/^[•\-*]\s+/, ''))
+      };
+    }
+
+    // Short uppercase line with no blank token -> section title
+    const hasBlank = Boolean(trimmed.match(BLANK_TOKEN_REGEX));
+    if (!hasBlank && trimmed.length <= 64 && trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed)) {
+      return {
+        id: lineIdx,
+        kind: 'heading',
+        segments: [{ type: 'text', value: trimmed }]
+      };
+    }
+
+    return {
+      id: lineIdx,
+      kind: 'paragraph',
+      segments: splitLineIntoClozeSegments(rawLine)
+    };
+  });
+}
+
+export function filterQuestionsByScope(questions = [], scopeField, scopeIdx) {
+  if (!Array.isArray(questions)) return [];
+  if (!scopeField || typeof scopeIdx !== 'number') return questions;
+  const hasAnyScoped = questions.some(q => typeof q?.[scopeField] === 'number');
+  if (!hasAnyScoped) return questions;
+  return questions.filter(q => typeof q?.[scopeField] !== 'number' || q[scopeField] === scopeIdx);
+}
+
+export function resolveQuestionForBlank(questions = [], blankNum, scopeField, scopeIdx) {
+  const scoped = filterQuestionsByScope(questions, scopeField, scopeIdx);
+
+  // 1. Explicit blankNum match inside scope (or unscoped legacy questions)
+  const byBlankScoped = scoped.find(q => Number(q?.blankNum) === Number(blankNum));
+  if (byBlankScoped) return byBlankScoped;
+
+  // 2. Fallback: fill question inside scope whose title starts with "<blankNum>." or "Câu <blankNum>"
+  const numRegex = new RegExp(`^(?:câu\\s*)?${blankNum}(?:[.)\\s:]|$)`, 'i');
+  return scoped.find(q => q?.type === 'fill' && numRegex.test(String(q.question || '').trim())) || null;
+}
+
+export function syncClozeBlanksWithQuestions({
+  clozeText = '',
+  existingQuestions = [],
+  scopeField = 'trackIdx',
+  scopeIdx = 0,
+  skill = 'listening'
+}) {
+  const blankNums = extractBlankNumbers(clozeText);
+  if (blankNums.length === 0) return existingQuestions;
+
+  const lines = String(clozeText).replace(/\r\n/g, '\n').split('\n');
+  const findContextForBlank = (num) => {
+    const tokenRegex = new RegExp(`(?:\\{\\{\\s*${num}\\s*\\}\\}|\\[\\s*${num}\\s*\\]|\\(__+\\s*${num}\\s*__+\\))`);
+    const matchedLine = lines.find(l => tokenRegex.test(l));
+    if (!matchedLine) return `${num}. Điền vào chỗ trống (${num})`;
+    const cleanContext = matchedLine
+      .replace(/^[•\-*\s#]+/, '')
+      .replace(/\*\*/g, '')
+      .replace(new RegExp(BLANK_TOKEN_REGEX.source, 'g'), m => {
+        const parsed = parseBlankNumberFromToken(m);
+        return parsed ? `(${parsed})____` : '____';
+      })
+      .trim();
+    return `${num}. ${cleanContext}`;
+  };
+
+  const nextQuestions = [...existingQuestions];
+
+  blankNums.forEach(num => {
+    const existing = resolveQuestionForBlank(nextQuestions, num, scopeField, scopeIdx);
+    if (existing) {
+      const idx = nextQuestions.findIndex(q => q.id === existing.id);
+      if (idx >= 0) {
+        nextQuestions[idx] = {
+          ...nextQuestions[idx],
+          type: 'fill',
+          blankNum: num,
+          options: [],
+          [scopeField]: scopeIdx
+        };
+      }
+    } else {
+      nextQuestions.push({
+        id: `${skill[0]}q_${Date.now()}_${num}_${Math.random().toString(36).slice(2, 6)}`,
+        type: 'fill',
+        blankNum: num,
+        [scopeField]: scopeIdx,
+        question: findContextForBlank(num),
+        options: [],
+        correctAnswer: ''
+      });
+    }
+  });
+
+  // Sort fill questions with blankNum sensibly when mixed
+  return nextQuestions;
+}
+
+export function parseAnswerKeyText(rawText = '') {
+  const lines = String(rawText || '').replace(/\r\n/g, '\n').split('\n');
+  const map = new Map();
+  let sequentialCursor = 1;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    // Supports: "1. Hills", "1) 250", "Q1: park", "1 - morning", "1 full"
+    const numberedMatch = line.match(/^(?:q(?:uestion)?\s*)?(\d+)\s*[.):\-–]\s*(.+)$/i);
+    if (numberedMatch) {
+      const num = Number(numberedMatch[1]);
+      const ans = numberedMatch[2].trim();
+      if (num > 0 && ans) {
+        map.set(num, ans);
+        sequentialCursor = num + 1;
+      }
+      continue;
+    }
+
+    const spaceMatch = line.match(/^(\d+)\s+(.+)$/);
+    if (spaceMatch) {
+      const num = Number(spaceMatch[1]);
+      const ans = spaceMatch[2].trim();
+      if (num > 0 && ans) {
+        map.set(num, ans);
+        sequentialCursor = num + 1;
+      }
+      continue;
+    }
+
+    // Bare line fallback -> assign sequentially 1, 2, 3...
+    map.set(sequentialCursor, line);
+    sequentialCursor++;
+  }
+
+  return map;
+}
+
+export function applyAnswerKeyTextToQuestions(rawKeyText = '', existingQuestions = [], scopeField, scopeIdx) {
+  const keyMap = parseAnswerKeyText(rawKeyText);
+  if (keyMap.size === 0) return { updated: existingQuestions, matchedCount: 0 };
+
+  let matchedCount = 0;
+  let scopedCounter = 0;
+  const hasScoped = existingQuestions.some(q => typeof q?.[scopeField] === 'number');
+
+  const updated = existingQuestions.map(q => {
+    const inScope = !hasScoped || typeof q?.[scopeField] !== 'number' || q[scopeField] === scopeIdx;
+    if (!inScope) return q;
+    scopedCounter++;
+
+    const numMatch = String(q.question || '').trim().match(/^(?:câu\s*)?(\d+)(?:[.):\s]|$)/i);
+    const numKey = typeof q.blankNum === 'number'
+      ? q.blankNum
+      : numMatch
+      ? Number(numMatch[1])
+      : scopedCounter;
+
+    if (!keyMap.has(numKey)) return q;
+    const rawAns = keyMap.get(numKey);
+    matchedCount++;
+
+    if ((q.type === 'mcq' || q.type === 'tfng') && Array.isArray(q.options) && q.options.length > 0) {
+      const norm = rawAns.trim().toUpperCase();
+      const letterMatch = q.options.find(opt => String(opt).trim().toUpperCase().startsWith(`${norm}.`) || String(opt).trim().toUpperCase() === norm);
+      return { ...q, correctAnswer: letterMatch || rawAns };
+    }
+
+    return { ...q, correctAnswer: rawAns };
+  });
+
+  return { updated, matchedCount };
+}

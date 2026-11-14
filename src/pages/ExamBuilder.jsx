@@ -20,10 +20,14 @@ import {
   Upload
 } from 'lucide-react';
 import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../utils/clozeHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
+import AiExamExtractorPanel from '../components/teacher/AiExamExtractorPanel';
+import ClozeEditorBox from '../components/teacher/ClozeEditorBox';
 
 export default function ExamBuilder({
   addQuestionToSkill,
+  aiApiKey,
   builderListeningIdx,
   builderReadingIdx,
   builderTab,
@@ -35,19 +39,149 @@ export default function ExamBuilder({
   handleSaveTestBuilder,
   handleWritingTask1ImageUpload,
   removeQuestionFromSkill,
+  setApiTestState,
   setBuilderListeningIdx,
   setBuilderReadingIdx,
   setBuilderTab,
   setEditingTest,
+  setShowApiKeyModal,
   setTestForm,
   setView,
   setZoomedReadingImg,
+  showToast,
   testForm,
   updateListeningTrackField,
   updateOptionInSkill,
   updateQuestionInSkill,
   updateReadingPassageField
 }) {
+  const handleSyncClozeQuestions = (skill, scopeField, scopeIdx, clozeText) => {
+    setTestForm(prev => {
+      const synced = syncClozeBlanksWithQuestions({
+        clozeText,
+        existingQuestions: prev[skill]?.questions || [],
+        scopeField,
+        scopeIdx,
+        skill
+      });
+      return {
+        ...prev,
+        [skill]: {
+          ...prev[skill],
+          questions: synced
+        }
+      };
+    });
+    showToast?.('Đã đồng bộ các ô đục lỗ sang danh sách câu hỏi chấm điểm!');
+  };
+
+  const handleQuickAnswerKeyText = (skill, scopeField, scopeIdx, rawText) => {
+    let matchedCount = 0;
+    setTestForm(prev => {
+      const result = applyAnswerKeyTextToQuestions(rawText, prev[skill]?.questions || [], scopeField, scopeIdx);
+      matchedCount = result.matchedCount;
+      return {
+        ...prev,
+        [skill]: {
+          ...prev[skill],
+          questions: result.updated
+        }
+      };
+    });
+    if (matchedCount > 0) {
+      showToast?.(`Đã tự động điền ${matchedCount} đáp án vào danh sách câu hỏi!`);
+    } else {
+      showToast?.('Chưa khớp được số câu nào. Hãy đảm bảo đã có danh sách câu hỏi hoặc viết dạng "1. đáp án".', 'info');
+    }
+  };
+
+  const handleApplyAiExtraction = (skill, scopeField, scopeIdx, extracted, { replaceScope = true }) => {
+    const stampedQuestions = (extracted.questions || []).map((q, idx) => ({
+      id: `${skill[0]}q_ai_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+      type: q.type || 'fill',
+      ...(typeof q.blankNum === 'number' ? { blankNum: q.blankNum } : {}),
+      [scopeField]: scopeIdx,
+      question: q.question || `${q.blankNum || idx + 1}. Câu hỏi`,
+      options: q.options || [],
+      correctAnswer: q.correctAnswer || ''
+    }));
+
+    setTestForm(prev => {
+      const currentQs = prev[skill]?.questions || [];
+      const hasScoped = currentQs.some(q => typeof q?.[scopeField] === 'number');
+      const retainedQs = replaceScope
+        ? currentQs.filter(q => {
+            if (!hasScoped) return false;
+            return typeof q?.[scopeField] === 'number' && q[scopeField] !== scopeIdx;
+          })
+        : currentQs;
+
+      let mergedQs = [...retainedQs, ...stampedQuestions];
+      if (extracted.clozeText) {
+        mergedQs = syncClozeBlanksWithQuestions({
+          clozeText: extracted.clozeText,
+          existingQuestions: mergedQs,
+          scopeField,
+          scopeIdx,
+          skill
+        });
+      }
+
+      if (skill === 'listening') {
+        const tracks = getListeningTracks(prev.listening);
+        const updatedTracks = tracks.map((tr, i) =>
+          i === scopeIdx
+            ? {
+                ...tr,
+                title: extracted.title || tr.title,
+                clozeText: extracted.clozeText !== undefined
+                  ? (extracted.clozeText || (replaceScope ? '' : tr.clozeText))
+                  : tr.clozeText
+              }
+            : tr
+        );
+        const first = updatedTracks[0] || {};
+        return {
+          ...prev,
+          listening: {
+            ...prev.listening,
+            tracks: updatedTracks,
+            clozeText: first.clozeText || '',
+            questions: mergedQs
+          }
+        };
+      }
+
+      const passages = getReadingPassages(prev.reading);
+      const updatedPassages = passages.map((p, i) =>
+        i === scopeIdx
+          ? {
+              ...p,
+              title: extracted.title || p.title,
+              passageText: extracted.passageText || p.passageText,
+              clozeText: extracted.clozeText !== undefined
+                ? (extracted.clozeText || (replaceScope ? '' : p.clozeText))
+                : p.clozeText
+            }
+          : p
+      );
+      const first = updatedPassages[0] || {};
+      return {
+        ...prev,
+        reading: {
+          ...prev.reading,
+          passages: updatedPassages,
+          passageTitle: first.title || '',
+          passageText: first.passageText || '',
+          clozeText: first.clozeText || '',
+          questions: mergedQs
+        }
+      };
+    });
+
+    return { totalInScope: stampedQuestions.length };
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -757,7 +891,33 @@ export default function ExamBuilder({
                 />
               </div>
             </div>
+
+            {/* Inline Cloze / Note Completion Editor for Active Listening Topic */}
+            <ClozeEditorBox
+              clozeText={activeTrack?.clozeText || ''}
+              onChangeClozeText={val => updateListeningTrackField(activeIdx, { clozeText: val })}
+              onSyncBlanks={() => handleSyncClozeQuestions('listening', 'trackIdx', activeIdx, activeTrack?.clozeText || '')}
+              questions={testForm.listening?.questions || []}
+              scopeField="trackIdx"
+              scopeIdx={activeIdx}
+              scopeLabel={`Chủ đề #${activeIdx + 1}`}
+            />
           </div>
+
+          {/* AI Image-to-Exam Extractor for Active Listening Topic */}
+          <AiExamExtractorPanel
+            aiApiKey={aiApiKey}
+            existingMediaImageUrl={activeTrack?.imageUrl}
+            scopeLabel={`Listening • Chủ đề #${activeIdx + 1}`}
+            skill="listening"
+            setApiTestState={setApiTestState}
+            setShowApiKeyModal={setShowApiKeyModal}
+            showToast={showToast}
+            onApplyQuickAnswerText={txt => handleQuickAnswerKeyText('listening', 'trackIdx', activeIdx, txt)}
+            onApplyExtraction={(extracted, opts) =>
+              handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
+            }
+          />
 
           {/* Listening Questions List */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">
@@ -1097,11 +1257,37 @@ export default function ExamBuilder({
                 rows={7}
                 value={activePassage?.passageText || ''}
                 onChange={e => updateReadingPassageField(activeIdx, { passageText: e.target.value })}
-                className="w-full p-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-2xl text-xs leading-relaxed font-serif focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                className="w-full p-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-2xl text-xs leading-relaxed font-serif focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                 placeholder={`Nhập nội dung văn bản cho Bài đọc số ${activeIdx + 1}...`}
               />
             </div>
+
+            {/* Inline Cloze / Summary Completion Editor for Active Reading Passage */}
+            <ClozeEditorBox
+              clozeText={activePassage?.clozeText || ''}
+              onChangeClozeText={val => updateReadingPassageField(activeIdx, { clozeText: val })}
+              onSyncBlanks={() => handleSyncClozeQuestions('reading', 'passageIdx', activeIdx, activePassage?.clozeText || '')}
+              questions={testForm.reading?.questions || []}
+              scopeField="passageIdx"
+              scopeIdx={activeIdx}
+              scopeLabel={`Bài đọc #${activeIdx + 1}`}
+            />
           </div>
+
+          {/* AI Image-to-Exam Extractor for Active Reading Passage */}
+          <AiExamExtractorPanel
+            aiApiKey={aiApiKey}
+            existingMediaImageUrl={activePassage?.imageUrl}
+            scopeLabel={`Reading • Bài #${activeIdx + 1}`}
+            skill="reading"
+            setApiTestState={setApiTestState}
+            setShowApiKeyModal={setShowApiKeyModal}
+            showToast={showToast}
+            onApplyQuickAnswerText={txt => handleQuickAnswerKeyText('reading', 'passageIdx', activeIdx, txt)}
+            onApplyExtraction={(extracted, opts) =>
+              handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
+            }
+          />
 
           {/* Reading Questions CRUD */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">

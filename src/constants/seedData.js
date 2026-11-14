@@ -97,7 +97,8 @@ export const getReadingPassages = (readingObj) => {
       title: p.title || `Bài đọc ${idx + 1}`,
       imageUrl: p.imageUrl || '',
       imageFileName: p.imageFileName || '',
-      passageText: p.passageText || ''
+      passageText: p.passageText || '',
+      clozeText: p.clozeText || ''
     }));
   }
   return [
@@ -106,7 +107,8 @@ export const getReadingPassages = (readingObj) => {
       title: readingObj?.passageTitle || 'Reading Passage 1',
       imageUrl: readingObj?.imageUrl || '',
       imageFileName: readingObj?.imageFileName || '',
-      passageText: readingObj?.passageText || ''
+      passageText: readingObj?.passageText || '',
+      clozeText: readingObj?.clozeText || ''
     }
   ];
 };
@@ -121,6 +123,7 @@ export const getListeningTracks = (listeningObj) => {
       imageUrl: tr.imageUrl || '',
       imageFileName: tr.imageFileName || '',
       contextText: tr.contextText || tr.passageText || '',
+      clozeText: tr.clozeText || '',
       transcript: tr.transcript || ''
     }));
   }
@@ -133,6 +136,7 @@ export const getListeningTracks = (listeningObj) => {
       imageUrl: listeningObj?.imageUrl || '',
       imageFileName: listeningObj?.imageFileName || '',
       contextText: listeningObj?.contextText || '',
+      clozeText: listeningObj?.clozeText || '',
       transcript: listeningObj?.transcript || ''
     }
   ];
@@ -162,6 +166,7 @@ export const createEmptyTestForm = () => ({
     imageUrl: '',
     imageFileName: '',
     contextText: '',
+    clozeText: '',
     transcript: '',
     tracks: [
       {
@@ -172,6 +177,7 @@ export const createEmptyTestForm = () => ({
         imageUrl: '',
         imageFileName: '',
         contextText: '',
+        clozeText: '',
         transcript: ''
       }
     ],
@@ -180,9 +186,10 @@ export const createEmptyTestForm = () => ({
   reading: {
     passageTitle: '',
     passageText: '',
+    clozeText: '',
     imageUrl: '',
     imageFileName: '',
-    passages: [{ id: 'passage-1', title: 'Bài đọc 1', imageUrl: '', imageFileName: '', passageText: '' }],
+    passages: [{ id: 'passage-1', title: 'Bài đọc 1', imageUrl: '', imageFileName: '', passageText: '', clozeText: '' }],
     questions: []
   },
   writing: {
