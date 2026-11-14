@@ -294,7 +294,7 @@ export default function ExamMode({
       {q.type === 'fill' && (
         <input
           type="text"
-          placeholder={`Câu ${displayNum}: Nhập đáp án...`}
+          placeholder={`Câu ${Number(String(q.question || '').trim().match(/^(?:Câu\s*)?(\d+)[.)]/i)?.[1]) || displayNum}: Nhập đáp án...`}
           value={examState.answers[q.id] || ''}
           onChange={e =>
             setExamState(prev => ({
@@ -506,7 +506,11 @@ export default function ExamMode({
                     <button
                       key={tr.id || trIdx}
                       type="button"
-                      onClick={() => setExamState(prev => ({ ...prev, listeningTrackIdx: trIdx }))}
+                      onClick={() => {
+                        setActiveBlankNum(null);
+                        setActiveQuestionId(null);
+                        setExamState(prev => ({ ...prev, listeningTrackIdx: trIdx }));
+                      }}
                       className={`px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1.5 border ${
                         isSelected
                           ? 'bg-[#007A7A] text-white border-[#007A7A]'
@@ -686,7 +690,11 @@ export default function ExamMode({
                     <button
                       key={p.id || pIdx}
                       type="button"
-                      onClick={() => setExamState(prev => ({ ...prev, readingPassageIdx: pIdx }))}
+                      onClick={() => {
+                        setActiveBlankNum(null);
+                        setActiveQuestionId(null);
+                        setExamState(prev => ({ ...prev, readingPassageIdx: pIdx }));
+                      }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 border ${
                         pIdx === safePassageIdx
                           ? 'bg-[#007A7A] text-white border-[#007A7A] shadow-xs'
@@ -938,9 +946,12 @@ export default function ExamMode({
                     </span>
                     <div className="flex items-center gap-1 flex-wrap">
                       {part.questions.map((q, qIdx) => {
-                        const displayNum = typeof q.blankNum === 'number' ? q.blankNum : qIdx + 1;
+                        const leadingNum = Number(String(q.question || '').trim().match(/^(?:Câu\s*)?(\d+)[.)]/i)?.[1]);
+                        const displayNum = typeof q.blankNum === 'number' ? q.blankNum : (leadingNum || qIdx + 1);
                         const isAnswered = String(examState.answers[q.id] || '').trim().length > 0;
-                        const isFocused = activeQuestionId === q.id || Number(activeBlankNum) === Number(displayNum);
+                        const isFocused =
+                          activeQuestionId === q.id ||
+                          (typeof q.blankNum === 'number' && Number(activeBlankNum) === Number(q.blankNum));
 
                         return (
                           <button

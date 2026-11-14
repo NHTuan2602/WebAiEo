@@ -29,6 +29,8 @@ function createInitialStore() {
   return {
     version: 0,
     seeded: false,
+    seededTags: {},
+    deletedTestIds: [],
     rooms: {},
     tests: [],
     attempts: [],
@@ -51,6 +53,12 @@ export function createPersistentSyncStore(persistFile = '') {
         if (parsed && typeof parsed === 'object') {
           store.version = Number(parsed.version) || 0;
           store.seeded = Boolean(parsed.seeded);
+          if (parsed.seededTags && typeof parsed.seededTags === 'object') {
+            store.seededTags = { ...parsed.seededTags };
+          }
+          if (Array.isArray(parsed.deletedTestIds)) {
+            store.deletedTestIds = parsed.deletedTestIds;
+          }
           if (parsed.rooms && typeof parsed.rooms === 'object') {
             Object.entries(parsed.rooms).forEach(([pin, r]) => {
               store.rooms[pin] = normalizeServerRoom(r, pin);
@@ -144,6 +152,9 @@ function applySyncAction(store, type, payload = {}) {
         }
         if (Array.isArray(payload.tests)) {
           store.tests = payload.tests;
+          payload.tests.forEach(t => {
+            if (t?.seedTag) store.seededTags[t.seedTag] = true;
+          });
         }
         if (Array.isArray(payload.attempts)) {
           store.attempts = payload.attempts;
@@ -157,13 +168,24 @@ function applySyncAction(store, type, payload = {}) {
         store.seeded = true;
         changed = true;
       } else {
-        // Merge only missing custom users or newly created local rooms if server didn't know about them
+        // Merge only missing custom users or newly released tagged default tests
         if (payload.users && typeof payload.users === 'object') {
           Object.entries(payload.users).forEach(([uname, u]) => {
             if (!store.users[uname]) {
               store.users[uname] = u;
               changed = true;
             }
+          });
+        }
+        if (Array.isArray(payload.defaultTests)) {
+          payload.defaultTests.forEach(dt => {
+            if (!dt?.id || !dt?.seedTag) return;
+            if (store.seededTags[dt.seedTag]) return;
+            store.seededTags[dt.seedTag] = true;
+            if (!store.deletedTestIds.includes(dt.id) && !store.tests.some(t => t.id === dt.id)) {
+              store.tests = [dt, ...store.tests];
+            }
+            changed = true;
           });
         }
       }
@@ -421,6 +443,9 @@ function applySyncAction(store, type, payload = {}) {
     case 'DELETE_TEST': {
       const testId = payload.testId;
       if (!testId) break;
+      if (!store.deletedTestIds.includes(testId)) {
+        store.deletedTestIds.push(testId);
+      }
       store.tests = store.tests.filter(t => t.id !== testId);
       changed = true;
       break;

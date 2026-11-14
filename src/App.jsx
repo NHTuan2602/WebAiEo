@@ -84,12 +84,29 @@ export default function App() {
 
   // Tests & Attempts states (loaded before navigation/exam draft restoration)
   const [tests, setTests] = useState(() => {
+    const taggedDefaults = DEFAULT_TESTS.filter(d => Boolean(d.seedTag));
+    let injectedTags = [];
+    try {
+      const rawTags = localStorage.getItem('ielts_seed_tags_v1');
+      injectedTags = rawTags ? JSON.parse(rawTags) : [];
+      if (!Array.isArray(injectedTags)) injectedTags = [];
+    } catch (_e) {
+      injectedTags = [];
+    }
+
+    const markAllTagged = () => {
+      try {
+        const nextTags = Array.from(new Set([...injectedTags, ...taggedDefaults.map(d => d.seedTag)]));
+        localStorage.setItem('ielts_seed_tags_v1', JSON.stringify(nextTags));
+      } catch (_e) {}
+    };
+
     const saved = localStorage.getItem('ielts_tests');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(t => {
+          const normalizedSaved = parsed.map(t => {
             const def = DEFAULT_TESTS.find(d => d.id === t.id);
             return {
               ...t,
@@ -100,9 +117,16 @@ export default function App() {
               }
             };
           });
+          const existingIds = new Set(normalizedSaved.map(t => t.id));
+          const pendingNewSeeds = taggedDefaults.filter(
+            d => !injectedTags.includes(d.seedTag) && !existingIds.has(d.id)
+          );
+          markAllTagged();
+          return pendingNewSeeds.length > 0 ? [...pendingNewSeeds, ...normalizedSaved] : normalizedSaved;
         }
       } catch (_e) {}
     }
+    markAllTagged();
     return DEFAULT_TESTS;
   });
 
@@ -820,7 +844,10 @@ export default function App() {
             users: usersDb
           });
         } else {
-          await dispatchSyncAction('SEED_DEFAULTS', { users: usersDb });
+          await dispatchSyncAction('SEED_DEFAULTS', {
+            users: usersDb,
+            defaultTests: DEFAULT_TESTS.filter(d => Boolean(d.seedTag))
+          });
         }
       }
 

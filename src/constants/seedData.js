@@ -198,7 +198,433 @@ export const createEmptyTestForm = () => ({
   }
 });
 
+const CAMBRIDGE_TASK1_CHART_SVG_URL =
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 340" width="680" height="340">
+  <rect width="680" height="340" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="340" y="30" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="#0f172a">Electricity Generation by Energy Source in Northland (TWh), 2005–2025</text>
+  <line x1="72" y1="250" x2="640" y2="250" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="72" y1="66" x2="72" y2="250" stroke="#94a3b8" stroke-width="1.5"/>
+  <g stroke="#e2e8f0" stroke-dasharray="4 4" stroke-width="1">
+    <line x1="72" y1="204" x2="640" y2="204"/>
+    <line x1="72" y1="158" x2="640" y2="158"/>
+    <line x1="72" y1="112" x2="640" y2="112"/>
+    <line x1="72" y1="66" x2="640" y2="66"/>
+  </g>
+  <g font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569" text-anchor="end">
+    <text x="64" y="254">0</text>
+    <text x="64" y="208">40</text>
+    <text x="64" y="162">80</text>
+    <text x="64" y="116">120</text>
+    <text x="64" y="70">160</text>
+  </g>
+  <text x="20" y="160" transform="rotate(-90 20 160)" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#475569">Output (TWh)</text>
+  <!-- Coal: 140, 115, 45 -->
+  <rect x="102" y="89" width="26" height="161" rx="3" fill="#334155"/><text x="115" y="84" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#334155">140</text>
+  <rect x="132" y="118" width="26" height="132" rx="3" fill="#0284c7"/><text x="145" y="113" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0284c7">115</text>
+  <rect x="162" y="198" width="26" height="52" rx="3" fill="#0d9488"/><text x="175" y="193" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0d9488">45</text>
+  <text x="145" y="272" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Coal</text>
+  <!-- Natural Gas: 80, 105, 90 -->
+  <rect x="242" y="158" width="26" height="92" rx="3" fill="#334155"/><text x="255" y="153" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#334155">80</text>
+  <rect x="272" y="129" width="26" height="121" rx="3" fill="#0284c7"/><text x="285" y="124" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0284c7">105</text>
+  <rect x="302" y="146" width="26" height="104" rx="3" fill="#0d9488"/><text x="315" y="141" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0d9488">90</text>
+  <text x="285" y="272" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Natural Gas</text>
+  <!-- Hydroelectric: 45, 50, 55 -->
+  <rect x="382" y="198" width="26" height="52" rx="3" fill="#334155"/><text x="395" y="193" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#334155">45</text>
+  <rect x="412" y="192" width="26" height="58" rx="3" fill="#0284c7"/><text x="425" y="187" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0284c7">50</text>
+  <rect x="442" y="187" width="26" height="63" rx="3" fill="#0d9488"/><text x="455" y="182" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0d9488">55</text>
+  <text x="425" y="272" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Hydro</text>
+  <!-- Wind & Solar: 10, 42, 135 -->
+  <rect x="522" y="238" width="26" height="12" rx="3" fill="#334155"/><text x="535" y="233" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#334155">10</text>
+  <rect x="552" y="202" width="26" height="48" rx="3" fill="#0284c7"/><text x="565" y="197" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0284c7">42</text>
+  <rect x="582" y="95" width="26" height="155" rx="3" fill="#0d9488"/><text x="595" y="90" text-anchor="middle" font-family="sans-serif" font-size="10" font-weight="700" fill="#0d9488">135</text>
+  <text x="565" y="272" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#0f172a">Wind &amp; Solar</text>
+  <!-- Legend -->
+  <g transform="translate(225, 298)" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#334155">
+    <rect x="0" y="0" width="14" height="14" rx="3" fill="#334155"/><text x="20" y="11">2005</text>
+    <rect x="78" y="0" width="14" height="14" rx="3" fill="#0284c7"/><text x="98" y="11">2015</text>
+    <rect x="156" y="0" width="14" height="14" rx="3" fill="#0d9488"/><text x="176" y="11">2025</text>
+  </g>
+</svg>`
+  );
+
 export const DEFAULT_TESTS = [
+  {
+    id: 'test-ielts-cam-18-01',
+    seedTag: 'cam18_t1_v1',
+    title: 'IELTS Academic Mock Test 02 — Cambridge Standard (Đục Lỗ + Full 3 Skills)',
+    description:
+      'Đề thi IELTS Academic hoàn chỉnh chuẩn phòng thi LexiPrep: Listening 3 Parts (Note Completion đục lỗ Q1–Q10, Bảo tàng Hàng hải Q11–Q15, Nghiên cứu đất đô thị Q16–Q20 có giọng đọc tiếng Anh), Reading 2 Academic Passages (16 câu Đục lỗ, TFNG, MCQ) và Writing Task 1 (kèm biểu đồ) + Task 2.',
+    createdAt: '2026-11-14',
+    visibility: 'public',
+    maxAttempts: 0,
+    sequentialMode: false,
+    allowEarlyNextSection: true,
+    antiCheatEnabled: false,
+    sectionOrder: ['listening', 'reading', 'writing'],
+    sectionDurations: { listening: 30, reading: 60, writing: 60 },
+    maxAudioPlays: 2,
+    shuffleOptions: false,
+    allowViewAnswers: true,
+    listening: {
+      audioUrl: '',
+      clozeText: `Questions 1-10
+Complete the notes below.
+Write ONE WORD AND/OR A NUMBER for each answer.
+
+**HIRING A PUBLIC ROOM**
+Example
+• the Main Hall – seats ..........200..........
+
+### Room and cost
+• the {{1}} Room – seats 100
+• Cost of Main Hall for Saturday evening: £{{2}}
+• + £250 deposit ({{3}} payment is required)
+• Cost includes use of tables and chairs and also {{4}}
+• Additional charge for use of the kitchen: £25
+
+### Before and after the event
+• Will need a {{5}} licence
+• Caretaker must confirm floor is {{6}} before locking up
+• Bring your own extension {{7}} if needed
+• Do not leave {{8}} in the entrance corridor
+• Sort all {{9}} waste after the dinner
+• Contact caretaker Mr {{10}} for key collection`,
+      transcript: `Receptionist: Good morning, Thorndyke Community Centre. Caller: Hello, I am calling to enquire about booking a room for our neighbourhood charity dinner next month. Receptionist: Certainly. We have the Main Hall which seats 200 people, and for smaller groups we offer the Garden Room, which seats 100. For a Saturday evening booking, the Main Hall costs one hundred and fifteen pounds, so 115 pounds flat rate. Caller: Is there a deposit? Receptionist: Yes, we ask for a 250 pound refundable deposit, and cash payment is required for that. The hire fee includes tables, chairs, and free parking right outside. If you need live singers or amplified music, you will need a music licence. After the dinner, please sort all recyclable waste and make sure the floor is swept clean. You should bring your own extension cables if needed, and remind guests not to leave bicycles inside the entrance corridor. Finally, please contact our caretaker, Mr Evans, to collect the keys.`,
+      tracks: [
+        {
+          id: 'ltr_cam18_1',
+          title: 'Part 1: Hiring a Public Room (Q1–10)',
+          audioUrl: '',
+          audioFileName: '',
+          imageUrl: '',
+          imageFileName: '',
+          contextText: '',
+          clozeText: `Questions 1-10
+Complete the notes below.
+Write ONE WORD AND/OR A NUMBER for each answer.
+
+**HIRING A PUBLIC ROOM**
+Example
+• the Main Hall – seats ..........200..........
+
+### Room and cost
+• the {{1}} Room – seats 100
+• Cost of Main Hall for Saturday evening: £{{2}}
+• + £250 deposit ({{3}} payment is required)
+• Cost includes use of tables and chairs and also {{4}}
+• Additional charge for use of the kitchen: £25
+
+### Before and after the event
+• Will need a {{5}} licence
+• Caretaker must confirm floor is {{6}} before locking up
+• Bring your own extension {{7}} if needed
+• Do not leave {{8}} in the entrance corridor
+• Sort all {{9}} waste after the dinner
+• Contact caretaker Mr {{10}} for key collection`,
+          transcript: `Receptionist: Good morning, Thorndyke Community Centre. Caller: Hello, I am calling to enquire about booking a room for our neighbourhood charity dinner next month. Receptionist: Certainly. We have the Main Hall which seats 200 people, and for smaller groups we offer the Garden Room, which seats 100. For a Saturday evening booking, the Main Hall costs one hundred and fifteen pounds, so 115 pounds flat rate. Caller: Is there a deposit? Receptionist: Yes, we ask for a 250 pound refundable deposit, and cash payment is required for that. The hire fee includes tables, chairs, and free parking right outside. If you need live singers or amplified music, you will need a music licence. After the dinner, please sort all recyclable waste and make sure the floor is swept clean. You should bring your own extension cables if needed, and remind guests not to leave bicycles inside the entrance corridor. Finally, please contact our caretaker, Mr Evans, to collect the keys.`
+        },
+        {
+          id: 'ltr_cam18_2',
+          title: 'Part 2: Portside Maritime Museum (Q11–15)',
+          audioUrl: '',
+          audioFileName: '',
+          imageUrl: '',
+          imageFileName: '',
+          contextText: '',
+          clozeText: '',
+          transcript: `Welcome everyone to the Portside Maritime Museum briefing. Before you explore our galleries, here are a few practical details. We are standing inside the historic North Dock building. Although locals often assume it once housed retired sailors or repaired fishing boats, architectural records show it was constructed in 1840 strictly for storing timber and heavy hemp rope for shipyard riggers. Just outside pier two, you will see our newly restored Steam Tugboat. Because boarding spaces on the upper deck are strictly limited for safety reasons, weekend visitors need to collect free timed boarding passes at least 20 minutes before sailing. If you would like audio commentary during your walk, luggage lockers beside reception cost two pounds, whereas multilingual audio handsets are provided completely free of charge at the Information Desk. On Wednesday mornings, our upper-floor Museum Archives open exclusively to registered museum members without any admission charge. Finally, when you feel ready for refreshments, walk beside Pier 3 to our Compass Cafe, where bakers prepare traditional ship biscuits using a nineteenth-century recipe.`
+        },
+        {
+          id: 'ltr_cam18_3',
+          title: 'Part 3: Urban Soil Research Project (Q16–20)',
+          audioUrl: '',
+          audioFileName: '',
+          imageUrl: '',
+          imageFileName: '',
+          contextText: '',
+          clozeText: `Questions 16-20
+Complete the research summary below.
+Write ONE WORD ONLY for each answer.
+
+**URBAN SOIL MICROBIOME PROJECT**
+### Methodology
+• Samples collected from twelve municipal {{16}} across the city.
+• Soil core depth kept consistently at twenty {{17}} below surface turf.
+
+### Key Findings
+• Roadside plots showed heavy buildup of zinc and {{18}} particles.
+• Adding organic {{19}} boosted earthworm numbers within six weeks.
+• Dr Patel advises measuring moisture next semester using a digital {{20}}.`,
+          transcript: `Tutor Dr Patel: So Liam and Maya, let us review your preliminary findings for the Urban Soil Microbiome Project. Maya: Right, over the autumn term we collected topsoil samples from twelve municipal parks scattered from the industrial riverfront out to quiet residential hills. Liam: Unlike earlier teams who sampled randomly, we fixed our core depth at twenty centimetres below the surface turf so bacterial layers stayed comparable. Dr Patel: Smart choice. What stood out in the chemistry assays? Maya: Roadside borders contained elevated traces of zinc from brake wear, along with fine lead particles near older arterial intersections. Liam: Fortunately, on plots where groundskeepers mixed in organic compost, earthworm populations bounced back noticeably within just six weeks. Dr Patel: Excellent. Before scaling up next semester, instead of weighing damp trays manually, I advise recording daily soil moisture using a digital sensor.`
+        }
+      ],
+      questions: [
+        { id: 'cam18_l1', type: 'fill', blankNum: 1, trackIdx: 0, question: '1. the ______ Room – seats 100', options: [], correctAnswer: 'Garden|garden' },
+        { id: 'cam18_l2', type: 'fill', blankNum: 2, trackIdx: 0, question: '2. Cost of Main Hall for Saturday evening: £______', options: [], correctAnswer: '115|£115' },
+        { id: 'cam18_l3', type: 'fill', blankNum: 3, trackIdx: 0, question: '3. + £250 deposit (______ payment is required)', options: [], correctAnswer: 'cash|Cash' },
+        { id: 'cam18_l4', type: 'fill', blankNum: 4, trackIdx: 0, question: '4. Cost includes use of tables and chairs and also ______', options: [], correctAnswer: 'parking|free parking' },
+        { id: 'cam18_l5', type: 'fill', blankNum: 5, trackIdx: 0, question: '5. Will need a ______ licence', options: [], correctAnswer: 'music|Music' },
+        { id: 'cam18_l6', type: 'fill', blankNum: 6, trackIdx: 0, question: '6. Caretaker must confirm floor is ______ before locking up', options: [], correctAnswer: 'swept|clean|swept clean' },
+        { id: 'cam18_l7', type: 'fill', blankNum: 7, trackIdx: 0, question: '7. Bring your own extension ______ if needed', options: [], correctAnswer: 'cables|cable' },
+        { id: 'cam18_l8', type: 'fill', blankNum: 8, trackIdx: 0, question: '8. Do not leave ______ in the entrance corridor', options: [], correctAnswer: 'bicycles|bikes' },
+        { id: 'cam18_l9', type: 'fill', blankNum: 9, trackIdx: 0, question: '9. Sort all ______ waste after the dinner', options: [], correctAnswer: 'recyclable|Recyclable' },
+        { id: 'cam18_l10', type: 'fill', blankNum: 10, trackIdx: 0, question: '10. Contact caretaker Mr ______ for key collection', options: [], correctAnswer: 'Evans|evans' },
+        {
+          id: 'cam18_l11',
+          type: 'mcq',
+          trackIdx: 1,
+          question: '11. What was the North Dock building originally constructed for in 1840?',
+          options: [
+            'A. Storing timber and hemp rope',
+            'B. Repairing wooden fishing boats',
+            'C. Serving as the harbour customs office',
+            'D. Housing retired naval sailors'
+          ],
+          correctAnswer: 'A. Storing timber and hemp rope'
+        },
+        {
+          id: 'cam18_l12',
+          type: 'mcq',
+          trackIdx: 1,
+          question: '12. Why must weekend visitors collect timed passes for the Steam Tugboat tour?',
+          options: [
+            'A. Tide schedules change every hour',
+            'B. Boarding capacity on deck is strictly limited',
+            'C. Guided commentary only runs twice per day',
+            'D. Engine maintenance closes the pier at noon'
+          ],
+          correctAnswer: 'B. Boarding capacity on deck is strictly limited'
+        },
+        {
+          id: 'cam18_l13',
+          type: 'mcq',
+          trackIdx: 1,
+          question: '13. Which service is provided free of charge at the Information Desk?',
+          options: [
+            'A. Secure luggage lockers',
+            'B. Printed harbour charts',
+            'C. Multilingual audio handsets',
+            'D. Guided photography tours'
+          ],
+          correctAnswer: 'C. Multilingual audio handsets'
+        },
+        {
+          id: 'cam18_l14',
+          type: 'mcq',
+          trackIdx: 1,
+          question: '14. Who is eligible for free admission to the Museum Archives on Wednesday mornings?',
+          options: [
+            'A. Local school excursions',
+            'B. Marine engineering students',
+            'C. Registered museum members',
+            'D. Retired dockyard staff'
+          ],
+          correctAnswer: 'C. Registered museum members'
+        },
+        {
+          id: 'cam18_l15',
+          type: 'fill',
+          trackIdx: 1,
+          question: '15. Visitors can sample traditional ship biscuits at the ______ Cafe near Pier 3. (ONE WORD)',
+          options: [],
+          correctAnswer: 'Compass|compass'
+        },
+        { id: 'cam18_l16', type: 'fill', blankNum: 16, trackIdx: 2, question: '16. Samples collected from twelve municipal ______ across the city.', options: [], correctAnswer: 'parks|park' },
+        { id: 'cam18_l17', type: 'fill', blankNum: 17, trackIdx: 2, question: '17. Soil core depth kept consistently at twenty ______ below surface turf.', options: [], correctAnswer: 'centimetres|centimeters|cm' },
+        { id: 'cam18_l18', type: 'fill', blankNum: 18, trackIdx: 2, question: '18. Roadside plots showed heavy buildup of zinc and ______ particles.', options: [], correctAnswer: 'lead' },
+        { id: 'cam18_l19', type: 'fill', blankNum: 19, trackIdx: 2, question: '19. Adding organic ______ boosted earthworm numbers within six weeks.', options: [], correctAnswer: 'compost' },
+        { id: 'cam18_l20', type: 'fill', blankNum: 20, trackIdx: 2, question: '20. Dr Patel advises measuring moisture next semester using a digital ______.', options: [], correctAnswer: 'sensor|probe' }
+      ]
+    },
+    reading: {
+      passageTitle: 'Passage 1: How Ancient Salt Shaped Trade and Empire',
+      passageText: `A For thousands of years before artificial cooling transformed kitchens and shipping, sodium chloride was far more than a culinary seasoning: it functioned as the world’s premier natural preservative. By drawing moisture out of beef, pork, and ocean harvests, curing prevented lethal bacterial decay during winter scarcity and sustained crews across multi-month maritime voyages.
+
+B Because fertile coastal pans and rock-salt deposits were unevenly scattered across continents, salt quickly forged long-distance highways. In Roman Italy, the Via Salaria—one of the peninsula’s oldest engineered roads—carried coastal salt inland toward upland towns. Historians frequently debate whether the modern word “salary” grew directly out of salt stipends; archaeological pay ledgers confirm legionaries were primarily paid in minted silver coins alongside occasional salt rations. Across North Africa, Saharan mines at Taghaza supplied immense rectangular slabs hauled south by camel caravans along desert tracks to Timbuktu, where scarcity made salt slabs rival equal weights of gold dust in regional barter.
+
+C Inevitably, anything indispensable became a tempting fiscal target for monarchs and colonial empires. Medieval French kings imposed the notorious gabelle, forcing citizens above age eight to purchase fixed quotas of heavily taxed state salt—a grievance frequently cited in petitions before the 1789 Revolution. More than a century later, in 1930, Mahatma Gandhi selected British salt monopolies as the symbolic focal point of a 390-kilometre civil disobedience march to the Arabian Sea, demonstrating how an everyday mineral could mobilise political solidarity across social classes.
+
+D Everything changed once household iceboxes gave way to electric refrigeration in the early twentieth century. Salt lost its historical monopoly over food preservation, yet modern industry consumes unprecedented tonnages today—over half of global production now feeds chemical manufacturing, producing chlorine, caustic soda, and glass rather than dining-table shakers.`,
+      clozeText: `Questions 1-5
+Complete the summary below.
+Choose NO MORE THAN TWO WORDS from the passage for each answer.
+
+**THE ECONOMIC HISTORY OF SALT**
+• Long before mechanical cooling existed, communities relied on salt as the chief natural {{1}} for fish and meat.
+• Across the Sahara Desert, merchants loaded mineral blocks onto {{2}} caravans bound for Timbuktu.
+• In ancient Italy, coastal pans supplied inland towns along the historic {{3}}.
+• Heavy anger over France’s mandatory {{4}} tax contributed to protests prior to 1789.
+• Today, more than half of global salt tonnage supplies {{5}} manufacturing rather than kitchens.`,
+      passages: [
+        {
+          id: 'pass_cam18_1',
+          title: 'Passage 1: How Ancient Salt Shaped Trade and Empire',
+          imageUrl: '',
+          imageFileName: '',
+          passageText: `A For thousands of years before artificial cooling transformed kitchens and shipping, sodium chloride was far more than a culinary seasoning: it functioned as the world’s premier natural preservative. By drawing moisture out of beef, pork, and ocean harvests, curing prevented lethal bacterial decay during winter scarcity and sustained crews across multi-month maritime voyages.
+
+B Because fertile coastal pans and rock-salt deposits were unevenly scattered across continents, salt quickly forged long-distance highways. In Roman Italy, the Via Salaria—one of the peninsula’s oldest engineered roads—carried coastal salt inland toward upland towns. Historians frequently debate whether the modern word “salary” grew directly out of salt stipends; archaeological pay ledgers confirm legionaries were primarily paid in minted silver coins alongside occasional salt rations. Across North Africa, Saharan mines at Taghaza supplied immense rectangular slabs hauled south by camel caravans along desert tracks to Timbuktu, where scarcity made salt slabs rival equal weights of gold dust in regional barter.
+
+C Inevitably, anything indispensable became a tempting fiscal target for monarchs and colonial empires. Medieval French kings imposed the notorious gabelle, forcing citizens above age eight to purchase fixed quotas of heavily taxed state salt—a grievance frequently cited in petitions before the 1789 Revolution. More than a century later, in 1930, Mahatma Gandhi selected British salt monopolies as the symbolic focal point of a 390-kilometre civil disobedience march to the Arabian Sea, demonstrating how an everyday mineral could mobilise political solidarity across social classes.
+
+D Everything changed once household iceboxes gave way to electric refrigeration in the early twentieth century. Salt lost its historical monopoly over food preservation, yet modern industry consumes unprecedented tonnages today—over half of global production now feeds chemical manufacturing, producing chlorine, caustic soda, and glass rather than dining-table shakers.`,
+          clozeText: `Questions 1-5
+Complete the summary below.
+Choose NO MORE THAN TWO WORDS from the passage for each answer.
+
+**THE ECONOMIC HISTORY OF SALT**
+• Long before mechanical cooling existed, communities relied on salt as the chief natural {{1}} for fish and meat.
+• Across the Sahara Desert, merchants loaded mineral blocks onto {{2}} caravans bound for Timbuktu.
+• In ancient Italy, coastal pans supplied inland towns along the historic {{3}}.
+• Heavy anger over France’s mandatory {{4}} tax contributed to protests prior to 1789.
+• Today, more than half of global salt tonnage supplies {{5}} manufacturing rather than kitchens.`
+        },
+        {
+          id: 'pass_cam18_2',
+          title: 'Passage 2: Designing Cooler Cities & Urban Microclimates',
+          imageUrl: '',
+          imageFileName: '',
+          passageText: `A Modern metropolises routinely register night-time temperatures three to five degrees Celsius warmer than adjacent agricultural fields—a phenomenon climatologists term the Urban Heat Island (UHI) effect. Dense concentrations of dark slate roofing and asphalt roadways possess low albedo, a technical measure of solar reflectance; instead of bouncing sunlight skyward, these dark materials absorb up to ninety percent of incoming solar radiation throughout the afternoon.
+
+B After sunset, geometry determines how rapidly that trapped energy escapes. In leafy rural meadows, warmth radiates directly upward toward the night sky. By contrast, narrow downtown "street canyons" flanked by glass and concrete facades repeatedly re-emit and trap outgoing longwave thermal radiation between opposing walls, keeping pavements hot well past midnight and driving peak air-conditioning electricity demand.
+
+C Field experiments in Athens and Los Angeles indicate that coating flat commercial rooftops with pale high-albedo paint lowers top-floor indoor temperatures by two to three degrees Celsius across sunny climates without mechanical cooling. Complementing reflective roofs, porous stone pavements—pioneered under "Sponge City" drainage plans—capture rainwater below porous bricks and passively cool surrounding pedestrian air through gradual daytime evaporation.
+
+D Green infrastructure must still obey aerodynamic logic. Planting shade trees lowers surface temperatures under canopies, yet urban meteorologists caution that overly dense, unbroken rows of broadleaf trees can inadvertently block nocturnal sea breezes from flushing polluted warm air down central avenues. Well-designed cooling corridors carefully pair staggered shade trees with open wind channels so sunlit districts cool naturally once evening arrives.`,
+          clozeText: ''
+        }
+      ],
+      questions: [
+        { id: 'cam18_r1', type: 'fill', blankNum: 1, passageIdx: 0, question: '1. ...chief natural ______ for fish and meat.', options: [], correctAnswer: 'preservative' },
+        { id: 'cam18_r2', type: 'fill', blankNum: 2, passageIdx: 0, question: '2. ...loaded mineral blocks onto ______ caravans bound for Timbuktu.', options: [], correctAnswer: 'camel|camels' },
+        { id: 'cam18_r3', type: 'fill', blankNum: 3, passageIdx: 0, question: '3. ...inland towns along the historic ______.', options: [], correctAnswer: 'Via Salaria|via salaria' },
+        { id: 'cam18_r4', type: 'fill', blankNum: 4, passageIdx: 0, question: '4. ...France’s mandatory ______ tax...', options: [], correctAnswer: 'gabelle|Gabelle' },
+        { id: 'cam18_r5', type: 'fill', blankNum: 5, passageIdx: 0, question: '5. ...supplies ______ manufacturing rather than kitchens.', options: [], correctAnswer: 'chemical' },
+        {
+          id: 'cam18_r6',
+          type: 'tfng',
+          passageIdx: 0,
+          question: '6. Roman soldiers received all of their regular annual pay exclusively in salt rather than coins.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'FALSE'
+        },
+        {
+          id: 'cam18_r7',
+          type: 'tfng',
+          passageIdx: 0,
+          question: '7. In regional trade at Timbuktu, salt slabs could match an equivalent weight of gold in value.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'TRUE'
+        },
+        {
+          id: 'cam18_r8',
+          type: 'tfng',
+          passageIdx: 0,
+          question: '8. Excavation work at Taghaza extracted twice as much salt annually as coastal Italian pans.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'NOT GIVEN'
+        },
+        {
+          id: 'cam18_r9',
+          type: 'tfng',
+          passageIdx: 0,
+          question: '9. Electric household refrigerators brought an end to salt’s dominant role in preserving food.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'TRUE'
+        },
+        {
+          id: 'cam18_r10',
+          type: 'mcq',
+          passageIdx: 1,
+          question: '10. According to Paragraph B, why do narrow city streets remain hot long after dark?',
+          options: [
+            'A. Opposing building walls continuously absorb and re-emit thermal radiation',
+            'B. Underground metro trains generate continuous mechanical heat',
+            'C. Road paints seal soil moisture beneath thick asphalt',
+            'D. Air conditioners exhaust steam directly into drainage channels'
+          ],
+          correctAnswer: 'A. Opposing building walls continuously absorb and re-emit thermal radiation'
+        },
+        {
+          id: 'cam18_r11',
+          type: 'mcq',
+          passageIdx: 1,
+          question: '11. Trials in Athens and Los Angeles showed that pale reflective roof coatings:',
+          options: [
+            'A. eliminated indoor cooling bills year-round',
+            'B. reduced upper-floor indoor heat by two to three degrees Celsius',
+            'C. worked only on slanted residential tile roofs',
+            'D. increased winter glare on adjacent glass towers'
+          ],
+          correctAnswer: 'B. reduced upper-floor indoor heat by two to three degrees Celsius'
+        },
+        {
+          id: 'cam18_r12',
+          type: 'mcq',
+          passageIdx: 1,
+          question: '12. What potential drawback do urban meteorologists highlight regarding street trees?',
+          options: [
+            'A. Deep roots crack porous Sponge City stones within years',
+            'B. Dense unbroken canopies can obstruct cool evening breezes',
+            'C. Evergreen pollen triggers seasonal respiratory allergies',
+            'D. Fallen branches block sunlight from rooftop solar cells'
+          ],
+          correctAnswer: 'B. Dense unbroken canopies can obstruct cool evening breezes'
+        },
+        {
+          id: 'cam18_r13',
+          type: 'tfng',
+          passageIdx: 1,
+          question: '13. Dark asphalt absorbs less daytime solar energy than pale painted concrete.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'FALSE'
+        },
+        {
+          id: 'cam18_r14',
+          type: 'tfng',
+          passageIdx: 1,
+          question: '14. Porous pavements lower street temperatures passively as trapped rainwater evaporates.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'TRUE'
+        },
+        {
+          id: 'cam18_r15',
+          type: 'tfng',
+          passageIdx: 1,
+          question: '15. Athens legally banned dark rooftop tiles across all commercial zones after its cool-roof trials.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'NOT GIVEN'
+        },
+        {
+          id: 'cam18_r16',
+          type: 'fill',
+          passageIdx: 1,
+          question: '16. The technical measure describing how much sunlight a surface reflects is its ______. (ONE WORD)',
+          options: [],
+          correctAnswer: 'albedo'
+        }
+      ]
+    },
+    writing: {
+      task1: {
+        prompt:
+          'Task 1: The bar chart below shows electricity generation by energy source in Northland (in Terawatt-hours, TWh) in 2005, 2015, and 2025. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
+        minWords: 150,
+        imageUrl: CAMBRIDGE_TASK1_CHART_SVG_URL,
+        modelAnswer:
+          'The bar chart illustrates electricity output across four energy sources—coal, natural gas, hydroelectric power, and wind and solar—measured in terawatt-hours (TWh) in Northland for 2005, 2015, and 2025. Overall, total reliance on coal plummeted dramatically over the twenty-year period, whereas wind and solar generation surged more than thirteenfold to overtake every other fuel by 2025. In 2005, coal dominated Northland’s grid at 140 TWh, followed by natural gas at 80 TWh, hydroelectricity at 45 TWh, and wind and solar at merely 10 TWh. Over the following decade, natural gas rose to 105 TWh while coal slipped to 115 TWh and renewables climbed steadily to 42 TWh. Between 2015 and 2025, energy transition accelerated sharply: coal output contracted to 45 TWh and gas eased back to 90 TWh, while wind and solar expanded rapidly to reach a peak of 135 TWh. Hydroelectric output remained the steadiest source, inching upward gradually from 45 to 55 TWh.'
+      },
+      task2: {
+        prompt:
+          'Task 2: In many cities, older historic buildings and traditional neighbourhoods are being demolished to make room for high-rise apartment complexes and commercial towers. Do the advantages of this urban redevelopment outweigh the disadvantages?',
+        minWords: 250,
+        modelAnswer:
+          'Rapid urbanisation has compelled many municipal planners to weigh cultural preservation against economic modernisation, often resulting in the demolition of older districts to erect high-density towers. Although replacing ageing low-rise blocks boosts housing supply and updates civic infrastructure, I contend that sweeping demolition destroys irreplaceable cultural heritage and architectural diversity, making its long-term drawbacks clearly outweigh its immediate gains. Proponents rightly note that ageing structures frequently suffer from substandard plumbing, weak earthquake resilience, and poor thermal insulation. Replacing cramped brick terraces with multi-storey residential complexes enables metropolitan centres to accommodate growing populations efficiently near public transit nodes while lowering per-capita heating energy. Commercial skyscrapers can also attract multinational investment and expand municipal tax bases. Nevertheless, razing historic quarters inflicts irreversible damage upon urban identity. Traditional streetscapes preserve tactile evidence of local craftsmanship and shared collective memory, forming neighbourhood social cohesion that sterile glass towers rarely foster. Once vernacular courtyards and heritage shopfronts disappear under concrete foundations, successive generations lose tangible connections to regional architectural history. Furthermore, well-maintained historic quarters act as powerful magnets for sustainable cultural tourism, creative industries, and independent hospitality ventures, generating lasting economic returns far exceeding one-off construction booms. Rather than choosing between stagnation and complete erasure, visionary planners can deploy adaptive reuse: reinforcing historic facades structurally while modernising interior wiring, insulation, rooftop solar panels, and heating efficiency. In conclusion, while vertical construction addresses short-term land scarcity, indiscriminate demolition sacrifices cultural continuity that can never be reconstructed; targeted renovation paired with selective brownfield high-rises offers a far healthier urban balance.'
+      }
+    }
+  },
   {
     id: 'test-1',
     title: 'IELTS Academic Practice Test 01 - Full Simulation',
