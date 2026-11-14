@@ -8,7 +8,8 @@ import {
   Moon,
   ShieldAlert,
   Sun,
-  UserCheck
+  UserCheck,
+  Users
 } from 'lucide-react';
 import UserAvatarBadge from './UserAvatarBadge';
 
@@ -23,7 +24,9 @@ export default function Navbar({
   setSelectedProfileStudent,
   setShowApiKeyModal,
   setShowAvatarModal,
+  setTeacherHubTab,
   setView,
+  teacherHubTab,
   view
 }) {
   if (view === 'AUTH') return null;
@@ -79,32 +82,53 @@ export default function Navbar({
             <Gamepad2 className="w-3.5 h-3.5" />
             <span>Đấu Trường Từ Vựng</span>
           </button>
-          <button
-            onClick={() => {
-              setSelectedProfileStudent(currentUser?.username);
-              setView('STUDENT_PROFILE');
-            }}
-            className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-              view === 'STUDENT_PROFILE'
-                ? 'bg-white dark:bg-[#0F172B] text-[#007A7A] dark:text-[#1EE1D6] shadow-sm border border-[#B5F5F1] dark:border-teal-500/30'
-                : 'text-[#314158] dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-white'
-            }`}
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span>{isTeacher ? 'Hồ Sơ Học Viên' : 'Tiến Trình Của Tôi'}</span>
-          </button>
-          {isTeacher && (
+          {!isTeacher && (
             <button
-              onClick={() => setView('TEACHER_DASHBOARD')}
+              onClick={() => {
+                setSelectedProfileStudent(currentUser?.username);
+                setView('STUDENT_PROFILE');
+              }}
               className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
-                view === 'TEACHER_DASHBOARD' || view === 'EXAM_BUILDER'
-                  ? 'bg-[#F25220] text-white shadow-sm'
-                  : 'text-[#E17100] dark:text-amber-300 hover:bg-amber-500/10'
+                view === 'STUDENT_PROFILE'
+                  ? 'bg-white dark:bg-[#0F172B] text-[#007A7A] dark:text-[#1EE1D6] shadow-sm border border-[#B5F5F1] dark:border-teal-500/30'
+                  : 'text-[#314158] dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-white'
               }`}
             >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Quản Trị Giáo Viên</span>
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Tiến Trình Của Tôi</span>
             </button>
+          )}
+          {isTeacher && (
+            <>
+              <button
+                onClick={() => {
+                  setTeacherHubTab(prev => (prev === 'accounts' ? 'tests' : prev));
+                  setView('TEACHER_DASHBOARD');
+                }}
+                className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  (view === 'TEACHER_DASHBOARD' && teacherHubTab !== 'accounts') || view === 'EXAM_BUILDER'
+                    ? 'bg-[#F25220] text-white shadow-sm'
+                    : 'text-[#E17100] dark:text-amber-300 hover:bg-amber-500/10'
+                }`}
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>Quản Trị Giáo Viên</span>
+              </button>
+              <button
+                onClick={() => {
+                  setTeacherHubTab('accounts');
+                  setView('TEACHER_DASHBOARD');
+                }}
+                className={`px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  view === 'TEACHER_DASHBOARD' && teacherHubTab === 'accounts'
+                    ? 'bg-white dark:bg-[#0F172B] text-[#007A7A] dark:text-[#1EE1D6] shadow-sm border border-[#B5F5F1] dark:border-teal-500/30'
+                    : 'text-[#314158] dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-white'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Quản Lý Tài Khoản</span>
+              </button>
+            </>
           )}
         </nav>
 
@@ -140,11 +164,15 @@ export default function Navbar({
           <div className="flex items-center gap-1.5">
             <div
               onClick={() => {
-                setSelectedProfileStudent(currentUser?.username);
-                setView('STUDENT_PROFILE');
+                if (isTeacher) {
+                  setShowAvatarModal(true);
+                } else {
+                  setSelectedProfileStudent(currentUser?.username);
+                  setView('STUDENT_PROFILE');
+                }
               }}
               className="flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-xl hover:bg-[#EDFFFD] dark:hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-[#B5F5F1] dark:hover:border-slate-700"
-              title="Xem hồ sơ học tập"
+              title={isTeacher ? 'Ảnh đại diện tài khoản Giáo viên' : 'Xem tiến trình học tập'}
             >
               <UserAvatarBadge user={currentUser} sizeClass="w-8 h-8" textClass="text-xs" rounded="rounded-lg" />
               <div className="text-left text-xs hidden sm:block">
@@ -196,30 +224,50 @@ export default function Navbar({
         >
           <Gamepad2 className="w-3.5 h-3.5" /> Từ Vựng
         </button>
-        <button
-          onClick={() => {
-            setSelectedProfileStudent(currentUser?.username);
-            setView('STUDENT_PROFILE');
-          }}
-          className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
-            view === 'STUDENT_PROFILE'
-              ? 'bg-[#007A7A] text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-[#314158] dark:text-slate-300'
-          }`}
-        >
-          <UserCheck className="w-3.5 h-3.5" /> Tiến Trình
-        </button>
-        {isTeacher && (
+        {!isTeacher && (
           <button
-            onClick={() => setView('TEACHER_DASHBOARD')}
+            onClick={() => {
+              setSelectedProfileStudent(currentUser?.username);
+              setView('STUDENT_PROFILE');
+            }}
             className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
-              view === 'TEACHER_DASHBOARD' || view === 'EXAM_BUILDER'
-                ? 'bg-[#F25220] text-white'
-                : 'bg-amber-50 dark:bg-amber-500/15 text-[#E17100] dark:text-amber-300'
+              view === 'STUDENT_PROFILE'
+                ? 'bg-[#007A7A] text-white'
+                : 'bg-slate-100 dark:bg-slate-800 text-[#314158] dark:text-slate-300'
             }`}
           >
-            <ShieldAlert className="w-3.5 h-3.5" /> Giáo Viên
+            <UserCheck className="w-3.5 h-3.5" /> Tiến Trình
           </button>
+        )}
+        {isTeacher && (
+          <>
+            <button
+              onClick={() => {
+                setTeacherHubTab(prev => (prev === 'accounts' ? 'tests' : prev));
+                setView('TEACHER_DASHBOARD');
+              }}
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
+                (view === 'TEACHER_DASHBOARD' && teacherHubTab !== 'accounts') || view === 'EXAM_BUILDER'
+                  ? 'bg-[#F25220] text-white'
+                  : 'bg-amber-50 dark:bg-amber-500/15 text-[#E17100] dark:text-amber-300'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" /> Giáo Viên
+            </button>
+            <button
+              onClick={() => {
+                setTeacherHubTab('accounts');
+                setView('TEACHER_DASHBOARD');
+              }}
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition flex items-center gap-1.5 ${
+                view === 'TEACHER_DASHBOARD' && teacherHubTab === 'accounts'
+                  ? 'bg-[#007A7A] text-white'
+                  : 'bg-slate-100 dark:bg-slate-800 text-[#314158] dark:text-slate-300'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" /> Tài Khoản
+            </button>
+          </>
         )}
       </div>
     </header>

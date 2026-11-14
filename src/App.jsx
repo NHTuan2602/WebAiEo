@@ -66,7 +66,10 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { ...DEFAULT_USERS, ...parsed };
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          const hasTeacher = Object.values(parsed).some(u => u?.role === 'teacher');
+          return hasTeacher ? parsed : { teacher_ielts: DEFAULT_USERS.teacher_ielts, ...parsed };
+        }
       } catch (_e) {}
     }
     localStorage.setItem('ielts_users_db_v2', JSON.stringify(DEFAULT_USERS));
@@ -335,18 +338,25 @@ export default function App() {
     );
   };
 
-  // Update User Target Band / Display Name / Goal (Teacher or Student)
+  // Update User Target Band / Display Name / Goal / Role (Teacher or Student)
   const handleUpdateUserProfileFields = (username, patch) => {
     if (!username || !usersDb[username]) return;
     const targetUser = usersDb[username];
+    const nextRole =
+      patch.role && currentUser?.role === 'teacher' && username !== currentUser?.username
+        ? (patch.role === 'teacher' ? 'teacher' : 'student')
+        : targetUser.role;
     const cleanBand =
-      patch.targetBand !== undefined
-        ? Math.min(9.0, Math.max(4.0, Math.round((Number(patch.targetBand) || 7.0) * 2) / 2))
-        : targetUser.targetBand;
+      nextRole === 'teacher'
+        ? 9.0
+        : patch.targetBand !== undefined
+          ? Math.min(9.0, Math.max(4.0, Math.round((Number(patch.targetBand) || 7.0) * 2) / 2))
+          : targetUser.targetBand;
     const updatedUser = {
       ...targetUser,
+      role: nextRole,
       ...(patch.name !== undefined ? { name: patch.name.trim() || targetUser.name } : {}),
-      ...(patch.targetBand !== undefined ? { targetBand: cleanBand } : {}),
+      ...(nextRole === 'teacher' || patch.targetBand !== undefined ? { targetBand: cleanBand } : {}),
       ...(patch.studyGoal !== undefined ? { studyGoal: patch.studyGoal.trim() } : {})
     };
     setUsersDb(prev => ({ ...prev, [username]: updatedUser }));
@@ -354,7 +364,11 @@ export default function App() {
       setCurrentUser(updatedUser);
     }
     dispatchSyncAction('UPSERT_USER', { username, user: updatedUser });
-    showToast(`Đã cập nhật mục tiêu cho ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`);
+    showToast(
+      updatedUser.role === 'teacher'
+        ? `Đã cập nhật tài khoản Giáo viên ${updatedUser.name}!`
+        : `Đã cập nhật tài khoản ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`
+    );
   };
 
   // Teacher Action: Duplicate Test (defaults copy to private so students can't accidentally open it)
@@ -396,30 +410,37 @@ export default function App() {
     showToast(`Đã mở khóa lượt làm lại cho học viên ${attemptObj.studentName}.`);
   };
 
-  // Teacher Action: Create Single or Bulk Student Accounts
+  // Teacher Action: Create Single or Bulk Accounts (Strictly Teacher Only)
   const handleSaveNewStudents = (e) => {
     if (e) e.preventDefault();
+    if (currentUser?.role !== 'teacher') {
+      showToast('Chỉ Giáo viên mới có quyền tạo tài khoản mới!', 'error');
+      return;
+    }
     const today = new Date().toISOString().split('T')[0];
 
     if (addStudentMode === 'single') {
       const uname = (newStudentForm.username || '').trim().replace(/\s+/g, '_');
       const pass = (newStudentForm.password || '').trim();
       const name = (newStudentForm.name || '').trim() || uname;
-      const band = Math.min(9.0, Math.max(4.0, roundIeltsBand(Number(newStudentForm.targetBand) || 7.0)));
+      const role = newStudentForm.role === 'teacher' ? 'teacher' : 'student';
+      const band = role === 'teacher'
+        ? 9.0
+        : Math.min(9.0, Math.max(4.0, roundIeltsBand(Number(newStudentForm.targetBand) || 7.0)));
       if (!uname || !pass) {
-        showToast('Vui lòng nhập tên đăng nhập và mật khẩu học viên!', 'error');
+        showToast('Vui lòng nhập tên đăng nhập và mật khẩu tài khoản!', 'error');
         return;
       }
       if (usersDb[uname]) {
         showToast(`Tài khoản "${uname}" đã tồn tại!`, 'error');
         return;
       }
-      const userObj = { username: uname, pass, name, role: 'student', targetBand: band, joinedDate: today };
+      const userObj = { username: uname, pass, name, role, targetBand: band, joinedDate: today };
       setUsersDb(prev => ({ ...prev, [uname]: userObj }));
       dispatchSyncAction('UPSERT_USER', { username: uname, user: userObj });
-      setNewStudentForm({ username: '', name: '', password: '123', targetBand: 7.0 });
+      setNewStudentForm({ username: '', name: '', password: '123', targetBand: 7.0, role: 'student' });
       setShowAddStudentModal(false);
-      showToast(`Đã tạo tài khoản học viên "${name}" (@${uname})!`);
+      showToast(`Đã tạo tài khoản ${role === 'teacher' ? 'Giáo viên' : 'Học viên'} "${name}" (@${uname})!`);
       return;
     }
 
@@ -457,10 +478,10 @@ export default function App() {
     showToast(`Đã thêm ${addedEntries.length} học viên${skipped > 0 ? ` (bỏ qua ${skipped} tài khoản trùng)` : ''}!`);
   };
 
-  // Teacher Action: Reset Student Password
+  // Teacher Action: Reset Account Password
   const handleResetStudentPassword = (e) => {
     if (e) e.preventDefault();
-    if (!editingStudentAccount) return;
+    if (currentUser?.role !== 'teacher' || !editingStudentAccount) return;
     const nextPass = (studentPasswordDraft || '').trim();
     if (!nextPass) {
       showToast('Mật khẩu mới không được để trống!', 'error');
@@ -473,7 +494,38 @@ export default function App() {
     dispatchSyncAction('UPSERT_USER', { username: uname, user: updatedUser });
     setEditingStudentAccount(null);
     setStudentPasswordDraft('');
-    showToast(`Đã đặt lại mật khẩu mới cho học viên ${updatedUser.name}!`);
+    showToast(`Đã đặt lại mật khẩu mới cho tài khoản ${updatedUser.name}!`);
+  };
+
+  // Teacher Action: Delete Managed Account
+  const handleDeleteAccount = (userObj) => {
+    if (currentUser?.role !== 'teacher' || !userObj?.username) return;
+    const uname = userObj.username;
+    if (uname === currentUser.username) {
+      showToast('Không thể tự xóa tài khoản đang đăng nhập!', 'error');
+      return;
+    }
+    const teacherCount = Object.values(usersDb).filter(u => u?.role === 'teacher').length;
+    if (userObj.role === 'teacher' && teacherCount <= 1) {
+      showToast('Cần giữ lại ít nhất 1 tài khoản Giáo viên trong hệ thống!', 'error');
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc muốn xóa tài khoản "${userObj.name}" (@${uname})?`)) {
+      return;
+    }
+    setUsersDb(prev => {
+      const next = { ...prev };
+      delete next[uname];
+      return next;
+    });
+    setTeacherNotes(prev => {
+      if (!prev[uname]) return prev;
+      const next = { ...prev };
+      delete next[uname];
+      return next;
+    });
+    dispatchSyncAction('DELETE_USER', { username: uname });
+    showToast(`Đã xóa tài khoản "${userObj.name}" (@${uname}).`, 'info');
   };
 
   // Teacher Action: Copy Room Invite Link (?pin=...)
@@ -582,18 +634,19 @@ export default function App() {
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
-  // Auth Form State (Student-only UI, auto-routes teacher on login)
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+  // Auth Form State (Login-only, accounts created strictly by Teachers)
   const [authForm, setAuthForm] = useState({ username: '', password: '', fullName: '' });
   const [authError, setAuthError] = useState('');
 
-  // Teacher Hub Sub-Tab ('tests', 'grading', 'game_room', 'students')
-  const [teacherHubTab, setTeacherHubTab] = useState(() => initialNav.teacherHubTab || 'tests');
+  // Teacher Hub Sub-Tab ('tests', 'grading', 'game_room', 'accounts')
+  const [teacherHubTab, setTeacherHubTab] = useState(() => (
+    initialNav.teacherHubTab === 'students' ? 'accounts' : (initialNav.teacherHubTab || 'tests')
+  ));
   const [expandedTeacherTestId, setExpandedTeacherTestId] = useState(() => initialNav.expandedTeacherTestId || null);
   const [gradingFilters, setGradingFilters] = useState({ testId: 'all', status: 'all', risk: 'all', search: '' });
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [addStudentMode, setAddStudentMode] = useState('single'); // 'single' | 'bulk'
-  const [newStudentForm, setNewStudentForm] = useState({ username: '', name: '', password: '123', targetBand: 7.0 });
+  const [newStudentForm, setNewStudentForm] = useState({ username: '', name: '', password: '123', targetBand: 7.0, role: 'student' });
   const [bulkStudentsText, setBulkStudentsText] = useState('hocsinh_04 | Lê Minh Tuấn | 123 | 7.0\nhocsinh_05 | Phạm Thảo Vy | 123 | 7.5');
   const [editingStudentAccount, setEditingStudentAccount] = useState(null);
   const [studentPasswordDraft, setStudentPasswordDraft] = useState('');
@@ -648,6 +701,7 @@ export default function App() {
   const skipNextRoomBroadcastRef = useRef(false);
   const skipNextTestsBroadcastRef = useRef(false);
   const skipNextAttemptsBroadcastRef = useRef(false);
+  const skipNextUsersBroadcastRef = useRef(false);
   const lastSyncVersionRef = useRef(-1);
   const chatScrollRef = useRef(null);
 
@@ -688,6 +742,11 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('ielts_users_db_v2', JSON.stringify(usersDb));
+    if (skipNextUsersBroadcastRef.current) {
+      skipNextUsersBroadcastRef.current = false;
+      return;
+    }
+    syncChannelRef.current?.postMessage({ key: 'ielts_users_db_v2', payload: usersDb });
   }, [usersDb]);
 
   useEffect(() => {
@@ -739,8 +798,15 @@ export default function App() {
       setTeacherNotes(prev => (JSON.stringify(prev) === JSON.stringify(snap.teacherNotes) ? prev : snap.teacherNotes));
     }
     if (snap.users && typeof snap.users === 'object' && Object.keys(snap.users).length > 0) {
+      const deletedSet = new Set(Array.isArray(snap.deletedUserIds) ? snap.deletedUserIds : []);
+      skipNextUsersBroadcastRef.current = true;
       setUsersDb(prev => {
-        const merged = { ...prev, ...snap.users };
+        const merged = {};
+        Object.entries({ ...prev, ...snap.users }).forEach(([uname, u]) => {
+          if (!deletedSet.has(uname) && u) {
+            merged[uname] = u;
+          }
+        });
         return JSON.stringify(prev) === JSON.stringify(merged) ? prev : merged;
       });
       setCurrentUser(prev => {
@@ -806,6 +872,9 @@ export default function App() {
         setAttempts(prev => (JSON.stringify(prev) === JSON.stringify(payload) ? prev : payload));
       } else if (key === 'ielts_teacher_notes' && typeof payload === 'object') {
         setTeacherNotes(prev => (JSON.stringify(prev) === JSON.stringify(payload) ? prev : payload));
+      } else if (key === 'ielts_users_db_v2' && typeof payload === 'object') {
+        skipNextUsersBroadcastRef.current = true;
+        setUsersDb(prev => (JSON.stringify(prev) === JSON.stringify(payload) ? prev : payload));
       }
     };
 
@@ -819,7 +888,7 @@ export default function App() {
 
     const handleStorageEvent = (e) => {
       if (!e.newValue) return;
-      if (['ielts_rooms_db_v2', 'ielts_tests', 'ielts_attempts', 'ielts_teacher_notes'].includes(e.key)) {
+      if (['ielts_rooms_db_v2', 'ielts_tests', 'ielts_attempts', 'ielts_teacher_notes', 'ielts_users_db_v2'].includes(e.key)) {
         try {
           applyRemoteUpdate(e.key, JSON.parse(e.newValue));
         } catch (_err) {}
@@ -1759,54 +1828,29 @@ export default function App() {
 
     const uname = authForm.username.trim();
     const pass = authForm.password.trim();
-    const fname = authForm.fullName.trim() || uname;
 
     if (!uname || !pass) {
       setAuthError('Vui lòng nhập đầy đủ tên tài khoản và mật khẩu!');
       return;
     }
 
-    if (authMode === 'register') {
-      if (usersDb[uname]) {
-        setAuthError(`Tài khoản "${uname}" đã tồn tại! Vui lòng chọn tên khác hoặc chuyển sang Đăng nhập.`);
-        return;
-      }
-      const newUser = {
-        username: uname,
-        pass: pass,
-        name: fname,
-        role: 'student',
-        targetBand: 7.5,
-        joinedDate: new Date().toISOString().split('T')[0]
-      };
-      clearNavSession();
-      setSelectedTestId(null);
-      setSelectedAttemptId(null);
-      setSelectedProfileStudent(null);
-      setUsersDb(prev => ({ ...prev, [uname]: newUser }));
-      dispatchSyncAction('UPSERT_USER', { username: uname, user: newUser });
-      setCurrentUser(newUser);
-      setView('HOME');
-      showToast(`Chào mừng học viên ${fname} đến với LexiPrep Academy!`);
+    // Login only: tài khoản do Giáo viên tạo và cấp
+    const user = usersDb[uname];
+    if (!user || user.pass !== pass) {
+      setAuthError('Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
+      return;
+    }
+    clearNavSession();
+    setSelectedTestId(null);
+    setSelectedAttemptId(null);
+    setSelectedProfileStudent(null);
+    setCurrentUser(user);
+    if (user.role === 'teacher') {
+      setView('TEACHER_DASHBOARD');
+      showToast(`Xin chào Giáo viên ${user.name}! Đã chuyển sang Trung tâm Quản trị.`);
     } else {
-      // Login: tự động nhận diện tài khoản Giáo viên hay Học sinh
-      const user = usersDb[uname];
-      if (!user || user.pass !== pass) {
-        setAuthError('Sai tên đăng nhập hoặc mật khẩu! Vui lòng kiểm tra lại.');
-        return;
-      }
-      clearNavSession();
-      setSelectedTestId(null);
-      setSelectedAttemptId(null);
-      setSelectedProfileStudent(null);
-      setCurrentUser(user);
-      if (user.role === 'teacher') {
-        setView('TEACHER_DASHBOARD');
-        showToast(`Xin chào Giáo viên ${user.name}! Đã chuyển sang Trung tâm Quản trị.`);
-      } else {
-        setView('HOME');
-        showToast(`Chào mừng trở lại, ${user.name}!`);
-      }
+      setView('HOME');
+      showToast(`Chào mừng trở lại, ${user.name}!`);
     }
   };
 
@@ -3802,7 +3846,9 @@ export default function App() {
           setSelectedProfileStudent={setSelectedProfileStudent}
           setShowApiKeyModal={setShowApiKeyModal}
           setShowAvatarModal={setShowAvatarModal}
+          setTeacherHubTab={setTeacherHubTab}
           setView={setView}
+          teacherHubTab={teacherHubTab}
           view={view}
         />
       )}
@@ -3812,12 +3858,10 @@ export default function App() {
         <AuthScreen
           authError={authError}
           authForm={authForm}
-          authMode={authMode}
           darkMode={darkMode}
           handleAuthSubmit={handleAuthSubmit}
           setAuthError={setAuthError}
           setAuthForm={setAuthForm}
-          setAuthMode={setAuthMode}
           setDarkMode={setDarkMode}
           setShowAuthPass={setShowAuthPass}
           showAuthPass={showAuthPass}
@@ -3839,7 +3883,7 @@ export default function App() {
         />
       )}
 
-      {view === 'STUDENT_PROFILE' && (
+      {view === 'STUDENT_PROFILE' && currentUser?.role !== 'teacher' && (
         <StudentProfile
           attempts={attempts}
           currentRoomPin={currentRoomPin}
@@ -4008,6 +4052,7 @@ export default function App() {
           gradingFilters={gradingFilters}
           gradingScores={gradingScores}
           handleCopyInviteLink={handleCopyInviteLink}
+          handleDeleteAccount={handleDeleteAccount}
           handleDeleteAttempt={handleDeleteAttempt}
           handleDeleteRoom={handleDeleteRoom}
           handleDeleteTest={handleDeleteTest}
@@ -4021,6 +4066,7 @@ export default function App() {
           openExamBuilder={openExamBuilder}
           roomsDb={roomsDb}
           saveTeacherGrading={saveTeacherGrading}
+          setAddStudentMode={setAddStudentMode}
           setCopiedRoomPin={setCopiedRoomPin}
           setCurrentRoomPin={setCurrentRoomPin}
           setCustomVocabInput={setCustomVocabInput}
@@ -4030,8 +4076,6 @@ export default function App() {
           setGradingAttempt={setGradingAttempt}
           setGradingFilters={setGradingFilters}
           setGradingScores={setGradingScores}
-          setPreviousView={setPreviousView}
-          setSelectedProfileStudent={setSelectedProfileStudent}
           setShowAddStudentModal={setShowAddStudentModal}
           setShowCreateRoomModal={setShowCreateRoomModal}
           setShowVocabModal={setShowVocabModal}

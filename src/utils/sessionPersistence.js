@@ -15,6 +15,7 @@ const ALLOWED_VIEWS = new Set([
 ]);
 
 const TEACHER_ONLY_VIEWS = new Set(['TEACHER_DASHBOARD', 'EXAM_BUILDER']);
+const STUDENT_ONLY_VIEWS = new Set(['STUDENT_PROFILE']);
 
 export function getExamDraftKey(username, testId) {
   return `${EXAM_DRAFT_PREFIX}${username || 'guest'}_${testId}`;
@@ -119,6 +120,9 @@ export function loadNavSession(user) {
     if (TEACHER_ONLY_VIEWS.has(nextView) && user.role !== 'teacher') {
       nextView = 'HOME';
     }
+    if (STUDENT_ONLY_VIEWS.has(nextView) && user.role === 'teacher') {
+      nextView = 'TEACHER_DASHBOARD';
+    }
     if (nextView === 'EXAM_MODE' && !parsed.selectedTestId) {
       nextView = defaultView;
     }
@@ -137,14 +141,24 @@ export function loadNavSession(user) {
       }
     }
 
+    let safePreviousView = ALLOWED_VIEWS.has(parsed.previousView) ? parsed.previousView : defaultView;
+    if (STUDENT_ONLY_VIEWS.has(safePreviousView) && user.role === 'teacher') {
+      safePreviousView = 'TEACHER_DASHBOARD';
+    }
+    if (TEACHER_ONLY_VIEWS.has(safePreviousView) && user.role !== 'teacher') {
+      safePreviousView = 'HOME';
+    }
+
+    const rawTeacherTab = parsed.teacherHubTab === 'students' ? 'accounts' : parsed.teacherHubTab;
+
     return {
       view: nextView,
-      previousView: ALLOWED_VIEWS.has(parsed.previousView) ? parsed.previousView : defaultView,
+      previousView: safePreviousView,
       selectedTestId: parsed.selectedTestId || null,
       selectedAttemptId: parsed.selectedAttemptId || null,
-      selectedProfileStudent: parsed.selectedProfileStudent || null,
+      selectedProfileStudent: user.role === 'teacher' ? null : (parsed.selectedProfileStudent || null),
       resultReviewTab: ['listening', 'reading', 'writing'].includes(parsed.resultReviewTab) ? parsed.resultReviewTab : 'listening',
-      teacherHubTab: ['tests', 'grading', 'game_room', 'students'].includes(parsed.teacherHubTab) ? parsed.teacherHubTab : 'tests',
+      teacherHubTab: ['tests', 'grading', 'game_room', 'accounts'].includes(rawTeacherTab) ? rawTeacherTab : 'tests',
       expandedTeacherTestId: parsed.expandedTeacherTestId || null,
       currentRoomPin: parsed.currentRoomPin || '686868',
       joinedRoomPin: parsed.joinedRoomPin || null,

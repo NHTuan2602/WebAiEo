@@ -31,6 +31,7 @@ function createInitialStore() {
     seeded: false,
     seededTags: {},
     deletedTestIds: [],
+    deletedUserIds: [],
     rooms: {},
     tests: [],
     attempts: [],
@@ -58,6 +59,9 @@ export function createPersistentSyncStore(persistFile = '') {
           }
           if (Array.isArray(parsed.deletedTestIds)) {
             store.deletedTestIds = parsed.deletedTestIds;
+          }
+          if (Array.isArray(parsed.deletedUserIds)) {
+            store.deletedUserIds = parsed.deletedUserIds;
           }
           if (parsed.rooms && typeof parsed.rooms === 'object') {
             Object.entries(parsed.rooms).forEach(([pin, r]) => {
@@ -131,6 +135,7 @@ function getSnapshot(store) {
     version: store.version,
     seeded: store.seeded,
     serverTime: Date.now(),
+    deletedUserIds: store.deletedUserIds,
     rooms: store.rooms,
     tests: store.tests,
     attempts: store.attempts,
@@ -171,7 +176,7 @@ function applySyncAction(store, type, payload = {}) {
         // Merge only missing custom users or newly released tagged default tests
         if (payload.users && typeof payload.users === 'object') {
           Object.entries(payload.users).forEach(([uname, u]) => {
-            if (!store.users[uname]) {
+            if (!store.users[uname] && !store.deletedUserIds.includes(uname)) {
               store.users[uname] = u;
               changed = true;
             }
@@ -505,6 +510,7 @@ function applySyncAction(store, type, payload = {}) {
     case 'UPSERT_USER': {
       const uname = payload.username || payload.user?.username;
       if (!uname || !payload.user) break;
+      store.deletedUserIds = store.deletedUserIds.filter(id => id !== uname);
       store.users[uname] = payload.user;
       // Propagate updated avatarUrl & display name into any active room lobbies / live races
       Object.entries(store.rooms).forEach(([_pin, r]) => {
@@ -524,6 +530,25 @@ function applySyncAction(store, type, payload = {}) {
         }
       });
       changed = true;
+      break;
+    }
+
+    case 'DELETE_USER': {
+      const uname = payload.username;
+      if (!uname) break;
+      if (!store.deletedUserIds.includes(uname)) {
+        store.deletedUserIds.push(uname);
+      }
+      const existed = Boolean(store.users[uname]);
+      delete store.users[uname];
+      delete store.teacherNotes[uname];
+      Object.values(store.rooms).forEach(r => {
+        if (r?.lobbyPlayers?.[uname]) delete r.lobbyPlayers[uname];
+        if (r?.liveMatch?.[uname]) delete r.liveMatch[uname];
+      });
+      if (existed) {
+        changed = true;
+      }
       break;
     }
 

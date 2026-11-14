@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
@@ -51,6 +52,7 @@ export default function TeacherDashboard({
   gradingFilters,
   gradingScores,
   handleCopyInviteLink,
+  handleDeleteAccount,
   handleDeleteAttempt,
   handleDeleteRoom,
   handleDeleteTest,
@@ -64,6 +66,7 @@ export default function TeacherDashboard({
   openExamBuilder,
   roomsDb,
   saveTeacherGrading,
+  setAddStudentMode,
   setCopiedRoomPin,
   setCurrentRoomPin,
   setCustomVocabInput,
@@ -73,8 +76,6 @@ export default function TeacherDashboard({
   setGradingAttempt,
   setGradingFilters,
   setGradingScores,
-  setPreviousView,
-  setSelectedProfileStudent,
   setShowAddStudentModal,
   setShowCreateRoomModal,
   setShowVocabModal,
@@ -93,15 +94,23 @@ export default function TeacherDashboard({
   updateTestQuickDuration,
   usersDb
 }) {
+  const [accountRoleFilter, setAccountRoleFilter] = useState('all');
+
   const room = normalizeRoomObject(roomsDb[currentRoomPin] || { pin: currentRoomPin, pass: 'ielts', players: {} }, currentRoomPin);
   const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin));
   const lobbyPlayersList = Object.values(room.lobbyPlayers || {});
   const leaderboardPlayers = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
-  const studentList = Object.values(usersDb).filter(u => u.role === 'student');
-  const filteredStudents = studentList.filter(s =>
-    (s.name || '').toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
-    (s.username || '').toLowerCase().includes(studentSearchQuery.toLowerCase())
-  );
+  const allAccounts = Object.values(usersDb || {}).filter(Boolean).sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'teacher' ? -1 : 1;
+    return (a.name || a.username || '').localeCompare(b.name || b.username || '');
+  });
+  const teacherAccountsCount = allAccounts.filter(u => u.role === 'teacher').length;
+  const studentAccountsCount = allAccounts.filter(u => u.role === 'student').length;
+  const filteredAccounts = allAccounts.filter(u => {
+    if (accountRoleFilter !== 'all' && u.role !== accountRoleFilter) return false;
+    const q = studentSearchQuery.toLowerCase();
+    return (u.name || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q);
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -111,7 +120,7 @@ export default function TeacherDashboard({
             <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Trung Tâm Điều Hành Giáo Viên
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Bảng Điều Khiển Giáo Viên (Teacher Hub)</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quản lý kho đề thi, chấm điểm bài làm với AI, giám sát chống gian lận và điều phối phòng Game PIN.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quản lý kho đề thi, chấm điểm bài làm với AI, giám sát chống gian lận, điều phối Game PIN và cấp tài khoản.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -120,6 +129,17 @@ export default function TeacherDashboard({
             className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTeacherHubTab('accounts');
+              setAddStudentMode('single');
+              setShowAddStudentModal(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+          >
+            <UserPlus className="w-4 h-4" /> Tạo Tài Khoản
           </button>
           <button
             onClick={() => handleTeacherOpenLobby(currentRoomPin)}
@@ -166,12 +186,12 @@ export default function TeacherDashboard({
           <Trophy className="w-4 h-4 text-amber-500" /> 3. Phòng Đấu Game PIN & Bảng Xếp Hạng ({leaderboardPlayers.length})
         </button>
         <button
-          onClick={() => setTeacherHubTab('students')}
+          onClick={() => setTeacherHubTab('accounts')}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'students' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            (teacherHubTab === 'accounts' || teacherHubTab === 'students') ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <GraduationCap className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> 4. Hồ Sơ & Quản Lý Học Sinh ({studentList.length})
+          <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> 4. Tạo &amp; Quản Lý Tài Khoản ({allAccounts.length})
         </button>
       </div>
 
@@ -971,167 +991,257 @@ export default function TeacherDashboard({
         </div>
       )}
 
-      {/* Tab 4: Hồ Sơ & Quản Lý Học Sinh */}
-      {teacherHubTab === 'students' && (
+      {/* Tab 4: Tạo & Quản Lý Tài Khoản */}
+      {(teacherHubTab === 'accounts' || teacherHubTab === 'students') && (
         <div className="space-y-6">
-          {/* Search and Summary Bar */}
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
-                Danh Sách & Hồ Sơ Học Viên Trong Hệ Thống ({studentList.length})
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Bấm vào từng học viên để xem toàn bộ lịch sử các lần thi, biểu đồ tiến bộ band điểm và ghi chú học tập.
-              </p>
+          {/* Header, Role Filters & Creation Actions */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                  Tạo &amp; Quản Lý Tài Khoản Hệ Thống ({allAccounts.length})
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Chỉ Giáo viên mới có thể tạo, cấp mật khẩu, phân quyền hoặc xóa tài khoản đăng nhập. Học viên không thể tự đăng ký bên ngoài.
+                </p>
+              </div>
+
+              <div className="w-full lg:w-auto flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddStudentMode('single');
+                    setShowAddStudentModal(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <UserPlus className="w-4 h-4" /> + Tạo 1 Tài Khoản
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddStudentMode('bulk');
+                    setShowAddStudentModal(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Users className="w-4 h-4" /> Nhập Hàng Loạt
+                </button>
+              </div>
             </div>
 
-            <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setAccountRoleFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl border transition ${
+                    accountRoleFilter === 'all'
+                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  Tất cả ({allAccounts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountRoleFilter('student')}
+                  className={`px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 ${
+                    accountRoleFilter === 'student'
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <GraduationCap className="w-3.5 h-3.5" /> Học viên ({studentAccountsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountRoleFilter('teacher')}
+                  className={`px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 ${
+                    accountRoleFilter === 'teacher'
+                      ? 'bg-amber-600 text-white border-amber-600'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên ({teacherAccountsCount})
+                </button>
+              </div>
+
               <input
                 type="text"
-                placeholder="🔍 Tìm kiếm theo tên hoặc username..."
+                placeholder="🔍 Tìm theo tên hoặc @username..."
                 value={studentSearchQuery}
                 onChange={e => setStudentSearchQuery(e.target.value)}
-                className="w-full sm:w-64 px-4 py-2.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none font-medium"
+                className="w-full sm:w-72 px-4 py-2 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none font-medium"
               />
-              <button
-                type="button"
-                onClick={() => setShowAddStudentModal(true)}
-                className="px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5 shrink-0"
-              >
-                <UserPlus className="w-4 h-4" /> + Thêm Học Viên
-              </button>
             </div>
           </div>
 
-          {/* Students Table */}
+          {/* Accounts Management Table */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
                 <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
                   <tr>
-                    <th className="px-6 py-4">Học Viên</th>
-                    <th className="px-6 py-4 text-center">Mục Tiêu Target</th>
-                    <th className="px-6 py-4 text-center">Số Lần Thi</th>
-                    <th className="px-6 py-4 text-center">Band Cao Nhất</th>
-                    <th className="px-6 py-4 text-center">Lần Thi Gần Nhất</th>
-                    <th className="px-6 py-4 text-center">Đánh Giá Gian Lận</th>
+                    <th className="px-6 py-4">Tài Khoản</th>
+                    <th className="px-6 py-4 text-center">Vai Trò</th>
+                    <th className="px-6 py-4 text-center">Mục Tiêu / Ghi Chú</th>
+                    <th className="px-6 py-4 text-center">Hoạt Động</th>
+                    <th className="px-6 py-4 text-center">Ngày Tạo</th>
                     <th className="px-6 py-4 text-right">Thao Tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredStudents.length === 0 ? (
+                  {filteredAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center text-xs text-slate-400">
-                        Không tìm thấy học sinh nào phù hợp với từ khóa "{studentSearchQuery}".
+                      <td colSpan={6} className="px-6 py-10 text-center text-xs text-slate-400">
+                        Không tìm thấy tài khoản nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
                   ) : (
-                    filteredStudents.map(student => {
-                      const studentAttempts = attempts.filter(a => a.studentId === student.username);
+                    filteredAccounts.map(account => {
+                      const isTeacherAccount = account.role === 'teacher';
+                      const isSelfAccount = account.username === currentUser?.username;
+                      const studentAttempts = attempts.filter(a => a.studentId === account.username);
                       const bestBand = studentAttempts.length > 0
                         ? Math.max(...studentAttempts.map(a => a.overallBand || 0))
                         : null;
-                      const latestAttempt = studentAttempts[0];
-                      const totalTab = studentAttempts.reduce((acc, curr) => acc + (curr.tabSwitchCount || 0), 0);
-                      const avgTab = studentAttempts.length > 0 ? (totalTab / studentAttempts.length).toFixed(1) : 0;
 
                       return (
-                        <tr key={student.username} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                        <tr key={account.username} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-500 text-white font-black text-sm flex items-center justify-center shadow-sm">
-                                {student.name ? student.name[0] : 'S'}
+                              <div
+                                className={`w-10 h-10 rounded-2xl text-white font-black text-sm flex items-center justify-center shadow-sm ${
+                                  isTeacherAccount
+                                    ? 'bg-gradient-to-tr from-amber-500 to-orange-500'
+                                    : 'bg-gradient-to-tr from-[#007A7A] to-teal-500'
+                                }`}
+                              >
+                                {account.name ? account.name[0] : (isTeacherAccount ? 'T' : 'S')}
                               </div>
                               <div>
-                                <p className="font-bold text-slate-900 dark:text-white leading-tight">{student.name}</p>
-                                <p className="text-xs text-slate-400 font-mono mt-0.5">@{student.username}</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="font-bold text-slate-900 dark:text-white leading-tight">{account.name}</p>
+                                  {isSelfAccount && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                                      Bạn
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-400 font-mono mt-0.5">@{account.username}</p>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditingTargetUser({
-                                  username: student.username,
-                                  name: student.name || '',
-                                  targetBand: student.targetBand || 7.5,
-                                  studyGoal: student.studyGoal || ''
-                                })
-                              }
-                              title="Bấm để chỉnh sửa mục tiêu Target & ghi chú học viên"
-                              className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full transition"
-                            >
-                              <Target className="w-3.5 h-3.5 text-amber-500" />
-                              Band {student.targetBand || '7.5'}
-                              <Edit className="w-3 h-3 opacity-70" />
-                            </button>
-                            {student.studyGoal && (
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 max-w-[140px] mx-auto truncate" title={student.studyGoal}>
-                                {student.studyGoal}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-center font-bold text-slate-800 dark:text-slate-100">
-                            {studentAttempts.length > 0 ? (
-                              <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs px-2.5 py-1 rounded-md font-extrabold">
-                                {studentAttempts.length} lần
+                            {isTeacherAccount ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                                <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-400">Chưa thi</span>
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+                                <GraduationCap className="w-3.5 h-3.5" /> Học viên
+                              </span>
                             )}
                           </td>
                           <td className="px-6 py-4 text-center">
-                            {bestBand ? (
-                              <span className="text-sm font-black text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-3 py-1 rounded-xl">
-                                {bestBand}
+                            {isTeacherAccount ? (
+                              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                Quản trị &amp; Ra đề
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {latestAttempt ? (
                               <div>
-                                <p className="text-xs font-bold text-slate-800 dark:text-slate-100">Band {latestAttempt.overallBand || 'Chờ'}</p>
-                                <p className="text-[11px] text-slate-400">{latestAttempt.submittedAt}</p>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditingTargetUser({
+                                      username: account.username,
+                                      name: account.name || '',
+                                      role: account.role || 'student',
+                                      targetBand: account.targetBand || 7.5,
+                                      studyGoal: account.studyGoal || ''
+                                    })
+                                  }
+                                  title="Chỉnh sửa Target Band & thông tin tài khoản"
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full transition"
+                                >
+                                  <Target className="w-3.5 h-3.5 text-amber-500" />
+                                  Band {account.targetBand || '7.5'}
+                                  <Edit className="w-3 h-3 opacity-70" />
+                                </button>
+                                {account.studyGoal && (
+                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 max-w-[160px] mx-auto truncate" title={account.studyGoal}>
+                                    {account.studyGoal}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {isTeacherAccount ? (
+                              <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                Toàn quyền quản lý
+                              </span>
+                            ) : studentAttempts.length > 0 ? (
+                              <div className="inline-flex items-center gap-1.5 text-xs">
+                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-2.5 py-1 rounded-md font-extrabold">
+                                  {studentAttempts.length} bài
+                                </span>
+                                {bestBand ? (
+                                  <span className="font-black text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2.5 py-1 rounded-md">
+                                    Best {bestBand}
+                                  </span>
+                                ) : null}
                               </div>
                             ) : (
-                              <span className="text-xs text-slate-400">-</span>
+                              <span className="text-xs text-slate-400">Chưa làm bài</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                              avgTab <= 1
-                                ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                            }`}>
-                              TB {avgTab} lần tab
-                            </span>
+                          <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
+                            {account.joinedDate || '-'}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="inline-flex items-center gap-1.5">
                               <button
                                 type="button"
+                                onClick={() =>
+                                  setEditingTargetUser({
+                                    username: account.username,
+                                    name: account.name || '',
+                                    role: account.role || 'student',
+                                    targetBand: account.targetBand || 7.5,
+                                    studyGoal: account.studyGoal || ''
+                                  })
+                                }
+                                className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition inline-flex items-center gap-1"
+                                title="Sửa thông tin & phân quyền tài khoản"
+                              >
+                                <Edit className="w-3.5 h-3.5" /> Sửa
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => {
-                                  setEditingStudentAccount(student);
+                                  setEditingStudentAccount(account);
                                   setStudentPasswordDraft('');
                                 }}
                                 className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-500/15 text-slate-700 dark:text-slate-200 hover:text-amber-700 dark:hover:text-amber-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition inline-flex items-center gap-1"
-                                title="Đặt lại mật khẩu đăng nhập cho học viên"
+                                title="Đặt lại mật khẩu đăng nhập"
                               >
                                 <Key className="w-3.5 h-3.5" /> Đổi MK
                               </button>
                               <button
-                                onClick={() => {
-                                  setSelectedProfileStudent(student.username);
-                                  setPreviousView('TEACHER_DASHBOARD');
-                                  setView('STUDENT_PROFILE');
-                                }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition shadow-sm inline-flex items-center gap-1.5"
+                                type="button"
+                                disabled={isSelfAccount}
+                                onClick={() => handleDeleteAccount(account)}
+                                className={`px-2.5 py-2 rounded-xl border text-xs font-bold transition inline-flex items-center gap-1 ${
+                                  isSelfAccount
+                                    ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                                    : 'bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
+                                }`}
+                                title={isSelfAccount ? 'Không thể xóa tài khoản đang đăng nhập' : 'Xóa tài khoản này'}
                               >
-                                <GraduationCap className="w-3.5 h-3.5" /> Xem Hồ Sơ & Lịch Sử
+                                <Trash2 className="w-3.5 h-3.5" /> Xóa
                               </button>
                             </div>
                           </td>

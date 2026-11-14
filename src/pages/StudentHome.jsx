@@ -33,6 +33,7 @@ export default function StudentHome({
   tests
 }) {
   const [testFilter, setTestFilter] = useState('all');
+  const isTeacher = currentUser?.role === 'teacher';
 
   const visibleTests = tests.filter(t => normalizeExamConfig(t).visibility !== 'private');
   const filteredTests = visibleTests.filter(t => {
@@ -218,16 +219,26 @@ export default function StudentHome({
                   </p>
                 )}
 
-                <button
-                  onClick={() => {
-                    setSelectedProfileStudent(currentUser?.username);
-                    setView('STUDENT_PROFILE');
-                  }}
-                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-[#0F172B] hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white transition flex items-center justify-center gap-2"
-                >
-                  <TrendingUp className="w-4 h-4 text-[#1EE1D6]" />
-                  <span>Xem Biểu Đồ Tiến Độ</span>
-                </button>
+                {isTeacher ? (
+                  <button
+                    onClick={() => setView('TEACHER_DASHBOARD')}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-[#F25220] hover:bg-[#d94417] text-white transition flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Quay Lại Quản Trị Giáo Viên</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setSelectedProfileStudent(currentUser?.username);
+                      setView('STUDENT_PROFILE');
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-[#0F172B] hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white transition flex items-center justify-center gap-2"
+                  >
+                    <TrendingUp className="w-4 h-4 text-[#1EE1D6]" />
+                    <span>Xem Biểu Đồ Tiến Độ</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -508,15 +519,17 @@ export default function StudentHome({
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white">Lịch Sử Làm Bài</h2>
               <p className="text-xs sm:text-sm text-[#62748E] dark:text-slate-400 mt-0.5">Theo dõi các bài thi bạn đã hoàn thành và chấm chữa</p>
             </div>
-            <button
-              onClick={() => {
-                setSelectedProfileStudent(currentUser?.username);
-                setView('STUDENT_PROFILE');
-              }}
-              className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 flex items-center gap-1.5 transition px-4 py-2 rounded-xl border border-[#B5F5F1] dark:border-slate-700 bg-white dark:bg-[#0F172B]"
-            >
-              <TrendingUp className="w-4 h-4" /> Xem Hồ Sơ &amp; Biểu Đồ Tiến Độ
-            </button>
+            {!isTeacher && (
+              <button
+                onClick={() => {
+                  setSelectedProfileStudent(currentUser?.username);
+                  setView('STUDENT_PROFILE');
+                }}
+                className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 flex items-center gap-1.5 transition px-4 py-2 rounded-xl border border-[#B5F5F1] dark:border-slate-700 bg-white dark:bg-[#0F172B]"
+              >
+                <TrendingUp className="w-4 h-4" /> Xem Hồ Sơ &amp; Biểu Đồ Tiến Độ
+              </button>
+            )}
           </div>
 
           {studentAttempts.length === 0 ? (

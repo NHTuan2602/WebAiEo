@@ -18,12 +18,10 @@ import {
 export default function AuthScreen({
   authError,
   authForm,
-  authMode,
   darkMode,
   handleAuthSubmit,
   setAuthError,
   setAuthForm,
-  setAuthMode,
   setDarkMode,
   setShowAuthPass,
   showAuthPass
@@ -157,12 +155,10 @@ export default function AuthScreen({
                 <div className="flex items-start justify-between gap-3 mb-5">
                   <div>
                     <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white">
-                      {authMode === 'login' ? 'Đăng nhập tài khoản' : 'Tạo tài khoản mới'}
+                      Đăng nhập tài khoản
                     </h2>
                     <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1">
-                      {authMode === 'login'
-                        ? 'Truy cập kho đề thi IELTS và lịch sử học tập.'
-                        : 'Đăng ký nhanh để bắt đầu làm bài thi thử.'}
+                      Truy cập hệ thống bằng tài khoản do Giáo viên tạo và cấp.
                     </p>
                   </div>
                   <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-[#059271] dark:text-emerald-300 bg-[#ECFDF5] dark:bg-emerald-500/15 px-2.5 py-1 rounded-full border border-[#9FF5E1] dark:border-emerald-500/30">
@@ -170,30 +166,15 @@ export default function AuthScreen({
                   </span>
                 </div>
 
-                {/* Auth Mode Toggle */}
-                <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl text-xs font-bold mb-5 border border-slate-200/70 dark:border-slate-700/70">
-                  <button
-                    type="button"
-                    onClick={() => { setAuthMode('login'); setAuthError(''); }}
-                    className={`py-2.5 rounded-lg transition ${
-                      authMode === 'login'
-                        ? 'bg-white dark:bg-[#0F172B] text-[#007A7A] dark:text-[#1EE1D6] shadow-sm'
-                        : 'text-[#62748E] dark:text-slate-400 hover:text-[#0F172B] dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Đăng Nhập
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAuthMode('register'); setAuthError(''); }}
-                    className={`py-2.5 rounded-lg transition ${
-                      authMode === 'register'
-                        ? 'bg-white dark:bg-[#0F172B] text-[#007A7A] dark:text-[#1EE1D6] shadow-sm'
-                        : 'text-[#62748E] dark:text-slate-400 hover:text-[#0F172B] dark:hover:text-slate-200'
-                    }`}
-                  >
-                    Đăng Ký Mới
-                  </button>
+                {/* Teacher-Managed Accounts Notice */}
+                <div className="mb-5 p-3 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/10 border border-[#B5F5F1] dark:border-teal-500/30 flex items-start gap-2.5 text-xs text-[#065B5B] dark:text-teal-200">
+                  <ShieldCheck className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Chỉ Giáo viên mới có quyền tạo tài khoản</p>
+                    <p className="text-[11px] opacity-90 mt-0.5">
+                      Đăng ký tự do đã được khóa. Học viên vui lòng nhận tên đăng nhập và mật khẩu từ Giáo viên, hoặc đăng nhập Giáo viên để quản lý tài khoản.
+                    </p>
+                  </div>
                 </div>
 
                 {authError && (
@@ -204,20 +185,6 @@ export default function AuthScreen({
                 )}
 
                 <form onSubmit={handleAuthSubmit} className="space-y-4">
-                  {authMode === 'register' && (
-                    <div>
-                      <label className="block text-xs font-bold text-[#314158] dark:text-slate-300 mb-1.5">Họ và tên</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="VD: Nguyễn Minh Anh"
-                        value={authForm.fullName}
-                        onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-[#0F172B] dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-[#007A7A] focus:border-[#007A7A] focus:outline-none transition"
-                      />
-                    </div>
-                  )}
-
                   <div>
                     <label className="block text-xs font-bold text-[#314158] dark:text-slate-300 mb-1.5">Tên đăng nhập</label>
                     <input
@@ -256,7 +223,7 @@ export default function AuthScreen({
                     type="submit"
                     className="w-full bg-[#007A7A] hover:bg-[#065B5B] text-white font-bold py-3 rounded-xl transition shadow-md shadow-teal-900/15 flex items-center justify-center gap-2 text-sm mt-2"
                   >
-                    <span>{authMode === 'login' ? 'Bắt Đầu Vào Phòng Thi' : 'Tạo Tài Khoản Học Viên'}</span>
+                    <span>Đăng Nhập Hệ Thống</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
@@ -264,13 +231,13 @@ export default function AuthScreen({
                 {/* Quick Demo Logins */}
                 <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-[#62748E] dark:text-slate-400 mb-2.5">
-                    Dùng thử nhanh
+                    Tài khoản mẫu có sẵn
                   </p>
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => {
-                        setAuthMode('login');
+                        setAuthError('');
                         setAuthForm({ username: 'hocsinh_01', password: '123456', fullName: '' });
                       }}
                       className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 border border-slate-200 dark:border-slate-700 hover:border-[#B5F5F1] rounded-xl transition text-left"
@@ -281,7 +248,7 @@ export default function AuthScreen({
                     <button
                       type="button"
                       onClick={() => {
-                        setAuthMode('login');
+                        setAuthError('');
                         setAuthForm({ username: 'teacher_ielts', password: '123456', fullName: '' });
                       }}
                       className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-orange-50 dark:hover:bg-orange-500/15 border border-slate-200 dark:border-slate-700 hover:border-orange-200 rounded-xl transition text-left"

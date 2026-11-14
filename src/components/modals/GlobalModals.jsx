@@ -162,7 +162,7 @@ export default function GlobalModals({
       </div>
     )}
 
-    {/* Shared Modal: Edit Student/User Target Band & Study Goal */}
+    {/* Shared Modal: Edit Account Info / Role / Target Band & Study Goal */}
     {editingTargetUser && (currentUser?.role === 'teacher' || editingTargetUser.username === currentUser?.username) && (
       <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <form
@@ -170,6 +170,7 @@ export default function GlobalModals({
             e.preventDefault();
             handleUpdateUserProfileFields(editingTargetUser.username, {
               name: editingTargetUser.name,
+              role: editingTargetUser.role,
               targetBand: editingTargetUser.targetBand,
               studyGoal: editingTargetUser.studyGoal
             });
@@ -179,7 +180,8 @@ export default function GlobalModals({
         >
           <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
             <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Target className="w-4 h-4 text-amber-500" /> Chỉnh Sửa Mục Tiêu Target
+              <Target className="w-4 h-4 text-amber-500" />
+              {editingTargetUser.username === currentUser?.username ? 'Chỉnh Sửa Mục Tiêu Target' : 'Chỉnh Sửa Thông Tin Tài Khoản'}
             </h3>
             <button type="button" onClick={() => setEditingTargetUser(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <X className="w-5 h-5" />
@@ -199,49 +201,85 @@ export default function GlobalModals({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Target IELTS Band (4.0 – 9.0)
-              </label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {[6.0, 6.5, 7.0, 7.5, 8.0, 8.5].map(bandVal => (
+            {currentUser?.role === 'teacher' && editingTargetUser.username !== currentUser?.username && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Vai trò tài khoản
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
                   <button
-                    key={bandVal}
                     type="button"
-                    onClick={() => setEditingTargetUser(prev => ({ ...prev, targetBand: bandVal }))}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
-                      Number(editingTargetUser.targetBand) === bandVal
-                        ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                    onClick={() => setEditingTargetUser(prev => ({ ...prev, role: 'student' }))}
+                    className={`py-2 rounded-lg text-xs font-bold transition ${
+                      (editingTargetUser.role || 'student') === 'student'
+                        ? 'bg-white dark:bg-slate-900 text-[#007A7A] dark:text-[#1EE1D6] shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    {bandVal.toFixed(1)}
+                    Học viên
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setEditingTargetUser(prev => ({ ...prev, role: 'teacher' }))}
+                    className={`py-2 rounded-lg text-xs font-bold transition ${
+                      editingTargetUser.role === 'teacher'
+                        ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-300 shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    Giáo viên
+                  </button>
+                </div>
               </div>
-              <input
-                type="number"
-                step="0.5"
-                min="4.0"
-                max="9.0"
-                value={editingTargetUser.targetBand}
-                onChange={e => setEditingTargetUser(prev => ({ ...prev, targetBand: e.target.value }))}
-                className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Ghi chú mục tiêu học tập / Kỳ thi
-              </label>
-              <input
-                type="text"
-                value={editingTargetUser.studyGoal || ''}
-                onChange={e => setEditingTargetUser(prev => ({ ...prev, studyGoal: e.target.value }))}
-                placeholder="VD: Thi IELTS Academic tháng 12 - Ưu tiên Reading 8.0"
-                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
+            {editingTargetUser.role !== 'teacher' && (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Target IELTS Band (4.0 – 9.0)
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[6.0, 6.5, 7.0, 7.5, 8.0, 8.5].map(bandVal => (
+                      <button
+                        key={bandVal}
+                        type="button"
+                        onClick={() => setEditingTargetUser(prev => ({ ...prev, targetBand: bandVal }))}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                          Number(editingTargetUser.targetBand) === bandVal
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {bandVal.toFixed(1)}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="4.0"
+                    max="9.0"
+                    value={editingTargetUser.targetBand}
+                    onChange={e => setEditingTargetUser(prev => ({ ...prev, targetBand: e.target.value }))}
+                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Ghi chú mục tiêu học tập / Kỳ thi
+                  </label>
+                  <input
+                    type="text"
+                    value={editingTargetUser.studyGoal || ''}
+                    onChange={e => setEditingTargetUser(prev => ({ ...prev, studyGoal: e.target.value }))}
+                    placeholder="VD: Thi IELTS Academic tháng 12 - Ưu tiên Reading 8.0"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end gap-2 pt-2">
               <button
@@ -255,7 +293,7 @@ export default function GlobalModals({
                 type="submit"
                 className="px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-sm flex items-center gap-1.5"
               >
-                <Save className="w-3.5 h-3.5" /> Lưu Mục Tiêu
+                <Save className="w-3.5 h-3.5" /> Lưu Thay Đổi
               </button>
             </div>
           </div>
@@ -488,15 +526,16 @@ export default function GlobalModals({
       );
     })()}
 
-    {/* Teacher Add / Bulk Import Student Account Modal */}
+    {/* Teacher Add / Bulk Import Account Modal */}
     {showAddStudentModal && currentUser?.role === 'teacher' && (() => {
       const bulkParsedCount = parseBulkStudentsText(bulkStudentsText).length;
+      const isCreatingTeacher = (newStudentForm.role || 'student') === 'teacher';
       return (
       <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
         <form onSubmit={handleSaveNewStudents} className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
             <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Thêm Tài Khoản Học Viên Mới
+              <UserPlus className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Tạo Tài Khoản Mới
             </h3>
             <button type="button" onClick={() => setShowAddStudentModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <X className="w-5 h-5" />
@@ -508,24 +547,48 @@ export default function GlobalModals({
               type="button"
               onClick={() => setAddStudentMode('single')}
               className={`py-2 rounded-lg text-xs font-bold transition ${
-                addStudentMode === 'single' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-600 dark:text-slate-400'
+                addStudentMode === 'single' ? 'bg-white dark:bg-slate-900 text-[#007A7A] dark:text-[#1EE1D6] shadow-sm' : 'text-slate-600 dark:text-slate-400'
               }`}
             >
-              Thêm 1 Học Viên
+              Tạo 1 Tài Khoản
             </button>
             <button
               type="button"
               onClick={() => setAddStudentMode('bulk')}
               className={`py-2 rounded-lg text-xs font-bold transition ${
-                addStudentMode === 'bulk' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-600 dark:text-slate-400'
+                addStudentMode === 'bulk' ? 'bg-white dark:bg-slate-900 text-[#007A7A] dark:text-[#1EE1D6] shadow-sm' : 'text-slate-600 dark:text-slate-400'
               }`}
             >
-              Nhập Hàng Loạt ({bulkParsedCount})
+              Nhập Hàng Loạt Học Viên ({bulkParsedCount})
             </button>
           </div>
 
           {addStudentMode === 'single' ? (
             <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Loại tài khoản</label>
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setNewStudentForm(prev => ({ ...prev, role: 'student' }))}
+                    className={`py-2 rounded-lg text-xs font-bold transition ${
+                      !isCreatingTeacher ? 'bg-white dark:bg-slate-900 text-[#007A7A] dark:text-[#1EE1D6] shadow-sm' : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    Tài khoản Học viên
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewStudentForm(prev => ({ ...prev, role: 'teacher' }))}
+                    className={`py-2 rounded-lg text-xs font-bold transition ${
+                      isCreatingTeacher ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-300 shadow-sm' : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    Tài khoản Giáo viên
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tên đăng nhập</label>
@@ -533,7 +596,7 @@ export default function GlobalModals({
                     type="text"
                     value={newStudentForm.username}
                     onChange={e => setNewStudentForm(prev => ({ ...prev, username: e.target.value }))}
-                    placeholder="VD: hocsinh_04"
+                    placeholder={isCreatingTeacher ? 'VD: teacher_lan' : 'VD: hocsinh_04'}
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
                     required
                   />
@@ -550,30 +613,39 @@ export default function GlobalModals({
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
+              <div className={`grid ${isCreatingTeacher ? 'grid-cols-1' : 'grid-cols-3'} gap-3`}>
+                <div className={isCreatingTeacher ? '' : 'col-span-2'}>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Họ và tên</label>
                   <input
                     type="text"
                     value={newStudentForm.name}
                     onChange={e => setNewStudentForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="VD: Nguyễn Minh Khôi"
+                    placeholder={isCreatingTeacher ? 'VD: Cô Nguyễn Ngọc Lan' : 'VD: Nguyễn Minh Khôi'}
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Target Band</label>
-                  <select
-                    value={newStudentForm.targetBand}
-                    onChange={e => setNewStudentForm(prev => ({ ...prev, targetBand: Number(e.target.value) }))}
-                    className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold"
-                  >
-                    {[5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0].map(b => (
-                      <option key={b} value={b}>Band {b}</option>
-                    ))}
-                  </select>
-                </div>
+                {!isCreatingTeacher && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Target Band</label>
+                    <select
+                      value={newStudentForm.targetBand}
+                      onChange={e => setNewStudentForm(prev => ({ ...prev, targetBand: Number(e.target.value) }))}
+                      className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold"
+                    >
+                      {[5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0].map(b => (
+                        <option key={b} value={b}>Band {b}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
+
+              {isCreatingTeacher && (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span>Tài khoản Giáo viên có toàn quyền tạo đề thi, chấm bài và tạo/quản lý các tài khoản khác.</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -602,9 +674,9 @@ export default function GlobalModals({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow flex items-center gap-1.5"
+              className="px-4 py-2 text-xs font-bold bg-[#007A7A] hover:bg-[#065B5B] text-white rounded-xl shadow flex items-center gap-1.5"
             >
-              <UserPlus className="w-3.5 h-3.5" /> Lưu Tài Khoản
+              <UserPlus className="w-3.5 h-3.5" /> Tạo Tài Khoản
             </button>
           </div>
         </form>
@@ -612,20 +684,20 @@ export default function GlobalModals({
       );
     })()}
 
-    {/* Teacher Reset Student Password Modal */}
+    {/* Teacher Reset Account Password Modal */}
     {editingStudentAccount && currentUser?.role === 'teacher' && (
       <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <form onSubmit={handleResetStudentPassword} className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
             <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Key className="w-4 h-4 text-amber-500" /> Đặt Lại Mật Khẩu Học Viên
+              <Key className="w-4 h-4 text-amber-500" /> Đặt Lại Mật Khẩu Tài Khoản
             </h3>
             <button type="button" onClick={() => setEditingStudentAccount(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <X className="w-5 h-5" />
             </button>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Học viên: <b className="text-slate-900 dark:text-white">{editingStudentAccount.name}</b> (<code className="font-mono">@{editingStudentAccount.username}</code>)
+            Tài khoản: <b className="text-slate-900 dark:text-white">{editingStudentAccount.name}</b> (<code className="font-mono">@{editingStudentAccount.username}</code>)
           </p>
           <div className="mb-4">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mật khẩu mới</label>
