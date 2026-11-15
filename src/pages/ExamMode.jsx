@@ -13,6 +13,7 @@ import {
   GraduationCap,
   Headphones,
   Lock,
+  LogOut,
   MessageSquare,
   Moon,
   PenTool,
@@ -37,12 +38,14 @@ export default function ExamMode({
   addNote,
   advanceToNextExamSection,
   audioProgress = { currentTime: 0, duration: 0 },
+  currentUser,
   darkMode,
   examState,
   handleFinalExamSubmit,
   handlePassageTextSelect,
   handlePlayListeningAudio,
   isPlayingAudio,
+  onExitExam,
   onExitMissingTest,
   playingAudioKey,
   selectedPassageText,
@@ -52,12 +55,15 @@ export default function ExamMode({
   setShowSubmitConfirmModal,
   setZoomedReadingImg,
   showSubmitConfirmModal,
+  showToast,
   stopExamAudio,
   tests
 }) {
   const [activeBlankNum, setActiveBlankNum] = useState(null);
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [showNotesDrawer, setShowNotesDrawer] = useState(false);
+  const [showSubmitLockedModal, setShowSubmitLockedModal] = useState(false);
+  const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
 
   const blankInputRefs = useRef({});
   const questionCardRefs = useRef({});
@@ -440,20 +446,48 @@ export default function ExamMode({
 
           <button
             type="button"
-            disabled={!allSkillsVisited}
             onClick={() => {
-              if (!allSkillsVisited) return;
+              if (currentUser?.role === 'teacher') {
+                onExitExam?.();
+              } else {
+                setShowExitConfirmModal(true);
+              }
+            }}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition flex items-center gap-1"
+            title={
+              currentUser?.role === 'teacher'
+                ? 'Thoát chế độ xem trước và quay về Bảng Quản Trị Giáo Viên'
+                : 'Lưu nháp bài làm và tạm quay về Trang Chủ'
+            }
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {currentUser?.role === 'teacher' ? 'Thoát Xem Trước' : 'Tạm Thoát'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!allSkillsVisited) {
+                setShowSubmitLockedModal(true);
+                showToast?.(
+                  `Còn kỹ năng chưa hoàn tất: ${unvisitedLabels.join(', ')}.`,
+                  'info'
+                );
+                return;
+              }
               setShowSubmitConfirmModal(true);
             }}
             title={
               allSkillsVisited
                 ? 'Bấm để xác nhận nộp bài thi'
-                : `Bạn cần xem hết cả ${cfg.order.length} kỹ năng (${unvisitedLabels.join(', ')}) mới có thể nộp bài.`
+                : `Bạn cần đi qua cả ${cfg.order.length} kỹ năng (${unvisitedLabels.join(', ')}) mới có thể nộp bài. Bấm để xem hướng dẫn.`
             }
-            className={`font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 border ${
+            className={`font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 border cursor-pointer ${
               allSkillsVisited
-                ? 'bg-[#059271] hover:bg-emerald-700 text-white border-[#059271] cursor-pointer shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                ? 'bg-[#059271] hover:bg-emerald-700 text-white border-[#059271] shadow-xs'
+                : 'bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
             }`}
           >
             {!allSkillsVisited ? <Lock className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
@@ -466,22 +500,61 @@ export default function ExamMode({
 
       {/* Collapsible Highlights & Notes Drawer */}
       {showNotesDrawer && (examState.highlights.length > 0 || examState.notes.length > 0) && (
-        <div className="bg-white dark:bg-[#111820] border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex items-center gap-2 text-xs overflow-x-auto">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400 shrink-0">Highlight &amp; Notes:</span>
+        <div className="bg-white dark:bg-[#111820] border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex flex-wrap items-start gap-2 text-xs max-h-40 overflow-y-auto">
+          <span className="text-[10px] font-extrabold uppercase text-slate-400 shrink-0 mt-1">Highlight &amp; Notes:</span>
           {examState.highlights.map(h => (
-            <span key={h.id} style={{ backgroundColor: h.color }} className="px-2.5 py-0.5 rounded-full text-[11px] font-medium truncate max-w-[160px] text-slate-900 shrink-0">
-              {h.text}
+            <span
+              key={h.id}
+              style={{ backgroundColor: h.color }}
+              className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 rounded-full text-[11px] font-medium text-slate-900 max-w-xs"
+            >
+              <span className="break-words">{h.text}</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setExamState(prev => ({
+                    ...prev,
+                    highlights: prev.highlights.filter(item => item.id !== h.id)
+                  }))
+                }
+                className="p-0.5 rounded-full hover:bg-black/15 transition shrink-0"
+                title="Xóa highlight này"
+                aria-label="Xóa highlight"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </span>
           ))}
           {examState.notes.map(n => (
-            <span key={n.id} className="bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] px-2.5 py-0.5 rounded-full text-[11px] font-semibold truncate max-w-[180px] border border-[#B5F5F1] dark:border-teal-500/30 shrink-0">
-              📝 {n.note}
+            <span
+              key={n.id}
+              className="inline-flex items-start gap-1.5 bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] pl-2.5 pr-1.5 py-1 rounded-xl text-[11px] font-semibold border border-[#B5F5F1] dark:border-teal-500/30 max-w-sm"
+            >
+              <span className="break-words leading-snug">
+                📝 {n.note}
+                {n.text ? <span className="block text-[10px] font-normal opacity-75 italic">“{n.text}”</span> : null}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setExamState(prev => ({
+                    ...prev,
+                    notes: prev.notes.filter(item => item.id !== n.id)
+                  }))
+                }
+                className="p-0.5 rounded-full hover:bg-teal-900/15 dark:hover:bg-white/15 transition shrink-0 mt-0.5"
+                title="Xóa ghi chú này"
+                aria-label="Xóa ghi chú"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </span>
           ))}
           <button
             type="button"
             onClick={() => setShowNotesDrawer(false)}
-            className="ml-auto text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0"
+            className="ml-auto text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0 p-1"
+            title="Thu gọn thanh ghi chú"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -998,6 +1071,180 @@ export default function ExamMode({
             </div>
           </div>
         </footer>
+      )}
+
+      {/* Modal hướng dẫn khi bấm Nộp bài nhưng chưa đi qua đủ các kỹ năng */}
+      {showSubmitLockedModal && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowSubmitLockedModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 flex items-center justify-center shrink-0 border border-amber-200 dark:border-amber-500/30">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0F172B] dark:text-white">
+                    Chưa thể nộp toàn bài ({visitedInOrderCount}/{cfg.order.length} kỹ năng)
+                  </h3>
+                  <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1">
+                    Để hoàn tất bài thi chuẩn 3 kỹ năng, bạn cần đi qua hết tất cả các phần theo thứ tự:
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSubmitLockedModal(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3 text-xs">
+              <div className="space-y-2">
+                {cfg.order.map((sId, idx) => {
+                  const visited = visitedSkillsList.includes(sId);
+                  const isCurrent = examState.skill === sId && idx === currentSectionIdx;
+                  const meta = skillMeta[sId] || { label: sId };
+                  return (
+                    <div
+                      key={sId}
+                      className={`px-3.5 py-2.5 rounded-xl border flex items-center justify-between ${
+                        isCurrent
+                          ? 'bg-[#EDFFFD] dark:bg-teal-950/40 border-[#B5F5F1] dark:border-teal-500/40 text-[#007A7A] dark:text-[#1EE1D6]'
+                          : visited
+                          ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <span className="font-bold">
+                        {idx + 1}. {meta.label} ({cfg.durations[sId] || 15} phút)
+                      </span>
+                      <span className="font-extrabold">
+                        {isCurrent ? 'Đang làm' : visited ? 'Đã qua ✓' : 'Chưa làm'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {cfg.sequentialMode && !cfg.allowEarlyNextSection && currentSectionIdx < cfg.order.length - 1 && (
+                <p className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Đề thi đang bật chế độ <b>Thi nối tiếp chuẩn IELTS</b>. Khi hết đồng hồ kỹ năng hiện tại, hệ thống sẽ tự động chuyển sang <b>{skillMeta[cfg.order[currentSectionIdx + 1]]?.label}</b>.
+                </p>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSubmitLockedModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700 transition"
+              >
+                Tiếp tục làm phần hiện tại
+              </button>
+              {(!cfg.sequentialMode || cfg.allowEarlyNextSection) && currentSectionIdx < cfg.order.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSubmitLockedModal(false);
+                    if (cfg.sequentialMode) {
+                      advanceToNextExamSection(false);
+                    } else {
+                      const nextSkill = cfg.order[currentSectionIdx + 1];
+                      setExamState(prev => ({
+                        ...prev,
+                        sectionIdx: currentSectionIdx + 1,
+                        skill: nextSkill,
+                        timeRemaining: (cfg.durations[nextSkill] || 15) * 60,
+                        visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), nextSkill])),
+                        listeningTrackIdx: 0,
+                        readingPassageIdx: 0
+                      }));
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-extrabold bg-[#007A7A] hover:bg-[#065B5B] text-white transition flex items-center gap-1.5"
+                >
+                  <span>Chuyển sang {skillMeta[cfg.order[currentSectionIdx + 1]]?.label}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận Tạm Thoát về Trang Chủ (An toàn chống blur cửa sổ) */}
+      {showExitConfirmModal && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowExitConfirmModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0F172B] dark:text-white">
+                    Lưu nháp và quay về Trang Chủ?
+                  </h3>
+                  <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1">
+                    Các câu trả lời và bài viết của bạn được tự động lưu trên trình duyệt để bạn bấm &quot;Tiếp Tục Bài Đang Làm&quot; sau.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExitConfirmModal(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {cfg.maxAttempts > 0 && (
+              <div className="px-6 pt-4">
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Đây là bài <b>Thi thật giới hạn lượt</b>. Bạn vẫn chưa nộp bài (chưa mất lượt), nhưng hãy quay lại hoàn thành và bấm Submit theo quy định của giáo viên.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="px-6 py-4 mt-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowExitConfirmModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+              >
+                Ở lại làm bài
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitConfirmModal(false);
+                  onExitExam?.();
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-extrabold bg-slate-900 dark:bg-[#007A7A] hover:opacity-90 text-white transition"
+              >
+                Lưu nháp &amp; Thoát
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal Xác Nhận Nộp Bài Thi (In-app modal để không kích hoạt window blur chống gian lận) */}

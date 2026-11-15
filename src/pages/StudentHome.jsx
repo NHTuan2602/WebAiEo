@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock,
   Edit,
+  EyeOff,
   FileText,
   Gamepad2,
   Headphones,
@@ -35,7 +36,7 @@ export default function StudentHome({
   const [testFilter, setTestFilter] = useState('all');
   const isTeacher = currentUser?.role === 'teacher';
 
-  const visibleTests = tests.filter(t => normalizeExamConfig(t).visibility !== 'private');
+  const visibleTests = tests.filter(t => isTeacher || normalizeExamConfig(t).visibility !== 'private');
   const filteredTests = visibleTests.filter(t => {
     const cfg = normalizeExamConfig(t);
     if (testFilter === 'unlimited') return cfg.maxAttempts === 0;
@@ -389,6 +390,12 @@ export default function StudentHome({
                             : `Thi thật ${myUsedCount}/${cfg.maxAttempts} lượt`}
                         </span>
                       </div>
+
+                      {isTeacher && cfg.visibility === 'private' && (
+                        <div className="mb-3 inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 mr-2">
+                          <EyeOff className="w-3 h-3" /> Đang Ẩn — Giáo viên xem trước
+                        </div>
+                      )}
 
                       {hasDraft && !isExhausted && (
                         <div className="mb-3 inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1447E6] dark:text-blue-300 border border-[#DBEAFE] dark:border-blue-500/30">

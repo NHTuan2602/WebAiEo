@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -30,6 +30,111 @@ import { clearBuilderDraft } from '../utils/sessionPersistence';
 import AiExamExtractorPanel from '../components/teacher/AiExamExtractorPanel';
 import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
 import ClozeEditorBox from '../components/teacher/ClozeEditorBox';
+
+function getScopedQuestionEntries(questions = [], groupField, activeIdx, onlyActive, multiGroup) {
+  const indexed = (questions || []).map((q, idx) => ({ q, idx }));
+  if (!multiGroup || !onlyActive) return indexed;
+  return indexed.filter(({ q }) => typeof q[groupField] !== 'number' || q[groupField] === activeIdx);
+}
+
+const SCOPE_ACCENT_STYLES = {
+  blue: {
+    wrap: 'bg-blue-50/70 dark:bg-blue-500/10 border-blue-200/80 dark:border-blue-500/25',
+    text: 'text-blue-900 dark:text-blue-200',
+    box: 'border-blue-200 dark:border-slate-700',
+    btn: 'bg-blue-600 text-white',
+    cta: 'bg-blue-600 hover:bg-blue-700 text-white font-bold'
+  },
+  indigo: {
+    wrap: 'bg-indigo-50/70 dark:bg-indigo-500/10 border-indigo-200/80 dark:border-indigo-500/25',
+    text: 'text-indigo-900 dark:text-indigo-200',
+    box: 'border-indigo-200 dark:border-slate-700',
+    btn: 'bg-indigo-600 text-white',
+    cta: 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold'
+  }
+};
+
+function QuestionScopeFilterBar({
+  activeIdx,
+  accent = 'blue',
+  groupCount,
+  groupLabel,
+  isFiltered,
+  onSetFilter,
+  totalCount,
+  visibleCount
+}) {
+  if (groupCount <= 1) return null;
+  const s = SCOPE_ACCENT_STYLES[accent] || SCOPE_ACCENT_STYLES.blue;
+  return (
+    <div className={`mb-4 flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border text-xs ${s.wrap}`}>
+      <span className={`font-bold ${s.text}`}>
+        {isFiltered
+          ? `Đang lọc riêng ${groupLabel} #${activeIdx + 1}: ${visibleCount}/${totalCount} câu`
+          : `Đang hiển thị toàn bộ ${totalCount} câu của ${groupCount} ${groupLabel.toLowerCase()}`}
+      </span>
+      <div className={`flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border ${s.box}`}>
+        <button
+          type="button"
+          onClick={() => onSetFilter(true)}
+          className={`px-2.5 py-1 rounded-md font-bold transition ${
+            isFiltered ? s.btn : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          Chỉ {groupLabel} #{activeIdx + 1}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSetFilter(false)}
+          className={`px-2.5 py-1 rounded-md font-bold transition ${
+            !isFiltered ? s.btn : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          Tất cả ({totalCount})
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QuestionScopeEmptyState({
+  activeIdx,
+  accent = 'blue',
+  emptyText,
+  groupCount,
+  groupLabel,
+  isFiltered,
+  onAddQuestion,
+  onShowAll,
+  totalCount
+}) {
+  const s = SCOPE_ACCENT_STYLES[accent] || SCOPE_ACCENT_STYLES.blue;
+  return (
+    <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400">
+      {groupCount > 1 && isFiltered && totalCount > 0 ? (
+        <div className="space-y-2">
+          <p className="font-semibold">
+            {groupLabel} #{activeIdx + 1} chưa có câu hỏi nào riêng.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={onAddQuestion} className={`px-3 py-1.5 rounded-lg ${s.cta}`}>
+              + Thêm Câu Vào {groupLabel} #{activeIdx + 1}
+            </button>
+            <button
+              type="button"
+              onClick={onShowAll}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold"
+            >
+              Xem tất cả ({totalCount} câu)
+            </button>
+          </div>
+        </div>
+      ) : (
+        emptyText
+      )}
+    </div>
+  );
+}
 
 export default function ExamBuilder({
   addQuestionToSkill,
@@ -64,6 +169,34 @@ export default function ExamBuilder({
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [showAdvancedListeningExtras, setShowAdvancedListeningExtras] = useState(false);
   const [showAdvancedReadingImg, setShowAdvancedReadingImg] = useState(false);
+  const [filterListeningByTrack, setFilterListeningByTrack] = useState(true);
+  const [filterReadingByPassage, setFilterReadingByPassage] = useState(true);
+
+  const sessionKey = `${editingTest?.id || 'new'}::${testForm?.id || 'draft'}`;
+  const initialSnapshotRef = useRef({ key: null, json: '' });
+  useEffect(() => {
+    if (initialSnapshotRef.current.key !== sessionKey) {
+      initialSnapshotRef.current = {
+        key: sessionKey,
+        json: JSON.stringify(testForm || {})
+      };
+    }
+  }, [sessionKey, testForm]);
+
+  const handleExitBuilder = () => {
+    const hasUnsavedChanges =
+      initialSnapshotRef.current.key === sessionKey &&
+      JSON.stringify(testForm || {}) !== initialSnapshotRef.current.json;
+    if (
+      hasUnsavedChanges &&
+      !window.confirm('Bạn có thay đổi chưa lưu trong trình soạn đề. Rời trang lúc này sẽ mất các chỉnh sửa vừa nhập. Bạn vẫn muốn quay lại?')
+    ) {
+      return;
+    }
+    clearBuilderDraft(currentUser?.username);
+    setEditingTest(null);
+    setView('TEACHER_DASHBOARD');
+  };
 
   const handleLoadSampleTemplate = () => {
     const hasExistingData =
@@ -377,11 +510,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <button
-            onClick={() => {
-              clearBuilderDraft(currentUser?.username);
-              setEditingTest(null);
-              setView('TEACHER_DASHBOARD');
-            }}
+            onClick={handleExitBuilder}
             className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm"
           >
             <ChevronLeft className="w-4 h-4" /> Quay Lại Bảng Điều Khiển Giáo Viên
@@ -403,11 +532,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <HelpCircle className="w-4 h-4" /> Hướng Dẫn Cách Tạo
           </button>
           <button
-            onClick={() => {
-              clearBuilderDraft(currentUser?.username);
-              setEditingTest(null);
-              setView('TEACHER_DASHBOARD');
-            }}
+            onClick={handleExitBuilder}
             className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 transition"
           >
             Hủy Bỏ
@@ -553,6 +678,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 </span>
               </label>
               <input
+                id="builder-test-title-input"
                 type="text"
                 value={testForm.title}
                 onChange={e => setTestForm({ ...testForm, title: e.target.value })}
@@ -1235,9 +1361,45 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               </button>
             </div>
 
-            <div className="space-y-5">
-              {(testForm.listening?.questions || []).map((q, idx) => (
-                <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+            {(() => {
+              const allListeningQs = testForm.listening?.questions || [];
+              const visibleEntries = getScopedQuestionEntries(
+                allListeningQs,
+                'trackIdx',
+                activeIdx,
+                filterListeningByTrack,
+                tracks.length > 1
+              );
+
+              return (
+                <>
+                  <QuestionScopeFilterBar
+                    activeIdx={activeIdx}
+                    accent="blue"
+                    groupCount={tracks.length}
+                    groupLabel="Chủ đề"
+                    isFiltered={filterListeningByTrack}
+                    onSetFilter={setFilterListeningByTrack}
+                    totalCount={allListeningQs.length}
+                    visibleCount={visibleEntries.length}
+                  />
+
+                  {visibleEntries.length === 0 ? (
+                    <QuestionScopeEmptyState
+                      activeIdx={activeIdx}
+                      accent="blue"
+                      emptyText='Chưa có câu hỏi Listening nào. Bấm "+ Thêm Câu Hỏi Listening" hoặc dùng khung AI ở trên.'
+                      groupCount={tracks.length}
+                      groupLabel="Chủ đề"
+                      isFiltered={filterListeningByTrack}
+                      onAddQuestion={() => addQuestionToSkill('listening')}
+                      onShowAll={() => setFilterListeningByTrack(false)}
+                      totalCount={allListeningQs.length}
+                    />
+                  ) : (
+                    <div className="space-y-5">
+                      {visibleEntries.map(({ q, idx }) => (
+                        <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <span className="text-xs font-extrabold bg-blue-600 text-white px-3 py-1 rounded-lg">
                       Câu hỏi #{idx + 1}
@@ -1353,8 +1515,12 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
         );
@@ -1633,9 +1799,45 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               </button>
             </div>
 
-            <div className="space-y-5">
-              {(testForm.reading?.questions || []).map((q, idx) => (
-                <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+            {(() => {
+              const allReadingQs = testForm.reading?.questions || [];
+              const visibleEntries = getScopedQuestionEntries(
+                allReadingQs,
+                'passageIdx',
+                activeIdx,
+                filterReadingByPassage,
+                passages.length > 1
+              );
+
+              return (
+                <>
+                  <QuestionScopeFilterBar
+                    activeIdx={activeIdx}
+                    accent="indigo"
+                    groupCount={passages.length}
+                    groupLabel="Bài"
+                    isFiltered={filterReadingByPassage}
+                    onSetFilter={setFilterReadingByPassage}
+                    totalCount={allReadingQs.length}
+                    visibleCount={visibleEntries.length}
+                  />
+
+                  {visibleEntries.length === 0 ? (
+                    <QuestionScopeEmptyState
+                      activeIdx={activeIdx}
+                      accent="indigo"
+                      emptyText='Chưa có câu hỏi Reading nào. Bấm "+ Thêm Câu Hỏi Reading" hoặc dùng khung AI ở trên.'
+                      groupCount={passages.length}
+                      groupLabel="Bài"
+                      isFiltered={filterReadingByPassage}
+                      onAddQuestion={() => addQuestionToSkill('reading')}
+                      onShowAll={() => setFilterReadingByPassage(false)}
+                      totalCount={allReadingQs.length}
+                    />
+                  ) : (
+                    <div className="space-y-5">
+                      {visibleEntries.map(({ q, idx }) => (
+                        <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <span className="text-xs font-extrabold bg-indigo-600 text-white px-3 py-1 rounded-lg">
                       Câu hỏi Reading #{idx + 1}
@@ -1751,8 +1953,12 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
         );

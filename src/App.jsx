@@ -341,6 +341,21 @@ export default function App() {
     );
   };
 
+  // Teacher Action: Inline Quick-Rename test title on Teacher Dashboard
+  const updateTestQuickTitle = (testId, nextTitle) => {
+    const cleanTitle = String(nextTitle || '').trim();
+    if (!cleanTitle) {
+      showToast('Tên đề thi không được để trống!', 'error');
+      return false;
+    }
+    updateTestQuickConfig(
+      testId,
+      t => ({ ...t, title: cleanTitle }),
+      `Đã đổi tên đề thi thành "${cleanTitle}"!`
+    );
+    return true;
+  };
+
   // Update User Target Band / Display Name / Goal / Role (Teacher or Student)
   const handleUpdateUserProfileFields = (username, patch) => {
     if (!username || !usersDb[username]) return;
@@ -1941,6 +1956,21 @@ export default function App() {
     setView('EXAM_MODE');
   };
 
+  const handleExitExamMode = () => {
+    stopExamAudio();
+    setShowSubmitConfirmModal(false);
+    const exitingTestId = selectedTestId;
+    const isTeacher = currentUser?.role === 'teacher';
+    if (isTeacher && exitingTestId) {
+      clearExamDraft(currentUser?.username, exitingTestId);
+    }
+    setSelectedTestId(null);
+    setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
+    if (!isTeacher) {
+      showToast('Đã lưu nháp bài làm! Bấm "Tiếp Tục Bài Đang Làm" để làm tiếp bất kỳ lúc nào.', 'info');
+    }
+  };
+
   const handlePlayListeningAudio = (audioKey = 'mainAudio', transcript = '', customUrlOverride = undefined) => {
     const activeTest = tests.find(t => t.id === selectedTestId);
     const maxPlays = activeTest?.maxAudioPlays || 1;
@@ -1951,14 +1981,18 @@ export default function App() {
       return;
     }
 
+    const customAudioUrl = customUrlOverride !== undefined ? customUrlOverride : activeTest?.listening?.audioUrl;
+    if (!customAudioUrl && !('speechSynthesis' in window && transcript)) {
+      alert('Phần nghe này chưa có file âm thanh hoặc transcript.');
+      return;
+    }
+
     stopExamAudio();
 
     setExamState(prev => ({
       ...prev,
       audioPlays: { ...prev.audioPlays, [audioKey]: currentPlays + 1 }
     }));
-
-    const customAudioUrl = customUrlOverride !== undefined ? customUrlOverride : activeTest?.listening?.audioUrl;
     if (customAudioUrl) {
       try {
         const audio = new Audio(customAudioUrl);
@@ -2762,7 +2796,9 @@ export default function App() {
 
   const handleSaveTestBuilder = () => {
     if (!testForm.title.trim()) {
-      alert('Vui lòng nhập tên đề thi!');
+      setBuilderTab('general');
+      showToast('Vui lòng nhập Tên Đề Thi ở tab Thông Tin Chung trước khi lưu!', 'error');
+      setTimeout(() => document.getElementById('builder-test-title-input')?.focus(), 60);
       return;
     }
     const cfg = normalizeExamConfig(testForm);
@@ -4148,12 +4184,14 @@ export default function App() {
           addNote={addNote}
           advanceToNextExamSection={advanceToNextExamSection}
           audioProgress={audioProgress}
+          currentUser={currentUser}
           darkMode={darkMode}
           examState={examState}
           handleFinalExamSubmit={handleFinalExamSubmit}
           handlePassageTextSelect={handlePassageTextSelect}
           handlePlayListeningAudio={handlePlayListeningAudio}
           isPlayingAudio={isPlayingAudio}
+          onExitExam={handleExitExamMode}
           onExitMissingTest={() => {
             setSelectedTestId(null);
             setView(currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME');
@@ -4166,6 +4204,7 @@ export default function App() {
           setShowSubmitConfirmModal={setShowSubmitConfirmModal}
           setZoomedReadingImg={setZoomedReadingImg}
           showSubmitConfirmModal={showSubmitConfirmModal}
+          showToast={showToast}
           stopExamAudio={stopExamAudio}
           tests={tests}
         />
@@ -4231,6 +4270,7 @@ export default function App() {
           setTeacherHubTab={setTeacherHubTab}
           setView={setView}
           showToast={showToast}
+          startExam={startExam}
           studentSearchQuery={studentSearchQuery}
           teacherHubTab={teacherHubTab}
           tests={tests}
@@ -4239,6 +4279,7 @@ export default function App() {
           toggleTestExamMode={toggleTestExamMode}
           toggleTestVisibility={toggleTestVisibility}
           updateTestQuickDuration={updateTestQuickDuration}
+          updateTestQuickTitle={updateTestQuickTitle}
           usersDb={usersDb}
         />
       )}

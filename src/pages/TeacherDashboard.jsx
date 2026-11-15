@@ -18,6 +18,7 @@ import {
   Key,
   Lock,
   PenTool,
+  Play,
   Plus,
   RefreshCw,
   Rocket,
@@ -32,7 +33,8 @@ import {
   UserMinus,
   UserPlus,
   Users,
-  Wifi
+  Wifi,
+  X
 } from 'lucide-react';
 import { DEFAULT_VOCAB_TEXT, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
@@ -76,6 +78,7 @@ export default function TeacherDashboard({
   setTeacherHubTab,
   setView,
   showToast,
+  startExam,
   studentSearchQuery,
   teacherHubTab,
   tests,
@@ -84,9 +87,20 @@ export default function TeacherDashboard({
   toggleTestExamMode,
   toggleTestVisibility,
   updateTestQuickDuration,
+  updateTestQuickTitle,
   usersDb
 }) {
   const [accountRoleFilter, setAccountRoleFilter] = useState('all');
+  const [renamingTestId, setRenamingTestId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  const handleCommitInlineRename = (testId) => {
+    const ok = updateTestQuickTitle?.(testId, renameDraft);
+    if (ok !== false) {
+      setRenamingTestId(null);
+      setRenameDraft('');
+    }
+  };
 
   const room = normalizeRoomObject(roomsDb[currentRoomPin] || { pin: currentRoomPin, pass: 'ielts', players: {} }, currentRoomPin);
   const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin));
@@ -224,9 +238,68 @@ export default function TeacherDashboard({
                     isExpanded ? '' : 'px-5 py-4'
                   }`}
                 >
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
-                    {t.title}
-                  </h3>
+                  {renamingTestId === t.id ? (
+                    <div
+                      className="flex flex-wrap items-center gap-1.5 flex-1 min-w-[220px]"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        autoFocus
+                        value={renameDraft}
+                        onChange={e => setRenameDraft(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCommitInlineRename(t.id);
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setRenamingTestId(null);
+                            setRenameDraft('');
+                          }
+                        }}
+                        placeholder="Nhập tên đề thi mới..."
+                        className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border-2 border-[#007A7A] dark:border-[#1EE1D6] text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleCommitInlineRename(t.id)}
+                        className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs"
+                        title="Lưu tên mới (Enter)"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Lưu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenamingTestId(null);
+                          setRenameDraft('');
+                        }}
+                        className="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-bold flex items-center gap-1"
+                        title="Hủy (Esc)"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
+                        {t.title}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setRenamingTestId(t.id);
+                          setRenameDraft(t.title || '');
+                        }}
+                        title="Đổi nhanh tên đề thi ngay tại đây"
+                        className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/20 text-slate-600 dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
+                      >
+                        <Edit className="w-3 h-3" /> Đổi tên
+                      </button>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2.5 flex-shrink-0">
                     <button
@@ -479,7 +552,7 @@ export default function TeacherDashboard({
                             onClick={() => openExamBuilder(t, 'general')}
                             className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1"
                           >
-                            <Clock className="w-3.5 h-3.5" /> Cài Giờ &amp; Thứ Tự
+                            <Clock className="w-3.5 h-3.5" /> Sửa Tên &amp; Cài Đặt Chung
                           </button>
                           <button
                             type="button"
@@ -487,6 +560,14 @@ export default function TeacherDashboard({
                             className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30"
                           >
                             <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi &amp; Ảnh
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startExam?.(t.id)}
+                            className="bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-[#B5F5F1] dark:border-teal-500/30"
+                            title="Mở giao diện làm bài như học sinh để kiểm tra đề (kể cả đề Đang Ẩn)"
+                          >
+                            <Play className="w-3.5 h-3.5" /> Làm Thử Đề
                           </button>
                         </div>
                         <div className="flex items-center gap-1.5">

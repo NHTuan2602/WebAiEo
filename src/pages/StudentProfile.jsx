@@ -251,7 +251,7 @@ export default function StudentProfile({
             <p className="text-2xl font-black text-[#007A7A] dark:text-[#1EE1D6]">{overallAvg || '-'}</p>
             {totalAttempts > 0 && (
               <span className="text-[11px] block font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
-                L: {avgListening} • R: {avgReading} • W: {avgWriting}
+                L: {avgListening ?? '-'} • R: {avgReading ?? '-'} • W: {avgWriting ?? 'Chờ'}
               </span>
             )}
           </div>
@@ -415,50 +415,66 @@ export default function StudentProfile({
             {/* Skill Growth Highlights */}
             {firstAttempt && latestAttempt && totalAttempts > 1 && (
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-xl font-bold text-xs">
-                    <Headphones className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Tiến Độ Listening</p>
-                    <p className="text-sm font-extrabold text-slate-900 dark:text-white">
-                      Band {firstAttempt.scores.listening.band} → <b className="text-blue-600 dark:text-blue-400">Band {latestAttempt.scores.listening.band}</b>
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold ml-1.5">
-                        (+{(latestAttempt.scores.listening.band - firstAttempt.scores.listening.band).toFixed(1)})
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-xl font-bold text-xs">
-                    <BookOpen className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Tiến Độ Reading</p>
-                    <p className="text-sm font-extrabold text-slate-900 dark:text-white">
-                      Band {firstAttempt.scores.reading.band} → <b className="text-indigo-600 dark:text-indigo-400">Band {latestAttempt.scores.reading.band}</b>
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold ml-1.5">
-                        (+{(latestAttempt.scores.reading.band - firstAttempt.scores.reading.band).toFixed(1)})
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-xl font-bold text-xs">
-                    <PenTool className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Tiến Độ Writing</p>
-                    <p className="text-sm font-extrabold text-slate-900 dark:text-white">
-                      Band {firstAttempt.scores.writing.overallBand} → <b className="text-emerald-600 dark:text-emerald-400">Band {latestAttempt.scores.writing.overallBand}</b>
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold ml-1.5">
-                        (+{(latestAttempt.scores.writing.overallBand - firstAttempt.scores.writing.overallBand).toFixed(1)})
-                      </span>
-                    </p>
-                  </div>
-                </div>
+                {[
+                  {
+                    key: 'listening',
+                    label: 'Tiến Độ Listening',
+                    Icon: Headphones,
+                    iconWrap: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
+                    latestCls: 'text-blue-600 dark:text-blue-400',
+                    firstBand: firstAttempt.scores?.listening?.band,
+                    latestBand: latestAttempt.scores?.listening?.band
+                  },
+                  {
+                    key: 'reading',
+                    label: 'Tiến Độ Reading',
+                    Icon: BookOpen,
+                    iconWrap: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300',
+                    latestCls: 'text-indigo-600 dark:text-indigo-400',
+                    firstBand: firstAttempt.scores?.reading?.band,
+                    latestBand: latestAttempt.scores?.reading?.band
+                  },
+                  {
+                    key: 'writing',
+                    label: 'Tiến Độ Writing',
+                    Icon: PenTool,
+                    iconWrap: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+                    latestCls: 'text-emerald-600 dark:text-emerald-400',
+                    firstBand: firstAttempt.scores?.writing?.overallBand,
+                    latestBand: latestAttempt.scores?.writing?.overallBand
+                  }
+                ].map(({ key, label, Icon, iconWrap, latestCls, firstBand, latestBand }) => {
+                  const hasFirst = typeof firstBand === 'number';
+                  const hasLatest = typeof latestBand === 'number';
+                  const delta = hasFirst && hasLatest ? latestBand - firstBand : null;
+                  return (
+                    <div key={key} className="flex items-center gap-3">
+                      <div className={`p-2.5 ${iconWrap} rounded-xl font-bold text-xs`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">{label}</p>
+                        <p className="text-sm font-extrabold text-slate-900 dark:text-white">
+                          {hasFirst ? `Band ${firstBand}` : 'Chờ chấm'} →{' '}
+                          <b className={latestCls}>{hasLatest ? `Band ${latestBand}` : 'Chờ chấm'}</b>
+                          {delta !== null && (
+                            <span
+                              className={`text-xs font-bold ml-1.5 ${
+                                delta > 0
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : delta < 0
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-slate-500 dark:text-slate-400'
+                              }`}
+                            >
+                              ({delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)})
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -576,7 +592,7 @@ export default function StudentProfile({
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Lời khuyên, phân tích điểm yếu và lộ trình rèn luyện cá nhân hóa.</p>
           </div>
           <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-3 py-1 rounded-full font-bold">
-            Thầy Minh IELTS Master
+            Giáo Viên Phụ Trách
           </span>
         </div>
 
