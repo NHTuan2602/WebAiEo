@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   AlertTriangle,
   Camera,
@@ -30,6 +31,7 @@ export default function GlobalModals({
   currentRoomPin,
   currentUser,
   customVocabInput,
+  customVocabTopics = [],
   dispatchSyncAction,
   editingStudentAccount,
   editingTargetUser,
@@ -38,7 +40,9 @@ export default function GlobalModals({
   gradingScores,
   handleChangeCrewColor,
   handleCreateRoom,
+  handleDeleteCustomVocabTopic,
   handleResetStudentPassword,
+  handleSaveCustomVocabTopic,
   handleSaveNewStudents,
   handleTeacherAIGrade,
   handleTestGeminiKey,
@@ -78,6 +82,10 @@ export default function GlobalModals({
   studentPasswordDraft,
   zoomedReadingImg
 }) {
+  const [showNewTopicForm, setShowNewTopicForm] = useState(false);
+  const [newTopicLabel, setNewTopicLabel] = useState('');
+  const [newTopicText, setNewTopicText] = useState('');
+
   return (
     <>
     {/* AI Key Configuration Modal (Strictly Teacher Only) */}
@@ -244,52 +252,56 @@ export default function GlobalModals({
             )}
 
             {editingTargetUser.role !== 'teacher' && (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Target IELTS Band (4.0 – 9.0)
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {[6.0, 6.5, 7.0, 7.5, 8.0, 8.5].map(bandVal => (
-                      <button
-                        key={bandVal}
-                        type="button"
-                        onClick={() => setEditingTargetUser(prev => ({ ...prev, targetBand: bandVal }))}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
-                          Number(editingTargetUser.targetBand) === bandVal
-                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        {bandVal.toFixed(1)}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="4.0"
-                    max="9.0"
-                    value={editingTargetUser.targetBand}
-                    onChange={e => setEditingTargetUser(prev => ({ ...prev, targetBand: e.target.value }))}
-                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Target IELTS Band (4.0 – 9.0)
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[6.0, 6.5, 7.0, 7.5, 8.0, 8.5].map(bandVal => (
+                    <button
+                      key={bandVal}
+                      type="button"
+                      onClick={() => setEditingTargetUser(prev => ({ ...prev, targetBand: bandVal }))}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                        Number(editingTargetUser.targetBand) === bandVal
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {bandVal.toFixed(1)}
+                    </button>
+                  ))}
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Ghi chú mục tiêu học tập / Kỳ thi
-                  </label>
-                  <input
-                    type="text"
-                    value={editingTargetUser.studyGoal || ''}
-                    onChange={e => setEditingTargetUser(prev => ({ ...prev, studyGoal: e.target.value }))}
-                    placeholder="VD: Thi IELTS Academic tháng 12 - Ưu tiên Reading 8.0"
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-              </>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="4.0"
+                  max="9.0"
+                  value={editingTargetUser.targetBand}
+                  onChange={e => setEditingTargetUser(prev => ({ ...prev, targetBand: e.target.value }))}
+                  className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
             )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                {editingTargetUser.role === 'teacher'
+                  ? 'Giới thiệu chuyên môn / Khẩu hiệu giảng dạy'
+                  : 'Ghi chú mục tiêu học tập / Kỳ thi'}
+              </label>
+              <input
+                type="text"
+                value={editingTargetUser.studyGoal || ''}
+                onChange={e => setEditingTargetUser(prev => ({ ...prev, studyGoal: e.target.value }))}
+                placeholder={
+                  editingTargetUser.role === 'teacher'
+                    ? 'VD: Chuyên sâu IELTS 4 kỹ năng • Practice makes perfect.'
+                    : 'VD: Thi IELTS Academic tháng 12 - Ưu tiên Reading 8.0'
+                }
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button
@@ -435,6 +447,11 @@ export default function GlobalModals({
       const rawLines = customVocabInput.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
       const parsedPreview = parseRawVocabText(customVocabInput);
       const badLinesCount = Math.max(0, rawLines.length - parsedPreview.length);
+      const newTopicParsedCount = parseRawVocabText(newTopicText).length;
+      const closeVocabModal = () => {
+        setShowNewTopicForm(false);
+        setShowVocabModal(false);
+      };
       return (
       <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
@@ -442,17 +459,17 @@ export default function GlobalModals({
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Edit className="w-4 h-4 text-purple-600 dark:text-purple-400" /> Sửa Bộ Từ Vựng Game 3 Vòng (Phòng {currentRoomPin})
             </h3>
-            <button onClick={() => setShowVocabModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+            <button type="button" onClick={closeVocabModal} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Quick-Load IELTS Topic Presets */}
+          {/* Quick-Load IELTS Topic Presets + Teacher Custom Topics + Add "+" Button */}
           <div className="mb-3">
             <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">
               Nạp nhanh bộ từ vựng mẫu theo chủ đề IELTS:
             </p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {Object.entries(VOCAB_PRESETS).map(([presetKey, preset]) => (
                 <button
                   key={presetKey}
@@ -466,8 +483,150 @@ export default function GlobalModals({
                   + {preset.label}
                 </button>
               ))}
+              {customVocabTopics.map(topic => (
+                <div
+                  key={topic.id}
+                  className="inline-flex items-center rounded-lg bg-teal-50 dark:bg-teal-500/15 border border-teal-200 dark:border-teal-500/30 overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomVocabInput(topic.text);
+                      showToast(`Đã nạp chủ đề "${topic.label}"! Bấm Lưu để áp dụng.`);
+                    }}
+                    className="px-2.5 py-1 hover:bg-teal-100 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] text-[11px] font-bold transition"
+                  >
+                    + {topic.label}
+                  </button>
+                  {handleDeleteCustomVocabTopic && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCustomVocabTopic(topic)}
+                      className="px-1.5 py-1 text-teal-600/70 hover:text-rose-600 dark:text-teal-300/70 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/20 transition"
+                      title={`Xóa chủ đề "${topic.label}"`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewTopicForm(prev => {
+                    const next = !prev;
+                    if (next && !newTopicText.trim()) {
+                      setNewTopicText(customVocabInput || '');
+                    }
+                    return next;
+                  });
+                }}
+                className={`w-7 h-7 rounded-lg border-2 border-dashed flex items-center justify-center transition ${
+                  showNewTopicForm
+                    ? 'bg-[#007A7A] border-[#007A7A] text-white'
+                    : 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-400 dark:border-emerald-500/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
+                }`}
+                title="Thêm chủ đề từ vựng mới (+)"
+                aria-label="Thêm chủ đề từ vựng mới"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewTopicForm(prev => {
+                    const next = !prev;
+                    if (next && !newTopicText.trim()) {
+                      setNewTopicText(customVocabInput || '');
+                    }
+                    return next;
+                  });
+                }}
+                className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline px-1"
+              >
+                {showNewTopicForm ? 'Đóng form thêm' : 'Thêm chủ đề'}
+              </button>
             </div>
           </div>
+
+          {/* Inline Custom Topic Creator Panel */}
+          {showNewTopicForm && (
+            <div className="mb-4 p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-700/60 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5" /> Tạo Chủ Đề Từ Vựng Mới (Lưu Dùng Lâu Dài)
+                </p>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setNewTopicText(customVocabInput || '')}
+                    className="font-bold text-indigo-600 dark:text-indigo-300 hover:underline"
+                  >
+                    Lấy từ đang soạn ở dưới
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewTopicText('')}
+                    className="font-semibold text-slate-500 dark:text-slate-400 hover:underline"
+                  >
+                    Xóa trắng
+                  </button>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={newTopicLabel}
+                onChange={e => setNewTopicLabel(e.target.value)}
+                placeholder="Nhập tên chủ đề mới (VD: Kinh tế & Việc làm, Du lịch & Văn hóa...)"
+                className="w-full px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-emerald-300 dark:border-emerald-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              />
+              <textarea
+                rows={4}
+                value={newTopicText}
+                onChange={e => setNewTopicText(e.target.value)}
+                placeholder="Dán danh sách từ mới theo định dạng: TỪ | Nghĩa tiếng Việt | /IPA/ | Câu ví dụ..."
+                className="w-full p-2.5 font-mono text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-emerald-300 dark:border-emerald-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              />
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                  Nhận diện hợp lệ: {newTopicParsedCount} từ
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewTopicForm(false)}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800 rounded-xl"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cleanLabel = newTopicLabel.trim();
+                      if (!cleanLabel) {
+                        showToast('Vui lòng nhập tên chủ đề mới!', 'error');
+                        return;
+                      }
+                      if (newTopicParsedCount < 1) {
+                        showToast('Vui lòng nhập ít nhất 1 dòng từ vựng hợp lệ (TỪ | Nghĩa)!', 'error');
+                        return;
+                      }
+                      const saved = handleSaveCustomVocabTopic?.({ label: cleanLabel, text: newTopicText });
+                      if (saved !== false) {
+                        setCustomVocabInput(newTopicText);
+                        setNewTopicLabel('');
+                        setNewTopicText('');
+                        setShowNewTopicForm(false);
+                      }
+                    }}
+                    className="px-3.5 py-1.5 text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" /> Lưu Chủ Đề Mới
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Live Format Validation Status */}
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] mb-2">
@@ -500,12 +659,14 @@ export default function GlobalModals({
             </button>
             <div className="flex gap-2">
               <button
-                onClick={() => setShowVocabModal(false)}
+                type="button"
+                onClick={closeVocabModal}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
               >
                 Hủy
               </button>
               <button
+                type="button"
                 onClick={() => {
                   if (parsedPreview.length < 3) {
                     alert('Vui lòng nhập tối thiểu 3 từ vựng!');
@@ -522,7 +683,7 @@ export default function GlobalModals({
                     pin: currentRoomPin,
                     updates: { rawVocab: customVocabInput }
                   });
-                  setShowVocabModal(false);
+                  closeVocabModal();
                   showToast(`Đã lưu ${parsedPreview.length} từ vựng cho phòng ${currentRoomPin}!`);
                 }}
                 className="px-4 py-2 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow"

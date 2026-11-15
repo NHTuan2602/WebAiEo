@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import {
   AlertTriangle,
+  Award,
   Camera,
   Check,
   CheckCircle,
@@ -21,6 +23,7 @@ import {
   Share2,
   ShieldCheck,
   Snowflake,
+  Target,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -30,16 +33,24 @@ import {
   Volume2,
   VolumeX,
   Wifi,
+  X,
   Zap
 } from 'lucide-react';
 import { CREWMATE_COLORS, DEFAULT_VOCAB_TEXT } from '../constants/seedData';
-import { getSpeedAdjustedTimeLimit, normalizeRoomObject, parseRawVocabText } from '../utils/examHelpers';
+import {
+  LOBBY_CHAT_RESET_MS,
+  getSpeedAdjustedTimeLimit,
+  normalizeRoomObject,
+  parseRawVocabText
+} from '../utils/examHelpers';
 import { speakWord } from '../utils/mediaHelpers';
 import AmongUsCrewmate from '../components/common/AmongUsCrewmate';
+import UserAvatarBadge from '../components/common/UserAvatarBadge';
 
 export default function GameArena({
   activeQuestion,
   advanceNextGameRound,
+  attempts = [],
   autoNextTimerRef,
   canvasRef,
   chatScrollRef,
@@ -64,6 +75,7 @@ export default function GameArena({
   gameTypedProgress,
   gameWordIdx,
   handleChangeCrewColor,
+  handleClearLobbyChatNow,
   handleCopyInviteLink,
   handleDeleteRoom,
   handleFinishRoomMatch,
@@ -93,6 +105,7 @@ export default function GameArena({
   lobbyCountdownTimerRef,
   lobbyNowTick,
   myCrewColor,
+  openMemberProfile,
   roomJoinError,
   roomJoinForm,
   roomsDb,
@@ -117,11 +130,19 @@ export default function GameArena({
   usersDb,
   wordTimerRef
 }) {
+  const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
   const isTeacher = currentUser?.role === 'teacher';
   const activePin = joinedRoomPin || currentRoomPin;
-  const room = normalizeRoomObject(roomsDb[activePin], activePin);
-  const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin));
+  const room = normalizeRoomObject(roomsDb[activePin], activePin, lobbyNowTick);
+  const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin, lobbyNowTick));
   const roomChatMessages = Array.isArray(room.chatMessages) ? room.chatMessages : [];
+  const chatRemainingMs =
+    roomChatMessages.length > 0 && room.chatCycleStartedAt
+      ? Math.max(0, LOBBY_CHAT_RESET_MS - Math.max(0, lobbyNowTick - room.chatCycleStartedAt))
+      : LOBBY_CHAT_RESET_MS;
+  const chatRemMin = Math.floor(chatRemainingMs / 60000);
+  const chatRemSec = Math.floor((chatRemainingMs % 60000) / 1000);
+  const chatResetCountdownStr = `${String(chatRemMin).padStart(2, '0')}:${String(chatRemSec).padStart(2, '0')}`;
   const leaderboardPlayers = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
   const lobbyPlayersList = Object.values(room.lobbyPlayers || {}).sort((a, b) => {
     if (a.role === 'teacher' && b.role !== 'teacher') return -1;
@@ -210,20 +231,46 @@ export default function GameArena({
 
   const renderLobbyChatPanel = (heightClass = 'h-[270px] lg:h-[360px]', titleLabel = 'Chat Phòng Chờ') => (
     <div className={`lg:col-span-5 xl:col-span-4 bg-slate-900/85 border border-slate-700/80 rounded-3xl p-4 flex flex-col ${heightClass} shadow-xl backdrop-blur-md`}>
-      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 mb-2.5 shrink-0">
+      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-800 mb-2.5 shrink-0 flex-wrap">
         <span className="text-xs font-extrabold text-white flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-cyan-400" /> {titleLabel}
         </span>
-        <span className="text-[11px] font-semibold text-slate-400">
-          {roomChatMessages.length} tin nhắn
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+              roomChatMessages.length > 0 && room.chatCycleStartedAt
+                ? 'bg-amber-500/15 text-amber-300 border-amber-400/30 font-mono'
+                : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}
+            title="Khung chat tự động làm mới xóa trắng sau mỗi 10 phút"
+          >
+            <Clock className="w-3 h-3 shrink-0" />
+            {roomChatMessages.length > 0 && room.chatCycleStartedAt
+              ? `Xóa sau ${chatResetCountdownStr}`
+              : 'Làm mới mỗi 10p'}
+          </span>
+          <span className="text-[11px] font-semibold text-slate-400 tabular-nums">
+            {roomChatMessages.length} tin
+          </span>
+          {isTeacher && roomChatMessages.length > 0 && handleClearLobbyChatNow && (
+            <button
+              type="button"
+              onClick={() => handleClearLobbyChatNow(activePin)}
+              className="p-1 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-700 transition"
+              title="Xóa trắng khung chat ngay"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1">
         {roomChatMessages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 text-xs px-3">
-            <MessageSquare className="w-7 h-7 mb-1.5 opacity-40" />
+          <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 text-xs px-3 gap-1">
+            <MessageSquare className="w-7 h-7 mb-1 opacity-40" />
             <p>Chưa có tin nhắn nào. Hãy nhắn chào cả phòng hoặc chọn câu chat nhanh bên dưới!</p>
+            <p className="text-[10px] text-slate-500/80">Khung chat tự động làm mới xóa trắng sau mỗi 10 phút.</p>
           </div>
         ) : (
           roomChatMessages.map(msg => {
@@ -727,17 +774,22 @@ export default function GameArena({
                         {/* Floor Shadow */}
                         <div className="w-11 h-2 bg-black/50 rounded-full blur-[2px] -mt-1 mb-2" />
 
-                        {/* Nameplate */}
-                        <div className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 border ${
-                          isSelf
-                            ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200'
-                            : 'bg-slate-800/90 border-slate-700 text-slate-200'
-                        }`}>
+                        {/* Nameplate (click to quick-view member profile in lobby) */}
+                        <button
+                          type="button"
+                          onClick={() => setInspectedLobbyUsername(player.username)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 border transition hover:scale-105 cursor-pointer ${
+                            isSelf
+                              ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200 hover:bg-cyan-500/30'
+                              : 'bg-slate-800/90 border-slate-700 text-slate-200 hover:border-cyan-400/60 hover:text-white'
+                          }`}
+                          title={`Xem nhanh hồ sơ ${player.name}`}
+                        >
                           <span className={`w-2 h-2 rounded-full ${
                             player.ready || isHost ? 'bg-emerald-400' : 'bg-amber-400'
                           }`} />
                           <span className="truncate max-w-[105px]">{player.name}</span>
-                        </div>
+                        </button>
                       </div>
                     );
                   })
@@ -802,6 +854,101 @@ export default function GameArena({
             </div>
           </div>
         </div>
+
+        {/* Non-disruptive Quick Profile Card in Lobby */}
+        {inspectedLobbyUsername && (() => {
+          const member = usersDb[inspectedLobbyUsername] || room.lobbyPlayers?.[inspectedLobbyUsername];
+          if (!member) return null;
+          const isMemberTeacher = member.role === 'teacher';
+          const memberAttempts = attempts.filter(a => a.studentId === inspectedLobbyUsername);
+          const memberBands = memberAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
+          const memberBest = memberBands.length > 0 ? Math.max(...memberBands) : null;
+          const memberGameRec = room.players?.[member.name] || room.players?.[inspectedLobbyUsername];
+          return (
+            <div
+              className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+              onClick={() => setInspectedLobbyUsername(null)}
+            >
+              <div
+                className="bg-slate-900 border border-slate-700 rounded-3xl max-w-sm w-full p-5 text-white shadow-2xl space-y-4"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <UserAvatarBadge user={member} sizeClass="w-12 h-12" textClass="text-lg" rounded="rounded-2xl" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-extrabold text-sm text-white truncate">{member.name || inspectedLobbyUsername}</h3>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          isMemberTeacher
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                            : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                        }`}>
+                          {isMemberTeacher ? 'Giáo viên' : 'Học viên'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-mono text-slate-400 mt-0.5">@{inspectedLobbyUsername}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setInspectedLobbyUsername(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {member.studyGoal && (
+                  <p className="text-xs text-cyan-200 bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2">
+                    🎯 {member.studyGoal}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center justify-center gap-1">
+                      <Target className="w-3 h-3 text-amber-400" /> {isMemberTeacher ? 'Vai trò' : 'Target'}
+                    </p>
+                    <p className="font-extrabold text-amber-300 mt-0.5">
+                      {isMemberTeacher ? 'GV IELTS' : `Band ${member.targetBand || '7.5'}`}
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center justify-center gap-1">
+                      <Award className="w-3 h-3 text-emerald-400" /> {isMemberTeacher ? 'Đề thi' : 'Best Band'}
+                    </p>
+                    <p className="font-extrabold text-emerald-300 mt-0.5">
+                      {isMemberTeacher ? 'Quản trị' : memberBest !== null ? memberBest : '-'}
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center justify-center gap-1">
+                      <Trophy className="w-3 h-3 text-pink-400" /> Game
+                    </p>
+                    <p className="font-extrabold text-pink-300 mt-0.5 font-mono">
+                      {memberGameRec ? `${memberGameRec.score}đ` : '0đ'}
+                    </p>
+                  </div>
+                </div>
+
+                {openMemberProfile && usersDb[inspectedLobbyUsername] && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetUname = inspectedLobbyUsername;
+                      setInspectedLobbyUsername(null);
+                      openMemberProfile(targetUname, 'GAME_ARENA');
+                    }}
+                    className="w-full py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold transition"
+                  >
+                    Mở Trang Hồ Sơ Đầy Đủ →
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Synchronized 3-2-1 Rocket Launch Countdown Overlay */}
         {gameSubState === 'COUNTDOWN' && (

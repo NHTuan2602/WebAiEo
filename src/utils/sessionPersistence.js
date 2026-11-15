@@ -15,7 +15,7 @@ const ALLOWED_VIEWS = new Set([
 ]);
 
 const TEACHER_ONLY_VIEWS = new Set(['TEACHER_DASHBOARD', 'EXAM_BUILDER']);
-const STUDENT_ONLY_VIEWS = new Set(['STUDENT_PROFILE']);
+const STUDENT_ONLY_VIEWS = new Set([]);
 
 export function getExamDraftKey(username, testId) {
   return `${EXAM_DRAFT_PREFIX}${username || 'guest'}_${testId}`;
@@ -156,7 +156,7 @@ export function loadNavSession(user) {
       previousView: safePreviousView,
       selectedTestId: parsed.selectedTestId || null,
       selectedAttemptId: parsed.selectedAttemptId || null,
-      selectedProfileStudent: user.role === 'teacher' ? null : (parsed.selectedProfileStudent || null),
+      selectedProfileStudent: parsed.selectedProfileStudent || null,
       resultReviewTab: ['listening', 'reading', 'writing'].includes(parsed.resultReviewTab) ? parsed.resultReviewTab : 'listening',
       teacherHubTab: ['tests', 'grading', 'game_room', 'accounts'].includes(rawTeacherTab) ? rawTeacherTab : 'tests',
       expandedTeacherTestId: parsed.expandedTeacherTestId || null,

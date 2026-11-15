@@ -22,10 +22,13 @@ import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../
 import { BRAND_INFO } from '../constants/brandInfo';
 import { loadExamDraft } from '../utils/sessionPersistence';
 import BrandContactFooter from '../components/common/BrandContactFooter';
+import { Users as ClassMembersIcon } from 'lucide-react';
+import UserAvatarBadge from '../components/common/UserAvatarBadge';
 
 export default function StudentHome({
   attempts,
   currentUser,
+  openMemberProfile,
   openStudentGamePortal,
   setEditingTargetUser,
   setPreviousView,
@@ -33,7 +36,8 @@ export default function StudentHome({
   setSelectedProfileStudent,
   setView,
   startExam,
-  tests
+  tests,
+  usersDb = {}
 }) {
   const [testFilter, setTestFilter] = useState('all');
   const isTeacher = currentUser?.role === 'teacher';
@@ -233,8 +237,13 @@ export default function StudentHome({
                 ) : (
                   <button
                     onClick={() => {
-                      setSelectedProfileStudent(currentUser?.username);
-                      setView('STUDENT_PROFILE');
+                      if (openMemberProfile) {
+                        openMemberProfile(currentUser?.username, 'HOME');
+                      } else {
+                        setPreviousView('HOME');
+                        setSelectedProfileStudent(currentUser?.username);
+                        setView('STUDENT_PROFILE');
+                      }
                     }}
                     className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-[#0F172B] hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white transition flex items-center justify-center gap-2"
                   >
@@ -523,6 +532,94 @@ export default function StudentHome({
 
         {/* Clean Student Attempt History */}
         <section>
+          {/* Class Members Directory Strip (View Teacher & Peer Profiles) */}
+          {Object.keys(usersDb || {}).length > 0 && (
+            <div className="mb-8 bg-white dark:bg-[#0F172B] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 flex items-center justify-center text-[#007A7A] dark:text-[#1EE1D6]">
+                    <ClassMembersIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-[#0F172B] dark:text-white">Thành Viên Lớp Học &amp; Hồ Sơ</h3>
+                    <p className="text-xs text-[#62748E] dark:text-slate-400">Xem hồ sơ giáo viên và tiến độ học tập của các thành viên trong lớp</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (openMemberProfile) {
+                      openMemberProfile(currentUser?.username, 'HOME');
+                    } else {
+                      setPreviousView('HOME');
+                      setSelectedProfileStudent(currentUser?.username);
+                      setView('STUDENT_PROFILE');
+                    }
+                  }}
+                  className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 px-3.5 py-2 rounded-xl border border-[#B5F5F1] dark:border-slate-700 transition whitespace-nowrap"
+                >
+                  Xem Tất Cả Hồ Sơ →
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {Object.entries(usersDb || {})
+                  .sort(([uA, a], [uB, b]) => {
+                    if (a?.role === 'teacher' && b?.role !== 'teacher') return -1;
+                    if (a?.role !== 'teacher' && b?.role === 'teacher') return 1;
+                    if (uA === currentUser?.username) return -1;
+                    if (uB === currentUser?.username) return 1;
+                    return (a?.name || uA).localeCompare(b?.name || uB, 'vi');
+                  })
+                  .slice(0, 8)
+                  .map(([uname, u]) => {
+                    const isSelf = uname === currentUser?.username;
+                    const memberIsTeacher = u?.role === 'teacher';
+                    const memberAttCount = (attempts || []).filter(att => att.studentId === uname).length;
+                    return (
+                      <button
+                        key={uname}
+                        type="button"
+                        onClick={() => {
+                          if (openMemberProfile) {
+                            openMemberProfile(uname, 'HOME');
+                          } else {
+                            setPreviousView('HOME');
+                            setSelectedProfileStudent(uname);
+                            setView('STUDENT_PROFILE');
+                          }
+                        }}
+                        className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-[#EDFFFD]/60 dark:hover:bg-teal-950/30 transition text-left group"
+                      >
+                        <UserAvatarBadge user={{ ...u, username: uname }} sizeClass="w-10 h-10" textClass="text-sm" rounded="rounded-xl" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-[#0F172B] dark:text-white truncate group-hover:text-teal-700 dark:group-hover:text-teal-300">
+                              {u?.name || uname}
+                            </span>
+                            {isSelf && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 shrink-0">Bạn</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                              memberIsTeacher
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                                : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300'
+                            }`}>
+                              {memberIsTeacher ? 'Giáo viên' : 'Học viên'}
+                            </span>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                              {memberIsTeacher ? 'Hồ sơ giảng viên' : `${memberAttCount} bài thi`}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white">Lịch Sử Làm Bài</h2>
@@ -531,8 +628,13 @@ export default function StudentHome({
             {!isTeacher && (
               <button
                 onClick={() => {
-                  setSelectedProfileStudent(currentUser?.username);
-                  setView('STUDENT_PROFILE');
+                  if (openMemberProfile) {
+                    openMemberProfile(currentUser?.username, 'HOME');
+                  } else {
+                    setPreviousView('HOME');
+                    setSelectedProfileStudent(currentUser?.username);
+                    setView('STUDENT_PROFILE');
+                  }
                 }}
                 className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 flex items-center gap-1.5 transition px-4 py-2 rounded-xl border border-[#B5F5F1] dark:border-slate-700 bg-white dark:bg-[#0F172B]"
               >

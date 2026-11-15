@@ -237,7 +237,72 @@ export function compressAvatarImageFile(file, targetSize = 160) {
   });
 }
 
-export function normalizeRoomObject(room, pinKey) {
+export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
+
+export function getChatMessageTimestamp(msg) {
+  const rawTs = Number(msg?.createdAt ?? msg?.id);
+  return Number.isFinite(rawTs) && rawTs > 1_000_000_000_000 ? rawTs : 0;
+}
+
+export function pruneExpiredRoomChat(room, now = Date.now()) {
+  const rawChats = Array.isArray(room?.chatMessages) ? room.chatMessages : [];
+  const baseLobbyPlayers = room?.lobbyPlayers && typeof room.lobbyPlayers === 'object' ? { ...room.lobbyPlayers } : {};
+
+  if (rawChats.length === 0) {
+    return { chatMessages: [], chatCycleStartedAt: null, lobbyPlayers: baseLobbyPlayers };
+  }
+
+  let cycleStart = Number(room?.chatCycleStartedAt);
+  if (!Number.isFinite(cycleStart) || cycleStart <= 1_000_000_000_000) {
+    const oldestTs = rawChats.map(getChatMessageTimestamp).find(ts => ts > 0);
+    cycleStart = oldestTs || now;
+  }
+
+  const resetChatPlayers = (playersMap) => {
+    const cleaned = {};
+    Object.entries(playersMap).forEach(([uname, p]) => {
+      if (!p) return;
+      if (p.chat || p.chatAt) {
+        cleaned[uname] = { ...p, chat: '', chatAt: null };
+      } else {
+        cleaned[uname] = p;
+      }
+    });
+    return cleaned;
+  };
+
+  if (now - cycleStart >= LOBBY_CHAT_RESET_MS) {
+    return {
+      chatMessages: [],
+      chatCycleStartedAt: null,
+      lobbyPlayers: resetChatPlayers(baseLobbyPlayers)
+    };
+  }
+
+  const validChats = rawChats
+    .filter(msg => {
+      const ts = getChatMessageTimestamp(msg);
+      return ts === 0 || now - ts < LOBBY_CHAT_RESET_MS;
+    })
+    .slice(-50);
+
+  if (validChats.length === 0) {
+    return {
+      chatMessages: [],
+      chatCycleStartedAt: null,
+      lobbyPlayers: resetChatPlayers(baseLobbyPlayers)
+    };
+  }
+
+  return {
+    chatMessages: validChats,
+    chatCycleStartedAt: cycleStart,
+    lobbyPlayers: baseLobbyPlayers
+  };
+}
+
+export function normalizeRoomObject(room, pinKey, now = Date.now()) {
+  const prunedChat = pruneExpiredRoomChat(room, now);
   return {
     pin: String(room?.pin || pinKey || ''),
     name: room?.name || `Phòng Đấu Từ Vựng #${room?.pin || pinKey}`,
@@ -248,9 +313,10 @@ export function normalizeRoomObject(room, pinKey) {
     roundSize: Math.max(2, Math.min(8, Number(room?.roundSize) || 4)),
     speedMode: ['relaxed', 'normal', 'turbo'].includes(room?.speedMode) ? room.speedMode : 'normal',
     startedAt: room?.startedAt || null,
-    lobbyPlayers: room?.lobbyPlayers || {},
+    lobbyPlayers: prunedChat.lobbyPlayers,
     liveMatch: room?.liveMatch || {},
-    chatMessages: Array.isArray(room?.chatMessages) ? room.chatMessages.slice(-50) : [],
+    chatMessages: prunedChat.chatMessages,
+    chatCycleStartedAt: prunedChat.chatCycleStartedAt,
     rawVocab: room?.rawVocab || DEFAULT_VOCAB_TEXT,
     players: room?.players || {}
   };

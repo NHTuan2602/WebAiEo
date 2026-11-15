@@ -27,7 +27,8 @@ import {
   buildRoomInviteLink,
   parseBulkStudentsText,
   parseRawVocabText,
-  normalizeRoomObject
+  normalizeRoomObject,
+  pruneExpiredRoomChat
 } from './utils/examHelpers';
 import {
   testGeminiApiConnection,
@@ -684,6 +685,17 @@ export default function App() {
   // Vocab Modal in Teacher View
   const [showVocabModal, setShowVocabModal] = useState(false);
   const [customVocabInput, setCustomVocabInput] = useState(DEFAULT_VOCAB_TEXT);
+  const [customVocabTopics, setCustomVocabTopics] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ielts_custom_vocab_topics_v1');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed)
+        ? parsed.filter(t => t?.id && t?.label && typeof t?.text === 'string')
+        : [];
+    } catch (_e) {
+      return [];
+    }
+  });
 
   // ==========================================
   // GAME ARENA STATE & REFS
@@ -732,8 +744,14 @@ export default function App() {
   const skipNextTestsBroadcastRef = useRef(false);
   const skipNextAttemptsBroadcastRef = useRef(false);
   const skipNextUsersBroadcastRef = useRef(false);
+  const skipNextVocabTopicsBroadcastRef = useRef(false);
   const lastSyncVersionRef = useRef(-1);
   const chatScrollRef = useRef(null);
+  const roomsDbRef = useRef(roomsDb);
+  const lastAutoClearKeyRef = useRef('');
+  useEffect(() => {
+    roomsDbRef.current = roomsDb;
+  }, [roomsDb]);
 
   const gameRuntimeRef = useRef({
     round: 1,
@@ -787,6 +805,15 @@ export default function App() {
     }
     syncChannelRef.current?.postMessage({ key: 'ielts_rooms_db_v2', payload: roomsDb });
   }, [roomsDb]);
+
+  useEffect(() => {
+    localStorage.setItem('ielts_custom_vocab_topics_v1', JSON.stringify(customVocabTopics));
+    if (skipNextVocabTopicsBroadcastRef.current) {
+      skipNextVocabTopicsBroadcastRef.current = false;
+      return;
+    }
+    syncChannelRef.current?.postMessage({ key: 'ielts_custom_vocab_topics_v1', payload: customVocabTopics });
+  }, [customVocabTopics]);
 
   useEffect(() => {
     localStorage.setItem('ielts_teacher_notes', JSON.stringify(teacherNotes));
@@ -844,6 +871,11 @@ export default function App() {
         const remote = normalizeBrandTeacherUser(snap.users[prev.username]);
         return JSON.stringify(prev) === JSON.stringify(remote) ? prev : { ...prev, ...remote };
       });
+    }
+    if (Array.isArray(snap.customVocabTopics)) {
+      const validTopics = snap.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+      skipNextVocabTopicsBroadcastRef.current = true;
+      setCustomVocabTopics(prev => (JSON.stringify(prev) === JSON.stringify(validTopics) ? prev : validTopics));
     }
   };
 
@@ -905,6 +937,10 @@ export default function App() {
       } else if (key === 'ielts_users_db_v2' && typeof payload === 'object') {
         skipNextUsersBroadcastRef.current = true;
         setUsersDb(prev => (JSON.stringify(prev) === JSON.stringify(payload) ? prev : payload));
+      } else if (key === 'ielts_custom_vocab_topics_v1' && Array.isArray(payload)) {
+        const validTopics = payload.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+        skipNextVocabTopicsBroadcastRef.current = true;
+        setCustomVocabTopics(prev => (JSON.stringify(prev) === JSON.stringify(validTopics) ? prev : validTopics));
       }
     };
 
@@ -918,7 +954,7 @@ export default function App() {
 
     const handleStorageEvent = (e) => {
       if (!e.newValue) return;
-      if (['ielts_rooms_db_v2', 'ielts_tests', 'ielts_attempts', 'ielts_teacher_notes', 'ielts_users_db_v2'].includes(e.key)) {
+      if (['ielts_rooms_db_v2', 'ielts_tests', 'ielts_attempts', 'ielts_teacher_notes', 'ielts_users_db_v2', 'ielts_custom_vocab_topics_v1'].includes(e.key)) {
         try {
           applyRemoteUpdate(e.key, JSON.parse(e.newValue));
         } catch (_err) {}
@@ -940,11 +976,13 @@ export default function App() {
             tests,
             attempts,
             teacherNotes,
-            users: usersDb
+            users: usersDb,
+            customVocabTopics
           });
         } else {
           await dispatchSyncAction('SEED_DEFAULTS', {
             users: usersDb,
+            customVocabTopics,
             defaultTests: DEFAULT_TESTS.filter(d => Boolean(d.seedTag))
           });
         }
@@ -979,12 +1017,36 @@ export default function App() {
     };
   }, []);
 
-  // Tick timer for Crewmate speech bubbles + auto-scroll Lobby Chat while in Lobby
+  // Tick timer for Crewmate speech bubbles + 10-minute chat cycle sweep + auto-scroll Lobby Chat while in Lobby
   useEffect(() => {
-    if (view !== 'GAME_ARENA' || gameSubState !== 'LOBBY') return;
-    const t = setInterval(() => setLobbyNowTick(Date.now()), 1000);
+    if (view !== 'GAME_ARENA' || (gameSubState !== 'LOBBY' && gameSubState !== 'HOST_SPECTATE')) return;
+    const runTick = () => {
+      const now = Date.now();
+      setLobbyNowTick(now);
+      const activePin = joinedRoomPin || currentRoomPin;
+      const room = activePin ? roomsDbRef.current?.[activePin] : null;
+      const chats = Array.isArray(room?.chatMessages) ? room.chatMessages : [];
+      if (room && chats.length > 0) {
+        const refreshed = normalizeRoomObject(room, activePin, now);
+        if (refreshed.chatMessages.length === 0) {
+          const lastMsgTs = chats.reduce((maxTs, m) => Math.max(maxTs, Number(m?.createdAt || m?.id) || 0), 0) || now;
+          const clearKey = `${activePin}:${lastMsgTs}`;
+          setRoomsDb(prev => {
+            const curr = prev[activePin];
+            if (!curr) return prev;
+            return { ...prev, [activePin]: normalizeRoomObject(curr, activePin, now) };
+          });
+          if (lastAutoClearKeyRef.current !== clearKey) {
+            lastAutoClearKeyRef.current = clearKey;
+            dispatchSyncAction('CLEAR_LOBBY_CHAT', { pin: activePin, beforeTs: lastMsgTs });
+          }
+        }
+      }
+    };
+    runTick();
+    const t = setInterval(runTick, 1000);
     return () => clearInterval(t);
-  }, [view, gameSubState]);
+  }, [view, gameSubState, joinedRoomPin, currentRoomPin]);
 
   const activeLobbyRoomChatCount = (roomsDb[joinedRoomPin || currentRoomPin]?.chatMessages || []).length;
   useEffect(() => {
@@ -1716,8 +1778,9 @@ export default function App() {
     const cleanText = (text || '').trim();
     if (!activePin || !currentUser || !cleanText) return;
 
-    const msgId = Date.now() + Math.floor(Math.random() * 1000);
-    const currentRoom = normalizeRoomObject(roomsDb[activePin], activePin);
+    const now = Date.now();
+    const msgId = now + Math.floor(Math.random() * 1000);
+    const currentRoom = normalizeRoomObject(roomsDb[activePin], activePin, now);
     const me = currentRoom.lobbyPlayers?.[currentUser.username] || buildLobbyPlayerEntry(currentUser);
     const chatMessage = {
       id: msgId,
@@ -1726,21 +1789,24 @@ export default function App() {
       role: currentUser.role,
       colorId: me.colorId || myCrewColor,
       text: cleanText,
-      createdAt: Date.now(),
-      timeStr: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      createdAt: now,
+      timeStr: new Date(now).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
     };
 
     setRoomsDb(prev => {
-      const r = normalizeRoomObject(prev[activePin], activePin);
-      const curr = r.lobbyPlayers?.[currentUser.username] || me;
-      const prevChats = Array.isArray(r.chatMessages) ? r.chatMessages : [];
+      const base = normalizeRoomObject(prev[activePin], activePin, now);
+      const pruned = pruneExpiredRoomChat(base, now);
+      const curr = pruned.lobbyPlayers?.[currentUser.username] || me;
+      const prevChats = pruned.chatMessages;
+      const cycleStart = prevChats.length === 0 || !pruned.chatCycleStartedAt ? now : pruned.chatCycleStartedAt;
       return {
         ...prev,
         [activePin]: {
-          ...r,
+          ...base,
           chatMessages: [...prevChats, chatMessage].slice(-50),
+          chatCycleStartedAt: cycleStart,
           lobbyPlayers: {
-            ...r.lobbyPlayers,
+            ...pruned.lobbyPlayers,
             [currentUser.username]: { ...curr, chat: cleanText, chatAt: msgId }
           }
         }
@@ -1752,6 +1818,84 @@ export default function App() {
       message: chatMessage,
       fallbackPlayer: me
     });
+  };
+
+  const handleClearLobbyChatNow = (pinOverride) => {
+    const targetPin = String(pinOverride || joinedRoomPin || currentRoomPin || '').trim();
+    if (!targetPin) return;
+    setRoomsDb(prev => {
+      const base = normalizeRoomObject(prev[targetPin], targetPin);
+      const clearedPlayers = {};
+      Object.entries(base.lobbyPlayers || {}).forEach(([uname, p]) => {
+        clearedPlayers[uname] = p ? { ...p, chat: '', chatAt: null } : p;
+      });
+      return {
+        ...prev,
+        [targetPin]: {
+          ...base,
+          chatMessages: [],
+          chatCycleStartedAt: null,
+          lobbyPlayers: clearedPlayers
+        }
+      };
+    });
+    dispatchSyncAction('CLEAR_LOBBY_CHAT', { pin: targetPin });
+    showToast('Đã xóa trắng toàn bộ khung chat phòng chờ!', 'success');
+  };
+
+  const handleSaveCustomVocabTopic = ({ label, text }) => {
+    const cleanLabel = String(label || '').trim();
+    const cleanText = String(text || '').trim();
+    if (!cleanLabel) {
+      showToast('Vui lòng nhập tên chủ đề từ vựng mới!', 'error');
+      return false;
+    }
+    const parsedWords = parseRawVocabText(cleanText);
+    if (parsedWords.length === 0) {
+      showToast('Nội dung chủ đề cần ít nhất 1 dòng từ vựng hợp lệ (TỪ | Nghĩa tiếng Việt | /IPA/ | Ví dụ)!', 'error');
+      return false;
+    }
+    const existing = customVocabTopics.find(
+      t => t.label.trim().toLowerCase() === cleanLabel.toLowerCase()
+    );
+    const topic = {
+      id: existing?.id || `topic_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      label: cleanLabel,
+      text: cleanText,
+      updatedAt: Date.now(),
+      createdAt: existing?.createdAt || Date.now()
+    };
+    setCustomVocabTopics(prev => {
+      const idx = prev.findIndex(t => t.id === topic.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = topic;
+        return next;
+      }
+      return [...prev, topic];
+    });
+    dispatchSyncAction('UPSERT_VOCAB_TOPIC', { topic });
+    showToast(`Đã lưu chủ đề "${cleanLabel}" (${parsedWords.length} từ) và nạp vào bộ từ!`, 'success');
+    return true;
+  };
+
+  const handleDeleteCustomVocabTopic = (topic) => {
+    if (!topic?.id) return;
+    setCustomVocabTopics(prev => prev.filter(t => t.id !== topic.id));
+    dispatchSyncAction('DELETE_VOCAB_TOPIC', { topicId: topic.id });
+    showToast(`Đã xóa chủ đề "${topic.label}".`, 'info');
+  };
+
+  const openMemberProfile = (username, fromView = view) => {
+    const targetUsername = usersDb[username]
+      ? username
+      : (currentUser?.username || Object.keys(usersDb || {})[0] || '');
+    if (!targetUsername) return;
+    if (fromView && fromView !== 'STUDENT_PROFILE') {
+      setPreviousView(fromView);
+    }
+    setSelectedProfileStudent(targetUsername);
+    setView('STUDENT_PROFILE');
   };
 
   const handleCreateRoom = (e) => {
@@ -4039,6 +4183,7 @@ export default function App() {
           currentUser={currentUser}
           darkMode={darkMode}
           handleLogout={handleLogout}
+          openMemberProfile={openMemberProfile}
           openStudentGamePortal={openStudentGamePortal}
           setApiTestState={setApiTestState}
           setDarkMode={setDarkMode}
@@ -4071,6 +4216,7 @@ export default function App() {
         <StudentHome
           attempts={attempts}
           currentUser={currentUser}
+          openMemberProfile={openMemberProfile}
           openStudentGamePortal={openStudentGamePortal}
           setEditingTargetUser={setEditingTargetUser}
           setPreviousView={setPreviousView}
@@ -4079,10 +4225,11 @@ export default function App() {
           setView={setView}
           startExam={startExam}
           tests={tests}
+          usersDb={usersDb}
         />
       )}
 
-      {view === 'STUDENT_PROFILE' && currentUser?.role !== 'teacher' && (
+      {view === 'STUDENT_PROFILE' && (
         <StudentProfile
           attempts={attempts}
           currentRoomPin={currentRoomPin}
@@ -4090,6 +4237,7 @@ export default function App() {
           dispatchSyncAction={dispatchSyncAction}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
           openStudentGamePortal={openStudentGamePortal}
+          previousView={previousView}
           roomsDb={roomsDb}
           selectedProfileStudent={selectedProfileStudent}
           setEditingTargetUser={setEditingTargetUser}
@@ -4101,8 +4249,10 @@ export default function App() {
           setTempNoteText={setTempNoteText}
           setView={setView}
           showToast={showToast}
+          startExam={startExam}
           teacherNotes={teacherNotes}
           tempNoteText={tempNoteText}
+          tests={tests}
           usersDb={usersDb}
         />
       )}
@@ -4111,6 +4261,7 @@ export default function App() {
         <GameArena
           activeQuestion={activeQuestion}
           advanceNextGameRound={advanceNextGameRound}
+          attempts={attempts}
           autoNextTimerRef={autoNextTimerRef}
           canvasRef={canvasRef}
           chatScrollRef={chatScrollRef}
@@ -4135,6 +4286,7 @@ export default function App() {
           gameTypedProgress={gameTypedProgress}
           gameWordIdx={gameWordIdx}
           handleChangeCrewColor={handleChangeCrewColor}
+          handleClearLobbyChatNow={handleClearLobbyChatNow}
           handleCopyInviteLink={handleCopyInviteLink}
           handleDeleteRoom={handleDeleteRoom}
           handleFinishRoomMatch={handleFinishRoomMatch}
@@ -4164,6 +4316,7 @@ export default function App() {
           lobbyCountdownTimerRef={lobbyCountdownTimerRef}
           lobbyNowTick={lobbyNowTick}
           myCrewColor={myCrewColor}
+          openMemberProfile={openMemberProfile}
           roomJoinError={roomJoinError}
           roomJoinForm={roomJoinForm}
           roomsDb={roomsDb}
@@ -4262,6 +4415,7 @@ export default function App() {
           handleTeacherResetLobby={handleTeacherResetLobby}
           initGameCampaign={initGameCampaign}
           openExamBuilder={openExamBuilder}
+          openMemberProfile={openMemberProfile}
           openTeacherGradingModal={openTeacherGradingModal}
           roomsDb={roomsDb}
           setAddStudentMode={setAddStudentMode}
@@ -4338,6 +4492,7 @@ export default function App() {
         currentRoomPin={currentRoomPin}
         currentUser={currentUser}
         customVocabInput={customVocabInput}
+        customVocabTopics={customVocabTopics}
         dispatchSyncAction={dispatchSyncAction}
         editingStudentAccount={editingStudentAccount}
         editingTargetUser={editingTargetUser}
@@ -4346,7 +4501,9 @@ export default function App() {
         gradingScores={gradingScores}
         handleChangeCrewColor={handleChangeCrewColor}
         handleCreateRoom={handleCreateRoom}
+        handleDeleteCustomVocabTopic={handleDeleteCustomVocabTopic}
         handleResetStudentPassword={handleResetStudentPassword}
+        handleSaveCustomVocabTopic={handleSaveCustomVocabTopic}
         handleSaveNewStudents={handleSaveNewStudents}
         handleTeacherAIGrade={handleTeacherAIGrade}
         handleTestGeminiKey={handleTestGeminiKey}

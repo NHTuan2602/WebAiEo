@@ -58,6 +58,7 @@ export default function TeacherDashboard({
   handleTeacherResetLobby,
   initGameCampaign,
   openExamBuilder,
+  openMemberProfile,
   openTeacherGradingModal,
   roomsDb,
   setAddStudentMode,
@@ -741,7 +742,21 @@ export default function TeacherDashboard({
 
                   return (
                     <tr key={att.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{att.studentName}</td>
+                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                        {openMemberProfile && att.studentId ? (
+                          <button
+                            type="button"
+                            onClick={() => openMemberProfile(att.studentId, 'TEACHER_DASHBOARD')}
+                            title="Xem hồ sơ thành viên"
+                            className="inline-flex items-center gap-1.5 text-left hover:text-teal-600 dark:hover:text-teal-400 hover:underline transition"
+                          >
+                            <span>{att.studentName}</span>
+                            <Eye className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                          </button>
+                        ) : (
+                          att.studentName
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">{att.testTitle}</td>
                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{att.submittedAt}</td>
                       <td className="px-6 py-4 text-center">
@@ -985,17 +1000,27 @@ export default function TeacherDashboard({
               </div>
               <div className="flex flex-wrap gap-3">
                 {lobbyPlayersList.map(lp => (
-                  <div key={lp.username} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <AmongUsCrewmate colorId={lp.colorId} avatarUrl={lp.avatarUrl || usersDb[lp.username]?.avatarUrl || ''} size={28} />
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                        {lp.name}
-                        {lp.role === 'teacher' && <Crown className="w-3 h-3 text-amber-500" />}
-                      </p>
-                      <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                        {lp.ready ? 'Đã sẵn sàng' : 'Đang chuẩn bị'}
-                      </p>
-                    </div>
+                  <div
+                    key={lp.username}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-500 transition"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openMemberProfile?.(lp.username, 'TEACHER_DASHBOARD')}
+                      title="Xem hồ sơ thành viên"
+                      className="flex items-center gap-2.5 text-left group"
+                    >
+                      <AmongUsCrewmate colorId={lp.colorId} avatarUrl={lp.avatarUrl || usersDb[lp.username]?.avatarUrl || ''} size={28} />
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 group-hover:text-teal-600 dark:group-hover:text-teal-400 group-hover:underline">
+                          {lp.name}
+                          {lp.role === 'teacher' && <Crown className="w-3 h-3 text-amber-500" />}
+                        </p>
+                        <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          {lp.ready ? 'Đã sẵn sàng' : 'Đang chuẩn bị'}
+                        </p>
+                      </div>
+                    </button>
                     {lp.role !== 'teacher' && (
                       <button
                         type="button"
@@ -1208,7 +1233,18 @@ export default function TeacherDashboard({
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <p className="font-bold text-slate-900 dark:text-white leading-tight">{account.name}</p>
+                                  {openMemberProfile ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openMemberProfile(account.username, 'TEACHER_DASHBOARD')}
+                                      title="Mở trang hồ sơ chi tiết"
+                                      className="font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 hover:underline leading-tight text-left transition"
+                                    >
+                                      {account.name}
+                                    </button>
+                                  ) : (
+                                    <p className="font-bold text-slate-900 dark:text-white leading-tight">{account.name}</p>
+                                  )}
                                   {isSelfAccount && (
                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
                                       Bạn
@@ -1288,6 +1324,15 @@ export default function TeacherDashboard({
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="inline-flex items-center gap-1.5">
+                              {openMemberProfile && (
+                                <button
+                                  type="button"
+                                  onClick={() => openMemberProfile(account.username, 'TEACHER_DASHBOARD')}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 transition"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Hồ sơ
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() =>

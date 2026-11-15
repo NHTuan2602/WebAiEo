@@ -3,9 +3,69 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export function normalizeServerRoom(raw = {}, pinKey = '') {
-  const pin = String(raw?.pin || pinKey || '').trim();
+export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
+
+function getServerChatMsgTs(msg) {
+  const rawTs = Number(msg?.createdAt ?? msg?.id);
+  return Number.isFinite(rawTs) && rawTs > 1_000_000_000_000 ? rawTs : 0;
+}
+
+export function pruneServerRoomChat(raw = {}, now = Date.now()) {
   const baseChats = Array.isArray(raw?.chatMessages) ? raw.chatMessages : [];
+  const baseLobby = raw?.lobbyPlayers && typeof raw.lobbyPlayers === 'object' ? { ...raw.lobbyPlayers } : {};
+
+  if (baseChats.length === 0) {
+    return { chatMessages: [], chatCycleStartedAt: null, lobbyPlayers: baseLobby };
+  }
+
+  let cycleStart = Number(raw?.chatCycleStartedAt);
+  if (!Number.isFinite(cycleStart) || cycleStart <= 1_000_000_000_000) {
+    const oldestTs = baseChats.map(getServerChatMsgTs).find(ts => ts > 0);
+    cycleStart = oldestTs || now;
+  }
+
+  const clearLobbyChatBubbles = (playersMap) => {
+    const next = {};
+    Object.entries(playersMap).forEach(([uname, p]) => {
+      if (!p) return;
+      next[uname] = (p.chat || p.chatAt) ? { ...p, chat: '', chatAt: null } : p;
+    });
+    return next;
+  };
+
+  if (now - cycleStart >= LOBBY_CHAT_RESET_MS) {
+    return {
+      chatMessages: [],
+      chatCycleStartedAt: null,
+      lobbyPlayers: clearLobbyChatBubbles(baseLobby)
+    };
+  }
+
+  const validChats = baseChats
+    .filter(msg => {
+      const ts = getServerChatMsgTs(msg);
+      return ts === 0 || now - ts < LOBBY_CHAT_RESET_MS;
+    })
+    .slice(-50);
+
+  if (validChats.length === 0) {
+    return {
+      chatMessages: [],
+      chatCycleStartedAt: null,
+      lobbyPlayers: clearLobbyChatBubbles(baseLobby)
+    };
+  }
+
+  return {
+    chatMessages: validChats,
+    chatCycleStartedAt: cycleStart,
+    lobbyPlayers: baseLobby
+  };
+}
+
+export function normalizeServerRoom(raw = {}, pinKey = '', now = Date.now()) {
+  const pin = String(raw?.pin || pinKey || '').trim();
+  const prunedChat = pruneServerRoomChat(raw, now);
   const rawRoundSize = Number(raw?.roundSize);
   return {
     pin,
@@ -17,12 +77,32 @@ export function normalizeServerRoom(raw = {}, pinKey = '') {
     roundSize: Number.isFinite(rawRoundSize) && rawRoundSize >= 2 ? Math.min(8, Math.round(rawRoundSize)) : 4,
     speedMode: ['relaxed', 'normal', 'turbo'].includes(raw?.speedMode) ? raw.speedMode : 'normal',
     startedAt: raw?.startedAt || null,
-    lobbyPlayers: raw?.lobbyPlayers && typeof raw.lobbyPlayers === 'object' ? { ...raw.lobbyPlayers } : {},
+    lobbyPlayers: prunedChat.lobbyPlayers,
     liveMatch: raw?.liveMatch && typeof raw.liveMatch === 'object' ? { ...raw.liveMatch } : {},
-    chatMessages: baseChats.slice(-50),
+    chatMessages: prunedChat.chatMessages,
+    chatCycleStartedAt: prunedChat.chatCycleStartedAt,
     rawVocab: typeof raw?.rawVocab === 'string' ? raw.rawVocab : '',
     players: raw?.players && typeof raw.players === 'object' ? { ...raw.players } : {}
   };
+}
+
+function pruneExpiredStoreChats(store, now = Date.now()) {
+  let prunedAny = false;
+  Object.entries(store.rooms || {}).forEach(([pin, r]) => {
+    const prevLen = Array.isArray(r?.chatMessages) ? r.chatMessages.length : 0;
+    const normalized = normalizeServerRoom(r, pin, now);
+    if (
+      normalized.chatMessages.length !== prevLen ||
+      normalized.chatCycleStartedAt !== (r?.chatCycleStartedAt ?? null)
+    ) {
+      store.rooms[pin] = normalized;
+      prunedAny = true;
+    }
+  });
+  if (prunedAny) {
+    store.version += 1;
+  }
+  return prunedAny;
 }
 
 function createInitialStore() {
@@ -36,7 +116,8 @@ function createInitialStore() {
     tests: [],
     attempts: [],
     teacherNotes: {},
-    users: {}
+    users: {},
+    customVocabTopics: []
   };
 }
 
@@ -81,6 +162,9 @@ export function createPersistentSyncStore(persistFile = '') {
                 name: 'Ms. Như — IELTS Nha Trang'
               };
             }
+          }
+          if (Array.isArray(parsed.customVocabTopics)) {
+            store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
           }
         }
       }
@@ -137,6 +221,7 @@ function readJsonBody(req) {
 }
 
 function getSnapshot(store) {
+  pruneExpiredStoreChats(store, Date.now());
   return {
     version: store.version,
     seeded: store.seeded,
@@ -146,7 +231,8 @@ function getSnapshot(store) {
     tests: store.tests,
     attempts: store.attempts,
     teacherNotes: store.teacherNotes,
-    users: store.users
+    users: store.users,
+    customVocabTopics: store.customVocabTopics
   };
 }
 
@@ -176,6 +262,9 @@ function applySyncAction(store, type, payload = {}) {
         if (payload.users && typeof payload.users === 'object') {
           store.users = { ...payload.users };
         }
+        if (Array.isArray(payload.customVocabTopics)) {
+          store.customVocabTopics = payload.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+        }
         store.seeded = true;
         changed = true;
       } else {
@@ -187,6 +276,13 @@ function applySyncAction(store, type, payload = {}) {
               changed = true;
             }
           });
+        }
+        if (Array.isArray(payload.customVocabTopics) && store.customVocabTopics.length === 0) {
+          const validTopics = payload.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+          if (validTopics.length > 0) {
+            store.customVocabTopics = validTopics;
+            changed = true;
+          }
         }
         if (store.users?.teacher_ielts?.name === 'Thầy Minh IELTS Master') {
           store.users.teacher_ielts = {
@@ -290,26 +386,66 @@ function applySyncAction(store, type, payload = {}) {
       const cleanPin = String(payload.pin || '').trim();
       const message = payload.message;
       if (!cleanPin || !message?.username || !message?.text) break;
-      const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin);
+      const now = Date.now();
+      const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin, now);
       const player = base.lobbyPlayers[message.username] || payload.fallbackPlayer || {
         username: message.username,
         name: message.name || message.username,
         role: message.role || 'student',
         colorId: message.colorId || 'cyan',
         ready: true,
-        joinedAt: Date.now()
+        joinedAt: now
       };
       base.lobbyPlayers[message.username] = {
         ...player,
         chat: message.text,
-        chatAt: message.id || Date.now()
+        chatAt: message.id || now
       };
       const prevChats = Array.isArray(base.chatMessages) ? base.chatMessages : [];
       if (!prevChats.some(m => m.id === message.id)) {
         base.chatMessages = [...prevChats, message].slice(-50);
       }
+      if (!base.chatCycleStartedAt || prevChats.length === 0) {
+        base.chatCycleStartedAt = getServerChatMsgTs(message) || now;
+      }
       store.rooms[cleanPin] = base;
       changed = true;
+      break;
+    }
+
+    case 'CLEAR_LOBBY_CHAT': {
+      const cleanPin = String(payload.pin || '').trim();
+      if (!cleanPin || !store.rooms[cleanPin]) break;
+      const now = Date.now();
+      const base = normalizeServerRoom(store.rooms[cleanPin], cleanPin, now);
+      const beforeTs = Number(payload.beforeTs);
+      const prevLen = base.chatMessages.length;
+
+      if (Number.isFinite(beforeTs) && beforeTs > 0) {
+        base.chatMessages = base.chatMessages.filter(m => {
+          const ts = getServerChatMsgTs(m);
+          return ts > beforeTs;
+        });
+      } else {
+        base.chatMessages = [];
+      }
+
+      if (base.chatMessages.length === 0) {
+        base.chatCycleStartedAt = null;
+        Object.keys(base.lobbyPlayers || {}).forEach(uname => {
+          const lp = base.lobbyPlayers[uname];
+          if (lp && (lp.chat || lp.chatAt)) {
+            base.lobbyPlayers[uname] = { ...lp, chat: '', chatAt: null };
+          }
+        });
+      } else {
+        base.chatCycleStartedAt = getServerChatMsgTs(base.chatMessages[0]) || now;
+      }
+
+      if (prevLen !== base.chatMessages.length || (prevLen === 0 && store.rooms[cleanPin]?.chatCycleStartedAt)) {
+        store.rooms[cleanPin] = base;
+        changed = true;
+      }
       break;
     }
 
@@ -565,6 +701,33 @@ function applySyncAction(store, type, payload = {}) {
       break;
     }
 
+    case 'UPSERT_VOCAB_TOPIC': {
+      const topic = payload.topic;
+      if (!topic?.id || !topic?.label || typeof topic?.text !== 'string') break;
+      const list = Array.isArray(store.customVocabTopics) ? store.customVocabTopics : [];
+      const idx = list.findIndex(t => t.id === topic.id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...topic };
+        store.customVocabTopics = [...list];
+      } else {
+        store.customVocabTopics = [...list, topic];
+      }
+      changed = true;
+      break;
+    }
+
+    case 'DELETE_VOCAB_TOPIC': {
+      const topicId = payload.topicId;
+      if (!topicId) break;
+      const list = Array.isArray(store.customVocabTopics) ? store.customVocabTopics : [];
+      const filtered = list.filter(t => t.id !== topicId);
+      if (filtered.length !== list.length) {
+        store.customVocabTopics = filtered;
+        changed = true;
+      }
+      break;
+    }
+
     default:
       break;
   }
@@ -586,6 +749,15 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       }
     }
   };
+
+  // Sweep expired 10-minute room chats automatically and broadcast updates
+  const chatSweepTimer = setInterval(() => {
+    if (pruneExpiredStoreChats(store, Date.now())) {
+      onChanged?.(store);
+      broadcast();
+    }
+  }, 10000);
+  chatSweepTimer.unref?.();
 
   middlewares.use('/api/sync', async (req, res, next) => {
     const reqUrl = (req.url || '/').split('?')[0];
