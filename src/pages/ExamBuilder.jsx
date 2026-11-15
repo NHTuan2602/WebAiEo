@@ -27,114 +27,8 @@ import {
 import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
 import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../utils/clozeHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
-import AiExamExtractorPanel from '../components/teacher/AiExamExtractorPanel';
 import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
-import ClozeEditorBox from '../components/teacher/ClozeEditorBox';
-
-function getScopedQuestionEntries(questions = [], groupField, activeIdx, onlyActive, multiGroup) {
-  const indexed = (questions || []).map((q, idx) => ({ q, idx }));
-  if (!multiGroup || !onlyActive) return indexed;
-  return indexed.filter(({ q }) => typeof q[groupField] !== 'number' || q[groupField] === activeIdx);
-}
-
-const SCOPE_ACCENT_STYLES = {
-  blue: {
-    wrap: 'bg-blue-50/70 dark:bg-blue-500/10 border-blue-200/80 dark:border-blue-500/25',
-    text: 'text-blue-900 dark:text-blue-200',
-    box: 'border-blue-200 dark:border-slate-700',
-    btn: 'bg-blue-600 text-white',
-    cta: 'bg-blue-600 hover:bg-blue-700 text-white font-bold'
-  },
-  indigo: {
-    wrap: 'bg-indigo-50/70 dark:bg-indigo-500/10 border-indigo-200/80 dark:border-indigo-500/25',
-    text: 'text-indigo-900 dark:text-indigo-200',
-    box: 'border-indigo-200 dark:border-slate-700',
-    btn: 'bg-indigo-600 text-white',
-    cta: 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold'
-  }
-};
-
-function QuestionScopeFilterBar({
-  activeIdx,
-  accent = 'blue',
-  groupCount,
-  groupLabel,
-  isFiltered,
-  onSetFilter,
-  totalCount,
-  visibleCount
-}) {
-  if (groupCount <= 1) return null;
-  const s = SCOPE_ACCENT_STYLES[accent] || SCOPE_ACCENT_STYLES.blue;
-  return (
-    <div className={`mb-4 flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border text-xs ${s.wrap}`}>
-      <span className={`font-bold ${s.text}`}>
-        {isFiltered
-          ? `Đang lọc riêng ${groupLabel} #${activeIdx + 1}: ${visibleCount}/${totalCount} câu`
-          : `Đang hiển thị toàn bộ ${totalCount} câu của ${groupCount} ${groupLabel.toLowerCase()}`}
-      </span>
-      <div className={`flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border ${s.box}`}>
-        <button
-          type="button"
-          onClick={() => onSetFilter(true)}
-          className={`px-2.5 py-1 rounded-md font-bold transition ${
-            isFiltered ? s.btn : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          Chỉ {groupLabel} #{activeIdx + 1}
-        </button>
-        <button
-          type="button"
-          onClick={() => onSetFilter(false)}
-          className={`px-2.5 py-1 rounded-md font-bold transition ${
-            !isFiltered ? s.btn : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          Tất cả ({totalCount})
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function QuestionScopeEmptyState({
-  activeIdx,
-  accent = 'blue',
-  emptyText,
-  groupCount,
-  groupLabel,
-  isFiltered,
-  onAddQuestion,
-  onShowAll,
-  totalCount
-}) {
-  const s = SCOPE_ACCENT_STYLES[accent] || SCOPE_ACCENT_STYLES.blue;
-  return (
-    <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400">
-      {groupCount > 1 && isFiltered && totalCount > 0 ? (
-        <div className="space-y-2">
-          <p className="font-semibold">
-            {groupLabel} #{activeIdx + 1} chưa có câu hỏi nào riêng.
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <button type="button" onClick={onAddQuestion} className={`px-3 py-1.5 rounded-lg ${s.cta}`}>
-              + Thêm Câu Vào {groupLabel} #{activeIdx + 1}
-            </button>
-            <button
-              type="button"
-              onClick={onShowAll}
-              className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold"
-            >
-              Xem tất cả ({totalCount} câu)
-            </button>
-          </div>
-        </div>
-      ) : (
-        emptyText
-      )}
-    </div>
-  );
-}
+import SkillQuestionWorkspace from '../components/teacher/SkillQuestionWorkspace';
 
 export default function ExamBuilder({
   addQuestionToSkill,
@@ -171,6 +65,8 @@ export default function ExamBuilder({
   const [showAdvancedReadingImg, setShowAdvancedReadingImg] = useState(false);
   const [filterListeningByTrack, setFilterListeningByTrack] = useState(true);
   const [filterReadingByPassage, setFilterReadingByPassage] = useState(true);
+  const [questionTabBySkill, setQuestionTabBySkill] = useState({ listening: 'all', reading: 'all' });
+  const [sourceFilterBySkill, setSourceFilterBySkill] = useState({ listening: 'all', reading: 'all' });
 
   const sessionKey = `${editingTest?.id || 'new'}::${testForm?.id || 'draft'}`;
   const initialSnapshotRef = useRef({ key: null, json: '' });
@@ -422,6 +318,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     const stampedQuestions = (extracted.questions || []).map((q, idx) => ({
       id: `${skill[0]}q_ai_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
       type: q.type || 'fill',
+      source: 'ai',
       ...(typeof q.blankNum === 'number' ? { blankNum: q.blankNum } : {}),
       [scopeField]: scopeIdx,
       question: q.question || `${q.blankNum || idx + 1}. Câu hỏi`,
@@ -446,7 +343,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           existingQuestions: mergedQs,
           scopeField,
           scopeIdx,
-          skill
+          skill,
+          defaultSource: 'ai'
         });
       }
 
@@ -1312,216 +1210,35 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 placeholder={`Dán lời thoại bài nghe tiếng Anh cho Chủ đề ${activeIdx + 1} tại đây (hoặc bỏ trống nếu đã tải file MP3 ở trên)...`}
               />
             </div>
-
-            {/* Inline Cloze / Note Completion Editor for Active Listening Topic */}
-            <ClozeEditorBox
-              clozeText={activeTrack?.clozeText || ''}
-              onChangeClozeText={val => updateListeningTrackField(activeIdx, { clozeText: val })}
-              onSyncBlanks={() => handleSyncClozeQuestions('listening', 'trackIdx', activeIdx, activeTrack?.clozeText || '')}
-              questions={testForm.listening?.questions || []}
-              scopeField="trackIdx"
-              scopeIdx={activeIdx}
-              scopeLabel={`Chủ đề #${activeIdx + 1}`}
-            />
           </div>
 
-          {/* AI Image-to-Exam Extractor for Active Listening Topic */}
-          <AiExamExtractorPanel
-            aiApiKey={aiApiKey}
-            existingMediaImageUrl={activeTrack?.imageUrl}
-            scopeLabel={`Listening • Chủ đề #${activeIdx + 1}`}
+          <SkillQuestionWorkspace
             skill="listening"
+            groups={tracks}
+            activeIdx={activeIdx}
+            activeGroup={activeTrack}
+            questions={testForm.listening?.questions || []}
+            activeTab={questionTabBySkill.listening}
+            onChangeTab={tab => setQuestionTabBySkill(prev => ({ ...prev, listening: tab }))}
+            sourceFilter={sourceFilterBySkill.listening}
+            onChangeSourceFilter={f => setSourceFilterBySkill(prev => ({ ...prev, listening: f }))}
+            filterByGroup={filterListeningByTrack}
+            onSetFilterByGroup={setFilterListeningByTrack}
+            onAddQuestion={qType => addQuestionToSkill('listening', qType)}
+            onUpdateQuestion={(qId, field, value) => updateQuestionInSkill('listening', qId, field, value)}
+            onUpdateOption={(qId, optIdx, val) => updateOptionInSkill('listening', qId, optIdx, val)}
+            onRemoveQuestion={qId => removeQuestionFromSkill('listening', qId)}
+            onChangeClozeText={val => updateListeningTrackField(activeIdx, { clozeText: val })}
+            onSyncCloze={() => handleSyncClozeQuestions('listening', 'trackIdx', activeIdx, activeTrack?.clozeText || '')}
+            aiApiKey={aiApiKey}
             setApiTestState={setApiTestState}
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
             onApplyQuickAnswerText={txt => handleQuickAnswerKeyText('listening', 'trackIdx', activeIdx, txt)}
-            onApplyExtraction={(extracted, opts) =>
+            onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
             }
           />
-
-          {/* Listening Questions List */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-slate-200 dark:border-slate-800 mb-6">
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                  Danh Sách Câu Hỏi Listening ({testForm.listening?.questions?.length || 0} câu)
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Thêm câu hỏi Trắc nghiệm (MCQ), Điền từ, True/False/Not Given — và gắn vào Chủ đề 1, 2, 3... tương ứng.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => addQuestionToSkill('listening')}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Listening {tracks.length > 1 ? `(Chủ đề #${activeIdx + 1})` : ''}
-              </button>
-            </div>
-
-            {(() => {
-              const allListeningQs = testForm.listening?.questions || [];
-              const visibleEntries = getScopedQuestionEntries(
-                allListeningQs,
-                'trackIdx',
-                activeIdx,
-                filterListeningByTrack,
-                tracks.length > 1
-              );
-
-              return (
-                <>
-                  <QuestionScopeFilterBar
-                    activeIdx={activeIdx}
-                    accent="blue"
-                    groupCount={tracks.length}
-                    groupLabel="Chủ đề"
-                    isFiltered={filterListeningByTrack}
-                    onSetFilter={setFilterListeningByTrack}
-                    totalCount={allListeningQs.length}
-                    visibleCount={visibleEntries.length}
-                  />
-
-                  {visibleEntries.length === 0 ? (
-                    <QuestionScopeEmptyState
-                      activeIdx={activeIdx}
-                      accent="blue"
-                      emptyText='Chưa có câu hỏi Listening nào. Bấm "+ Thêm Câu Hỏi Listening" hoặc dùng khung AI ở trên.'
-                      groupCount={tracks.length}
-                      groupLabel="Chủ đề"
-                      isFiltered={filterListeningByTrack}
-                      onAddQuestion={() => addQuestionToSkill('listening')}
-                      onShowAll={() => setFilterListeningByTrack(false)}
-                      totalCount={allListeningQs.length}
-                    />
-                  ) : (
-                    <div className="space-y-5">
-                      {visibleEntries.map(({ q, idx }) => (
-                        <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <span className="text-xs font-extrabold bg-blue-600 text-white px-3 py-1 rounded-lg">
-                      Câu hỏi #{idx + 1}
-                    </span>
-
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      {tracks.length > 1 && (
-                        <select
-                          value={typeof q.trackIdx === 'number' ? String(q.trackIdx) : ''}
-                          onChange={e =>
-                            updateQuestionInSkill(
-                              'listening',
-                              q.id,
-                              'trackIdx',
-                              e.target.value === '' ? null : Number(e.target.value)
-                            )
-                          }
-                          className="px-3 py-1.5 bg-blue-50 dark:bg-blue-500/20 border border-blue-200 dark:border-blue-500/40 rounded-xl text-xs font-bold text-blue-800 dark:text-blue-200"
-                        >
-                          <option value="">Hiện ở tất cả chủ đề</option>
-                          {tracks.map((tr, tIdx) => (
-                            <option key={tr.id || tIdx} value={String(tIdx)}>
-                              Thuộc Chủ đề {tIdx + 1} ({(tr.title || '').slice(0, 18)})
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <select
-                        value={q.type}
-                        onChange={e => updateQuestionInSkill('listening', q.id, 'type', e.target.value)}
-                        className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200"
-                      >
-                        <option value="mcq">Trắc nghiệm 4 lựa chọn (MCQ)</option>
-                        <option value="fill">Điền từ vào chỗ trống (Fill-in-blank)</option>
-                        <option value="tfng">True / False / Not Given</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => removeQuestionFromSkill('listening', q.id)}
-                        className="p-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl transition"
-                        title="Xóa câu hỏi này"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                      Nội dung câu hỏi
-                    </label>
-                    <input
-                      type="text"
-                      value={q.question}
-                      onChange={e => updateQuestionInSkill('listening', q.id, 'question', e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      placeholder="Nhập đề bài câu hỏi..."
-                    />
-                  </div>
-
-                  {q.type === 'mcq' && (
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-2">
-                        Các phương án lựa chọn (A, B, C, D)
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {(q.options || []).map((opt, optIdx) => (
-                          <input
-                            key={optIdx}
-                            type="text"
-                            value={opt}
-                            onChange={e => updateOptionInSkill('listening', q.id, optIdx, e.target.value)}
-                            className="px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            placeholder={`Phương án ${optIdx + 1}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Correct Answer Field */}
-                  <div className="bg-emerald-50/80 dark:bg-emerald-500/15 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-500/30">
-                    <label className="block text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300 uppercase mb-1">
-                      ✅ Đáp án đúng của câu hỏi này (Dùng để chấm điểm tự động)
-                    </label>
-                    {q.type === 'mcq' || q.type === 'tfng' ? (
-                      <select
-                        value={q.correctAnswer}
-                        onChange={e => updateQuestionInSkill('listening', q.id, 'correctAnswer', e.target.value)}
-                        className="w-full sm:w-80 px-3 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
-                      >
-                        {(q.options || []).map((opt, i) => (
-                          <option key={i} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div>
-                        <input
-                          type="text"
-                          value={q.correctAnswer}
-                          onChange={e => updateQuestionInSkill('listening', q.id, 'correctAnswer', e.target.value)}
-                          className="w-full sm:w-96 px-3.5 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
-                          placeholder="VD: 15 | fifteen hoặc color / colour"
-                        />
-                        <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
-                          Mẹo: Dùng dấu <code className="font-bold">|</code> hoặc <code className="font-bold">/</code> nếu chấp nhận nhiều đáp án tương đương.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
         </div>
         );
       })()}
@@ -1739,7 +1456,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               <label className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                 <span>Nội Dung Văn Bản Bài Đọc #{activeIdx + 1}</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold">
-                  Copy/Dán bài đọc từ Word/PDF hoặc dùng AI bên dưới tự chép giúp bạn
+                  Copy/Dán bài đọc từ Word/PDF hoặc dùng tab Tạo Tự Động (AI Ảnh) bên dưới
                 </span>
               </label>
               <textarea
@@ -1750,216 +1467,35 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 placeholder={`Dán đoạn văn Reading Bài ${activeIdx + 1} tại đây...`}
               />
             </div>
-
-            {/* Inline Cloze / Summary Completion Editor for Active Reading Passage */}
-            <ClozeEditorBox
-              clozeText={activePassage?.clozeText || ''}
-              onChangeClozeText={val => updateReadingPassageField(activeIdx, { clozeText: val })}
-              onSyncBlanks={() => handleSyncClozeQuestions('reading', 'passageIdx', activeIdx, activePassage?.clozeText || '')}
-              questions={testForm.reading?.questions || []}
-              scopeField="passageIdx"
-              scopeIdx={activeIdx}
-              scopeLabel={`Bài đọc #${activeIdx + 1}`}
-            />
           </div>
 
-          {/* AI Image-to-Exam Extractor for Active Reading Passage */}
-          <AiExamExtractorPanel
-            aiApiKey={aiApiKey}
-            existingMediaImageUrl={activePassage?.imageUrl}
-            scopeLabel={`Reading • Bài #${activeIdx + 1}`}
+          <SkillQuestionWorkspace
             skill="reading"
+            groups={passages}
+            activeIdx={activeIdx}
+            activeGroup={activePassage}
+            questions={testForm.reading?.questions || []}
+            activeTab={questionTabBySkill.reading}
+            onChangeTab={tab => setQuestionTabBySkill(prev => ({ ...prev, reading: tab }))}
+            sourceFilter={sourceFilterBySkill.reading}
+            onChangeSourceFilter={f => setSourceFilterBySkill(prev => ({ ...prev, reading: f }))}
+            filterByGroup={filterReadingByPassage}
+            onSetFilterByGroup={setFilterReadingByPassage}
+            onAddQuestion={qType => addQuestionToSkill('reading', qType)}
+            onUpdateQuestion={(qId, field, value) => updateQuestionInSkill('reading', qId, field, value)}
+            onUpdateOption={(qId, optIdx, val) => updateOptionInSkill('reading', qId, optIdx, val)}
+            onRemoveQuestion={qId => removeQuestionFromSkill('reading', qId)}
+            onChangeClozeText={val => updateReadingPassageField(activeIdx, { clozeText: val })}
+            onSyncCloze={() => handleSyncClozeQuestions('reading', 'passageIdx', activeIdx, activePassage?.clozeText || '')}
+            aiApiKey={aiApiKey}
             setApiTestState={setApiTestState}
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
             onApplyQuickAnswerText={txt => handleQuickAnswerKeyText('reading', 'passageIdx', activeIdx, txt)}
-            onApplyExtraction={(extracted, opts) =>
+            onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
             }
           />
-
-          {/* Reading Questions CRUD */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-slate-200 dark:border-slate-800 mb-6">
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                  Danh Sách Câu Hỏi Reading ({testForm.reading?.questions?.length || 0} câu)
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Hỗ trợ True/False/Not Given, Trắc nghiệm (MCQ), Điền từ — và gắn câu hỏi vào Bài số 1, 2, 3... tương ứng.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => addQuestionToSkill('reading')}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" /> Thêm Câu Hỏi Reading {passages.length > 1 ? `(Bài #${activeIdx + 1})` : ''}
-              </button>
-            </div>
-
-            {(() => {
-              const allReadingQs = testForm.reading?.questions || [];
-              const visibleEntries = getScopedQuestionEntries(
-                allReadingQs,
-                'passageIdx',
-                activeIdx,
-                filterReadingByPassage,
-                passages.length > 1
-              );
-
-              return (
-                <>
-                  <QuestionScopeFilterBar
-                    activeIdx={activeIdx}
-                    accent="indigo"
-                    groupCount={passages.length}
-                    groupLabel="Bài"
-                    isFiltered={filterReadingByPassage}
-                    onSetFilter={setFilterReadingByPassage}
-                    totalCount={allReadingQs.length}
-                    visibleCount={visibleEntries.length}
-                  />
-
-                  {visibleEntries.length === 0 ? (
-                    <QuestionScopeEmptyState
-                      activeIdx={activeIdx}
-                      accent="indigo"
-                      emptyText='Chưa có câu hỏi Reading nào. Bấm "+ Thêm Câu Hỏi Reading" hoặc dùng khung AI ở trên.'
-                      groupCount={passages.length}
-                      groupLabel="Bài"
-                      isFiltered={filterReadingByPassage}
-                      onAddQuestion={() => addQuestionToSkill('reading')}
-                      onShowAll={() => setFilterReadingByPassage(false)}
-                      totalCount={allReadingQs.length}
-                    />
-                  ) : (
-                    <div className="space-y-5">
-                      {visibleEntries.map(({ q, idx }) => (
-                        <div key={q.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <span className="text-xs font-extrabold bg-indigo-600 text-white px-3 py-1 rounded-lg">
-                      Câu hỏi Reading #{idx + 1}
-                    </span>
-
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      {passages.length > 1 && (
-                        <select
-                          value={typeof q.passageIdx === 'number' ? String(q.passageIdx) : ''}
-                          onChange={e =>
-                            updateQuestionInSkill(
-                              'reading',
-                              q.id,
-                              'passageIdx',
-                              e.target.value === '' ? null : Number(e.target.value)
-                            )
-                          }
-                          className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-500/40 rounded-xl text-xs font-bold text-indigo-800 dark:text-indigo-200"
-                        >
-                          <option value="">Hiện ở tất cả bài</option>
-                          {passages.map((p, pIdx) => (
-                            <option key={p.id || pIdx} value={String(pIdx)}>
-                              Thuộc Bài {pIdx + 1} ({(p.title || '').slice(0, 18)})
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <select
-                        value={q.type}
-                        onChange={e => updateQuestionInSkill('reading', q.id, 'type', e.target.value)}
-                        className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200"
-                      >
-                        <option value="tfng">True / False / Not Given</option>
-                        <option value="mcq">Trắc nghiệm 4 lựa chọn (MCQ)</option>
-                        <option value="fill">Điền từ vào chỗ trống (Fill-in-blank)</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => removeQuestionFromSkill('reading', q.id)}
-                        className="p-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/20 rounded-xl transition"
-                        title="Xóa câu hỏi này"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                      Nội dung câu hỏi
-                    </label>
-                    <input
-                      type="text"
-                      value={q.question}
-                      onChange={e => updateQuestionInSkill('reading', q.id, 'question', e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                      placeholder="Nhập câu hỏi Reading..."
-                    />
-                  </div>
-
-                  {q.type === 'mcq' && (
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-2">
-                        Các phương án lựa chọn (A, B, C, D)
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {(q.options || []).map((opt, optIdx) => (
-                          <input
-                            key={optIdx}
-                            type="text"
-                            value={opt}
-                            onChange={e => updateOptionInSkill('reading', q.id, optIdx, e.target.value)}
-                            className="px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            placeholder={`Phương án ${optIdx + 1}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Correct Answer Field */}
-                  <div className="bg-emerald-50/80 dark:bg-emerald-500/15 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-500/30">
-                    <label className="block text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300 uppercase mb-1">
-                      ✅ Đáp án đúng của câu hỏi này
-                    </label>
-                    {q.type === 'mcq' || q.type === 'tfng' ? (
-                      <select
-                        value={q.correctAnswer}
-                        onChange={e => updateQuestionInSkill('reading', q.id, 'correctAnswer', e.target.value)}
-                        className="w-full sm:w-80 px-3 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
-                      >
-                        {(q.options || []).map((opt, i) => (
-                          <option key={i} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div>
-                        <input
-                          type="text"
-                          value={q.correctAnswer}
-                          onChange={e => updateQuestionInSkill('reading', q.id, 'correctAnswer', e.target.value)}
-                          className="w-full sm:w-96 px-3.5 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
-                          placeholder="VD: 15 | fifteen hoặc color / colour"
-                        />
-                        <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
-                          Mẹo: Dùng dấu <code className="font-bold">|</code> hoặc <code className="font-bold">/</code> nếu chấp nhận nhiều đáp án tương đương.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
         </div>
         );
       })()}

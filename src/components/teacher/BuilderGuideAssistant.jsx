@@ -25,11 +25,11 @@ const GUIDE_TAB_TIPS = {
   },
   listening: {
     title: 'Bước 2: Soạn Phần Nghe (Listening)',
-    text: 'Có 2 cách: (1) Dán ảnh đề vào khung AI để máy tự tạo câu hỏi; hoặc (2) Bấm "+ Thêm Câu Hỏi" ở cuối trang. Nếu không có file ghi âm MP3, chỉ cần dán lời thoại vào ô Transcript là máy tự đọc giọng tiếng Anh.'
+    text: 'Nhập audio/Transcript ở hộp trên. Ở hộp câu hỏi bên dưới có các tab riêng để bạn đỡ rối: "Tạo Tự Động (AI Ảnh)", "Đục Lỗ Tự Động ({{1}})", hoặc "Tạo Bằng Tay". Mọi câu đều có nhãn phân biệt Tự động vs Tạo bằng tay.'
   },
   reading: {
     title: 'Bước 3: Soạn Phần Đọc (Reading)',
-    text: 'Nếu đề có sẵn trên ảnh/PDF: dán ảnh vào khung AI ở trên cùng để máy tự chép bài đọc & câu hỏi hộ bạn. Nếu gõ tay: dán đoạn văn vào ô "Nội Dung Bài Đọc" rồi thêm câu hỏi bên dưới.'
+    text: 'Dán bài đọc ở hộp trên, rồi chọn tab tạo câu hỏi tương ứng ở hộp dưới: dùng "Tạo Tự Động (AI Ảnh)" để AI tự chép bài & câu hỏi, hoặc chọn "Đục Lỗ Tự Động" / "Tạo Bằng Tay" theo nhu cầu.'
   },
   writing: {
     title: 'Bước 4: Soạn Đề Viết (Writing) & Lưu',
@@ -143,10 +143,10 @@ export function BuilderGuideModal({ isOpen, onClose, onJumpToTab }) {
                 Mở file PDF/Word hoặc sách đề thi trên màn hình. Dùng phím <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-[11px] font-bold">Windows + Shift + S</kbd> (trên Windows) để chụp vùng câu hỏi cần tạo.
               </li>
               <li>
-                Bấm chuột vào ô khung viền nét đứt trong phần <strong>Tạo Đề Tự Động Từ Ảnh Đề Thi</strong> và nhấn <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-[11px] font-bold">Ctrl + V</kbd> (hoặc bấm nút Chọn Ảnh từ máy).
+                Mở tab <strong>Tạo Tự Động (AI Ảnh)</strong>, bấm chuột vào ô khung viền nét đứt rồi nhấn <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-[11px] font-bold">Ctrl + V</kbd> (hoặc bấm nút Chọn Ảnh từ máy).
               </li>
               <li>
-                Nếu có bảng đáp án ngắn dạng chữ (VD: <code>1. garden</code>, <code>2. 115</code>), dán vào ô <em>Bảng Đáp Án</em> rồi bấm <strong>AI Đọc Ảnh &amp; Tạo Đề Ngay</strong>.
+                Nếu có bảng đáp án ngắn dạng chữ (VD: <code>1. garden</code>, <code>2. 115</code>), dán vào ô <em>Bảng Đáp Án</em> rồi bấm <strong>AI Đọc Ảnh &amp; Tạo Đề Ngay</strong>. Các câu sinh ra sẽ được gắn nhãn <strong>Tự động (AI Ảnh)</strong> rõ ràng.
               </li>
             </ol>
           </div>
@@ -154,10 +154,10 @@ export function BuilderGuideModal({ isOpen, onClose, onJumpToTab }) {
           {/* Method 2: Cloze */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
             <h3 className="font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2 text-sm">
-              <FileCode2 className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Cách Tạo Dạng Bài Đục Lỗ (Điền Từ Vào Đoạn Ghi Chú)
+              <FileCode2 className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Cách Tạo Dạng Bài Đục Lỗ (Tab Đục Lỗ Tự Động)
             </h3>
             <p className="text-xs leading-relaxed">
-              Rất dễ: bạn chỉ cần gõ hai dấu ngoặc nhọn quanh số thứ tự câu, ví dụ:
+              Vào tab <strong>Đục Lỗ Tự Động ({'{{1}}'})</strong>, bạn chỉ cần gõ hai dấu ngoặc nhọn quanh số thứ tự câu, ví dụ:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono">

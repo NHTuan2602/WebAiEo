@@ -2721,15 +2721,23 @@ export default function App() {
   };
 
   // Question CRUD Helpers for Listening & Reading Builder
-  const addQuestionToSkill = (skill) => {
+  const addQuestionToSkill = (skill, questionType = 'mcq') => {
     const currentQuestions = testForm[skill]?.questions || [];
     const nextNum = currentQuestions.length + 1;
+    const isTfng = questionType === 'tfng';
+    const isFill = questionType === 'fill';
+    const options = isTfng
+      ? ['TRUE', 'FALSE', 'NOT GIVEN']
+      : isFill
+      ? []
+      : ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'];
     const newQ = {
       id: `${skill[0]}q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      type: 'mcq',
+      type: questionType,
+      source: 'manual',
       question: `${nextNum}. Nhập nội dung câu hỏi số ${nextNum}...`,
-      options: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'],
-      correctAnswer: 'A. Đáp án A',
+      options,
+      correctAnswer: isTfng ? 'TRUE' : isFill ? '' : 'A. Đáp án A',
       ...(skill === 'reading' ? { passageIdx: builderReadingIdx } : {}),
       ...(skill === 'listening' ? { trackIdx: builderListeningIdx } : {})
     };
