@@ -630,7 +630,7 @@ export default function GlobalModals({
                     type="text"
                     value={newStudentForm.name}
                     onChange={e => setNewStudentForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder={isCreatingTeacher ? 'VD: Cô Nguyễn Ngọc Lan' : 'VD: Nguyễn Minh Khôi'}
+                    placeholder={isCreatingTeacher ? 'VD: Cô Ms. Như / Cô Ngọc Lan' : 'VD: Nguyễn Minh Khôi'}
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
                   />
                 </div>

@@ -334,7 +334,7 @@ export default function ExamMode({
             <span className="w-7 h-7 rounded-lg bg-[#007A7A] text-white flex items-center justify-center shadow-xs">
               <GraduationCap className="w-4 h-4" />
             </span>
-            <span className="font-extrabold text-sm tracking-tight hidden sm:inline">LexiPrep</span>
+            <span className="font-extrabold text-sm tracking-tight hidden sm:inline">IELTS Ms. Như</span>
             <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">/</span>
           </div>
           <h2 className="font-bold text-xs sm:text-sm truncate max-w-[200px] sm:max-w-[260px]" title={activeTest.title}>

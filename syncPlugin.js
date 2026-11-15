@@ -75,6 +75,12 @@ export function createPersistentSyncStore(persistFile = '') {
           }
           if (parsed.users && typeof parsed.users === 'object') {
             store.users = parsed.users;
+            if (store.users.teacher_ielts?.name === 'Thầy Minh IELTS Master') {
+              store.users.teacher_ielts = {
+                ...store.users.teacher_ielts,
+                name: 'Ms. Như — IELTS Nha Trang'
+              };
+            }
           }
         }
       }
@@ -181,6 +187,13 @@ function applySyncAction(store, type, payload = {}) {
               changed = true;
             }
           });
+        }
+        if (store.users?.teacher_ielts?.name === 'Thầy Minh IELTS Master') {
+          store.users.teacher_ielts = {
+            ...store.users.teacher_ielts,
+            name: 'Ms. Như — IELTS Nha Trang'
+          };
+          changed = true;
         }
         if (Array.isArray(payload.defaultTests)) {
           payload.defaultTests.forEach(dt => {

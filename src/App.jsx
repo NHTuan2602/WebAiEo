@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { normalizeBrandTeacherUser } from './constants/brandInfo';
 import {
   DEFAULT_VOCAB_TEXT,
   GAME_ROUND_TIME_LIMITS,
@@ -70,8 +71,11 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-          const hasTeacher = Object.values(parsed).some(u => u?.role === 'teacher');
-          return hasTeacher ? parsed : { teacher_ielts: DEFAULT_USERS.teacher_ielts, ...parsed };
+          const normalized = Object.fromEntries(
+            Object.entries(parsed).map(([k, v]) => [k, normalizeBrandTeacherUser(v)])
+          );
+          const hasTeacher = Object.values(normalized).some(u => u?.role === 'teacher');
+          return hasTeacher ? normalized : { teacher_ielts: DEFAULT_USERS.teacher_ielts, ...normalized };
         }
       } catch (_e) {}
     }
@@ -83,7 +87,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('ielts_current_user');
     if (saved) {
-      try { return JSON.parse(saved); } catch (_e) {}
+      try { return normalizeBrandTeacherUser(JSON.parse(saved)); } catch (_e) {}
     }
     return null; // Forces login screen
   });
@@ -830,14 +834,14 @@ export default function App() {
         const merged = {};
         Object.entries({ ...prev, ...snap.users }).forEach(([uname, u]) => {
           if (!deletedSet.has(uname) && u) {
-            merged[uname] = u;
+            merged[uname] = normalizeBrandTeacherUser(u);
           }
         });
         return JSON.stringify(prev) === JSON.stringify(merged) ? prev : merged;
       });
       setCurrentUser(prev => {
         if (!prev || !snap.users[prev.username]) return prev;
-        const remote = snap.users[prev.username];
+        const remote = normalizeBrandTeacherUser(snap.users[prev.username]);
         return JSON.stringify(prev) === JSON.stringify(remote) ? prev : { ...prev, ...remote };
       });
     }

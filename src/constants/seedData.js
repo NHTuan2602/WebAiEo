@@ -255,7 +255,7 @@ export const DEFAULT_TESTS = [
     seedTag: 'cam18_t1_v1',
     title: 'IELTS Academic Mock Test 02 — Cambridge Standard (Đục Lỗ + Full 3 Skills)',
     description:
-      'Đề thi IELTS Academic hoàn chỉnh chuẩn phòng thi LexiPrep: Listening 3 Parts (Note Completion đục lỗ Q1–Q10, Bảo tàng Hàng hải Q11–Q15, Nghiên cứu đất đô thị Q16–Q20 có giọng đọc tiếng Anh), Reading 2 Academic Passages (16 câu Đục lỗ, TFNG, MCQ) và Writing Task 1 (kèm biểu đồ) + Task 2.',
+      'Đề thi IELTS Academic hoàn chỉnh chuẩn phòng thi Luyện thi IELTS Nha Trang (Ms. Như): Listening 3 Parts (Note Completion đục lỗ Q1–Q10, Bảo tàng Hàng hải Q11–Q15, Nghiên cứu đất đô thị Q16–Q20 có giọng đọc tiếng Anh), Reading 2 Academic Passages (16 câu Đục lỗ, TFNG, MCQ) và Writing Task 1 (kèm biểu đồ) + Task 2.',
     createdAt: '2026-11-14',
     visibility: 'public',
     maxAttempts: 0,
@@ -888,7 +888,7 @@ export const DEFAULT_ATTEMPTS = [
 ];
 
 export const DEFAULT_USERS = {
-  'teacher_ielts': { username: 'teacher_ielts', pass: '123456', name: 'Thầy Minh IELTS Master', role: 'teacher', targetBand: 9.0, joinedDate: '2026-01-01' },
+  'teacher_ielts': { username: 'teacher_ielts', pass: '123456', name: 'Ms. Như — IELTS Nha Trang', role: 'teacher', targetBand: 9.0, joinedDate: '2026-01-01' },
   'hocsinh_01': { username: 'hocsinh_01', pass: '123456', name: 'Nguyễn Văn A', role: 'student', targetBand: 8.0, joinedDate: '2026-02-01' },
   'hocsinh_02': { username: 'hocsinh_02', pass: '123456', name: 'Trần Thị Mai', role: 'student', targetBand: 7.5, joinedDate: '2026-02-15' },
   'hocsinh_03': { username: 'hocsinh_03', pass: '123456', name: 'Lê Hoàng Long', role: 'student', targetBand: 7.0, joinedDate: '2026-02-20' }

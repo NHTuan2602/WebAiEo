@@ -118,7 +118,7 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
   });
 
   server.listen(port, host, () => {
-    console.log(`[LexiPrep] Production server listening at http://${host}:${port}`);
+    console.log(`[Luyện Thi IELTS Nha Trang] Production server listening at http://${host}:${port}`);
   });
 
   return server;

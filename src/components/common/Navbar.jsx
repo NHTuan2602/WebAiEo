@@ -6,11 +6,13 @@ import {
   Key,
   LogOut,
   Moon,
+  Phone,
   ShieldAlert,
   Sun,
   UserCheck,
   Users
 } from 'lucide-react';
+import { BRAND_INFO } from '../../constants/brandInfo';
 import UserAvatarBadge from './UserAvatarBadge';
 
 export default function Navbar({
@@ -35,7 +37,7 @@ export default function Navbar({
   return (
     <header className="bg-white/95 dark:bg-[#0F172B]/95 backdrop-blur-xl border-b border-slate-200/90 dark:border-slate-800 text-slate-800 dark:text-slate-100 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        {/* LexiPrep Brand Lockup */}
+        {/* Luyện Thi IELTS Nha Trang Brand Lockup */}
         <div
           className="flex items-center gap-3 cursor-pointer group shrink-0"
           onClick={() => setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME')}
@@ -46,14 +48,14 @@ export default function Navbar({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#0F172B] dark:text-white">
-                LexiPrep
+                {BRAND_INFO.shortName}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30">
-                IELTS
+                Nha Trang
               </span>
             </div>
             <p className="text-[11px] text-[#62748E] dark:text-slate-400 hidden sm:block leading-none mt-0.5">
-              Computer-Delivered IELTS • Academy
+              {BRAND_INFO.siteName}
             </p>
           </div>
         </div>
@@ -134,6 +136,14 @@ export default function Navbar({
 
         {/* Right Utility Controls */}
         <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={BRAND_INFO.phoneHref}
+            title={`Liên hệ ${BRAND_INFO.teacherName}: ${BRAND_INFO.phoneDisplay} • ${BRAND_INFO.address}`}
+            className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#B5F5F1]/60 transition"
+          >
+            <Phone className="w-3.5 h-3.5" />
+            <span>{BRAND_INFO.phoneDisplay}</span>
+          </a>
           <button
             type="button"
             onClick={() => setDarkMode(d => !d)}

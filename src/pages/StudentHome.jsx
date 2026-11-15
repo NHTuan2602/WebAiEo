@@ -19,7 +19,9 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import { BRAND_INFO } from '../constants/brandInfo';
 import { loadExamDraft } from '../utils/sessionPersistence';
+import BrandContactFooter from '../components/common/BrandContactFooter';
 
 export default function StudentHome({
   attempts,
@@ -120,7 +122,7 @@ export default function StudentHome({
             <div className="lg:col-span-8 space-y-5">
               <div className="inline-flex items-center gap-2 bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 px-3.5 py-1.5 rounded-full text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6]">
                 <MonitorCheck className="w-4 h-4" />
-                <span>Không gian Luyện Thi &amp; Khảo Thí • {currentUser?.name || 'Học viên'}</span>
+                <span>{BRAND_INFO.siteName} ({BRAND_INFO.teacherName}) • {currentUser?.name || 'Học viên'}</span>
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#0F172B] dark:text-white leading-[1.2]">
@@ -132,7 +134,7 @@ export default function StudentHome({
               </h1>
 
               <p className="text-sm sm:text-base text-[#314158] dark:text-slate-300 leading-relaxed max-w-2xl">
-                Làm bài thi thử 3 kỹ năng liên hoàn, tự động lưu bài làm ngay khi tải lại trang và theo dõi báo cáo tiến trình chi tiết từ giáo viên.
+                Làm bài thi thử 3 kỹ năng liên hoàn, tự động lưu bài làm ngay khi tải lại trang và theo dõi báo cáo tiến trình chi tiết cùng <strong>{BRAND_INFO.teacherName}</strong>.
               </p>
 
               {/* Inline LexiPrep Feature Checks */}
@@ -611,17 +613,9 @@ export default function StudentHome({
         </section>
       </div>
 
-      {/* Sleek LexiPrep Footer Strip */}
+      {/* Branded Footer Strip with Contact Info */}
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
-        <div className="bg-[#0F172B] text-slate-300 rounded-2xl px-6 py-5 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-[#1EE1D6]" />
-            <span className="font-bold text-white">LexiPrep Academy</span>
-            <span className="text-slate-500">•</span>
-            <span className="text-slate-400">Phòng Thi Thử IELTS Online Chuẩn Quốc Tế</span>
-          </div>
-          <span className="text-[11px] text-slate-400">Listening • Reading • Writing • Vocabulary Arena</span>
-        </div>
+        <BrandContactFooter variant="card" />
       </footer>
     </div>
   );

@@ -144,7 +144,7 @@ export function exportAttemptsToCsv(attemptRows = []) {
   const link = document.createElement('a');
   const objectUrl = URL.createObjectURL(blob);
   link.href = objectUrl;
-  link.download = `lexiprep-bang-diem-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `ielts-nhatrang-msnhu-bang-diem-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

@@ -592,7 +592,7 @@ export default function StudentProfile({
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Lời khuyên, phân tích điểm yếu và lộ trình rèn luyện cá nhân hóa.</p>
           </div>
           <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-3 py-1 rounded-full font-bold">
-            Giáo Viên Phụ Trách
+            Ms. Như (Giáo Viên Phụ Trách)
           </span>
         </div>
 

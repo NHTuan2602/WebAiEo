@@ -3,17 +3,24 @@ import {
   ArrowRight,
   Award,
   CheckCircle2,
+  ExternalLink,
   Eye,
   EyeOff,
   Gamepad2,
+  Globe,
   GraduationCap,
   Headphones,
+  MapPin,
+  MessageCircle,
   MonitorCheck,
   Moon,
+  Phone,
   ShieldCheck,
   Sparkles,
   Sun
 } from 'lucide-react';
+import BrandContactFooter from '../components/common/BrandContactFooter';
+import { BRAND_INFO } from '../constants/brandInfo';
 
 export default function AuthScreen({
   authError,
@@ -37,7 +44,7 @@ export default function AuthScreen({
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#020618] text-[#0F172B] dark:text-slate-100 flex flex-col justify-between transition-colors">
-      {/* Sticky Minimal LexiPrep Public Header */}
+      {/* Sticky Minimal Branded Public Header */}
       <header className="bg-white/95 dark:bg-[#0F172B]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -46,20 +53,28 @@ export default function AuthScreen({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg tracking-tight text-[#0F172B] dark:text-white">
-                  LexiPrep
+                <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#0F172B] dark:text-white">
+                  {BRAND_INFO.siteName}
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30">
-                  IELTS Online
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 hidden sm:inline">
+                  {BRAND_INFO.englishSubName}
                 </span>
               </div>
               <p className="text-[11px] text-[#62748E] dark:text-slate-400 hidden sm:block leading-none mt-0.5">
-                Nền tảng Thi Thử & Khảo Thí IELTS trên Máy Tính
+                {BRAND_INFO.established} • SĐT/Zalo: {BRAND_INFO.phoneDisplay}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5">
+            <a
+              href={BRAND_INFO.facebookUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden lg:inline-flex items-center gap-1.5 text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 px-3 py-1.5 rounded-full hover:bg-[#B5F5F1]/60 transition"
+            >
+              <MessageCircle className="w-3.5 h-3.5" /> Fanpage {BRAND_INFO.teacherName}
+            </a>
             <span className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-[#059271] dark:text-emerald-300 bg-[#ECFDF5] dark:bg-emerald-500/15 border border-[#9FF5E1] dark:border-emerald-500/30 px-3 py-1.5 rounded-full">
               <MonitorCheck className="w-3.5 h-3.5" /> Chuẩn Cambridge / IDP
             </span>
@@ -83,20 +98,20 @@ export default function AuthScreen({
           <div className="lg:col-span-7 space-y-6">
             <div className="inline-flex items-center gap-2 bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 px-3.5 py-1.5 rounded-full text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6]">
               <Award className="w-4 h-4" />
-              <span>Hệ thống Thi Thử IELTS Online & Quản lý Lớp học</span>
+              <span>{BRAND_INFO.siteName} • Giáo viên {BRAND_INFO.teacherName}</span>
             </div>
 
             <div className="space-y-4">
               <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-extrabold tracking-tight text-[#0F172B] dark:text-white leading-[1.18]">
                 Luyện &amp; Thi Thử{' '}
                 <span className="lexi-underlined text-[#007A7A] dark:text-[#1EE1D6]">
-                  IELTS Online
+                  IELTS Nha Trang
                 </span>{' '}
-                Chuẩn Quốc Tế
+                Cùng {BRAND_INFO.teacherName}
               </h1>
 
               <p className="text-sm sm:text-base text-[#314158] dark:text-slate-300 leading-relaxed max-w-2xl">
-                Trải nghiệm phòng thi <strong>Computer-Delivered IELTS</strong> thực tế với giao diện chia đôi màn hình, công cụ Highlight trực tiếp, chấm điểm tức thì và lộ trình theo dõi tiến độ từ giáo viên.
+                Phòng thi <strong>Computer-Delivered IELTS</strong> dành riêng cho học viên lớp <strong>{BRAND_INFO.englishSubName}</strong> — chấm điểm tức thì, theo dõi tiến độ sát sao và &ldquo;{BRAND_INFO.slogan}&rdquo;.
               </p>
             </div>
 
@@ -143,6 +158,53 @@ export default function AuthScreen({
                 <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1 leading-relaxed">
                   Tham gia phòng thi đấu từ vựng theo mã PIN lớp học trực tiếp cùng bạn bè.
                 </p>
+              </div>
+            </div>
+
+            {/* Contact & Consultation Card for Students / Parents */}
+            <div className="bg-white/95 dark:bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-[#B5F5F1] dark:border-teal-500/30 shadow-xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6] uppercase tracking-wider">
+                  Thông Tin Liên Hệ &amp; Đăng Ký Lớp • {BRAND_INFO.teacherName}
+                </span>
+                <span className="text-[11px] font-semibold italic text-[#62748E] dark:text-slate-400">
+                  &ldquo;{BRAND_INFO.motto}&rdquo;
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                <a
+                  href={BRAND_INFO.phoneHref}
+                  className="flex items-center gap-2 p-2.5 rounded-xl bg-[#EDFFFD]/70 dark:bg-teal-500/10 border border-[#B5F5F1]/70 dark:border-teal-500/25 text-[#0F172B] dark:text-slate-100 hover:border-[#007A7A] transition font-bold"
+                >
+                  <Phone className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                  <span>{BRAND_INFO.phoneDisplay} ({BRAND_INFO.teacherName})</span>
+                </a>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-[#314158] dark:text-slate-200 font-semibold">
+                  <MapPin className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                  <span>{BRAND_INFO.address}</span>
+                </div>
+                <a
+                  href={BRAND_INFO.facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#EFF6FF] dark:bg-blue-500/10 border border-[#DBEAFE] dark:border-blue-500/25 text-[#1447E6] dark:text-blue-300 hover:border-blue-400 transition font-bold"
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <MessageCircle className="w-4 h-4 shrink-0" /> Facebook: {BRAND_INFO.facebookHandle}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                </a>
+                <a
+                  href={BRAND_INFO.blogUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#ECFDF5] dark:bg-emerald-500/10 border border-[#9FF5E1] dark:border-emerald-500/25 text-[#059271] dark:text-emerald-300 hover:border-emerald-500 transition font-bold"
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <Globe className="w-4 h-4 shrink-0" /> Blogspot Tài Liệu IELTS
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                </a>
               </div>
             </div>
           </div>
@@ -253,7 +315,7 @@ export default function AuthScreen({
                       }}
                       className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-orange-50 dark:hover:bg-orange-500/15 border border-slate-200 dark:border-slate-700 hover:border-orange-200 rounded-xl transition text-left"
                     >
-                      <span className="block text-xs font-bold text-[#0F172B] dark:text-slate-100">Giáo viên</span>
+                      <span className="block text-xs font-bold text-[#0F172B] dark:text-slate-100">Giáo viên ({BRAND_INFO.teacherName})</span>
                       <span className="font-mono text-[10px] text-[#62748E] dark:text-slate-400">teacher_ielts / 123456</span>
                     </button>
                   </div>
@@ -264,22 +326,9 @@ export default function AuthScreen({
         </div>
       </main>
 
-      {/* Deep Navy LexiPrep Footer Strip */}
-      <footer className="bg-[#0F172B] text-slate-300 border-t border-slate-800 px-4 sm:px-6 py-5">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-lg bg-[#007A7A] text-white flex items-center justify-center">
-              <GraduationCap className="w-3.5 h-3.5" />
-            </span>
-            <span className="font-bold text-white">LexiPrep Academy</span>
-            <span className="text-slate-500">•</span>
-            <span className="text-slate-400">Computer-Delivered IELTS Test Platform</span>
-          </div>
-          <div className="flex items-center gap-4 text-[11px] text-slate-400">
-            <span>Listening • Reading • Writing</span>
-            <span>© 2026 LexiPrep Academy</span>
-          </div>
-        </div>
+      {/* Deep Navy Branded Footer Strip with Contact Info */}
+      <footer className="bg-[#0F172B] text-slate-300 border-t border-slate-800 px-4 sm:px-6 py-6">
+        <BrandContactFooter variant="full" />
       </footer>
     </div>
   );
