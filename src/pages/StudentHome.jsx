@@ -206,7 +206,8 @@ export default function StudentHome({
                           username: currentUser.username,
                           name: currentUser.name || '',
                           targetBand: currentUser.targetBand || 7.5,
-                          studyGoal: currentUser.studyGoal || ''
+                          studyGoal: currentUser.studyGoal || '',
+                          avatarUrl: currentUser.avatarUrl || ''
                         })
                       }
                       title="Chỉnh sửa mục tiêu Band"
@@ -321,7 +322,8 @@ export default function StudentHome({
                     username: currentUser.username,
                     name: currentUser.name || '',
                     targetBand: currentUser.targetBand || 7.5,
-                    studyGoal: currentUser.studyGoal || ''
+                    studyGoal: currentUser.studyGoal || '',
+                    avatarUrl: currentUser.avatarUrl || ''
                   })
                 }
                 title="Chỉnh sửa mục tiêu Band"

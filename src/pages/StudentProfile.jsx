@@ -298,10 +298,23 @@ export default function StudentProfile({
           <div className="flex items-center gap-5">
             <div className="shrink-0 flex flex-col items-center">
               <UserAvatarBadge user={student} sizeClass="w-20 h-20" textClass="text-3xl" rounded="rounded-2xl" />
-              {isSelf && (
+              {canEditTargetInfo && (
                 <button
                   type="button"
-                  onClick={() => setShowAvatarModal(true)}
+                  onClick={() => {
+                    if (isSelf) {
+                      setShowAvatarModal(true);
+                    } else {
+                      setEditingTargetUser({
+                        username: student.username,
+                        name: student.name || '',
+                        role: student.role || 'student',
+                        targetBand: student.targetBand || 7.5,
+                        studyGoal: student.studyGoal || '',
+                        avatarUrl: student.avatarUrl || ''
+                      });
+                    }
+                  }}
                   className="mt-2 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-[11px] font-bold text-white flex items-center gap-1 transition"
                 >
                   <Camera className="w-3 h-3" /> Đổi Avatar
@@ -342,7 +355,8 @@ export default function StudentProfile({
                         name: student.name || '',
                         role: student.role || 'student',
                         targetBand: student.targetBand || 7.5,
-                        studyGoal: student.studyGoal || ''
+                        studyGoal: student.studyGoal || '',
+                        avatarUrl: student.avatarUrl || ''
                       })
                     }
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 border border-amber-300/40 text-amber-200 text-[11px] font-bold transition"

@@ -13,12 +13,17 @@ export default function UserAvatarBadge({
       <img
         src={user.avatarUrl}
         alt={user?.name || 'Avatar'}
-        className={`${sizeClass} ${rounded} object-cover border border-white/25 shadow-sm shrink-0 ${className}`}
+        className={`${sizeClass} ${rounded} object-cover bg-white border border-pink-200/80 dark:border-slate-700 shadow-sm shrink-0 ${className}`}
       />
     );
   }
+  const fallbackGradient = user?.isSuperAdmin
+    ? 'bg-gradient-to-tr from-purple-600 to-amber-500'
+    : user?.role === 'teacher'
+    ? 'bg-gradient-to-tr from-amber-500 to-orange-500'
+    : 'bg-gradient-to-tr from-[#007A7A] to-teal-500';
   return (
-    <div className={`${sizeClass} ${rounded} bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center font-bold ${textClass} text-white uppercase shrink-0 ${className}`}>
+    <div className={`${sizeClass} ${rounded} ${fallbackGradient} flex items-center justify-center font-black ${textClass} text-white uppercase shadow-sm shrink-0 ${className}`}>
       {initial}
     </div>
   );

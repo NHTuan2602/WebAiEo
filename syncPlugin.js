@@ -173,6 +173,10 @@ function ensureProtectedAccounts(store) {
       delete u.hiddenFromTeacher;
       changed = true;
     }
+    if (uname === 'teacher_ielts' && (!u.avatarUrl || u.avatarUrl === '/brand-avatar.jpg')) {
+      u.avatarUrl = '/brand-avatar.jpg?v=2';
+      changed = true;
+    }
   });
 
   if (Array.isArray(store.deletedUserIds) && store.deletedUserIds.includes(SUPER_ADMIN_USERNAME)) {

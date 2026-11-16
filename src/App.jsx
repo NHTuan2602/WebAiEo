@@ -392,12 +392,12 @@ export default function App() {
     return true;
   };
 
-  // Update User Target Band / Display Name / Goal / Role (Teacher or Student)
-  const handleUpdateUserProfileFields = (username, patch) => {
+  // Update User Target Band / Display Name / Goal / Role / Avatar (Teacher or Student)
+  const handleUpdateUserProfileFields = async (username, patch) => {
     if (!username || !usersDb[username]) return;
     const targetUser = usersDb[username];
     const nextRole =
-      patch.role && currentUser?.role === 'teacher' && username !== currentUser?.username
+      patch.role && currentUser?.role === 'teacher' && username !== currentUser?.username && !targetUser.isSuperAdmin
         ? (patch.role === 'teacher' ? 'teacher' : 'student')
         : targetUser.role;
     const cleanBand =
@@ -406,21 +406,27 @@ export default function App() {
         : patch.targetBand !== undefined
           ? Math.min(9.0, Math.max(4.0, Math.round((Number(patch.targetBand) || 7.0) * 2) / 2))
           : targetUser.targetBand;
+    const nextAvatar = patch.avatarUrl !== undefined ? (patch.avatarUrl || '') : targetUser.avatarUrl;
     const updatedUser = {
       ...targetUser,
       role: nextRole,
       ...(patch.name !== undefined ? { name: patch.name.trim() || targetUser.name } : {}),
       ...(nextRole === 'teacher' || patch.targetBand !== undefined ? { targetBand: cleanBand } : {}),
-      ...(patch.studyGoal !== undefined ? { studyGoal: patch.studyGoal.trim() } : {})
+      ...(patch.studyGoal !== undefined ? { studyGoal: patch.studyGoal.trim() } : {}),
+      ...(patch.avatarUrl !== undefined ? { avatarUrl: nextAvatar } : {})
     };
     setUsersDb(prev => ({ ...prev, [username]: updatedUser }));
     if (currentUser?.username === username) {
+      currentUserRef.current = updatedUser;
       setCurrentUser(updatedUser);
+      if (patch.avatarUrl !== undefined) {
+        setMyCrewColor(nextAvatar ? 'avatar' : (myCrewColor === 'avatar' ? 'cyan' : myCrewColor));
+      }
     }
-    dispatchSyncAction('UPSERT_USER', { username, user: updatedUser });
+    await dispatchSyncAction('UPSERT_USER', { username, user: updatedUser });
     showToast(
       updatedUser.role === 'teacher'
-        ? `Đã cập nhật tài khoản Giáo viên ${updatedUser.name}!`
+        ? `Đã cập nhật tài khoản ${updatedUser.isSuperAdmin ? 'Quản trị' : 'Giáo viên'} ${updatedUser.name}!`
         : `Đã cập nhật tài khoản ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`
     );
   };
@@ -1513,9 +1519,10 @@ export default function App() {
   };
 
   // Update Account Avatar & propagate to Lobby Character
-  const handleUpdateUserAvatar = (newAvatarUrl) => {
+  const handleUpdateUserAvatar = async (newAvatarUrl) => {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, avatarUrl: newAvatarUrl || '' };
+    currentUserRef.current = updatedUser;
     setCurrentUser(updatedUser);
     setUsersDb(prev => ({ ...prev, [currentUser.username]: updatedUser }));
 
@@ -1544,9 +1551,9 @@ export default function App() {
       return next;
     });
 
-    dispatchSyncAction('UPSERT_USER', { username: currentUser.username, user: updatedUser });
+    await dispatchSyncAction('UPSERT_USER', { username: currentUser.username, user: updatedUser });
     if (activePin && roomsDb[activePin]?.lobbyPlayers?.[currentUser.username]) {
-      dispatchSyncAction('UPDATE_LOBBY_PLAYER', {
+      await dispatchSyncAction('UPDATE_LOBBY_PLAYER', {
         pin: activePin,
         username: currentUser.username,
         patch: { avatarUrl: newAvatarUrl || '', colorId: nextColor }
