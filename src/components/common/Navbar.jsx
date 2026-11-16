@@ -77,7 +77,7 @@ export default function Navbar({
             }`}
           >
             <BookOpen className="w-3.5 h-3.5 shrink-0" />
-            <span>Luyện Đề</span>
+            <span>Đề Thi</span>
           </button>
           <button
             type="button"
@@ -89,7 +89,7 @@ export default function Navbar({
             }`}
           >
             <Mic className="w-3.5 h-3.5 shrink-0" />
-            <span>Speaking AI <span className="hidden xl:inline">&amp; 4 Kỹ Năng</span></span>
+            <span>Bài Tập <span className="hidden xl:inline">4 Kỹ Năng</span></span>
           </button>
           <button
             type="button"
@@ -237,7 +237,7 @@ export default function Navbar({
               : 'bg-slate-100 dark:bg-slate-800 text-[#314158] dark:text-slate-300'
           }`}
         >
-          <BookOpen className="w-3.5 h-3.5" /> Luyện Đề
+          <BookOpen className="w-3.5 h-3.5" /> Đề Thi
         </button>
         <button
           type="button"
@@ -248,7 +248,7 @@ export default function Navbar({
               : 'bg-indigo-50 dark:bg-[#23222E] text-[#570DF8] dark:text-[#C4B5FD]'
           }`}
         >
-          <Mic className="w-3.5 h-3.5" /> Speaking AI &amp; 4 Kỹ Năng
+          <Mic className="w-3.5 h-3.5" /> Bài Tập 4 Kỹ Năng
         </button>
         <button
           type="button"

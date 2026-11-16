@@ -175,7 +175,7 @@ export default function StudentHome({
                   className="bg-[#570DF8] hover:bg-[#490AD2] text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl shadow-md shadow-indigo-900/15 transition flex items-center gap-2"
                 >
                   <Mic className="w-4 h-4" />
-                  <span>Speaking AI &amp; 4 Kỹ Năng ({singleSkillCount})</span>
+                  <span>Bài Tập 4 Kỹ Năng &amp; Speaking AI ({singleSkillCount})</span>
                 </button>
                 <button
                   onClick={openStudentGamePortal}
@@ -351,7 +351,7 @@ export default function StudentHome({
             {/* Filter Pills */}
             <div className="flex items-center gap-1.5 bg-[#FFF5F8] dark:bg-[#0F172B] p-1 rounded-xl border border-pink-200/90 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
               {[
-                { id: 'all', label: `Tất cả đề gộp (${fullExamTests.length})` },
+                { id: 'all', label: `Tất cả đề thi (${fullExamTests.length})` },
                 { id: 'unlimited', label: 'Luyện tập tự do' },
                 { id: 'limited', label: 'Thi thật / Giới hạn lượt' }
               ].map(tab => (
@@ -665,7 +665,7 @@ export default function StudentHome({
                 <table className="w-full text-left text-sm text-[#314158] dark:text-slate-300">
                   <thead className="bg-rose-50/85 dark:bg-slate-800/70 border-b border-pink-200/90 dark:border-slate-800 text-xs text-[#62748E] dark:text-slate-400 font-bold">
                     <tr>
-                      <th className="px-6 py-3.5">Tên Đề Thi</th>
+                      <th className="px-6 py-3.5">Tên Đề Thi / Bài Tập</th>
                       <th className="px-6 py-3.5">Thời Gian Nộp</th>
                       <th className="px-6 py-3.5 text-center">Listening</th>
                       <th className="px-6 py-3.5 text-center">Reading</th>
@@ -678,7 +678,22 @@ export default function StudentHome({
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {studentAttempts.map(att => (
                       <tr key={att.id} className="hover:bg-[#EDFFFD]/45 dark:hover:bg-slate-800/40 transition">
-                        <td className="px-6 py-4 font-bold text-[#0F172B] dark:text-white">{att.testTitle}</td>
+                        <td className="px-6 py-4 font-bold text-[#0F172B] dark:text-white">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                                att.testMode === 'single_skill'
+                                  ? 'bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/25'
+                                  : 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30'
+                              }`}
+                            >
+                              {att.testMode === 'single_skill'
+                                ? `BÀI TẬP ${(att.focusSkill || '').toUpperCase()}`
+                                : 'ĐỀ THI'}
+                            </span>
+                            <span>{att.testTitle}</span>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-xs text-[#62748E] dark:text-slate-400">{att.submittedAt}</td>
                         <td className="px-6 py-4 text-center font-bold text-[#0F172B] dark:text-slate-100 tabular-nums">
                           {att.scores?.listening?.band ?? '-'}

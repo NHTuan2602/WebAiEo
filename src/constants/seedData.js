@@ -396,11 +396,11 @@ export const createEmptySingleSkillTestForm = (skill = 'speaking') => {
   return {
     ...base,
     id: 'test-skill-' + Date.now(),
-    title: `Đề Luyện Riêng Kỹ Năng ${skillNames[safeSkill]} Mới`,
+    title: `Bài Tập ${skillNames[safeSkill]} Mới`,
     description:
       safeSkill === 'speaking'
-        ? 'Bài luyện nói IELTS Speaking chấm tự động 4 tiêu chí bằng AI & lưu file ghi âm.'
-        : `Đề luyện tập tập trung riêng kỹ năng ${skillNames[safeSkill]}.`,
+        ? 'Bài tập luyện nói IELTS Speaking chấm tự động 4 tiêu chí bằng AI & lưu file ghi âm.'
+        : `Bài tập thực hành riêng kỹ năng ${skillNames[safeSkill]} (làm tự do không gộp kỹ năng khác).`,
     createdAt: new Date().toISOString().split('T')[0],
     testMode: 'single_skill',
     focusSkill: safeSkill,
@@ -409,7 +409,7 @@ export const createEmptySingleSkillTestForm = (skill = 'speaking') => {
     maxAttempts: 0,
     sequentialMode: false,
     allowEarlyNextSection: true,
-    antiCheatEnabled: safeSkill !== 'speaking',
+    antiCheatEnabled: false,
     allowViewAnswers: true,
     sectionOrder: [safeSkill],
     sectionDurations: { ...DEFAULT_SECTION_DURATIONS }

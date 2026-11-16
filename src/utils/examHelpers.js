@@ -126,7 +126,7 @@ export function exportAttemptsToCsv(attemptRows = []) {
       const wBand = att.scores?.writing?.overallBand ?? '-';
       const sBand = att.scores?.speaking?.band ?? '-';
       const overall = att.overallBand ?? '-';
-      const modeTag = att.testMode === 'single_skill' ? `Kỹ năng: ${(att.focusSkill || '').toUpperCase()}` : 'Đề Gộp L·R·W';
+      const modeTag = att.testMode === 'single_skill' ? `Bài tập ${(att.focusSkill || '').toUpperCase()}` : 'Đề Thi IELTS';
       const statusLabel = att.teacherGraded ? (att.aiGraded ? 'AI Đã Chấm' : 'GV Đã Chấm') : 'Chờ Chấm';
       return [
         att.studentName || '',

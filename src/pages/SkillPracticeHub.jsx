@@ -67,18 +67,18 @@ export default function SkillPracticeHub({
   const featuredSpMeta = featuredSpeakingTest ? normalizeSpeakingSection(featuredSpeakingTest.speaking) : null;
 
   const navItems = [
-    { id: 'speaking', label: 'Thi thử Speaking AI', icon: Mic, badge: speakingTests.length },
-    { id: 'forecast', label: 'Luyện Forecast', icon: Flame, badge: forecastTests.length },
-    { id: 'listening', label: 'Listening Riêng', icon: Headphones, badge: listeningTests.length },
-    { id: 'reading', label: 'Reading Riêng', icon: BookOpen, badge: readingTests.length },
-    { id: 'writing', label: 'Writing Riêng', icon: PenTool, badge: writingTests.length }
+    { id: 'speaking', label: 'Bài Tập Speaking AI', icon: Mic, badge: speakingTests.length },
+    { id: 'forecast', label: 'Bài Tập Forecast', icon: Flame, badge: forecastTests.length },
+    { id: 'listening', label: 'Bài Tập Listening', icon: Headphones, badge: listeningTests.length },
+    { id: 'reading', label: 'Bài Tập Reading', icon: BookOpen, badge: readingTests.length },
+    { id: 'writing', label: 'Bài Tập Writing', icon: PenTool, badge: writingTests.length }
   ];
 
   const renderSkillTestCards = (skillId, list) => {
     const metaMap = {
-      listening: { name: 'Listening Riêng', color: 'text-[#007A7A] dark:text-[#1EE1D6]', bg: 'bg-[#EDFFFD] dark:bg-teal-500/15', icon: Headphones },
-      reading: { name: 'Reading Riêng', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/15', icon: BookOpen },
-      writing: { name: 'Writing Riêng', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/15', icon: PenTool }
+      listening: { name: 'Listening', color: 'text-[#007A7A] dark:text-[#1EE1D6]', bg: 'bg-[#EDFFFD] dark:bg-teal-500/15', icon: Headphones },
+      reading: { name: 'Reading', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/15', icon: BookOpen },
+      writing: { name: 'Writing', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/15', icon: PenTool }
     };
     const meta = metaMap[skillId] || metaMap.reading;
     const IconComp = meta.icon;
@@ -91,10 +91,10 @@ export default function SkillPracticeHub({
               <span className={`w-10 h-10 rounded-2xl ${meta.bg} ${meta.color} flex items-center justify-center`}>
                 <IconComp className="w-5 h-5" />
               </span>
-              <span>Luyện Tập Riêng: {meta.name}</span>
+              <span>Bài Tập Kỹ Năng: {meta.name}</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Làm tập trung duy nhất kỹ năng này (không gộp chung các kỹ năng khác như đề thi gộp L·R·W).
+              Bài tập thực hành chuyên sâu theo từng kỹ năng, tách biệt hoàn toàn khỏi bộ Đề Thi IELTS (L·R·W).
             </p>
           </div>
           {isTeacher && (
@@ -103,7 +103,7 @@ export default function SkillPracticeHub({
               onClick={() => onOpenSkillBuilder?.(skillId)}
               className="px-4 py-2.5 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold flex items-center gap-2 shadow-sm transition self-start sm:self-auto"
             >
-              <Plus className="w-4 h-4" /> Tạo Đề {skillId.toUpperCase()} Riêng
+              <Plus className="w-4 h-4" /> Tạo Bài Tập {skillId.toUpperCase()}
             </button>
           )}
         </div>
@@ -112,12 +112,12 @@ export default function SkillPracticeHub({
           <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-dashed border-pink-300 dark:border-[#34323F] rounded-3xl p-10 text-center space-y-3">
             <IconComp className="w-10 h-10 mx-auto text-slate-400" />
             <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
-              Chưa có đề {skillId.toUpperCase()} riêng lẻ nào
+              Chưa có bài tập {skillId.toUpperCase()} nào
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
               {isTeacher
-                ? `Hãy bấm "Tạo Đề ${skillId.toUpperCase()} Riêng" để tạo nhanh một đề luyện tập trung chỉ có kỹ năng ${skillId.toUpperCase()}.`
-                : 'Giáo viên sẽ đăng tải các bài luyện tập chuyên sâu theo từng kỹ năng tại đây.'}
+                ? `Hãy bấm "Tạo Bài Tập ${skillId.toUpperCase()}" để tạo nhanh một bài tập luyện riêng kỹ năng ${skillId.toUpperCase()}.`
+                : 'Giáo viên sẽ đăng tải các bài tập luyện tập chuyên sâu theo từng kỹ năng tại đây.'}
             </p>
           </div>
         ) : (
@@ -191,7 +191,7 @@ export default function SkillPracticeHub({
                         type="button"
                         onClick={() => onOpenSkillBuilder?.(skillId, test)}
                         className="p-2.5 rounded-xl bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-600 dark:text-slate-300 hover:text-[#570DF8]"
-                        title="Chỉnh sửa đề này"
+                        title="Chỉnh sửa bài tập này"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
@@ -242,7 +242,7 @@ export default function SkillPracticeHub({
                   className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-rose-100/70 dark:hover:bg-[#24232E] flex items-center gap-2.5 transition"
                 >
                   <ArrowLeft className="w-4 h-4 shrink-0" />
-                  <span>Đề Thi Thật Gộp (L·R·W)</span>
+                  <span>Kho Đề Thi IELTS (L·R·W)</span>
                 </button>
 
                 <div className="h-px bg-pink-200/70 dark:bg-[#2C2A35] my-2" />
@@ -307,7 +307,7 @@ export default function SkillPracticeHub({
                   onClick={() => onOpenSkillBuilder?.(activeTab === 'listening' || activeTab === 'reading' || activeTab === 'writing' ? activeTab : 'speaking')}
                   className="w-full py-2.5 px-3 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition"
                 >
-                  <Plus className="w-4 h-4" /> Tạo Đề Kỹ Năng Riêng
+                  <Plus className="w-4 h-4" /> Tạo Bài Tập Kỹ Năng Mới
                 </button>
               )}
             </div>
@@ -395,7 +395,7 @@ export default function SkillPracticeHub({
                     </div>
                   ) : (
                     <div className="p-4 rounded-2xl bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] text-xs text-slate-600 dark:text-slate-300">
-                      Chưa có đề Speaking công khai. {isTeacher ? 'Bấm "Tạo Đề Kỹ Năng Riêng" bên trái để tạo đề Speaking đầu tiên.' : 'Vui lòng chờ giáo viên mở đề Speaking.'}
+                      Chưa có bài tập Speaking công khai. {isTeacher ? 'Bấm "Tạo Bài Tập Kỹ Năng Mới" bên trái để tạo bài tập Speaking đầu tiên.' : 'Vui lòng chờ giáo viên mở bài tập Speaking.'}
                     </div>
                   )}
                 </div>
@@ -406,12 +406,12 @@ export default function SkillPracticeHub({
                 </div>
               </div>
 
-              {/* Kho Đề Speaking Của Lớp */}
+              {/* Kho Bài Tập Speaking Của Lớp */}
               <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
-                      {activeTab === 'forecast' ? 'Danh Sách Bộ Đề Forecast Speaking' : 'Danh Sách Đề Speaking Do Giáo Viên Tạo'}
+                      {activeTab === 'forecast' ? 'Danh Sách Bài Tập Forecast Speaking' : 'Danh Sách Bài Tập Speaking Do Giáo Viên Tạo'}
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       Chọn làm trọn bộ 3 Part hoặc chọn thi nhanh 1 Part tùy thích
@@ -520,7 +520,7 @@ export default function SkillPracticeHub({
                               type="button"
                               onClick={() => onOpenSkillBuilder?.('speaking', test)}
                               className="p-2.5 rounded-xl bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-600 dark:text-slate-300 hover:text-[#570DF8]"
-                              title="Chỉnh sửa đề Speaking này"
+                              title="Chỉnh sửa bài tập Speaking này"
                             >
                               <Edit className="w-3.5 h-3.5" />
                             </button>

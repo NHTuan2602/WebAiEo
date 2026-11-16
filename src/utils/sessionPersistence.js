@@ -166,7 +166,7 @@ export function loadNavSession(user) {
       resultReviewTab: ['listening', 'reading', 'writing', 'speaking'].includes(parsed.resultReviewTab) ? parsed.resultReviewTab : 'listening',
       skillHubTab: ['speaking', 'forecast', 'listening', 'reading', 'writing'].includes(parsed.skillHubTab) ? parsed.skillHubTab : 'speaking',
       speakingPartMode: ['full', 'part1', 'part2', 'part3'].includes(parsed.speakingPartMode) ? parsed.speakingPartMode : 'full',
-      teacherHubTab: ['tests', 'grading', 'game_room', 'accounts'].includes(rawTeacherTab) ? rawTeacherTab : 'tests',
+      teacherHubTab: ['tests', 'skill_exercises', 'grading', 'game_room', 'accounts'].includes(rawTeacherTab) ? rawTeacherTab : 'tests',
       expandedTeacherTestId: parsed.expandedTeacherTestId || null,
       currentRoomPin: parsed.currentRoomPin || '686868',
       joinedRoomPin: parsed.joinedRoomPin || null,

@@ -3217,18 +3217,20 @@ export default function App() {
       }
     };
     const existingIndex = tests.findIndex(t => t.id === normalizedTest.id);
+    const itemNoun = cfg.testMode === 'single_skill' ? 'bài tập' : 'đề thi';
     if (existingIndex >= 0) {
       const updated = [...tests];
       updated[existingIndex] = normalizedTest;
       setTests(updated);
-      showToast(`Đã cập nhật đề thi "${normalizedTest.title}" thành công!`);
+      showToast(`Đã cập nhật ${itemNoun} "${normalizedTest.title}" thành công!`);
     } else {
       setTests([...tests, normalizedTest]);
-      showToast(`Đã tạo mới đề thi "${normalizedTest.title}" thành công!`);
+      showToast(`Đã tạo mới ${itemNoun} "${normalizedTest.title}" thành công!`);
     }
     dispatchSyncAction('UPSERT_TEST', { test: normalizedTest });
     clearBuilderDraft(currentUser?.username);
     setEditingTest(null);
+    setTeacherHubTab(cfg.testMode === 'single_skill' ? 'skill_exercises' : 'tests');
     setView('TEACHER_DASHBOARD');
   };
 

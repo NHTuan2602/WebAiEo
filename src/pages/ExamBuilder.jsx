@@ -422,10 +422,16 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <ChevronLeft className="w-4 h-4" /> Quay Lại Bảng Điều Khiển Giáo Viên
           </button>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-            {editingTest ? `Chỉnh Sửa Đề Thi: ${editingTest.title}` : 'Tạo & Biên Soạn Đề Thi IELTS Mới'}
+            {(() => {
+              const isEx = normalizeExamConfig(testForm).testMode === 'single_skill';
+              if (editingTest) return `${isEx ? 'Chỉnh Sửa Bài Tập' : 'Chỉnh Sửa Đề Thi'}: ${editingTest.title}`;
+              return isEx ? 'Tạo & Biên Soạn Bài Tập Kỹ Năng Mới' : 'Tạo & Biên Soạn Đề Thi IELTS Mới';
+            })()}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Tùy chỉnh câu hỏi Listening (kèm file ghi âm MP3/WAV), Reading (kèm hình ảnh minh họa), Writing và quyền xem đáp án.
+            {normalizeExamConfig(testForm).testMode === 'single_skill'
+              ? 'Biên soạn nội dung, câu hỏi, audio / hình ảnh hoặc đề Speaking AI riêng cho bài tập kỹ năng này.'
+              : 'Tùy chỉnh câu hỏi Listening (kèm file ghi âm MP3/WAV), Reading (kèm hình ảnh minh họa), Writing và quyền xem đáp án.'}
           </p>
         </div>
 
@@ -447,7 +453,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onClick={handleSaveTestBuilder}
             className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2"
           >
-            <Save className="w-4 h-4" /> Lưu Toàn Bộ Đề Thi
+            <Save className="w-4 h-4" /> {normalizeExamConfig(testForm).testMode === 'single_skill' ? 'Lưu Bài Tập' : 'Lưu Toàn Bộ Đề Thi'}
           </button>
         </div>
       </div>
@@ -547,7 +553,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 
             {isSingleSkill && (
               <span className="px-3 py-1 rounded-xl bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] text-[11px] font-extrabold mr-1">
-                Chế độ: Đề Kỹ Năng Riêng ({currentCfg.focusSkill.toUpperCase()})
+                Chế độ: Bài Tập {currentCfg.focusSkill === 'speaking' ? 'Speaking AI' : currentCfg.focusSkill.toUpperCase()}
               </span>
             )}
           </div>
@@ -573,15 +579,15 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 
         return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
-          {/* Exam Structure Mode Switcher: Full Mock Exam vs Single Skill */}
+          {/* Exam Structure Mode Switcher: Full Mock Exam vs Single Skill Exercise */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#570DF8]/5 dark:bg-indigo-950/25 border border-[#570DF8]/25 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-xs sm:text-sm font-extrabold text-[#570DF8] dark:text-[#C4B5FD]">
-                  Kiểu Đề Thi: Đề Thi Gộp Chuẩn IELTS vs Luyện 1 Kỹ Năng Riêng (4 Kỹ Năng)
+                  Loại Nội Dung: Đề Thi IELTS (L·R·W) vs Bài Tập Từng Kỹ Năng Riêng
                 </h3>
                 <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
-                  Chọn <b>Đề Thi Gộp</b> để thi đủ Listening → Reading → Writing liên hoàn, hoặc chọn <b>1 Kỹ Năng Riêng</b> (Listening / Reading / Writing / Speaking AI).
+                  Chọn <b>Đề Thi IELTS</b> để thi đủ Listening → Reading → Writing liên hoàn, hoặc chọn <b>Bài Tập Kỹ Năng</b> (Speaking AI / Listening / Reading / Writing) để xếp riêng vào Kho Bài Tập 4 Kỹ Năng.
                 </p>
               </div>
             </div>
@@ -603,11 +609,11 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                🎓 Đề Thi Thử Gộp (L · R · W)
+                🎓 Đề Thi IELTS (L · R · W)
               </button>
               {ALL_SKILL_OPTIONS.map(sk => {
                 const isActiveSk = cfg.testMode === 'single_skill' && cfg.focusSkill === sk;
-                const skLabel = { listening: '🎧 Listening Riêng', reading: '📖 Reading Riêng', writing: '✍️ Writing Riêng', speaking: '🎙️ Speaking AI' }[sk];
+                const skLabel = { listening: '🎧 Bài Tập Listening', reading: '📖 Bài Tập Reading', writing: '✍️ Bài Tập Writing', speaking: '🎙️ Bài Tập Speaking AI' }[sk];
                 return (
                   <button
                     key={sk}
@@ -619,7 +625,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         focusSkill: sk,
                         sectionOrder: [sk],
                         sequentialMode: false,
-                        autoAiGrade: sk === 'speaking' ? true : prev.autoAiGrade
+                        autoAiGrade: sk === 'speaking' ? true : prev.autoAiGrade,
+                        ...(!editingTest ? { maxAttempts: 0, allowViewAnswers: true, antiCheatEnabled: false } : {})
                       }))
                     }
                     className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition ${

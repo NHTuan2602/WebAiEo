@@ -101,7 +101,7 @@ export default function TeacherDashboard({
   usersDb
 }) {
   const [accountRoleFilter, setAccountRoleFilter] = useState('all');
-  const [testTypeFilter, setTestTypeFilter] = useState('all');
+  const [exerciseSkillFilter, setExerciseSkillFilter] = useState('all');
   const [renamingTestId, setRenamingTestId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
 
@@ -111,6 +111,442 @@ export default function TeacherDashboard({
       setRenamingTestId(null);
       setRenameDraft('');
     }
+  };
+
+  const fullExamTests = (tests || []).filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
+  const skillExercises = (tests || []).filter(t => normalizeExamConfig(t).testMode === 'single_skill');
+  const filteredSkillExercises = exerciseSkillFilter === 'all'
+    ? skillExercises
+    : skillExercises.filter(t => normalizeExamConfig(t).focusSkill === exerciseSkillFilter);
+
+  const SKILL_EXERCISE_BUTTONS = [
+    { id: 'speaking', label: '+ Bài Tập Speaking AI', shortLabel: 'Speaking AI', icon: Mic, cls: 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30 hover:bg-[#570DF8] hover:text-white' },
+    { id: 'listening', label: '+ Bài Tập Listening', shortLabel: 'Listening', icon: Headphones, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
+    { id: 'reading', label: '+ Bài Tập Reading', shortLabel: 'Reading', icon: BookOpen, cls: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
+    { id: 'writing', label: '+ Bài Tập Writing', shortLabel: 'Writing', icon: PenTool, cls: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-600 hover:text-white' }
+  ];
+
+  const renderManagementItemCard = (t) => {
+    const cfg = normalizeExamConfig(t);
+    const isExercise = cfg.testMode === 'single_skill';
+    const isPrivate = cfg.visibility === 'private';
+    const isExpanded = expandedTeacherTestId === t.id;
+    const entityLabel = isExercise ? 'bài tập' : 'đề thi';
+
+    return (
+      <div
+        key={t.id}
+        className={`bg-white dark:bg-slate-900 rounded-2xl border transition ${
+          isExpanded
+            ? 'border-blue-500/60 dark:border-blue-500/40 shadow-md p-5 sm:p-6'
+            : 'border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700'
+        }`}
+      >
+        {/* Minimal Header Row: Title + Công khai / Chỉ mình tôi */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id))}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id));
+            }
+          }}
+          aria-expanded={isExpanded}
+          className={`w-full flex items-center justify-between gap-3 text-left cursor-pointer select-none ${
+            isExpanded ? '' : 'px-5 py-4'
+          }`}
+        >
+          {renamingTestId === t.id ? (
+            <div
+              className="flex flex-wrap items-center gap-1.5 flex-1 min-w-[220px]"
+              onClick={e => e.stopPropagation()}
+            >
+              <input
+                type="text"
+                autoFocus
+                value={renameDraft}
+                onChange={e => setRenameDraft(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCommitInlineRename(t.id);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setRenamingTestId(null);
+                    setRenameDraft('');
+                  }
+                }}
+                placeholder={`Nhập tên ${entityLabel} mới...`}
+                className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border-2 border-[#007A7A] dark:border-[#1EE1D6] text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => handleCommitInlineRename(t.id)}
+                className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs"
+                title="Lưu tên mới (Enter)"
+              >
+                <Check className="w-3.5 h-3.5" /> Lưu
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingTestId(null);
+                  setRenameDraft('');
+                }}
+                className="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-bold flex items-center gap-1"
+                title="Hủy (Esc)"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <span
+                className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
+                  isExercise
+                    ? cfg.focusSkill === 'speaking'
+                      ? 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30'
+                      : 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30'
+                    : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
+                }`}
+              >
+                {isExercise
+                  ? `BÀI TẬP • ${cfg.focusSkill === 'speaking' ? 'SPEAKING AI' : (cfg.focusSkill || 'skill').toUpperCase()}`
+                  : 'ĐỀ THI IELTS'}
+              </span>
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
+                {t.title}
+              </h3>
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  setRenamingTestId(t.id);
+                  setRenameDraft(t.title || '');
+                }}
+                title={`Đổi nhanh tên ${entityLabel} ngay tại đây`}
+                className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/20 text-slate-600 dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
+              >
+                <Edit className="w-3 h-3" /> Đổi tên
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                toggleTestVisibility(t.id);
+              }}
+              title="Bấm để chuyển Công khai / Chỉ mình tôi thấy"
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
+                isPrivate
+                  ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/25'
+                  : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
+              }`}
+            >
+              {isPrivate ? <EyeOff className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+              {isPrivate ? 'Chỉ mình tôi' : 'Công khai'}
+            </button>
+
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                isExpanded ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+              }`}
+            />
+          </div>
+        </div>
+
+        {/* Expanded Details Panel */}
+        {isExpanded && (() => {
+          const listeningTracks = getListeningTracks(t.listening);
+          const listeningTracksCount = listeningTracks.length;
+          const hasListeningAudio = listeningTracks.some(tr => !!tr.audioUrl);
+          const hasListeningImg = listeningTracks.some(tr => !!tr.imageUrl);
+          const passagesCount = getReadingPassages(t.reading).length;
+          const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
+
+          return (
+            <div className="mt-4 pt-5 border-t border-slate-100 dark:border-slate-800 space-y-4">
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  {isExercise ? (
+                    <span className="text-[11px] bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] font-bold px-2.5 py-1 rounded-lg border border-[#570DF8]/25">
+                      {cfg.focusSkill === 'speaking'
+                        ? `Speaking AI: ${getSpeakingQuestionItems(t.speaking, 'all').length} câu (Part 1·2·3)`
+                        : cfg.focusSkill === 'listening'
+                        ? `Bài tập Listening: ${t.listening?.questions?.length || 0} câu (${cfg.durations.listening}p)`
+                        : cfg.focusSkill === 'reading'
+                        ? `Bài tập Reading: ${t.reading?.questions?.length || 0} câu (${cfg.durations.reading}p)`
+                        : `Bài tập Writing: Task 1 & 2 (${cfg.durations.writing}p)`}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
+                        Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
+                      </span>
+                      <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
+                        ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
+                      </span>
+                    </>
+                  )}
+                  <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
+                    {cfg.maxAttempts === 0 ? '∞ Luyện tự do' : `🔒 Tối đa ${cfg.maxAttempts} lần`}
+                  </span>
+                  {!isExercise && cfg.sequentialMode && (
+                    <span className="text-[10px] bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-md">
+                      Tuần tự: {cfg.order.map(s => s[0].toUpperCase()).join('→')}
+                    </span>
+                  )}
+                  {(!isExercise || cfg.focusSkill === 'listening') && (
+                    hasListeningAudio ? (
+                      <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
+                        🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} chủ đề nghe` : 'Đã đính kèm Audio'}
+                      </span>
+                    ) : listeningTracksCount > 1 || hasListeningImg ? (
+                      <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
+                        🎧 {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
+                        🔊 Dùng AI Voice (TTS)
+                      </span>
+                    )
+                  )}
+                  {(!isExercise || cfg.focusSkill === 'reading') && (hasReadingImg || passagesCount > 1) && (
+                    <span className="text-[10px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30">
+                      🖼️ {passagesCount} bài Reading
+                    </span>
+                  )}
+                  {(!isExercise || cfg.focusSkill === 'writing') && t.writing?.task1?.imageUrl && (
+                    <span className="text-[10px] bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-500/30">
+                      📊 Có biểu đồ Task 1
+                    </span>
+                  )}
+                </div>
+                {t.description && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t.description}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                <div className="p-3.5 rounded-2xl bg-[#EDFFFD]/65 dark:bg-teal-500/10 border border-[#B5F5F1] dark:border-teal-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-extrabold text-[#003538] dark:text-[#1EE1D6] flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> {isExercise ? 'Thời gian làm bài (phút)' : 'Thời gian từng phần (phút)'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openExamBuilder(t, 'general')}
+                      className="text-[10px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
+                    >
+                      Cài đặt chi tiết →
+                    </button>
+                  </div>
+                  <div className={`grid gap-1.5 ${cfg.order.length === 1 ? 'grid-cols-1 max-w-[200px]' : 'grid-cols-3'}`}>
+                    {cfg.order.map((sId, sIdx) => (
+                      <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-[#B5F5F1]/80 dark:border-slate-700 text-center">
+                        <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                          {cfg.order.length > 1 ? `${sIdx + 1}. ` : ''}{sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : sId === 'speaking' ? 'Nói AI' : 'Viết'}
+                        </span>
+                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                          <input
+                            key={`${t.id}-${sId}-${cfg.durations[sId]}`}
+                            type="number"
+                            min={1}
+                            max={180}
+                            defaultValue={cfg.durations[sId]}
+                            onBlur={e => {
+                              const parsed = Math.max(1, Math.min(180, Number(e.target.value) || cfg.durations[sId]));
+                              e.target.value = String(parsed);
+                              if (parsed !== cfg.durations[sId]) {
+                                updateTestQuickDuration(t.id, sId, parsed);
+                              }
+                            }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') e.currentTarget.blur();
+                            }}
+                            title="Nhập số phút rồi bấm ra ngoài hoặc nhấn Enter để lưu"
+                            className="w-12 px-1 py-0.5 text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-extrabold text-slate-900 dark:text-white"
+                          />
+                          <span className="text-[10px] text-slate-400 font-bold">p</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {!isExercise && (
+                    <p className="text-[10px] text-indigo-700/80 dark:text-indigo-300/80 font-medium">
+                      {cfg.sequentialMode
+                        ? 'Hết giờ từng phần sẽ tự động chuyển sang phần tiếp theo.'
+                        : 'Đang cho phép chuyển tự do giữa các phần.'}
+                    </p>
+                  )}
+                </div>
+
+                {/* 4 Quick Toggles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Hiển thị {entityLabel} cho HS</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {isPrivate ? 'Đang ẩn — HS chưa thấy' : 'Công khai — HS làm được'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleTestVisibility(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                        isPrivate
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+                      {isPrivate ? 'Đang Ẩn' : 'Công Khai'}
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chế độ Luyện / Thi thật</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {cfg.maxAttempts === 1
+                          ? 'Thi thật: Chỉ làm 1 lần'
+                          : cfg.maxAttempts === 0
+                          ? 'Luyện tự do: Nhiều lần'
+                          : `Giới hạn ${cfg.maxAttempts} lần`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleTestExamMode(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                        cfg.maxAttempts === 1
+                          ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      }`}
+                    >
+                      {cfg.maxAttempts === 1 ? 'Thi Thật' : cfg.maxAttempts === 0 ? 'Thi Thử' : `Tối đa ${cfg.maxAttempts}`}
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Xem đáp án đúng</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {t.allowViewAnswers ? 'HS xem được sau khi nộp' : 'Đang ẩn đáp án đúng'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleTestAllowViewAnswers(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                        t.allowViewAnswers
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {t.allowViewAnswers ? (
+                        <>
+                          <Unlock className="w-3.5 h-3.5" /> Đã Mở
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5" /> Đang Khóa
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chống gian lận (Ẩn với HS)</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {cfg.antiCheatEnabled ? 'Đếm tab, khóa chuột phải & Extension' : 'Đang tắt — làm tự do'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleTestAntiCheat(t.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
+                        cfg.antiCheatEnabled
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {cfg.antiCheatEnabled ? (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5" /> Đang Bật
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5" /> Đang Tắt
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => openExamBuilder(t, 'general')}
+                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1"
+                  >
+                    <Clock className="w-3.5 h-3.5" /> Sửa Tên &amp; Cài Đặt Chung
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openExamBuilder(t, isExercise && cfg.focusSkill ? cfg.focusSkill : 'reading')}
+                    className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30"
+                  >
+                    <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi &amp; Nội Dung
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startExam?.(t.id)}
+                    className="bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-[#B5F5F1] dark:border-teal-500/30"
+                    title={`Mở giao diện làm bài như học sinh để kiểm tra ${entityLabel} (kể cả khi Đang Ẩn)`}
+                  >
+                    <Play className="w-3.5 h-3.5" /> {isExercise ? 'Làm Thử Bài Tập' : 'Làm Thử Đề Thi'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleDuplicateTest(t)}
+                    className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-500/15 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 transition"
+                    title={`Nhân bản ${entityLabel} (Bản sao tự động ở chế độ Riêng tư)`}
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTest(t)}
+                    className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
+                    title={`Xóa ${entityLabel} này`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedTeacherTestId(null)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold transition"
+                  >
+                    Thu gọn
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    );
   };
 
   const room = normalizeRoomObject(roomsDb[currentRoomPin] || { pin: currentRoomPin, pass: 'ielts', players: {} }, currentRoomPin);
@@ -137,22 +573,23 @@ export default function TeacherDashboard({
             <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Trung Tâm Điều Hành Giáo Viên • Luyện Thi IELTS Nha Trang (Ms. Như)
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Bảng Điều Khiển Giáo Viên (Teacher Hub)</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quản lý kho đề thi, chấm điểm bài làm với AI, giám sát chống gian lận, điều phối Game PIN và cấp tài khoản.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quản lý kho đề thi IELTS, bài tập 4 kỹ năng riêng biệt, chấm điểm AI, giám sát chống gian lận, Game PIN và tài khoản.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             onClick={() => openExamBuilder()}
             className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" /> Tạo Đề Gộp (L·R·W)
+            <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
           </button>
           <button
             type="button"
-            onClick={() => openSingleSkillBuilder?.('speaking')}
+            onClick={() => setTeacherHubTab('skill_exercises')}
             className="bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
           >
-            <Mic className="w-4 h-4" /> Tạo Đề Speaking AI
+            <Sparkles className="w-4 h-4" /> Tạo Bài Tập 4 Kỹ Năng
           </button>
           <button
             type="button"
@@ -183,35 +620,6 @@ export default function TeacherDashboard({
         </div>
       </div>
 
-      {/* Dedicated 4-Skill Standalone Creation Strip */}
-      <div className="mb-6 bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200 dark:border-slate-800 rounded-2xl p-3.5 sm:px-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" />
-          <span>Tạo Đề Cho Từng Kỹ Năng Riêng Biệt (Không Gộp Chung L·R·W):</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { id: 'speaking', label: '+ Speaking AI', icon: Mic, cls: 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30 hover:bg-[#570DF8] hover:text-white' },
-            { id: 'listening', label: '+ Listening Riêng', icon: Headphones, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
-            { id: 'reading', label: '+ Reading Riêng', icon: BookOpen, cls: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
-            { id: 'writing', label: '+ Writing Riêng', icon: PenTool, cls: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-600 hover:text-white' }
-          ].map(sk => {
-            const IconComp = sk.icon;
-            return (
-              <button
-                key={sk.id}
-                type="button"
-                onClick={() => openSingleSkillBuilder?.(sk.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition flex items-center gap-1.5 ${sk.cls}`}
-              >
-                <IconComp className="w-3.5 h-3.5" />
-                <span>{sk.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Teacher Navigation Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 gap-2 flex-wrap">
         <button
@@ -220,7 +628,15 @@ export default function TeacherDashboard({
             teacherHubTab === 'tests' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <BookOpen className="w-4 h-4" /> 1. Kho Đề Thi ({tests.length})
+          <BookOpen className="w-4 h-4" /> 1. Kho Đề Thi ({fullExamTests.length})
+        </button>
+        <button
+          onClick={() => setTeacherHubTab('skill_exercises')}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
+            teacherHubTab === 'skill_exercises' ? 'border-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" /> 2. Bài Tập 4 Kỹ Năng ({skillExercises.length})
         </button>
         <button
           onClick={() => setTeacherHubTab('grading')}
@@ -228,7 +644,7 @@ export default function TeacherDashboard({
             teacherHubTab === 'grading' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <PenTool className="w-4 h-4" /> 2. Chấm Bài & Giám Sát Chống Gian Lận ({attempts.length})
+          <PenTool className="w-4 h-4" /> 3. Chấm Bài &amp; Giám Sát Chống Gian Lận ({attempts.length})
         </button>
         <button
           onClick={() => setTeacherHubTab('game_room')}
@@ -236,7 +652,7 @@ export default function TeacherDashboard({
             teacherHubTab === 'game_room' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <Trophy className="w-4 h-4 text-amber-500" /> 3. Phòng Đấu Game PIN & Bảng Xếp Hạng ({leaderboardPlayers.length})
+          <Trophy className="w-4 h-4 text-amber-500" /> 4. Phòng Đấu Game PIN &amp; Bảng Xếp Hạng ({leaderboardPlayers.length})
         </button>
         <button
           onClick={() => setTeacherHubTab('accounts')}
@@ -244,37 +660,59 @@ export default function TeacherDashboard({
             (teacherHubTab === 'accounts' || teacherHubTab === 'students') ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> 4. Tạo &amp; Quản Lý Tài Khoản ({allAccounts.length})
+          <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> 5. Tạo &amp; Quản Lý Tài Khoản ({allAccounts.length})
         </button>
       </div>
 
-      {/* Tab 1: Kho Đề Thi */}
-      {teacherHubTab === 'tests' && (() => {
-        const fullTestsCount = tests.filter(t => normalizeExamConfig(t).testMode !== 'single_skill').length;
-        const singleTestsCount = tests.filter(t => normalizeExamConfig(t).testMode === 'single_skill').length;
-        const displayedTests = tests.filter(t => {
-          const mode = normalizeExamConfig(t).testMode;
-          if (testTypeFilter === 'full_exam') return mode !== 'single_skill';
-          if (testTypeFilter === 'single_skill') return mode === 'single_skill';
-          return true;
-        });
+      {/* Tab 2: Kho Bài Tập 4 Kỹ Năng Riêng Biệt */}
+      {teacherHubTab === 'skill_exercises' && (
+        <div className="space-y-4">
+          <div className="bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" />
+                  Tạo Bài Tập Cho Từng Kỹ Năng Riêng Biệt
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Các bài tập riêng được xếp tách biệt tại đây để học viên luyện từng kỹ năng (Speaking AI, Listening, Reading, Writing) hoặc giáo viên giao về nhà.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {SKILL_EXERCISE_BUTTONS.map(sk => {
+                const IconComp = sk.icon;
+                return (
+                  <button
+                    key={sk.id}
+                    type="button"
+                    onClick={() => openSingleSkillBuilder?.(sk.id)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition flex items-center gap-1.5 shadow-xs ${sk.cls}`}
+                  >
+                    <IconComp className="w-3.5 h-3.5" />
+                    <span>{sk.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-        return (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold">
               {[
-                { id: 'all', label: `Tất cả đề (${tests.length})` },
-                { id: 'full_exam', label: `Đề Gộp Chuẩn L·R·W (${fullTestsCount})` },
-                { id: 'single_skill', label: `Kỹ Năng Riêng 4 Kỹ Năng (${singleTestsCount})` }
+                { id: 'all', label: `Tất cả bài tập (${skillExercises.length})` },
+                { id: 'speaking', label: `Speaking AI (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'speaking').length})` },
+                { id: 'listening', label: `Listening (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'listening').length})` },
+                { id: 'reading', label: `Reading (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'reading').length})` },
+                { id: 'writing', label: `Writing (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'writing').length})` }
               ].map(tab => (
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setTestTypeFilter(tab.id)}
+                  onClick={() => setExerciseSkillFilter(tab.id)}
                   className={`px-3 py-1.5 rounded-lg transition ${
-                    testTypeFilter === tab.id
-                      ? 'bg-[#007A7A] text-white shadow-xs'
+                    exerciseSkillFilter === tab.id
+                      ? 'bg-[#570DF8] text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
@@ -284,432 +722,48 @@ export default function TeacherDashboard({
             </div>
           </div>
 
-          {displayedTests.length === 0 ? (
+          {filteredSkillExercises.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
-              Chưa có đề thi nào trong mục này. Bấm <strong>Tạo Đề Gộp</strong> hoặc <strong>Tạo Đề Speaking AI / Kỹ Năng Riêng</strong> phía trên để bắt đầu.
+              Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút <strong>+ Bài Tập Speaking AI / Listening / Reading / Writing</strong> phía trên để tạo ngay.
             </div>
-          ) : displayedTests.map(t => {
-            const cfg = normalizeExamConfig(t);
-            const isPrivate = cfg.visibility === 'private';
-            const isExpanded = expandedTeacherTestId === t.id;
-
-            return (
-              <div
-                key={t.id}
-                className={`bg-white dark:bg-slate-900 rounded-2xl border transition ${
-                  isExpanded
-                    ? 'border-blue-500/60 dark:border-blue-500/40 shadow-md p-5 sm:p-6'
-                    : 'border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700'
-                }`}
-              >
-                {/* Minimal Header Row: Title + Công khai / Chỉ mình tôi */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id))}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id));
-                    }
-                  }}
-                  aria-expanded={isExpanded}
-                  className={`w-full flex items-center justify-between gap-3 text-left cursor-pointer select-none ${
-                    isExpanded ? '' : 'px-5 py-4'
-                  }`}
-                >
-                  {renamingTestId === t.id ? (
-                    <div
-                      className="flex flex-wrap items-center gap-1.5 flex-1 min-w-[220px]"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <input
-                        type="text"
-                        autoFocus
-                        value={renameDraft}
-                        onChange={e => setRenameDraft(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleCommitInlineRename(t.id);
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            setRenamingTestId(null);
-                            setRenameDraft('');
-                          }
-                        }}
-                        placeholder="Nhập tên đề thi mới..."
-                        className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border-2 border-[#007A7A] dark:border-[#1EE1D6] text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleCommitInlineRename(t.id)}
-                        className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs"
-                        title="Lưu tên mới (Enter)"
-                      >
-                        <Check className="w-3.5 h-3.5" /> Lưu
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRenamingTestId(null);
-                          setRenameDraft('');
-                        }}
-                        className="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-bold flex items-center gap-1"
-                        title="Hủy (Esc)"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <span
-                        className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
-                          cfg.testMode === 'single_skill'
-                            ? cfg.focusSkill === 'speaking'
-                              ? 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30'
-                              : 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30'
-                            : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
-                        }`}
-                      >
-                        {cfg.testMode === 'single_skill' ? `${(cfg.focusSkill || 'skill').toUpperCase()} RIÊNG` : 'FULL L·R·W'}
-                      </span>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
-                        {t.title}
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          setRenamingTestId(t.id);
-                          setRenameDraft(t.title || '');
-                        }}
-                        title="Đổi nhanh tên đề thi ngay tại đây"
-                        className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/20 text-slate-600 dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
-                      >
-                        <Edit className="w-3 h-3" /> Đổi tên
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2.5 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        toggleTestVisibility(t.id);
-                      }}
-                      title="Bấm để chuyển Công khai / Chỉ mình tôi thấy"
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
-                        isPrivate
-                          ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/25'
-                          : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
-                      }`}
-                    >
-                      {isPrivate ? <EyeOff className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
-                      {isPrivate ? 'Chỉ mình tôi' : 'Công khai'}
-                    </button>
-
-                    <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                        isExpanded ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Expanded Details Panel (Visible only when clicked) */}
-                {isExpanded && (() => {
-                  const listeningTracks = getListeningTracks(t.listening);
-                  const listeningTracksCount = listeningTracks.length;
-                  const hasListeningAudio = listeningTracks.some(tr => !!tr.audioUrl);
-                  const hasListeningImg = listeningTracks.some(tr => !!tr.imageUrl);
-                  const passagesCount = getReadingPassages(t.reading).length;
-                  const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
-
-                  return (
-                    <div className="mt-4 pt-5 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                      <div className="space-y-2.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {cfg.testMode === 'single_skill' ? (
-                            <span className="text-[11px] bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] font-bold px-2.5 py-1 rounded-lg border border-[#570DF8]/25">
-                              {cfg.focusSkill === 'speaking'
-                                ? `Speaking AI: ${getSpeakingQuestionItems(t.speaking, 'all').length} câu (Part 1·2·3)`
-                                : cfg.focusSkill === 'listening'
-                                ? `Listening Riêng: ${t.listening?.questions?.length || 0} câu (${cfg.durations.listening}p)`
-                                : cfg.focusSkill === 'reading'
-                                ? `Reading Riêng: ${t.reading?.questions?.length || 0} câu (${cfg.durations.reading}p)`
-                                : `Writing Riêng: Task 1 & 2 (${cfg.durations.writing}p)`}
-                            </span>
-                          ) : (
-                            <>
-                              <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
-                                Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
-                              </span>
-                              <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
-                                ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
-                              </span>
-                            </>
-                          )}
-                          <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
-                            {cfg.maxAttempts === 0 ? '∞ Làm tự do' : `🔒 Tối đa ${cfg.maxAttempts} lần`}
-                          </span>
-                          {cfg.sequentialMode && (
-                            <span className="text-[10px] bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-md">
-                              Tuần tự: {cfg.order.map(s => s[0].toUpperCase()).join('→')}
-                            </span>
-                          )}
-                          {hasListeningAudio ? (
-                            <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                              🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} chủ đề nghe` : 'Đã đính kèm Audio'}
-                            </span>
-                          ) : listeningTracksCount > 1 || hasListeningImg ? (
-                            <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                              🎧 {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
-                              🔊 Dùng AI Voice (TTS)
-                            </span>
-                          )}
-                          {(hasReadingImg || passagesCount > 1) && (
-                            <span className="text-[10px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30">
-                              🖼️ {passagesCount} bài Reading
-                            </span>
-                          )}
-                          {t.writing?.task1?.imageUrl && (
-                            <span className="text-[10px] bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-500/30">
-                              📊 Có biểu đồ Task 1
-                            </span>
-                          )}
-                        </div>
-                        {t.description && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t.description}</p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                        {/* Inline Quick Controls: Per-Skill Durations */}
-                        <div className="p-3.5 rounded-2xl bg-[#EDFFFD]/65 dark:bg-teal-500/10 border border-[#B5F5F1] dark:border-teal-500/30 space-y-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-extrabold text-[#003538] dark:text-[#1EE1D6] flex items-center gap-1">
-                              <Clock className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Thời gian từng phần (phút)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => openExamBuilder(t, 'general')}
-                              className="text-[10px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
-                            >
-                              Thứ tự &amp; Tuần tự →
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {cfg.order.map((sId, sIdx) => (
-                              <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-[#B5F5F1]/80 dark:border-slate-700 text-center">
-                                <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                  {sIdx + 1}. {sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : sId === 'speaking' ? 'Nói AI' : 'Viết'}
-                                </span>
-                                <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                                  <input
-                                    key={`${t.id}-${sId}-${cfg.durations[sId]}`}
-                                    type="number"
-                                    min={1}
-                                    max={180}
-                                    defaultValue={cfg.durations[sId]}
-                                    onBlur={e => {
-                                      const parsed = Math.max(1, Math.min(180, Number(e.target.value) || cfg.durations[sId]));
-                                      e.target.value = String(parsed);
-                                      if (parsed !== cfg.durations[sId]) {
-                                        updateTestQuickDuration(t.id, sId, parsed);
-                                      }
-                                    }}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') e.currentTarget.blur();
-                                    }}
-                                    title="Nhập số phút rồi bấm ra ngoài hoặc nhấn Enter để lưu"
-                                    className="w-12 px-1 py-0.5 text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-extrabold text-slate-900 dark:text-white"
-                                  />
-                                  <span className="text-[10px] text-slate-400 font-bold">p</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <p className="text-[10px] text-indigo-700/80 dark:text-indigo-300/80 font-medium">
-                            {cfg.sequentialMode
-                              ? 'Hết giờ từng phần sẽ tự động chuyển sang phần tiếp theo.'
-                              : 'Đang cho phép chuyển tự do giữa các phần.'}
-                          </p>
-                        </div>
-
-                        {/* Right column: 4 Quick Toggles */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          {/* Quick Toggle Visibility (Ẩn / Công khai) */}
-                          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Hiển thị đề cho học sinh</p>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                                {isPrivate ? 'Đang ẩn — HS chưa thấy' : 'Công khai — HS làm được'}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleTestVisibility(t.id)}
-                              className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                                isPrivate
-                                  ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                              }`}
-                            >
-                              {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
-                              {isPrivate ? 'Đang Ẩn' : 'Công Khai'}
-                            </button>
-                          </div>
-
-                          {/* Quick Toggle Practice vs Real Exam (Thi thử nhiều lần / Thi thật 1 lần) */}
-                          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chế độ Thi thử / Thi thật</p>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                                {cfg.maxAttempts === 1
-                                  ? 'Thi thật: Chỉ làm 1 lần'
-                                  : cfg.maxAttempts === 0
-                                  ? 'Thi thử: Làm nhiều lần'
-                                  : `Giới hạn ${cfg.maxAttempts} lần`}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleTestExamMode(t.id)}
-                              className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                                cfg.maxAttempts === 1
-                                  ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                              }`}
-                            >
-                              {cfg.maxAttempts === 1 ? 'Thi Thật' : cfg.maxAttempts === 0 ? 'Thi Thử' : `Tối đa ${cfg.maxAttempts}`}
-                            </button>
-                          </div>
-
-                          {/* Quick Toggle Allow View Correct Answers */}
-                          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Xem đáp án đúng</p>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                                {t.allowViewAnswers ? 'HS xem được sau khi nộp' : 'Đang ẩn đáp án đúng'}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleTestAllowViewAnswers(t.id)}
-                              className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                                t.allowViewAnswers
-                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                  : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
-                              }`}
-                            >
-                              {t.allowViewAnswers ? (
-                                <>
-                                  <Unlock className="w-3.5 h-3.5" /> Đã Mở
-                                </>
-                              ) : (
-                                <>
-                                  <Lock className="w-3.5 h-3.5" /> Đang Khóa
-                                </>
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Quick Toggle Stealth Anti-Cheat (Hidden from Students) */}
-                          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">Chống gian lận (Ẩn với HS)</p>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                                {cfg.antiCheatEnabled ? 'Đếm tab, khóa chuột phải & Extension' : 'Đang tắt — làm tự do'}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleTestAntiCheat(t.id)}
-                              className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1 transition shadow-sm flex-shrink-0 ${
-                                cfg.antiCheatEnabled
-                                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                                  : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200'
-                              }`}
-                            >
-                              {cfg.antiCheatEnabled ? (
-                                <>
-                                  <ShieldCheck className="w-3.5 h-3.5" /> Đang Bật
-                                </>
-                              ) : (
-                                <>
-                                  <EyeOff className="w-3.5 h-3.5" /> Đang Tắt
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => openExamBuilder(t, 'general')}
-                            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1"
-                          >
-                            <Clock className="w-3.5 h-3.5" /> Sửa Tên &amp; Cài Đặt Chung
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openExamBuilder(t, cfg.testMode === 'single_skill' && cfg.focusSkill ? cfg.focusSkill : 'reading')}
-                            className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30"
-                          >
-                            <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi &amp; Nội Dung
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => startExam?.(t.id)}
-                            className="bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-[#B5F5F1] dark:border-teal-500/30"
-                            title="Mở giao diện làm bài như học sinh để kiểm tra đề (kể cả đề Đang Ẩn)"
-                          >
-                            <Play className="w-3.5 h-3.5" /> Làm Thử Đề
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicateTest(t)}
-                            className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-500/15 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-300 border border-slate-200 dark:border-slate-700 transition"
-                            title="Nhân bản đề thi (Bản sao tự động ở chế độ Riêng tư)"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTest(t)}
-                            className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
-                            title="Xóa đề thi này"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setExpandedTeacherTestId(null)}
-                            className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold transition"
-                          >
-                            Thu gọn
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })}
+          ) : (
+            <div className="space-y-3">
+              {filteredSkillExercises.map(renderManagementItemCard)}
+            </div>
+          )}
         </div>
-        );
-      })()}
+      )}
+
+      {/* Tab 1: Kho Đề Thi */}
+      {teacherHubTab === 'tests' && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
+                Danh sách Đề Thi IELTS ({fullExamTests.length})
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Chỉ hiển thị các đề thi đầy đủ 3 phần Listening · Reading · Writing. Bài tập từng kỹ năng riêng nằm ở tab <strong>2. Bài Tập 4 Kỹ Năng</strong>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openExamBuilder()}
+              className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> + Tạo Đề Thi Mới
+            </button>
+          </div>
+
+          {fullExamTests.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
+              Chưa có đề thi IELTS nào. Bấm <strong>+ Tạo Đề Thi Mới</strong> để bắt đầu.
+            </div>
+          ) : (
+            fullExamTests.map(renderManagementItemCard)
+          )}
+        </div>
+      )}
 
       {/* Tab 2: Giám Sát Gian Lận & Chấm Điểm */}
       {teacherHubTab === 'grading' && (() => {
@@ -746,7 +800,7 @@ export default function TeacherDashboard({
               <p className="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">{attempts.length}</p>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-amber-200 dark:border-amber-500/30 p-4 shadow-sm">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Chờ chấm Writing</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Chờ chấm điểm</p>
               <p className="text-2xl font-black text-amber-600 dark:text-amber-300 mt-1 tabular-nums">{pendingCount}</p>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-500/30 p-4 shadow-sm">
@@ -770,7 +824,7 @@ export default function TeacherDashboard({
                 onChange={e => setGradingFilters(prev => ({ ...prev, testId: e.target.value }))}
                 className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 max-w-[200px]"
               >
-                <option value="all">Tất cả đề thi</option>
+                <option value="all">Tất cả đề thi &amp; bài tập</option>
                 {uniqueAttemptTests.map(([tid, title]) => (
                   <option key={tid} value={tid}>{title}</option>
                 ))}
@@ -862,7 +916,22 @@ export default function TeacherDashboard({
                           att.studentName
                         )}
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">{att.testTitle}</td>
+                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                              att.testMode === 'single_skill'
+                                ? 'bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/25'
+                                : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
+                            }`}
+                          >
+                            {att.testMode === 'single_skill'
+                              ? `BÀI TẬP • ${(att.focusSkill || 'SK').toUpperCase()}`
+                              : 'ĐỀ THI'}
+                          </span>
+                          <span>{att.testTitle}</span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{att.submittedAt}</td>
                       <td className="px-6 py-4 text-center">
                         <div className="inline-flex flex-col items-center gap-1">
@@ -908,7 +977,7 @@ export default function TeacherDashboard({
                             onClick={() => openTeacherGradingModal(att)}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm"
                           >
-                            Chấm & Sửa Điểm (L/R/W)
+                            {att.testMode === 'single_skill' ? 'Chấm & Xem Chi Tiết' : 'Chấm & Sửa Điểm (L/R/W)'}
                           </button>
                           <button
                             type="button"
