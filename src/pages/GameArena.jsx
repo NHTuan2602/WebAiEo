@@ -36,7 +36,12 @@ import {
   X,
   Zap
 } from 'lucide-react';
-import { CREWMATE_COLORS, DEFAULT_VOCAB_TEXT } from '../constants/seedData';
+import {
+  ANIMAL_ACCESSORIES,
+  ANIMAL_CHARACTERS,
+  CREWMATE_COLORS,
+  DEFAULT_VOCAB_TEXT
+} from '../constants/seedData';
 import {
   LOBBY_CHAT_RESET_MS,
   getSpeedAdjustedTimeLimit,
@@ -44,7 +49,7 @@ import {
   parseRawVocabText
 } from '../utils/examHelpers';
 import { speakWord } from '../utils/mediaHelpers';
-import AmongUsCrewmate from '../components/common/AmongUsCrewmate';
+import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 
 export default function GameArena({
@@ -74,6 +79,8 @@ export default function GameArena({
   gameToast,
   gameTypedProgress,
   gameWordIdx,
+  handleChangeAccessory,
+  handleChangeAnimal,
   handleChangeCrewColor,
   handleClearLobbyChatNow,
   handleCopyInviteLink,
@@ -104,6 +111,8 @@ export default function GameArena({
   lobbyCountdown,
   lobbyCountdownTimerRef,
   lobbyNowTick,
+  myAccessoryId = 'crown',
+  myAnimalId = 'cat',
   myCrewColor,
   openMemberProfile,
   roomJoinError,
@@ -116,6 +125,8 @@ export default function GameArena({
   setHostRoomDraft,
   setLobbyChatInput,
   setLobbyCountdown,
+  setMyAccessoryId,
+  setMyAnimalId,
   setMyCrewColor,
   setRoomJoinError,
   setRoomJoinForm,
@@ -131,6 +142,7 @@ export default function GameArena({
   wordTimerRef
 }) {
   const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
+  const [showPilotDrawer, setShowPilotDrawer] = useState(false);
   const isTeacher = currentUser?.role === 'teacher';
   const activePin = joinedRoomPin || currentRoomPin;
   const room = normalizeRoomObject(roomsDb[activePin], activePin, lobbyNowTick);
@@ -155,6 +167,10 @@ export default function GameArena({
   const studentLobbyPlayers = lobbyPlayersList.filter(p => p.role !== 'teacher');
   const hasStudentsInLobby = studentLobbyPlayers.length > 0;
   const activeCrewColorId = myLobbyEntry?.colorId || myCrewColor;
+  const activeAnimalId = myLobbyEntry?.animalId || myAnimalId;
+  const activeAccessoryId = myLobbyEntry?.accessoryId || myAccessoryId;
+  const activeAnimalObj = ANIMAL_CHARACTERS.find(a => a.id === activeAnimalId) || ANIMAL_CHARACTERS[0];
+  const activeAccessoryObj = ANIMAL_ACCESSORIES.find(a => a.id === activeAccessoryId) || ANIMAL_ACCESSORIES[0];
   const myAvatarUrl = currentUser?.avatarUrl || '';
   const timePct = Math.max(0, Math.min(100, (gameTimeLeft / Math.max(1, gameTimeLimit)) * 100));
   const isLowTime = gameTimeLeft <= 5;
@@ -168,8 +184,8 @@ export default function GameArena({
     setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
   };
 
-  const renderCrewColorPicker = (compact = false) => {
-    const swatchSize = compact ? 'w-5 h-5' : 'w-7 h-7';
+  const renderPilotCustomizer = (compact = false) => {
+    const swatchSize = compact ? 'w-5 h-5' : 'w-6 h-6';
     const applyColor = (colorId) => {
       if (gameSubState === 'JOIN') {
         setMyCrewColor(colorId);
@@ -177,54 +193,135 @@ export default function GameArena({
         handleChangeCrewColor(colorId);
       }
     };
+    const applyAnimal = (animalId) => {
+      if (gameSubState === 'JOIN') {
+        setMyAnimalId?.(animalId);
+      } else {
+        handleChangeAnimal?.(animalId);
+      }
+    };
+    const applyAccessory = (accessoryId) => {
+      if (gameSubState === 'JOIN') {
+        setMyAccessoryId?.(accessoryId);
+      } else {
+        handleChangeAccessory?.(accessoryId);
+      }
+    };
 
     return (
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        {CREWMATE_COLORS.map(c => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => applyColor(c.id)}
-            className={`${swatchSize} rounded-full border-2 transition ${
-              activeCrewColorId === c.id ? 'border-white scale-115 shadow-lg' : 'border-slate-700 opacity-75 hover:opacity-100'
-            }`}
-            style={{ backgroundColor: c.fill }}
-            title={c.label}
-          />
-        ))}
-        {myAvatarUrl ? (
-          <div className="flex items-center gap-1.5 pl-1 border-l border-slate-700/80">
-            <button
-              type="button"
-              onClick={() => applyColor('avatar')}
-              className={`${compact ? 'w-6 h-6' : 'w-8 h-8'} rounded-full overflow-hidden border-2 transition bg-slate-800 ${
-                activeCrewColorId === 'avatar'
-                  ? 'border-cyan-300 ring-2 ring-cyan-400/60 scale-115 shadow-lg'
-                  : 'border-slate-600 opacity-85 hover:opacity-100'
-              }`}
-              title="Dùng Ảnh Avatar trên đầu nhân vật"
-            >
-              <img src={myAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAvatarModal(true)}
-              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-bold text-cyan-300 transition flex items-center gap-1"
-              title="Đổi ảnh Avatar khuôn mặt"
-            >
-              <Camera className="w-3 h-3" /> Đổi ảnh
-            </button>
+      <div className="space-y-3">
+        {/* 1. Animal Species Picker */}
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+            <span>1. Chọn Nhân Vật Động Vật</span>
+            <span className="text-cyan-300 font-extrabold normal-case">{activeAnimalObj.label}</span>
+          </p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {ANIMAL_CHARACTERS.map(sp => {
+              const selected = activeAnimalId === sp.id;
+              return (
+                <button
+                  key={sp.id}
+                  type="button"
+                  onClick={() => applyAnimal(sp.id)}
+                  className={`px-2 py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition ${
+                    selected
+                      ? 'bg-cyan-500/20 border-cyan-400 text-white shadow-sm ring-1 ring-cyan-400/50'
+                      : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600'
+                  }`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0 border border-slate-950"
+                    style={{ backgroundColor: sp.body }}
+                  />
+                  <span className="truncate">{sp.label}</span>
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowAvatarModal(true)}
-            className="ml-1 px-2.5 py-1 rounded-full border border-dashed border-cyan-500/60 bg-cyan-500/10 hover:bg-cyan-500/20 text-[10px] font-bold text-cyan-300 transition flex items-center gap-1"
-            title="Tải ảnh khuôn mặt để gắn lên đầu nhân vật"
-          >
-            <Camera className="w-3 h-3" /> + Avatar
-          </button>
-        )}
+        </div>
+
+        {/* 2. Accessories Picker */}
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+            <span>2. Phụ Kiện Đeo / Đội Đầu</span>
+            <span className="text-amber-300 font-extrabold normal-case">{activeAccessoryObj.icon} {activeAccessoryObj.label}</span>
+          </p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {ANIMAL_ACCESSORIES.map(acc => {
+              const selected = activeAccessoryId === acc.id;
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => applyAccessory(acc.id)}
+                  className={`px-2 py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1 transition ${
+                    selected
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-sm ring-1 ring-amber-400/40'
+                      : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600'
+                  }`}
+                >
+                  <span>{acc.icon}</span>
+                  <span className="truncate">{acc.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3. Spaceship Paint Color & Avatar */}
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            3. Màu Phi Thuyền &amp; Ảnh Mặt Avatar
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {CREWMATE_COLORS.map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => applyColor(c.id)}
+                className={`${swatchSize} rounded-full border-2 transition ${
+                  activeCrewColorId === c.id ? 'border-white scale-115 shadow-lg' : 'border-slate-700 opacity-75 hover:opacity-100'
+                }`}
+                style={{ backgroundColor: c.fill }}
+                title={`Màu tàu ${c.label}`}
+              />
+            ))}
+            {myAvatarUrl ? (
+              <div className="flex items-center gap-1.5 pl-1 border-l border-slate-700/80">
+                <button
+                  type="button"
+                  onClick={() => applyColor('avatar')}
+                  className={`${compact ? 'w-6 h-6' : 'w-7 h-7'} rounded-full overflow-hidden border-2 transition bg-slate-800 ${
+                    activeCrewColorId === 'avatar'
+                      ? 'border-cyan-300 ring-2 ring-cyan-400/60 scale-115 shadow-lg'
+                      : 'border-slate-600 opacity-85 hover:opacity-100'
+                  }`}
+                  title="Dùng Ảnh Avatar làm mặt phi công"
+                >
+                  <img src={myAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarModal(true)}
+                  className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-bold text-cyan-300 transition flex items-center gap-1"
+                  title="Đổi ảnh Avatar khuôn mặt"
+                >
+                  <Camera className="w-3 h-3" /> Đổi ảnh
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAvatarModal(true)}
+                className="ml-1 px-2.5 py-1 rounded-full border border-dashed border-cyan-500/60 bg-cyan-500/10 hover:bg-cyan-500/20 text-[10px] font-bold text-cyan-300 transition flex items-center gap-1"
+                title="Tải ảnh khuôn mặt để gắn lên phi công"
+              >
+                <Camera className="w-3 h-3" /> + Avatar
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     );
   };
@@ -372,25 +469,46 @@ export default function GameArena({
           </div>
         </div>
 
-        <div className="max-w-xl w-full mx-auto my-auto py-6 relative z-10">
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-7 sm:p-9 shadow-2xl">
-            <div className="flex flex-col items-center text-center mb-6">
-              <div className="mb-3">
-                <AmongUsCrewmate colorId={myCrewColor} avatarUrl={myAvatarUrl} size={64} />
+        <div className="max-w-2xl w-full mx-auto my-auto py-4 relative z-10">
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+            <div className="flex flex-col items-center text-center mb-5">
+              <div className="flex items-center justify-center gap-5 mb-3 bg-slate-950/75 px-6 py-3 rounded-2xl border border-slate-800/80">
+                <div className="flex flex-col items-center">
+                  <AnimalPilotAvatar
+                    animalId={myAnimalId}
+                    accessoryId={myAccessoryId}
+                    colorId={myCrewColor}
+                    avatarUrl={myAvatarUrl}
+                    size={58}
+                    onShip={false}
+                  />
+                  <span className="text-[10px] font-bold text-slate-400 mt-1">Trong Sảnh</span>
+                </div>
+                <div className="h-10 w-px bg-slate-800" />
+                <div className="flex flex-col items-center">
+                  <AnimalPilotAvatar
+                    animalId={myAnimalId}
+                    accessoryId={myAccessoryId}
+                    colorId={myCrewColor}
+                    avatarUrl={myAvatarUrl}
+                    size={62}
+                    onShip={true}
+                  />
+                  <span className="text-[10px] font-bold text-cyan-300 mt-1">Phi Thuyền 3 Vòng</span>
+                </div>
               </div>
               <span className="text-[11px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1 rounded-full mb-2">
-                Sảnh Chờ Phi Hành Đoàn
+                Sảnh Chờ Phi Hành Đoàn Thú Cưng
               </span>
               <h1 className="text-2xl font-extrabold text-white">Tham Gia Phòng Đấu Từ Vựng</h1>
-              <p className="text-xs text-slate-400 mt-1.5 max-w-md leading-relaxed">
-                Nhập <b>Mã Phòng (PIN)</b> và <b>Mật Khẩu</b> do giáo viên tạo để bước vào Sảnh Chờ. Trận đấu sẽ chỉ bắt đầu khi giáo viên bấm khởi hành!
+              <p className="text-xs text-slate-400 mt-1 max-w-md leading-relaxed">
+                Chọn <b>Thú Cưng &amp; Phụ Kiện</b> để cùng bạn lái phi thuyền vượt qua 3 vòng đấu. Trận đấu bắt đầu khi giáo viên bấm khởi hành!
               </p>
             </div>
 
-            {/* Pick Suit Color before entering */}
-            <div className="mb-6">
-              <p className="text-[11px] font-semibold text-slate-400 text-center mb-2">Chọn màu phi hành gia hoặc đầu Avatar:</p>
-              {renderCrewColorPicker(false)}
+            {/* Pick Animal + Accessory + Ship Color before entering */}
+            <div className="mb-5 bg-slate-950/60 border border-slate-800/90 rounded-2xl p-4">
+              {renderPilotCustomizer(false)}
             </div>
 
             {roomJoinError && (
@@ -763,12 +881,15 @@ export default function GameArena({
                           </div>
                         )}
 
-                        <AmongUsCrewmate
+                        <AnimalPilotAvatar
+                          animalId={player.animalId || 'cat'}
+                          accessoryId={player.accessoryId || 'none'}
                           colorId={player.colorId || 'cyan'}
                           avatarUrl={player.avatarUrl || usersDb[player.username]?.avatarUrl || ''}
-                          size={56}
+                          size={58}
                           flip={idx % 2 === 1}
                           animate={true}
+                          onShip={false}
                         />
 
                         {/* Floor Shadow */}
@@ -801,12 +922,45 @@ export default function GameArena({
             {renderLobbyChatPanel('h-[270px] lg:h-[360px]', 'Chat Phòng Chờ')}
           </div>
 
-          {/* Bottom Controls Bar (Suit Customize + Ready / Host Launch) */}
-          <div className="max-w-6xl w-full mx-auto bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3.5 flex flex-col md:flex-row items-center justify-between gap-3 backdrop-blur-md">
-            <div className="flex items-center gap-2 bg-slate-950/70 px-3 py-2 rounded-xl border border-slate-800 flex-wrap justify-center">
-              <span className="text-[11px] text-slate-400 font-semibold mr-1">Phi hành gia:</span>
-              {renderCrewColorPicker(true)}
-            </div>
+          {/* Bottom Controls Bar (Animal Pilot Customize + Ready / Host Launch) */}
+          <div className="max-w-6xl w-full mx-auto space-y-2">
+            {showPilotDrawer && (
+              <div className="bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-md">
+                {renderPilotCustomizer(true)}
+              </div>
+            )}
+            <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 flex flex-col md:flex-row items-center justify-between gap-3 backdrop-blur-md">
+              <div className="flex items-center gap-3 bg-slate-950/70 px-3 py-1.5 rounded-xl border border-slate-800 flex-wrap justify-center">
+                <AnimalPilotAvatar
+                  animalId={activeAnimalId}
+                  accessoryId={activeAccessoryId}
+                  colorId={activeCrewColorId}
+                  avatarUrl={myAvatarUrl}
+                  size={36}
+                  animate={false}
+                  onShip={true}
+                />
+                <div className="text-left">
+                  <p className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                    <span>{activeAnimalObj.label}</span>
+                    <span className="text-[11px] font-bold text-amber-300">
+                      {activeAccessoryObj.icon} {activeAccessoryObj.label}
+                    </span>
+                  </p>
+                  <p className="text-[10px] text-cyan-300 font-medium">Lái phi thuyền cả 3 vòng chơi</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPilotDrawer(v => !v)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                    showPilotDrawer
+                      ? 'bg-cyan-500 text-slate-950 border-cyan-400'
+                      : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border-slate-700'
+                  }`}
+                >
+                  {showPilotDrawer ? 'Thu Gọn' : 'Đổi Thú & Phụ Kiện'}
+                </button>
+              </div>
 
             <div className="flex items-center gap-2.5 flex-wrap justify-center shrink-0">
               {!isTeacher ? (
@@ -851,6 +1005,7 @@ export default function GameArena({
                   </button>
                 </>
               )}
+            </div>
             </div>
           </div>
         </div>
@@ -1114,11 +1269,14 @@ export default function GameArena({
                         }`}>
                           {rankLabel}
                         </span>
-                        <AmongUsCrewmate
+                        <AnimalPilotAvatar
+                          animalId={p.animalId || 'cat'}
+                          accessoryId={p.accessoryId || 'none'}
                           colorId={p.colorId || 'cyan'}
                           avatarUrl={p.avatarUrl}
-                          size={isFirst ? 54 : 44}
+                          size={isFirst ? 52 : 42}
                           animate={!p.finished && (p.lives ?? 3) > 0}
+                          onShip={true}
                         />
                         <p className="font-extrabold text-sm text-white mt-1.5 truncate max-w-full">{p.name}</p>
                         <p className="font-mono text-lg font-black text-amber-300 tabular-nums">{p.score || 0}đ</p>
@@ -1190,13 +1348,16 @@ export default function GameArena({
                           )}
                         </div>
 
-                        {/* Crewmate / Avatar Character */}
+                        {/* Animal Pilot Spaceship Character */}
                         <div className="shrink-0">
-                          <AmongUsCrewmate
+                          <AnimalPilotAvatar
+                            animalId={p.animalId || 'cat'}
+                            accessoryId={p.accessoryId || 'none'}
                             colorId={p.colorId || 'cyan'}
                             avatarUrl={p.avatarUrl}
-                            size={42}
+                            size={40}
                             animate={!p.finished && livesLeft > 0}
+                            onShip={true}
                           />
                         </div>
 
@@ -1319,6 +1480,19 @@ export default function GameArena({
           </span>
           <span className="hidden sm:inline-flex bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-full font-bold">
             {currentUser?.name || currentUser?.username}
+          </span>
+          <span className="hidden md:inline-flex items-center gap-1.5 bg-cyan-500/15 text-cyan-200 border border-cyan-500/35 px-2.5 py-0.5 rounded-full font-bold">
+            <AnimalPilotAvatar
+              animalId={myAnimalId}
+              accessoryId={myAccessoryId}
+              colorId={myCrewColor}
+              avatarUrl={myAvatarUrl}
+              size={18}
+              animate={false}
+              onShip={true}
+            />
+            <span>{activeAnimalObj.label}</span>
+            {activeAccessoryId !== 'none' && <span className="text-amber-300">{activeAccessoryObj.icon}</span>}
           </span>
           <button
             type="button"

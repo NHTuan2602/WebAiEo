@@ -480,6 +480,8 @@ function applySyncAction(store, type, payload = {}) {
         name: message.name || message.username,
         role: message.role || 'student',
         colorId: message.colorId || 'cyan',
+        animalId: message.animalId || 'cat',
+        accessoryId: message.accessoryId || 'crown',
         ready: true,
         joinedAt: now
       };
@@ -550,6 +552,8 @@ function applySyncAction(store, type, payload = {}) {
             name: lp.name || lp.username,
             role: lp.role || 'student',
             colorId: lp.colorId || 'cyan',
+            animalId: lp.animalId || 'cat',
+            accessoryId: lp.accessoryId || 'none',
             avatarUrl: lp.avatarUrl || store.users?.[lp.username]?.avatarUrl || '',
             score: 0,
             streak: 0,

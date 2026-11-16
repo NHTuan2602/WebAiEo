@@ -19,7 +19,7 @@ import {
 import { DEFAULT_VOCAB_TEXT, VOCAB_PRESETS } from '../../constants/seedData';
 import { compressAvatarImageFile, normalizeRoomObject, parseBulkStudentsText, parseRawVocabText } from '../../utils/examHelpers';
 import UserAvatarBadge from '../../components/common/UserAvatarBadge';
-import AmongUsCrewmate from '../../components/common/AmongUsCrewmate';
+import AnimalPilotAvatar from '../../components/common/AnimalPilotAvatar';
 import TeacherGradingModal from './TeacherGradingModal';
 
 export default function GlobalModals({
@@ -50,6 +50,8 @@ export default function GlobalModals({
   handleUpdateUserAvatar,
   handleUpdateUserProfileFields,
   isGradingAI,
+  myAccessoryId = 'crown',
+  myAnimalId = 'cat',
   myCrewColor,
   newRoomForm,
   newStudentForm,
@@ -923,12 +925,15 @@ export default function GlobalModals({
               <UserAvatarBadge user={currentUser} sizeClass="w-20 h-20" textClass="text-2xl" rounded="rounded-2xl" />
             </div>
             <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 flex flex-col items-center text-center">
-              <p className="text-[11px] font-bold text-cyan-300 mb-2">Trong Game</p>
-              <AmongUsCrewmate
+              <p className="text-[11px] font-bold text-cyan-300 mb-2">Phi Thuyền Thú Cưng</p>
+              <AnimalPilotAvatar
+                animalId={myAnimalId}
+                accessoryId={myAccessoryId}
                 colorId={currentUser.avatarUrl ? 'avatar' : myCrewColor}
                 avatarUrl={currentUser.avatarUrl}
                 size={68}
                 animate={true}
+                onShip={true}
               />
             </div>
           </div>

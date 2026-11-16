@@ -50,7 +50,7 @@ import {
   normalizeExamConfig
 } from '../constants/seedData';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
-import AmongUsCrewmate from '../components/common/AmongUsCrewmate';
+import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 
 export default function TeacherDashboard({
   attempts,
@@ -106,6 +106,7 @@ export default function TeacherDashboard({
 }) {
   const [accountRoleFilter, setAccountRoleFilter] = useState('all');
   const [exerciseSkillFilter, setExerciseSkillFilter] = useState('all');
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [onlyIncompleteFilter, setOnlyIncompleteFilter] = useState(false);
   const [completionModalTestId, setCompletionModalTestId] = useState(null);
   const [completionFilter, setCompletionFilter] = useState('missing');
@@ -200,18 +201,24 @@ export default function TeacherDashboard({
 
   const fullExamTests = (tests || []).filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
   const skillExercises = (tests || []).filter(t => normalizeExamConfig(t).testMode === 'single_skill');
-  const filteredFullExamTests = onlyIncompleteFilter
-    ? fullExamTests.filter(t => getTestCompletionStats(t.id).missingList.length > 0)
-    : fullExamTests;
+  const publicFullExamsCount = fullExamTests.filter(t => normalizeExamConfig(t).visibility !== 'private').length;
+  const pendingGradingCount = (attempts || []).filter(a => !a.teacherGraded).length;
+  const itemQuery = itemSearchQuery.trim().toLowerCase();
+
+  const matchesItemFilters = (item) => {
+    if (itemQuery && !(item.title || '').toLowerCase().includes(itemQuery)) return false;
+    if (onlyIncompleteFilter && getTestCompletionStats(item.id).missingList.length === 0) return false;
+    return true;
+  };
+
+  const filteredFullExamTests = fullExamTests.filter(matchesItemFilters);
   const skillFilteredList = exerciseSkillFilter === 'all'
     ? skillExercises
     : skillExercises.filter(t => normalizeExamConfig(t).focusSkill === exerciseSkillFilter);
-  const filteredSkillExercises = onlyIncompleteFilter
-    ? skillFilteredList.filter(t => getTestCompletionStats(t.id).missingList.length > 0)
-    : skillFilteredList;
+  const filteredSkillExercises = skillFilteredList.filter(matchesItemFilters);
 
   const SKILL_EXERCISE_BUTTONS = [
-    { id: 'speaking', label: '+ Bài Tập Speaking AI', shortLabel: 'Speaking AI', icon: Mic, cls: 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30 hover:bg-[#570DF8] hover:text-white' },
+    { id: 'speaking', label: '+ Bài Tập Speaking AI', shortLabel: 'Speaking AI', icon: Mic, cls: 'bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30 hover:bg-[#570DF8] hover:text-white' },
     { id: 'listening', label: '+ Bài Tập Listening', shortLabel: 'Listening', icon: Headphones, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
     { id: 'reading', label: '+ Bài Tập Reading', shortLabel: 'Reading', icon: BookOpen, cls: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
     { id: 'writing', label: '+ Bài Tập Writing', shortLabel: 'Writing', icon: PenTool, cls: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-600 hover:text-white' }
@@ -231,10 +238,10 @@ export default function TeacherDashboard({
     return (
       <div
         key={t.id}
-        className={`bg-white dark:bg-slate-900 rounded-2xl border transition ${
+        className={`bg-white dark:bg-slate-900 rounded-2xl border transition-all ${
           isExpanded
-            ? 'border-blue-500/60 dark:border-blue-500/40 shadow-md p-5 sm:p-6'
-            : 'border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700'
+            ? 'border-[#007A7A]/50 dark:border-[#1EE1D6]/40 ring-2 ring-[#007A7A]/12 shadow-lg p-5 sm:p-6'
+            : 'border-pink-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-pink-300 dark:hover:border-slate-700'
         }`}
       >
         {/* Minimal Header Row: Title + Công khai / Chỉ mình tôi */}
@@ -765,116 +772,178 @@ export default function TeacherDashboard({
   const leaderboardPlayers = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-bold mb-2">
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Trung Tâm Điều Hành Giáo Viên • Luyện Thi IELTS Nha Trang (Ms. Như)
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-7 space-y-6">
+      {/* Studio Hero Header Card (Clean & Hierarchy-Driven) */}
+      <div className="bg-white/95 dark:bg-slate-900 rounded-3xl border border-pink-200/80 dark:border-slate-800 shadow-[0_14px_38px_-18px_rgba(15,23,42,0.12)] p-6 sm:p-7 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-2 bg-[#FFF5F8] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-pink-200 dark:border-teal-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider">
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Trung Tâm Điều Hành • Ms. Như IELTS Nha Trang</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Bảng Điều Khiển Giáo Viên (Teacher Hub)</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Quản lý kho đề thi IELTS, bài tập 4 kỹ năng riêng biệt, chấm điểm AI, giám sát chống gian lận, Game PIN và tài khoản.</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Bảng Điều Khiển Giáo Viên
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+            Quản lý đề thi thử IELTS, bài tập 4 kỹ năng, theo dõi học sinh chưa làm bài, chấm điểm AI và phòng Game PIN trực tuyến.
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => openExamBuilder()}
-            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs sm:text-sm font-extrabold px-5 py-3 rounded-2xl shadow-md shadow-teal-900/15 transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
           </button>
           <button
             type="button"
             onClick={() => setTeacherHubTab('skill_exercises')}
-            className="bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+            className="bg-[#570DF8]/10 hover:bg-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD] hover:text-white border border-[#570DF8]/25 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-2xl transition flex items-center gap-2"
           >
             <Sparkles className="w-4 h-4" /> Tạo Bài Tập 4 Kỹ Năng
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTeacherHubTab('accounts');
-              setAddStudentMode('single');
-              setShowAddStudentModal(true);
-            }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
-          >
-            <UserPlus className="w-4 h-4" /> Tạo Tài Khoản
-          </button>
-          <button
-            onClick={() => handleTeacherOpenLobby(currentRoomPin)}
-            className="bg-[#059271] hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
-          >
-            <Rocket className="w-4 h-4" /> Sảnh Chờ Game PIN ({currentRoomPin})
-          </button>
-          <button
-            onClick={() => {
-              setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
-              setShowVocabModal(true);
-            }}
-            className="bg-[#F25220] hover:bg-[#d94417] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
-          >
-            <Edit className="w-4 h-4" /> Sửa Bộ Từ Game
           </button>
         </div>
       </div>
 
-      {/* Teacher Navigation Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 gap-2 flex-wrap">
+      {/* Interactive Overview KPI Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <button
+          type="button"
           onClick={() => setTeacherHubTab('tests')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'tests' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
+            teacherHubTab === 'tests'
+              ? 'bg-white dark:bg-slate-900 border-[#007A7A]/50 ring-2 ring-[#007A7A]/12 shadow-md'
+              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-[#007A7A]/40 hover:shadow-sm'
           }`}
         >
-          <BookOpen className="w-4 h-4" /> 1. Kho Đề Thi ({fullExamTests.length})
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Kho Đề Thi</span>
+            <span className="w-8 h-8 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center">
+              <BookOpen className="w-4 h-4" />
+            </span>
+          </div>
+          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{fullExamTests.length}</p>
+          <p className="text-[11px] text-[#007A7A] dark:text-[#1EE1D6] font-semibold mt-0.5">
+            {publicFullExamsCount} đề đang công khai
+          </p>
         </button>
+
         <button
+          type="button"
           onClick={() => setTeacherHubTab('skill_exercises')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'skill_exercises' ? 'border-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
+            teacherHubTab === 'skill_exercises'
+              ? 'bg-white dark:bg-slate-900 border-[#570DF8]/50 ring-2 ring-[#570DF8]/12 shadow-md'
+              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-[#570DF8]/40 hover:shadow-sm'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" /> 2. Bài Tập 4 Kỹ Năng ({skillExercises.length})
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Bài Tập 4 Kỹ Năng</span>
+            <span className="w-8 h-8 rounded-xl bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center">
+              <Sparkles className="w-4 h-4" />
+            </span>
+          </div>
+          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{skillExercises.length}</p>
+          <p className="text-[11px] text-[#570DF8] dark:text-[#C4B5FD] font-semibold mt-0.5">
+            Speaking AI · L · R · W
+          </p>
         </button>
+
         <button
+          type="button"
           onClick={() => setTeacherHubTab('grading')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'grading' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
+            teacherHubTab === 'grading'
+              ? 'bg-white dark:bg-slate-900 border-amber-500/60 ring-2 ring-amber-500/12 shadow-md'
+              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-amber-400 hover:shadow-sm'
           }`}
         >
-          <PenTool className="w-4 h-4" /> 3. Chấm Bài &amp; Giám Sát Chống Gian Lận ({attempts.length})
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Bài Nộp &amp; Chấm AI</span>
+            <span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300 flex items-center justify-center">
+              <PenTool className="w-4 h-4" />
+            </span>
+          </div>
+          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{attempts.length}</p>
+          <p className={`text-[11px] font-semibold mt-0.5 ${pendingGradingCount > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-emerald-600 dark:text-emerald-400'}`}>
+            {pendingGradingCount > 0 ? `${pendingGradingCount} bài đang chờ chấm` : 'Đã chấm toàn bộ bài nộp'}
+          </p>
         </button>
+
         <button
-          onClick={() => setTeacherHubTab('game_room')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            teacherHubTab === 'game_room' ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <Trophy className="w-4 h-4 text-amber-500" /> 4. Phòng Đấu Game PIN &amp; Bảng Xếp Hạng ({leaderboardPlayers.length})
-        </button>
-        <button
+          type="button"
           onClick={() => setTeacherHubTab('accounts')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-            (teacherHubTab === 'accounts' || teacherHubTab === 'students') ? 'border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
+            (teacherHubTab === 'accounts' || teacherHubTab === 'students')
+              ? 'bg-white dark:bg-slate-900 border-indigo-500/50 ring-2 ring-indigo-500/12 shadow-md'
+              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-indigo-400 hover:shadow-sm'
           }`}
         >
-          <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> 5. Tạo &amp; Quản Lý Tài Khoản ({allAccounts.length})
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Học Viên &amp; Game</span>
+            <span className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </span>
+          </div>
+          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{studentAccountsCount}</p>
+          <p className="text-[11px] text-indigo-600 dark:text-indigo-300 font-semibold mt-0.5">
+            PIN #{currentRoomPin} · {lobbyPlayersList.length} chờ
+          </p>
         </button>
+      </div>
+
+      {/* Segmented Pill Workspace Navigation */}
+      <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-2xl p-1.5 shadow-xs flex flex-wrap gap-1.5">
+        {[
+          { id: 'tests', label: '1. Kho Đề Thi', count: fullExamTests.length, icon: BookOpen, activeCls: 'bg-[#007A7A] text-white shadow-sm' },
+          { id: 'skill_exercises', label: '2. Bài Tập 4 Kỹ Năng', count: skillExercises.length, icon: Sparkles, activeCls: 'bg-[#570DF8] text-white shadow-sm' },
+          { id: 'grading', label: '3. Chấm Bài & Giám Sát', count: attempts.length, icon: PenTool, activeCls: 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-sm' },
+          { id: 'game_room', label: '4. Phòng Game PIN', count: `PIN #${currentRoomPin}`, icon: Trophy, activeCls: 'bg-emerald-600 text-white shadow-sm' },
+          { id: 'accounts', label: '5. Tài Khoản Lớp', count: allAccounts.length, icon: Users, activeCls: 'bg-indigo-600 text-white shadow-sm' }
+        ].map(tab => {
+          const IconComp = tab.icon;
+          const isActive =
+            teacherHubTab === tab.id || (tab.id === 'accounts' && teacherHubTab === 'students');
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setTeacherHubTab(tab.id)}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center gap-2 ${
+                isActive
+                  ? tab.activeCls
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-rose-50/70 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <IconComp className="w-4 h-4 shrink-0" />
+              <span>{tab.label}</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-black tabular-nums ${
+                  isActive
+                    ? 'bg-white/20 text-white dark:bg-slate-900/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab 2: Kho Bài Tập 4 Kỹ Năng Riêng Biệt */}
       {teacherHubTab === 'skill_exercises' && (
         <div className="space-y-4">
-          <div className="bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
+          <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-3xl p-5 space-y-3.5 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" />
                   Tạo Bài Tập Cho Từng Kỹ Năng Riêng Biệt
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Các bài tập riêng được xếp tách biệt tại đây để học viên luyện từng kỹ năng (Speaking AI, Listening, Reading, Writing) hoặc giáo viên giao về nhà.
+                  Chọn kỹ năng để soạn bài tập nhanh (Speaking AI, Listening, Reading, Writing) tách biệt khỏi bộ Đề Thi IELTS.
                 </p>
               </div>
             </div>
@@ -896,8 +965,8 @@ export default function TeacherDashboard({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-pink-200/80 dark:border-slate-800 text-xs font-bold">
               {[
                 { id: 'all', label: `Tất cả bài tập (${skillExercises.length})` },
                 { id: 'speaking', label: `Speaking AI (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'speaking').length})` },
@@ -920,22 +989,34 @@ export default function TeacherDashboard({
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setOnlyIncompleteFilter(prev => !prev)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
-                onlyIncompleteFilter
-                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
-              }`}
-            >
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>{onlyIncompleteFilter ? 'Đang lọc: Còn HS chưa làm' : 'Lọc bài còn HS chưa làm'}</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 flex-1 sm:flex-initial justify-end">
+              <div className="relative flex-1 sm:w-52">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={itemSearchQuery}
+                  onChange={e => setItemSearchQuery(e.target.value)}
+                  placeholder="Tìm bài tập..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#570DF8]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setOnlyIncompleteFilter(prev => !prev)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                  onlyIncompleteFilter
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-pink-200/80 dark:border-slate-800 hover:border-rose-300'
+                }`}
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{onlyIncompleteFilter ? 'Đang lọc: Còn HS chưa làm' : 'Lọc bài còn HS chưa làm'}</span>
+              </button>
+            </div>
           </div>
 
           {filteredSkillExercises.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-pink-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
               {onlyIncompleteFilter
                 ? 'Tất cả bài tập trong mục này đã được 100% học sinh hoàn thành!'
                 : 'Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút + Bài Tập Speaking AI / Listening / Reading / Writing phía trên để tạo ngay.'}
@@ -950,17 +1031,27 @@ export default function TeacherDashboard({
 
       {/* Tab 1: Kho Đề Thi */}
       {teacherHubTab === 'tests' && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+        <div className="space-y-4">
+          <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-2xl p-4 sm:px-5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
             <div>
-              <h2 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
-                Danh sách Đề Thi IELTS ({fullExamTests.length})
+              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                Danh Sách Đề Thi IELTS ({fullExamTests.length})
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Chỉ hiển thị các đề thi đầy đủ 3 phần Listening · Reading · Writing. Bấm badge <strong>Chưa làm: ... HS</strong> trên từng đề để xem ai chưa làm.
+                Đề thi chuẩn 3 phần Listening · Reading · Writing. Bấm <strong>Chưa làm: ... HS</strong> để kiểm tra và nhắc học sinh.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-44 sm:w-52">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={itemSearchQuery}
+                  onChange={e => setItemSearchQuery(e.target.value)}
+                  placeholder="Tìm đề thi..."
+                  className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setOnlyIncompleteFilter(prev => !prev)}
@@ -1361,7 +1452,7 @@ export default function TeacherDashboard({
                 onClick={() => handleTeacherOpenLobby(currentRoomPin)}
                 className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl transition shadow-lg flex items-center gap-2"
               >
-                <Rocket className="w-4 h-4" /> Mở Sảnh Chờ (Among Us)
+                <Rocket className="w-4 h-4" /> Mở Sảnh Chờ Phi Thuyền
               </button>
               {room.status !== 'LOBBY' && (
                 <button
@@ -1418,7 +1509,15 @@ export default function TeacherDashboard({
                       title="Xem hồ sơ thành viên"
                       className="flex items-center gap-2.5 text-left group"
                     >
-                      <AmongUsCrewmate colorId={lp.colorId} avatarUrl={lp.avatarUrl || usersDb[lp.username]?.avatarUrl || ''} size={28} />
+                      <AnimalPilotAvatar
+                        animalId={lp.animalId || 'cat'}
+                        accessoryId={lp.accessoryId || 'none'}
+                        colorId={lp.colorId}
+                        avatarUrl={lp.avatarUrl || usersDb[lp.username]?.avatarUrl || ''}
+                        size={32}
+                        animate={false}
+                        onShip={true}
+                      />
                       <div>
                         <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1 group-hover:text-teal-600 dark:group-hover:text-teal-400 group-hover:underline">
                           {lp.name}

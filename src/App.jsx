@@ -16,9 +16,9 @@ import {
   DEFAULT_ATTEMPTS,
   DEFAULT_USERS,
   DEFAULT_ROOMS,
-  DEFAULT_TEACHER_NOTES,
-  CREWMATE_COLORS
+  DEFAULT_TEACHER_NOTES
 } from './constants/seedData';
+import { drawAnimalSpaceshipCanvas } from './utils/animalRenderer';
 import {
   calculateAutoBand,
   calculateOverallIeltsBand,
@@ -198,7 +198,28 @@ export default function App() {
     return { pin: pinFromUrl.trim(), pass: '' };
   });
   const [roomJoinError, setRoomJoinError] = useState('');
-  const [myCrewColor, setMyCrewColor] = useState('cyan');
+  const [myCrewColor, setMyCrewColor] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ielts_game_pilot_prefs') || '{}').colorId || 'cyan';
+    } catch {
+      return 'cyan';
+    }
+  });
+  const [myAnimalId, setMyAnimalId] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ielts_game_pilot_prefs') || '{}').animalId || 'cat';
+    } catch {
+      return 'cat';
+    }
+  });
+  const [myAccessoryId, setMyAccessoryId] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ielts_game_pilot_prefs') || '{}').accessoryId || 'crown';
+    } catch {
+      return 'crown';
+    }
+  });
+  const avatarImageRef = useRef(null);
   const [lobbyCountdown, setLobbyCountdown] = useState(null);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
   const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal' });
@@ -780,6 +801,9 @@ export default function App() {
     queues: { 1: [], 2: [], 3: [] },
     isSandbox: false,
     paused: false,
+    crewColorId: 'cyan',
+    animalId: 'cat',
+    accessoryId: 'crown',
     timeLimit: GAME_ROUND_TIME_LIMITS[1],
     questionResolved: false
   });
@@ -1324,6 +1348,8 @@ export default function App() {
       name: currentUser.name || currentUser.username,
       role: 'student',
       colorId: lobbyInfo?.colorId || myCrewColor,
+      animalId: lobbyInfo?.animalId || myAnimalId,
+      accessoryId: lobbyInfo?.accessoryId || myAccessoryId,
       avatarUrl: currentUser.avatarUrl || '',
       score: scoreVal,
       streak: streakVal,
@@ -1438,6 +1464,8 @@ export default function App() {
     name: user.name || user.username,
     role: user.role,
     colorId: overrides.colorId ?? (user.avatarUrl && myCrewColor === 'avatar' ? 'avatar' : myCrewColor),
+    animalId: overrides.animalId ?? myAnimalId,
+    accessoryId: overrides.accessoryId ?? myAccessoryId,
     avatarUrl: overrides.avatarUrl ?? user.avatarUrl ?? '',
     ready: overrides.ready ?? (user.role === 'teacher'),
     chat: '',
@@ -1736,17 +1764,12 @@ export default function App() {
     setView(currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME');
   };
 
-  const handleChangeCrewColor = (colorId) => {
-    if (colorId === 'avatar' && !currentUser?.avatarUrl) {
-      setShowAvatarModal(true);
-      showToast('Hãy tải lên ảnh Avatar trước để dùng làm mặt nhân vật!', 'info');
-      return;
-    }
-    setMyCrewColor(colorId);
+  const updateLobbyPilotCustomization = (patch) => {
     const activePin = joinedRoomPin || currentRoomPin;
     if (!activePin || !currentUser) return;
     const avatarUrl = currentUser.avatarUrl || '';
-    const fallbackPlayer = buildLobbyPlayerEntry(currentUser, { colorId, avatarUrl });
+    const fullPatch = { ...patch, avatarUrl };
+    const fallbackPlayer = buildLobbyPlayerEntry(currentUser, fullPatch);
     setRoomsDb(prev => {
       const r = normalizeRoomObject(prev[activePin], activePin);
       const currPlayer = r.lobbyPlayers?.[currentUser.username] || fallbackPlayer;
@@ -1756,7 +1779,7 @@ export default function App() {
           ...r,
           lobbyPlayers: {
             ...r.lobbyPlayers,
-            [currentUser.username]: { ...currPlayer, colorId, avatarUrl }
+            [currentUser.username]: { ...currPlayer, ...fullPatch }
           }
         }
       };
@@ -1764,9 +1787,29 @@ export default function App() {
     dispatchSyncAction('UPDATE_LOBBY_PLAYER', {
       pin: activePin,
       username: currentUser.username,
-      patch: { colorId, avatarUrl },
+      patch: fullPatch,
       fallbackPlayer
     });
+  };
+
+  const handleChangeCrewColor = (colorId) => {
+    if (colorId === 'avatar' && !currentUser?.avatarUrl) {
+      setShowAvatarModal(true);
+      showToast('Hãy tải lên ảnh Avatar trước để dùng làm mặt nhân vật!', 'info');
+      return;
+    }
+    setMyCrewColor(colorId);
+    updateLobbyPilotCustomization({ colorId });
+  };
+
+  const handleChangeAnimal = (animalId) => {
+    setMyAnimalId(animalId);
+    updateLobbyPilotCustomization({ animalId });
+  };
+
+  const handleChangeAccessory = (accessoryId) => {
+    setMyAccessoryId(accessoryId);
+    updateLobbyPilotCustomization({ accessoryId });
   };
 
   const handleToggleLobbyReady = () => {
@@ -1813,6 +1856,8 @@ export default function App() {
       name: currentUser.name || currentUser.username,
       role: currentUser.role,
       colorId: me.colorId || myCrewColor,
+      animalId: me.animalId || myAnimalId,
+      accessoryId: me.accessoryId || myAccessoryId,
       text: cleanText,
       createdAt: now,
       timeStr: new Date(now).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
@@ -3246,10 +3291,34 @@ export default function App() {
     return idx;
   };
 
-  // Sync mutable color id for Canvas spaceship rendering
+  // Sync mutable pilot prefs for Canvas spaceship rendering & persist locally
   useEffect(() => {
     gameRuntimeRef.current.crewColorId = myCrewColor;
-  }, [myCrewColor]);
+    gameRuntimeRef.current.animalId = myAnimalId;
+    gameRuntimeRef.current.accessoryId = myAccessoryId;
+    try {
+      localStorage.setItem(
+        'ielts_game_pilot_prefs',
+        JSON.stringify({ colorId: myCrewColor, animalId: myAnimalId, accessoryId: myAccessoryId })
+      );
+    } catch {}
+  }, [myCrewColor, myAnimalId, myAccessoryId]);
+
+  useEffect(() => {
+    const url = currentUser?.avatarUrl || '';
+    if (!url || typeof Image === 'undefined') {
+      avatarImageRef.current = null;
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      avatarImageRef.current = img;
+    };
+    img.onerror = () => {
+      avatarImageRef.current = null;
+    };
+    img.src = url;
+  }, [currentUser?.avatarUrl]);
 
   // Helper to spawn particle bursts inside Space Arena Canvas
   const pushGameParticles = (x, y, color = '#00f2fe', count = 18) => {
@@ -3359,6 +3428,8 @@ export default function App() {
       paused: false,
       speedMode,
       crewColorId: myCrewColor,
+      animalId: myAnimalId,
+      accessoryId: myAccessoryId,
       timeLimit: r1Limit,
       questionResolved: false
     };
@@ -3429,6 +3500,8 @@ export default function App() {
       paused: false,
       speedMode,
       crewColorId: myCrewColor,
+      animalId: myAnimalId,
+      accessoryId: myAccessoryId,
       timeLimit: getSpeedAdjustedTimeLimit(roundNum, speedMode),
       questionResolved: false
     };
@@ -3940,7 +4013,7 @@ export default function App() {
 
     const fireBullet = () => {
       if (gameRuntimeRef.current.round === 1 && gameRuntimeRef.current.subState === 'PLAYING' && !gameRuntimeRef.current.paused) {
-        bullets.push({ x: playerX, y: height - 52, speed: 13 });
+        bullets.push({ x: playerX, y: height - 74, speed: 13 });
         playSound('shoot');
       }
     };
@@ -4133,7 +4206,7 @@ export default function App() {
       // Draw Chickens (Round 1) — smoothly descend with timer
       if (rt.round === 1 && rt.subState === 'PLAYING') {
         const topBaseY = Math.max(46, height * 0.14);
-        const maxDescendY = Math.max(topBaseY + 20, height - 155);
+        const maxDescendY = Math.max(topBaseY + 20, height - 172);
         chickens.forEach(c => {
           if (!rt.paused) {
             c.wingPhase += isFrozen ? 0.03 : 0.1;
@@ -4204,7 +4277,7 @@ export default function App() {
         const swayX = Math.sin(Date.now() * 0.0025) * Math.min(75, width * 0.14);
         const bossX = width / 2 + swayX;
         const startBossY = Math.max(58, height * 0.2);
-        const endBossY = Math.max(startBossY + 35, height - 98);
+        const endBossY = Math.max(startBossY + 35, height - 118);
         const bossY = startBossY + elapsedRatio * (endBossY - startBossY);
 
         // Update active homing laser targets
@@ -4305,49 +4378,21 @@ export default function App() {
         ctx.restore();
       }
 
-      // Draw Player Spaceship with Crewmate cockpit visor & glowing thruster
+      // Draw Player Spaceship with chosen Animal Pilot + Accessory inside Glass Cockpit (Rounds 1, 2 & 3)
       const shipX = rt.round === 1 ? playerX : width / 2;
-      const crewPalette = CREWMATE_COLORS.find(c => c.id === rt.crewColorId);
-      const hullColor = crewPalette ? crewPalette.fill : (rt.round === 1 ? '#00f2fe' : '#a855f7');
-      ctx.save();
-      ctx.translate(shipX, height - 34);
-
-      // Animated Thruster Flame
-      if (!rt.paused) {
-        const flameLen = 14 + Math.random() * 8;
-        ctx.fillStyle = rt.combo >= 3 ? '#fbbf24' : '#38bdf8';
-        ctx.beginPath();
-        ctx.moveTo(-6, 10);
-        ctx.lineTo(0, 10 + flameLen);
-        ctx.lineTo(6, 10);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Main Hull + Wings
-      ctx.fillStyle = hullColor;
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, -22);
-      ctx.lineTo(20, 14);
-      ctx.lineTo(0, 8);
-      ctx.lineTo(-20, 14);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Crewmate Visor Cockpit
-      ctx.fillStyle = '#bae6fd';
-      ctx.beginPath();
-      ctx.roundRect(-6, -9, 12, 8, 4);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.ellipse(-2, -6.5, 2.5, 1.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
+      drawAnimalSpaceshipCanvas(ctx, {
+        x: shipX,
+        y: height - 48,
+        animalId: rt.animalId || 'cat',
+        accessoryId: rt.accessoryId || 'crown',
+        colorId: rt.crewColorId || 'cyan',
+        combo: rt.combo,
+        round: rt.round,
+        isFrozen,
+        paused: rt.paused,
+        timeMs: Date.now(),
+        avatarImg: avatarImageRef.current
+      });
 
       animFrameRef.current = requestAnimationFrame(renderLoop);
     };
@@ -4530,6 +4575,8 @@ export default function App() {
           gameToast={gameToast}
           gameTypedProgress={gameTypedProgress}
           gameWordIdx={gameWordIdx}
+          handleChangeAccessory={handleChangeAccessory}
+          handleChangeAnimal={handleChangeAnimal}
           handleChangeCrewColor={handleChangeCrewColor}
           handleClearLobbyChatNow={handleClearLobbyChatNow}
           handleCopyInviteLink={handleCopyInviteLink}
@@ -4560,6 +4607,8 @@ export default function App() {
           lobbyCountdown={lobbyCountdown}
           lobbyCountdownTimerRef={lobbyCountdownTimerRef}
           lobbyNowTick={lobbyNowTick}
+          myAccessoryId={myAccessoryId}
+          myAnimalId={myAnimalId}
           myCrewColor={myCrewColor}
           openMemberProfile={openMemberProfile}
           roomJoinError={roomJoinError}
@@ -4572,6 +4621,8 @@ export default function App() {
           setHostRoomDraft={setHostRoomDraft}
           setLobbyChatInput={setLobbyChatInput}
           setLobbyCountdown={setLobbyCountdown}
+          setMyAccessoryId={setMyAccessoryId}
+          setMyAnimalId={setMyAnimalId}
           setMyCrewColor={setMyCrewColor}
           setRoomJoinError={setRoomJoinError}
           setRoomJoinForm={setRoomJoinForm}
@@ -4758,6 +4809,8 @@ export default function App() {
         handleUpdateUserAvatar={handleUpdateUserAvatar}
         handleUpdateUserProfileFields={handleUpdateUserProfileFields}
         isGradingAI={isGradingAI}
+        myAccessoryId={myAccessoryId}
+        myAnimalId={myAnimalId}
         myCrewColor={myCrewColor}
         newRoomForm={newRoomForm}
         newStudentForm={newStudentForm}

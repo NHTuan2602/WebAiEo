@@ -1260,3 +1260,31 @@ export const CREWMATE_COLORS = [
   { id: 'purple', label: 'Tím', fill: '#8b5cf6', shade: '#6d28d9' },
   { id: 'white', label: 'Trắng', fill: '#e2e8f0', shade: '#94a3b8' }
 ];
+
+export const ANIMAL_CHARACTERS = [
+  { id: 'cat', label: 'Mèo Cam', body: '#fb923c', belly: '#ffedd5', innerEar: '#fda4af', accent: '#c2410c' },
+  { id: 'shiba', label: 'Cún Shiba', body: '#eab308', belly: '#fef9c3', innerEar: '#fde047', accent: '#854d0e' },
+  { id: 'bunny', label: 'Thỏ Hồng', body: '#f472b6', belly: '#fdf2f8', innerEar: '#fbcfe8', accent: '#be185d' },
+  { id: 'panda', label: 'Gấu Trúc', body: '#f8fafc', belly: '#e2e8f0', innerEar: '#1e293b', accent: '#0f172a' },
+  { id: 'fox', label: 'Cáo Rừng', body: '#ef4444', belly: '#fff7ed', innerEar: '#fed7aa', accent: '#991b1b' },
+  { id: 'penguin', label: 'Cánh Cụt', body: '#334155', belly: '#f8fafc', innerEar: '#94a3b8', accent: '#f59e0b' },
+  { id: 'frog', label: 'Ếch IELTS', body: '#22c55e', belly: '#dcfce7', innerEar: '#86efac', accent: '#15803d' },
+  { id: 'lion', label: 'Sư Tử', body: '#f59e0b', belly: '#fef3c7', innerEar: '#fde68a', accent: '#b45309' }
+];
+
+export const ANIMAL_ACCESSORIES = [
+  { id: 'none', label: 'Tự nhiên', icon: '✨' },
+  { id: 'crown', label: 'Vương Miện', icon: '👑' },
+  { id: 'headphones', label: 'Tai Nghe', icon: '🎧' },
+  { id: 'glasses', label: 'Kính Râm', icon: '🕶️' },
+  { id: 'grad_cap', label: 'Mũ Cử Nhân', icon: '🎓' },
+  { id: 'helmet', label: 'Mũ Vũ Trụ', icon: '👩‍🚀' },
+  { id: 'bow', label: 'Nơ Xinh', icon: '🎀' },
+  { id: 'halo', label: 'Hào Quang', icon: '😇' }
+];
+
+export const normalizeAnimalId = (animalId) =>
+  ANIMAL_CHARACTERS.some(a => a.id === animalId) ? animalId : 'cat';
+
+export const normalizeAccessoryId = (accessoryId) =>
+  ANIMAL_ACCESSORIES.some(a => a.id === accessoryId) ? accessoryId : 'none';
