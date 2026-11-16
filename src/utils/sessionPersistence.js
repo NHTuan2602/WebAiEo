@@ -29,6 +29,7 @@ export function buildInitialExamState(test = null) {
     sectionIdx: 0,
     timeRemaining: (cfg.durations[firstSkill] || 15) * 60,
     answers: {},
+    bookmarkedQuestions: {},
     audioPlays: { mainAudio: 0 },
     highlights: [],
     notes: [],
@@ -38,7 +39,8 @@ export function buildInitialExamState(test = null) {
     listeningTrackIdx: 0,
     showAllListeningQs: false,
     readingPassageIdx: 0,
-    showAllReadingQs: false
+    showAllReadingQs: false,
+    writingTaskIdx: 0
   };
 }
 
@@ -68,6 +70,7 @@ export function loadExamDraft(username, testId, testsList = []) {
           ? parsed.timeRemaining
           : (cfg.durations[restoredSkill] || 15) * 60,
       answers: parsed.answers || {},
+      bookmarkedQuestions: parsed.bookmarkedQuestions && typeof parsed.bookmarkedQuestions === 'object' ? parsed.bookmarkedQuestions : {},
       audioPlays: parsed.audioPlays || { mainAudio: 0 },
       highlights: Array.isArray(parsed.highlights) ? parsed.highlights : [],
       notes: Array.isArray(parsed.notes) ? parsed.notes : [],
@@ -77,7 +80,8 @@ export function loadExamDraft(username, testId, testsList = []) {
       listeningTrackIdx: Number(parsed.listeningTrackIdx) || 0,
       showAllListeningQs: Boolean(parsed.showAllListeningQs),
       readingPassageIdx: Number(parsed.readingPassageIdx) || 0,
-      showAllReadingQs: Boolean(parsed.showAllReadingQs)
+      showAllReadingQs: Boolean(parsed.showAllReadingQs),
+      writingTaskIdx: Number(parsed.writingTaskIdx) === 1 ? 1 : 0
     };
   } catch (_err) {
     return null;

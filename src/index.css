@@ -119,6 +119,32 @@ html.dark ::-webkit-scrollbar {
   height: 8px;
 }
 
+.font-exam {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+.cd-exam-scroll::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.cd-exam-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cd-exam-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 9999px;
+}
+
+html.dark .cd-exam-scroll::-webkit-scrollbar-thumb {
+  background: rgba(217, 155, 0, 0.65);
+}
+
+html.dark .cd-exam-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(234, 179, 8, 0.9);
+}
+
 html.dark ::-webkit-scrollbar-track {
   background: #0f172a;
 }

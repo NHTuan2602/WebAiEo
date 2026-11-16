@@ -2608,9 +2608,12 @@ export default function App() {
     setSelectedPassageText('');
   };
 
-  const addNote = () => {
+  const addNote = (customNoteText = null) => {
     if (!selectedPassageText) return;
-    const noteContent = prompt('Nhập ghi chú cho đoạn văn bản đã chọn:', '');
+    const noteContent =
+      typeof customNoteText === 'string'
+        ? customNoteText.trim()
+        : prompt('Nhập ghi chú cho đoạn văn bản đã chọn:', '');
     if (noteContent) {
       setExamState(prev => ({
         ...prev,

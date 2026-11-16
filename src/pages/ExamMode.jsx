@@ -1,25 +1,25 @@
 import { useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BookOpen,
+  Bookmark,
   Check,
   CheckCircle,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
   Clock,
   Eye,
-  GraduationCap,
   Headphones,
   Lock,
   LogOut,
+  Menu,
   MessageSquare,
   Moon,
   PenTool,
   Play,
   Send,
   Sun,
+  Type,
   Volume2,
   X
 } from 'lucide-react';
@@ -31,7 +31,28 @@ import {
 } from '../constants/seedData';
 import { extractBlankNumbers } from '../utils/clozeHelpers';
 import { getWordCount } from '../utils/examHelpers';
+import {
+  buildScopedNavParts,
+  getQuestionDisplayNumber,
+  getQuestionRangeText,
+  parseReadingPassageBlocks,
+  segmentTextWithHighlights
+} from '../utils/examUiHelpers';
 import ClozeNoteSheet from '../components/exam/ClozeNoteSheet';
+import ExamQuestionList from '../components/exam/ExamQuestionList';
+import SplitResizableWorkspace from '../components/exam/SplitResizableWorkspace';
+
+const FONT_SIZE_CLASSES = {
+  regular: 'text-[15.5px] leading-[1.65]',
+  large: 'text-[17px] leading-[1.7]',
+  xl: 'text-[18.5px] leading-[1.75]'
+};
+
+const FONT_SIZE_LABELS = {
+  regular: 'Regular',
+  large: 'Large',
+  xl: 'XL'
+};
 
 export default function ExamMode({
   addHighlight,
@@ -61,7 +82,11 @@ export default function ExamMode({
 }) {
   const [activeBlankNum, setActiveBlankNum] = useState(null);
   const [activeQuestionId, setActiveQuestionId] = useState(null);
-  const [showNotesDrawer, setShowNotesDrawer] = useState(false);
+  const [splitPercent, setSplitPercent] = useState(50);
+  const [fontSizeMode, setFontSizeMode] = useState('regular');
+  const [showMenuDrawer, setShowMenuDrawer] = useState(false);
+  const [showInlineNoteForm, setShowInlineNoteForm] = useState(false);
+  const [inlineNoteDraft, setInlineNoteDraft] = useState('');
   const [showSubmitLockedModal, setShowSubmitLockedModal] = useState(false);
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
 
@@ -71,21 +96,21 @@ export default function ExamMode({
   const activeTest = tests.find(t => t.id === selectedTestId);
   if (!activeTest) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#020618] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 text-center shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/60 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-[#F4F5F7] dark:bg-[#121212] flex items-center justify-center p-6 font-exam">
+        <div className="max-w-md w-full bg-white dark:bg-[#1B1B1B] border border-[#D5D9E0] dark:border-[#333333] rounded-2xl p-6 text-center shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
             <BookOpen className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white mb-2">
+          <h2 className="text-lg font-extrabold text-[#111827] dark:text-white mb-2">
             Đang khôi phục phiên làm bài...
           </h2>
-          <p className="text-xs text-[#62748E] dark:text-slate-400 leading-relaxed mb-5">
+          <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed mb-5">
             Dữ liệu đáp án của bạn đã được lưu tạm an toàn trên trình duyệt. Nếu đề thi chưa tự hiển thị sau vài giây đồng bộ, hãy quay về trang chính để chọn lại đề và tiếp tục từ vị trí cũ.
           </p>
           <button
             type="button"
             onClick={onExitMissingTest}
-            className="w-full py-2.5 px-4 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-sm font-bold transition shadow-md"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-bold transition shadow-md"
           >
             Quay về Trang Chủ
           </button>
@@ -99,11 +124,16 @@ export default function ExamMode({
     typeof examState.sectionIdx === 'number'
       ? Math.min(Math.max(0, examState.sectionIdx), cfg.order.length - 1)
       : Math.max(0, cfg.order.indexOf(examState.skill));
+
   const skillMeta = {
     listening: { label: 'Listening', icon: Headphones },
     reading: { label: 'Reading', icon: BookOpen },
     writing: { label: 'Writing', icon: PenTool }
   };
+
+  const fontSizeClass = FONT_SIZE_CLASSES[fontSizeMode] || FONT_SIZE_CLASSES.regular;
+  const bookmarkedQuestions = examState.bookmarkedQuestions || {};
+  const activeWritingTask = Number(examState.writingTaskIdx) === 1 ? 1 : 0;
 
   const readingPassages = getReadingPassages(activeTest.reading);
   const safePassageIdx = Math.min(Math.max(0, examState.readingPassageIdx || 0), readingPassages.length - 1);
@@ -133,6 +163,8 @@ export default function ExamMode({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const remainingMinutesLabel = `${Math.max(1, Math.ceil((examState.timeRemaining || 0) / 60))} minutes remaining`;
+
   const visitedSkillsList = Array.from(new Set([...(examState.visitedSkills || []), examState.skill]));
   const visitedInOrderCount = cfg.order.filter(sId => visitedSkillsList.includes(sId)).length;
   const allSkillsVisited = cfg.order.every(sId => visitedSkillsList.includes(sId));
@@ -144,8 +176,9 @@ export default function ExamMode({
   const answeredReadingCount = allReadingQs.filter(q => String(examState.answers[q.id] || '').trim().length > 0).length;
   const w1Words = getWordCount(examState.answers.w1);
   const w2Words = getWordCount(examState.answers.w2);
+  const task1MinWords = activeTest.writing?.task1?.minWords || 150;
+  const task2MinWords = activeTest.writing?.task2?.minWords || 250;
 
-  // Filter standalone question cards so fill blanks already present in ClozeNoteSheet are never rendered twice
   const activeListeningCloze = activeTrack?.clozeText || '';
   const listeningClozeSet = new Set(extractBlankNumbers(activeListeningCloze));
   const standaloneListeningQs = displayedListeningQs.filter(
@@ -160,9 +193,23 @@ export default function ExamMode({
 
   const listeningNeedsLeftPane = Boolean(activeTrack?.imageUrl || activeTrack?.contextText);
 
+  const toggleBookmarkQuestion = (qId) => {
+    if (!qId) return;
+    setExamState(prev => {
+      const nextBookmarks = { ...(prev.bookmarkedQuestions || {}) };
+      if (nextBookmarks[qId]) {
+        delete nextBookmarks[qId];
+      } else {
+        nextBookmarks[qId] = true;
+      }
+      return { ...prev, bookmarkedQuestions: nextBookmarks };
+    });
+  };
+
   const scrollToQuestionOrBlank = (q, fallbackIdx) => {
     setActiveQuestionId(q.id);
-    const blankTarget = typeof q.blankNum === 'number' ? q.blankNum : null;
+    const derivedNum = getQuestionDisplayNumber(q, fallbackIdx + 1);
+    const blankTarget = typeof q.blankNum === 'number' ? q.blankNum : (q.type === 'fill' ? derivedNum : null);
     if (blankTarget && blankInputRefs.current[blankTarget]) {
       setActiveBlankNum(blankTarget);
       const inputEl = blankInputRefs.current[blankTarget];
@@ -181,138 +228,133 @@ export default function ExamMode({
     }
   };
 
-  // Bottom navigator dataset (Listening Parts or Reading Passages)
+  // Bottom navigator dataset across Parts / Passages / Writing Tasks
   const navParts =
     examState.skill === 'listening'
-      ? listeningTracks.map((tr, idx) => {
-          const partQs = hasScopedListeningQs
-            ? allListeningQs.filter(q => typeof q.trackIdx !== 'number' || q.trackIdx === idx)
-            : allListeningQs;
-          return { idx, label: listeningTracks.length > 1 ? `Part ${idx + 1}` : 'Listening', questions: partQs };
+      ? buildScopedNavParts({
+          items: listeningTracks,
+          allQuestions: allListeningQs,
+          hasScopedQs: hasScopedListeningQs,
+          scopeField: 'trackIdx',
+          multiLabelPrefix: 'PART',
+          singleLabel: 'LISTENING'
         })
       : examState.skill === 'reading'
-      ? readingPassages.map((p, idx) => {
-          const partQs = hasScopedReadingQs
-            ? allReadingQs.filter(q => typeof q.passageIdx !== 'number' || q.passageIdx === idx)
-            : allReadingQs;
-          return { idx, label: readingPassages.length > 1 ? `Passage ${idx + 1}` : 'Reading', questions: partQs };
+      ? buildScopedNavParts({
+          items: readingPassages,
+          allQuestions: allReadingQs,
+          hasScopedQs: hasScopedReadingQs,
+          scopeField: 'passageIdx',
+          multiLabelPrefix: 'PASSAGE',
+          singleLabel: 'READING'
         })
-      : [];
+      : [
+          { idx: 0, offset: 0, label: 'TASK 1', questions: [{ id: 'w1', num: 1, answered: w1Words > 0 }] },
+          { idx: 1, offset: 1, label: 'TASK 2', questions: [{ id: 'w2', num: 2, answered: w2Words > 0 }] }
+        ];
 
-  const activePartIdx = examState.skill === 'listening' ? safeTrackIdx : safePassageIdx;
-  const activePartQs = navParts[activePartIdx]?.questions || [];
+  const activePartIdx =
+    examState.skill === 'listening'
+      ? safeTrackIdx
+      : examState.skill === 'reading'
+      ? safePassageIdx
+      : activeWritingTask;
 
-  const handleStepQuestion = (delta) => {
-    if (activePartQs.length === 0) return;
-    const currentIdx = activePartQs.findIndex(q => q.id === activeQuestionId);
-    const nextIdx =
-      currentIdx === -1
-        ? delta > 0
-          ? 0
-          : activePartQs.length - 1
-        : Math.max(0, Math.min(activePartQs.length - 1, currentIdx + delta));
-    const targetQ = activePartQs[nextIdx];
-    if (targetQ) scrollToQuestionOrBlank(targetQ, nextIdx);
+  const activePartObj = navParts[activePartIdx] || navParts[0];
+  const activePartQs = activePartObj?.questions || [];
+  const activePartRange =
+    examState.skill === 'writing'
+      ? `${activeWritingTask + 1}–${activeWritingTask + 1}`
+      : getQuestionRangeText(activePartQs, activePartObj?.offset || 0);
+
+  const readingBaseOffset = examState.showAllReadingQs ? 0 : activePartObj?.offset || 0;
+  const listeningBaseOffset = examState.showAllListeningQs ? 0 : activePartObj?.offset || 0;
+
+  const switchPartIndex = (targetIdx, skillType = examState.skill) => {
+    setActiveBlankNum(null);
+    setActiveQuestionId(null);
+    if (skillType === 'listening') {
+      setExamState(prev => ({ ...prev, listeningTrackIdx: targetIdx }));
+    } else if (skillType === 'reading') {
+      setExamState(prev => ({ ...prev, readingPassageIdx: targetIdx }));
+    } else {
+      setExamState(prev => ({ ...prev, writingTaskIdx: targetIdx }));
+    }
   };
 
-  const renderQuestionCard = (q, displayNum, scopeSetterField) => (
-    <div
-      key={q.id}
-      ref={el => {
-        if (el) questionCardRefs.current[q.id] = el;
-      }}
-      onClick={() => {
-        setActiveQuestionId(q.id);
-        setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
-      }}
-      className={`p-4 sm:p-5 rounded-2xl border transition ${
-        activeQuestionId === q.id
-          ? 'bg-[#EDFFFD]/60 dark:bg-[#003538]/30 border-[#007A7A] dark:border-[#1EE1D6] shadow-xs'
-          : 'bg-slate-50 dark:bg-slate-800/55 border-slate-200 dark:border-slate-700/90'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="font-bold text-[#0F172B] dark:text-slate-100 text-xs sm:text-sm leading-relaxed">
-          {q.question}
-        </p>
-        {scopeSetterField === 'listening' && typeof q.trackIdx === 'number' && listeningTracks.length > 1 && (
-          <button
-            type="button"
-            onClick={e => {
-              e.stopPropagation();
-              setExamState(prev => ({
-                ...prev,
-                listeningTrackIdx: Math.min(q.trackIdx, listeningTracks.length - 1)
-              }));
-            }}
-            className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30"
-          >
-            Part {q.trackIdx + 1}
-          </button>
-        )}
-        {scopeSetterField === 'reading' && typeof q.passageIdx === 'number' && readingPassages.length > 1 && (
-          <button
-            type="button"
-            onClick={e => {
-              e.stopPropagation();
-              setExamState(prev => ({ ...prev, readingPassageIdx: q.passageIdx }));
-            }}
-            className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30"
-          >
-            Bài {q.passageIdx + 1}
-          </button>
-        )}
-      </div>
+  const handleStepQuestion = (delta) => {
+    if (examState.skill === 'writing') {
+      const nextTask = Math.max(0, Math.min(1, activeWritingTask + delta));
+      switchPartIndex(nextTask, 'writing');
+      return;
+    }
+    if (activePartQs.length === 0) return;
 
-      {(q.type === 'mcq' || q.type === 'tfng') && (
-        <div className="space-y-1.5">
-          {(q.options || []).map((opt, optIdx) => {
-            const isSelected = examState.answers[q.id] === opt;
-            return (
-              <label
-                key={optIdx}
-                className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer transition border ${
-                  isSelected
-                    ? 'bg-[#EDFFFD] dark:bg-teal-500/15 border-[#007A7A] dark:border-[#1EE1D6]'
-                    : 'hover:bg-white dark:hover:bg-slate-800 border-transparent hover:border-slate-200 dark:hover:border-slate-700'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`${scopeSetterField}_q_${q.id}`}
-                  value={opt}
-                  checked={isSelected}
-                  onChange={e =>
-                    setExamState(prev => ({
-                      ...prev,
-                      answers: { ...prev.answers, [q.id]: e.target.value }
-                    }))
-                  }
-                  className="mt-0.5 text-[#007A7A] focus:ring-[#007A7A]"
-                />
-                <span className="text-xs sm:text-[13px] text-[#0F172B] dark:text-slate-200 font-medium">{opt}</span>
-              </label>
-            );
-          })}
-        </div>
-      )}
+    const currentIdx = activePartQs.findIndex(q => q.id === activeQuestionId);
+    if (currentIdx === -1) {
+      const startIdx = delta > 0 ? 0 : activePartQs.length - 1;
+      if (activePartQs[startIdx]) scrollToQuestionOrBlank(activePartQs[startIdx], startIdx);
+      return;
+    }
 
-      {q.type === 'fill' && (
-        <input
-          type="text"
-          placeholder={`Câu ${Number(String(q.question || '').trim().match(/^(?:Câu\s*)?(\d+)[.)]/i)?.[1]) || displayNum}: Nhập đáp án...`}
-          value={examState.answers[q.id] || ''}
-          onChange={e =>
-            setExamState(prev => ({
-              ...prev,
-              answers: { ...prev.answers, [q.id]: e.target.value }
-            }))
-          }
-          className="w-full max-w-md px-4 py-2 bg-white dark:bg-[#0B1117] text-[#0F172B] dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-full text-xs sm:text-sm font-semibold focus:border-[#007A7A] dark:focus:border-[#1EE1D6] focus:ring-2 focus:ring-[#00B2AD]/30 focus:outline-none"
-        />
-      )}
-    </div>
-  );
+    const nextIdx = currentIdx + delta;
+    if (nextIdx >= 0 && nextIdx < activePartQs.length) {
+      scrollToQuestionOrBlank(activePartQs[nextIdx], nextIdx);
+      return;
+    }
+
+    // Move across Passage / Listening Part boundaries seamlessly
+    const targetPartIdx = activePartIdx + (delta > 0 ? 1 : -1);
+    if (targetPartIdx >= 0 && targetPartIdx < navParts.length) {
+      switchPartIndex(targetPartIdx, examState.skill);
+      const nextPartQs = navParts[targetPartIdx]?.questions || [];
+      const edgeQ = delta > 0 ? nextPartQs[0] : nextPartQs[nextPartQs.length - 1];
+      if (edgeQ) {
+        setTimeout(() => scrollToQuestionOrBlank(edgeQ, delta > 0 ? 0 : nextPartQs.length - 1), 80);
+      }
+    }
+  };
+
+  const handleRequestSubmit = () => {
+    if (!allSkillsVisited) {
+      setShowSubmitLockedModal(true);
+      showToast?.(`Còn kỹ năng chưa hoàn tất: ${unvisitedLabels.join(', ')}.`, 'info');
+      return;
+    }
+    setShowSubmitConfirmModal(true);
+  };
+
+  const handleSubmitInlineNote = (e) => {
+    e?.preventDefault();
+    const cleaned = inlineNoteDraft.trim();
+    if (!cleaned) return;
+    addNote?.(cleaned);
+    setInlineNoteDraft('');
+    setShowInlineNoteForm(false);
+  };
+
+  const handleCancelInlineNote = () => {
+    setInlineNoteDraft('');
+    setShowInlineNoteForm(false);
+    addNote?.('');
+  };
+
+  const renderHighlightRuns = (text) => {
+    const runs = segmentTextWithHighlights(text, examState.highlights);
+    return runs.map((run, idx) =>
+      run.color ? (
+        <mark
+          key={idx}
+          style={{ backgroundColor: run.color }}
+          className="text-[#111827] rounded-[3px] px-0.5 py-0.5 font-medium"
+        >
+          {run.text}
+        </mark>
+      ) : (
+        <span key={idx}>{run.text}</span>
+      )
+    );
+  };
 
   const audioPercent =
     audioProgress.duration > 0
@@ -321,127 +363,144 @@ export default function ExamMode({
       ? 42
       : 0;
 
+  const bookmarkedList = [
+    ...allListeningQs.map((q, idx) => ({ skill: 'listening', q, num: getQuestionDisplayNumber(q, idx + 1) })),
+    ...allReadingQs.map((q, idx) => ({ skill: 'reading', q, num: getQuestionDisplayNumber(q, idx + 1) }))
+  ].filter(item => Boolean(bookmarkedQuestions[item.q.id]));
+
+  const currentWritingKey = activeWritingTask === 0 ? 'w1' : 'w2';
+  const currentWritingCfg = activeWritingTask === 0 ? activeTest.writing?.task1 : activeTest.writing?.task2;
+  const currentWritingWords = activeWritingTask === 0 ? w1Words : w2Words;
+  const currentWritingMinWords = activeWritingTask === 0 ? task1MinWords : task2MinWords;
+
   return (
     <div
       onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
-      className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B1117] text-[#0F172B] dark:text-slate-100 flex flex-col justify-between select-none transition-colors"
+      className="min-h-screen bg-[#F4F5F7] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam"
     >
-      {/* LexiPrep Computer-Delivered Exam Header */}
-      <header className="bg-white dark:bg-[#111820] text-[#0F172B] dark:text-white px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/90 shadow-xs sticky top-0 z-50">
-        {/* Left: Monogram + Title + Skill Tabs */}
-        <div className="flex items-center gap-3 flex-wrap min-w-0">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="w-7 h-7 rounded-lg bg-[#007A7A] text-white flex items-center justify-center shadow-xs">
-              <GraduationCap className="w-4 h-4" />
-            </span>
-            <span className="font-extrabold text-sm tracking-tight hidden sm:inline">IELTS Ms. Như</span>
-            <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">/</span>
+      {/* Top Computer-Delivered Header (matches Real IELTS bar) */}
+      <header className="bg-white dark:bg-[#161616] text-[#111827] dark:text-white px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-[#D5D9E0] dark:border-[#2C2C2C] sticky top-0 z-50">
+        {/* Left: Golden IELTS emblem + Test Title + Minutes Remaining */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-black text-[11px] flex items-center justify-center shrink-0 shadow-sm ring-2 ring-amber-400/30"
+            title="Luyện Thi IELTS Nha Trang — IELTS with Ms. Như"
+          >
+            IELTS
           </div>
-          <h2 className="font-bold text-xs sm:text-sm truncate max-w-[200px] sm:max-w-[260px]" title={activeTest.title}>
-            {activeTest.title}
-          </h2>
-
-          {/* Skill Tabs */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl text-[11px] gap-1 border border-slate-200/80 dark:border-slate-700">
-            {cfg.order.map((sId, idx) => {
-              const meta = skillMeta[sId] || { label: sId, icon: BookOpen };
-              const IconComp = meta.icon;
-              const isCurrent = examState.skill === sId && idx === currentSectionIdx;
-              const isDone = cfg.sequentialMode && idx < currentSectionIdx;
-              const isLocked = cfg.sequentialMode && idx !== currentSectionIdx;
-              const isVisited = visitedSkillsList.includes(sId);
-
-              return (
-                <button
-                  key={sId}
-                  type="button"
-                  disabled={isLocked}
-                  title={
-                    isLocked
-                      ? `Chế độ tuần tự: Hết giờ ${skillMeta[examState.skill]?.label || ''} hệ thống tự chuyển phần.`
-                      : `Kỹ năng ${meta.label} (${cfg.durations[sId]} phút)${isVisited ? ' • Đã xem' : ''}`
-                  }
-                  onClick={() => {
-                    if (isLocked || isCurrent) return;
-                    stopExamAudio();
-                    setActiveBlankNum(null);
-                    setActiveQuestionId(null);
-                    setExamState(prev => ({
-                      ...prev,
-                      skill: sId,
-                      sectionIdx: idx,
-                      visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), sId]))
-                    }));
-                  }}
-                  className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition ${
-                    isCurrent
-                      ? 'bg-[#007A7A] text-white shadow-xs'
-                      : isDone
-                      ? 'text-[#059271] dark:text-emerald-400 cursor-not-allowed opacity-85'
-                      : isLocked
-                      ? 'text-slate-400 dark:text-slate-500 cursor-not-allowed'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <IconComp className="w-3 h-3" />
-                  <span>{meta.label}</span>
-                  {isLocked && !isDone && <Lock className="w-2.5 h-2.5 opacity-70" />}
-                  {(isDone || (!isLocked && !isCurrent && isVisited)) && <Check className="w-3 h-3 text-[#059271] dark:text-emerald-400" />}
-                </button>
-              );
-            })}
+          <div className="min-w-0">
+            <h2
+              className="font-extrabold text-xs sm:text-sm text-[#111827] dark:text-white truncate max-w-[180px] sm:max-w-[320px] md:max-w-[420px]"
+              title={activeTest.title}
+            >
+              {activeTest.title}
+            </h2>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-neutral-300 font-medium">
+              <span>{remainingMinutesLabel}</span>
+              <span className="opacity-40">•</span>
+              <span
+                className={`inline-flex items-center gap-1 font-mono font-bold px-1.5 py-0.5 rounded ${
+                  examState.timeRemaining <= 60
+                    ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse'
+                    : 'bg-slate-100 dark:bg-[#242424] text-[#111827] dark:text-[#E5E7EB]'
+                }`}
+              >
+                <Clock className="w-3 h-3 text-amber-500" />
+                {formatTime(examState.timeRemaining)}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Center Countdown */}
-        <div
-          className={`flex items-center gap-2 font-mono font-bold text-xs sm:text-sm px-3.5 py-1.5 rounded-xl border ${
-            examState.timeRemaining <= 60
-              ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-500/50 animate-pulse'
-              : 'bg-slate-50 dark:bg-slate-900 text-[#0F172B] dark:text-slate-200 border-slate-200 dark:border-slate-700'
-          }`}
-          title={cfg.sequentialMode ? 'Hết giờ kỹ năng sẽ tự chuyển sang phần tiếp theo' : 'Thời gian còn lại'}
-        >
-          <Clock className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
-          <span>{formatTime(examState.timeRemaining)}</span>
-          <span className="text-[11px] font-sans font-medium text-slate-500 dark:text-slate-400 hidden xl:inline">
-            remaining
-          </span>
+        {/* Center: Compact Skill Tabs */}
+        <div className="hidden md:flex items-center bg-[#EEF1F5] dark:bg-[#222222] p-1 rounded-lg text-xs gap-1 border border-[#D5D9E0] dark:border-[#343434] shrink-0">
+          {cfg.order.map((sId, idx) => {
+            const meta = skillMeta[sId] || { label: sId, icon: BookOpen };
+            const IconComp = meta.icon;
+            const isCurrent = examState.skill === sId && idx === currentSectionIdx;
+            const isDone = cfg.sequentialMode && idx < currentSectionIdx;
+            const isLocked = cfg.sequentialMode && idx !== currentSectionIdx;
+            const isVisited = visitedSkillsList.includes(sId);
+
+            return (
+              <button
+                key={sId}
+                type="button"
+                disabled={isLocked}
+                title={
+                  isLocked
+                    ? `Chế độ tuần tự: Hết giờ ${skillMeta[examState.skill]?.label || ''} hệ thống tự chuyển phần.`
+                    : `Kỹ năng ${meta.label} (${cfg.durations[sId]} phút)`
+                }
+                onClick={() => {
+                  if (isLocked || isCurrent) return;
+                  stopExamAudio();
+                  setActiveBlankNum(null);
+                  setActiveQuestionId(null);
+                  setExamState(prev => ({
+                    ...prev,
+                    skill: sId,
+                    sectionIdx: idx,
+                    visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), sId]))
+                  }));
+                }}
+                className={`px-3 py-1.5 rounded-md font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+                  isCurrent
+                    ? 'bg-[#2563EB] text-white shadow-xs'
+                    : isDone
+                    ? 'text-emerald-600 dark:text-emerald-400 cursor-not-allowed opacity-85'
+                    : isLocked
+                    ? 'text-slate-400 dark:text-neutral-500 cursor-not-allowed'
+                    : 'text-slate-700 dark:text-neutral-300 hover:bg-white dark:hover:bg-[#2E2E2E]'
+                }`}
+              >
+                <IconComp className="w-3.5 h-3.5" />
+                <span>{meta.label}</span>
+                {isLocked && !isDone && <Lock className="w-3 h-3 opacity-70" />}
+                {(isDone || (!isLocked && !isCurrent && isVisited)) && (
+                  <Check className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Right Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Right: Actions + Contrast + Drawer Menu + Submit */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {cfg.sequentialMode && cfg.allowEarlyNextSection && currentSectionIdx < cfg.order.length - 1 && (
             <button
               type="button"
               onClick={() => advanceToNextExamSection(false)}
-              className="bg-[#007A7A] hover:bg-[#065B5B] text-white font-bold text-xs px-3 py-1.5 rounded-xl transition shadow-xs flex items-center gap-1"
+              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1 whitespace-nowrap"
             >
-              <span>Phần Tiếp</span>
+              <span className="hidden sm:inline">Phần Tiếp</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {(examState.highlights.length > 0 || examState.notes.length > 0) && (
-            <button
-              type="button"
-              onClick={() => setShowNotesDrawer(v => !v)}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 flex items-center gap-1.5 transition"
-              title="Xem ghi chú & highlight đã lưu"
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              <span>{examState.highlights.length + examState.notes.length}</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={() => setDarkMode(d => !d)}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition"
-            title={darkMode ? 'Giao diện Sáng' : 'Giao diện Tối'}
-            aria-label={darkMode ? 'Giao diện Sáng' : 'Giao diện Tối'}
+            className="p-2 rounded-lg bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition"
+            title={darkMode ? 'Chế độ Sáng (Black on White)' : 'Chế độ Tối (White on Black)'}
+            aria-label={darkMode ? 'Chế độ Sáng' : 'Chế độ Tối'}
           >
-            {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#007A7A]" />}
+            {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#2563EB]" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowMenuDrawer(true)}
+            className="relative p-2 rounded-lg bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-100 border border-[#D5D9E0] dark:border-[#383838] transition"
+            title="Cài đặt màn hình, Highlight, Đánh dấu & Thoát"
+            aria-label="Mở menu tùy chọn phòng thi"
+          >
+            <Menu className="w-4 h-4" />
+            {(examState.highlights.length + examState.notes.length + bookmarkedList.length > 0) && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
+                {examState.highlights.length + examState.notes.length + bookmarkedList.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -453,273 +512,499 @@ export default function ExamMode({
                 setShowExitConfirmModal(true);
               }
             }}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition flex items-center gap-1"
-            title={
-              currentUser?.role === 'teacher'
-                ? 'Thoát chế độ xem trước và quay về Bảng Quản Trị Giáo Viên'
-                : 'Lưu nháp bài làm và tạm quay về Trang Chủ'
-            }
+            className="hidden sm:flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition items-center gap-1 whitespace-nowrap"
+            title={currentUser?.role === 'teacher' ? 'Thoát xem trước' : 'Lưu nháp & Tạm Thoát'}
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">
-              {currentUser?.role === 'teacher' ? 'Thoát Xem Trước' : 'Tạm Thoát'}
-            </span>
+            <span>{currentUser?.role === 'teacher' ? 'Thoát' : 'Tạm Thoát'}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              if (!allSkillsVisited) {
-                setShowSubmitLockedModal(true);
-                showToast?.(
-                  `Còn kỹ năng chưa hoàn tất: ${unvisitedLabels.join(', ')}.`,
-                  'info'
-                );
-                return;
-              }
-              setShowSubmitConfirmModal(true);
-            }}
+            onClick={handleRequestSubmit}
             title={
               allSkillsVisited
-                ? 'Bấm để xác nhận nộp bài thi'
-                : `Bạn cần đi qua cả ${cfg.order.length} kỹ năng (${unvisitedLabels.join(', ')}) mới có thể nộp bài. Bấm để xem hướng dẫn.`
+                ? 'Xác nhận nộp bài thi'
+                : `Cần đi qua cả ${cfg.order.length} kỹ năng (${unvisitedLabels.join(', ')}) để nộp bài.`
             }
-            className={`font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 border cursor-pointer ${
+            className={`font-bold text-xs px-3 sm:px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 border cursor-pointer whitespace-nowrap ${
               allSkillsVisited
-                ? 'bg-[#059271] hover:bg-emerald-700 text-white border-[#059271] shadow-xs'
-                : 'bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-xs'
+                : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border-amber-500/40'
             }`}
           >
             {!allSkillsVisited ? <Lock className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
-            <span>
-              {allSkillsVisited ? 'Submit' : `Nộp (${visitedInOrderCount}/${cfg.order.length})`}
-            </span>
+            <span>{allSkillsVisited ? 'Nộp Bài' : `Nộp (${visitedInOrderCount}/${cfg.order.length})`}</span>
           </button>
         </div>
       </header>
 
-      {/* Collapsible Highlights & Notes Drawer */}
-      {showNotesDrawer && (examState.highlights.length > 0 || examState.notes.length > 0) && (
-        <div className="bg-white dark:bg-[#111820] border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex flex-wrap items-start gap-2 text-xs max-h-40 overflow-y-auto">
-          <span className="text-[10px] font-extrabold uppercase text-slate-400 shrink-0 mt-1">Highlight &amp; Notes:</span>
-          {examState.highlights.map(h => (
-            <span
-              key={h.id}
-              style={{ backgroundColor: h.color }}
-              className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 rounded-full text-[11px] font-medium text-slate-900 max-w-xs"
+      {/* Mobile Skill Switcher Row */}
+      <div className="md:hidden bg-white dark:bg-[#161616] border-b border-[#D5D9E0] dark:border-[#2C2C2C] px-3 py-1.5 flex items-center justify-center gap-1 overflow-x-auto">
+        {cfg.order.map((sId, idx) => {
+          const meta = skillMeta[sId] || { label: sId, icon: BookOpen };
+          const IconComp = meta.icon;
+          const isCurrent = examState.skill === sId && idx === currentSectionIdx;
+          const isDone = cfg.sequentialMode && idx < currentSectionIdx;
+          const isLocked = cfg.sequentialMode && idx !== currentSectionIdx;
+          return (
+            <button
+              key={sId}
+              type="button"
+              disabled={isLocked}
+              onClick={() => {
+                if (isLocked || isCurrent) return;
+                stopExamAudio();
+                setActiveBlankNum(null);
+                setActiveQuestionId(null);
+                setExamState(prev => ({
+                  ...prev,
+                  skill: sId,
+                  sectionIdx: idx,
+                  visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), sId]))
+                }));
+              }}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 whitespace-nowrap ${
+                isCurrent
+                  ? 'bg-[#2563EB] text-white'
+                  : isDone
+                  ? 'text-emerald-500'
+                  : isLocked
+                  ? 'text-slate-400 dark:text-neutral-600'
+                  : 'text-slate-600 dark:text-neutral-300 bg-slate-100 dark:bg-[#242424]'
+              }`}
             >
-              <span className="break-words">{h.text}</span>
-              <button
-                type="button"
-                onClick={() =>
-                  setExamState(prev => ({
-                    ...prev,
-                    highlights: prev.highlights.filter(item => item.id !== h.id)
-                  }))
-                }
-                className="p-0.5 rounded-full hover:bg-black/15 transition shrink-0"
-                title="Xóa highlight này"
-                aria-label="Xóa highlight"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-          {examState.notes.map(n => (
-            <span
-              key={n.id}
-              className="inline-flex items-start gap-1.5 bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] pl-2.5 pr-1.5 py-1 rounded-xl text-[11px] font-semibold border border-[#B5F5F1] dark:border-teal-500/30 max-w-sm"
-            >
-              <span className="break-words leading-snug">
-                📝 {n.note}
-                {n.text ? <span className="block text-[10px] font-normal opacity-75 italic">“{n.text}”</span> : null}
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setExamState(prev => ({
-                    ...prev,
-                    notes: prev.notes.filter(item => item.id !== n.id)
-                  }))
-                }
-                className="p-0.5 rounded-full hover:bg-teal-900/15 dark:hover:bg-white/15 transition shrink-0 mt-0.5"
-                title="Xóa ghi chú này"
-                aria-label="Xóa ghi chú"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={() => setShowNotesDrawer(false)}
-            className="ml-auto text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0 p-1"
-            title="Thu gọn thanh ghi chú"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
+              <IconComp className="w-3 h-3" />
+              <span>{meta.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Horizontal Listening Audio Bar (Sleek LexiPrep Computer-Delivered Bar) */}
-      {examState.skill === 'listening' && (
-        <div className="bg-slate-50/90 dark:bg-[#0D1319] border-b border-slate-200/90 dark:border-slate-800/80 px-4 sm:px-6 py-2.5">
-          <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            {/* Multi-Part Pills if >1 track */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {listeningTracks.length > 1 ? (
-                listeningTracks.map((tr, trIdx) => {
-                  const trKey = getListeningAudioKey(tr, trIdx);
-                  const trPlays = examState.audioPlays[trKey] || 0;
-                  const maxPlays = activeTest.maxAudioPlays || 1;
-                  const isPlayingThis = isPlayingAudio && playingAudioKey === trKey;
-                  const isSelected = trIdx === safeTrackIdx;
-
-                  return (
-                    <button
-                      key={tr.id || trIdx}
-                      type="button"
-                      onClick={() => {
-                        setActiveBlankNum(null);
-                        setActiveQuestionId(null);
-                        setExamState(prev => ({ ...prev, listeningTrackIdx: trIdx }));
-                      }}
-                      className={`px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1.5 border ${
-                        isSelected
-                          ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                      }`}
-                    >
-                      <span>{tr.title || `Part ${trIdx + 1}`}</span>
-                      <span className="text-[10px] font-mono opacity-85">
-                        {isPlayingThis ? '▶' : `${trPlays}/${maxPlays}`}
-                      </span>
-                    </button>
-                  );
-                })
-              ) : (
-                <span className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] flex items-center gap-1.5">
-                  <Headphones className="w-4 h-4" />
-                  <span>{activeTrack?.title || 'Listening Section'}</span>
-                </span>
-              )}
+      {/* Text-Selection Floating Highlight & Inline Note Toolbar */}
+      {selectedPassageText && (
+        <div className="bg-[#1F2937] dark:bg-[#262626] border-b border-[#374151] dark:border-[#404040] px-4 py-2 text-white">
+          <div className="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[11px] text-neutral-300 font-semibold shrink-0">Đoạn đã chọn:</span>
+              <span className="truncate max-w-md italic text-amber-300">“{selectedPassageText}”</span>
             </div>
 
-            {/* Signature Centered Progress Strip & No-Rewind Play Control */}
-            <div className="flex items-center gap-3 flex-1 justify-center min-w-[240px]">
-              <button
-                type="button"
-                onClick={() => handlePlayListeningAudio(activeTrackPlayKey, activeTrack?.transcript || '', activeTrack?.audioUrl || '')}
-                disabled={(examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays || isPlayingAudio}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
-                  (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
-                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                    : isPlayingAudio
-                    ? 'bg-[#007A7A]/20 text-[#007A7A] dark:text-[#1EE1D6] border border-[#00B2AD]/40 animate-pulse cursor-wait'
-                    : 'bg-[#007A7A] hover:bg-[#065B5B] text-white shadow-xs'
-                }`}
-              >
-                {isPlayingAudio ? <Volume2 className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                <span>
-                  {isPlayingAudio && playingAudioKey === activeTrackPlayKey
-                    ? 'Đang Phát'
-                    : (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
-                    ? 'Đã Nghe Hết'
-                    : 'Phát Audio'}
-                </span>
-              </button>
-
-              <div className="flex items-center gap-2.5 flex-1 max-w-xs">
-                <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full bg-[#00B2AD] rounded-full transition-all duration-300 ${
-                      isPlayingAudio && audioProgress.duration === 0 ? 'animate-pulse' : ''
-                    }`}
-                    style={{ width: `${audioPercent}%` }}
-                  />
-                </div>
-                <span className="text-[11px] font-mono text-slate-600 dark:text-slate-300 tabular-nums shrink-0">
-                  {audioProgress.duration > 0
-                    ? `${formatTime(audioProgress.currentTime)} / ${formatTime(audioProgress.duration)}`
-                    : `${examState.audioPlays[activeTrackPlayKey] || 0}/${activeTest.maxAudioPlays}`}
-                </span>
-              </div>
-            </div>
-
-            {selectedPassageText && (
-              <div className="flex items-center gap-1.5 bg-[#0F172B] text-white px-3 py-1 rounded-full text-xs shadow-md">
-                <span className="text-[10px] text-slate-300">Highlight:</span>
-                <button onClick={() => addHighlight('#fef08a')} className="w-3.5 h-3.5 rounded-full bg-yellow-300 hover:scale-110 transition" title="Vàng" />
-                <button onClick={() => addHighlight('#bbf7d0')} className="w-3.5 h-3.5 rounded-full bg-emerald-300 hover:scale-110 transition" title="Xanh lá" />
-                <button onClick={addNote} className="ml-1 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded text-[10px] text-[#1EE1D6]">
-                  <MessageSquare className="w-3 h-3" /> Ghi chú
+            {!showInlineNoteForm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-neutral-300">Highlight:</span>
+                <button
+                  type="button"
+                  onClick={() => addHighlight('#fef08a')}
+                  className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition ring-1 ring-white/40"
+                  title="Highlight Vàng"
+                />
+                <button
+                  type="button"
+                  onClick={() => addHighlight('#bbf7d0')}
+                  className="w-4 h-4 rounded-full bg-emerald-300 hover:scale-110 transition ring-1 ring-white/40"
+                  title="Highlight Xanh lá"
+                />
+                <button
+                  type="button"
+                  onClick={() => addHighlight('#bae6fd')}
+                  className="w-4 h-4 rounded-full bg-sky-300 hover:scale-110 transition ring-1 ring-white/40"
+                  title="Highlight Xanh dương"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowInlineNoteForm(true)}
+                  className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-[11px] font-bold transition"
+                >
+                  <MessageSquare className="w-3 h-3" /> Thêm Ghi Chú
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelInlineNote}
+                  className="p-1 text-neutral-400 hover:text-white"
+                  title="Đóng"
+                >
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
+            ) : (
+              <form onSubmit={handleSubmitInlineNote} className="flex items-center gap-2 flex-1 max-w-lg">
+                <input
+                  type="text"
+                  autoFocus
+                  value={inlineNoteDraft}
+                  onChange={e => setInlineNoteDraft(e.target.value)}
+                  placeholder="Nhập ghi chú nhanh tại đây..."
+                  className="flex-1 h-7 px-2.5 rounded bg-[#111827] border border-neutral-600 text-xs text-white focus:border-amber-400 outline-none"
+                />
+                <button
+                  type="submit"
+                  className="px-2.5 h-7 rounded bg-emerald-600 hover:bg-emerald-700 text-[11px] font-bold"
+                >
+                  Lưu
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelInlineNote}
+                  className="px-2 h-7 rounded bg-neutral-700 hover:bg-neutral-600 text-[11px] font-semibold"
+                >
+                  Hủy
+                </button>
+              </form>
             )}
           </div>
         </div>
       )}
 
       {/* Main Computer-Delivered Workspace */}
-      <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 overflow-y-auto">
-        {/* LISTENING WORKSPACE */}
-        {examState.skill === 'listening' && (
-          <div className={listeningNeedsLeftPane ? 'grid grid-cols-1 lg:grid-cols-2 gap-5 lg:h-[71vh]' : 'max-w-5xl mx-auto space-y-6'}>
-            {/* Optional Diagram / Map / Context Left Pane (only if track has image/context) */}
-            {listeningNeedsLeftPane && (
-              <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 flex flex-col overflow-hidden shadow-xs">
-                <h3 className="font-extrabold text-[#0F172B] dark:text-white text-sm sm:text-base mb-3 pb-2.5 border-b border-slate-100 dark:border-slate-800">
-                  {activeTrack?.title || `Chủ đề ${safeTrackIdx + 1}`}
-                </h3>
-                <div
-                  onMouseUp={handlePassageTextSelect}
-                  className="flex-1 overflow-y-auto pr-2 text-[#314158] dark:text-slate-200 text-sm leading-relaxed whitespace-pre-line select-text font-serif"
+      <main className="flex-1 max-w-[1640px] w-full mx-auto px-3 sm:px-5 pt-3 pb-14 flex flex-col relative">
+        {/* Part / Passage / Task Banner Strip */}
+        <div className="rounded-lg border border-[#D5D9E0] dark:border-[#363636] bg-[#ECEFF3] dark:bg-[#242424] px-4 sm:px-5 py-2.5 mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-[#111827] dark:text-white">
+              {activePartObj?.label || (examState.skill === 'writing' ? `TASK ${activeWritingTask + 1}` : 'PART 1')}
+            </h1>
+            <p className="text-xs text-slate-600 dark:text-[#D1D5DB] mt-0.5">
+              {examState.skill === 'reading' &&
+                `Read the text and answer questions ${activePartRange || `1–${displayedReadingQs.length || 1}`}`}
+              {examState.skill === 'listening' &&
+                `Listen and answer questions ${activePartRange || `1–${displayedListeningQs.length || 1}`}`}
+              {examState.skill === 'writing' &&
+                `Read the prompt and answer questions ${activePartRange}`}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Inline Listening Audio Controller inside Banner */}
+            {examState.skill === 'listening' && (
+              <div className="flex items-center gap-2.5 bg-white dark:bg-[#171717] border border-[#CBD5E1] dark:border-[#383838] rounded-lg px-3 py-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePlayListeningAudio(
+                      activeTrackPlayKey,
+                      activeTrack?.transcript || '',
+                      activeTrack?.audioUrl || ''
+                    )
+                  }
+                  disabled={
+                    (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays || isPlayingAudio
+                  }
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
+                    (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
+                      ? 'bg-slate-200 dark:bg-[#2A2A2A] text-slate-400 cursor-not-allowed'
+                      : isPlayingAudio
+                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40 animate-pulse cursor-wait'
+                      : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white'
+                  }`}
                 >
-                  {activeTrack?.imageUrl && (
-                    <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-2">
-                      <img
-                        src={activeTrack.imageUrl}
-                        alt={`Listening Diagram ${safeTrackIdx + 1}`}
-                        onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
-                        className="w-full max-h-[48vh] object-contain rounded-lg mx-auto cursor-zoom-in"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
-                        className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline font-sans"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Phóng to ảnh / sơ đồ
-                      </button>
-                    </div>
-                  )}
-                  {activeTrack?.contextText}
+                  {isPlayingAudio ? <Volume2 className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                  <span>
+                    {isPlayingAudio && playingAudioKey === activeTrackPlayKey
+                      ? 'Đang Phát'
+                      : (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
+                      ? 'Đã Nghe Hết'
+                      : 'Phát Audio'}
+                  </span>
+                </button>
+                <div className="w-24 sm:w-36 h-1.5 bg-slate-200 dark:bg-[#303030] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#2563EB] dark:bg-amber-400 rounded-full transition-all duration-300"
+                    style={{ width: `${audioPercent}%` }}
+                  />
                 </div>
+                <span className="text-[11px] font-mono text-slate-600 dark:text-neutral-300 tabular-nums">
+                  {audioProgress.duration > 0
+                    ? `${formatTime(audioProgress.currentTime)} / ${formatTime(audioProgress.duration)}`
+                    : `${examState.audioPlays[activeTrackPlayKey] || 0}/${activeTest.maxAudioPlays}`}
+                </span>
               </div>
             )}
 
-            {/* Right / Centered Question Sheet (Cloze Note Completion + Standalone Questions) */}
-            <div className={`${listeningNeedsLeftPane ? 'bg-white dark:bg-[#0F172B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 flex flex-col overflow-y-auto shadow-xs' : ''} space-y-5`}>
-              {listeningTracks.length > 1 && hasScopedListeningQs && (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6]">
-                    {activeTrack?.title || `Part ${safeTrackIdx + 1}`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setExamState(prev => ({ ...prev, showAllListeningQs: !prev.showAllListeningQs }))}
-                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
-                  >
-                    {examState.showAllListeningQs ? `Chỉ xem Part ${safeTrackIdx + 1}` : `Xem tất cả (${allListeningQs.length})`}
-                  </button>
-                </div>
-              )}
+            {/* Toggle All Questions in Multi-Part */}
+            {examState.skill === 'reading' && readingPassages.length > 1 && hasScopedReadingQs && (
+              <button
+                type="button"
+                onClick={() => setExamState(prev => ({ ...prev, showAllReadingQs: !prev.showAllReadingQs }))}
+                className="text-[11px] font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
+              >
+                {examState.showAllReadingQs ? `Chỉ xem Passage ${safePassageIdx + 1}` : `Xem tất cả (${allReadingQs.length})`}
+              </button>
+            )}
+            {examState.skill === 'listening' && listeningTracks.length > 1 && hasScopedListeningQs && (
+              <button
+                type="button"
+                onClick={() => setExamState(prev => ({ ...prev, showAllListeningQs: !prev.showAllListeningQs }))}
+                className="text-[11px] font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
+              >
+                {examState.showAllListeningQs ? `Chỉ xem Part ${safeTrackIdx + 1}` : `Xem tất cả (${allListeningQs.length})`}
+              </button>
+            )}
 
-              {/* Inline Cloze / Note Completion Box */}
+            {/* Quick Text Size Toggle */}
+            <button
+              type="button"
+              onClick={() =>
+                setFontSizeMode(prev => (prev === 'regular' ? 'large' : prev === 'large' ? 'xl' : 'regular'))
+              }
+              className="text-[11px] font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] flex items-center gap-1 transition"
+              title="Đổi cỡ chữ đề thi"
+            >
+              <Type className="w-3.5 h-3.5" />
+              <span>{FONT_SIZE_LABELS[fontSizeMode]}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ============================================================
+            1. READING WORKSPACE (Resizable 2-Pane Split)
+           ============================================================ */}
+        {examState.skill === 'reading' && (
+          <SplitResizableWorkspace
+            splitPercent={splitPercent}
+            onChangeSplit={setSplitPercent}
+            left={
+              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
+                  <h3 className="font-extrabold text-[#111827] dark:text-white text-base sm:text-[17px] leading-snug">
+                    {activePassage?.title || `Passage ${safePassageIdx + 1}`}
+                  </h3>
+                </div>
+
+                <div
+                  onMouseUp={handlePassageTextSelect}
+                  className={`flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-4 select-text font-exam text-[#1F2937] dark:text-[#EDEDED] ${fontSizeClass}`}
+                >
+                  {activePassage?.imageUrl && (
+                    <div className="rounded-lg overflow-hidden border border-[#CBD5E1] dark:border-[#3A3A3A] bg-white p-2.5 relative">
+                      <img
+                        src={activePassage.imageUrl}
+                        alt={`Reading Passage ${safePassageIdx + 1}`}
+                        onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
+                        className="w-full max-h-[48vh] object-contain rounded mx-auto cursor-zoom-in"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
+                        className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] hover:underline"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Phóng to ảnh minh họa
+                      </button>
+                    </div>
+                  )}
+
+                  {parseReadingPassageBlocks(activePassage?.passageText).map(block => {
+                    if (block.kind === 'numberBox') {
+                      return (
+                        <div key={block.id} className="pt-2">
+                          <div className="w-36 sm:w-44 mx-auto text-center py-0.5 border border-[#9CA3AF] dark:border-[#555555] rounded-[4px] text-xs font-extrabold text-[#111827] dark:text-white bg-[#F3F4F6] dark:bg-[#222222]">
+                            {block.label}
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (block.kind === 'lead') {
+                      return (
+                        <p key={block.id} className="italic font-medium text-slate-600 dark:text-[#D4D4D4]">
+                          {renderHighlightRuns(block.text)}
+                        </p>
+                      );
+                    }
+                    if (block.kind === 'numberedParagraph') {
+                      return (
+                        <div key={block.id} className="space-y-2">
+                          <div className="w-36 sm:w-44 mx-auto text-center py-0.5 border border-[#9CA3AF] dark:border-[#555555] rounded-[4px] text-xs font-extrabold text-[#111827] dark:text-white bg-[#F3F4F6] dark:bg-[#222222]">
+                            {block.label}
+                          </div>
+                          <p>{renderHighlightRuns(block.text)}</p>
+                        </div>
+                      );
+                    }
+                    if (block.kind === 'letterParagraph') {
+                      return (
+                        <p key={block.id}>
+                          <strong className="font-extrabold text-[#111827] dark:text-white mr-2">{block.label}</strong>
+                          {renderHighlightRuns(block.text)}
+                        </p>
+                      );
+                    }
+                    return <p key={block.id}>{renderHighlightRuns(block.text)}</p>;
+                  })}
+                </div>
+              </div>
+            }
+            right={
+              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
+                  {activeReadingCloze.trim() && (
+                    <ClozeNoteSheet
+                      activeBlankNum={activeBlankNum}
+                      answers={examState.answers}
+                      bookmarkedQuestions={bookmarkedQuestions}
+                      clozeText={activeReadingCloze}
+                      fontSizeClass={fontSizeClass}
+                      inputRefs={blankInputRefs}
+                      onAnswerChange={(qId, val) =>
+                        setExamState(prev => ({
+                          ...prev,
+                          answers: { ...prev.answers, [qId]: val }
+                        }))
+                      }
+                      onBlankFocus={(num, qId) => {
+                        setActiveBlankNum(num);
+                        if (qId) setActiveQuestionId(qId);
+                      }}
+                      onPassageTextSelect={handlePassageTextSelect}
+                      onToggleBookmark={toggleBookmarkQuestion}
+                      questions={allReadingQs}
+                      scopeField="passageIdx"
+                      scopeIdx={safePassageIdx}
+                    />
+                  )}
+
+                  {standaloneReadingQs.length > 0 ? (
+                    <ExamQuestionList
+                      activeQuestionId={activeQuestionId}
+                      answers={examState.answers}
+                      baseOffset={readingBaseOffset}
+                      bookmarkedQuestions={bookmarkedQuestions}
+                      fontSizeClass={fontSizeClass}
+                      onAnswerChange={(qId, val) =>
+                        setExamState(prev => ({
+                          ...prev,
+                          answers: { ...prev.answers, [qId]: val }
+                        }))
+                      }
+                      onSelectQuestion={q => {
+                        setActiveQuestionId(q.id);
+                        setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
+                      }}
+                      onSwitchScope={pIdx => switchPartIndex(pIdx, 'reading')}
+                      onToggleBookmark={toggleBookmarkQuestion}
+                      questionCardRefs={questionCardRefs}
+                      questions={standaloneReadingQs}
+                      scopeLabelPrefix="Passage"
+                      scopeType="reading"
+                      showScopeBadge={examState.showAllReadingQs && readingPassages.length > 1}
+                    />
+                  ) : !activeReadingCloze.trim() ? (
+                    <p className="text-xs text-slate-500 dark:text-neutral-400 italic py-8 text-center">
+                      Chưa có câu hỏi gắn riêng cho Passage {safePassageIdx + 1}.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            }
+          />
+        )}
+
+        {/* ============================================================
+            2. LISTENING WORKSPACE (Resizable Split if diagram/context exists)
+           ============================================================ */}
+        {examState.skill === 'listening' &&
+          (listeningNeedsLeftPane ? (
+            <SplitResizableWorkspace
+              splitPercent={splitPercent}
+              onChangeSplit={setSplitPercent}
+              left={
+                <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+                  <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
+                    <h3 className="font-extrabold text-[#111827] dark:text-white text-base">
+                      {activeTrack?.title || `Part ${safeTrackIdx + 1}`}
+                    </h3>
+                  </div>
+                  <div
+                    onMouseUp={handlePassageTextSelect}
+                    className={`flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-4 select-text text-[#1F2937] dark:text-[#EDEDED] whitespace-pre-line ${fontSizeClass}`}
+                  >
+                    {activeTrack?.imageUrl && (
+                      <div className="rounded-lg overflow-hidden border border-[#CBD5E1] dark:border-[#3A3A3A] bg-white p-2.5">
+                        <img
+                          src={activeTrack.imageUrl}
+                          alt={`Listening Map ${safeTrackIdx + 1}`}
+                          onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                          className="w-full max-h-[48vh] object-contain rounded mx-auto cursor-zoom-in"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                          className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] hover:underline"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Phóng to bản đồ / sơ đồ
+                        </button>
+                      </div>
+                    )}
+                    {renderHighlightRuns(activeTrack?.contextText || '')}
+                  </div>
+                </div>
+              }
+              right={
+                <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
+                    {activeListeningCloze.trim() && (
+                      <ClozeNoteSheet
+                        activeBlankNum={activeBlankNum}
+                        answers={examState.answers}
+                        bookmarkedQuestions={bookmarkedQuestions}
+                        clozeText={activeListeningCloze}
+                        fontSizeClass={fontSizeClass}
+                        inputRefs={blankInputRefs}
+                        onAnswerChange={(qId, val) =>
+                          setExamState(prev => ({
+                            ...prev,
+                            answers: { ...prev.answers, [qId]: val }
+                          }))
+                        }
+                        onBlankFocus={(num, qId) => {
+                          setActiveBlankNum(num);
+                          if (qId) setActiveQuestionId(qId);
+                        }}
+                        onPassageTextSelect={handlePassageTextSelect}
+                        onToggleBookmark={toggleBookmarkQuestion}
+                        questions={allListeningQs}
+                        scopeField="trackIdx"
+                        scopeIdx={safeTrackIdx}
+                      />
+                    )}
+                    {standaloneListeningQs.length > 0 && (
+                      <ExamQuestionList
+                        activeQuestionId={activeQuestionId}
+                        answers={examState.answers}
+                        baseOffset={listeningBaseOffset}
+                        bookmarkedQuestions={bookmarkedQuestions}
+                        fontSizeClass={fontSizeClass}
+                        onAnswerChange={(qId, val) =>
+                          setExamState(prev => ({
+                            ...prev,
+                            answers: { ...prev.answers, [qId]: val }
+                          }))
+                        }
+                        onSelectQuestion={q => {
+                          setActiveQuestionId(q.id);
+                          setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
+                        }}
+                        onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
+                        onToggleBookmark={toggleBookmarkQuestion}
+                        questionCardRefs={questionCardRefs}
+                        questions={standaloneListeningQs}
+                        scopeLabelPrefix="Part"
+                        scopeType="listening"
+                        showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
+                      />
+                    )}
+                  </div>
+                </div>
+              }
+            />
+          ) : (
+            <div className="rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] p-5 sm:p-7 max-w-5xl w-full mx-auto space-y-5 flex-1 overflow-y-auto cd-exam-scroll">
               {activeListeningCloze.trim() && (
                 <ClozeNoteSheet
                   activeBlankNum={activeBlankNum}
                   answers={examState.answers}
+                  bookmarkedQuestions={bookmarkedQuestions}
                   clozeText={activeListeningCloze}
+                  fontSizeClass={fontSizeClass}
                   inputRefs={blankInputRefs}
                   onAnswerChange={(qId, val) =>
                     setExamState(prev => ({
@@ -732,367 +1017,511 @@ export default function ExamMode({
                     if (qId) setActiveQuestionId(qId);
                   }}
                   onPassageTextSelect={handlePassageTextSelect}
+                  onToggleBookmark={toggleBookmarkQuestion}
                   questions={allListeningQs}
                   scopeField="trackIdx"
                   scopeIdx={safeTrackIdx}
                 />
               )}
-
-              {/* Remaining / Non-cloze Questions */}
               {standaloneListeningQs.length > 0 ? (
-                <div className="space-y-4">
-                  {standaloneListeningQs.map((q, idx) => renderQuestionCard(q, idx + 1, 'listening'))}
-                </div>
-              ) : !activeListeningCloze.trim() ? (
-                <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                  Chưa có câu hỏi gắn cho Part {safeTrackIdx + 1}.
-                </div>
-              ) : null}
-            </div>
-          </div>
-        )}
-
-        {/* READING WORKSPACE */}
-        {examState.skill === 'reading' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:h-[75vh]">
-            {/* Left Split: Passage Viewer + Highlight Toolbar */}
-            <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 flex flex-col overflow-hidden shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800 mb-3">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {readingPassages.map((p, pIdx) => (
-                    <button
-                      key={p.id || pIdx}
-                      type="button"
-                      onClick={() => {
-                        setActiveBlankNum(null);
-                        setActiveQuestionId(null);
-                        setExamState(prev => ({ ...prev, readingPassageIdx: pIdx }));
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 border ${
-                        pIdx === safePassageIdx
-                          ? 'bg-[#007A7A] text-white border-[#007A7A] shadow-xs'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15'
-                      }`}
-                    >
-                      <span
-                        className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
-                          pIdx === safePassageIdx
-                            ? 'bg-white text-[#007A7A]'
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
-                        }`}
-                      >
-                        {pIdx + 1}
-                      </span>
-                      <span className="max-w-[140px] truncate">{p.title || `Bài ${pIdx + 1}`}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {selectedPassageText && (
-                  <div className="flex items-center gap-1.5 bg-[#0F172B] text-white px-3 py-1 rounded-full text-xs shadow-lg">
-                    <span className="text-[10px] text-slate-300 mr-1">Highlight:</span>
-                    <button onClick={() => addHighlight('#fef08a')} className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition" title="Vàng" />
-                    <button onClick={() => addHighlight('#bbf7d0')} className="w-4 h-4 rounded-full bg-emerald-300 hover:scale-110 transition" title="Xanh lá" />
-                    <button onClick={addNote} className="ml-2 flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-[10px] text-[#1EE1D6]">
-                      <MessageSquare className="w-3 h-3" /> Ghi chú
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <h3 className="font-extrabold text-[#0F172B] dark:text-white text-base mb-3">
-                {readingPassages.length > 1 ? `Bài ${safePassageIdx + 1}: ` : ''}
-                {activePassage?.title}
-              </h3>
-
-              <div
-                onMouseUp={handlePassageTextSelect}
-                className="flex-1 overflow-y-auto pr-3 text-[#314158] dark:text-slate-200 text-sm leading-relaxed whitespace-pre-line select-text font-serif"
-              >
-                {activePassage?.imageUrl && (
-                  <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-2 relative group">
-                    <img
-                      src={activePassage.imageUrl}
-                      alt={`Reading Passage ${safePassageIdx + 1}`}
-                      onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
-                      className="w-full max-h-[52vh] object-contain rounded-lg mx-auto cursor-zoom-in"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
-                      className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline font-sans"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Phóng to ảnh bài đọc #{safePassageIdx + 1}
-                    </button>
-                  </div>
-                )}
-                {activePassage?.passageText}
-              </div>
-            </div>
-
-            {/* Right Split: Reading Cloze Summary + Questions */}
-            <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 flex flex-col overflow-y-auto shadow-xs space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-                <h3 className="font-extrabold text-[#0F172B] dark:text-white text-base">
-                  Câu Hỏi Phần Reading {readingPassages.length > 1 && hasScopedReadingQs && !examState.showAllReadingQs ? `(Bài ${safePassageIdx + 1})` : ''}
-                </h3>
-                {readingPassages.length > 1 && hasScopedReadingQs && (
-                  <button
-                    type="button"
-                    onClick={() => setExamState(prev => ({ ...prev, showAllReadingQs: !prev.showAllReadingQs }))}
-                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
-                  >
-                    {examState.showAllReadingQs ? `Chỉ xem Bài ${safePassageIdx + 1}` : `Xem tất cả (${allReadingQs.length})`}
-                  </button>
-                )}
-              </div>
-
-              {activeReadingCloze.trim() && (
-                <ClozeNoteSheet
-                  activeBlankNum={activeBlankNum}
+                <ExamQuestionList
+                  activeQuestionId={activeQuestionId}
                   answers={examState.answers}
-                  clozeText={activeReadingCloze}
-                  inputRefs={blankInputRefs}
+                  baseOffset={listeningBaseOffset}
+                  bookmarkedQuestions={bookmarkedQuestions}
+                  fontSizeClass={fontSizeClass}
                   onAnswerChange={(qId, val) =>
                     setExamState(prev => ({
                       ...prev,
                       answers: { ...prev.answers, [qId]: val }
                     }))
                   }
-                  onBlankFocus={(num, qId) => {
-                    setActiveBlankNum(num);
-                    if (qId) setActiveQuestionId(qId);
+                  onSelectQuestion={q => {
+                    setActiveQuestionId(q.id);
+                    setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
                   }}
-                  onPassageTextSelect={handlePassageTextSelect}
-                  questions={allReadingQs}
-                  scopeField="passageIdx"
-                  scopeIdx={safePassageIdx}
+                  onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
+                  onToggleBookmark={toggleBookmarkQuestion}
+                  questionCardRefs={questionCardRefs}
+                  questions={standaloneListeningQs}
+                  scopeLabelPrefix="Part"
+                  scopeType="listening"
+                  showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
                 />
-              )}
-
-              {standaloneReadingQs.length > 0 ? (
-                <div className="space-y-4">
-                  {standaloneReadingQs.map((q, idx) => renderQuestionCard(q, idx + 1, 'reading'))}
-                </div>
-              ) : !activeReadingCloze.trim() ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400 italic py-6 text-center">
-                  Chưa có câu hỏi gắn riêng cho Bài {safePassageIdx + 1}. Hãy chuyển bài đọc hoặc bấm &quot;Xem tất cả&quot;.
+              ) : !activeListeningCloze.trim() ? (
+                <p className="text-xs text-slate-500 dark:text-neutral-400 text-center py-8">
+                  Chưa có câu hỏi gắn cho Part {safeTrackIdx + 1}.
                 </p>
               ) : null}
             </div>
-          </div>
-        )}
+          ))}
 
-        {/* WRITING WORKSPACE */}
+        {/* ============================================================
+            3. WRITING WORKSPACE (Single-Task Split Pane matching Screenshots 4 & 5)
+           ============================================================ */}
         {examState.skill === 'writing' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:h-[78vh]">
-            {/* Task 1 */}
-            <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between shadow-xs">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-3">
-                  <h3 className="font-extrabold text-[#0F172B] dark:text-white text-sm flex items-center gap-2">
-                    <PenTool className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Writing Task 1
+          <SplitResizableWorkspace
+            splitPercent={splitPercent}
+            onChangeSplit={setSplitPercent}
+            left={
+              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-3.5">
+                  <h3 className="text-base font-extrabold text-[#111827] dark:text-white">
+                    Questions {activeWritingTask + 1}
                   </h3>
-                  <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-bold ${
-                      w1Words >= (activeTest.writing?.task1?.minWords || 150)
-                        ? 'bg-[#ECFDF5] dark:bg-emerald-500/20 text-[#059271] dark:text-emerald-300'
-                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300'
-                    }`}
-                  >
-                    {w1Words} / {activeTest.writing?.task1?.minWords || 150} từ
-                  </span>
-                </div>
-
-                <p className="text-xs text-[#314158] dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 leading-relaxed mb-3">
-                  {activeTest.writing?.task1?.prompt}
-                </p>
-
-                {activeTest.writing?.task1?.imageUrl && (
-                  <div className="mb-3 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-2">
-                    <img
-                      src={activeTest.writing.task1.imageUrl}
-                      alt="Writing Task 1 Chart"
-                      className="w-full max-h-52 object-contain rounded-lg mx-auto"
-                    />
+                  <div className="text-xs sm:text-sm text-[#1F2937] dark:text-[#E5E7EB] space-y-1">
+                    <p>You should spend about {activeWritingTask === 0 ? 20 : 40} minutes on this task.</p>
+                    <p>
+                      Write at least <strong>{currentWritingMinWords} words</strong>.
+                    </p>
                   </div>
-                )}
+                  <div className="flex items-start gap-2.5 text-[#111827] dark:text-[#F3F4F6]">
+                    <span className="shrink-0 min-w-[26px] h-6 px-1.5 rounded bg-slate-100 dark:bg-[#262626] border border-[#CBD5E1] dark:border-[#404040] text-xs font-extrabold inline-flex items-center justify-center mt-0.5">
+                      {activeWritingTask + 1}
+                    </span>
+                    <p className={`${fontSizeClass} font-semibold leading-relaxed whitespace-pre-line`}>
+                      {currentWritingCfg?.prompt || 'Chưa có đề bài cho phần Writing này.'}
+                    </p>
+                  </div>
 
-                <textarea
-                  rows={12}
-                  placeholder="Viết bài Task 1 của bạn ở đây..."
-                  value={examState.answers.w1 || ''}
-                  onChange={e =>
-                    setExamState(prev => ({
-                      ...prev,
-                      answers: { ...prev.answers, w1: e.target.value }
-                    }))
-                  }
-                  className="w-full p-3.5 text-xs leading-relaxed bg-white dark:bg-[#0B1117] text-[#0F172B] dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none font-sans"
-                />
+                  {currentWritingCfg?.imageUrl && (
+                    <div className="rounded-lg border border-[#CBD5E1] dark:border-[#3A3A3A] bg-white p-3 mt-2">
+                      <img
+                        src={currentWritingCfg.imageUrl}
+                        alt={`Writing Task ${activeWritingTask + 1} Visual`}
+                        onClick={() => setZoomedReadingImg(currentWritingCfg.imageUrl)}
+                        className="w-full max-h-[46vh] object-contain mx-auto cursor-zoom-in rounded"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setZoomedReadingImg(currentWritingCfg.imageUrl)}
+                        className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] hover:underline"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Phóng to biểu đồ / hình minh họa
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* Task 2 */}
-            <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between shadow-xs">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-3">
-                  <h3 className="font-extrabold text-[#0F172B] dark:text-white text-sm flex items-center gap-2">
-                    <PenTool className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Writing Task 2
+            }
+            right={
+              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm sm:text-base font-extrabold text-[#111827] dark:text-white">
+                    Your answer
                   </h3>
                   <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-bold ${
-                      w2Words >= (activeTest.writing?.task2?.minWords || 250)
-                        ? 'bg-[#ECFDF5] dark:bg-emerald-500/20 text-[#059271] dark:text-emerald-300'
-                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                      currentWritingWords >= currentWritingMinWords
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
                     }`}
                   >
-                    {w2Words} / {activeTest.writing?.task2?.minWords || 250} từ
+                    {currentWritingWords >= currentWritingMinWords
+                      ? `✓ Đạt tối thiểu ${currentWritingMinWords} từ`
+                      : `Còn thiếu ${currentWritingMinWords - currentWritingWords} từ`}
                   </span>
                 </div>
 
-                <p className="text-xs text-[#314158] dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 leading-relaxed mb-3">
-                  {activeTest.writing?.task2?.prompt}
-                </p>
-
+                {/* High-contrast crisp white paper essay box matching Screenshots 4 & 5 */}
                 <textarea
-                  rows={12}
-                  placeholder="Viết bài Task 2 của bạn ở đây..."
-                  value={examState.answers.w2 || ''}
+                  value={examState.answers[currentWritingKey] || ''}
                   onChange={e =>
                     setExamState(prev => ({
                       ...prev,
-                      answers: { ...prev.answers, w2: e.target.value }
+                      answers: { ...prev.answers, [currentWritingKey]: e.target.value }
                     }))
                   }
-                  className="w-full p-3.5 text-xs leading-relaxed bg-white dark:bg-[#0B1117] text-[#0F172B] dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none font-sans"
+                  placeholder="Type your answer here..."
+                  className={`flex-1 w-full min-h-[300px] sm:min-h-[380px] p-4 rounded-md bg-white text-[#111827] border border-[#CBD5E1] dark:border-[#404040] focus:outline-none focus:ring-2 focus:ring-[#2563EB] resize-none font-exam ${fontSizeClass} select-text`}
                 />
+
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="inline-flex items-center gap-1.5 rounded bg-[#EFEFEF] dark:bg-[#262626] border border-[#D1D5DB] dark:border-[#3F3F46] px-2.5 py-1 text-xs font-bold text-[#111827] dark:text-white">
+                    <span className="text-slate-500 dark:text-neutral-400 font-semibold">Words Count:</span>
+                    <span className="font-mono font-extrabold text-sm">{currentWritingWords}</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+                    Tự động lưu nháp liên tục
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
+            }
+          />
         )}
+
+        {/* Floating Bottom-Right Question / Task Stepper Arrows (matching Screenshots 1–5) */}
+        <div className="fixed bottom-16 right-4 sm:right-6 z-40 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => handleStepQuestion(-1)}
+            className="w-9 h-9 rounded-md border border-[#CBD5E1] dark:border-[#404040] bg-white dark:bg-[#262626] hover:bg-slate-100 dark:hover:bg-[#333333] text-[#111827] dark:text-white shadow-md flex items-center justify-center transition"
+            title={examState.skill === 'writing' ? 'Task trước' : 'Câu trước'}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStepQuestion(1)}
+            className="w-9 h-9 rounded-md border border-[#CBD5E1] dark:border-[#404040] bg-white dark:bg-[#262626] hover:bg-slate-100 dark:hover:bg-[#333333] text-[#111827] dark:text-white shadow-md flex items-center justify-center transition"
+            title={examState.skill === 'writing' ? 'Task tiếp theo' : 'Câu tiếp theo'}
+          >
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
       </main>
 
-      {/* Bottom LexiPrep Computer-Delivered Question Navigator Bar (for Listening & Reading) */}
-      {(examState.skill === 'listening' || examState.skill === 'reading') && (
-        <footer className="bg-white dark:bg-[#0B1117] border-t border-slate-200 dark:border-slate-800/90 px-4 sm:px-6 py-2.5 sticky bottom-0 z-40">
-          <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-0.5 flex-1">
-              {navParts.map(part => {
-                const isActive = part.idx === activePartIdx;
-                const answeredInPart = part.questions.filter(
-                  q => String(examState.answers[q.id] || '').trim().length > 0
-                ).length;
+      {/* Bottom Sticky Part & Question Palette Bar (matches Screenshots 1–5) */}
+      <footer className="bg-white dark:bg-[#141414] border-t border-[#D5D9E0] dark:border-[#2C2C2C] px-3 sm:px-6 py-2 sticky bottom-0 z-40">
+        <div className="max-w-[1640px] mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 overflow-x-auto cd-exam-scroll flex-1 py-0.5">
+            {navParts.map(part => {
+              const isActive = part.idx === activePartIdx;
+              const answeredInPart =
+                examState.skill === 'writing'
+                  ? part.questions[0]?.answered
+                    ? 1
+                    : 0
+                  : part.questions.filter(q => String(examState.answers[q.id] || '').trim().length > 0).length;
 
-                if (!isActive) {
-                  return (
-                    <button
-                      key={part.idx}
-                      type="button"
-                      onClick={() => {
-                        setActiveBlankNum(null);
-                        setActiveQuestionId(null);
-                        setExamState(prev => ({
-                          ...prev,
-                          ...(examState.skill === 'listening'
-                            ? { listeningTrackIdx: part.idx }
-                            : { readingPassageIdx: part.idx })
-                        }));
-                      }}
-                      className="shrink-0 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#111820] hover:border-[#007A7A] text-xs font-bold text-[#314158] dark:text-slate-300 transition flex items-center gap-2"
-                    >
-                      <span>{part.label} :</span>
-                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                        {answeredInPart} of {part.questions.length} questions
-                      </span>
-                    </button>
-                  );
-                }
-
+              if (!isActive) {
                 return (
-                  <div
+                  <button
                     key={part.idx}
-                    className="shrink-0 px-3.5 py-1.5 rounded-xl border border-[#007A7A]/50 dark:border-slate-700 bg-[#F8FAFC] dark:bg-[#111820] flex items-center gap-2 flex-wrap"
+                    type="button"
+                    onClick={() => switchPartIndex(part.idx, examState.skill)}
+                    className="shrink-0 px-3 py-1.5 rounded-md border border-transparent hover:border-[#CBD5E1] dark:hover:border-[#3A3A3A] text-xs font-extrabold text-[#111827] dark:text-[#E5E7EB] hover:bg-slate-100 dark:hover:bg-[#222222] transition flex items-center gap-2 whitespace-nowrap"
                   >
-                    <span className="text-xs font-extrabold text-[#0F172B] dark:text-white pr-1">
-                      {part.label}
+                    <span>{part.label}</span>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+                      {answeredInPart} of {part.questions.length}
                     </span>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {part.questions.map((q, qIdx) => {
-                        const leadingNum = Number(String(q.question || '').trim().match(/^(?:Câu\s*)?(\d+)[.)]/i)?.[1]);
-                        const displayNum = typeof q.blankNum === 'number' ? q.blankNum : (leadingNum || qIdx + 1);
-                        const isAnswered = String(examState.answers[q.id] || '').trim().length > 0;
-                        const isFocused =
-                          activeQuestionId === q.id ||
-                          (typeof q.blankNum === 'number' && Number(activeBlankNum) === Number(q.blankNum));
-
-                        return (
-                          <button
-                            key={q.id}
-                            type="button"
-                            onClick={() => scrollToQuestionOrBlank(q, qIdx)}
-                            title={`Câu ${displayNum}${isAnswered ? ' (Đã trả lời)' : ''}`}
-                            className={`w-6 h-6 rounded-full text-[11px] font-extrabold transition flex items-center justify-center border ${
-                              isFocused
-                                ? 'bg-white dark:bg-slate-200 text-[#0F172B] border-[#00B2AD] ring-2 ring-[#00B2AD]/60'
-                                : isAnswered
-                                ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                                : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 hover:border-[#007A7A]'
-                            }`}
-                          >
-                            {displayNum}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  </button>
                 );
-              })}
-            </div>
+              }
 
-            {/* Prev / Next Floating Circular Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
+              return (
+                <div key={part.idx} className="shrink-0 flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wide text-[#111827] dark:text-white pr-1 whitespace-nowrap">
+                    {part.label}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {part.questions.map((q, qIdx) => {
+                      const displayNum =
+                        examState.skill === 'writing'
+                          ? q.num
+                          : getQuestionDisplayNumber(q, (part.offset || 0) + qIdx + 1);
+                      const isAnswered =
+                        examState.skill === 'writing'
+                          ? Boolean(q.answered)
+                          : String(examState.answers[q.id] || '').trim().length > 0;
+                      const isFlagged = Boolean(bookmarkedQuestions[q.id]);
+                      const isFocused =
+                        examState.skill === 'writing' ||
+                        activeQuestionId === q.id ||
+                        (typeof q.blankNum === 'number' && Number(activeBlankNum) === Number(q.blankNum));
+
+                      return (
+                        <button
+                          key={q.id}
+                          type="button"
+                          onClick={() => {
+                            if (examState.skill !== 'writing') scrollToQuestionOrBlank(q, qIdx);
+                          }}
+                          title={`Câu ${displayNum}${isAnswered ? ' • Đã trả lời' : ''}${isFlagged ? ' • Đã đánh dấu' : ''}`}
+                          className={`relative min-w-[27px] h-7 px-1.5 rounded-[4px] text-[11px] font-extrabold transition flex items-center justify-center border ${
+                            isFocused
+                              ? 'bg-white dark:bg-[#2A2A2A] text-[#111827] dark:text-white border-[#2563EB] dark:border-white ring-1 ring-[#2563EB] dark:ring-white/80'
+                              : isAnswered
+                              ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                              : 'bg-transparent text-slate-600 dark:text-[#D1D5DB] border-[#CBD5E1] dark:border-[#404040] hover:border-[#2563EB] dark:hover:border-neutral-300'
+                          }`}
+                        >
+                          {displayNum}
+                          {isFlagged && (
+                            <span
+                              className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-[#141414]"
+                              aria-label="Đã đánh dấu"
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Rightmost Submit Checkmark Button matching Screenshots 1–5 */}
+          <button
+            type="button"
+            onClick={handleRequestSubmit}
+            title={allSkillsVisited ? 'Hoàn thành & Nộp Bài' : `Cần qua đủ ${cfg.order.length} kỹ năng để nộp bài`}
+            className={`shrink-0 w-9 h-9 rounded-md border flex items-center justify-center transition ${
+              allSkillsVisited
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm'
+                : 'bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-500 dark:text-neutral-300 border-[#CBD5E1] dark:border-[#3A3A3A]'
+            }`}
+          >
+            {allSkillsVisited ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Lock className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </footer>
+
+      {/* ============================================================
+          SLIDE-OVER EXAM MENU DRAWER (Instructions, Settings, Notes, Bookmarks)
+         ============================================================ */}
+      {showMenuDrawer && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] flex justify-end"
+          onClick={() => setShowMenuDrawer(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-[#181818] border-l border-[#D5D9E0] dark:border-[#333333] h-full flex flex-col shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-[#E5E7EB] dark:border-[#2C2C2C] flex items-center justify-between">
+              <h3 className="text-base font-extrabold text-[#111827] dark:text-white">
+                Tùy Chỉnh &amp; Ghi Chú Phòng Thi
+              </h3>
               <button
                 type="button"
-                onClick={() => handleStepQuestion(-1)}
-                className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:border-[#007A7A] hover:text-[#007A7A] dark:hover:text-[#1EE1D6] flex items-center justify-center transition"
-                title="Câu trước"
+                onClick={() => setShowMenuDrawer(false)}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#282828]"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto cd-exam-scroll p-5 space-y-5 text-xs">
+              {/* Display Settings (Contrast + Font Size) */}
+              <div className="space-y-3">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+                  Hiển Thị Màn Hình
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDarkMode(false)}
+                    className={`py-2 px-3 rounded-lg border font-bold flex items-center justify-center gap-1.5 transition ${
+                      !darkMode
+                        ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                        : 'bg-slate-100 dark:bg-[#242424] text-slate-700 dark:text-neutral-200 border-[#CBD5E1] dark:border-[#383838]'
+                    }`}
+                  >
+                    <Sun className="w-3.5 h-3.5" /> Black on White
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDarkMode(true)}
+                    className={`py-2 px-3 rounded-lg border font-bold flex items-center justify-center gap-1.5 transition ${
+                      darkMode
+                        ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                        : 'bg-slate-100 dark:bg-[#242424] text-slate-700 dark:text-neutral-200 border-[#CBD5E1] dark:border-[#383838]'
+                    }`}
+                  >
+                    <Moon className="w-3.5 h-3.5" /> White on Black
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {Object.entries(FONT_SIZE_LABELS).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setFontSizeMode(mode)}
+                      className={`py-2 px-2 rounded-lg border font-bold transition ${
+                        fontSizeMode === mode
+                          ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                          : 'bg-slate-100 dark:bg-[#242424] text-slate-700 dark:text-neutral-200 border-[#CBD5E1] dark:border-[#383838]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bookmarked Questions */}
+              <div className="space-y-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400 flex items-center justify-between">
+                  <span>Câu Đánh Dấu Xem Lại ({bookmarkedList.length})</span>
+                </p>
+                {bookmarkedList.length === 0 ? (
+                  <p className="text-slate-500 dark:text-neutral-500 italic">
+                    Chưa có câu hỏi nào được đánh dấu. Nhấn biểu tượng Bookmark trên mỗi câu để xem lại nhanh.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {bookmarkedList.map(item => (
+                      <button
+                        key={item.q.id}
+                        type="button"
+                        onClick={() => {
+                          setShowMenuDrawer(false);
+                          if (item.skill !== examState.skill) {
+                            const sIdx = cfg.order.indexOf(item.skill);
+                            if (!cfg.sequentialMode && sIdx >= 0) {
+                              setExamState(prev => ({
+                                ...prev,
+                                skill: item.skill,
+                                sectionIdx: sIdx,
+                                readingPassageIdx: typeof item.q.passageIdx === 'number' ? item.q.passageIdx : prev.readingPassageIdx,
+                                listeningTrackIdx: typeof item.q.trackIdx === 'number' ? item.q.trackIdx : prev.listeningTrackIdx
+                              }));
+                            }
+                          } else {
+                            if (typeof item.q.passageIdx === 'number') {
+                              setExamState(prev => ({ ...prev, readingPassageIdx: item.q.passageIdx }));
+                            }
+                            if (typeof item.q.trackIdx === 'number') {
+                              setExamState(prev => ({ ...prev, listeningTrackIdx: item.q.trackIdx }));
+                            }
+                          }
+                          setTimeout(() => scrollToQuestionOrBlank(item.q, item.num - 1), 100);
+                        }}
+                        className="px-2.5 py-1 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 font-bold inline-flex items-center gap-1 hover:bg-amber-500/25"
+                      >
+                        <Bookmark className="w-3 h-3 fill-current" />
+                        <span>
+                          {item.skill === 'reading' ? 'R' : 'L'}#{item.num}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Saved Highlights & Notes */}
+              <div className="space-y-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+                  Highlight &amp; Ghi Chú ({examState.highlights.length + examState.notes.length})
+                </p>
+                {examState.highlights.length === 0 && examState.notes.length === 0 ? (
+                  <p className="text-slate-500 dark:text-neutral-500 italic">
+                    Bôi đen văn bản trong bài đọc hoặc câu hỏi để tô màu Highlight hoặc tạo ghi chú.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {examState.highlights.map(h => (
+                      <div
+                        key={h.id}
+                        className="flex items-start justify-between gap-2 p-2.5 rounded-lg border border-[#E5E7EB] dark:border-[#2E2E2E] bg-slate-50 dark:bg-[#222222]"
+                      >
+                        <span
+                          style={{ backgroundColor: h.color }}
+                          className="text-[#111827] px-1.5 py-0.5 rounded font-medium leading-snug"
+                        >
+                          {h.text}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExamState(prev => ({
+                              ...prev,
+                              highlights: prev.highlights.filter(item => item.id !== h.id)
+                            }))
+                          }
+                          className="p-1 text-slate-400 hover:text-rose-500 shrink-0"
+                          title="Xóa highlight"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {examState.notes.map(n => (
+                      <div
+                        key={n.id}
+                        className="flex items-start justify-between gap-2 p-2.5 rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50/70 dark:bg-blue-950/30"
+                      >
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="font-bold text-[#1E3A8A] dark:text-blue-200">📝 {n.note}</p>
+                          {n.text && (
+                            <p className="text-[11px] italic text-slate-500 dark:text-neutral-400 truncate">
+                              “{n.text}”
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExamState(prev => ({
+                              ...prev,
+                              notes: prev.notes.filter(item => item.id !== n.id)
+                            }))
+                          }
+                          className="p-1 text-slate-400 hover:text-rose-500 shrink-0"
+                          title="Xóa ghi chú"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Official CD Exam Tips */}
+              <div className="p-3.5 rounded-lg border border-[#E5E7EB] dark:border-[#2E2E2E] bg-slate-50 dark:bg-[#222222] space-y-1.5 text-[11px] leading-relaxed text-slate-600 dark:text-neutral-300">
+                <p className="font-extrabold text-[#111827] dark:text-white">Lưu Ý Giao Diện Thi IELTS:</p>
+                <p>• Kéo thanh ↔ ở giữa màn hình để mở rộng khung Bài đọc / Biểu đồ hoặc khung Câu hỏi.</p>
+                <p>• Bôi đen từ/câu trong Passage để Highlight vàng/xanh hoặc lưu ghi chú.</p>
+                <p>• Đáp án và bài viết được tự động lưu nháp liên tục.</p>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-[#E5E7EB] dark:border-[#2C2C2C] flex items-center justify-between gap-2 bg-slate-50 dark:bg-[#141414]">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenuDrawer(false);
+                  if (currentUser?.role === 'teacher') {
+                    onExitExam?.();
+                  } else {
+                    setShowExitConfirmModal(true);
+                  }
+                }}
+                className="px-3.5 py-2 rounded-lg border border-[#CBD5E1] dark:border-[#3A3A3A] text-xs font-bold text-slate-700 dark:text-neutral-200 hover:bg-slate-200/70 dark:hover:bg-[#282828] flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>{currentUser?.role === 'teacher' ? 'Thoát Xem Trước' : 'Lưu Nháp & Thoát'}</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleStepQuestion(1)}
-                className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:border-[#007A7A] hover:text-[#007A7A] dark:hover:text-[#1EE1D6] flex items-center justify-center transition"
-                title="Câu tiếp theo"
+                onClick={() => {
+                  setShowMenuDrawer(false);
+                  handleRequestSubmit();
+                }}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5"
               >
-                <ChevronRight className="w-4 h-4" />
+                <Check className="w-3.5 h-3.5" /> Nộp Bài
               </button>
             </div>
           </div>
-        </footer>
+        </div>
       )}
 
       {/* Modal hướng dẫn khi bấm Nộp bài nhưng chưa đi qua đủ các kỹ năng */}
       {showSubmitLockedModal && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setShowSubmitLockedModal(false)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-[#181818] border border-[#D5D9E0] dark:border-[#333333] shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3">
+            <div className="p-6 border-b border-[#E5E7EB] dark:border-[#2C2C2C] flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 flex items-center justify-center shrink-0 border border-amber-200 dark:border-amber-500/30">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/30">
                   <Lock className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-[#0F172B] dark:text-white">
+                  <h3 className="text-base font-extrabold text-[#111827] dark:text-white">
                     Chưa thể nộp toàn bài ({visitedInOrderCount}/{cfg.order.length} kỹ năng)
                   </h3>
-                  <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-neutral-400 mt-1">
                     Để hoàn tất bài thi chuẩn 3 kỹ năng, bạn cần đi qua hết tất cả các phần theo thứ tự:
                   </p>
                 </div>
@@ -1100,52 +1529,50 @@ export default function ExamMode({
               <button
                 type="button"
                 onClick={() => setShowSubmitLockedModal(false)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-3 text-xs">
-              <div className="space-y-2">
-                {cfg.order.map((sId, idx) => {
-                  const visited = visitedSkillsList.includes(sId);
-                  const isCurrent = examState.skill === sId && idx === currentSectionIdx;
-                  const meta = skillMeta[sId] || { label: sId };
-                  return (
-                    <div
-                      key={sId}
-                      className={`px-3.5 py-2.5 rounded-xl border flex items-center justify-between ${
-                        isCurrent
-                          ? 'bg-[#EDFFFD] dark:bg-teal-950/40 border-[#B5F5F1] dark:border-teal-500/40 text-[#007A7A] dark:text-[#1EE1D6]'
-                          : visited
-                          ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                          : 'bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'
-                      }`}
-                    >
-                      <span className="font-bold">
-                        {idx + 1}. {meta.label} ({cfg.durations[sId] || 15} phút)
-                      </span>
-                      <span className="font-extrabold">
-                        {isCurrent ? 'Đang làm' : visited ? 'Đã qua ✓' : 'Chưa làm'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="p-6 space-y-2 text-xs">
+              {cfg.order.map((sId, idx) => {
+                const visited = visitedSkillsList.includes(sId);
+                const isCurrent = examState.skill === sId && idx === currentSectionIdx;
+                const meta = skillMeta[sId] || { label: sId };
+                return (
+                  <div
+                    key={sId}
+                    className={`px-3.5 py-2.5 rounded-lg border flex items-center justify-between ${
+                      isCurrent
+                        ? 'bg-blue-50 dark:bg-blue-500/15 border-blue-200 dark:border-blue-500/40 text-blue-700 dark:text-blue-300'
+                        : visited
+                        ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-slate-50 dark:bg-[#222222] border-slate-200 dark:border-[#343434] text-slate-500 dark:text-neutral-400'
+                    }`}
+                  >
+                    <span className="font-bold">
+                      {idx + 1}. {meta.label} ({cfg.durations[sId] || 15} phút)
+                    </span>
+                    <span className="font-extrabold">
+                      {isCurrent ? 'Đang làm' : visited ? 'Đã qua ✓' : 'Chưa làm'}
+                    </span>
+                  </div>
+                );
+              })}
 
               {cfg.sequentialMode && !cfg.allowEarlyNextSection && currentSectionIdx < cfg.order.length - 1 && (
-                <p className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 leading-relaxed">
+                <p className="p-3 rounded-lg bg-slate-50 dark:bg-[#222222] border border-slate-200 dark:border-[#343434] text-slate-600 dark:text-neutral-300 leading-relaxed mt-2">
                   Đề thi đang bật chế độ <b>Thi nối tiếp chuẩn IELTS</b>. Khi hết đồng hồ kỹ năng hiện tại, hệ thống sẽ tự động chuyển sang <b>{skillMeta[cfg.order[currentSectionIdx + 1]]?.label}</b>.
                 </p>
               )}
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex flex-wrap justify-end gap-2">
+            <div className="px-6 py-4 bg-slate-50 dark:bg-[#141414] border-t border-[#E5E7EB] dark:border-[#2C2C2C] flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowSubmitLockedModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700 transition"
+                className="px-4 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-neutral-300 hover:bg-slate-200/70 dark:hover:bg-[#262626] transition"
               >
                 Tiếp tục làm phần hiện tại
               </button>
@@ -1169,7 +1596,7 @@ export default function ExamMode({
                       }));
                     }
                   }}
-                  className="px-4 py-2 rounded-xl text-xs font-extrabold bg-[#007A7A] hover:bg-[#065B5B] text-white transition flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-lg text-xs font-extrabold bg-[#2563EB] hover:bg-[#1D4ED8] text-white transition flex items-center gap-1.5"
                 >
                   <span>Chuyển sang {skillMeta[cfg.order[currentSectionIdx + 1]]?.label}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -1180,26 +1607,26 @@ export default function ExamMode({
         </div>
       )}
 
-      {/* Modal xác nhận Tạm Thoát về Trang Chủ (An toàn chống blur cửa sổ) */}
+      {/* Modal xác nhận Tạm Thoát */}
       {showExitConfirmModal && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setShowExitConfirmModal(false)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-[#181818] border border-[#D5D9E0] dark:border-[#333333] shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3">
+            <div className="p-6 border-b border-[#E5E7EB] dark:border-[#2C2C2C] flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#262626] text-slate-700 dark:text-neutral-200 flex items-center justify-center shrink-0">
                   <LogOut className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-[#0F172B] dark:text-white">
+                  <h3 className="text-base font-extrabold text-[#111827] dark:text-white">
                     Lưu nháp và quay về Trang Chủ?
                   </h3>
-                  <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-neutral-400 mt-1">
                     Các câu trả lời và bài viết của bạn được tự động lưu trên trình duyệt để bạn bấm &quot;Tiếp Tục Bài Đang Làm&quot; sau.
                   </p>
                 </div>
@@ -1207,7 +1634,7 @@ export default function ExamMode({
               <button
                 type="button"
                 onClick={() => setShowExitConfirmModal(false)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1215,20 +1642,20 @@ export default function ExamMode({
 
             {cfg.maxAttempts > 0 && (
               <div className="px-6 pt-4">
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2">
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    Đây là bài <b>Thi thật giới hạn lượt</b>. Bạn vẫn chưa nộp bài (chưa mất lượt), nhưng hãy quay lại hoàn thành và bấm Submit theo quy định của giáo viên.
+                    Đây là bài <b>Thi thật giới hạn lượt</b>. Bạn vẫn chưa nộp bài (chưa mất lượt), nhưng hãy quay lại hoàn thành và bấm Nộp Bài theo quy định của giáo viên.
                   </span>
                 </div>
               </div>
             )}
 
-            <div className="px-6 py-4 mt-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+            <div className="px-6 py-4 mt-2 bg-slate-50 dark:bg-[#141414] border-t border-[#E5E7EB] dark:border-[#2C2C2C] flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowExitConfirmModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                className="px-4 py-2 rounded-lg text-xs font-bold text-slate-700 dark:text-neutral-200 bg-white dark:bg-[#262626] border border-[#CBD5E1] dark:border-[#3A3A3A] hover:bg-slate-100 dark:hover:bg-[#323232] transition"
               >
                 Ở lại làm bài
               </button>
@@ -1238,7 +1665,7 @@ export default function ExamMode({
                   setShowExitConfirmModal(false);
                   onExitExam?.();
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-extrabold bg-slate-900 dark:bg-[#007A7A] hover:opacity-90 text-white transition"
+                className="px-4 py-2 rounded-lg text-xs font-extrabold bg-[#2563EB] hover:bg-[#1D4ED8] text-white transition"
               >
                 Lưu nháp &amp; Thoát
               </button>
@@ -1247,26 +1674,26 @@ export default function ExamMode({
         </div>
       )}
 
-      {/* Modal Xác Nhận Nộp Bài Thi (In-app modal để không kích hoạt window blur chống gian lận) */}
+      {/* Modal Xác Nhận Nộp Bài Thi */}
       {showSubmitConfirmModal && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setShowSubmitConfirmModal(false)}
         >
           <div
-            className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
+            className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#181818] border border-[#D5D9E0] dark:border-[#333333] shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4">
+            <div className="p-6 border-b border-[#E5E7EB] dark:border-[#2C2C2C] flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#ECFDF5] dark:bg-emerald-950/70 text-[#059271] dark:text-emerald-300 flex items-center justify-center flex-shrink-0 border border-[#9FF5E1] dark:border-emerald-800">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/30">
                   <CheckCircle className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-extrabold text-[#0F172B] dark:text-white">
+                  <h3 className="text-lg font-extrabold text-[#111827] dark:text-white">
                     Bạn có chắc chắn muốn nộp bài không?
                   </h3>
-                  <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-neutral-400 mt-1">
                     Sau khi xác nhận nộp bài, hệ thống sẽ lưu kết quả ngay và bạn sẽ không thể chỉnh sửa lại bài làm.
                   </p>
                 </div>
@@ -1274,7 +1701,7 @@ export default function ExamMode({
               <button
                 type="button"
                 onClick={() => setShowSubmitConfirmModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
                 aria-label="Đóng hộp thoại xác nhận nộp bài"
               >
                 <X className="w-5 h-5" />
@@ -1283,29 +1710,25 @@ export default function ExamMode({
 
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Listening</p>
-                  <p className="text-base font-extrabold text-[#0F172B] dark:text-white mt-0.5">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Listening</p>
+                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
                     {answeredListeningCount}/{allListeningQs.length} câu
                   </p>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Reading</p>
-                  <p className="text-base font-extrabold text-[#0F172B] dark:text-white mt-0.5">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Reading</p>
+                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
                     {answeredReadingCount}/{allReadingQs.length} câu
                   </p>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Writing Task 1</p>
-                  <p className="text-base font-extrabold text-[#0F172B] dark:text-white mt-0.5">
-                    {w1Words} từ
-                  </p>
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 1</p>
+                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w1Words} từ</p>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Writing Task 2</p>
-                  <p className="text-base font-extrabold text-[#0F172B] dark:text-white mt-0.5">
-                    {w2Words} từ
-                  </p>
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 2</p>
+                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w2Words} từ</p>
                 </div>
               </div>
 
@@ -1313,8 +1736,8 @@ export default function ExamMode({
                 answeredReadingCount < allReadingQs.length ||
                 w1Words === 0 ||
                 w2Words === 0) && (
-                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                   <span>
                     Một số câu hỏi hoặc phần Writing hiện vẫn còn trống. Bạn có thể bấm <strong>Quay lại làm tiếp</strong> để rà soát trước khi nộp bài.
                   </span>
@@ -1322,18 +1745,18 @@ export default function ExamMode({
               )}
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
+            <div className="px-6 py-4 bg-slate-50 dark:bg-[#141414] border-t border-[#E5E7EB] dark:border-[#2C2C2C] flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowSubmitConfirmModal(false)}
-                className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                className="px-4 py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-700 dark:text-neutral-200 bg-white dark:bg-[#262626] border border-[#CBD5E1] dark:border-[#3A3A3A] hover:bg-slate-100 dark:hover:bg-[#323232] transition"
               >
                 Quay lại làm tiếp
               </button>
               <button
                 type="button"
                 onClick={handleFinalExamSubmit}
-                className="px-5 py-2.5 rounded-xl text-sm font-extrabold text-white bg-[#059271] hover:bg-emerald-700 shadow-lg shadow-emerald-600/25 flex items-center gap-2 transition"
+                className="px-5 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition"
               >
                 <Check className="w-4 h-4" /> Xác nhận Nộp Bài
               </button>
