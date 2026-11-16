@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react';
-import FrogMascot from './FrogMascot';
+import { BRAND_INFO } from '../../constants/brandInfo';
 
 function getCelebrationCopy(band) {
   const num = Number(band) || 0;
@@ -34,7 +34,11 @@ export default function SpeakingResultCelebrationModal({
     <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2E2C38] rounded-3xl p-6 sm:p-8 text-center shadow-2xl space-y-5">
         <div className="flex justify-center">
-          <FrogMascot className="w-24 h-24 animate-bounce" mood="celebrate" />
+          <img
+            src={BRAND_INFO.avatarUrl}
+            alt={BRAND_INFO.shortName}
+            className="w-24 h-24 rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-md animate-bounce"
+          />
         </div>
 
         <div className="space-y-2.5">

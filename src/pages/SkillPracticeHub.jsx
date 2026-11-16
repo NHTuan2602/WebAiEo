@@ -16,8 +16,8 @@ import {
   Plus,
   Sparkles
 } from 'lucide-react';
+import { BRAND_INFO } from '../constants/brandInfo';
 import { getListeningTracks, getReadingPassages, getSpeakingQuestionItems, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
-import FrogMascot from '../components/speaking/FrogMascot';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 
 export default function SkillPracticeHub({
@@ -213,10 +213,14 @@ export default function SkillPracticeHub({
         <aside className="lg:w-64 shrink-0">
           <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-3xl p-4 flex flex-col justify-between gap-5 lg:sticky lg:top-20 shadow-xs">
             <div className="space-y-4">
-              {/* Brand lockup with Frog */}
+              {/* Brand lockup with Ms. Như Brand Avatar */}
               <div className="flex items-center justify-between gap-2 px-1">
                 <div className="flex items-center gap-2.5">
-                  <FrogMascot className="w-10 h-10 shrink-0" mood="idle" />
+                  <img
+                    src={BRAND_INFO.avatarUrl}
+                    alt={BRAND_INFO.shortName}
+                    className="w-10 h-10 rounded-full object-cover border border-pink-200 dark:border-[#34323F] bg-white shadow-xs shrink-0"
+                  />
                   <div>
                     <span className="block font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
                       Luyện Nói IELTS

@@ -14,11 +14,11 @@ import {
   Square,
   Volume2
 } from 'lucide-react';
+import { BRAND_INFO } from '../constants/brandInfo';
 import { getSpeakingQuestionItems, normalizeExamConfig } from '../constants/seedData';
 import { cleanAudioMimeType, roundSpeakingBand } from '../utils/speakingAiEngine';
 import { pickSupportedAudioMimeType, requestAiSpeakingGrading, uploadSpeakingRecording } from '../utils/speakingApi';
 import AudioLevelMeter from '../components/speaking/AudioLevelMeter';
-import FrogMascot from '../components/speaking/FrogMascot';
 import SpeakingResultCelebrationModal from '../components/speaking/SpeakingResultCelebrationModal';
 
 function formatSecs(totalSec) {
@@ -525,7 +525,11 @@ export default function SpeakingExamRoom({
     return (
       <div className="min-h-screen bg-[#FDECF2] dark:bg-[#141318] flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 text-center space-y-4 shadow-xl">
-          <FrogMascot className="w-16 h-16 mx-auto" />
+          <img
+            src={BRAND_INFO.avatarUrl}
+            alt={BRAND_INFO.shortName}
+            className="w-16 h-16 mx-auto rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-sm"
+          />
           <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
             Đề Speaking không có câu hỏi khả dụng
           </h2>
@@ -551,7 +555,15 @@ export default function SpeakingExamRoom({
       {/* Top Room Header */}
       <header className="bg-[#FDF2F6] dark:bg-[#191820] border-b border-pink-200 dark:border-[#2C2A35] px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sticky top-0 z-40">
         <div className="flex items-center gap-3 min-w-0">
-          <FrogMascot className="w-9 h-9 shrink-0" mood={isRecording ? 'listening' : 'idle'} />
+          <img
+            src={BRAND_INFO.avatarUrl}
+            alt={BRAND_INFO.shortName}
+            className={`w-9 h-9 rounded-full object-cover bg-white shrink-0 border-2 transition ${
+              isRecording
+                ? 'border-rose-500 ring-2 ring-rose-400/40 animate-pulse'
+                : 'border-pink-200 dark:border-[#34323F]'
+            }`}
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#570DF8] text-white shrink-0">
@@ -601,7 +613,11 @@ export default function SpeakingExamRoom({
       {phase === 'MIC_CHECK' && (
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
           <div className="max-w-lg w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 text-center">
-            <FrogMascot className="w-20 h-20 mx-auto" mood="idle" />
+            <img
+              src={BRAND_INFO.avatarUrl}
+              alt={BRAND_INFO.shortName}
+              className="w-20 h-20 mx-auto rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-md"
+            />
             <div className="space-y-1.5">
               <span className="text-[11px] font-black uppercase tracking-wider text-[#570DF8] dark:text-[#A78BFA]">
                 Chuẩn bị phòng thi Speaking AI
@@ -877,10 +893,14 @@ export default function SpeakingExamRoom({
         </main>
       )}
 
-      {/* PHASE 3: GRADING LOADING SCREEN (Luyennoi Frog Style) */}
+      {/* PHASE 3: GRADING LOADING SCREEN */}
       {phase === 'GRADING' && (
         <main className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-5">
-          <FrogMascot className="w-28 h-28 animate-bounce" mood="listening" />
+          <img
+            src={BRAND_INFO.avatarUrl}
+            alt={BRAND_INFO.shortName}
+            className="w-28 h-28 rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-lg animate-bounce"
+          />
           <div className="space-y-2 max-w-md">
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
               {gradingProgressText || 'Uốn lưỡi bảy lần trước khi chấm bài...'}
