@@ -457,3 +457,64 @@ Return ONLY strictly valid JSON matching this schema:
     usedModel
   };
 }
+
+export async function generateSpeakingQuestionsWithAI({
+  apiKey,
+  topic = 'Modern Technology & Daily Life',
+  part1Count = 4,
+  part3Count = 4
+}) {
+  const promptText = `You are a Senior IELTS Speaking Test Designer.
+Generate an authentic, cohesive IELTS Speaking Test (Forecast / Academic standard) centered around the topic: "${topic}".
+Return strictly valid JSON matching this schema (no markdown fences):
+{
+  "part1Topic": "Short English topic name for Part 1",
+  "part1Questions": [
+    { "prompt": "Natural IELTS Part 1 question?", "hint": "Short Vietnamese tip / key vocabulary" }
+  ],
+  "part2Title": "Cue Card title starting with Describe...",
+  "part2CueCardPrompt": "Describe ... (same or 1-sentence instruction)",
+  "part2Bullets": [
+    "what it is / when it happened",
+    "who was involved / where it is",
+    "what you did / what happened",
+    "and explain why you feel this way about it"
+  ],
+  "part2FollowUpQuestion": "Short rounding-off question",
+  "part3Topic": "Abstract Part 3 Discussion Theme",
+  "part3Questions": [
+    { "prompt": "Deep analytical IELTS Part 3 question?", "hint": "Short Vietnamese analytical angle / vocab" }
+  ]
+}
+Requirements:
+- Include exactly ${part1Count} concise conversational questions for Part 1.
+- Include 4 natural IELTS bullet points for Part 2.
+- Include exactly ${part3Count} abstract discussion questions for Part 3.`;
+
+  const { parsed, usedModel } = await callGeminiGenerateJson({
+    apiKey,
+    promptText,
+    temperature: 0.45
+  });
+
+  const stamp = Date.now();
+  return {
+    part1Topic: String(parsed?.part1Topic || topic).trim(),
+    part1Questions: (Array.isArray(parsed?.part1Questions) ? parsed.part1Questions : []).map((q, i) => ({
+      id: `sp1_${stamp}_${i}`,
+      prompt: String(q?.prompt || q || '').trim(),
+      hint: String(q?.hint || '').trim()
+    })).filter(q => q.prompt),
+    part2Title: String(parsed?.part2Title || `Describe something related to ${topic}`).trim(),
+    part2CueCardPrompt: String(parsed?.part2CueCardPrompt || parsed?.part2Title || `Describe something related to ${topic}.`).trim(),
+    part2Bullets: (Array.isArray(parsed?.part2Bullets) ? parsed.part2Bullets : []).map(b => String(b || '').trim()).filter(Boolean),
+    part2FollowUpQuestion: String(parsed?.part2FollowUpQuestion || '').trim(),
+    part3Topic: String(parsed?.part3Topic || `${topic} in Society`).trim(),
+    part3Questions: (Array.isArray(parsed?.part3Questions) ? parsed.part3Questions : []).map((q, i) => ({
+      id: `sp3_${stamp}_${i}`,
+      prompt: String(q?.prompt || q || '').trim(),
+      hint: String(q?.hint || '').trim()
+    })).filter(q => q.prompt),
+    usedModel
+  };
+}

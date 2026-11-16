@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Image,
   Lock,
+  Mic,
   PenTool,
   Plus,
   Save,
@@ -24,11 +25,18 @@ import {
   Unlock,
   Upload
 } from 'lucide-react';
-import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import {
+  ALL_SKILL_OPTIONS,
+  getListeningTracks,
+  getReadingPassages,
+  getSpeakingQuestionItems,
+  normalizeExamConfig
+} from '../constants/seedData';
 import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../utils/clozeHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
 import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
 import SkillQuestionWorkspace from '../components/teacher/SkillQuestionWorkspace';
+import SpeakingBuilderPanel from '../components/teacher/SpeakingBuilderPanel';
 
 export default function ExamBuilder({
   addQuestionToSkill,
@@ -444,14 +452,16 @@ Write ONE WORD AND/OR A NUMBER for each answer.
         </div>
       </div>
 
-      {/* Step-by-Step Interactive Guide Banner & Modal */}
-      <BuilderGuideBanner
-        builderTab={builderTab}
-        onJumpToTab={setBuilderTab}
-        onLoadSampleTemplate={handleLoadSampleTemplate}
-        onOpenGuideModal={() => setShowGuideModal(true)}
-        testForm={testForm}
-      />
+      {/* Step-by-Step Interactive Guide Banner (Hidden cleanly in Single-Skill focus mode) */}
+      {normalizeExamConfig(testForm).testMode !== 'single_skill' && (
+        <BuilderGuideBanner
+          builderTab={builderTab}
+          onJumpToTab={setBuilderTab}
+          onLoadSampleTemplate={handleLoadSampleTemplate}
+          onOpenGuideModal={() => setShowGuideModal(true)}
+          testForm={testForm}
+        />
+      )}
 
       <BuilderGuideModal
         isOpen={showGuideModal}
@@ -460,48 +470,89 @@ Write ONE WORD AND/OR A NUMBER for each answer.
       />
 
       {/* Builder Sub-Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 mb-6 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <button
-          onClick={() => setBuilderTab('general')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
-            builderTab === 'general'
-              ? 'bg-[#007A7A] text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <FileText className="w-4 h-4" /> 1. Tên Đề &amp; Cài Đặt Chung
-        </button>
-        <button
-          onClick={() => setBuilderTab('listening')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
-            builderTab === 'listening'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Headphones className="w-4 h-4" /> 2. Phần Listening ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} Part • ` : ''}{testForm.listening?.questions?.length || 0} câu)
-        </button>
-        <button
-          onClick={() => setBuilderTab('reading')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
-            builderTab === 'reading'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" /> 3. Phần Reading ({testForm.reading?.questions?.length || 0} câu)
-        </button>
-        <button
-          onClick={() => setBuilderTab('writing')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
-            builderTab === 'writing'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <PenTool className="w-4 h-4" /> 4. Phần Writing &amp; Bài Mẫu
-        </button>
-      </div>
+      {(() => {
+        const currentCfg = normalizeExamConfig(testForm);
+        const isSingleSkill = currentCfg.testMode === 'single_skill' && currentCfg.focusSkill;
+        const singleMetaMap = {
+          listening: { label: `2. Nội Dung & Câu Hỏi Listening (${testForm.listening?.questions?.length || 0} câu)`, icon: Headphones, activeCls: 'bg-blue-600 text-white shadow-sm' },
+          reading: { label: `2. Nội Dung & Câu Hỏi Reading (${testForm.reading?.questions?.length || 0} câu)`, icon: BookOpen, activeCls: 'bg-indigo-600 text-white shadow-sm' },
+          writing: { label: '2. Nội Dung Đề Writing & Bài Mẫu', icon: PenTool, activeCls: 'bg-emerald-600 text-white shadow-sm' },
+          speaking: { label: `2. Câu Hỏi Speaking AI (${getSpeakingQuestionItems(testForm.speaking, 'all').length} câu)`, icon: Mic, activeCls: 'bg-[#570DF8] text-white shadow-sm' }
+        };
+
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-6 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setBuilderTab('general')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
+                  builderTab === 'general'
+                    ? 'bg-[#007A7A] text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <FileText className="w-4 h-4" /> 1. Tên Đề &amp; Cài Đặt Chung
+              </button>
+
+              {isSingleSkill ? (() => {
+                const sm = singleMetaMap[currentCfg.focusSkill] || singleMetaMap.speaking;
+                const SkillIcon = sm.icon;
+                return (
+                  <button
+                    onClick={() => setBuilderTab(currentCfg.focusSkill)}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
+                      builderTab === currentCfg.focusSkill
+                        ? sm.activeCls
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <SkillIcon className="w-4 h-4" /> {sm.label}
+                  </button>
+                );
+              })() : (
+                <>
+                  <button
+                    onClick={() => setBuilderTab('listening')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
+                      builderTab === 'listening'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Headphones className="w-4 h-4" /> 2. Phần Listening ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} Part • ` : ''}{testForm.listening?.questions?.length || 0} câu)
+                  </button>
+                  <button
+                    onClick={() => setBuilderTab('reading')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
+                      builderTab === 'reading'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <BookOpen className="w-4 h-4" /> 3. Phần Reading ({testForm.reading?.questions?.length || 0} câu)
+                  </button>
+                  <button
+                    onClick={() => setBuilderTab('writing')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
+                      builderTab === 'writing'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <PenTool className="w-4 h-4" /> 4. Phần Writing &amp; Bài Mẫu
+                  </button>
+                </>
+              )}
+            </div>
+
+            {isSingleSkill && (
+              <span className="px-3 py-1 rounded-xl bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] text-[11px] font-extrabold mr-1">
+                Chế độ: Đề Kỹ Năng Riêng ({currentCfg.focusSkill.toUpperCase()})
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* TAB 1: GENERAL SETTINGS, VISIBILITY, ATTEMPT LIMITS, SECTION TIMERS & ANSWER PERMISSIONS */}
       {builderTab === 'general' && (() => {
@@ -509,7 +560,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
         const skillLabels = {
           listening: { name: 'Listening', icon: Headphones, color: 'text-blue-600 dark:text-blue-400' },
           reading: { name: 'Reading', icon: BookOpen, color: 'text-indigo-600 dark:text-indigo-400' },
-          writing: { name: 'Writing', icon: PenTool, color: 'text-purple-600 dark:text-purple-400' }
+          writing: { name: 'Writing', icon: PenTool, color: 'text-purple-600 dark:text-purple-400' },
+          speaking: { name: 'Speaking AI', icon: Mic, color: 'text-[#570DF8] dark:text-[#C4B5FD]' }
         };
         const moveSectionOrder = (idx, dir) => {
           const nextIdx = idx + dir;
@@ -521,6 +573,67 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 
         return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
+          {/* Exam Structure Mode Switcher: Full Mock Exam vs Single Skill */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#570DF8]/5 dark:bg-indigo-950/25 border border-[#570DF8]/25 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-[#570DF8] dark:text-[#C4B5FD]">
+                  Kiểu Đề Thi: Đề Thi Gộp Chuẩn IELTS vs Luyện 1 Kỹ Năng Riêng (4 Kỹ Năng)
+                </h3>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                  Chọn <b>Đề Thi Gộp</b> để thi đủ Listening → Reading → Writing liên hoàn, hoặc chọn <b>1 Kỹ Năng Riêng</b> (Listening / Reading / Writing / Speaking AI).
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setTestForm(prev => ({
+                    ...prev,
+                    testMode: 'full_exam',
+                    focusSkill: null,
+                    sectionOrder: ['listening', 'reading', 'writing'],
+                    sequentialMode: true
+                  }))
+                }
+                className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition ${
+                  cfg.testMode !== 'single_skill'
+                    ? 'bg-[#007A7A] text-white border-[#007A7A] shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                🎓 Đề Thi Thử Gộp (L · R · W)
+              </button>
+              {ALL_SKILL_OPTIONS.map(sk => {
+                const isActiveSk = cfg.testMode === 'single_skill' && cfg.focusSkill === sk;
+                const skLabel = { listening: '🎧 Listening Riêng', reading: '📖 Reading Riêng', writing: '✍️ Writing Riêng', speaking: '🎙️ Speaking AI' }[sk];
+                return (
+                  <button
+                    key={sk}
+                    type="button"
+                    onClick={() =>
+                      setTestForm(prev => ({
+                        ...prev,
+                        testMode: 'single_skill',
+                        focusSkill: sk,
+                        sectionOrder: [sk],
+                        sequentialMode: false,
+                        autoAiGrade: sk === 'speaking' ? true : prev.autoAiGrade
+                      }))
+                    }
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition ${
+                      isActiveSk
+                        ? 'bg-[#570DF8] text-white border-[#570DF8] shadow-xs'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#570DF8]'
+                    }`}
+                  >
+                    {skLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {/* 1-Click Quick Configuration Presets for Non-Tech Users */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#EDFFFD]/80 dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-500/30 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1628,6 +1741,17 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             </div>
           </div>
         </div>
+      )}
+      {/* TAB 5: SPEAKING AI BUILDER (PART 1, PART 2 CUE CARD, PART 3) */}
+      {builderTab === 'speaking' && (
+        <SpeakingBuilderPanel
+          aiApiKey={aiApiKey}
+          onChangeSpeaking={nextSp => setTestForm(prev => ({ ...prev, speaking: nextSp }))}
+          setApiTestState={setApiTestState}
+          setShowApiKeyModal={setShowApiKeyModal}
+          showToast={showToast}
+          speakingData={testForm.speaking}
+        />
       )}
     </div>
   );

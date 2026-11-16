@@ -6,6 +6,8 @@ const BUILDER_DRAFT_PREFIX = 'ielts_builder_draft_';
 
 const ALLOWED_VIEWS = new Set([
   'HOME',
+  'SKILL_HUB',
+  'SPEAKING_MODE',
   'EXAM_MODE',
   'RESULT_VIEW',
   'TEACHER_DASHBOARD',
@@ -127,7 +129,7 @@ export function loadNavSession(user) {
     if (STUDENT_ONLY_VIEWS.has(nextView) && user.role === 'teacher') {
       nextView = 'TEACHER_DASHBOARD';
     }
-    if (nextView === 'EXAM_MODE' && !parsed.selectedTestId) {
+    if ((nextView === 'EXAM_MODE' || nextView === 'SPEAKING_MODE') && !parsed.selectedTestId) {
       nextView = defaultView;
     }
     if (nextView === 'RESULT_VIEW' && !parsed.selectedAttemptId) {
@@ -161,7 +163,9 @@ export function loadNavSession(user) {
       selectedTestId: parsed.selectedTestId || null,
       selectedAttemptId: parsed.selectedAttemptId || null,
       selectedProfileStudent: parsed.selectedProfileStudent || null,
-      resultReviewTab: ['listening', 'reading', 'writing'].includes(parsed.resultReviewTab) ? parsed.resultReviewTab : 'listening',
+      resultReviewTab: ['listening', 'reading', 'writing', 'speaking'].includes(parsed.resultReviewTab) ? parsed.resultReviewTab : 'listening',
+      skillHubTab: ['speaking', 'forecast', 'listening', 'reading', 'writing'].includes(parsed.skillHubTab) ? parsed.skillHubTab : 'speaking',
+      speakingPartMode: ['full', 'part1', 'part2', 'part3'].includes(parsed.speakingPartMode) ? parsed.speakingPartMode : 'full',
       teacherHubTab: ['tests', 'grading', 'game_room', 'accounts'].includes(rawTeacherTab) ? rawTeacherTab : 'tests',
       expandedTeacherTestId: parsed.expandedTeacherTestId || null,
       currentRoomPin: parsed.currentRoomPin || '686868',

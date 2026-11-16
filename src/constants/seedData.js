@@ -63,27 +63,209 @@ SANITATION | Hệ thống vệ sinh công cộng | /ˌsæn.ɪˈteɪ.ʃən/ | Cle
 };
 
 export const DEFAULT_SECTION_ORDER = ['listening', 'reading', 'writing'];
-export const DEFAULT_SECTION_DURATIONS = { listening: 15, reading: 20, writing: 25 };
+export const ALL_SKILL_OPTIONS = ['listening', 'reading', 'writing', 'speaking'];
+export const DEFAULT_SECTION_DURATIONS = { listening: 15, reading: 20, writing: 25, speaking: 14 };
+
+export const createDefaultSpeakingSection = () => ({
+  isForecast: false,
+  autoAiGrade: true,
+  part1SpeakSec: 45,
+  part2PrepSec: 60,
+  part2SpeakSec: 120,
+  part3SpeakSec: 60,
+  part1: {
+    enabled: true,
+    topic: 'Hometown & Daily Routine',
+    questions: [
+      {
+        id: 'sp1_q1',
+        prompt: 'Where is your hometown and what do you like most about living there?',
+        hint: 'Nêu vị trí, nét đặc trưng địa phương và 1 kỷ niệm hoặc lý do cá nhân.'
+      },
+      {
+        id: 'sp1_q2',
+        prompt: 'Is your hometown a popular place for tourists to visit?',
+        hint: 'Dùng từ vựng: coastal attractions, vibrant street food, hospitality...'
+      },
+      {
+        id: 'sp1_q3',
+        prompt: 'What part of the day do you enjoy the most, and why?',
+        hint: 'Giải thích thói quen sáng/tối giúp bạn tập trung hoặc thư giãn.'
+      }
+    ]
+  },
+  part2: {
+    enabled: true,
+    title: 'Describe a memorable journey you took',
+    cueCardPrompt: 'Describe a memorable journey you made in the past.',
+    bullets: [
+      'where you went',
+      'who you travelled with',
+      'what happened during the journey',
+      'and explain why it was so memorable to you'
+    ],
+    followUpQuestion: 'Do you think you will visit that place again in the future?'
+  },
+  part3: {
+    enabled: true,
+    topic: 'Modern Travel & Cultural Exchange',
+    questions: [
+      {
+        id: 'sp3_q1',
+        prompt: 'Why do people today travel more frequently than previous generations?',
+        hint: 'So sánh chi phí vé máy bay, công việc từ xa, nhu cầu trải nghiệm.'
+      },
+      {
+        id: 'sp3_q2',
+        prompt: 'Do you think international tourism benefits local communities more than it harms them?',
+        hint: 'Phân tích 2 mặt: doanh thu kinh tế vs quá tải hạ tầng & bảo tồn văn hóa.'
+      },
+      {
+        id: 'sp3_q3',
+        prompt: 'How might virtual reality change the way people explore new destinations in the future?',
+        hint: 'Thảo luận tính tiện lợi và trải nghiệm thực tế không thể thay thế.'
+      }
+    ]
+  }
+});
+
+export const normalizeSpeakingSection = (rawSpeaking = {}) => {
+  const def = createDefaultSpeakingSection();
+  const s = rawSpeaking && typeof rawSpeaking === 'object' ? rawSpeaking : {};
+  const p1 = s.part1 && typeof s.part1 === 'object' ? s.part1 : {};
+  const p2 = s.part2 && typeof s.part2 === 'object' ? s.part2 : {};
+  const p3 = s.part3 && typeof s.part3 === 'object' ? s.part3 : {};
+
+  return {
+    isForecast: Boolean(s.isForecast),
+    autoAiGrade: s.autoAiGrade !== false,
+    part1SpeakSec: Math.max(15, Number(s.part1SpeakSec ?? def.part1SpeakSec) || 45),
+    part2PrepSec: Math.max(10, Number(s.part2PrepSec ?? def.part2PrepSec) || 60),
+    part2SpeakSec: Math.max(30, Number(s.part2SpeakSec ?? def.part2SpeakSec) || 120),
+    part3SpeakSec: Math.max(15, Number(s.part3SpeakSec ?? def.part3SpeakSec) || 60),
+    part1: {
+      enabled: p1.enabled !== false,
+      topic: String(p1.topic ?? def.part1.topic),
+      questions: Array.isArray(p1.questions)
+        ? p1.questions.map((q, idx) => ({
+            id: q?.id || `sp1_${idx + 1}`,
+            prompt: String(q?.prompt || '').trim(),
+            hint: String(q?.hint || '').trim()
+          }))
+        : def.part1.questions
+    },
+    part2: {
+      enabled: p2.enabled !== false,
+      title: String(p2.title ?? def.part2.title),
+      cueCardPrompt: String(p2.cueCardPrompt ?? def.part2.cueCardPrompt),
+      bullets: Array.isArray(p2.bullets)
+        ? p2.bullets.map(b => String(b || '').trim())
+        : def.part2.bullets,
+      followUpQuestion: String(p2.followUpQuestion ?? '')
+    },
+    part3: {
+      enabled: p3.enabled !== false,
+      topic: String(p3.topic ?? def.part3.topic),
+      questions: Array.isArray(p3.questions)
+        ? p3.questions.map((q, idx) => ({
+            id: q?.id || `sp3_${idx + 1}`,
+            prompt: String(q?.prompt || '').trim(),
+            hint: String(q?.hint || '').trim()
+          }))
+        : def.part3.questions
+    }
+  };
+};
+
+export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
+  const sp = normalizeSpeakingSection(rawSpeaking);
+  const items = [];
+
+  if ((partFilter === 'all' || partFilter === 'part1') && sp.part1.enabled) {
+    (sp.part1.questions || [])
+      .filter(q => String(q.prompt || '').trim())
+      .forEach((q, idx) => {
+        items.push({
+          id: q.id || `sp1_${idx + 1}`,
+          part: 1,
+          partLabel: 'Part 1',
+          topic: sp.part1.topic || 'Part 1 Interview',
+          prompt: q.prompt,
+          bullets: [],
+          hint: q.hint || '',
+          prepSec: 0,
+          speakSec: sp.part1SpeakSec
+        });
+      });
+  }
+
+  if ((partFilter === 'all' || partFilter === 'part2') && sp.part2.enabled && String(sp.part2.cueCardPrompt || sp.part2.title || '').trim()) {
+    items.push({
+      id: 'sp2_cuecard',
+      part: 2,
+      partLabel: 'Part 2 Cue Card',
+      topic: sp.part2.title || 'Individual Long Turn',
+      prompt: sp.part2.cueCardPrompt || sp.part2.title,
+      bullets: (sp.part2.bullets || []).filter(Boolean),
+      hint: sp.part2.followUpQuestion ? `Câu hỏi phụ gợi ý: ${sp.part2.followUpQuestion}` : '',
+      prepSec: sp.part2PrepSec,
+      speakSec: sp.part2SpeakSec
+    });
+  }
+
+  if ((partFilter === 'all' || partFilter === 'part3') && sp.part3.enabled) {
+    (sp.part3.questions || [])
+      .filter(q => String(q.prompt || '').trim())
+      .forEach((q, idx) => {
+        items.push({
+          id: q.id || `sp3_${idx + 1}`,
+          part: 3,
+          partLabel: 'Part 3 Discussion',
+          topic: sp.part3.topic || 'Two-way Discussion',
+          prompt: q.prompt,
+          bullets: [],
+          hint: q.hint || '',
+          prepSec: 0,
+          speakSec: sp.part3SpeakSec
+        });
+      });
+  }
+
+  return items;
+};
 
 export const normalizeExamConfig = (test) => {
-  const rawOrder = Array.isArray(test?.sectionOrder) ? test.sectionOrder : DEFAULT_SECTION_ORDER;
-  const validSkills = new Set(DEFAULT_SECTION_ORDER);
-  const deduped = rawOrder.filter((s, idx) => validSkills.has(s) && rawOrder.indexOf(s) === idx);
-  const missing = DEFAULT_SECTION_ORDER.filter(s => !deduped.includes(s));
-  const order = [...deduped, ...missing];
+  const testMode = test?.testMode === 'single_skill' ? 'single_skill' : 'full_exam';
+  const focusSkill = testMode === 'single_skill' && ALL_SKILL_OPTIONS.includes(test?.focusSkill)
+    ? test.focusSkill
+    : null;
+
+  let order;
+  if (testMode === 'single_skill' && focusSkill) {
+    order = [focusSkill];
+  } else {
+    const rawOrder = Array.isArray(test?.sectionOrder) ? test.sectionOrder : DEFAULT_SECTION_ORDER;
+    const validSkills = new Set(DEFAULT_SECTION_ORDER);
+    const deduped = rawOrder.filter((s, idx) => validSkills.has(s) && rawOrder.indexOf(s) === idx);
+    const missing = DEFAULT_SECTION_ORDER.filter(s => !deduped.includes(s));
+    order = [...deduped, ...missing];
+  }
 
   const rawDurations = test?.sectionDurations || {};
   const durations = {
     listening: Math.max(1, Number(rawDurations.listening ?? DEFAULT_SECTION_DURATIONS.listening) || 15),
     reading: Math.max(1, Number(rawDurations.reading ?? DEFAULT_SECTION_DURATIONS.reading) || 20),
-    writing: Math.max(1, Number(rawDurations.writing ?? DEFAULT_SECTION_DURATIONS.writing) || 25)
+    writing: Math.max(1, Number(rawDurations.writing ?? DEFAULT_SECTION_DURATIONS.writing) || 25),
+    speaking: Math.max(1, Number(rawDurations.speaking ?? DEFAULT_SECTION_DURATIONS.speaking) || 14)
   };
 
   return {
+    testMode,
+    focusSkill,
     visibility: test?.visibility === 'private' ? 'private' : 'public',
     maxAttempts: Math.max(0, Number(test?.maxAttempts ?? 0) || 0),
-    sequentialMode: test?.sequentialMode !== false,
-    allowEarlyNextSection: !!test?.allowEarlyNextSection,
+    sequentialMode: testMode === 'single_skill' ? false : test?.sequentialMode !== false,
+    allowEarlyNextSection: testMode === 'single_skill' ? true : !!test?.allowEarlyNextSection,
     antiCheatEnabled: test?.antiCheatEnabled !== false,
     order,
     durations
@@ -150,6 +332,9 @@ export const getListeningAudioKey = (track, idx) =>
 export const createEmptyTestForm = () => ({
   title: '',
   description: '',
+  testMode: 'full_exam',
+  focusSkill: null,
+  autoAiGrade: true,
   visibility: 'private',
   maxAttempts: 0,
   sequentialMode: true,
@@ -195,8 +380,41 @@ export const createEmptyTestForm = () => ({
   writing: {
     task1: { prompt: '', minWords: 150, imageUrl: '', modelAnswer: '' },
     task2: { prompt: '', minWords: 250, modelAnswer: '' }
-  }
+  },
+  speaking: createDefaultSpeakingSection()
 });
+
+export const createEmptySingleSkillTestForm = (skill = 'speaking') => {
+  const safeSkill = ALL_SKILL_OPTIONS.includes(skill) ? skill : 'speaking';
+  const skillNames = {
+    listening: 'Listening',
+    reading: 'Reading',
+    writing: 'Writing',
+    speaking: 'Speaking AI'
+  };
+  const base = createEmptyTestForm();
+  return {
+    ...base,
+    id: 'test-skill-' + Date.now(),
+    title: `Đề Luyện Riêng Kỹ Năng ${skillNames[safeSkill]} Mới`,
+    description:
+      safeSkill === 'speaking'
+        ? 'Bài luyện nói IELTS Speaking chấm tự động 4 tiêu chí bằng AI & lưu file ghi âm.'
+        : `Đề luyện tập tập trung riêng kỹ năng ${skillNames[safeSkill]}.`,
+    createdAt: new Date().toISOString().split('T')[0],
+    testMode: 'single_skill',
+    focusSkill: safeSkill,
+    autoAiGrade: safeSkill === 'speaking',
+    visibility: 'private',
+    maxAttempts: 0,
+    sequentialMode: false,
+    allowEarlyNextSection: true,
+    antiCheatEnabled: safeSkill !== 'speaking',
+    allowViewAnswers: true,
+    sectionOrder: [safeSkill],
+    sectionDurations: { ...DEFAULT_SECTION_DURATIONS }
+  };
+};
 
 const CAMBRIDGE_TASK1_CHART_SVG_URL =
   'data:image/svg+xml;charset=utf-8,' +
@@ -720,6 +938,115 @@ However, energy storage remains a critical bottleneck. Solar power output fluctu
         prompt: 'Task 2: Some people believe that governments should prioritize spending on renewable energy research, while others think traditional infrastructure (roads, bridges, hospitals) is more urgent. Discuss both views and give your opinion.',
         minWords: 250,
         modelAnswer: 'The question of whether government expenditure should be directed towards renewable energy research or conventional physical infrastructure remains a subject of intense global debate. While public infrastructure such as highways and healthcare systems addresses immediate social needs, I firmly believe that investment in sustainable energy research is far more vital for long-term ecological survival and sustainable economic growth.'
+      }
+    }
+  },
+  {
+    id: 'test-spk-luyennoi-1',
+    seedTag: 'speaking_luyennoi_full_v1',
+    title: 'IELTS Speaking Full Test 01 — Hometown, Memorable Trip & Tourism',
+    description: 'Đề thi thử IELTS Speaking đầy đủ 3 phần (Part 1, Cue Card Part 2, Part 3). Ghi âm câu trả lời lưu trực tiếp lên hệ thống và AI chấm band 4 tiêu chí.',
+    createdAt: '2026-11-16',
+    testMode: 'single_skill',
+    focusSkill: 'speaking',
+    autoAiGrade: true,
+    visibility: 'public',
+    maxAttempts: 0,
+    sequentialMode: false,
+    allowEarlyNextSection: true,
+    antiCheatEnabled: false,
+    sectionOrder: ['speaking'],
+    sectionDurations: { listening: 15, reading: 20, writing: 25, speaking: 14 },
+    maxAudioPlays: 2,
+    shuffleOptions: false,
+    allowViewAnswers: true,
+    listening: { tracks: [], questions: [] },
+    reading: { passages: [], questions: [] },
+    writing: { task1: { prompt: '', minWords: 150, modelAnswer: '' }, task2: { prompt: '', minWords: 250, modelAnswer: '' } },
+    speaking: createDefaultSpeakingSection()
+  },
+  {
+    id: 'test-spk-forecast-2',
+    seedTag: 'speaking_forecast_q4_v1',
+    title: 'Forecast Speaking Mới Nhất — AI Technology, Study & Modern Lifestyle',
+    description: 'Bộ câu hỏi Forecast Speaking cập nhật để học viên luyện từng Part hoặc thi Full Test với AI chấm điểm & gợi ý nâng Band.',
+    createdAt: '2026-11-16',
+    testMode: 'single_skill',
+    focusSkill: 'speaking',
+    autoAiGrade: true,
+    visibility: 'public',
+    maxAttempts: 0,
+    sequentialMode: false,
+    allowEarlyNextSection: true,
+    antiCheatEnabled: false,
+    sectionOrder: ['speaking'],
+    sectionDurations: { listening: 15, reading: 20, writing: 25, speaking: 14 },
+    maxAudioPlays: 2,
+    shuffleOptions: false,
+    allowViewAnswers: true,
+    listening: { tracks: [], questions: [] },
+    reading: { passages: [], questions: [] },
+    writing: { task1: { prompt: '', minWords: 150, modelAnswer: '' }, task2: { prompt: '', minWords: 250, modelAnswer: '' } },
+    speaking: {
+      isForecast: true,
+      autoAiGrade: true,
+      part1SpeakSec: 45,
+      part2PrepSec: 60,
+      part2SpeakSec: 120,
+      part3SpeakSec: 60,
+      part1: {
+        enabled: true,
+        topic: 'Technology & Study Habits',
+        questions: [
+          {
+            id: 'fc_p1_1',
+            prompt: 'How much time do you usually spend using smartphones or computers every day?',
+            hint: 'Dùng từ: screen time, indispensable tool, balance study and leisure...'
+          },
+          {
+            id: 'fc_p1_2',
+            prompt: 'Do you prefer studying in a quiet library or in a lively café?',
+            hint: 'So sánh mức độ tập trung vs không gian thoải mái.'
+          },
+          {
+            id: 'fc_p1_3',
+            prompt: 'What app or piece of software has helped you the most in learning English?',
+            hint: 'Nêu tên công cụ + 1 lợi ích cụ thể cho từ vựng hoặc phát âm.'
+          }
+        ]
+      },
+      part2: {
+        enabled: true,
+        title: 'Describe a useful skill you learned from a website or video',
+        cueCardPrompt: 'Describe a practical skill you learned from an online video or website.',
+        bullets: [
+          'what skill you learned',
+          'how you found that website or video',
+          'what challenges you faced when learning it',
+          'and explain why this skill has been useful to you'
+        ],
+        followUpQuestion: 'Would you recommend this learning method to older people?'
+      },
+      part3: {
+        enabled: true,
+        topic: 'AI & Future of Education',
+        questions: [
+          {
+            id: 'fc_p3_1',
+            prompt: 'In what ways has Artificial Intelligence changed how students learn today?',
+            hint: 'Nhắc đến cá nhân hóa lộ trình, phản hồi tức thì và rủi ro phụ thuộc.'
+          },
+          {
+            id: 'fc_p3_2',
+            prompt: 'Can online teachers or AI tools ever completely replace human teachers in classrooms?',
+            hint: 'Nêu vai trò cảm hứng, thấu hiểu tâm lý và giao tiếp người-người.'
+          },
+          {
+            id: 'fc_p3_3',
+            prompt: 'What skills will young workers need most in an automated economy?',
+            hint: 'Critical thinking, adaptability, emotional intelligence...'
+          }
+        ]
       }
     }
   }

@@ -45,6 +45,7 @@ export default function GlobalModals({
   handleSaveCustomVocabTopic,
   handleSaveNewStudents,
   handleTeacherAIGrade,
+  handleTeacherAIGradeSpeaking,
   handleTestGeminiKey,
   handleUpdateUserAvatar,
   handleUpdateUserProfileFields,
@@ -996,13 +997,14 @@ export default function GlobalModals({
       </div>
     )}
 
-    {/* Teacher Grading Modal (Listening, Reading & Writing) */}
+    {/* Teacher Grading Modal (Listening, Reading, Writing & Speaking) */}
     {currentUser?.role === 'teacher' && (
       <TeacherGradingModal
         aiGradingStep={aiGradingStep}
         gradingAttempt={gradingAttempt}
         gradingScores={gradingScores}
         handleTeacherAIGrade={handleTeacherAIGrade}
+        handleTeacherAIGradeSpeaking={handleTeacherAIGradeSpeaking}
         isGradingAI={isGradingAI}
         recalculateObjectiveScores={recalculateObjectiveScores}
         saveTeacherGrading={saveTeacherGrading}

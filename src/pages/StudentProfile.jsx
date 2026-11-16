@@ -113,10 +113,10 @@ export default function StudentProfile({
     : null;
 
   const avgListening = totalAttempts > 0
-    ? (studentAttempts.reduce((acc, a) => acc + (a.scores.listening.band || 0), 0) / totalAttempts).toFixed(1)
+    ? (studentAttempts.reduce((acc, a) => acc + (a.scores?.listening?.band || 0), 0) / totalAttempts).toFixed(1)
     : null;
   const avgReading = totalAttempts > 0
-    ? (studentAttempts.reduce((acc, a) => acc + (a.scores.reading.band || 0), 0) / totalAttempts).toFixed(1)
+    ? (studentAttempts.reduce((acc, a) => acc + (a.scores?.reading?.band || 0), 0) / totalAttempts).toFixed(1)
     : null;
   const gradedWritingAttempts = studentAttempts.filter(a => typeof a.scores?.writing?.overallBand === 'number');
   const avgWriting = gradedWritingAttempts.length > 0
@@ -689,12 +689,12 @@ export default function StudentProfile({
                         <span className="flex items-center gap-1">
                           <Headphones className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" /> Listening
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white">{att.scores.listening.band ?? '-'}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{att.scores?.listening?.band ?? '-'}</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-blue-500 rounded-full transition-all"
-                          style={{ width: `${((att.scores.listening.band || 0) / 9) * 100}%` }}
+                          style={{ width: `${((att.scores?.listening?.band || 0) / 9) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -704,12 +704,12 @@ export default function StudentProfile({
                         <span className="flex items-center gap-1">
                           <BookOpen className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" /> Reading
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white">{att.scores.reading.band ?? '-'}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{att.scores?.reading?.band ?? '-'}</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-indigo-500 rounded-full transition-all"
-                          style={{ width: `${((att.scores.reading.band || 0) / 9) * 100}%` }}
+                          style={{ width: `${((att.scores?.reading?.band || 0) / 9) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -717,14 +717,16 @@ export default function StudentProfile({
                     <div>
                       <div className="flex justify-between text-slate-600 dark:text-slate-300 font-semibold mb-1">
                         <span className="flex items-center gap-1">
-                          <PenTool className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> Writing
+                          <PenTool className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" /> {att.scores?.speaking ? 'Speaking AI' : 'Writing'}
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white">{att.scores.writing.overallBand ?? '-'}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {att.scores?.speaking ? (att.scores.speaking.band ?? '-') : (att.scores?.writing?.overallBand ?? '-')}
+                        </span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-emerald-500 rounded-full transition-all"
-                          style={{ width: `${((att.scores.writing.overallBand || 0) / 9) * 100}%` }}
+                          style={{ width: `${(((att.scores?.speaking ? att.scores.speaking.band : att.scores?.writing?.overallBand) || 0) / 9) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -865,16 +867,25 @@ export default function StudentProfile({
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{att.submittedAt}</td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores.listening.band ?? '-'}</span>
-                        <span className="text-[11px] text-slate-400 block font-normal">({att.scores.listening.raw}/{att.scores.listening.total} câu)</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores?.listening?.band ?? '-'}</span>
+                        <span className="text-[11px] text-slate-400 block font-normal">({att.scores?.listening?.raw || 0}/{att.scores?.listening?.total || 0} câu)</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores.reading.band ?? '-'}</span>
-                        <span className="text-[11px] text-slate-400 block font-normal">({att.scores.reading.raw}/{att.scores.reading.total} câu)</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores?.reading?.band ?? '-'}</span>
+                        <span className="text-[11px] text-slate-400 block font-normal">({att.scores?.reading?.raw || 0}/{att.scores?.reading?.total || 0} câu)</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores.writing.overallBand ?? 'Chờ chấm'}</span>
-                        <span className="text-[11px] text-slate-400 block font-normal">T1: {att.scores.writing.task1Band ?? '-'} | T2: {att.scores.writing.task2Band ?? '-'}</span>
+                        {att.scores?.speaking ? (
+                          <>
+                            <span className="font-bold text-[#570DF8] dark:text-[#C4B5FD]">Spk {att.scores.speaking.band ?? '-'}</span>
+                            <span className="text-[11px] text-slate-400 block font-normal">Speaking AI</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores?.writing?.overallBand ?? (att.testMode === 'single_skill' ? '-' : 'Chờ chấm')}</span>
+                            <span className="text-[11px] text-slate-400 block font-normal">T1: {att.scores?.writing?.task1Band ?? '-'} | T2: {att.scores?.writing?.task2Band ?? '-'}</span>
+                          </>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className="text-base font-black text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 rounded-xl border border-indigo-100 dark:border-indigo-500/30">

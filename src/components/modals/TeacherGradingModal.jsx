@@ -4,6 +4,7 @@ import {
   Bot,
   Headphones,
   Loader2,
+  Mic,
   PenTool,
   RefreshCw,
   Save,
@@ -37,6 +38,7 @@ export default function TeacherGradingModal({
   gradingAttempt,
   gradingScores,
   handleTeacherAIGrade,
+  handleTeacherAIGradeSpeaking,
   isGradingAI,
   recalculateObjectiveScores,
   saveTeacherGrading,
@@ -44,6 +46,16 @@ export default function TeacherGradingModal({
   setGradingScores
 }) {
   if (!gradingAttempt) return null;
+
+  const isSingleSkill = gradingAttempt.testMode === 'single_skill' && Boolean(gradingAttempt.focusSkill);
+  const focusSkill = isSingleSkill ? gradingAttempt.focusSkill : null;
+  const isSpeakingAttempt =
+    focusSkill === 'speaking' ||
+    Boolean(gradingAttempt.scores?.speaking) ||
+    (Array.isArray(gradingAttempt.speakingRecordings) && gradingAttempt.speakingRecordings.length > 0);
+  const showListeningBlock = !isSingleSkill || focusSkill === 'listening';
+  const showReadingBlock = !isSingleSkill || focusSkill === 'reading';
+  const showWritingBlock = !isSingleSkill || focusSkill === 'writing';
 
   const logsList = gradingAttempt.antiCheatLogs || [];
   const extSignalsCount = countExtensionCheatSignals(logsList);
@@ -59,17 +71,19 @@ export default function TeacherGradingModal({
   const expectedLBand = calculateAutoBand(lRawClean, lTotal, 'listening');
   const expectedRBand = calculateAutoBand(rRawClean, rTotal, 'reading');
   const hasObjectiveMismatch =
-    (lTotal > 0 && previewLBand !== expectedLBand) ||
-    (rTotal > 0 && previewRBand !== expectedRBand);
+    (showListeningBlock && lTotal > 0 && previewLBand !== expectedLBand) ||
+    (showReadingBlock && rTotal > 0 && previewRBand !== expectedRBand);
 
   const previewT1 = sanitizeBandInput(gradingScores.task1Band);
   const previewT2 = sanitizeBandInput(gradingScores.task2Band);
   const previewWriting = calculateWritingBand(previewT1, previewT2);
+  const previewSpeaking = sanitizeBandInput(gradingScores.speakingBand);
 
   const previewSkills = [];
-  if (lTotal > 0) previewSkills.push(previewLBand);
-  if (rTotal > 0) previewSkills.push(previewRBand);
-  previewSkills.push(previewWriting);
+  if (showListeningBlock && (lTotal > 0 || focusSkill === 'listening')) previewSkills.push(previewLBand);
+  if (showReadingBlock && (rTotal > 0 || focusSkill === 'reading')) previewSkills.push(previewRBand);
+  if (showWritingBlock) previewSkills.push(previewWriting);
+  if (isSpeakingAttempt) previewSkills.push(previewSpeaking);
   const previewOverall = calculateOverallIeltsBand(previewSkills);
 
   const handleObjectiveRawChange = (skill, total, rawInput) => {
@@ -170,6 +184,7 @@ export default function TeacherGradingModal({
         </div>
 
         {/* Listening & Reading Score Editor */}
+        {(showListeningBlock || showReadingBlock) && (
         <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-6 space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
@@ -289,8 +304,85 @@ export default function TeacherGradingModal({
             </div>
           </div>
         </div>
+        )}
+
+        {/* Speaking Audio Recordings & 4-Criteria Score Editor */}
+        {isSpeakingAttempt && (
+          <div className="bg-indigo-50/75 dark:bg-indigo-950/25 border border-[#570DF8]/30 rounded-2xl p-5 mb-6 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <Mic className="w-4 h-4 text-[#570DF8] dark:text-[#C4B5FD]" /> Bài Ghi Âm &amp; Điểm Speaking AI
+              </h4>
+              <button
+                type="button"
+                onClick={() => handleTeacherAIGradeSpeaking?.(gradingAttempt)}
+                disabled={isGradingAI}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#570DF8] hover:bg-[#490AD2] disabled:opacity-55 text-white flex items-center gap-1.5 shadow-sm transition"
+              >
+                {isGradingAI ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-300" />}
+                <span>{isGradingAI ? 'Đang nghe & chấm AI...' : '✨ AI Chấm Lại Từ Ghi Âm'}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {[
+                { key: 'speakingFc', label: 'Fluency (FC)' },
+                { key: 'speakingLr', label: 'Lexical (LR)' },
+                { key: 'speakingGra', label: 'Grammar (GRA)' },
+                { key: 'speakingPr', label: 'Pronun (PR)' },
+                { key: 'speakingBand', label: 'Speaking Overall' }
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    {f.label}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="9"
+                    value={gradingScores[f.key] ?? 0}
+                    onChange={e => setGradingScores(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    onBlur={() => handleBandBlur(f.key)}
+                    className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-[#570DF8] ${
+                      f.key === 'speakingBand'
+                        ? 'border-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD]'
+                        : 'border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white'
+                    }`}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              {(gradingAttempt.speakingRecordings || []).map((rec, idx) => (
+                <div key={rec.questionId || idx} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-800 dark:text-slate-100">
+                      Part {rec.part || 1} • Câu {idx + 1}: {rec.prompt}
+                    </span>
+                    <span className="text-[11px] font-bold text-[#570DF8] dark:text-[#C4B5FD] shrink-0">
+                      {rec.durationSec || 0}s • Band {rec.band ?? '-'}
+                    </span>
+                  </div>
+                  {rec.audioUrl ? (
+                    <audio controls src={rec.audioUrl} className="w-full h-9" />
+                  ) : (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">Chưa có file ghi âm cho câu này.</p>
+                  )}
+                  {rec.transcript && (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <strong>Transcript:</strong> {rec.transcript}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Student Writing Submissions */}
+        {showWritingBlock && (
         <div className="space-y-4 mb-6">
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">Bài Viết Của Học Sinh</h4>
 
@@ -312,9 +404,12 @@ export default function TeacherGradingModal({
             </div>
           </div>
         </div>
+        )}
 
-        {/* Writing Grading input and AI suggestion */}
+        {/* Writing Grading input OR General Feedback */}
         <div className="bg-[#EDFFFD]/50 dark:bg-[#003538]/30 border border-[#B5F5F1] dark:border-teal-500/30 rounded-2xl p-5 mb-6 space-y-4">
+          {showWritingBlock && (
+          <>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <h4 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
               <PenTool className="w-4 h-4 text-[#059271] dark:text-emerald-400" />
@@ -381,6 +476,8 @@ export default function TeacherGradingModal({
               />
             </div>
           </div>
+          </>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Nhận Xét & Ghi Chú Của Giáo Viên</label>
@@ -397,15 +494,26 @@ export default function TeacherGradingModal({
         {/* Live Overall Summary Preview */}
         <div className="bg-slate-900 dark:bg-slate-800/90 text-white rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-800 dark:border-slate-700">
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
-              Listening: <strong className="text-[#1EE1D6]">{previewLBand}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
-              Reading: <strong className="text-sky-400">{previewRBand}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
-              Writing: <strong className="text-emerald-400">{previewWriting}</strong>
-            </span>
+            {showListeningBlock && (
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
+                Listening: <strong className="text-[#1EE1D6]">{previewLBand}</strong>
+              </span>
+            )}
+            {showReadingBlock && (
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
+                Reading: <strong className="text-sky-400">{previewRBand}</strong>
+              </span>
+            )}
+            {showWritingBlock && (
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
+                Writing: <strong className="text-emerald-400">{previewWriting}</strong>
+              </span>
+            )}
+            {isSpeakingAttempt && (
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
+                Speaking: <strong className="text-[#C4B5FD]">{previewSpeaking}</strong>
+              </span>
+            )}
           </div>
           <div className="text-xs font-bold flex items-center gap-2">
             <span className="text-slate-400 uppercase tracking-wider">Band Overall Dự Kiến:</span>
@@ -423,19 +531,19 @@ export default function TeacherGradingModal({
           >
             Hủy
           </button>
-          {!gradingAttempt.teacherGraded && (
+          {!gradingAttempt.teacherGraded && !isSpeakingAttempt && showListeningBlock && showReadingBlock && (
             <button
               type="button"
               onClick={() => saveTeacherGrading({ includeWriting: false })}
               className="px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-xl transition flex items-center gap-1.5"
               title="Lưu riêng điểm Listening & Reading đã sửa, giữ nguyên trạng thái Chờ Chấm Writing"
             >
-              <Save className="w-3.5 h-3.5" /> Chỉ Lưu L & R (Chưa Chốt Writing)
+              <Save className="w-3.5 h-3.5" /> Chỉ Lưu L &amp; R (Chưa Chốt Writing)
             </button>
           )}
           <button
             type="button"
-            onClick={() => saveTeacherGrading({ includeWriting: true })}
+            onClick={() => saveTeacherGrading({ includeWriting: !isSpeakingAttempt })}
             className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow flex items-center gap-2"
           >
             <Save className="w-4 h-4" /> Lưu Kết Quả & Chấm Điểm

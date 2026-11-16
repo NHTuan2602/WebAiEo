@@ -2,8 +2,22 @@
 // Enables cross-browser & cross-device sync (Lobby, Chat, Đua Top Scores, Exams, Avatars).
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  buildSpeakingExaminerPrompt,
+  cleanAudioMimeType,
+  inferAudioExtension,
+  normalizeSpeakingEvaluation,
+  simulateAISpeakingGrading
+} from './src/utils/speakingAiEngine.js';
 
 export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
+const GEMINI_AUDIO_PREFERRED_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+  'gemini-flash-latest'
+];
 
 function getServerChatMsgTs(msg) {
   const rawTs = Number(msg?.createdAt ?? msg?.id);
@@ -105,7 +119,7 @@ function pruneExpiredStoreChats(store, now = Date.now()) {
   return prunedAny;
 }
 
-function createInitialStore() {
+function createInitialStore(audioDir = '') {
   return {
     version: 0,
     seeded: false,
@@ -117,8 +131,73 @@ function createInitialStore() {
     attempts: [],
     teacherNotes: {},
     users: {},
-    customVocabTopics: []
+    customVocabTopics: [],
+    aiConfig: { geminiApiKey: '' },
+    _audioDir: audioDir,
+    _audioMem: new Map()
   };
+}
+
+function sanitizeAudioId(raw = '') {
+  const cleaned = String(raw || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  return cleaned.length >= 4 && cleaned.length <= 120 ? cleaned : '';
+}
+
+function getEffectiveGeminiKey(store, clientOverride = '') {
+  return String(
+    store?.aiConfig?.geminiApiKey ||
+    process.env.GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    clientOverride ||
+    ''
+  ).trim().replace(/^['"]|['"]$/g, '');
+}
+
+function saveAudioRecord(store, { audioId, mimeType, dataBase64, username = '', attemptId = '', questionId = '' }) {
+  const safeId = sanitizeAudioId(audioId) || `spk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const cleanMime = cleanAudioMimeType(mimeType);
+  const rawB64 = String(dataBase64 || '').replace(/^data:[^;]+;base64,/, '');
+  const buffer = Buffer.from(rawB64, 'base64');
+  const ext = inferAudioExtension(cleanMime);
+  const meta = {
+    audioId: safeId,
+    mimeType: cleanMime,
+    ext,
+    sizeBytes: buffer.length,
+    username,
+    attemptId,
+    questionId,
+    createdAt: Date.now()
+  };
+
+  if (store._audioDir) {
+    fs.mkdirSync(store._audioDir, { recursive: true });
+    fs.writeFileSync(path.join(store._audioDir, `${safeId}.bin`), buffer);
+    fs.writeFileSync(path.join(store._audioDir, `${safeId}.meta.json`), JSON.stringify(meta), 'utf8');
+  } else {
+    store._audioMem.set(safeId, { buffer, meta });
+  }
+  return meta;
+}
+
+function loadAudioRecord(store, rawId) {
+  const safeId = sanitizeAudioId(rawId);
+  if (!safeId) return null;
+  if (store._audioDir) {
+    const binPath = path.join(store._audioDir, `${safeId}.bin`);
+    const metaPath = path.join(store._audioDir, `${safeId}.meta.json`);
+    if (fs.existsSync(binPath)) {
+      let meta = { audioId: safeId, mimeType: 'audio/webm', ext: 'webm' };
+      try {
+        if (fs.existsSync(metaPath)) {
+          meta = { ...meta, ...JSON.parse(fs.readFileSync(metaPath, 'utf8')) };
+        }
+      } catch (_err) {}
+      const buffer = fs.readFileSync(binPath);
+      return { buffer, meta };
+    }
+  }
+  return store._audioMem?.get(safeId) || null;
 }
 
 /**
@@ -126,7 +205,8 @@ function createInitialStore() {
  * Keeps existing in-memory behavior when `persistFile` is empty.
  */
 export function createPersistentSyncStore(persistFile = '') {
-  const store = createInitialStore();
+  const audioDir = persistFile ? path.join(path.dirname(persistFile), 'audio') : '';
+  const store = createInitialStore(audioDir);
 
   if (persistFile) {
     try {
@@ -166,6 +246,11 @@ export function createPersistentSyncStore(persistFile = '') {
           if (Array.isArray(parsed.customVocabTopics)) {
             store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
           }
+          if (parsed.aiConfig && typeof parsed.aiConfig === 'object') {
+            store.aiConfig = {
+              geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
+            };
+          }
         }
       }
     } catch {
@@ -182,7 +267,8 @@ export function createPersistentSyncStore(persistFile = '') {
       try {
         fs.mkdirSync(path.dirname(persistFile), { recursive: true });
         const tmpFile = `${persistFile}.tmp`;
-        fs.writeFileSync(tmpFile, JSON.stringify(store), 'utf8');
+        const { _audioDir, _audioMem, ...serializableStore } = store;
+        fs.writeFileSync(tmpFile, JSON.stringify(serializableStore), 'utf8');
         fs.renameSync(tmpFile, persistFile);
       } catch {
         // Ignore read-only filesystem errors so realtime relay never crashes
@@ -198,7 +284,7 @@ function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let totalBytes = 0;
-    const MAX_BYTES = 12 * 1024 * 1024;
+    const MAX_BYTES = 24 * 1024 * 1024;
     req.on('data', chunk => {
       totalBytes += chunk.length;
       if (totalBytes > MAX_BYTES) {
@@ -226,6 +312,7 @@ function getSnapshot(store) {
     version: store.version,
     seeded: store.seeded,
     serverTime: Date.now(),
+    aiConfigured: Boolean(getEffectiveGeminiKey(store)),
     deletedUserIds: store.deletedUserIds,
     rooms: store.rooms,
     tests: store.tests,
@@ -728,6 +815,16 @@ function applySyncAction(store, type, payload = {}) {
       break;
     }
 
+    case 'SET_AI_CONFIG': {
+      const nextKey = String(payload.geminiApiKey ?? '').trim().replace(/^['"]|['"]$/g, '');
+      const prevKey = String(store.aiConfig?.geminiApiKey || '');
+      if (nextKey !== prevKey) {
+        store.aiConfig = { ...(store.aiConfig || {}), geminiApiKey: nextKey };
+        changed = true;
+      }
+      break;
+    }
+
     default:
       break;
   }
@@ -736,6 +833,122 @@ function applySyncAction(store, type, payload = {}) {
     store.version += 1;
   }
   return changed;
+}
+
+async function discoverServerGeminiModels(cleanKey) {
+  const ordered = [];
+  const pushUnique = (id) => {
+    if (id && !ordered.includes(id)) ordered.push(id);
+  };
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cleanKey)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const ids = (data?.models || [])
+        .filter(m => {
+          const methods = m?.supportedGenerationMethods || [];
+          const name = String(m?.name || '').toLowerCase();
+          return (
+            methods.includes('generateContent') &&
+            !name.includes('embedding') &&
+            !name.includes('imagen') &&
+            !name.includes('tts') &&
+            !name.includes('aqa')
+          );
+        })
+        .map(m => String(m.name || '').replace(/^models\//, ''));
+      GEMINI_AUDIO_PREFERRED_MODELS.forEach(p => { if (ids.includes(p)) pushUnique(p); });
+      ids.filter(id => id.includes('flash')).forEach(pushUnique);
+      ids.filter(id => id.includes('gemini')).forEach(pushUnique);
+    }
+  } catch (_err) {}
+  GEMINI_AUDIO_PREFERRED_MODELS.forEach(pushUnique);
+  return ordered;
+}
+
+async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMode, recordings }) {
+  const parts = [];
+  const preparedRecordings = recordings.map(rec => {
+    let audioBuffer = null;
+    let resolvedMime = cleanAudioMimeType(rec.mimeType);
+
+    if (rec.audioId) {
+      const saved = loadAudioRecord(store, rec.audioId);
+      if (saved?.buffer?.length > 0) {
+        audioBuffer = saved.buffer;
+        resolvedMime = cleanAudioMimeType(saved.meta?.mimeType || resolvedMime);
+      }
+    }
+    if (!audioBuffer && rec.inlineAudioBase64) {
+      const rawB64 = String(rec.inlineAudioBase64).replace(/^data:[^;]+;base64,/, '');
+      if (rawB64) audioBuffer = Buffer.from(rawB64, 'base64');
+    }
+
+    const hasAudioBinary = Boolean(audioBuffer && audioBuffer.length > 256);
+    if (hasAudioBinary) {
+      parts.push({
+        inlineData: {
+          mimeType: resolvedMime,
+          data: audioBuffer.toString('base64')
+        }
+      });
+    }
+    return { ...rec, hasAudioBinary, mimeType: resolvedMime };
+  });
+
+  const meaningfulCount = preparedRecordings.filter(
+    r => (Number(r.durationSec) || 0) >= 1 && (r.hasAudioBinary || String(r.clientTranscript || '').trim().length >= 3)
+  ).length;
+  if (meaningfulCount === 0) {
+    return simulateAISpeakingGrading({ testTitle, partMode, recordings: preparedRecordings });
+  }
+
+  const promptText = buildSpeakingExaminerPrompt({
+    testTitle,
+    partMode,
+    recordings: preparedRecordings
+  });
+  const requestParts = [{ text: promptText }, ...parts];
+  const models = await discoverServerGeminiModels(apiKey);
+  let lastErr = null;
+
+  for (const modelId of models) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: requestParts }],
+        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        lastErr = new Error('AI không trả về JSON hợp lệ.');
+        continue;
+      }
+      const parsed = JSON.parse(jsonMatch[0]);
+      return normalizeSpeakingEvaluation({
+        parsed,
+        recordings: preparedRecordings,
+        usedModel: modelId,
+        gradedMode: 'gemini_audio'
+      });
+    }
+
+    const errText = await response.text();
+    if (response.status === 404 || /not found|not supported/i.test(errText)) {
+      lastErr = new Error(errText);
+      continue;
+    }
+    throw new Error(`Gemini API lỗi (${response.status}): ${errText.slice(0, 220)}`);
+  }
+
+  throw lastErr || new Error('Không tìm thấy model Gemini hỗ trợ chấm Speaking audio.');
 }
 
 export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null) {
@@ -761,6 +974,111 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
 
   middlewares.use('/api/sync', async (req, res, next) => {
     const reqUrl = (req.url || '/').split('?')[0];
+
+    if (req.method === 'POST' && reqUrl === '/audio') {
+      try {
+        const body = await readJsonBody(req);
+        if (!body?.dataBase64) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Missing audio data' }));
+          return;
+        }
+        const meta = saveAudioRecord(store, body);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({
+          ok: true,
+          audioId: meta.audioId,
+          audioUrl: `/api/sync/audio/${meta.audioId}`,
+          mimeType: meta.mimeType,
+          sizeBytes: meta.sizeBytes
+        }));
+      } catch (err) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Audio upload failed' }));
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl.startsWith('/audio/')) {
+      const rawId = decodeURIComponent(reqUrl.slice('/audio/'.length));
+      const record = loadAudioRecord(store, rawId);
+      if (!record) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Audio recording not found' }));
+        return;
+      }
+      const totalLen = record.buffer.length;
+      const mime = record.meta?.mimeType || 'audio/webm';
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+
+      const rangeHeader = req.headers?.range;
+      if (rangeHeader && /^bytes=\d*-\d*$/i.test(rangeHeader)) {
+        const [startStr, endStr] = rangeHeader.replace(/^bytes=/i, '').split('-');
+        const start = startStr ? Math.min(totalLen - 1, Math.max(0, parseInt(startStr, 10))) : 0;
+        const end = endStr ? Math.min(totalLen - 1, Math.max(start, parseInt(endStr, 10))) : totalLen - 1;
+        const slice = record.buffer.subarray(start, end + 1);
+        res.statusCode = 206;
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${totalLen}`);
+        res.setHeader('Content-Length', String(slice.length));
+        res.end(slice);
+      } else {
+        res.statusCode = 200;
+        res.setHeader('Content-Length', String(totalLen));
+        res.end(record.buffer);
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/grade-speaking') {
+      try {
+        const body = await readJsonBody(req);
+        const recordings = Array.isArray(body?.recordings) ? body.recordings : [];
+        const testTitle = body?.testTitle || 'IELTS Speaking Test';
+        const partMode = body?.partMode || 'full';
+        const effectiveKey = getEffectiveGeminiKey(store, body?.clientApiKey || '');
+
+        let evaluation = null;
+        let warning = '';
+
+        if (effectiveKey) {
+          try {
+            evaluation = await gradeSpeakingWithGeminiServer({
+              apiKey: effectiveKey,
+              store,
+              testTitle,
+              partMode,
+              recordings
+            });
+          } catch (geminiErr) {
+            warning = geminiErr?.message || 'Gemini API failed, fallback used';
+          }
+        }
+
+        if (!evaluation) {
+          const enriched = recordings.map(r => {
+            const saved = r.audioId ? loadAudioRecord(store, r.audioId) : null;
+            return { ...r, hasAudioBinary: Boolean(saved?.buffer?.length > 256 || r.inlineAudioBase64) };
+          });
+          evaluation = simulateAISpeakingGrading({ testTitle, partMode, recordings: enriched });
+          if (warning) evaluation._fallbackReason = warning;
+        }
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: true, evaluation }));
+      } catch (err) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Speaking grading failed' }));
+      }
+      return;
+    }
 
     if (req.method === 'GET' && reqUrl === '/state') {
       res.statusCode = 200;

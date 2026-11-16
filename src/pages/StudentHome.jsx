@@ -10,6 +10,7 @@ import {
   Gamepad2,
   Headphones,
   Lock,
+  Mic,
   MonitorCheck,
   PenTool,
   Play,
@@ -29,6 +30,7 @@ export default function StudentHome({
   attempts,
   currentUser,
   openMemberProfile,
+  openSkillPracticeHub,
   openStudentGamePortal,
   setEditingTargetUser,
   setPreviousView,
@@ -43,7 +45,9 @@ export default function StudentHome({
   const isTeacher = currentUser?.role === 'teacher';
 
   const visibleTests = tests.filter(t => isTeacher || normalizeExamConfig(t).visibility !== 'private');
-  const filteredTests = visibleTests.filter(t => {
+  const fullExamTests = visibleTests.filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
+  const singleSkillCount = visibleTests.filter(t => normalizeExamConfig(t).testMode === 'single_skill').length;
+  const filteredTests = fullExamTests.filter(t => {
     const cfg = normalizeExamConfig(t);
     if (testFilter === 'unlimited') return cfg.maxAttempts === 0;
     if (testFilter === 'limited') return cfg.maxAttempts > 0;
@@ -56,11 +60,11 @@ export default function StudentHome({
   const gradedBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number' && b >= 0);
   const bestOverallBand = gradedBands.length > 0 ? Math.max(...gradedBands) : null;
 
-  const firstPlayableTest = visibleTests.find(t => {
+  const firstPlayableTest = fullExamTests.find(t => {
     const cfg = normalizeExamConfig(t);
     const used = studentAttempts.filter(a => a.testId === t.id).length;
     return !(cfg.maxAttempts > 0 && used >= cfg.maxAttempts);
-  }) || visibleTests[0];
+  }) || fullExamTests[0];
   const firstTestHasDraft = firstPlayableTest
     ? Boolean(loadExamDraft(currentUser?.username, firstPlayableTest.id, tests))
     : false;
@@ -165,6 +169,14 @@ export default function StudentHome({
                     <span>{firstTestHasDraft ? 'Tiếp Tục Bài Đang Làm' : 'Thi Thử IELTS Ngay'}</span>
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('speaking') : setView('SKILL_HUB'))}
+                  className="bg-[#570DF8] hover:bg-[#490AD2] text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl shadow-md shadow-indigo-900/15 transition flex items-center gap-2"
+                >
+                  <Mic className="w-4 h-4" />
+                  <span>Speaking AI &amp; 4 Kỹ Năng ({singleSkillCount})</span>
+                </button>
                 <button
                   onClick={openStudentGamePortal}
                   className="bg-[#F25220] hover:bg-[#d94417] text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl shadow-md shadow-orange-900/15 transition flex items-center gap-2"
@@ -339,7 +351,7 @@ export default function StudentHome({
             {/* Filter Pills */}
             <div className="flex items-center gap-1.5 bg-[#FFF5F8] dark:bg-[#0F172B] p-1 rounded-xl border border-pink-200/90 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
               {[
-                { id: 'all', label: `Tất cả (${visibleTests.length})` },
+                { id: 'all', label: `Tất cả đề gộp (${fullExamTests.length})` },
                 { id: 'unlimited', label: 'Luyện tập tự do' },
                 { id: 'limited', label: 'Thi thật / Giới hạn lượt' }
               ].map(tab => (
@@ -658,6 +670,7 @@ export default function StudentHome({
                       <th className="px-6 py-3.5 text-center">Listening</th>
                       <th className="px-6 py-3.5 text-center">Reading</th>
                       <th className="px-6 py-3.5 text-center">Writing</th>
+                      <th className="px-6 py-3.5 text-center">Speaking AI</th>
                       <th className="px-6 py-3.5 text-center">Overall</th>
                       <th className="px-6 py-3.5 text-right">Chi Tiết</th>
                     </tr>
@@ -668,21 +681,26 @@ export default function StudentHome({
                         <td className="px-6 py-4 font-bold text-[#0F172B] dark:text-white">{att.testTitle}</td>
                         <td className="px-6 py-4 text-xs text-[#62748E] dark:text-slate-400">{att.submittedAt}</td>
                         <td className="px-6 py-4 text-center font-bold text-[#0F172B] dark:text-slate-100 tabular-nums">
-                          {att.scores.listening.band ?? '-'}
+                          {att.scores?.listening?.band ?? '-'}
                         </td>
                         <td className="px-6 py-4 text-center font-bold text-[#0F172B] dark:text-slate-100 tabular-nums">
-                          {att.scores.reading.band ?? '-'}
+                          {att.scores?.reading?.band ?? '-'}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {att.teacherGraded || (att.scores.writing.overallBand !== null && att.scores.writing.overallBand !== undefined) ? (
+                          {att.scores?.writing?.overallBand !== null && att.scores?.writing?.overallBand !== undefined ? (
                             <span className="font-bold text-[#0F172B] dark:text-slate-100 tabular-nums">
                               {att.scores.writing.overallBand}
                             </span>
+                          ) : att.testMode === 'single_skill' && att.focusSkill !== 'writing' ? (
+                            <span className="text-slate-400">-</span>
                           ) : (
                             <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-[#E17100] dark:text-amber-300 border border-amber-200/80 dark:border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold">
                               Chờ chấm
                             </span>
                           )}
+                        </td>
+                        <td className="px-6 py-4 text-center font-bold text-[#570DF8] dark:text-[#C4B5FD] tabular-nums">
+                          {att.scores?.speaking?.band ?? '-'}
                         </td>
                         <td className="px-6 py-4 text-center">
                           {att.overallBand !== null && att.overallBand !== undefined ? (

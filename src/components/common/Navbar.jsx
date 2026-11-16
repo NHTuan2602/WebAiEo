@@ -5,6 +5,7 @@ import {
   GraduationCap,
   Key,
   LogOut,
+  Mic,
   Moon,
   Phone,
   ShieldAlert,
@@ -77,6 +78,18 @@ export default function Navbar({
           >
             <BookOpen className="w-3.5 h-3.5 shrink-0" />
             <span>Luyện Đề</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('SKILL_HUB')}
+            className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
+              view === 'SKILL_HUB' || view === 'SPEAKING_MODE'
+                ? 'bg-[#570DF8] text-white shadow-sm'
+                : 'text-[#570DF8] dark:text-[#C4B5FD] hover:bg-[#570DF8]/10'
+            }`}
+          >
+            <Mic className="w-3.5 h-3.5 shrink-0" />
+            <span>Speaking AI <span className="hidden xl:inline">&amp; 4 Kỹ Năng</span></span>
           </button>
           <button
             type="button"
@@ -225,6 +238,17 @@ export default function Navbar({
           }`}
         >
           <BookOpen className="w-3.5 h-3.5" /> Luyện Đề
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('SKILL_HUB')}
+          className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
+            view === 'SKILL_HUB' || view === 'SPEAKING_MODE'
+              ? 'bg-[#570DF8] text-white'
+              : 'bg-indigo-50 dark:bg-[#23222E] text-[#570DF8] dark:text-[#C4B5FD]'
+          }`}
+        >
+          <Mic className="w-3.5 h-3.5" /> Speaking AI &amp; 4 Kỹ Năng
         </button>
         <button
           type="button"

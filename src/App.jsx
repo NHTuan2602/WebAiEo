@@ -9,6 +9,9 @@ import {
   getReadingPassages,
   getListeningTracks,
   createEmptyTestForm,
+  createEmptySingleSkillTestForm,
+  createDefaultSpeakingSection,
+  normalizeSpeakingSection,
   DEFAULT_TESTS,
   DEFAULT_ATTEMPTS,
   DEFAULT_USERS,
@@ -35,6 +38,8 @@ import {
   callGeminiWritingGrader,
   simulateAIWritingGrading
 } from './utils/geminiGrader';
+import { requestAiSpeakingGrading } from './utils/speakingApi';
+import { roundSpeakingBand } from './utils/speakingAiEngine';
 import { speakWord, playSound } from './utils/mediaHelpers';
 import { syncClozeBlanksWithQuestions } from './utils/clozeHelpers';
 import {
@@ -54,6 +59,8 @@ import Navbar from './components/common/Navbar';
 import GlobalModals from './components/modals/GlobalModals';
 import AuthScreen from './pages/AuthScreen';
 import StudentHome from './pages/StudentHome';
+import SkillPracticeHub from './pages/SkillPracticeHub';
+import SpeakingExamRoom from './pages/SpeakingExamRoom';
 import ExamMode from './pages/ExamMode';
 import ResultView from './pages/ResultView';
 import StudentProfile from './pages/StudentProfile';
@@ -223,7 +230,10 @@ export default function App() {
   const [previousView, setPreviousView] = useState(
     () => initialNav.previousView || (currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME')
   );
-  const [resultReviewTab, setResultReviewTab] = useState(() => initialNav.resultReviewTab || 'listening'); // 'listening', 'reading', 'writing'
+  const [resultReviewTab, setResultReviewTab] = useState(() => initialNav.resultReviewTab || 'listening'); // 'listening', 'reading', 'writing', 'speaking'
+  const [skillHubTab, setSkillHubTab] = useState(() => initialNav.skillHubTab || 'speaking');
+  const [speakingPartMode, setSpeakingPartMode] = useState(() => initialNav.speakingPartMode || 'full');
+  const [aiConfigured, setAiConfigured] = useState(false);
   const [teacherNotes, setTeacherNotes] = useState(() => {
     const saved = localStorage.getItem('ielts_teacher_notes');
     if (saved) {
@@ -654,6 +664,11 @@ export default function App() {
     readingBand: 0,
     task1Band: 6.0,
     task2Band: 6.5,
+    speakingFc: 6.0,
+    speakingLr: 6.0,
+    speakingGra: 6.0,
+    speakingPr: 6.0,
+    speakingBand: 6.0,
     feedback: ''
   });
 
@@ -835,6 +850,9 @@ export default function App() {
       if (snap.version < lastSyncVersionRef.current) return;
       lastSyncVersionRef.current = snap.version;
     }
+    if (typeof snap.aiConfigured === 'boolean') {
+      setAiConfigured(snap.aiConfigured);
+    }
     if (snap.rooms && typeof snap.rooms === 'object' && Object.keys(snap.rooms).length > 0) {
       const normalized = {};
       Object.entries(snap.rooms).forEach(([k, v]) => {
@@ -986,6 +1004,9 @@ export default function App() {
             defaultTests: DEFAULT_TESTS.filter(d => Boolean(d.seedTag))
           });
         }
+        if (currentUser?.role === 'teacher' && (aiApiKey || '').trim() && !snap.aiConfigured) {
+          await dispatchSyncAction('SET_AI_CONFIG', { geminiApiKey: aiApiKey.trim() });
+        }
       }
 
       if (cancelled || typeof EventSource === 'undefined') return;
@@ -1079,6 +1100,8 @@ export default function App() {
       selectedAttemptId,
       selectedProfileStudent,
       resultReviewTab,
+      skillHubTab,
+      speakingPartMode,
       teacherHubTab,
       expandedTeacherTestId,
       currentRoomPin,
@@ -1093,6 +1116,8 @@ export default function App() {
     selectedAttemptId,
     selectedProfileStudent,
     resultReviewTab,
+    skillHubTab,
+    speakingPartMode,
     teacherHubTab,
     expandedTeacherTestId,
     currentRoomPin,
@@ -2069,7 +2094,7 @@ export default function App() {
     setAudioProgress({ currentTime: 0, duration: 0 });
   };
 
-  const startExam = (testId) => {
+  const startExam = (testId, partModeOverride = 'full') => {
     const test = tests.find(t => t.id === testId);
     if (!test) return;
 
@@ -2093,6 +2118,12 @@ export default function App() {
     stopExamAudio();
     setShowSubmitConfirmModal(false);
     setSelectedTestId(testId);
+
+    if (cfg.testMode === 'single_skill' && cfg.focusSkill === 'speaking') {
+      setSpeakingPartMode(partModeOverride || 'full');
+      setView('SPEAKING_MODE');
+      return;
+    }
 
     const restoredDraft = loadExamDraft(currentUser?.username, testId, tests);
     if (restoredDraft) {
@@ -2212,6 +2243,7 @@ export default function App() {
     setShowSubmitConfirmModal(false);
     const activeTest = tests.find(t => t.id === selectedTestId);
     if (!activeTest) return;
+    const cfg = normalizeExamConfig(activeTest);
 
     let listeningRaw = 0;
     const lQuestions = activeTest.listening?.questions || [];
@@ -2229,31 +2261,50 @@ export default function App() {
 
     const lBand = calculateAutoBand(listeningRaw, lQuestions.length, 'listening');
     const rBand = calculateAutoBand(readingRaw, rQuestions.length, 'reading');
+    const isSingleObjective =
+      cfg.testMode === 'single_skill' && (cfg.focusSkill === 'listening' || cfg.focusSkill === 'reading');
+    const singleObjectiveBand =
+      cfg.focusSkill === 'listening' ? lBand : cfg.focusSkill === 'reading' ? rBand : null;
 
     const newAttempt = {
       id: 'att-' + Date.now(),
       testId: activeTest.id,
       testTitle: activeTest.title,
+      testMode: cfg.testMode,
+      focusSkill: cfg.focusSkill,
       studentId: currentUser?.username || 'std_guest',
       studentName: currentUser?.name || 'Học sinh',
       submittedAt: new Date().toLocaleString('vi-VN'),
       answers: examState.answers,
       antiCheatLogs: examState.antiCheatLogs,
       tabSwitchCount: examState.tabSwitchCount,
-      teacherGraded: false,
+      teacherGraded: isSingleObjective,
       aiGraded: false,
       scores: {
-        listening: { raw: listeningRaw, total: lQuestions.length, band: lBand },
-        reading: { raw: readingRaw, total: rQuestions.length, band: rBand },
+        listening: {
+          raw: listeningRaw,
+          total: lQuestions.length,
+          band: cfg.testMode === 'single_skill' && cfg.focusSkill !== 'listening' ? null : lBand
+        },
+        reading: {
+          raw: readingRaw,
+          total: rQuestions.length,
+          band: cfg.testMode === 'single_skill' && cfg.focusSkill !== 'reading' ? null : rBand
+        },
         writing: { task1Band: null, task2Band: null, overallBand: null }
       },
-      overallBand: null,
+      overallBand: isSingleObjective ? singleObjectiveBand : null,
       teacherFeedback: ''
     };
 
     setAttempts([newAttempt, ...attempts]);
     dispatchSyncAction('UPSERT_ATTEMPT', { attempt: newAttempt });
     setSelectedAttemptId(newAttempt.id);
+    if (cfg.testMode === 'single_skill' && cfg.focusSkill) {
+      setResultReviewTab(cfg.focusSkill);
+    } else {
+      setResultReviewTab('listening');
+    }
     setView('RESULT_VIEW');
   };
 
@@ -2310,11 +2361,12 @@ export default function App() {
       const usedModel = await testGeminiApiConnection(cleanKey);
       setAiApiKey(cleanKey);
       localStorage.setItem('ielts_ai_key', cleanKey);
+      await dispatchSyncAction('SET_AI_CONFIG', { geminiApiKey: cleanKey });
       setApiTestState({
         testing: false,
         ok: true,
         model: usedModel,
-        message: `Kết nối thành công! Hệ thống đang dùng model "${usedModel}" và đã lưu API Key.`
+        message: `Kết nối thành công! Hệ thống đang dùng model "${usedModel}" và đã đồng bộ API Key cho máy chủ (dùng để AI chấm Speaking & Writing).`
       });
     } catch (err) {
       setApiTestState({
@@ -2363,7 +2415,14 @@ export default function App() {
     return { ...fallback, _engineLabel: 'AI Examiner Tích Hợp (Offline)' };
   };
 
-  const computeAttemptFinalOverall = (attemptScores, writingOverall) => {
+  const computeAttemptFinalOverall = (attemptScores, writingOverall, attemptRef = null) => {
+    const isSingle = attemptRef?.testMode === 'single_skill' && attemptRef?.focusSkill;
+    if (isSingle) {
+      if (attemptRef.focusSkill === 'listening') return Number(attemptScores?.listening?.band) || 0;
+      if (attemptRef.focusSkill === 'reading') return Number(attemptScores?.reading?.band) || 0;
+      if (attemptRef.focusSkill === 'writing') return writingOverall;
+      if (attemptRef.focusSkill === 'speaking') return Number(attemptScores?.speaking?.band) || 0;
+    }
     const activeSkillBands = [];
     if ((attemptScores?.listening?.total || 0) > 0) {
       activeSkillBands.push(Number(attemptScores.listening.band) || 0);
@@ -2392,7 +2451,7 @@ export default function App() {
         ? roundIeltsBand(Math.max(0, Math.min(9.0, rawOverallW)))
         : calculateWritingBand(t1, t2);
 
-      const finalOverall = computeAttemptFinalOverall(targetAttempt.scores, writingOverall);
+      const finalOverall = computeAttemptFinalOverall(targetAttempt.scores, writingOverall, targetAttempt);
 
       const updatedAiAttempt = {
         ...targetAttempt,
@@ -2417,6 +2476,86 @@ export default function App() {
     }
   };
 
+  const handleGradeSpeakingWithAI = async (targetAttempt, updateModalState = false) => {
+    if (!targetAttempt || currentUser?.role !== 'teacher') return;
+    const recordings = Array.isArray(targetAttempt.speakingRecordings) ? targetAttempt.speakingRecordings : [];
+    setIsGradingAI(true);
+    setAiGradingStep('AI Examiner đang nghe lại file ghi âm và chấm 4 tiêu chí Speaking...');
+
+    try {
+      const evaluation = await requestAiSpeakingGrading({
+        testTitle: targetAttempt.testTitle,
+        partMode: targetAttempt.speakingPartMode || 'full',
+        recordings,
+        clientApiKey: aiApiKey
+      });
+
+      const spBand = roundSpeakingBand(evaluation?.overallBand ?? 0);
+      const criteria = evaluation?.criteria || { fc: spBand, lr: spBand, gra: spBand, pr: spBand };
+      const evalByQid = new Map((evaluation?.questionEvaluations || []).map(ev => [String(ev.questionId), ev]));
+
+      const refreshedRecordings = recordings.map(r => {
+        const ev = evalByQid.get(String(r.questionId));
+        return {
+          ...r,
+          transcript: ev?.transcript || r.transcript || r.clientTranscript || '',
+          band: ev?.band ?? r.band ?? 0,
+          feedback: ev?.feedback || r.feedback || '',
+          grammarVocabularyFixes: ev?.grammarVocabularyFixes || r.grammarVocabularyFixes || [],
+          upgradedSample: ev?.upgradedSample || r.upgradedSample || ''
+        };
+      });
+
+      const updatedAttempt = {
+        ...targetAttempt,
+        teacherGraded: true,
+        aiGraded: true,
+        speakingRecordings: refreshedRecordings,
+        speakingAiDetails: {
+          criteria,
+          strengths: evaluation?.strengths || [],
+          improvements: evaluation?.improvements || [],
+          _usedModel: evaluation?._usedModel || 'speaking-ai',
+          _gradedMode: evaluation?._gradedMode || 'fallback',
+          _fallbackReason: evaluation?._fallbackReason || ''
+        },
+        scores: {
+          ...targetAttempt.scores,
+          speaking: { band: spBand, criteria }
+        },
+        overallBand: spBand,
+        teacherFeedback: evaluation?.overallFeedback || targetAttempt.teacherFeedback || ''
+      };
+
+      setAttempts(prev => prev.map(att => (att.id === targetAttempt.id ? updatedAttempt : att)));
+      dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAttempt });
+
+      if (updateModalState) {
+        setGradingAttempt(updatedAttempt);
+        setGradingScores(prev => ({
+          ...prev,
+          speakingFc: criteria.fc ?? spBand,
+          speakingLr: criteria.lr ?? spBand,
+          speakingGra: criteria.gra ?? spBand,
+          speakingPr: criteria.pr ?? spBand,
+          speakingBand: spBand,
+          feedback: updatedAttempt.teacherFeedback
+        }));
+      }
+
+      showToast(
+        evaluation?._gradedMode === 'gemini_audio'
+          ? `AI (${evaluation._usedModel}) đã nghe lại file ghi âm & chấm Band ${spBand}!`
+          : `Đã chấm Speaking theo dữ liệu ghi âm (${evaluation?._fallbackReason || 'Bộ chấm tích hợp'}) — Band ${spBand}`
+      );
+    } catch (err) {
+      showToast('Lỗi chấm AI Speaking: ' + (err?.message || err), 'error');
+    } finally {
+      setIsGradingAI(false);
+      setAiGradingStep('');
+    }
+  };
+
   const sanitizeBandScore = (val) => {
     const parsed = parseFloat(val);
     return Number.isFinite(parsed) ? roundIeltsBand(Math.max(0, Math.min(9.0, parsed))) : 0;
@@ -2432,6 +2571,8 @@ export default function App() {
     const rRaw = Number.isFinite(Number(att.scores?.reading?.raw)) ? Number(att.scores.reading.raw) : 0;
     const rTotal = Number.isFinite(Number(att.scores?.reading?.total)) ? Number(att.scores.reading.total) : 0;
     const rBand = att.scores?.reading?.band ?? calculateAutoBand(rRaw, rTotal, 'reading');
+    const spBand = att.scores?.speaking?.band ?? (att.focusSkill === 'speaking' ? (att.overallBand ?? 0) : 0);
+    const spCrit = att.scores?.speaking?.criteria || {};
 
     setGradingAttempt(att);
     setGradingScores({
@@ -2441,6 +2582,11 @@ export default function App() {
       readingBand: rBand,
       task1Band: att.scores?.writing?.task1Band ?? (w1Empty ? 0 : 6.0),
       task2Band: att.scores?.writing?.task2Band ?? (w2Empty ? 0 : 6.5),
+      speakingFc: spCrit.fc ?? spBand,
+      speakingLr: spCrit.lr ?? spBand,
+      speakingGra: spCrit.gra ?? spBand,
+      speakingPr: spCrit.pr ?? spBand,
+      speakingBand: spBand,
       feedback: att.teacherFeedback || ''
     });
   };
@@ -2539,18 +2685,41 @@ export default function App() {
         ...(gradingAttempt.scores?.listening || {}),
         raw: cleanLRaw,
         total: lTotal,
-        band: lBand
+        band: gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill !== 'listening' ? null : lBand
       },
       reading: {
         ...(gradingAttempt.scores?.reading || {}),
         raw: cleanRRaw,
         total: rTotal,
-        band: rBand
+        band: gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill !== 'reading' ? null : rBand
       }
     };
 
+    const isSpeakingAttempt = gradingAttempt.focusSkill === 'speaking' || Boolean(gradingAttempt.scores?.speaking);
     let updatedAttemptObj;
-    if (includeWriting) {
+    if (isSpeakingAttempt) {
+      const spBand = sanitizeBandScore(gradingScores.speakingBand);
+      const nextCrit = {
+        fc: sanitizeBandScore(gradingScores.speakingFc),
+        lr: sanitizeBandScore(gradingScores.speakingLr),
+        gra: sanitizeBandScore(gradingScores.speakingGra),
+        pr: sanitizeBandScore(gradingScores.speakingPr)
+      };
+      updatedAttemptObj = {
+        ...gradingAttempt,
+        teacherGraded: true,
+        scores: {
+          ...baseScores,
+          speaking: { band: spBand, criteria: nextCrit }
+        },
+        speakingAiDetails: {
+          ...(gradingAttempt.speakingAiDetails || {}),
+          criteria: nextCrit
+        },
+        overallBand: spBand,
+        teacherFeedback: gradingScores.feedback
+      };
+    } else if (includeWriting && !(gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill !== 'writing')) {
       const t1 = sanitizeBandScore(gradingScores.task1Band);
       const t2 = sanitizeBandScore(gradingScores.task2Band);
       const writingOverall = calculateWritingBand(t1, t2);
@@ -2562,7 +2731,7 @@ export default function App() {
           overallBand: writingOverall
         }
       };
-      const finalOverall = computeAttemptFinalOverall(nextScores, writingOverall);
+      const finalOverall = computeAttemptFinalOverall(nextScores, writingOverall, gradingAttempt);
       updatedAttemptObj = {
         ...gradingAttempt,
         teacherGraded: true,
@@ -2570,11 +2739,20 @@ export default function App() {
         overallBand: finalOverall,
         teacherFeedback: gradingScores.feedback
       };
+    } else if (gradingAttempt.testMode === 'single_skill') {
+      const finalOverall = computeAttemptFinalOverall(baseScores, 0, gradingAttempt);
+      updatedAttemptObj = {
+        ...gradingAttempt,
+        teacherGraded: true,
+        scores: baseScores,
+        overallBand: finalOverall,
+        teacherFeedback: gradingScores.feedback
+      };
     } else {
       const existingWritingOverall = gradingAttempt.scores?.writing?.overallBand;
       const hasWritingBand = typeof existingWritingOverall === 'number';
       const nextOverall = hasWritingBand
-        ? computeAttemptFinalOverall(baseScores, existingWritingOverall)
+        ? computeAttemptFinalOverall(baseScores, existingWritingOverall, gradingAttempt)
         : null;
       updatedAttemptObj = {
         ...gradingAttempt,
@@ -2671,24 +2849,16 @@ export default function App() {
         writing: {
           task1: { prompt: '', minWords: 150, imageUrl: '', modelAnswer: '', ...(cloned.writing?.task1 || {}) },
           task2: { prompt: '', minWords: 250, modelAnswer: '', ...(cloned.writing?.task2 || {}) }
-        }
+        },
+        speaking: { ...createDefaultSpeakingSection(), ...(cloned.speaking || {}) }
       });
     } else {
       setTestForm({
+        ...createEmptyTestForm(),
         id: 'test-' + Date.now(),
         title: 'Đề Thi Thử IELTS Academic Mới',
         description: 'Đề thi chuẩn cấu trúc 3 kỹ năng Listening, Reading, Writing.',
         createdAt: new Date().toISOString().split('T')[0],
-        visibility: 'private',
-        maxAttempts: 0,
-        sequentialMode: true,
-        allowEarlyNextSection: false,
-        antiCheatEnabled: true,
-        sectionOrder: [...DEFAULT_SECTION_ORDER],
-        sectionDurations: { ...DEFAULT_SECTION_DURATIONS },
-        maxAudioPlays: 1,
-        shuffleOptions: true,
-        allowViewAnswers: false,
         listening: {
           audioUrl: '',
           audioFileName: '',
@@ -2761,10 +2931,24 @@ export default function App() {
             minWords: 250,
             modelAnswer: ''
           }
-        }
+        },
+        speaking: createDefaultSpeakingSection()
       });
     }
     setBuilderTab(initialTab || 'general');
+    setView('EXAM_BUILDER');
+  };
+
+  const openSingleSkillBuilder = (skill = 'speaking', testToEdit = null) => {
+    if (testToEdit) {
+      openExamBuilder(testToEdit, skill || 'general');
+      return;
+    }
+    setEditingTest(null);
+    setBuilderListeningIdx(0);
+    setBuilderReadingIdx(0);
+    setTestForm(createEmptySingleSkillTestForm(skill));
+    setBuilderTab(skill);
     setView('EXAM_BUILDER');
   };
 
@@ -2999,6 +3183,8 @@ export default function App() {
 
     const normalizedTest = {
       ...testForm,
+      testMode: cfg.testMode,
+      focusSkill: cfg.focusSkill,
       visibility: cfg.visibility,
       maxAttempts: cfg.maxAttempts,
       sequentialMode: cfg.sequentialMode,
@@ -3006,6 +3192,7 @@ export default function App() {
       antiCheatEnabled: cfg.antiCheatEnabled,
       sectionOrder: cfg.order,
       sectionDurations: cfg.durations,
+      speaking: normalizeSpeakingSection(testForm.speaking),
       listening: {
         ...testForm.listening,
         tracks,
@@ -4184,8 +4371,8 @@ export default function App() {
   // ==========================================
   return (
     <div className="min-h-screen bg-[#FDECF2] dark:bg-[#020618] font-sans text-[#0F172B] dark:text-slate-100 antialiased selection:bg-pink-200 dark:selection:bg-teal-700 transition-colors duration-200">
-      {/* Navbar rendered when not on Auth, Full Exam, or Game Arena */}
-      {view !== 'AUTH' && view !== 'EXAM_MODE' && view !== 'GAME_ARENA' && (
+      {/* Navbar rendered when not on Auth, Full Exam, Speaking Room, or Game Arena */}
+      {view !== 'AUTH' && view !== 'EXAM_MODE' && view !== 'SPEAKING_MODE' && view !== 'GAME_ARENA' && (
         <Navbar
           aiApiKey={aiApiKey}
           currentUser={currentUser}
@@ -4225,6 +4412,10 @@ export default function App() {
           attempts={attempts}
           currentUser={currentUser}
           openMemberProfile={openMemberProfile}
+          openSkillPracticeHub={(tab = 'speaking') => {
+            setSkillHubTab(tab);
+            setView('SKILL_HUB');
+          }}
           openStudentGamePortal={openStudentGamePortal}
           setEditingTargetUser={setEditingTargetUser}
           setPreviousView={setPreviousView}
@@ -4234,6 +4425,50 @@ export default function App() {
           startExam={startExam}
           tests={tests}
           usersDb={usersDb}
+        />
+      )}
+
+      {view === 'SKILL_HUB' && (
+        <SkillPracticeHub
+          activeTab={skillHubTab}
+          aiConfigured={aiConfigured}
+          attempts={attempts}
+          currentUser={currentUser}
+          onChangeTab={setSkillHubTab}
+          onOpenFullExamCatalog={() => setView('HOME')}
+          onOpenResult={attId => {
+            setSelectedAttemptId(attId);
+            setPreviousView('SKILL_HUB');
+            setResultReviewTab('speaking');
+            setView('RESULT_VIEW');
+          }}
+          onOpenSkillBuilder={(skill, testToEdit = null) => openSingleSkillBuilder(skill, testToEdit)}
+          onStartSingleSkillExam={testId => startExam(testId)}
+          onStartSpeakingExam={(testId, partMode = 'full') => startExam(testId, partMode)}
+          tests={tests}
+        />
+      )}
+
+      {view === 'SPEAKING_MODE' && (
+        <SpeakingExamRoom
+          aiApiKey={aiApiKey}
+          currentUser={currentUser}
+          dispatchSyncAction={dispatchSyncAction}
+          onAttemptCreated={newAtt => setAttempts(prev => [newAtt, ...prev])}
+          onExitSpeaking={() => {
+            setSelectedTestId(null);
+            setView('SKILL_HUB');
+          }}
+          onViewResult={attId => {
+            setSelectedAttemptId(attId);
+            setPreviousView('SKILL_HUB');
+            setResultReviewTab('speaking');
+            setView('RESULT_VIEW');
+          }}
+          partMode={speakingPartMode}
+          selectedTestId={selectedTestId}
+          showToast={showToast}
+          tests={tests}
         />
       )}
 
@@ -4389,6 +4624,7 @@ export default function App() {
           aiGradingStep={aiGradingStep}
           attempts={attempts}
           currentUser={currentUser}
+          handleGradeSpeakingWithAI={att => handleGradeSpeakingWithAI(att, false)}
           handleGradeWritingWithAI={handleGradeWritingWithAI}
           isGradingAI={isGradingAI}
           openTeacherGradingModal={openTeacherGradingModal}
@@ -4424,6 +4660,7 @@ export default function App() {
           initGameCampaign={initGameCampaign}
           openExamBuilder={openExamBuilder}
           openMemberProfile={openMemberProfile}
+          openSingleSkillBuilder={openSingleSkillBuilder}
           openTeacherGradingModal={openTeacherGradingModal}
           roomsDb={roomsDb}
           setAddStudentMode={setAddStudentMode}
@@ -4514,6 +4751,7 @@ export default function App() {
         handleSaveCustomVocabTopic={handleSaveCustomVocabTopic}
         handleSaveNewStudents={handleSaveNewStudents}
         handleTeacherAIGrade={handleTeacherAIGrade}
+        handleTeacherAIGradeSpeaking={att => handleGradeSpeakingWithAI(att, true)}
         handleTestGeminiKey={handleTestGeminiKey}
         handleUpdateUserAvatar={handleUpdateUserAvatar}
         handleUpdateUserProfileFields={handleUpdateUserProfileFields}

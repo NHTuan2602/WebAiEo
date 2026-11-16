@@ -116,7 +116,7 @@ export function buildRoomInviteLink(pin) {
 }
 
 export function exportAttemptsToCsv(attemptRows = []) {
-  const headers = ['Học viên', 'Tài khoản', 'Đề thi', 'Ngày nộp', 'Listening', 'Reading', 'Writing', 'Overall', 'Chuyển Tab', 'Trạng thái'];
+  const headers = ['Học viên', 'Tài khoản', 'Đề thi', 'Phân loại', 'Ngày nộp', 'Listening', 'Reading', 'Writing', 'Speaking', 'Overall', 'Chuyển Tab', 'Trạng thái'];
   const csvEscape = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
   const lines = [
     headers.map(csvEscape).join(','),
@@ -124,16 +124,20 @@ export function exportAttemptsToCsv(attemptRows = []) {
       const lBand = att.scores?.listening?.band ?? '-';
       const rBand = att.scores?.reading?.band ?? '-';
       const wBand = att.scores?.writing?.overallBand ?? '-';
+      const sBand = att.scores?.speaking?.band ?? '-';
       const overall = att.overallBand ?? '-';
-      const statusLabel = att.teacherGraded ? (att.aiGraded ? 'AI Đã Chấm' : 'GV Đã Chấm') : 'Chờ Chấm Writing';
+      const modeTag = att.testMode === 'single_skill' ? `Kỹ năng: ${(att.focusSkill || '').toUpperCase()}` : 'Đề Gộp L·R·W';
+      const statusLabel = att.teacherGraded ? (att.aiGraded ? 'AI Đã Chấm' : 'GV Đã Chấm') : 'Chờ Chấm';
       return [
         att.studentName || '',
         att.studentId || '',
         att.testTitle || '',
+        modeTag,
         att.submittedAt || '',
         lBand,
         rBand,
         wBand,
+        sBand,
         overall,
         att.tabSwitchCount || 0,
         statusLabel

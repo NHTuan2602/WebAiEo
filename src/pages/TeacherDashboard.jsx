@@ -15,8 +15,10 @@ import {
   Gamepad2,
   Globe,
   GraduationCap,
+  Headphones,
   Key,
   Lock,
+  Mic,
   PenTool,
   Play,
   Plus,
@@ -36,7 +38,13 @@ import {
   Wifi,
   X
 } from 'lucide-react';
-import { DEFAULT_VOCAB_TEXT, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import {
+  DEFAULT_VOCAB_TEXT,
+  getListeningTracks,
+  getReadingPassages,
+  getSpeakingQuestionItems,
+  normalizeExamConfig
+} from '../constants/seedData';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
 import AmongUsCrewmate from '../components/common/AmongUsCrewmate';
 
@@ -59,6 +67,7 @@ export default function TeacherDashboard({
   initGameCampaign,
   openExamBuilder,
   openMemberProfile,
+  openSingleSkillBuilder,
   openTeacherGradingModal,
   roomsDb,
   setAddStudentMode,
@@ -92,6 +101,7 @@ export default function TeacherDashboard({
   usersDb
 }) {
   const [accountRoleFilter, setAccountRoleFilter] = useState('all');
+  const [testTypeFilter, setTestTypeFilter] = useState('all');
   const [renamingTestId, setRenamingTestId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
 
@@ -135,7 +145,14 @@ export default function TeacherDashboard({
             onClick={() => openExamBuilder()}
             className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
+            <Plus className="w-4 h-4" /> Tạo Đề Gộp (L·R·W)
+          </button>
+          <button
+            type="button"
+            onClick={() => openSingleSkillBuilder?.('speaking')}
+            className="bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2"
+          >
+            <Mic className="w-4 h-4" /> Tạo Đề Speaking AI
           </button>
           <button
             type="button"
@@ -163,6 +180,35 @@ export default function TeacherDashboard({
           >
             <Edit className="w-4 h-4" /> Sửa Bộ Từ Game
           </button>
+        </div>
+      </div>
+
+      {/* Dedicated 4-Skill Standalone Creation Strip */}
+      <div className="mb-6 bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200 dark:border-slate-800 rounded-2xl p-3.5 sm:px-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" />
+          <span>Tạo Đề Cho Từng Kỹ Năng Riêng Biệt (Không Gộp Chung L·R·W):</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { id: 'speaking', label: '+ Speaking AI', icon: Mic, cls: 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30 hover:bg-[#570DF8] hover:text-white' },
+            { id: 'listening', label: '+ Listening Riêng', icon: Headphones, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
+            { id: 'reading', label: '+ Reading Riêng', icon: BookOpen, cls: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
+            { id: 'writing', label: '+ Writing Riêng', icon: PenTool, cls: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-600 hover:text-white' }
+          ].map(sk => {
+            const IconComp = sk.icon;
+            return (
+              <button
+                key={sk.id}
+                type="button"
+                onClick={() => openSingleSkillBuilder?.(sk.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition flex items-center gap-1.5 ${sk.cls}`}
+              >
+                <IconComp className="w-3.5 h-3.5" />
+                <span>{sk.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -203,13 +249,46 @@ export default function TeacherDashboard({
       </div>
 
       {/* Tab 1: Kho Đề Thi */}
-      {teacherHubTab === 'tests' && (
+      {teacherHubTab === 'tests' && (() => {
+        const fullTestsCount = tests.filter(t => normalizeExamConfig(t).testMode !== 'single_skill').length;
+        const singleTestsCount = tests.filter(t => normalizeExamConfig(t).testMode === 'single_skill').length;
+        const displayedTests = tests.filter(t => {
+          const mode = normalizeExamConfig(t).testMode;
+          if (testTypeFilter === 'full_exam') return mode !== 'single_skill';
+          if (testTypeFilter === 'single_skill') return mode === 'single_skill';
+          return true;
+        });
+
+        return (
         <div className="space-y-3">
-          {tests.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
-              Chưa có đề thi nào. Bấm <strong>Tạo Đề Thi Mới</strong> để bắt đầu.
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+            <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold">
+              {[
+                { id: 'all', label: `Tất cả đề (${tests.length})` },
+                { id: 'full_exam', label: `Đề Gộp Chuẩn L·R·W (${fullTestsCount})` },
+                { id: 'single_skill', label: `Kỹ Năng Riêng 4 Kỹ Năng (${singleTestsCount})` }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setTestTypeFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    testTypeFilter === tab.id
+                      ? 'bg-[#007A7A] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          ) : tests.map(t => {
+          </div>
+
+          {displayedTests.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
+              Chưa có đề thi nào trong mục này. Bấm <strong>Tạo Đề Gộp</strong> hoặc <strong>Tạo Đề Speaking AI / Kỹ Năng Riêng</strong> phía trên để bắt đầu.
+            </div>
+          ) : displayedTests.map(t => {
             const cfg = normalizeExamConfig(t);
             const isPrivate = cfg.visibility === 'private';
             const isExpanded = expandedTeacherTestId === t.id;
@@ -284,6 +363,17 @@ export default function TeacherDashboard({
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span
+                        className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
+                          cfg.testMode === 'single_skill'
+                            ? cfg.focusSkill === 'speaking'
+                              ? 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30'
+                              : 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30'
+                            : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
+                        }`}
+                      >
+                        {cfg.testMode === 'single_skill' ? `${(cfg.focusSkill || 'skill').toUpperCase()} RIÊNG` : 'FULL L·R·W'}
+                      </span>
                       <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
                         {t.title}
                       </h3>
@@ -341,12 +431,26 @@ export default function TeacherDashboard({
                     <div className="mt-4 pt-5 border-t border-slate-100 dark:border-slate-800 space-y-4">
                       <div className="space-y-2.5">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
-                            Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
-                          </span>
-                          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
-                            ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
-                          </span>
+                          {cfg.testMode === 'single_skill' ? (
+                            <span className="text-[11px] bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] font-bold px-2.5 py-1 rounded-lg border border-[#570DF8]/25">
+                              {cfg.focusSkill === 'speaking'
+                                ? `Speaking AI: ${getSpeakingQuestionItems(t.speaking, 'all').length} câu (Part 1·2·3)`
+                                : cfg.focusSkill === 'listening'
+                                ? `Listening Riêng: ${t.listening?.questions?.length || 0} câu (${cfg.durations.listening}p)`
+                                : cfg.focusSkill === 'reading'
+                                ? `Reading Riêng: ${t.reading?.questions?.length || 0} câu (${cfg.durations.reading}p)`
+                                : `Writing Riêng: Task 1 & 2 (${cfg.durations.writing}p)`}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
+                                Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
+                              </span>
+                              <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
+                                ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
+                              </span>
+                            </>
+                          )}
                           <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
                             {cfg.maxAttempts === 0 ? '∞ Làm tự do' : `🔒 Tối đa ${cfg.maxAttempts} lần`}
                           </span>
@@ -403,7 +507,7 @@ export default function TeacherDashboard({
                             {cfg.order.map((sId, sIdx) => (
                               <div key={sId} className="bg-white dark:bg-slate-900 rounded-xl p-1.5 border border-[#B5F5F1]/80 dark:border-slate-700 text-center">
                                 <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                  {sIdx + 1}. {sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : 'Viết'}
+                                  {sIdx + 1}. {sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : sId === 'speaking' ? 'Nói AI' : 'Viết'}
                                 </span>
                                 <div className="flex items-center justify-center gap-0.5 mt-0.5">
                                   <input
@@ -557,10 +661,10 @@ export default function TeacherDashboard({
                           </button>
                           <button
                             type="button"
-                            onClick={() => openExamBuilder(t, 'reading')}
+                            onClick={() => openExamBuilder(t, cfg.testMode === 'single_skill' && cfg.focusSkill ? cfg.focusSkill : 'reading')}
                             className="bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30"
                           >
-                            <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi &amp; Ảnh
+                            <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi &amp; Nội Dung
                           </button>
                           <button
                             type="button"
@@ -604,7 +708,8 @@ export default function TeacherDashboard({
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       {/* Tab 2: Giám Sát Gian Lận & Chấm Điểm */}
       {teacherHubTab === 'grading' && (() => {
@@ -789,7 +894,11 @@ export default function TeacherDashboard({
                           {att.overallBand ?? '-'}
                         </div>
                         <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
-                          L {att.scores?.listening?.band ?? '-'} · R {att.scores?.reading?.band ?? '-'} · W {att.scores?.writing?.overallBand ?? '-'}
+                          {att.focusSkill === 'speaking' || att.scores?.speaking
+                            ? `Speaking ${att.scores?.speaking?.band ?? att.overallBand ?? '-'}`
+                            : att.testMode === 'single_skill'
+                            ? `${(att.focusSkill || '').toUpperCase()} ${att.overallBand ?? '-'}`
+                            : `L ${att.scores?.listening?.band ?? '-'} · R ${att.scores?.reading?.band ?? '-'} · W ${att.scores?.writing?.overallBand ?? '-'}`}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
