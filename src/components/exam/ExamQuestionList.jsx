@@ -203,28 +203,28 @@ export default function ExamQuestionList({
               }
             }}
             onClick={() => onSelectQuestion?.(q)}
-            className={`px-4 py-3.5 rounded-lg border transition ${
+            className={`py-3 transition ${
               isActive
-                ? 'bg-[#EFF6FF]/60 dark:bg-[#1E232D] border-[#2563EB] dark:border-[#3B82F6]'
-                : 'bg-[#FFF9FB] dark:bg-[#161616] border-rose-200/80 dark:border-[#2C2C2C] hover:border-rose-300 dark:hover:border-[#404040]'
+                ? 'bg-pink-100/45 dark:bg-[#1E232D]/70 rounded-md px-2.5 -mx-2.5'
+                : 'px-0'
             }`}
           >
-            <div className="flex items-start justify-between gap-2.5 mb-2.5">
+            <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex items-start gap-2.5 min-w-0">
                 <span
-                  className={`shrink-0 min-w-[26px] h-6 px-1.5 rounded text-xs font-extrabold inline-flex items-center justify-center border mt-0.5 ${
+                  className={`shrink-0 min-w-[26px] h-[26px] px-1.5 rounded-[3px] text-[13px] font-bold inline-flex items-center justify-center border mt-0.5 ${
                     isActive
                       ? 'bg-[#2563EB] text-white border-[#2563EB]'
-                      : 'bg-slate-100 dark:bg-[#262626] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#404040]'
+                      : 'bg-white dark:bg-[#262626] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#4A4A4A]'
                   }`}
                 >
                   {displayNum}
                 </span>
-                <p className={`font-semibold text-[#111827] dark:text-[#F3F4F6] ${fontSizeClass} leading-snug`}>
+                <p className={`font-bold text-[#111827] dark:text-[#F3F4F6] ${fontSizeClass}`}>
                   {cleanPrompt}
                 </p>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                 {renderScopeJumpChip(q)}
                 <button
                   type="button"
@@ -245,16 +245,16 @@ export default function ExamQuestionList({
             </div>
 
             {(q.type === 'mcq' || q.type === 'tfng') && (
-              <div className="space-y-1 pl-8">
+              <div className="space-y-1.5 pl-1">
                 {(q.options || []).map((opt, optIdx) => {
                   const isSelected = answers?.[q.id] === opt;
                   return (
                     <label
                       key={optIdx}
-                      className={`flex items-start gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition ${
+                      className={`flex items-start gap-2.5 px-2 py-1 rounded-[4px] cursor-pointer transition ${
                         isSelected
-                          ? 'bg-[#DBEAFE] dark:bg-[#2563EB]/25 text-[#1E3A8A] dark:text-white'
-                          : 'text-[#374151] dark:text-[#D1D5DB] hover:bg-slate-100 dark:hover:bg-[#232323]'
+                          ? 'bg-[#DBEAFE]/80 dark:bg-[#2563EB]/25 text-[#111827] dark:text-white font-semibold'
+                          : 'text-[#1F2937] dark:text-[#E5E7EB] hover:bg-pink-100/50 dark:hover:bg-[#232323]'
                       }`}
                     >
                       <input
@@ -263,9 +263,9 @@ export default function ExamQuestionList({
                         value={opt}
                         checked={isSelected}
                         onChange={e => onAnswerChange?.(q.id, e.target.value)}
-                        className="mt-1 accent-[#2563EB] shrink-0"
+                        className="mt-1.5 w-4 h-4 accent-[#2563EB] shrink-0"
                       />
-                      <span className={`${fontSizeClass} leading-snug font-medium`}>
+                      <span className={`${fontSizeClass}`}>
                         {opt}
                       </span>
                     </label>
@@ -275,13 +275,13 @@ export default function ExamQuestionList({
             )}
 
             {q.type === 'fill' && (
-              <div className="pl-8 pt-1">
+              <div className="pl-1 pt-1">
                 <input
                   type="text"
                   placeholder={`${displayNum}`}
                   value={answers?.[q.id] || ''}
                   onChange={e => onAnswerChange?.(q.id, e.target.value)}
-                  className="w-full max-w-sm h-9 px-3.5 rounded-[5px] text-sm font-bold transition outline-none border bg-[#F1F3F5] dark:bg-[#4B4C52] text-[#111827] dark:text-white border-[#B8BFC9] dark:border-[#5D5F66] focus:bg-white dark:focus:bg-[#242833] focus:border-[#2563EB] dark:focus:border-[#3B82F6] placeholder:text-[#6B7280] dark:placeholder:text-[#D1D5DB] placeholder:font-bold"
+                  className="w-48 sm:w-64 h-[34px] px-3 rounded-[3px] text-center text-[15px] font-bold transition outline-none border bg-white dark:bg-[#3A3B40] text-[#111827] dark:text-white border-[#767676] dark:border-[#5D5F66] focus:bg-[#FFFDF7] dark:focus:bg-[#23262E] focus:border-[#A16207] dark:focus:border-[#EAB308] placeholder:text-[#111827] dark:placeholder:text-[#E5E7EB] placeholder:font-bold"
                 />
               </div>
             )}

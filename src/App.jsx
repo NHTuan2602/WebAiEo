@@ -4183,7 +4183,7 @@ export default function App() {
   // MAIN VIEW ROUTER
   // ==========================================
   return (
-    <div className="min-h-screen bg-[#FFF0F5] dark:bg-[#020618] font-sans text-[#0F172B] dark:text-slate-100 antialiased selection:bg-rose-200 dark:selection:bg-teal-700 transition-colors duration-200">
+    <div className="min-h-screen bg-[#FDECF2] dark:bg-[#020618] font-sans text-[#0F172B] dark:text-slate-100 antialiased selection:bg-pink-200 dark:selection:bg-teal-700 transition-colors duration-200">
       {/* Navbar rendered when not on Auth, Full Exam, or Game Arena */}
       {view !== 'AUTH' && view !== 'EXAM_MODE' && view !== 'GAME_ARENA' && (
         <Navbar

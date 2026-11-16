@@ -120,7 +120,7 @@ export default function StudentHome({
   return (
     <div className="space-y-10">
       {/* Soft Pastel Hero Section */}
-      <section className="lexi-hero-surface border-b border-rose-200/80 dark:border-slate-800">
+      <section className="lexi-hero-surface border-b border-pink-200/90 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-11">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-center">
             <div className="lg:col-span-8 space-y-5">
@@ -177,7 +177,7 @@ export default function StudentHome({
 
             {/* Right Compact Personal Target Card */}
             <div className="lg:col-span-4">
-              <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl p-5 sm:p-6 border border-rose-200/85 dark:border-slate-800 shadow-[0_14px_34px_-12px_rgba(190,24,93,0.10)] space-y-4">
+              <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 sm:p-6 border border-rose-200/85 dark:border-slate-800 shadow-[0_14px_34px_-12px_rgba(190,24,93,0.10)] space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-wider text-[#007A7A] dark:text-[#1EE1D6]">
@@ -260,7 +260,7 @@ export default function StudentHome({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
         {/* Clean 4-Card Learning Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl p-5 border border-rose-200/80 dark:border-slate-800 shadow-xs flex items-center gap-4">
+          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center shrink-0 border border-[#B5F5F1] dark:border-teal-500/30">
               <BookOpen className="w-5 h-5" />
             </div>
@@ -270,7 +270,7 @@ export default function StudentHome({
             </div>
           </div>
 
-          <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl p-5 border border-rose-200/80 dark:border-slate-800 shadow-xs flex items-center gap-4">
+          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1447E6] dark:text-blue-400 flex items-center justify-center shrink-0 border border-[#DBEAFE] dark:border-blue-500/30">
               <FileText className="w-5 h-5" />
             </div>
@@ -280,7 +280,7 @@ export default function StudentHome({
             </div>
           </div>
 
-          <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl p-5 border border-rose-200/80 dark:border-slate-800 shadow-xs flex items-center gap-4">
+          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-[#ECFDF5] dark:bg-emerald-500/15 text-[#059271] dark:text-emerald-400 flex items-center justify-center shrink-0 border border-[#9FF5E1] dark:border-emerald-500/30">
               <Award className="w-5 h-5" />
             </div>
@@ -292,7 +292,7 @@ export default function StudentHome({
             </div>
           </div>
 
-          <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl p-5 border border-rose-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between gap-3">
+          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center justify-between gap-3">
             <div className="flex items-center gap-4 min-w-0">
               <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-[#E17100] dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-200/80 dark:border-amber-500/30">
                 <Target className="w-5 h-5" />
@@ -337,7 +337,7 @@ export default function StudentHome({
             </div>
 
             {/* Filter Pills */}
-            <div className="flex items-center gap-1.5 bg-[#FFF9FB] dark:bg-[#0F172B] p-1 rounded-xl border border-rose-200/80 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
+            <div className="flex items-center gap-1.5 bg-[#FFF5F8] dark:bg-[#0F172B] p-1 rounded-xl border border-pink-200/90 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
               {[
                 { id: 'all', label: `Tất cả (${visibleTests.length})` },
                 { id: 'unlimited', label: 'Luyện tập tự do' },
@@ -360,7 +360,7 @@ export default function StudentHome({
           </div>
 
           {filteredTests.length === 0 ? (
-            <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl border border-dashed border-rose-300 dark:border-slate-700 p-10 text-center text-[#62748E] dark:text-slate-400 text-sm">
+            <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border border-dashed border-rose-300 dark:border-slate-700 p-10 text-center text-[#62748E] dark:text-slate-400 text-sm">
               {visibleTests.length === 0
                 ? 'Hiện chưa có đề thi công khai nào. Giáo viên sẽ mở đề khi bắt đầu buổi kiểm tra.'
                 : 'Không có bộ đề nào trong bộ lọc này. Hãy chuyển sang tab "Tất cả".'}
@@ -380,7 +380,7 @@ export default function StudentHome({
                 return (
                   <div
                     key={test.id}
-                    className="lexi-card bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl border border-rose-200/80 dark:border-slate-800 p-6 flex flex-col justify-between hover:border-[#007A7A]/60 dark:hover:border-teal-500/50"
+                    className="lexi-card bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border border-pink-200/90 dark:border-slate-800 p-6 flex flex-col justify-between hover:border-[#007A7A]/60 dark:hover:border-teal-500/50"
                   >
                     <div>
                       <div className="flex flex-wrap justify-between items-center gap-2 mb-3.5">
@@ -510,7 +510,7 @@ export default function StudentHome({
                   key={card.title}
                   type="button"
                   onClick={card.action}
-                  className="lexi-card text-left bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl p-5 sm:p-6 border border-rose-200/80 dark:border-slate-800 flex flex-col justify-between gap-4 hover:border-[#007A7A]/50"
+                  className="lexi-card text-left bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 sm:p-6 border border-pink-200/90 dark:border-slate-800 flex flex-col justify-between gap-4 hover:border-[#007A7A]/50"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-3.5">
@@ -534,7 +534,7 @@ export default function StudentHome({
         <section>
           {/* Class Members Directory Strip (View Teacher & Peer Profiles) */}
           {Object.keys(usersDb || {}).length > 0 && (
-            <div className="mb-8 bg-[#FFF9FB] dark:bg-[#0F172B] border border-rose-200/85 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <div className="mb-8 bg-[#FFF5F8] dark:bg-[#0F172B] border border-rose-200/85 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 flex items-center justify-center text-[#007A7A] dark:text-[#1EE1D6]">
@@ -588,7 +588,7 @@ export default function StudentHome({
                             setView('STUDENT_PROFILE');
                           }
                         }}
-                        className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl border border-rose-200/80 dark:border-slate-800 bg-rose-50/55 dark:bg-slate-900/60 hover:border-[#007A7A] dark:hover:border-teal-500 hover:bg-[#EDFFFD]/70 dark:hover:bg-teal-950/30 transition text-left group"
+                        className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl border border-pink-200/90 dark:border-slate-800 bg-rose-50/55 dark:bg-slate-900/60 hover:border-[#007A7A] dark:hover:border-teal-500 hover:bg-[#EDFFFD]/70 dark:hover:bg-teal-950/30 transition text-left group"
                       >
                         <UserAvatarBadge user={{ ...u, username: uname }} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
                         <div className="min-w-0 flex-1">
@@ -636,7 +636,7 @@ export default function StudentHome({
                     setView('STUDENT_PROFILE');
                   }
                 }}
-                className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 flex items-center gap-1.5 transition px-4 py-2 rounded-xl border border-[#B5F5F1] dark:border-slate-700 bg-[#FFF9FB] dark:bg-[#0F172B]"
+                className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 flex items-center gap-1.5 transition px-4 py-2 rounded-xl border border-[#B5F5F1] dark:border-slate-700 bg-[#FFF5F8] dark:bg-[#0F172B]"
               >
                 <TrendingUp className="w-4 h-4" /> Xem Hồ Sơ &amp; Biểu Đồ Tiến Độ
               </button>
@@ -644,14 +644,14 @@ export default function StudentHome({
           </div>
 
           {studentAttempts.length === 0 ? (
-            <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl border border-rose-200/80 dark:border-slate-800 py-12 px-6 text-center text-[#62748E] dark:text-slate-400 text-sm sm:text-base">
+            <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border border-pink-200/90 dark:border-slate-800 py-12 px-6 text-center text-[#62748E] dark:text-slate-400 text-sm sm:text-base">
               Bạn chưa hoàn thành bài thi nào. Hãy chọn một đề thi ở phía trên để bắt đầu!
             </div>
           ) : (
-            <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl border border-rose-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border border-pink-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-[#314158] dark:text-slate-300">
-                  <thead className="bg-rose-50/85 dark:bg-slate-800/70 border-b border-rose-200/80 dark:border-slate-800 text-xs text-[#62748E] dark:text-slate-400 font-bold">
+                  <thead className="bg-rose-50/85 dark:bg-slate-800/70 border-b border-pink-200/90 dark:border-slate-800 text-xs text-[#62748E] dark:text-slate-400 font-bold">
                     <tr>
                       <th className="px-6 py-3.5">Tên Đề Thi</th>
                       <th className="px-6 py-3.5">Thời Gian Nộp</th>

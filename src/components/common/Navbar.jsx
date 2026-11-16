@@ -44,7 +44,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="bg-[#FFF8FA]/95 dark:bg-[#0F172B]/95 backdrop-blur-xl border-b border-rose-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-100 sticky top-0 z-50 transition-colors">
+    <header className="bg-[#FDF2F6]/95 dark:bg-[#0F172B]/95 backdrop-blur-xl border-b border-pink-200/90 dark:border-slate-800 text-slate-800 dark:text-slate-100 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-3 sm:px-5 h-16 flex items-center justify-between gap-3">
         {/* Luyện Thi IELTS Nha Trang Brand Lockup */}
         <div
@@ -65,7 +65,7 @@ export default function Navbar({
         </div>
 
         {/* Center Editorial Navigation — strictly single-line pills */}
-        <nav className="hidden lg:flex items-center gap-1 bg-rose-100/60 dark:bg-slate-800/85 p-1 rounded-xl border border-rose-200/75 dark:border-slate-700/70 text-xs font-bold shrink-0">
+        <nav className="hidden lg:flex items-center gap-1 bg-pink-100/75 dark:bg-slate-800/85 p-1 rounded-xl border border-pink-200/90 dark:border-slate-700/70 text-xs font-bold shrink-0">
           <button
             type="button"
             onClick={() => setView('HOME')}
@@ -214,7 +214,7 @@ export default function Navbar({
       </div>
 
       {/* Mobile & Tablet Quick Nav Strip */}
-      <div className="lg:hidden bg-[#FFF5F8] dark:bg-[#0F172B] border-t border-rose-200/80 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
+      <div className="lg:hidden bg-[#FCECF2] dark:bg-[#0F172B] border-t border-pink-200/85 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
         <button
           type="button"
           onClick={() => setView('HOME')}

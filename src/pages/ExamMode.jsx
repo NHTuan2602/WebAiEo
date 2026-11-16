@@ -43,9 +43,9 @@ import ExamQuestionList from '../components/exam/ExamQuestionList';
 import SplitResizableWorkspace from '../components/exam/SplitResizableWorkspace';
 
 const FONT_SIZE_CLASSES = {
-  regular: 'text-[15.5px] leading-[1.65]',
-  large: 'text-[17px] leading-[1.7]',
-  xl: 'text-[18.5px] leading-[1.75]'
+  regular: 'text-[16px] leading-[1.6]',
+  large: 'text-[17.5px] leading-[1.65]',
+  xl: 'text-[19px] leading-[1.7]'
 };
 
 const FONT_SIZE_LABELS = {
@@ -96,7 +96,7 @@ export default function ExamMode({
   const activeTest = tests.find(t => t.id === selectedTestId);
   if (!activeTest) {
     return (
-      <div className="min-h-screen bg-[#FFF0F5] dark:bg-[#121212] flex items-center justify-center p-6 font-exam">
+      <div className="min-h-screen bg-[#FDECF2] dark:bg-[#121212] flex items-center justify-center p-6 font-exam">
         <div className="max-w-md w-full bg-white dark:bg-[#1B1B1B] border border-[#D5D9E0] dark:border-[#333333] rounded-2xl p-6 text-center shadow-xl">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
             <BookOpen className="w-6 h-6" />
@@ -380,10 +380,10 @@ export default function ExamMode({
   return (
     <div
       onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
-      className="min-h-screen bg-[#FFF0F5] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam"
+      className="min-h-screen bg-[#FDECF2] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam"
     >
       {/* Top Computer-Delivered Header (matches Real IELTS bar) */}
-      <header className="bg-[#FFF8FA] dark:bg-[#161616] text-[#111827] dark:text-white px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-rose-200/85 dark:border-[#2C2C2C] sticky top-0 z-50">
+      <header className="bg-[#FDF2F6] dark:bg-[#161616] text-[#111827] dark:text-white px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-pink-200 dark:border-[#2C2C2C] sticky top-0 z-50">
         {/* Left: Golden IELTS emblem + Test Title + Minutes Remaining */}
         <div className="flex items-center gap-3 min-w-0">
           <div
@@ -394,24 +394,29 @@ export default function ExamMode({
           </div>
           <div className="min-w-0">
             <h2
-              className="font-extrabold text-xs sm:text-sm text-[#111827] dark:text-white truncate max-w-[180px] sm:max-w-[320px] md:max-w-[420px]"
+              className="font-bold text-sm sm:text-[15px] text-[#111827] dark:text-white truncate max-w-[200px] sm:max-w-[360px] md:max-w-[460px]"
               title={activeTest.title}
             >
               {activeTest.title}
             </h2>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-neutral-300 font-medium">
+            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-neutral-300 font-medium">
               <span>{remainingMinutesLabel}</span>
               <span className="opacity-40">•</span>
               <span
                 className={`inline-flex items-center gap-1 font-mono font-bold px-1.5 py-0.5 rounded ${
                   examState.timeRemaining <= 60
                     ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse'
-                    : 'bg-slate-100 dark:bg-[#242424] text-[#111827] dark:text-[#E5E7EB]'
+                    : 'bg-pink-100/80 dark:bg-[#242424] text-[#111827] dark:text-[#E5E7EB]'
                 }`}
               >
                 <Clock className="w-3 h-3 text-amber-500" />
                 {formatTime(examState.timeRemaining)}
               </span>
+              {examState.skill === 'listening' && isPlayingAudio && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-[#111827] dark:text-amber-300 ml-1">
+                  <Volume2 className="w-3.5 h-3.5" /> Audio is playing
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -670,15 +675,15 @@ export default function ExamMode({
         </div>
       )}
 
-      {/* Main Computer-Delivered Workspace */}
-      <main className="flex-1 max-w-[1640px] w-full mx-auto px-3 sm:px-5 pt-3 pb-14 flex flex-col relative">
+      {/* Main Computer-Delivered Workspace (Full width left-aligned matching Real IELTS) */}
+      <main className="flex-1 w-full px-4 sm:px-6 pt-3 pb-16 flex flex-col relative">
         {/* Part / Passage / Task Banner Strip */}
-        <div className="rounded-lg border border-[#D5D9E0] dark:border-[#363636] bg-[#FFE8F0] dark:bg-[#242424] px-4 sm:px-5 py-2.5 mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-[4px] border border-pink-200 dark:border-[#363636] bg-[#F8DCE7] dark:bg-[#242424] px-4 sm:px-5 py-2.5 mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-[#111827] dark:text-white">
+            <h1 className="text-[14px] sm:text-[15px] font-bold uppercase tracking-wide text-[#111827] dark:text-white">
               {activePartObj?.label || (examState.skill === 'writing' ? `TASK ${activeWritingTask + 1}` : 'PART 1')}
             </h1>
-            <p className="text-xs text-slate-600 dark:text-[#D1D5DB] mt-0.5">
+            <p className="text-[14px] text-[#1F2937] dark:text-[#D1D5DB] mt-0.5">
               {examState.skill === 'reading' &&
                 `Read the text and answer questions ${activePartRange || `1–${displayedReadingQs.length || 1}`}`}
               {examState.skill === 'listening' &&
@@ -702,10 +707,10 @@ export default function ExamMode({
                     )
                   }
                   disabled={
-                    (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays || isPlayingAudio
+                    (examState.audioPlays?.[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays || isPlayingAudio
                   }
                   className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition shrink-0 ${
-                    (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
+                    (examState.audioPlays?.[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
                       ? 'bg-slate-200 dark:bg-[#2A2A2A] text-slate-400 cursor-not-allowed'
                       : isPlayingAudio
                       ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/40 animate-pulse cursor-wait'
@@ -716,7 +721,7 @@ export default function ExamMode({
                   <span>
                     {isPlayingAudio && playingAudioKey === activeTrackPlayKey
                       ? 'Đang Phát'
-                      : (examState.audioPlays[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
+                      : (examState.audioPlays?.[activeTrackPlayKey] || 0) >= activeTest.maxAudioPlays
                       ? 'Đã Nghe Hết'
                       : 'Phát Audio'}
                   </span>
@@ -730,7 +735,7 @@ export default function ExamMode({
                 <span className="text-[11px] font-mono text-slate-600 dark:text-neutral-300 tabular-nums">
                   {audioProgress.duration > 0
                     ? `${formatTime(audioProgress.currentTime)} / ${formatTime(audioProgress.duration)}`
-                    : `${examState.audioPlays[activeTrackPlayKey] || 0}/${activeTest.maxAudioPlays}`}
+                    : `${examState.audioPlays?.[activeTrackPlayKey] || 0}/${activeTest.maxAudioPlays}`}
                 </span>
               </div>
             )}
@@ -778,7 +783,7 @@ export default function ExamMode({
             splitPercent={splitPercent}
             onChangeSplit={setSplitPercent}
             left={
-              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
                   <h3 className="font-extrabold text-[#111827] dark:text-white text-base sm:text-[17px] leading-snug">
                     {activePassage?.title || `Passage ${safePassageIdx + 1}`}
@@ -848,7 +853,7 @@ export default function ExamMode({
               </div>
             }
             right={
-              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
                   {activeReadingCloze.trim() && (
                     <ClozeNoteSheet
@@ -921,7 +926,7 @@ export default function ExamMode({
               splitPercent={splitPercent}
               onChangeSplit={setSplitPercent}
               left={
-                <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
                   <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
                     <h3 className="font-extrabold text-[#111827] dark:text-white text-base">
                       {activeTrack?.title || `Part ${safeTrackIdx + 1}`}
@@ -953,7 +958,7 @@ export default function ExamMode({
                 </div>
               }
               right={
-                <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
                     {activeListeningCloze.trim() && (
                       <ClozeNoteSheet
@@ -1011,7 +1016,7 @@ export default function ExamMode({
               }
             />
           ) : (
-            <div className="rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] p-5 sm:p-7 max-w-5xl w-full mx-auto space-y-5 flex-1 overflow-y-auto cd-exam-scroll">
+            <div className="w-full px-1 sm:px-2 py-1 space-y-6 flex-1 overflow-y-auto cd-exam-scroll text-left">
               {activeListeningCloze.trim() && (
                 <ClozeNoteSheet
                   activeBlankNum={activeBlankNum}
@@ -1078,7 +1083,7 @@ export default function ExamMode({
             splitPercent={splitPercent}
             onChangeSplit={setSplitPercent}
             left={
-              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-3.5">
                   <h3 className="text-base font-extrabold text-[#111827] dark:text-white">
                     Questions {activeWritingTask + 1}
@@ -1119,7 +1124,7 @@ export default function ExamMode({
               </div>
             }
             right={
-              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden p-4 sm:p-5">
+              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm sm:text-base font-extrabold text-[#111827] dark:text-white">
                     Your answer
@@ -1186,9 +1191,9 @@ export default function ExamMode({
       </main>
 
       {/* Bottom Sticky Part & Question Palette Bar (matches Screenshots 1–5) */}
-      <footer className="bg-[#FFF8FA] dark:bg-[#141414] border-t border-rose-200/85 dark:border-[#2C2C2C] px-3 sm:px-6 py-2 sticky bottom-0 z-40">
-        <div className="max-w-[1640px] mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 overflow-x-auto cd-exam-scroll flex-1 py-0.5">
+      <footer className="bg-[#FDF2F6] dark:bg-[#141414] border-t border-pink-200 dark:border-[#2C2C2C] px-4 sm:px-6 py-2 sticky bottom-0 z-40">
+        <div className="w-full flex items-center justify-between gap-3">
+          <div className="flex items-center justify-start sm:justify-center gap-4 overflow-x-auto cd-exam-scroll flex-1 py-0.5">
             {navParts.map(part => {
               const isActive = part.idx === activePartIdx;
               const answeredInPart =

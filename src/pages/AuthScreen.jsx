@@ -43,9 +43,9 @@ export default function AuthScreen({
   ];
 
   return (
-    <div className="min-h-screen bg-[#FFF0F5] dark:bg-[#020618] text-[#0F172B] dark:text-slate-100 flex flex-col justify-between transition-colors">
+    <div className="min-h-screen bg-[#FDECF2] dark:bg-[#020618] text-[#0F172B] dark:text-slate-100 flex flex-col justify-between transition-colors">
       {/* Sticky Minimal Branded Public Header */}
-      <header className="bg-[#FFF8FA]/95 dark:bg-[#0F172B]/95 backdrop-blur-md border-b border-rose-200/80 dark:border-slate-800 sticky top-0 z-40">
+      <header className="bg-[#FDF2F6]/95 dark:bg-[#0F172B]/95 backdrop-blur-md border-b border-pink-200/90 dark:border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#007A7A] flex items-center justify-center shadow-sm">
@@ -120,7 +120,7 @@ export default function AuthScreen({
               {highlights.map(item => (
                 <span
                   key={item}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#FFF9FB] dark:bg-slate-900 border border-rose-200/80 dark:border-slate-800 text-[#0F172B] dark:text-slate-200 shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#FFF5F8] dark:bg-slate-900 border border-rose-200/80 dark:border-slate-800 text-[#0F172B] dark:text-slate-200 shadow-xs"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 text-[#059271] shrink-0" />
                   <span>{item}</span>
@@ -130,7 +130,7 @@ export default function AuthScreen({
 
             {/* 3 Clean Capability Feature Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
-              <div className="lexi-card bg-[#FFF9FB] dark:bg-slate-900/90 rounded-2xl p-4 border border-rose-200/80 dark:border-slate-800">
+              <div className="lexi-card bg-[#FFF5F8] dark:bg-slate-900/90 rounded-2xl p-4 border border-rose-200/80 dark:border-slate-800">
                 <div className="w-9 h-9 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center mb-3 border border-[#B5F5F1] dark:border-teal-500/30">
                   <Headphones className="w-4 h-4" />
                 </div>
@@ -140,7 +140,7 @@ export default function AuthScreen({
                 </p>
               </div>
 
-              <div className="lexi-card bg-[#FFF9FB] dark:bg-slate-900/90 rounded-2xl p-4 border border-rose-200/80 dark:border-slate-800">
+              <div className="lexi-card bg-[#FFF5F8] dark:bg-slate-900/90 rounded-2xl p-4 border border-rose-200/80 dark:border-slate-800">
                 <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1447E6] dark:text-blue-300 flex items-center justify-center mb-3 border border-[#DBEAFE] dark:border-blue-500/30">
                   <Sparkles className="w-4 h-4" />
                 </div>
@@ -150,7 +150,7 @@ export default function AuthScreen({
                 </p>
               </div>
 
-              <div className="lexi-card bg-[#FFF9FB] dark:bg-slate-900/90 rounded-2xl p-4 border border-rose-200/80 dark:border-slate-800">
+              <div className="lexi-card bg-[#FFF5F8] dark:bg-slate-900/90 rounded-2xl p-4 border border-rose-200/80 dark:border-slate-800">
                 <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-500/15 text-[#F25220] dark:text-orange-300 flex items-center justify-center mb-3 border border-orange-200/80 dark:border-orange-500/30">
                   <Gamepad2 className="w-4 h-4" />
                 </div>
@@ -162,7 +162,7 @@ export default function AuthScreen({
             </div>
 
             {/* Contact & Consultation Card for Students / Parents */}
-            <div className="bg-[#FFF9FB]/95 dark:bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-rose-200/90 dark:border-teal-500/30 shadow-xs space-y-3">
+            <div className="bg-[#FFF5F8]/95 dark:bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-rose-200/90 dark:border-teal-500/30 shadow-xs space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6] uppercase tracking-wider">
                   Thông Tin Liên Hệ &amp; Đăng Ký Lớp • {BRAND_INFO.teacherName}
@@ -211,7 +211,7 @@ export default function AuthScreen({
 
           {/* Right Auth Form Card */}
           <div className="lg:col-span-5">
-            <div className="bg-[#FFF9FB] dark:bg-[#0F172B] rounded-2xl shadow-[0_20px_50px_-15px_rgba(15,23,43,0.14)] dark:shadow-black/50 border border-rose-200/85 dark:border-slate-800 overflow-hidden">
+            <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl shadow-[0_20px_50px_-15px_rgba(15,23,43,0.14)] dark:shadow-black/50 border border-rose-200/85 dark:border-slate-800 overflow-hidden">
               <div className="h-1.5 bg-gradient-to-r from-[#007A7A] via-[#00B2AD] to-[#059271]" />
               <div className="p-6 sm:p-8">
                 <div className="flex items-start justify-between gap-3 mb-5">
