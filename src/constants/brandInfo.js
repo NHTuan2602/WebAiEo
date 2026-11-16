@@ -19,7 +19,7 @@ export const BRAND_INFO = {
   facebookHandle: 'fb.com/luyenthiIELTSwithMs.Nhu',
   blogUrl: 'https://luyenthiieltsnhatrang.blogspot.com/',
   blogHost: 'luyenthiieltsnhatrang.blogspot.com',
-  avatarUrl: '/brand-avatar.jpg'
+  avatarUrl: '/brand-avatar.jpg?v=2'
 };
 
 /**
@@ -29,7 +29,8 @@ export function normalizeBrandTeacherUser(user) {
   if (!user || typeof user !== 'object') return user;
   if (user.username === 'teacher_ielts') {
     const nextName = user.name === LEGACY_DEFAULT_TEACHER_NAME ? BRAND_INFO.teacherFullName : user.name;
-    const nextAvatar = user.avatarUrl || BRAND_INFO.avatarUrl;
+    const isBrandDefaultAvatar = !user.avatarUrl || user.avatarUrl.startsWith('/brand-avatar.jpg');
+    const nextAvatar = isBrandDefaultAvatar ? BRAND_INFO.avatarUrl : user.avatarUrl;
     if (nextName !== user.name || nextAvatar !== user.avatarUrl) {
       return { ...user, name: nextName, avatarUrl: nextAvatar };
     }
