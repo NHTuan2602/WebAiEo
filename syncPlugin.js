@@ -1,5 +1,6 @@
 // Built-in Realtime Sync Relay Middleware for Vite Dev & Production Node Server
 // Enables cross-browser & cross-device sync (Lobby, Chat, Đua Top Scores, Exams, Avatars).
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -11,6 +12,15 @@ import {
 } from './src/utils/speakingAiEngine.js';
 
 export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
+const SUPER_ADMIN_USERNAME = 'tuanpro123s';
+const SUPER_ADMIN_DEFAULT_PASS = process.env.SUPER_ADMIN_PASS || '0938899046';
+const SESSION_COOKIE_NAME = 'ielts_session';
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const LOGIN_RATE_WINDOW_MS = 5 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 15;
+const MAX_AUDIO_UPLOAD_BYTES = 15 * 1024 * 1024;
+const ALLOWED_AUDIO_MIMES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/x-m4a', 'audio/flac']);
+
 const GEMINI_AUDIO_PREFERRED_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
@@ -18,6 +28,359 @@ const GEMINI_AUDIO_PREFERRED_MODELS = [
   'gemini-2.5-pro',
   'gemini-flash-latest'
 ];
+
+const LISTENING_40_THRESHOLDS = [
+  [39, 9.0], [37, 8.5], [35, 8.0], [32, 7.5], [30, 7.0],
+  [26, 6.5], [23, 6.0], [18, 5.5], [16, 5.0], [13, 4.5],
+  [10, 4.0], [6, 3.5], [4, 3.0], [2, 2.0], [1, 1.0]
+];
+
+const ACADEMIC_READING_40_THRESHOLDS = [
+  [39, 9.0], [37, 8.5], [35, 8.0], [33, 7.5], [30, 7.0],
+  [27, 6.5], [23, 6.0], [19, 5.5], [15, 5.0], [13, 4.5],
+  [10, 4.0], [8, 3.5], [6, 3.0], [4, 2.5], [2, 2.0], [1, 1.0]
+];
+
+function hashPassword(rawPassword) {
+  const clean = String(rawPassword ?? '');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(clean, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyPassword(rawPassword, userRecord) {
+  if (!userRecord || typeof userRecord !== 'object') return false;
+  const candidate = String(rawPassword ?? '');
+  if (typeof userRecord.passwordHash === 'string' && userRecord.passwordHash.startsWith('scrypt$')) {
+    const parts = userRecord.passwordHash.split('$');
+    if (parts.length !== 3) return false;
+    try {
+      const salt = parts[1];
+      const expectedBuf = Buffer.from(parts[2], 'hex');
+      const actualBuf = crypto.scryptSync(candidate, salt, 64);
+      return expectedBuf.length === actualBuf.length && crypto.timingSafeEqual(expectedBuf, actualBuf);
+    } catch {
+      return false;
+    }
+  }
+  if (typeof userRecord.pass === 'string' && userRecord.pass.length > 0) {
+    const a = Buffer.from(candidate);
+    const b = Buffer.from(userRecord.pass);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }
+  return false;
+}
+
+function signToken(payloadObj, secret) {
+  const encoded = Buffer.from(JSON.stringify(payloadObj), 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
+  return `${encoded}.${sig}`;
+}
+
+function verifyToken(token, secret) {
+  if (!token || !secret || typeof token !== 'string') return null;
+  const dotIdx = token.indexOf('.');
+  if (dotIdx <= 0) return null;
+  const encoded = token.slice(0, dotIdx);
+  const sig = token.slice(dotIdx + 1);
+  const expectedSig = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
+  const sigBuf = Buffer.from(sig);
+  const expBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (parsed?.exp && Date.now() > Number(parsed.exp)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function parseCookies(req) {
+  const out = {};
+  const raw = String(req?.headers?.cookie || '');
+  if (!raw) return out;
+  raw.split(';').forEach(pair => {
+    const idx = pair.indexOf('=');
+    if (idx <= 0) return;
+    const k = pair.slice(0, idx).trim();
+    const v = pair.slice(idx + 1).trim();
+    if (k) {
+      try {
+        out[k] = decodeURIComponent(v);
+      } catch {
+        out[k] = v;
+      }
+    }
+  });
+  return out;
+}
+
+function resolveSessionUser(req, store) {
+  const cookies = parseCookies(req);
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (!token || !store?._authSecret) return null;
+  const payload = verifyToken(token, store._authSecret);
+  if (!payload?.username) return null;
+  const user = store.users?.[payload.username];
+  if (!user) return null;
+  if ((user.tokenVersion || 1) !== (payload.tokenVersion || 1)) return null;
+  return user;
+}
+
+function buildSessionCookieHeader(req, tokenValue, maxAgeSec) {
+  const isHttps = Boolean(
+    req?.socket?.encrypted ||
+    String(req?.headers?.['x-forwarded-proto'] || '').toLowerCase().includes('https')
+  );
+  const parts = [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(tokenValue)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${Math.max(0, Math.floor(maxAgeSec))}`
+  ];
+  if (isHttps) parts.push('Secure');
+  return parts.join('; ');
+}
+
+function ensureProtectedAccounts(store) {
+  let changed = false;
+  if (!store._authSecret || typeof store._authSecret !== 'string') {
+    store._authSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+    changed = true;
+  }
+  if (!store.users || typeof store.users !== 'object') {
+    store.users = {};
+  }
+  Object.entries(store.users).forEach(([uname, u]) => {
+    if (!u || typeof u !== 'object') return;
+    if (typeof u.pass === 'string' && u.pass.length > 0 && !u.passwordHash) {
+      u.passwordHash = hashPassword(u.pass);
+      changed = true;
+    }
+    if ('pass' in u) {
+      delete u.pass;
+      changed = true;
+    }
+    if (!u.tokenVersion) {
+      u.tokenVersion = 1;
+    }
+    if (uname !== SUPER_ADMIN_USERNAME && (u.isSuperAdmin || u.hiddenFromTeacher)) {
+      delete u.isSuperAdmin;
+      delete u.hiddenFromTeacher;
+      changed = true;
+    }
+  });
+
+  if (Array.isArray(store.deletedUserIds) && store.deletedUserIds.includes(SUPER_ADMIN_USERNAME)) {
+    store.deletedUserIds = store.deletedUserIds.filter(id => id !== SUPER_ADMIN_USERNAME);
+    changed = true;
+  }
+
+  const existingSuper = store.users[SUPER_ADMIN_USERNAME];
+  if (!existingSuper) {
+    store.users[SUPER_ADMIN_USERNAME] = {
+      username: SUPER_ADMIN_USERNAME,
+      name: 'Quản Trị Hệ Thống',
+      role: 'teacher',
+      isSuperAdmin: true,
+      hiddenFromTeacher: true,
+      targetBand: 9.0,
+      joinedDate: '2026-01-01',
+      tokenVersion: 1,
+      passwordHash: hashPassword(SUPER_ADMIN_DEFAULT_PASS)
+    };
+    changed = true;
+  } else {
+    if (!existingSuper.passwordHash) {
+      existingSuper.passwordHash = hashPassword(SUPER_ADMIN_DEFAULT_PASS);
+      changed = true;
+    }
+    if (!existingSuper.isSuperAdmin || !existingSuper.hiddenFromTeacher || existingSuper.role !== 'teacher') {
+      existingSuper.role = 'teacher';
+      existingSuper.isSuperAdmin = true;
+      existingSuper.hiddenFromTeacher = true;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function getClientIp(req) {
+  const xff = String(req?.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
+  return xff || req?.socket?.remoteAddress || 'local';
+}
+
+function checkRateLimit(bucketMap, key, limit = LOGIN_MAX_ATTEMPTS, windowMs = LOGIN_RATE_WINDOW_MS) {
+  const now = Date.now();
+  if (bucketMap.size > 500) {
+    for (const [k, rec] of bucketMap.entries()) {
+      if (now - rec.start > windowMs) bucketMap.delete(k);
+    }
+  }
+  const existing = bucketMap.get(key);
+  if (!existing || now - existing.start > windowMs) {
+    bucketMap.set(key, { count: 1, start: now });
+    return true;
+  }
+  if (existing.count >= limit) {
+    return false;
+  }
+  existing.count += 1;
+  return true;
+}
+
+function sanitizeUserForViewer(user, viewer) {
+  if (!user || typeof user !== 'object') return null;
+  if ((user.isSuperAdmin || user.hiddenFromTeacher || user.username === SUPER_ADMIN_USERNAME) && !viewer?.isSuperAdmin) {
+    return null;
+  }
+  const safe = {
+    username: user.username,
+    name: user.name || user.username,
+    role: user.role === 'teacher' ? 'teacher' : 'student',
+    targetBand: user.targetBand ?? (user.role === 'teacher' ? 9.0 : 7.5),
+    studyGoal: user.studyGoal || '',
+    joinedDate: user.joinedDate || '',
+    avatarUrl: user.avatarUrl || ''
+  };
+  if (viewer?.isSuperAdmin && user.isSuperAdmin) {
+    safe.isSuperAdmin = true;
+    safe.hiddenFromTeacher = true;
+  }
+  return safe;
+}
+
+function stripQuestionSecrets(questions) {
+  return questions.map(q => {
+    if (!q || typeof q !== 'object') return q;
+    const nextQ = { ...q };
+    delete nextQ.correctAnswer;
+    delete nextQ.acceptableAnswers;
+    delete nextQ.explanation;
+    return nextQ;
+  });
+}
+
+function stripAnswerKeysFromTest(test) {
+  if (!test || typeof test !== 'object') return test;
+  const clone = { ...test };
+  if (clone.listening && Array.isArray(clone.listening.questions)) {
+    clone.listening = {
+      ...clone.listening,
+      questions: stripQuestionSecrets(clone.listening.questions)
+    };
+  }
+  if (clone.reading && Array.isArray(clone.reading.questions)) {
+    clone.reading = {
+      ...clone.reading,
+      questions: stripQuestionSecrets(clone.reading.questions)
+    };
+  }
+  if (clone.writing) {
+    clone.writing = {
+      ...clone.writing,
+      task1: clone.writing.task1 ? { ...clone.writing.task1, modelAnswer: '' } : undefined,
+      task2: clone.writing.task2 ? { ...clone.writing.task2, modelAnswer: '' } : undefined
+    };
+  }
+  return clone;
+}
+
+function sanitizeAttemptForPeer(att) {
+  if (!att || typeof att !== 'object') return att;
+  return {
+    id: att.id,
+    testId: att.testId,
+    testTitle: att.testTitle,
+    testMode: att.testMode,
+    focusSkill: att.focusSkill,
+    speakingPartMode: att.speakingPartMode,
+    studentId: att.studentId,
+    studentName: att.studentName,
+    submittedAt: att.submittedAt,
+    teacherGraded: Boolean(att.teacherGraded),
+    aiGraded: Boolean(att.aiGraded),
+    overallBand: att.overallBand ?? null,
+    scores: att.scores || {}
+  };
+}
+
+function calculateAutoBandServer(raw, total, skill = 'reading') {
+  const cleanTotal = Number(total);
+  const cleanRaw = Number(raw);
+  if (!Number.isFinite(cleanTotal) || cleanTotal <= 0 || !Number.isFinite(cleanRaw) || cleanRaw <= 0) {
+    return 0;
+  }
+  const equiv40 = (Math.min(cleanRaw, cleanTotal) / cleanTotal) * 40 + 1e-9;
+  const table = skill === 'listening' ? LISTENING_40_THRESHOLDS : ACADEMIC_READING_40_THRESHOLDS;
+  for (const [minRaw, band] of table) {
+    if (equiv40 >= minRaw) return band;
+  }
+  return 1.0;
+}
+
+function roundIeltsBandServer(score) {
+  const num = Number(score);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return Math.min(9.0, Math.round((num + 1e-9) * 2) / 2);
+}
+
+function isObjectiveAnswerCorrectServer(question, userRaw) {
+  const normalizedUser = String(userRaw ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizedKey = String(question?.correctAnswer ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (!normalizedUser || !normalizedKey) return false;
+  if (question?.type === 'mcq' || question?.type === 'tfng' || !/[|/]/.test(normalizedKey)) {
+    return normalizedUser === normalizedKey;
+  }
+  const acceptedVariants = normalizedKey
+    .split(/[|/]/)
+    .map(part => part.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);
+  return acceptedVariants.includes(normalizedUser);
+}
+
+function evaluateObjectiveScoresForAttempt(test, answers = {}) {
+  if (!test || typeof test !== 'object') return null;
+  const cfgMode = test.testMode === 'single_skill' ? 'single_skill' : 'full_exam';
+  const focusSkill = cfgMode === 'single_skill' ? (test.focusSkill || 'reading') : null;
+  const scores = {};
+
+  if (cfgMode !== 'single_skill' || focusSkill === 'listening') {
+    const qs = Array.isArray(test.listening?.questions) ? test.listening.questions : [];
+    const raw = qs.reduce((acc, q) => (isObjectiveAnswerCorrectServer(q, answers?.[q.id]) ? acc + 1 : acc), 0);
+    scores.listening = {
+      raw,
+      total: qs.length,
+      band: calculateAutoBandServer(raw, qs.length, 'listening')
+    };
+  }
+
+  if (cfgMode !== 'single_skill' || focusSkill === 'reading') {
+    const qs = Array.isArray(test.reading?.questions) ? test.reading.questions : [];
+    const raw = qs.reduce((acc, q) => (isObjectiveAnswerCorrectServer(q, answers?.[q.id]) ? acc + 1 : acc), 0);
+    scores.reading = {
+      raw,
+      total: qs.length,
+      band: calculateAutoBandServer(raw, qs.length, 'reading')
+    };
+  }
+
+  let overallBand = null;
+  let teacherGraded = false;
+  if (cfgMode === 'single_skill' && (focusSkill === 'listening' || focusSkill === 'reading')) {
+    overallBand = scores[focusSkill]?.band ?? 0;
+    teacherGraded = true;
+  } else if (cfgMode !== 'single_skill') {
+    teacherGraded = false;
+    overallBand = null;
+  }
+
+  return { scores, overallBand, teacherGraded, roundIeltsBandServer };
+}
 
 function getServerChatMsgTs(msg) {
   const rawTs = Number(msg?.createdAt ?? msg?.id);
@@ -120,7 +483,7 @@ function pruneExpiredStoreChats(store, now = Date.now()) {
 }
 
 function createInitialStore(audioDir = '') {
-  return {
+  const store = {
     version: 0,
     seeded: false,
     seededTags: {},
@@ -133,9 +496,13 @@ function createInitialStore(audioDir = '') {
     users: {},
     customVocabTopics: [],
     aiConfig: { geminiApiKey: '' },
+    _authSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+    _rateLimits: new Map(),
     _audioDir: audioDir,
     _audioMem: new Map()
   };
+  ensureProtectedAccounts(store);
+  return store;
 }
 
 function sanitizeAudioId(raw = '') {
@@ -251,12 +618,16 @@ export function createPersistentSyncStore(persistFile = '') {
               geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
             };
           }
+          if (typeof parsed._authSecret === 'string' && parsed._authSecret.length >= 32) {
+            store._authSecret = parsed._authSecret;
+          }
         }
       }
     } catch {
       // Fall back cleanly to a fresh in-memory store if state file is corrupt or unreadable
     }
   }
+  ensureProtectedAccounts(store);
 
   let writeTimer = null;
   const schedulePersist = () => {
@@ -267,7 +638,7 @@ export function createPersistentSyncStore(persistFile = '') {
       try {
         fs.mkdirSync(path.dirname(persistFile), { recursive: true });
         const tmpFile = `${persistFile}.tmp`;
-        const { _audioDir, _audioMem, ...serializableStore } = store;
+        const { _audioDir, _audioMem, _rateLimits, ...serializableStore } = store;
         fs.writeFileSync(tmpFile, JSON.stringify(serializableStore), 'utf8');
         fs.renameSync(tmpFile, persistFile);
       } catch {
@@ -306,24 +677,254 @@ function readJsonBody(req) {
   });
 }
 
-function getSnapshot(store) {
+function getSnapshotForViewer(store, viewer = null) {
   pruneExpiredStoreChats(store, Date.now());
-  return {
+  const basePayload = {
+    authenticated: Boolean(viewer),
     version: store.version,
     seeded: store.seeded,
     serverTime: Date.now(),
-    aiConfigured: Boolean(getEffectiveGeminiKey(store)),
-    deletedUserIds: store.deletedUserIds,
-    rooms: store.rooms,
-    tests: store.tests,
-    attempts: store.attempts,
-    teacherNotes: store.teacherNotes,
-    users: store.users,
-    customVocabTopics: store.customVocabTopics
+    aiConfigured: Boolean(getEffectiveGeminiKey(store))
+  };
+
+  if (!viewer) {
+    return {
+      ...basePayload,
+      deletedUserIds: [],
+      rooms: {},
+      tests: [],
+      attempts: [],
+      teacherNotes: {},
+      users: {},
+      customVocabTopics: []
+    };
+  }
+
+  const sanitizedUsers = {};
+  Object.entries(store.users || {}).forEach(([uname, u]) => {
+    const clean = sanitizeUserForViewer(u, viewer);
+    if (clean) sanitizedUsers[uname] = clean;
+  });
+
+  if (viewer.role === 'teacher') {
+    const sanitizedRooms = {};
+    Object.entries(store.rooms || {}).forEach(([pin, r]) => {
+      sanitizedRooms[pin] = r;
+    });
+    return {
+      ...basePayload,
+      deletedUserIds: (store.deletedUserIds || []).filter(id => id !== SUPER_ADMIN_USERNAME),
+      rooms: sanitizedRooms,
+      tests: store.tests || [],
+      attempts: store.attempts || [],
+      teacherNotes: store.teacherNotes || {},
+      users: sanitizedUsers,
+      customVocabTopics: store.customVocabTopics || []
+    };
+  }
+
+  // Strict student view: hide private tests, strip keys before viewing answers allowed, redact peer details & room passwords
+  const viewerAttempts = (store.attempts || []).filter(
+    a => a.studentId === viewer.username || a.studentUsername === viewer.username
+  );
+  const submittedTestIds = new Set(viewerAttempts.map(a => a.testId).filter(Boolean));
+
+  const studentTests = (store.tests || [])
+    .filter(t => (t?.visibility || 'public') !== 'private')
+    .map(t => {
+      const canSeeKeys = Boolean(t?.allowViewAnswers) && submittedTestIds.has(t.id);
+      return canSeeKeys ? t : stripAnswerKeysFromTest(t);
+    });
+
+  const studentAttempts = (store.attempts || []).map(att => {
+    const isMine = att.studentId === viewer.username || att.studentUsername === viewer.username;
+    return isMine ? att : sanitizeAttemptForPeer(att);
+  });
+
+  const studentRooms = {};
+  Object.entries(store.rooms || {}).forEach(([pin, r]) => {
+    if (!r) return;
+    const { pass: _hiddenPass, ...rest } = r;
+    studentRooms[pin] = { ...rest, hasPassword: Boolean(_hiddenPass) };
+  });
+
+  const myNote = store.teacherNotes?.[viewer.username];
+
+  return {
+    ...basePayload,
+    deletedUserIds: [],
+    rooms: studentRooms,
+    tests: studentTests,
+    attempts: studentAttempts,
+    teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
+    users: sanitizedUsers,
+    customVocabTopics: store.customVocabTopics || []
   };
 }
 
-function applySyncAction(store, type, payload = {}) {
+function authorizeSyncAction(store, type, payload = {}, viewer = null) {
+  if (type === 'SEED_DEFAULTS') {
+    if (!store.seeded) return { allowed: true };
+    // After initial seed, only authenticated users can append newly tagged seed tests
+    if (!viewer) return { allowed: false, status: 401, error: 'Vui lòng đăng nhập để đồng bộ.' };
+    return { allowed: true };
+  }
+
+  if (!viewer) {
+    return { allowed: false, status: 401, error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
+  }
+
+  const isTeacher = viewer.role === 'teacher';
+  const isSuperAdmin = Boolean(viewer.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+
+  const teacherOnlyActions = new Set([
+    'UPSERT_ROOM',
+    'CLEAR_LOBBY_CHAT',
+    'START_GAME',
+    'FINISH_ROOM_MATCH',
+    'KICK_LOBBY_PLAYER',
+    'DELETE_ROOM',
+    'RESET_LOBBY',
+    'UPSERT_TEST',
+    'DELETE_TEST',
+    'TOGGLE_TEST_ANSWERS',
+    'TOGGLE_TEST_VISIBILITY',
+    'DELETE_ATTEMPT',
+    'UPSERT_NOTE',
+    'UPSERT_VOCAB_TOPIC',
+    'DELETE_VOCAB_TOPIC',
+    'SET_AI_CONFIG'
+  ]);
+
+  if (teacherOnlyActions.has(type)) {
+    if (!isTeacher) {
+      return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới có quyền thực hiện thao tác này.' };
+    }
+    return { allowed: true };
+  }
+
+  switch (type) {
+    case 'RESET_USER_PASSWORD': {
+      const targetUsername = String(payload?.username || '').trim();
+      const targetUser = store.users?.[targetUsername];
+      if (!targetUsername || !targetUser) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy tài khoản.' };
+      }
+      if (!isTeacher) {
+        return { allowed: false, status: 403, error: 'Không có quyền đặt lại mật khẩu.' };
+      }
+      if ((targetUser.isSuperAdmin || targetUsername === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Không có quyền thao tác trên tài khoản Quản trị hệ thống.' };
+      }
+      if (targetUser.role === 'teacher' && targetUsername !== viewer.username && !isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới có thể đổi mật khẩu của tài khoản Giáo viên khác.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'DELETE_USER': {
+      if (!isTeacher) {
+        return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới được xóa tài khoản.' };
+      }
+      const targetUsername = String(payload?.username || '').trim();
+      const targetUser = store.users?.[targetUsername];
+      if (!targetUsername || targetUsername === SUPER_ADMIN_USERNAME || targetUser?.isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Không thể xóa tài khoản Quản trị hệ thống.' };
+      }
+      if (targetUsername === viewer.username) {
+        return { allowed: false, status: 403, error: 'Không thể tự xóa tài khoản đang đăng nhập.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'UPSERT_USER': {
+      const uname = String(payload?.username || payload?.user?.username || '').trim();
+      if (!uname || !payload?.user) {
+        return { allowed: false, status: 400, error: 'Thiếu thông tin tài khoản.' };
+      }
+      const targetExisting = store.users?.[uname];
+      if ((targetExisting?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Không thể chỉnh sửa tài khoản Quản trị hệ thống.' };
+      }
+      if (!isTeacher) {
+        if (uname !== viewer.username) {
+          return { allowed: false, status: 403, error: 'Học viên không được phép sửa tài khoản người khác.' };
+        }
+        if (payload.user.role === 'teacher' || payload.user.isSuperAdmin) {
+          return { allowed: false, status: 403, error: 'Không có quyền nâng cấp vai trò tài khoản.' };
+        }
+        return { allowed: true };
+      }
+      return { allowed: true };
+    }
+
+    case 'UPSERT_ATTEMPT': {
+      const att = payload?.attempt;
+      if (!att?.id) return { allowed: false, status: 400, error: 'Thiếu thông tin bài làm.' };
+      if (!isTeacher) {
+        const existingAtt = (store.attempts || []).find(a => a.id === att.id);
+        if (existingAtt && existingAtt.studentId !== viewer.username) {
+          return { allowed: false, status: 403, error: 'Không được phép sửa bài nộp của học viên khác.' };
+        }
+        if (existingAtt?.teacherGraded) {
+          return { allowed: false, status: 403, error: 'Bài đã chấm điểm không thể tự ý chỉnh sửa.' };
+        }
+        const test = (store.tests || []).find(t => t.id === att.testId);
+        if (test && Number(test.maxAttempts) > 0 && !existingAtt) {
+          const prevCount = (store.attempts || []).filter(
+            a => a.testId === test.id && (a.studentId === viewer.username || a.studentUsername === viewer.username)
+          ).length;
+          if (prevCount >= Number(test.maxAttempts)) {
+            return { allowed: false, status: 403, error: `Bạn đã dùng hết ${test.maxAttempts} lượt làm bài thi này.` };
+          }
+        }
+      }
+      return { allowed: true };
+    }
+
+    case 'JOIN_LOBBY': {
+      const cleanPin = String(payload?.pin || '').trim();
+      const room = store.rooms?.[cleanPin];
+      if (!cleanPin || !room) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy phòng đấu.' };
+      }
+      if (!isTeacher) {
+        if (payload?.player?.username && payload.player.username !== viewer.username) {
+          return { allowed: false, status: 403, error: 'Không thể vào phòng dưới tên người khác.' };
+        }
+        const alreadyIn = Boolean(room.lobbyPlayers?.[viewer.username]);
+        if (!alreadyIn && room.pass && String(payload?.roomPass || '').trim() !== String(room.pass).trim()) {
+          return { allowed: false, status: 403, error: 'Mật khẩu phòng không chính xác.' };
+        }
+      }
+      return { allowed: true };
+    }
+
+    case 'UPDATE_LOBBY_PLAYER':
+    case 'LEAVE_LOBBY':
+    case 'UPDATE_LIVE_SCORE':
+    case 'UPDATE_SCORE': {
+      const targetUname = payload?.username;
+      if (!isTeacher && targetUname && targetUname !== viewer.username) {
+        return { allowed: false, status: 403, error: 'Không thể thao tác dữ liệu game của người chơi khác.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'SEND_LOBBY_CHAT': {
+      const msgUname = payload?.message?.username;
+      if (!isTeacher && msgUname && msgUname !== viewer.username) {
+        return { allowed: false, status: 403, error: 'Không thể gửi tin nhắn dưới danh nghĩa người khác.' };
+      }
+      return { allowed: true };
+    }
+
+    default:
+      return { allowed: false, status: 400, error: 'Yêu cầu đồng bộ không hợp lệ.' };
+  }
+}
+
+function applySyncAction(store, type, payload = {}, viewer = null) {
   let changed = false;
 
   switch (type) {
@@ -347,23 +948,26 @@ function applySyncAction(store, type, payload = {}) {
           store.teacherNotes = { ...payload.teacherNotes };
         }
         if (payload.users && typeof payload.users === 'object') {
-          store.users = { ...payload.users };
+          Object.entries(payload.users).forEach(([uname, u]) => {
+            if (!u || uname === SUPER_ADMIN_USERNAME) return;
+            const clean = { ...u };
+            if (clean.pass && !clean.passwordHash) {
+              clean.passwordHash = hashPassword(clean.pass);
+            }
+            delete clean.pass;
+            delete clean.isSuperAdmin;
+            delete clean.hiddenFromTeacher;
+            clean.tokenVersion = clean.tokenVersion || 1;
+            store.users[uname] = clean;
+          });
         }
         if (Array.isArray(payload.customVocabTopics)) {
           store.customVocabTopics = payload.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
         }
+        ensureProtectedAccounts(store);
         store.seeded = true;
         changed = true;
       } else {
-        // Merge only missing custom users or newly released tagged default tests
-        if (payload.users && typeof payload.users === 'object') {
-          Object.entries(payload.users).forEach(([uname, u]) => {
-            if (!store.users[uname] && !store.deletedUserIds.includes(uname)) {
-              store.users[uname] = u;
-              changed = true;
-            }
-          });
-        }
         if (Array.isArray(payload.customVocabTopics) && store.customVocabTopics.length === 0) {
           const validTopics = payload.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
           if (validTopics.length > 0) {
@@ -717,8 +1321,64 @@ function applySyncAction(store, type, payload = {}) {
     }
 
     case 'UPSERT_ATTEMPT': {
-      const attempt = payload.attempt;
+      let attempt = payload.attempt;
       if (!attempt?.id) break;
+      const isTeacher = viewer?.role === 'teacher';
+      if (!isTeacher && viewer) {
+        const testObj = (store.tests || []).find(t => t.id === attempt.testId);
+        const serverObjEval = evaluateObjectiveScoresForAttempt(testObj, attempt.answers || {});
+        const isSpeakingMode = attempt.testMode === 'single_skill' && attempt.focusSkill === 'speaking';
+        const validTicket = isSpeakingMode && attempt.aiGradingTicket
+          ? verifyToken(attempt.aiGradingTicket, store._authSecret)
+          : null;
+        const ticketOk = Boolean(
+          validTicket &&
+          validTicket.kind === 'speaking_eval' &&
+          validTicket.username === viewer.username &&
+          validTicket.testTitle === attempt.testTitle
+        );
+
+        let sanitizedScores = {
+          listening: attempt.scores?.listening || { raw: 0, total: 0, band: null },
+          reading: attempt.scores?.reading || { raw: 0, total: 0, band: null },
+          writing: { task1Band: null, task2Band: null, overallBand: null }
+        };
+        let finalOverallBand = null;
+        let finalTeacherGraded = false;
+        let finalAiGraded = false;
+        let finalFeedback = '';
+
+        if (serverObjEval) {
+          if (serverObjEval.scores.listening) sanitizedScores.listening = serverObjEval.scores.listening;
+          if (serverObjEval.scores.reading) sanitizedScores.reading = serverObjEval.scores.reading;
+          finalOverallBand = serverObjEval.overallBand;
+          finalTeacherGraded = serverObjEval.teacherGraded;
+        }
+
+        if (isSpeakingMode && ticketOk && typeof validTicket.band === 'number') {
+          sanitizedScores = {
+            ...sanitizedScores,
+            speaking: { band: validTicket.band, criteria: validTicket.criteria || {} }
+          };
+          finalOverallBand = validTicket.band;
+          finalTeacherGraded = true;
+          finalAiGraded = true;
+          finalFeedback = typeof validTicket.overallFeedback === 'string' ? validTicket.overallFeedback : '';
+        }
+
+        attempt = {
+          ...attempt,
+          studentId: viewer.username,
+          studentName: viewer.name || attempt.studentName,
+          scores: sanitizedScores,
+          overallBand: finalOverallBand,
+          teacherGraded: finalTeacherGraded,
+          aiGraded: finalAiGraded,
+          teacherFeedback: finalFeedback
+        };
+        delete attempt.aiGradingTicket;
+      }
+
       const idx = store.attempts.findIndex(a => a.id === attempt.id);
       if (idx >= 0) {
         store.attempts[idx] = attempt;
@@ -747,25 +1407,76 @@ function applySyncAction(store, type, payload = {}) {
       break;
     }
 
+    case 'RESET_USER_PASSWORD': {
+      const uname = String(payload.username || '').trim();
+      const nextPass = String(payload.password || '').trim();
+      const target = store.users?.[uname];
+      if (!uname || !target || !nextPass) break;
+      const updated = {
+        ...target,
+        passwordHash: hashPassword(nextPass),
+        tokenVersion: (target.tokenVersion || 1) + 1
+      };
+      delete updated.pass;
+      store.users[uname] = updated;
+      changed = true;
+      break;
+    }
+
     case 'UPSERT_USER': {
-      const uname = payload.username || payload.user?.username;
+      const uname = String(payload.username || payload.user?.username || '').trim();
       if (!uname || !payload.user) break;
-      store.deletedUserIds = store.deletedUserIds.filter(id => id !== uname);
-      store.users[uname] = payload.user;
+      const prevUser = store.users?.[uname];
+      const isTeacher = viewer?.role === 'teacher';
+      const isSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+
+      if (!isTeacher && prevUser) {
+        // Student may only update non-privilege profile fields on own account
+        const cleanSelf = {
+          ...prevUser,
+          name: typeof payload.user.name === 'string' && payload.user.name.trim() ? payload.user.name.trim() : prevUser.name,
+          avatarUrl: payload.user.avatarUrl ?? prevUser.avatarUrl,
+          targetBand: payload.user.targetBand ?? prevUser.targetBand,
+          studyGoal: payload.user.studyGoal ?? prevUser.studyGoal
+        };
+        store.users[uname] = cleanSelf;
+      } else {
+        const incoming = { ...payload.user, username: uname };
+        if (incoming.pass && String(incoming.pass).trim()) {
+          incoming.passwordHash = hashPassword(String(incoming.pass).trim());
+        } else if (prevUser?.passwordHash) {
+          incoming.passwordHash = prevUser.passwordHash;
+        }
+        delete incoming.pass;
+        incoming.tokenVersion = prevUser?.tokenVersion || 1;
+        if (uname === SUPER_ADMIN_USERNAME && isSuperAdmin) {
+          incoming.isSuperAdmin = true;
+          incoming.hiddenFromTeacher = true;
+          incoming.role = 'teacher';
+        } else {
+          delete incoming.isSuperAdmin;
+          delete incoming.hiddenFromTeacher;
+          incoming.role = incoming.role === 'teacher' ? 'teacher' : 'student';
+        }
+        store.deletedUserIds = store.deletedUserIds.filter(id => id !== uname);
+        store.users[uname] = incoming;
+      }
+
+      const savedUser = store.users[uname];
       // Propagate updated avatarUrl & display name into any active room lobbies / live races
       Object.entries(store.rooms).forEach(([_pin, r]) => {
         if (r?.lobbyPlayers?.[uname]) {
           r.lobbyPlayers[uname] = {
             ...r.lobbyPlayers[uname],
-            name: payload.user.name || r.lobbyPlayers[uname].name,
-            avatarUrl: payload.user.avatarUrl ?? r.lobbyPlayers[uname].avatarUrl
+            name: savedUser.name || r.lobbyPlayers[uname].name,
+            avatarUrl: savedUser.avatarUrl ?? r.lobbyPlayers[uname].avatarUrl
           };
         }
         if (r?.liveMatch?.[uname]) {
           r.liveMatch[uname] = {
             ...r.liveMatch[uname],
-            name: payload.user.name || r.liveMatch[uname].name,
-            avatarUrl: payload.user.avatarUrl ?? r.liveMatch[uname].avatarUrl
+            name: savedUser.name || r.liveMatch[uname].name,
+            avatarUrl: savedUser.avatarUrl ?? r.liveMatch[uname].avatarUrl
           };
         }
       });
@@ -775,7 +1486,7 @@ function applySyncAction(store, type, payload = {}) {
 
     case 'DELETE_USER': {
       const uname = payload.username;
-      if (!uname) break;
+      if (!uname || uname === SUPER_ADMIN_USERNAME || store.users?.[uname]?.isSuperAdmin) break;
       if (!store.deletedUserIds.includes(uname)) {
         store.deletedUserIds.push(uname);
       }
@@ -956,10 +1667,13 @@ async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMod
 }
 
 export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null) {
+  const sseClientUsers = new WeakMap();
   const broadcast = () => {
-    const dataStr = `event: sync\ndata: ${JSON.stringify(getSnapshot(store))}\n\n`;
     for (const res of sseClients) {
       try {
+        const uname = sseClientUsers.get(res);
+        const viewer = uname ? store.users?.[uname] || null : null;
+        const dataStr = `event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`;
         res.write(dataStr);
       } catch (_err) {
         sseClients.delete(res);
@@ -978,8 +1692,168 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
 
   middlewares.use('/api/sync', async (req, res, next) => {
     const reqUrl = (req.url || '/').split('?')[0];
+    const viewer = resolveSessionUser(req, store);
+
+    if (req.method === 'POST' && reqUrl === '/auth/login') {
+      try {
+        const body = await readJsonBody(req);
+        const username = String(body?.username || '').trim();
+        const password = String(body?.password || '').trim();
+        const ip = getClientIp(req);
+
+        if (!checkRateLimit(store._rateLimits, `login:${ip}:${username}`)) {
+          res.statusCode = 429;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Thử đăng nhập sai quá nhiều lần. Vui lòng đợi vài phút rồi thử lại.' }));
+          return;
+        }
+
+        const user = username ? store.users?.[username] : null;
+        if (!user || !verifyPassword(password, user)) {
+          res.statusCode = 401;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Sai tên đăng nhập hoặc mật khẩu!' }));
+          return;
+        }
+
+        const token = signToken(
+          {
+            username: user.username,
+            role: user.role,
+            isSuperAdmin: Boolean(user.isSuperAdmin),
+            tokenVersion: user.tokenVersion || 1,
+            exp: Date.now() + SESSION_TTL_MS
+          },
+          store._authSecret
+        );
+        res.setHeader('Set-Cookie', buildSessionCookieHeader(req, token, SESSION_TTL_MS / 1000));
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            ok: true,
+            user: sanitizeUserForViewer(user, user),
+            snapshot: getSnapshotForViewer(store, user)
+          })
+        );
+      } catch (err) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Đăng nhập thất bại.' }));
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/logout') {
+      res.setHeader('Set-Cookie', buildSessionCookieHeader(req, '', 0));
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl === '/auth/session') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify({
+          ok: true,
+          authenticated: Boolean(viewer),
+          user: viewer ? sanitizeUserForViewer(viewer, viewer) : null,
+          snapshot: getSnapshotForViewer(store, viewer)
+        })
+      );
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/game/join') {
+      if (!viewer) {
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để tham gia phòng đấu.' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const cleanPin = String(body?.pin || '').trim();
+        const cleanPass = String(body?.pass || '').trim();
+        const ip = getClientIp(req);
+        if (!checkRateLimit(store._rateLimits, `room:${ip}:${viewer.username}`, 25, 5 * 60 * 1000)) {
+          res.statusCode = 429;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Nhập sai mã/mật khẩu phòng quá nhiều lần. Vui lòng đợi lát nữa.' }));
+          return;
+        }
+        const targetRoom = cleanPin ? store.rooms?.[cleanPin] : null;
+        if (!targetRoom) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: `Không tìm thấy phòng "${cleanPin}". Hãy kiểm tra lại mã phòng.` }));
+          return;
+        }
+        const normRoom = normalizeServerRoom(targetRoom, cleanPin);
+        if (normRoom.status === 'ENDED') {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Phòng đấu này đã kết thúc. Vui lòng xin mã phòng mới.' }));
+          return;
+        }
+        if (viewer.role !== 'teacher' && normRoom.pass && String(normRoom.pass).trim() !== cleanPass) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Mật khẩu phòng không chính xác. Vui lòng thử lại.' }));
+          return;
+        }
+        const alreadyJoined = Boolean(normRoom.lobbyPlayers?.[viewer.username]);
+        if (normRoom.status === 'PLAYING' && !alreadyJoined && viewer.role !== 'teacher') {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Trận đấu đang diễn ra! Hãy bảo Giáo viên bấm Mở Sảnh Mới.' }));
+          return;
+        }
+
+        const pilot = body?.pilot || {};
+        const existingPlayer = normRoom.lobbyPlayers?.[viewer.username];
+        normRoom.lobbyPlayers[viewer.username] = {
+          ...(existingPlayer || {}),
+          username: viewer.username,
+          name: viewer.name || viewer.username,
+          role: viewer.role,
+          colorId: pilot.colorId || existingPlayer?.colorId || 'cyan',
+          animalId: pilot.animalId || existingPlayer?.animalId || 'cat',
+          accessoryId: pilot.accessoryId || existingPlayer?.accessoryId || 'crown',
+          avatarUrl: viewer.avatarUrl || '',
+          ready: viewer.role === 'teacher' ? true : Boolean(existingPlayer?.ready),
+          chat: existingPlayer?.chat || '',
+          chatAt: existingPlayer?.chatAt || 0,
+          joinedAt: existingPlayer?.joinedAt || Date.now()
+        };
+        store.rooms[cleanPin] = normRoom;
+        store.version += 1;
+        onChanged?.(store);
+        broadcast();
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: true, room: getSnapshotForViewer(store, viewer).rooms[cleanPin], snapshot: getSnapshotForViewer(store, viewer) }));
+      } catch (err) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Không thể vào phòng.' }));
+      }
+      return;
+    }
 
     if (req.method === 'POST' && reqUrl === '/audio') {
+      if (!viewer) {
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để tải file ghi âm.' }));
+        return;
+      }
       try {
         const body = await readJsonBody(req);
         if (!body?.dataBase64) {
@@ -988,7 +1862,29 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           res.end(JSON.stringify({ ok: false, error: 'Missing audio data' }));
           return;
         }
-        const meta = saveAudioRecord(store, body);
+        const rawMime = String(body.mimeType || '').split(';')[0].trim().toLowerCase();
+        if (rawMime && !ALLOWED_AUDIO_MIMES.has(rawMime)) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Định dạng audio không hợp lệ.' }));
+          return;
+        }
+        const cleanMime = cleanAudioMimeType(body.mimeType);
+        if (!ALLOWED_AUDIO_MIMES.has(cleanMime.split(';')[0])) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Định dạng audio không hợp lệ.' }));
+          return;
+        }
+        const rawB64 = String(body.dataBase64 || '').replace(/^data:[^;]+;base64,/, '');
+        const approxBytes = Math.ceil((rawB64.length * 3) / 4);
+        if (approxBytes > MAX_AUDIO_UPLOAD_BYTES) {
+          res.statusCode = 413;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'File ghi âm vượt quá giới hạn 15MB.' }));
+          return;
+        }
+        const meta = saveAudioRecord(store, { ...body, username: viewer.username });
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify({
@@ -1007,6 +1903,12 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'GET' && reqUrl.startsWith('/audio/')) {
+      if (!viewer) {
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để nghe audio.' }));
+        return;
+      }
       const rawId = decodeURIComponent(reqUrl.slice('/audio/'.length));
       const record = loadAudioRecord(store, rawId);
       if (!record) {
@@ -1015,11 +1917,19 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         res.end(JSON.stringify({ ok: false, error: 'Audio recording not found' }));
         return;
       }
+      if (viewer.role !== 'teacher' && record.meta?.username && record.meta.username !== viewer.username) {
+        res.statusCode = 403;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Bạn không có quyền truy cập bản ghi âm này.' }));
+        return;
+      }
       const totalLen = record.buffer.length;
-      const mime = record.meta?.mimeType || 'audio/webm';
+      const rawStoredMime = String(record.meta?.mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
+      const mime = ALLOWED_AUDIO_MIMES.has(rawStoredMime) ? rawStoredMime : 'audio/webm';
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Content-Type', mime);
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
 
       const rangeHeader = req.headers?.range;
       if (rangeHeader && /^bytes=\d*-\d*$/i.test(rangeHeader)) {
@@ -1040,12 +1950,19 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'POST' && reqUrl === '/grade-speaking') {
+      if (!viewer) {
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để sử dụng AI chấm Speaking.' }));
+        return;
+      }
       try {
         const body = await readJsonBody(req);
         const recordings = Array.isArray(body?.recordings) ? body.recordings : [];
         const testTitle = body?.testTitle || 'IELTS Speaking Test';
         const partMode = body?.partMode || 'full';
-        const effectiveKey = getEffectiveGeminiKey(store, body?.clientApiKey || '');
+        const clientOverrideKey = viewer.role === 'teacher' ? (body?.clientApiKey || '') : '';
+        const effectiveKey = getEffectiveGeminiKey(store, clientOverrideKey);
 
         let evaluation = null;
         let warning = '';
@@ -1073,9 +1990,22 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           if (warning) evaluation._fallbackReason = warning;
         }
 
+        const aiGradingTicket = signToken(
+          {
+            kind: 'speaking_eval',
+            username: viewer.username,
+            testTitle,
+            band: evaluation.overallBand,
+            criteria: evaluation.criteria || {},
+            overallFeedback: evaluation.overallFeedback || '',
+            exp: Date.now() + 30 * 60 * 1000
+          },
+          store._authSecret
+        );
+
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ ok: true, evaluation }));
+        res.end(JSON.stringify({ ok: true, evaluation: { ...evaluation, aiGradingTicket } }));
       } catch (err) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -1088,7 +2018,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
-      res.end(JSON.stringify(getSnapshot(store)));
+      res.end(JSON.stringify(getSnapshotForViewer(store, viewer)));
       return;
     }
 
@@ -1101,7 +2031,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       res.flushHeaders?.();
 
       sseClients.add(res);
-      res.write(`event: sync\ndata: ${JSON.stringify(getSnapshot(store))}\n\n`);
+      sseClientUsers.set(res, viewer?.username || null);
+      res.write(`event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`);
 
       const keepAlive = setInterval(() => {
         try {
@@ -1122,14 +2053,21 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     if (req.method === 'POST' && reqUrl === '/action') {
       try {
         const body = await readJsonBody(req);
-        const changed = applySyncAction(store, body.type, body.payload);
+        const authCheck = authorizeSyncAction(store, body.type, body.payload, viewer);
+        if (!authCheck.allowed) {
+          res.statusCode = authCheck.status || 403;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: authCheck.error || 'Không có quyền thực hiện.' }));
+          return;
+        }
+        const changed = applySyncAction(store, body.type, body.payload, viewer);
         if (changed) {
           onChanged?.(store);
           broadcast();
         }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ ok: true, snapshot: getSnapshot(store) }));
+        res.end(JSON.stringify({ ok: true, snapshot: getSnapshotForViewer(store, viewer) }));
       } catch (err) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');

@@ -79,6 +79,13 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
   );
 
   const server = http.createServer((req, res) => {
+    // Harden HTTP responses with standard defensive security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self)');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+
     const rawUrl = req.url || '/';
     const pathname = rawUrl.split('?')[0];
 

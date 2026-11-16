@@ -79,12 +79,18 @@ export default function StudentProfile({
 
   const isTargetTeacher = student.role === 'teacher';
   const isSelf = student.username === currentUser?.username;
-  const canEditTargetInfo = isTeacherViewer || isSelf;
+  const isViewerSuperAdmin = Boolean(currentUser?.isSuperAdmin);
+  const isTargetSuperAdmin = Boolean(student.isSuperAdmin || student.username === 'tuanpro123s');
+  const canEditTargetInfo = isSelf || (isTeacherViewer && (!isTargetSuperAdmin || isViewerSuperAdmin));
   const canInspectAttemptDetails = isTeacherViewer || isSelf;
   const canSeeTeacherNotes = isTeacherViewer || isSelf;
 
   const allMembers = Object.values(usersDb)
-    .filter(Boolean)
+    .filter(u => {
+      if (!u) return false;
+      if (isViewerSuperAdmin) return true;
+      return !u.isSuperAdmin && !u.hiddenFromTeacher && u.username !== 'tuanpro123s';
+    })
     .sort((a, b) => {
       if (a.role !== b.role) return a.role === 'teacher' ? -1 : 1;
       if (a.username === currentUser?.username) return -1;

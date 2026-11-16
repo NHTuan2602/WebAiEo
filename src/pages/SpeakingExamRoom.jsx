@@ -500,6 +500,7 @@ export default function SpeakingExamRoom({
         tabSwitchCount: 0,
         teacherGraded: true,
         aiGraded: true,
+        ...(evaluation?.aiGradingTicket ? { aiGradingTicket: evaluation.aiGradingTicket } : {}),
         scores: {
           listening: { raw: 0, total: 0, band: null },
           reading: { raw: 0, total: 0, band: null },

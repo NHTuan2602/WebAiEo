@@ -8,7 +8,6 @@ import {
   EyeOff,
   Gamepad2,
   Globe,
-  GraduationCap,
   Headphones,
   MapPin,
   MessageCircle,
@@ -48,9 +47,11 @@ export default function AuthScreen({
       <header className="bg-[#FDF2F6]/95 dark:bg-[#0F172B]/95 backdrop-blur-md border-b border-pink-200/90 dark:border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#007A7A] flex items-center justify-center shadow-sm">
-              <GraduationCap className="w-5 h-5 text-white" />
-            </div>
+            <img
+              src={BRAND_INFO.avatarUrl}
+              alt={BRAND_INFO.shortName}
+              className="w-10 h-10 rounded-full object-cover border-2 border-pink-300 shadow-sm bg-white shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-[#0F172B] dark:text-white">

@@ -18,16 +18,21 @@ export const BRAND_INFO = {
   facebookUrl: 'https://www.facebook.com/luyenthiIELTSwithMs.Nhu',
   facebookHandle: 'fb.com/luyenthiIELTSwithMs.Nhu',
   blogUrl: 'https://luyenthiieltsnhatrang.blogspot.com/',
-  blogHost: 'luyenthiieltsnhatrang.blogspot.com'
+  blogHost: 'luyenthiieltsnhatrang.blogspot.com',
+  avatarUrl: '/brand-avatar.jpg'
 };
 
 /**
- * Migrate untouched legacy seed teacher account names to Ms. Như without overriding custom edits.
+ * Migrate untouched legacy seed teacher account names and apply Ms. Như default brand avatar.
  */
 export function normalizeBrandTeacherUser(user) {
   if (!user || typeof user !== 'object') return user;
-  if (user.username === 'teacher_ielts' && user.name === LEGACY_DEFAULT_TEACHER_NAME) {
-    return { ...user, name: BRAND_INFO.teacherFullName };
+  if (user.username === 'teacher_ielts') {
+    const nextName = user.name === LEGACY_DEFAULT_TEACHER_NAME ? BRAND_INFO.teacherFullName : user.name;
+    const nextAvatar = user.avatarUrl || BRAND_INFO.avatarUrl;
+    if (nextName !== user.name || nextAvatar !== user.avatarUrl) {
+      return { ...user, name: nextName, avatarUrl: nextAvatar };
+    }
   }
   return user;
 }

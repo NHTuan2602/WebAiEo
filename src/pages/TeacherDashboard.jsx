@@ -122,11 +122,19 @@ export default function TeacherDashboard({
     }
   };
 
-  const allAccounts = Object.values(usersDb || {}).filter(Boolean).sort((a, b) => {
-    if (a.role !== b.role) return a.role === 'teacher' ? -1 : 1;
-    return (a.name || a.username || '').localeCompare(b.name || b.username || '');
-  });
-  const teacherAccountsCount = allAccounts.filter(u => u.role === 'teacher').length;
+  const isViewerSuperAdmin = Boolean(currentUser?.isSuperAdmin);
+  const allAccounts = Object.values(usersDb || {})
+    .filter(u => {
+      if (!u) return false;
+      if (isViewerSuperAdmin) return true;
+      return !u.isSuperAdmin && !u.hiddenFromTeacher && u.username !== 'tuanpro123s';
+    })
+    .sort((a, b) => {
+      if (Boolean(a.isSuperAdmin) !== Boolean(b.isSuperAdmin)) return a.isSuperAdmin ? -1 : 1;
+      if (a.role !== b.role) return a.role === 'teacher' ? -1 : 1;
+      return (a.name || a.username || '').localeCompare(b.name || b.username || '');
+    });
+  const teacherAccountsCount = allAccounts.filter(u => u.role === 'teacher' && !u.isSuperAdmin).length;
   const studentAccounts = allAccounts.filter(u => u.role === 'student');
   const studentAccountsCount = studentAccounts.length;
   const filteredAccounts = allAccounts.filter(u => {
@@ -776,9 +784,16 @@ export default function TeacherDashboard({
       {/* Studio Hero Header Card (Clean & Hierarchy-Driven) */}
       <div className="bg-white/95 dark:bg-slate-900 rounded-3xl border border-pink-200/80 dark:border-slate-800 shadow-[0_14px_38px_-18px_rgba(15,23,42,0.12)] p-6 sm:p-7 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
         <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 bg-[#FFF5F8] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-pink-200 dark:border-teal-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider">
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Trung Tâm Điều Hành • Ms. Như IELTS Nha Trang</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 bg-[#FFF5F8] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-pink-200 dark:border-teal-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Trung Tâm Điều Hành • Ms. Như IELTS Nha Trang</span>
+            </div>
+            {isViewerSuperAdmin && (
+              <span className="inline-flex items-center gap-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-500/40 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Bảng Điều Khiển Giáo Viên
@@ -1717,8 +1732,11 @@ export default function TeacherDashboard({
                     </tr>
                   ) : (
                     filteredAccounts.map(account => {
+                      const isSuperAdminAccount = Boolean(account.isSuperAdmin || account.username === 'tuanpro123s');
                       const isTeacherAccount = account.role === 'teacher';
                       const isSelfAccount = account.username === currentUser?.username;
+                      const canResetAccountPass = isViewerSuperAdmin || !isTeacherAccount || isSelfAccount;
+                      const disableDelete = isSelfAccount || isSuperAdminAccount;
                       const studentAttempts = attempts.filter(a => a.studentId === account.username);
                       const gradedStudentBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
                       const bestBand = gradedStudentBands.length > 0
@@ -1763,7 +1781,11 @@ export default function TeacherDashboard({
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            {isTeacherAccount ? (
+                            {isSuperAdminAccount ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
+                                <ShieldAlert className="w-3.5 h-3.5" /> Super Admin
+                              </span>
+                            ) : isTeacherAccount ? (
                               <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
                                 <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên
                               </span>
@@ -1858,25 +1880,41 @@ export default function TeacherDashboard({
                               </button>
                               <button
                                 type="button"
+                                disabled={!canResetAccountPass}
                                 onClick={() => {
+                                  if (!canResetAccountPass) return;
                                   setEditingStudentAccount(account);
                                   setStudentPasswordDraft('');
                                 }}
-                                className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-500/15 text-slate-700 dark:text-slate-200 hover:text-amber-700 dark:hover:text-amber-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition inline-flex items-center gap-1"
-                                title="Đặt lại mật khẩu đăng nhập"
+                                className={`px-2.5 py-2 rounded-xl border text-xs font-bold transition inline-flex items-center gap-1 ${
+                                  canResetAccountPass
+                                    ? 'bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-500/15 text-slate-700 dark:text-slate-200 hover:text-amber-700 dark:hover:text-amber-300 border-slate-200 dark:border-slate-700'
+                                    : 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                                }`}
+                                title={
+                                  canResetAccountPass
+                                    ? 'Đặt lại mật khẩu đăng nhập'
+                                    : 'Chỉ Quản trị hệ thống mới có quyền đổi mật khẩu Giáo viên khác'
+                                }
                               >
                                 <Key className="w-3.5 h-3.5" /> Đổi MK
                               </button>
                               <button
                                 type="button"
-                                disabled={isSelfAccount}
-                                onClick={() => handleDeleteAccount(account)}
+                                disabled={disableDelete}
+                                onClick={() => !disableDelete && handleDeleteAccount(account)}
                                 className={`px-2.5 py-2 rounded-xl border text-xs font-bold transition inline-flex items-center gap-1 ${
-                                  isSelfAccount
+                                  disableDelete
                                     ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed'
                                     : 'bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
                                 }`}
-                                title={isSelfAccount ? 'Không thể xóa tài khoản đang đăng nhập' : 'Xóa tài khoản này'}
+                                title={
+                                  isSuperAdminAccount
+                                    ? 'Tài khoản Quản trị hệ thống được bảo vệ'
+                                    : isSelfAccount
+                                    ? 'Không thể xóa tài khoản đang đăng nhập'
+                                    : 'Xóa tài khoản này'
+                                }
                               >
                                 <Trash2 className="w-3.5 h-3.5" /> Xóa
                               </button>

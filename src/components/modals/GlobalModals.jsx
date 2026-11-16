@@ -873,6 +873,11 @@ export default function GlobalModals({
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
             Tài khoản: <b className="text-slate-900 dark:text-white">{editingStudentAccount.name}</b> (<code className="font-mono">@{editingStudentAccount.username}</code>)
           </p>
+          {currentUser?.isSuperAdmin && (
+            <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-[11px] font-semibold text-amber-800 dark:text-amber-200">
+              Quyền Quản Trị Hệ Thống: Có thể đặt lại mật khẩu mới cho mọi Giáo viên &amp; Học viên (tự động đăng xuất phiên cũ).
+            </div>
+          )}
           <div className="mb-4">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mật khẩu mới</label>
             <input

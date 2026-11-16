@@ -575,6 +575,7 @@ export default function StudentHome({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {Object.entries(usersDb || {})
+                  .filter(([uname, u]) => u && !u.isSuperAdmin && !u.hiddenFromTeacher && uname !== 'tuanpro123s')
                   .sort(([uA, a], [uB, b]) => {
                     if (a?.role === 'teacher' && b?.role !== 'teacher') return -1;
                     if (a?.role !== 'teacher' && b?.role === 'teacher') return 1;

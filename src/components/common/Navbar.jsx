@@ -2,7 +2,6 @@ import {
   BookOpen,
   Camera,
   Gamepad2,
-  GraduationCap,
   Key,
   LogOut,
   Mic,
@@ -52,9 +51,11 @@ export default function Navbar({
           className="flex items-center gap-2.5 cursor-pointer group shrink-0"
           onClick={() => setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME')}
         >
-          <div className="w-9 h-9 rounded-xl bg-[#007A7A] group-hover:bg-[#065B5B] flex items-center justify-center shadow-sm group-hover:scale-105 transition-all shrink-0">
-            <GraduationCap className="w-5 h-5 text-white" />
-          </div>
+          <img
+            src={BRAND_INFO.avatarUrl}
+            alt={BRAND_INFO.shortName}
+            className="w-10 h-10 rounded-full object-cover border-2 border-pink-300 shadow-sm group-hover:scale-105 transition-all shrink-0 bg-white"
+          />
           <div className="min-w-0">
             <span className="block font-extrabold text-sm sm:text-base tracking-tight text-[#0F172B] dark:text-white whitespace-nowrap leading-tight">
               {BRAND_INFO.shortName}

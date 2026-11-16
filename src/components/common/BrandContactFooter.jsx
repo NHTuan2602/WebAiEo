@@ -1,4 +1,4 @@
-import { ExternalLink, Globe, GraduationCap, MapPin, MessageCircle, Phone } from 'lucide-react';
+import { ExternalLink, Globe, MapPin, MessageCircle, Phone } from 'lucide-react';
 import { BRAND_INFO } from '../../constants/brandInfo';
 
 /**
@@ -16,9 +16,11 @@ export default function BrandContactFooter({ variant = 'full' }) {
         {/* Column 1: Brand Identity */}
         <div className="space-y-2.5">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-[#007A7A] text-white flex items-center justify-center shrink-0 shadow-sm">
-              <GraduationCap className="w-5 h-5" />
-            </span>
+            <img
+              src={BRAND_INFO.avatarUrl}
+              alt={BRAND_INFO.siteName}
+              className="w-12 h-12 rounded-full object-cover border-2 border-pink-300/90 bg-white shadow-sm shrink-0"
+            />
             <div>
               <p className="font-extrabold text-base sm:text-lg text-white leading-tight">{BRAND_INFO.siteName}</p>
               <p className="text-xs sm:text-sm font-semibold text-[#1EE1D6]">{BRAND_INFO.englishSubName}</p>

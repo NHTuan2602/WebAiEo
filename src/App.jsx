@@ -536,30 +536,47 @@ export default function App() {
   const handleResetStudentPassword = (e) => {
     if (e) e.preventDefault();
     if (currentUser?.role !== 'teacher' || !editingStudentAccount) return;
+    const uname = editingStudentAccount.username;
+    const baseUser = usersDb[uname] || editingStudentAccount;
+    const isActorSuperAdmin = Boolean(currentUser?.isSuperAdmin);
+    if ((baseUser.isSuperAdmin || uname === 'tuanpro123s') && !isActorSuperAdmin) {
+      showToast('Không có quyền thao tác trên tài khoản Quản trị hệ thống!', 'error');
+      return;
+    }
+    if (baseUser.role === 'teacher' && uname !== currentUser.username && !isActorSuperAdmin) {
+      showToast('Chỉ Quản trị hệ thống mới có quyền đổi mật khẩu tài khoản Giáo viên khác!', 'error');
+      return;
+    }
     const nextPass = (studentPasswordDraft || '').trim();
     if (!nextPass) {
       showToast('Mật khẩu mới không được để trống!', 'error');
       return;
     }
-    const uname = editingStudentAccount.username;
-    const baseUser = usersDb[uname] || editingStudentAccount;
-    const updatedUser = { ...baseUser, pass: nextPass };
-    setUsersDb(prev => ({ ...prev, [uname]: updatedUser }));
-    dispatchSyncAction('UPSERT_USER', { username: uname, user: updatedUser });
+    if (!serverSyncConnected) {
+      const updatedOffline = { ...baseUser, pass: nextPass };
+      setUsersDb(prev => ({ ...prev, [uname]: updatedOffline }));
+    }
+    dispatchSyncAction('RESET_USER_PASSWORD', { username: uname, password: nextPass });
     setEditingStudentAccount(null);
     setStudentPasswordDraft('');
-    showToast(`Đã đặt lại mật khẩu mới cho tài khoản ${updatedUser.name}!`);
+    showToast(`Đã đặt lại mật khẩu mới cho tài khoản ${baseUser.name || uname}!`);
   };
 
   // Teacher Action: Delete Managed Account
   const handleDeleteAccount = (userObj) => {
     if (currentUser?.role !== 'teacher' || !userObj?.username) return;
     const uname = userObj.username;
+    if (userObj.isSuperAdmin || uname === 'tuanpro123s') {
+      showToast('Không thể xóa tài khoản Quản trị hệ thống!', 'error');
+      return;
+    }
     if (uname === currentUser.username) {
       showToast('Không thể tự xóa tài khoản đang đăng nhập!', 'error');
       return;
     }
-    const teacherCount = Object.values(usersDb).filter(u => u?.role === 'teacher').length;
+    const teacherCount = Object.values(usersDb).filter(
+      u => u?.role === 'teacher' && !u?.isSuperAdmin && u?.username !== 'tuanpro123s'
+    ).length;
     if (userObj.role === 'teacher' && teacherCount <= 1) {
       showToast('Cần giữ lại ít nhất 1 tài khoản Giáo viên trong hệ thống!', 'error');
       return;
@@ -665,6 +682,9 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('ielts_theme', darkMode ? 'dark' : 'light');
+    if (gameRuntimeRef.current) {
+      gameRuntimeRef.current.darkMode = darkMode;
+    }
   }, [darkMode]);
 
   // Exam Builder State (restores draft across accidental reload)
@@ -789,6 +809,11 @@ export default function App() {
     roomsDbRef.current = roomsDb;
   }, [roomsDb]);
 
+  const serverSyncConnectedRef = useRef(false);
+  const bootSessionCheckedRef = useRef(false);
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
   const gameRuntimeRef = useRef({
     round: 1,
     score: 0,
@@ -801,6 +826,7 @@ export default function App() {
     queues: { 1: [], 2: [], 3: [] },
     isSandbox: false,
     paused: false,
+    darkMode: typeof localStorage !== 'undefined' && localStorage.getItem('ielts_theme') === 'dark',
     crewColorId: 'cyan',
     animalId: 'cat',
     accessoryId: 'crown',
@@ -870,6 +896,19 @@ export default function App() {
   const applyRemoteSnapshotData = useRef(null);
   applyRemoteSnapshotData.current = (snap) => {
     if (!snap || typeof snap !== 'object') return;
+    if (snap.authenticated === false) {
+      if (typeof snap.aiConfigured === 'boolean') {
+        setAiConfigured(snap.aiConfigured);
+      }
+      if (bootSessionCheckedRef.current && currentUserRef.current) {
+        setCurrentUser(null);
+        setJoinedRoomPin(null);
+        setGameSubState('JOIN');
+        setView('AUTH');
+        showToast('Phiên đăng nhập đã hết hạn hoặc mật khẩu vừa được thay đổi. Vui lòng đăng nhập lại.', 'info');
+      }
+      return;
+    }
     if (typeof snap.version === 'number') {
       if (snap.version < lastSyncVersionRef.current) return;
       lastSyncVersionRef.current = snap.version;
@@ -877,7 +916,7 @@ export default function App() {
     if (typeof snap.aiConfigured === 'boolean') {
       setAiConfigured(snap.aiConfigured);
     }
-    if (snap.rooms && typeof snap.rooms === 'object' && Object.keys(snap.rooms).length > 0) {
+    if (snap.rooms && typeof snap.rooms === 'object' && (Object.keys(snap.rooms).length > 0 || snap.seeded)) {
       const normalized = {};
       Object.entries(snap.rooms).forEach(([k, v]) => {
         normalized[k] = normalizeRoomObject(v, k);
@@ -885,28 +924,28 @@ export default function App() {
       skipNextRoomBroadcastRef.current = true;
       setRoomsDb(prev => (JSON.stringify(prev) === JSON.stringify(normalized) ? prev : normalized));
     }
-    if (Array.isArray(snap.tests) && snap.tests.length > 0) {
+    if (Array.isArray(snap.tests) && (snap.tests.length > 0 || snap.seeded)) {
       skipNextTestsBroadcastRef.current = true;
       setTests(prev => (JSON.stringify(prev) === JSON.stringify(snap.tests) ? prev : snap.tests));
     }
-    if (Array.isArray(snap.attempts) && snap.attempts.length > 0) {
+    if (Array.isArray(snap.attempts) && (snap.attempts.length > 0 || snap.seeded)) {
       skipNextAttemptsBroadcastRef.current = true;
       setAttempts(prev => (JSON.stringify(prev) === JSON.stringify(snap.attempts) ? prev : snap.attempts));
     }
-    if (snap.teacherNotes && typeof snap.teacherNotes === 'object' && Object.keys(snap.teacherNotes).length > 0) {
+    if (snap.teacherNotes && typeof snap.teacherNotes === 'object' && (Object.keys(snap.teacherNotes).length > 0 || snap.seeded)) {
       setTeacherNotes(prev => (JSON.stringify(prev) === JSON.stringify(snap.teacherNotes) ? prev : snap.teacherNotes));
     }
-    if (snap.users && typeof snap.users === 'object' && Object.keys(snap.users).length > 0) {
+    if (snap.users && typeof snap.users === 'object' && (Object.keys(snap.users).length > 0 || snap.seeded)) {
       const deletedSet = new Set(Array.isArray(snap.deletedUserIds) ? snap.deletedUserIds : []);
       skipNextUsersBroadcastRef.current = true;
       setUsersDb(prev => {
-        const merged = {};
-        Object.entries({ ...prev, ...snap.users }).forEach(([uname, u]) => {
+        const cleanUsers = {};
+        Object.entries(snap.users).forEach(([uname, u]) => {
           if (!deletedSet.has(uname) && u) {
-            merged[uname] = normalizeBrandTeacherUser(u);
+            cleanUsers[uname] = normalizeBrandTeacherUser(u);
           }
         });
-        return JSON.stringify(prev) === JSON.stringify(merged) ? prev : merged;
+        return JSON.stringify(prev) === JSON.stringify(cleanUsers) ? prev : cleanUsers;
       });
       setCurrentUser(prev => {
         if (!prev || !snap.users[prev.username]) return prev;
@@ -926,12 +965,14 @@ export default function App() {
       const res = await fetch('/api/sync/state', { cache: 'no-store' });
       if (!res.ok) return null;
       const snap = await res.json();
+      serverSyncConnectedRef.current = true;
       setServerSyncConnected(true);
-      if (forceApply || (typeof snap?.version === 'number' && snap.version > lastSyncVersionRef.current)) {
+      if (forceApply || (typeof snap?.version === 'number' && snap.version > lastSyncVersionRef.current) || snap?.authenticated === false) {
         applyRemoteSnapshotData.current?.(snap);
       }
       return snap;
     } catch (_err) {
+      serverSyncConnectedRef.current = false;
       setServerSyncConnected(false);
       return null;
     }
@@ -944,14 +985,27 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, payload })
       });
-      if (!res.ok) return null;
-      const data = await res.json();
+      serverSyncConnectedRef.current = true;
       setServerSyncConnected(true);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData?.error || `Thao tác bị từ chối (${res.status}).`;
+        if (res.status === 401) {
+          setCurrentUser(null);
+          setJoinedRoomPin(null);
+          setGameSubState('JOIN');
+          setView('AUTH');
+        }
+        showToast(errMsg, 'error');
+        return null;
+      }
+      const data = await res.json();
       if (data?.snapshot) {
         applyRemoteSnapshotData.current?.(data.snapshot);
       }
       return data?.snapshot || null;
     } catch (_err) {
+      serverSyncConnectedRef.current = false;
       setServerSyncConnected(false);
       return null;
     }
@@ -1009,10 +1063,22 @@ export default function App() {
     let evtSource = null;
 
     const initServerSync = async () => {
-      const snap = await pullServerSyncState(true);
+      let sessionData = null;
+      try {
+        const res = await fetch('/api/sync/auth/session', { cache: 'no-store' });
+        if (res.ok) {
+          sessionData = await res.json();
+          serverSyncConnectedRef.current = true;
+          setServerSyncConnected(true);
+        }
+      } catch (_err) {
+        serverSyncConnectedRef.current = false;
+        setServerSyncConnected(false);
+      }
       if (cancelled) return;
-      if (snap) {
-        if (!snap.seeded) {
+
+      if (sessionData) {
+        if (!sessionData.snapshot?.seeded) {
           await dispatchSyncAction('SEED_DEFAULTS', {
             rooms: roomsDb,
             tests,
@@ -1021,16 +1087,45 @@ export default function App() {
             users: usersDb,
             customVocabTopics
           });
+          if (cancelled) return;
+          try {
+            const refreshed = await fetch('/api/sync/auth/session', { cache: 'no-store' });
+            if (refreshed.ok) {
+              sessionData = await refreshed.json();
+            }
+          } catch (_err) {}
+          if (cancelled) return;
+        }
+
+        if (sessionData.authenticated && sessionData.user) {
+          const cleanUser = normalizeBrandTeacherUser(sessionData.user);
+          setCurrentUser(cleanUser);
+          currentUserRef.current = cleanUser;
+          if (sessionData.snapshot) {
+            applyRemoteSnapshotData.current?.(sessionData.snapshot);
+          }
+          if (cleanUser.role === 'teacher') {
+            await dispatchSyncAction('SEED_DEFAULTS', {
+              customVocabTopics,
+              defaultTests: DEFAULT_TESTS.filter(d => Boolean(d.seedTag))
+            });
+            if ((aiApiKey || '').trim() && !sessionData.snapshot?.aiConfigured) {
+              await dispatchSyncAction('SET_AI_CONFIG', { geminiApiKey: aiApiKey.trim() });
+            }
+          }
         } else {
-          await dispatchSyncAction('SEED_DEFAULTS', {
-            users: usersDb,
-            customVocabTopics,
-            defaultTests: DEFAULT_TESTS.filter(d => Boolean(d.seedTag))
-          });
+          if (sessionData.snapshot) {
+            applyRemoteSnapshotData.current?.(sessionData.snapshot);
+          }
+          if (currentUserRef.current) {
+            setCurrentUser(null);
+            currentUserRef.current = null;
+            setJoinedRoomPin(null);
+            setGameSubState('JOIN');
+            setView('AUTH');
+          }
         }
-        if (currentUser?.role === 'teacher' && (aiApiKey || '').trim() && !snap.aiConfigured) {
-          await dispatchSyncAction('SET_AI_CONFIG', { geminiApiKey: aiApiKey.trim() });
-        }
+        bootSessionCheckedRef.current = true;
       }
 
       if (cancelled || typeof EventSource === 'undefined') return;
@@ -1038,11 +1133,13 @@ export default function App() {
       evtSource.addEventListener('sync', (e) => {
         try {
           const parsed = JSON.parse(e.data);
+          serverSyncConnectedRef.current = true;
           setServerSyncConnected(true);
           applyRemoteSnapshotData.current?.(parsed);
         } catch (_err) {}
       });
       evtSource.onerror = () => {
+        serverSyncConnectedRef.current = false;
         setServerSyncConnected(false);
       };
     };
@@ -1513,11 +1610,49 @@ export default function App() {
       return;
     }
 
-    // Pull latest server state right before validating so newly created rooms on another browser match immediately
-    const latestSnap = await pullServerSyncState(true);
-    const liveRooms = latestSnap?.rooms && Object.keys(latestSnap.rooms).length > 0 ? latestSnap.rooms : roomsDb;
-    const targetRoom = liveRooms[cleanPin] ? normalizeRoomObject(liveRooms[cleanPin], cleanPin) : null;
+    const pilotPrefs = {
+      colorId: myCrewColor,
+      animalId: myAnimalId,
+      accessoryId: myAccessoryId
+    };
 
+    try {
+      const res = await fetch('/api/sync/game/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: cleanPin, pass: cleanPass, pilot: pilotPrefs })
+      });
+      serverSyncConnectedRef.current = true;
+      setServerSyncConnected(true);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) {
+          setCurrentUser(null);
+          setView('AUTH');
+        }
+        setRoomJoinError(data?.error || 'Không thể tham gia phòng đấu lúc này.');
+        return;
+      }
+      if (data?.snapshot) {
+        applyRemoteSnapshotData.current?.(data.snapshot);
+      }
+      const joinedRoom = data?.room ? normalizeRoomObject(data.room, cleanPin) : null;
+      setRoomJoinError('');
+      setJoinedRoomPin(cleanPin);
+      lastLaunchedAtRef.current = joinedRoom?.startedAt || null;
+      justJoinedLobbyAtRef.current = Date.now();
+      setLobbyChatInput('');
+      setGameSubState('LOBBY');
+      gameRuntimeRef.current.subState = 'LOBBY';
+      setView('GAME_ARENA');
+      return;
+    } catch (_offlineErr) {
+      serverSyncConnectedRef.current = false;
+      setServerSyncConnected(false);
+    }
+
+    // Offline fallback only when backend relay is unreachable
+    const targetRoom = roomsDb[cleanPin] ? normalizeRoomObject(roomsDb[cleanPin], cleanPin) : null;
     if (!targetRoom) {
       setRoomJoinError(`Không tìm thấy phòng "${cleanPin}". Hãy kiểm tra lại mã phòng.`);
       return;
@@ -1526,7 +1661,7 @@ export default function App() {
       setRoomJoinError('Phòng đấu này đã kết thúc. Vui lòng xin mã phòng mới.');
       return;
     }
-    if ((targetRoom.pass || '').trim() !== cleanPass) {
+    if (targetRoom.pass && (targetRoom.pass || '').trim() !== cleanPass) {
       setRoomJoinError('Mật khẩu phòng không chính xác. Vui lòng thử lại.');
       return;
     }
@@ -1560,8 +1695,6 @@ export default function App() {
     setGameSubState('LOBBY');
     gameRuntimeRef.current.subState = 'LOBBY';
     setView('GAME_ARENA');
-
-    await dispatchSyncAction('JOIN_LOBBY', { pin: cleanPin, player: studentEntry });
   };
 
   const handleTeacherOpenLobby = (pin = currentRoomPin) => {
@@ -2066,7 +2199,7 @@ export default function App() {
   // ==========================================
   // AUTHENTICATION HANDLERS
   // ==========================================
-  const handleAuthSubmit = (e) => {
+  const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
 
@@ -2078,27 +2211,62 @@ export default function App() {
       return;
     }
 
-    // Login only: tài khoản do Giáo viên tạo và cấp
-    const user = usersDb[uname];
-    if (!user || user.pass !== pass) {
-      setAuthError('Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
-      return;
+    let serverResponded = false;
+    let loggedInUser = null;
+    try {
+      const res = await fetch('/api/sync/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: uname, password: pass })
+      });
+      serverResponded = true;
+      serverSyncConnectedRef.current = true;
+      setServerSyncConnected(true);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.user) {
+        setAuthError(data?.error || 'Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
+        return;
+      }
+      bootSessionCheckedRef.current = true;
+      loggedInUser = normalizeBrandTeacherUser(data.user);
+      if (data.snapshot) {
+        applyRemoteSnapshotData.current?.(data.snapshot);
+      }
+    } catch (_offlineErr) {
+      serverSyncConnectedRef.current = false;
+      setServerSyncConnected(false);
     }
+
+    if (!serverResponded) {
+      const localUser = usersDb[uname];
+      if (!localUser || localUser.pass !== pass) {
+        setAuthError('Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
+        return;
+      }
+      loggedInUser = normalizeBrandTeacherUser(localUser);
+    }
+
     clearNavSession();
     setSelectedTestId(null);
     setSelectedAttemptId(null);
     setSelectedProfileStudent(null);
-    setCurrentUser(user);
-    if (user.role === 'teacher') {
+    currentUserRef.current = loggedInUser;
+    setCurrentUser(loggedInUser);
+    if (loggedInUser.role === 'teacher') {
       setView('TEACHER_DASHBOARD');
-      showToast(`Xin chào Giáo viên ${user.name}! Đã chuyển sang Trung tâm Quản trị.`);
+      showToast(
+        loggedInUser.isSuperAdmin
+          ? `Xin chào Quản Trị Hệ Thống (${loggedInUser.name || loggedInUser.username})!`
+          : `Xin chào Giáo viên ${loggedInUser.name}! Đã chuyển sang Trung tâm Quản trị.`
+      );
     } else {
       setView('HOME');
-      showToast(`Chào mừng trở lại, ${user.name}!`);
+      showToast(`Chào mừng trở lại, ${loggedInUser.name}!`);
     }
   };
 
   const handleLogout = () => {
+    fetch('/api/sync/auth/logout', { method: 'POST' }).catch(() => {});
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
     clearInterval(lobbyCountdownTimerRef.current);
@@ -2117,6 +2285,7 @@ export default function App() {
     setSelectedProfileStudent(null);
     setJoinedRoomPin(null);
     setGameSubState('JOIN');
+    currentUserRef.current = null;
     setCurrentUser(null);
     setView('AUTH');
     setAuthForm({ username: '', password: '', fullName: '' });
@@ -4058,6 +4227,7 @@ export default function App() {
       ctx.clearRect(0, 0, width, height);
 
       const rt = gameRuntimeRef.current;
+      const isDark = rt.darkMode !== false;
       const isFrozen = Date.now() < freezeUntilRef.current;
 
       // Keyboard ship steering for Round 1
@@ -4070,9 +4240,8 @@ export default function App() {
         }
       }
 
-      // Starfield
-      ctx.fillStyle = '#ffffff';
-      stars.forEach(s => {
+      // Starfield / Pastel Daytime Sky Sparkles
+      stars.forEach((s, idx) => {
         if (!rt.paused) {
           s.y += s.speed * (isFrozen ? 0.35 : 1);
           if (s.y > height) {
@@ -4080,9 +4249,15 @@ export default function App() {
             s.x = Math.random() * width;
           }
         }
-        ctx.globalAlpha = 0.5;
+        if (isDark) {
+          ctx.fillStyle = '#ffffff';
+          ctx.globalAlpha = 0.5;
+        } else {
+          ctx.fillStyle = idx % 3 === 0 ? '#007a7a' : idx % 2 === 0 ? '#f472b6' : '#38bdf8';
+          ctx.globalAlpha = 0.28;
+        }
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, isDark ? s.size : s.size * 1.15, 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.globalAlpha = 1;
@@ -4094,7 +4269,7 @@ export default function App() {
       if (rt.subState === 'PLAYING' && timeRemainingFloatRef.current <= 6) {
         const dangerY = height - 82;
         ctx.save();
-        ctx.strokeStyle = 'rgba(244, 63, 94, 0.45)';
+        ctx.strokeStyle = isDark ? 'rgba(244, 63, 94, 0.45)' : 'rgba(225, 29, 72, 0.65)';
         ctx.setLineDash([8, 8]);
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -4105,7 +4280,7 @@ export default function App() {
       }
 
       // Bullets & Hit detection (Round 1)
-      ctx.fillStyle = '#00f2fe';
+      ctx.fillStyle = isDark ? '#00f2fe' : '#007a7a';
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         if (!rt.paused) b.y -= b.speed;
@@ -4238,6 +4413,11 @@ export default function App() {
           ctx.beginPath();
           ctx.arc(0, 0, 18, 0, Math.PI * 2);
           ctx.fill();
+          if (!isDark) {
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
 
           // Comb & Beak
           ctx.fillStyle = '#ef4444';
@@ -4255,15 +4435,15 @@ export default function App() {
           // Word card
           ctx.font = 'bold 12px "JetBrains Mono", monospace';
           const textW = Math.max(82, ctx.measureText(c.word).width + 16);
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-          ctx.strokeStyle = '#00f2fe';
+          ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.96)';
+          ctx.strokeStyle = isDark ? '#00f2fe' : '#007a7a';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.roundRect(-textW / 2, 18, textW, 24, 6);
           ctx.fill();
           ctx.stroke();
 
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = isDark ? '#ffffff' : '#0f172b';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(c.word, 0, 30);
@@ -4346,9 +4526,9 @@ export default function App() {
         const barW = 96;
         const barH = 6;
         const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limit));
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(203, 213, 225, 0.95)';
         ctx.fillRect(-barW / 2, -52, barW, barH);
-        ctx.fillStyle = remainRatio > 0.4 ? '#22d3ee' : remainRatio > 0.2 ? '#f59e0b' : '#f43f5e';
+        ctx.fillStyle = remainRatio > 0.4 ? (isDark ? '#22d3ee' : '#007a7a') : remainRatio > 0.2 ? '#f59e0b' : '#f43f5e';
         ctx.fillRect(-barW / 2, -52, barW * remainRatio, barH);
 
         // Masked target label below Boss
@@ -4362,15 +4542,15 @@ export default function App() {
         const label = masked.trim();
         ctx.font = 'bold 13px "JetBrains Mono", monospace';
         const lblW = Math.max(100, ctx.measureText(label).width + 20);
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-        ctx.strokeStyle = rt.round === 3 ? '#ec4899' : '#f59e0b';
+        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.96)';
+        ctx.strokeStyle = rt.round === 3 ? '#ec4899' : '#d97706';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.roundRect(-lblW / 2, 36, lblW, 24, 6);
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = isDark ? '#ffffff' : '#0f172b';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(label, 0, 48);
@@ -4558,6 +4738,7 @@ export default function App() {
           copiedRoomPin={copiedRoomPin}
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
+          darkMode={darkMode}
           freezeCharges={freezeCharges}
           gameCombo={gameCombo}
           gameLives={gameLives}
@@ -4617,6 +4798,7 @@ export default function App() {
           serverSyncConnected={serverSyncConnected}
           setCopiedRoomPin={setCopiedRoomPin}
           setCustomVocabInput={setCustomVocabInput}
+          setDarkMode={setDarkMode}
           setGameSubState={setGameSubState}
           setHostRoomDraft={setHostRoomDraft}
           setLobbyChatInput={setLobbyChatInput}
