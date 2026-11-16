@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import {
+  AlertCircle,
   ArrowRight,
   BookOpen,
   Check,
+  CheckCircle2,
   ChevronDown,
+  ClipboardList,
   Clock,
   Copy,
   Crown,
@@ -24,6 +27,7 @@ import {
   Plus,
   RefreshCw,
   Rocket,
+  Search,
   Share2,
   ShieldAlert,
   ShieldCheck,
@@ -102,6 +106,10 @@ export default function TeacherDashboard({
 }) {
   const [accountRoleFilter, setAccountRoleFilter] = useState('all');
   const [exerciseSkillFilter, setExerciseSkillFilter] = useState('all');
+  const [onlyIncompleteFilter, setOnlyIncompleteFilter] = useState(false);
+  const [completionModalTestId, setCompletionModalTestId] = useState(null);
+  const [completionFilter, setCompletionFilter] = useState('missing');
+  const [completionSearch, setCompletionSearch] = useState('');
   const [renamingTestId, setRenamingTestId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
 
@@ -113,11 +121,94 @@ export default function TeacherDashboard({
     }
   };
 
+  const allAccounts = Object.values(usersDb || {}).filter(Boolean).sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'teacher' ? -1 : 1;
+    return (a.name || a.username || '').localeCompare(b.name || b.username || '');
+  });
+  const teacherAccountsCount = allAccounts.filter(u => u.role === 'teacher').length;
+  const studentAccounts = allAccounts.filter(u => u.role === 'student');
+  const studentAccountsCount = studentAccounts.length;
+  const filteredAccounts = allAccounts.filter(u => {
+    if (accountRoleFilter !== 'all' && u.role !== accountRoleFilter) return false;
+    const q = studentSearchQuery.toLowerCase();
+    return (u.name || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q);
+  });
+
+  const getTestCompletionStats = (testId) => {
+    const testAttempts = (attempts || []).filter(a => a.testId === testId);
+    const byStudent = new Map();
+    for (const att of testAttempts) {
+      const keys = [att.studentId, att.studentUsername].filter(Boolean);
+      for (const k of keys) {
+        if (!byStudent.has(k)) byStudent.set(k, []);
+        byStudent.get(k).push(att);
+      }
+    }
+    const doneList = [];
+    const missingList = [];
+    for (const stu of studentAccounts) {
+      const stuAttempts = byStudent.get(stu.username) || [];
+      const uniqueMap = new Map();
+      stuAttempts.forEach(a => uniqueMap.set(a.id, a));
+      const list = Array.from(uniqueMap.values());
+      if (list.length > 0) {
+        const latestAttempt = list[0];
+        const numericBands = list
+          .map(a => a.overallBand ?? a.scores?.speaking?.band)
+          .filter(b => typeof b === 'number' && !Number.isNaN(b));
+        const bestBand = numericBands.length > 0 ? Math.max(...numericBands) : null;
+        doneList.push({
+          account: stu,
+          attemptCount: list.length,
+          latestAttempt,
+          bestBand,
+          hasPendingGrade: list.some(a => !a.teacherGraded)
+        });
+      } else {
+        missingList.push({ account: stu });
+      }
+    }
+    return {
+      totalStudents: studentAccounts.length,
+      doneList,
+      missingList,
+      totalSubmissions: testAttempts.length
+    };
+  };
+
+  const handleOpenCompletionModal = (testId) => {
+    const stats = getTestCompletionStats(testId);
+    setCompletionFilter(stats.missingList.length > 0 ? 'missing' : 'all');
+    setCompletionSearch('');
+    setCompletionModalTestId(testId);
+  };
+
+  const handleCopyMissingList = (item, missingList) => {
+    if (!missingList.length) {
+      showToast?.('Tất cả học sinh trong lớp đã hoàn thành bài này!', 'info');
+      return;
+    }
+    const lines = missingList.map((m, idx) => `${idx + 1}. ${m.account.name || m.account.username} (@${m.account.username})`);
+    const text = `Danh sách học sinh CHƯA LÀM "${item.title}" (${missingList.length} bạn):\n${lines.join('\n')}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => showToast?.(`Đã sao chép danh sách ${missingList.length} học sinh chưa làm!`, 'success'),
+        () => showToast?.('Không thể truy cập clipboard trình duyệt.', 'error')
+      );
+    }
+  };
+
   const fullExamTests = (tests || []).filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
   const skillExercises = (tests || []).filter(t => normalizeExamConfig(t).testMode === 'single_skill');
-  const filteredSkillExercises = exerciseSkillFilter === 'all'
+  const filteredFullExamTests = onlyIncompleteFilter
+    ? fullExamTests.filter(t => getTestCompletionStats(t.id).missingList.length > 0)
+    : fullExamTests;
+  const skillFilteredList = exerciseSkillFilter === 'all'
     ? skillExercises
     : skillExercises.filter(t => normalizeExamConfig(t).focusSkill === exerciseSkillFilter);
+  const filteredSkillExercises = onlyIncompleteFilter
+    ? skillFilteredList.filter(t => getTestCompletionStats(t.id).missingList.length > 0)
+    : skillFilteredList;
 
   const SKILL_EXERCISE_BUTTONS = [
     { id: 'speaking', label: '+ Bài Tập Speaking AI', shortLabel: 'Speaking AI', icon: Mic, cls: 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30 hover:bg-[#570DF8] hover:text-white' },
@@ -132,6 +223,10 @@ export default function TeacherDashboard({
     const isPrivate = cfg.visibility === 'private';
     const isExpanded = expandedTeacherTestId === t.id;
     const entityLabel = isExercise ? 'bài tập' : 'đề thi';
+    const stats = getTestCompletionStats(t.id);
+    const completionPct = stats.totalStudents > 0
+      ? Math.round((stats.doneList.length / stats.totalStudents) * 100)
+      : 0;
 
     return (
       <div
@@ -234,7 +329,37 @@ export default function TeacherDashboard({
             </div>
           )}
 
-          <div className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0">
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                handleOpenCompletionModal(t.id);
+              }}
+              title="Kiểm tra học sinh đã làm và chưa làm bài này"
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
+                stats.totalStudents === 0
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                  : stats.missingList.length > 0
+                  ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 hover:bg-rose-100 dark:hover:bg-rose-500/25'
+                  : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
+              }`}
+            >
+              {stats.totalStudents === 0 ? (
+                <>
+                  <Users className="w-3 h-3" /> 0 HS
+                </>
+              ) : stats.missingList.length > 0 ? (
+                <>
+                  <AlertCircle className="w-3 h-3" /> Chưa làm: {stats.missingList.length}/{stats.totalStudents} HS
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3 h-3" /> Đủ {stats.doneList.length}/{stats.totalStudents} HS
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={e => {
@@ -491,6 +616,91 @@ export default function TeacherDashboard({
                 </div>
               </div>
 
+              {/* Class Student Completion Tracker Box */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/90 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                      <ClipboardList className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
+                      Theo Dõi Học Sinh Làm Bài:
+                    </span>
+                    <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                      Đã làm: {stats.doneList.length}/{stats.totalStudents} HS
+                    </span>
+                    <span
+                      className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md ${
+                        stats.missingList.length > 0
+                          ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      Chưa làm: {stats.missingList.length} HS
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {stats.missingList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMissingList(t, stats.missingList)}
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-[11px] font-bold transition flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" /> Copy DS Chưa Làm
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCompletionModal(t.id)}
+                      className="px-2.5 py-1 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold transition flex items-center gap-1 shadow-xs"
+                    >
+                      <Users className="w-3 h-3" /> Kiểm Tra Chi Tiết ({stats.totalStudents} HS)
+                    </button>
+                  </div>
+                </div>
+
+                {stats.totalStudents > 0 && (
+                  <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        completionPct === 100 ? 'bg-emerald-500' : 'bg-[#007A7A]'
+                      }`}
+                      style={{ width: `${completionPct}%` }}
+                    />
+                  </div>
+                )}
+
+                {stats.totalStudents === 0 ? (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Chưa có tài khoản học sinh nào trong danh sách tài khoản.
+                  </p>
+                ) : stats.missingList.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span className="font-bold text-rose-700 dark:text-rose-300">Còn thiếu:</span>
+                    {stats.missingList.slice(0, 6).map(({ account }) => (
+                      <span
+                        key={account.username}
+                        className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-500/30 text-slate-700 dark:text-slate-200 font-semibold"
+                      >
+                        {account.name || account.username}
+                      </span>
+                    ))}
+                    {stats.missingList.length > 6 && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCompletionModal(t.id)}
+                        className="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 font-extrabold hover:underline"
+                      >
+                        +{stats.missingList.length - 6} bạn nữa...
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Tuyệt vời! 100% học sinh trong lớp đã làm bài này.
+                  </p>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
@@ -553,17 +763,6 @@ export default function TeacherDashboard({
   const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin));
   const lobbyPlayersList = Object.values(room.lobbyPlayers || {});
   const leaderboardPlayers = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
-  const allAccounts = Object.values(usersDb || {}).filter(Boolean).sort((a, b) => {
-    if (a.role !== b.role) return a.role === 'teacher' ? -1 : 1;
-    return (a.name || a.username || '').localeCompare(b.name || b.username || '');
-  });
-  const teacherAccountsCount = allAccounts.filter(u => u.role === 'teacher').length;
-  const studentAccountsCount = allAccounts.filter(u => u.role === 'student').length;
-  const filteredAccounts = allAccounts.filter(u => {
-    if (accountRoleFilter !== 'all' && u.role !== accountRoleFilter) return false;
-    const q = studentSearchQuery.toLowerCase();
-    return (u.name || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q);
-  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -720,11 +919,26 @@ export default function TeacherDashboard({
                 </button>
               ))}
             </div>
+
+            <button
+              type="button"
+              onClick={() => setOnlyIncompleteFilter(prev => !prev)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                onlyIncompleteFilter
+                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>{onlyIncompleteFilter ? 'Đang lọc: Còn HS chưa làm' : 'Lọc bài còn HS chưa làm'}</span>
+            </button>
           </div>
 
           {filteredSkillExercises.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
-              Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút <strong>+ Bài Tập Speaking AI / Listening / Reading / Writing</strong> phía trên để tạo ngay.
+              {onlyIncompleteFilter
+                ? 'Tất cả bài tập trong mục này đã được 100% học sinh hoàn thành!'
+                : 'Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút + Bài Tập Speaking AI / Listening / Reading / Writing phía trên để tạo ngay.'}
             </div>
           ) : (
             <div className="space-y-3">
@@ -743,24 +957,40 @@ export default function TeacherDashboard({
                 Danh sách Đề Thi IELTS ({fullExamTests.length})
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Chỉ hiển thị các đề thi đầy đủ 3 phần Listening · Reading · Writing. Bài tập từng kỹ năng riêng nằm ở tab <strong>2. Bài Tập 4 Kỹ Năng</strong>.
+                Chỉ hiển thị các đề thi đầy đủ 3 phần Listening · Reading · Writing. Bấm badge <strong>Chưa làm: ... HS</strong> trên từng đề để xem ai chưa làm.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => openExamBuilder()}
-              className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" /> + Tạo Đề Thi Mới
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOnlyIncompleteFilter(prev => !prev)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                  onlyIncompleteFilter
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
+                }`}
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{onlyIncompleteFilter ? 'Đang lọc: Còn HS chưa làm' : 'Lọc đề còn HS chưa làm'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openExamBuilder()}
+                className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> + Tạo Đề Thi Mới
+              </button>
+            </div>
           </div>
 
-          {fullExamTests.length === 0 ? (
+          {filteredFullExamTests.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
-              Chưa có đề thi IELTS nào. Bấm <strong>+ Tạo Đề Thi Mới</strong> để bắt đầu.
+              {onlyIncompleteFilter
+                ? 'Tất cả đề thi IELTS đã được 100% học sinh trong lớp hoàn thành!'
+                : 'Chưa có đề thi IELTS nào. Bấm + Tạo Đề Thi Mới để bắt đầu.'}
             </div>
           ) : (
-            fullExamTests.map(renderManagementItemCard)
+            filteredFullExamTests.map(renderManagementItemCard)
           )}
         </div>
       )}
@@ -1563,6 +1793,263 @@ export default function TeacherDashboard({
           </div>
         </div>
       )}
+
+      {/* Student Completion Status Modal for Any Test or Exercise */}
+      {completionModalTestId && (() => {
+        const targetItem = (tests || []).find(item => item.id === completionModalTestId);
+        if (!targetItem) return null;
+        const cfg = normalizeExamConfig(targetItem);
+        const isExercise = cfg.testMode === 'single_skill';
+        const stats = getTestCompletionStats(targetItem.id);
+        const q = completionSearch.trim().toLowerCase();
+
+        const matchesSearch = acc =>
+          !q ||
+          (acc.name || '').toLowerCase().includes(q) ||
+          (acc.username || '').toLowerCase().includes(q);
+
+        const doneFiltered = stats.doneList.filter(d => matchesSearch(d.account));
+        const missingFiltered = stats.missingList.filter(m => matchesSearch(m.account));
+
+        const rowsToRender =
+          completionFilter === 'missing'
+            ? missingFiltered.map(m => ({ ...m, status: 'missing' }))
+            : completionFilter === 'done'
+            ? doneFiltered.map(d => ({ ...d, status: 'done' }))
+            : [
+                ...missingFiltered.map(m => ({ ...m, status: 'missing' })),
+                ...doneFiltered.map(d => ({ ...d, status: 'done' }))
+              ];
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setCompletionModalTestId(null)}
+          >
+            <div
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-[#FFF5F8] dark:bg-slate-900">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
+                        isExercise
+                          ? 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30'
+                          : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
+                      }`}
+                    >
+                      {isExercise
+                        ? `BÀI TẬP • ${cfg.focusSkill === 'speaking' ? 'SPEAKING AI' : (cfg.focusSkill || 'SKILL').toUpperCase()}`
+                        : 'ĐỀ THI IELTS'}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      Kiểm tra tiến độ học sinh
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white truncate">
+                    {targetItem.title}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCompletionModalTestId(null)}
+                  className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white transition"
+                  title="Đóng"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* KPI Strip & Controls */}
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 text-center">
+                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Tổng học sinh</div>
+                    <div className="text-xl font-black text-slate-900 dark:text-white tabular-nums">{stats.totalStudents}</div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-center">
+                    <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">Đã làm bài</div>
+                    <div className="text-xl font-black text-emerald-700 dark:text-emerald-300 tabular-nums">{stats.doneList.length}</div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-center">
+                    <div className="text-[11px] font-bold text-rose-700 dark:text-rose-300">Chưa làm bài</div>
+                    <div className="text-xl font-black text-rose-700 dark:text-rose-300 tabular-nums">{stats.missingList.length}</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
+                    {[
+                      { id: 'missing', label: `Chưa làm (${stats.missingList.length})` },
+                      { id: 'done', label: `Đã làm (${stats.doneList.length})` },
+                      { id: 'all', label: `Tất cả (${stats.totalStudents})` }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setCompletionFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-lg transition ${
+                          completionFilter === tab.id
+                            ? tab.id === 'missing'
+                              ? 'bg-rose-600 text-white shadow-xs'
+                              : tab.id === 'done'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-[#007A7A] text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+                    <div className="relative flex-1 sm:w-52">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={completionSearch}
+                        onChange={e => setCompletionSearch(e.target.value)}
+                        placeholder="Tìm tên học sinh..."
+                        className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
+                      />
+                    </div>
+                    {stats.missingList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMissingList(targetItem, stats.missingList)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs shrink-0 transition"
+                        title="Sao chép danh sách học sinh chưa làm để nhắc nhở"
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Copy DS Chưa Làm
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Student List Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-2.5">
+                {stats.totalStudents === 0 ? (
+                  <div className="text-center py-10 text-sm text-slate-500 dark:text-slate-400">
+                    Chưa có tài khoản học sinh nào. Hãy tạo tài khoản học sinh ở tab <strong>5. Tạo &amp; Quản Lý Tài Khoản</strong>.
+                  </div>
+                ) : rowsToRender.length === 0 ? (
+                  <div className="text-center py-10 text-sm text-slate-500 dark:text-slate-400">
+                    {completionFilter === 'missing' && !q
+                      ? 'Tất cả học sinh trong lớp đều đã làm bài này!'
+                      : 'Không tìm thấy học sinh phù hợp với bộ lọc.'}
+                  </div>
+                ) : (
+                  rowsToRender.map(row => {
+                    const stu = row.account;
+                    const isMissing = row.status === 'missing';
+                    return (
+                      <div
+                        key={stu.username}
+                        className={`p-3.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${
+                          isMissing
+                            ? 'bg-rose-50/50 dark:bg-rose-950/15 border-rose-200/90 dark:border-rose-500/25'
+                            : 'bg-emerald-50/40 dark:bg-emerald-950/15 border-emerald-200/80 dark:border-emerald-500/25'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                              isMissing
+                                ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300'
+                                : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                            }`}
+                          >
+                            {(stu.name || stu.username || 'H').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                                {stu.name || stu.username}
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                @{stu.username}
+                              </span>
+                              {isMissing ? (
+                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30">
+                                  Chưa làm bài
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
+                                  Đã nộp {row.attemptCount} lần
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              {isMissing ? (
+                                <span>Mục tiêu: Band {stu.targetBand || 7.5}</span>
+                              ) : (
+                                <span>
+                                  Nộp gần nhất: <strong>{row.latestAttempt?.submittedAt}</strong>
+                                  {row.bestBand !== null ? (
+                                    <> · Band cao nhất: <strong className="text-[#007A7A] dark:text-[#1EE1D6]">{row.bestBand}</strong></>
+                                  ) : row.hasPendingGrade ? (
+                                    <> · <span className="text-amber-600 dark:text-amber-400 font-bold">Chờ chấm</span></>
+                                  ) : null}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {openMemberProfile && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCompletionModalTestId(null);
+                                openMemberProfile(stu.username, 'TEACHER_DASHBOARD');
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold flex items-center gap-1 transition"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Hồ sơ
+                            </button>
+                          )}
+                          {!isMissing && row.latestAttempt && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCompletionModalTestId(null);
+                                  openTeacherGradingModal(row.latestAttempt);
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs"
+                              >
+                                Chấm / Sửa Điểm
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCompletionModalTestId(null);
+                                  setSelectedAttemptId(row.latestAttempt.id);
+                                  setPreviousView('TEACHER_DASHBOARD');
+                                  setView('RESULT_VIEW');
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1] text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 text-xs font-bold transition"
+                              >
+                                Xem bài làm
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
