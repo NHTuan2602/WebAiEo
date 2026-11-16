@@ -120,6 +120,10 @@ export default function ExamMode({
   }
 
   const cfg = normalizeExamConfig(activeTest);
+  const isTeacherUser = currentUser?.role === 'teacher';
+  const isRealExamLocked = cfg.maxAttempts > 0;
+  const canTemporaryExit = isTeacherUser || !isRealExamLocked;
+
   const currentSectionIdx =
     typeof examState.sectionIdx === 'number'
       ? Math.min(Math.max(0, examState.sectionIdx), cfg.order.length - 1)
@@ -503,21 +507,31 @@ export default function ExamMode({
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (currentUser?.role === 'teacher') {
-                onExitExam?.();
-              } else {
-                setShowExitConfirmModal(true);
-              }
-            }}
-            className="hidden sm:flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition items-center gap-1 whitespace-nowrap"
-            title={currentUser?.role === 'teacher' ? 'Thoát xem trước' : 'Lưu nháp & Tạm Thoát'}
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>{currentUser?.role === 'teacher' ? 'Thoát' : 'Tạm Thoát'}</span>
-          </button>
+          {canTemporaryExit ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (isTeacherUser) {
+                  onExitExam?.();
+                } else {
+                  setShowExitConfirmModal(true);
+                }
+              }}
+              className="hidden sm:flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition items-center gap-1 whitespace-nowrap"
+              title={isTeacherUser ? 'Thoát xem trước' : 'Lưu nháp & Tạm Thoát (Chỉ áp dụng khi Thi thử)'}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>{isTeacherUser ? 'Thoát' : 'Tạm Thoát'}</span>
+            </button>
+          ) : (
+            <span
+              className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30 items-center gap-1 whitespace-nowrap"
+              title="Bài thi thật: thí sinh không được phép tạm thoát khi chưa nộp bài"
+            >
+              <Lock className="w-3 h-3" />
+              <span>Thi Thật</span>
+            </span>
+          )}
 
           <button
             type="button"
@@ -1472,21 +1486,28 @@ export default function ExamMode({
             </div>
 
             <div className="p-4 border-t border-[#E5E7EB] dark:border-[#2C2C2C] flex items-center justify-between gap-2 bg-slate-50 dark:bg-[#141414]">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMenuDrawer(false);
-                  if (currentUser?.role === 'teacher') {
-                    onExitExam?.();
-                  } else {
-                    setShowExitConfirmModal(true);
-                  }
-                }}
-                className="px-3.5 py-2 rounded-lg border border-[#CBD5E1] dark:border-[#3A3A3A] text-xs font-bold text-slate-700 dark:text-neutral-200 hover:bg-slate-200/70 dark:hover:bg-[#282828] flex items-center gap-1.5"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>{currentUser?.role === 'teacher' ? 'Thoát Xem Trước' : 'Lưu Nháp & Thoát'}</span>
-              </button>
+              {canTemporaryExit ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenuDrawer(false);
+                    if (isTeacherUser) {
+                      onExitExam?.();
+                    } else {
+                      setShowExitConfirmModal(true);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-lg border border-[#CBD5E1] dark:border-[#3A3A3A] text-xs font-bold text-slate-700 dark:text-neutral-200 hover:bg-slate-200/70 dark:hover:bg-[#282828] flex items-center gap-1.5"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{isTeacherUser ? 'Thoát Xem Trước' : 'Lưu Nháp & Thoát'}</span>
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 dark:text-rose-300">
+                  <Lock className="w-3.5 h-3.5 shrink-0" />
+                  <span>Thi thật: không cho phép tạm thoát</span>
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1607,8 +1628,8 @@ export default function ExamMode({
         </div>
       )}
 
-      {/* Modal xác nhận Tạm Thoát */}
-      {showExitConfirmModal && (
+      {/* Modal xác nhận Tạm Thoát (Chỉ mở khi Thi thử hoặc Giáo viên xem trước) */}
+      {showExitConfirmModal && canTemporaryExit && (
         <div
           className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setShowExitConfirmModal(false)}

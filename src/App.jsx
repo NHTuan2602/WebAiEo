@@ -2105,10 +2105,15 @@ export default function App() {
   };
 
   const handleExitExamMode = () => {
+    const exitingTest = tests.find(t => t.id === selectedTestId);
+    const isTeacher = currentUser?.role === 'teacher';
+    if (!isTeacher && exitingTest && normalizeExamConfig(exitingTest).maxAttempts > 0) {
+      showToast('Bài thi thật không cho phép tạm thoát khi chưa nộp bài!', 'error');
+      return;
+    }
     stopExamAudio();
     setShowSubmitConfirmModal(false);
     const exitingTestId = selectedTestId;
-    const isTeacher = currentUser?.role === 'teacher';
     if (isTeacher && exitingTestId) {
       clearExamDraft(currentUser?.username, exitingTestId);
     }
