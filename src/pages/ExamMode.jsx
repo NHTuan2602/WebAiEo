@@ -96,7 +96,7 @@ export default function ExamMode({
   const activeTest = tests.find(t => t.id === selectedTestId);
   if (!activeTest) {
     return (
-      <div className="min-h-screen bg-[#F4F5F7] dark:bg-[#121212] flex items-center justify-center p-6 font-exam">
+      <div className="min-h-screen bg-[#FFF0F5] dark:bg-[#121212] flex items-center justify-center p-6 font-exam">
         <div className="max-w-md w-full bg-white dark:bg-[#1B1B1B] border border-[#D5D9E0] dark:border-[#333333] rounded-2xl p-6 text-center shadow-xl">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
             <BookOpen className="w-6 h-6" />
@@ -380,10 +380,10 @@ export default function ExamMode({
   return (
     <div
       onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
-      className="min-h-screen bg-[#F4F5F7] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam"
+      className="min-h-screen bg-[#FFF0F5] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam"
     >
       {/* Top Computer-Delivered Header (matches Real IELTS bar) */}
-      <header className="bg-white dark:bg-[#161616] text-[#111827] dark:text-white px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-[#D5D9E0] dark:border-[#2C2C2C] sticky top-0 z-50">
+      <header className="bg-[#FFF8FA] dark:bg-[#161616] text-[#111827] dark:text-white px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-rose-200/85 dark:border-[#2C2C2C] sticky top-0 z-50">
         {/* Left: Golden IELTS emblem + Test Title + Minutes Remaining */}
         <div className="flex items-center gap-3 min-w-0">
           <div
@@ -417,7 +417,7 @@ export default function ExamMode({
         </div>
 
         {/* Center: Compact Skill Tabs */}
-        <div className="hidden md:flex items-center bg-[#EEF1F5] dark:bg-[#222222] p-1 rounded-lg text-xs gap-1 border border-[#D5D9E0] dark:border-[#343434] shrink-0">
+        <div className="hidden md:flex items-center bg-rose-100/75 dark:bg-[#222222] p-1 rounded-lg text-xs gap-1 border border-[#D5D9E0] dark:border-[#343434] shrink-0">
           {cfg.order.map((sId, idx) => {
             const meta = skillMeta[sId] || { label: sId, icon: BookOpen };
             const IconComp = meta.icon;
@@ -485,7 +485,7 @@ export default function ExamMode({
           <button
             type="button"
             onClick={() => setDarkMode(d => !d)}
-            className="p-2 rounded-lg bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition"
+            className="p-2 rounded-lg bg-rose-100/75 dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition"
             title={darkMode ? 'Chế độ Sáng (Black on White)' : 'Chế độ Tối (White on Black)'}
             aria-label={darkMode ? 'Chế độ Sáng' : 'Chế độ Tối'}
           >
@@ -495,7 +495,7 @@ export default function ExamMode({
           <button
             type="button"
             onClick={() => setShowMenuDrawer(true)}
-            className="relative p-2 rounded-lg bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-100 border border-[#D5D9E0] dark:border-[#383838] transition"
+            className="relative p-2 rounded-lg bg-rose-100/75 dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-100 border border-[#D5D9E0] dark:border-[#383838] transition"
             title="Cài đặt màn hình, Highlight, Đánh dấu & Thoát"
             aria-label="Mở menu tùy chọn phòng thi"
           >
@@ -517,7 +517,7 @@ export default function ExamMode({
                   setShowExitConfirmModal(true);
                 }
               }}
-              className="hidden sm:flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition items-center gap-1 whitespace-nowrap"
+              className="hidden sm:flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-100/75 dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-700 dark:text-neutral-200 border border-[#D5D9E0] dark:border-[#383838] transition items-center gap-1 whitespace-nowrap"
               title={isTeacherUser ? 'Thoát xem trước' : 'Lưu nháp & Tạm Thoát (Chỉ áp dụng khi Thi thử)'}
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -673,7 +673,7 @@ export default function ExamMode({
       {/* Main Computer-Delivered Workspace */}
       <main className="flex-1 max-w-[1640px] w-full mx-auto px-3 sm:px-5 pt-3 pb-14 flex flex-col relative">
         {/* Part / Passage / Task Banner Strip */}
-        <div className="rounded-lg border border-[#D5D9E0] dark:border-[#363636] bg-[#ECEFF3] dark:bg-[#242424] px-4 sm:px-5 py-2.5 mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-lg border border-[#D5D9E0] dark:border-[#363636] bg-[#FFE8F0] dark:bg-[#242424] px-4 sm:px-5 py-2.5 mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-[#111827] dark:text-white">
               {activePartObj?.label || (examState.skill === 'writing' ? `TASK ${activeWritingTask + 1}` : 'PART 1')}
@@ -778,7 +778,7 @@ export default function ExamMode({
             splitPercent={splitPercent}
             onChangeSplit={setSplitPercent}
             left={
-              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
                   <h3 className="font-extrabold text-[#111827] dark:text-white text-base sm:text-[17px] leading-snug">
                     {activePassage?.title || `Passage ${safePassageIdx + 1}`}
@@ -848,7 +848,7 @@ export default function ExamMode({
               </div>
             }
             right={
-              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
                   {activeReadingCloze.trim() && (
                     <ClozeNoteSheet
@@ -921,7 +921,7 @@ export default function ExamMode({
               splitPercent={splitPercent}
               onChangeSplit={setSplitPercent}
               left={
-                <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
                   <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
                     <h3 className="font-extrabold text-[#111827] dark:text-white text-base">
                       {activeTrack?.title || `Part ${safeTrackIdx + 1}`}
@@ -953,7 +953,7 @@ export default function ExamMode({
                 </div>
               }
               right={
-                <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
                     {activeListeningCloze.trim() && (
                       <ClozeNoteSheet
@@ -1011,7 +1011,7 @@ export default function ExamMode({
               }
             />
           ) : (
-            <div className="rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] p-5 sm:p-7 max-w-5xl w-full mx-auto space-y-5 flex-1 overflow-y-auto cd-exam-scroll">
+            <div className="rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] p-5 sm:p-7 max-w-5xl w-full mx-auto space-y-5 flex-1 overflow-y-auto cd-exam-scroll">
               {activeListeningCloze.trim() && (
                 <ClozeNoteSheet
                   activeBlankNum={activeBlankNum}
@@ -1078,7 +1078,7 @@ export default function ExamMode({
             splitPercent={splitPercent}
             onChangeSplit={setSplitPercent}
             left={
-              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-3.5">
                   <h3 className="text-base font-extrabold text-[#111827] dark:text-white">
                     Questions {activeWritingTask + 1}
@@ -1119,7 +1119,7 @@ export default function ExamMode({
               </div>
             }
             right={
-              <div className="h-full rounded-lg border border-[#D5D9E0] dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden p-4 sm:p-5">
+              <div className="h-full rounded-lg border border-rose-200/90 dark:border-[#323232] bg-[#FFF9FB] dark:bg-[#141414] flex flex-col overflow-hidden p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm sm:text-base font-extrabold text-[#111827] dark:text-white">
                     Your answer
@@ -1186,7 +1186,7 @@ export default function ExamMode({
       </main>
 
       {/* Bottom Sticky Part & Question Palette Bar (matches Screenshots 1–5) */}
-      <footer className="bg-white dark:bg-[#141414] border-t border-[#D5D9E0] dark:border-[#2C2C2C] px-3 sm:px-6 py-2 sticky bottom-0 z-40">
+      <footer className="bg-[#FFF8FA] dark:bg-[#141414] border-t border-rose-200/85 dark:border-[#2C2C2C] px-3 sm:px-6 py-2 sticky bottom-0 z-40">
         <div className="max-w-[1640px] mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 overflow-x-auto cd-exam-scroll flex-1 py-0.5">
             {navParts.map(part => {
@@ -1275,7 +1275,7 @@ export default function ExamMode({
             className={`shrink-0 w-9 h-9 rounded-md border flex items-center justify-center transition ${
               allSkillsVisited
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm'
-                : 'bg-[#EEF1F5] dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-500 dark:text-neutral-300 border-[#CBD5E1] dark:border-[#3A3A3A]'
+                : 'bg-rose-100/75 dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-500 dark:text-neutral-300 border-[#CBD5E1] dark:border-[#3A3A3A]'
             }`}
           >
             {allSkillsVisited ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Lock className="w-3.5 h-3.5" />}

@@ -43,12 +43,12 @@ html.dark .lexi-underlined::after {
 }
 
 .lexi-hero-surface {
-  background-color: #ffffff;
+  background-color: #FFF4F7;
   background-image:
-    radial-gradient(at 88% 12%, rgba(0, 178, 173, 0.14) 0px, transparent 48%),
-    radial-gradient(at 10% 85%, rgba(20, 71, 230, 0.08) 0px, transparent 45%),
-    linear-gradient(to right, rgba(202, 213, 226, 0.25) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(202, 213, 226, 0.25) 1px, transparent 1px);
+    radial-gradient(at 88% 12%, rgba(244, 114, 182, 0.16) 0px, transparent 50%),
+    radial-gradient(at 10% 85%, rgba(251, 113, 133, 0.12) 0px, transparent 48%),
+    linear-gradient(to right, rgba(244, 162, 188, 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(244, 162, 188, 0.22) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
 }
 
@@ -96,7 +96,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #f8fafc;
+  background-color: #FFF0F5;
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

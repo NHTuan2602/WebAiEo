@@ -133,7 +133,7 @@ export default function ClozeNoteSheet({
         </div>
       )}
 
-      <div className="rounded-lg border border-[#D5D9E0] dark:border-[#343434] bg-white dark:bg-[#191919] p-4 sm:p-6 space-y-2 shadow-xs">
+      <div className="rounded-lg border border-rose-200/90 dark:border-[#343434] bg-[#FFF9FB] dark:bg-[#191919] p-4 sm:p-6 space-y-2 shadow-xs">
         {!readOnlyPreview && onToggleBookmark && blankNumbers.length > 0 && (
           <div className="flex items-center justify-end gap-1 flex-wrap pb-1">
             <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 mr-1">Đánh dấu câu:</span>

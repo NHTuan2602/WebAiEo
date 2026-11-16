@@ -44,7 +44,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="bg-white/95 dark:bg-[#0F172B]/95 backdrop-blur-xl border-b border-slate-200/90 dark:border-slate-800 text-slate-800 dark:text-slate-100 sticky top-0 z-50 transition-colors">
+    <header className="bg-[#FFF8FA]/95 dark:bg-[#0F172B]/95 backdrop-blur-xl border-b border-rose-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-100 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-3 sm:px-5 h-16 flex items-center justify-between gap-3">
         {/* Luyện Thi IELTS Nha Trang Brand Lockup */}
         <div
@@ -65,7 +65,7 @@ export default function Navbar({
         </div>
 
         {/* Center Editorial Navigation — strictly single-line pills */}
-        <nav className="hidden lg:flex items-center gap-1 bg-slate-100/85 dark:bg-slate-800/85 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/70 text-xs font-bold shrink-0">
+        <nav className="hidden lg:flex items-center gap-1 bg-rose-100/60 dark:bg-slate-800/85 p-1 rounded-xl border border-rose-200/75 dark:border-slate-700/70 text-xs font-bold shrink-0">
           <button
             type="button"
             onClick={() => setView('HOME')}
@@ -151,7 +151,7 @@ export default function Navbar({
           <button
             type="button"
             onClick={() => setDarkMode(d => !d)}
-            className="p-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-[#EDFFFD] hover:text-[#007A7A] dark:hover:bg-slate-700 transition border border-slate-200 dark:border-slate-700 shrink-0"
+            className="p-2 rounded-xl text-xs font-semibold bg-rose-50/80 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-[#EDFFFD] hover:text-[#007A7A] dark:hover:bg-slate-700 transition border border-rose-200/80 dark:border-slate-700 shrink-0"
             title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
             aria-label={darkMode ? 'Chế độ sáng' : 'Chế độ tối'}
           >
@@ -166,7 +166,7 @@ export default function Navbar({
                 setApiTestState({ testing: false, ok: null, message: '', model: '' });
                 setShowApiKeyModal(true);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-700 transition border border-slate-200 dark:border-slate-700 shrink-0 whitespace-nowrap"
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-rose-50/80 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-700 transition border border-rose-200/80 dark:border-slate-700 shrink-0 whitespace-nowrap"
               title="Cấu hình Google Gemini API Key"
             >
               <Key className="w-3.5 h-3.5 text-[#E17100] shrink-0" />
@@ -195,7 +195,7 @@ export default function Navbar({
             <button
               type="button"
               onClick={() => setShowAvatarModal(true)}
-              className="hidden sm:inline-flex p-2 rounded-xl text-[#62748E] dark:text-slate-400 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] transition border border-slate-200 dark:border-slate-700"
+              className="hidden sm:inline-flex p-2 rounded-xl text-[#62748E] dark:text-slate-400 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] transition border border-rose-200/80 dark:border-slate-700"
               title="Cài đặt ảnh đại diện & đầu nhân vật Game"
             >
               <Camera className="w-4 h-4" />
@@ -214,7 +214,7 @@ export default function Navbar({
       </div>
 
       {/* Mobile & Tablet Quick Nav Strip */}
-      <div className="lg:hidden border-t border-slate-200/80 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
+      <div className="lg:hidden bg-[#FFF5F8] dark:bg-[#0F172B] border-t border-rose-200/80 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
         <button
           type="button"
           onClick={() => setView('HOME')}

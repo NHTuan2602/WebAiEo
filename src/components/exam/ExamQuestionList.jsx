@@ -206,7 +206,7 @@ export default function ExamQuestionList({
             className={`px-4 py-3.5 rounded-lg border transition ${
               isActive
                 ? 'bg-[#EFF6FF]/60 dark:bg-[#1E232D] border-[#2563EB] dark:border-[#3B82F6]'
-                : 'bg-white dark:bg-[#161616] border-[#E2E8F0] dark:border-[#2C2C2C] hover:border-[#CBD5E1] dark:hover:border-[#404040]'
+                : 'bg-[#FFF9FB] dark:bg-[#161616] border-rose-200/80 dark:border-[#2C2C2C] hover:border-rose-300 dark:hover:border-[#404040]'
             }`}
           >
             <div className="flex items-start justify-between gap-2.5 mb-2.5">
