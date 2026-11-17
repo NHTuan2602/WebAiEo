@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Calendar,
   Clock,
@@ -13,13 +13,15 @@ import {
   Plus,
   ShieldCheck,
   Sparkles,
+  Square,
   Trash2,
   Upload,
   Wand2
 } from 'lucide-react';
 import { createDefaultSpeakingSection, getVietnamTodayDateKey, normalizeSpeakingSection } from '../../constants/seedData';
 import { generateSpeakingQuestionsWithAI } from '../../utils/geminiGrader';
-import { uploadSpeakingRecording } from '../../utils/speakingApi';
+import { cleanAudioMimeType } from '../../utils/speakingAiEngine';
+import { pickSupportedAudioMimeType, uploadSpeakingRecording } from '../../utils/speakingApi';
 
 export default function SpeakingBuilderPanel({
   aiApiKey,
@@ -33,7 +35,25 @@ export default function SpeakingBuilderPanel({
   const [aiTopic, setAiTopic] = useState('Sustainable Cities & Modern Education');
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadingKey, setUploadingKey] = useState('');
+  const [recordingKey, setRecordingKey] = useState('');
   const [showRoomPass, setShowRoomPass] = useState(false);
+  const recorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+          recorderRef.current.stop();
+        }
+      } catch (_err) {}
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
 
   const patchSpeaking = (patch) => {
     onChangeSpeaking({
@@ -118,8 +138,58 @@ export default function SpeakingBuilderPanel({
     }
   };
 
+  const handleToggleRecordPromptAudio = async (uploadKey, onApplyAudio) => {
+    if (recordingKey === uploadKey && recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop();
+      return;
+    }
+    if (recordingKey && recorderRef.current && recorderRef.current.state !== 'inactive') {
+      showToast?.('Vui lòng dừng ghi âm câu hiện tại trước khi thu câu khác.', 'info');
+      return;
+    }
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      showToast?.('Trình duyệt không hỗ trợ ghi âm Micro (cần HTTPS hoặc localhost).', 'error');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const chosenMime = pickSupportedAudioMimeType();
+      let mediaRecorder;
+      try {
+        mediaRecorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
+      } catch (_err) {
+        mediaRecorder = new MediaRecorder(stream);
+      }
+      chunksRef.current = [];
+      mediaRecorder.ondataavailable = ev => {
+        if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+      };
+      mediaRecorder.onstop = () => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+        }
+        const actualMime = cleanAudioMimeType(mediaRecorder.mimeType || chosenMime || 'audio/webm');
+        const blob = new Blob(chunksRef.current, { type: actualMime });
+        setRecordingKey('');
+        if (blob.size > 0) {
+          const ext = actualMime.includes('mp4') ? 'm4a' : actualMime.includes('ogg') ? 'ogg' : 'webm';
+          const fileLike = new File([blob], `gv_${uploadKey}.${ext}`, { type: actualMime });
+          handleUploadQuestionAudio(fileLike, uploadKey, onApplyAudio);
+        }
+      };
+      recorderRef.current = mediaRecorder;
+      mediaRecorder.start(250);
+      setRecordingKey(uploadKey);
+    } catch (_err) {
+      showToast?.('Không truy cập được Micro để thu âm câu hỏi.', 'error');
+    }
+  };
+
   const renderAudioAttachmentBox = ({ uploadKey, audioUrl = '', audioFileName = '', onApplyAudio }) => {
     const isBusy = uploadingKey === uploadKey;
+    const isRecHere = recordingKey === uploadKey;
     return (
       <div className="pt-2 mt-1 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -129,7 +199,7 @@ export default function SpeakingBuilderPanel({
             <input
               type="file"
               accept="audio/*"
-              disabled={isBusy}
+              disabled={isBusy || isRecHere}
               onChange={e => {
                 const file = e.target.files?.[0];
                 e.target.value = '';
@@ -138,12 +208,25 @@ export default function SpeakingBuilderPanel({
               className="hidden"
             />
           </label>
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => handleToggleRecordPromptAudio(uploadKey, onApplyAudio)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition ${
+              isRecHere
+                ? 'bg-rose-600 text-white border-rose-600 animate-pulse'
+                : 'bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
+            }`}
+          >
+            {isRecHere ? <Square className="w-3 h-3 fill-current" /> : <Mic className="w-3.5 h-3.5" />}
+            <span>{isRecHere ? 'Dừng & Lưu Ghi Âm' : 'Thu Âm Câu Hỏi Trực Tiếp'}</span>
+          </button>
           <input
             type="url"
             value={audioUrl.startsWith('data:') ? '' : audioUrl}
             onChange={e => onApplyAudio({ audioUrl: e.target.value.trim(), audioFileName: '' })}
             placeholder="Hoặc dán Link Audio URL ngoài (tùy chọn)..."
-            className="flex-1 min-w-[200px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-200"
+            className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-200"
           />
           {audioUrl && (
             <button
@@ -156,12 +239,17 @@ export default function SpeakingBuilderPanel({
           )}
         </div>
         {audioUrl && (
-          <div className="flex flex-wrap items-center gap-2.5 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
-            <FileAudio className="w-4 h-4 text-[#570DF8] shrink-0" />
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate max-w-[180px]">
-              {audioFileName || 'File ghi âm câu hỏi'}
-            </span>
-            <audio controls src={audioUrl} className="h-8 flex-1 min-w-[180px]" />
+          <div className="space-y-1.5 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/35">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <FileAudio className="w-4 h-4 text-[#570DF8] shrink-0" />
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate max-w-[220px]">
+                {audioFileName || 'File ghi âm của Giáo viên'}
+              </span>
+              <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                ✓ Học viên sẽ nghe trực tiếp file này (không qua AI đọc)
+              </span>
+            </div>
+            <audio controls src={audioUrl} className="h-8 w-full" />
           </div>
         )}
       </div>
@@ -361,6 +449,38 @@ export default function SpeakingBuilderPanel({
           </label>
         </div>
 
+        {/* Tùy chọn phát File Ghi Âm Giáo Viên & Tắt AI đọc */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <label className="p-3 rounded-xl bg-emerald-50/75 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-500/35 flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sp.disableAiTts}
+              onChange={e => patchSpeaking({ disableAiTts: e.target.checked })}
+              className="mt-0.5 w-4 h-4 accent-emerald-600"
+            />
+            <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
+              <strong>Tắt hẳn giọng AI đọc câu hỏi</strong>
+              <span className="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Câu có file ghi âm của Giáo viên luôn tự động phát giọng thật (không qua AI đọc). Bật mục này nếu muốn tắt AI đọc trên mọi câu.
+              </span>
+            </span>
+          </label>
+          <label className="p-3 rounded-xl bg-sky-50/75 dark:bg-sky-950/25 border border-sky-200 dark:border-sky-500/35 flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sp.hidePromptTextWhenAudio}
+              onChange={e => patchSpeaking({ hidePromptTextWhenAudio: e.target.checked })}
+              className="mt-0.5 w-4 h-4 accent-sky-600"
+            />
+            <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
+              <strong>Chỉ nghe file ghi âm &amp; trả lời (Ẩn chữ câu hỏi)</strong>
+              <span className="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Khi câu hỏi đã có file ghi âm của Giáo viên, học viên chỉ nghe Audio rồi nói trả lời giống thi thật.
+              </span>
+            </span>
+          </label>
+        </div>
+
         {/* Phân chia Chuyên Mục Speaking: Luyện Daily vs Thực Chiến Phòng Thi (Team Sắp Thi) */}
         <div className="p-4 rounded-2xl bg-slate-50/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3.5">
           <div>
@@ -536,7 +656,7 @@ export default function SpeakingBuilderPanel({
                   type="text"
                   value={q.prompt}
                   onChange={e => updateQuestionInPart('part1', idx, 'prompt', e.target.value)}
-                  placeholder="Nhập câu hỏi tiếng Anh giám khảo sẽ hỏi..."
+                  placeholder="Nhập câu hỏi tiếng Anh (hoặc để trống nếu học viên chỉ nghe file ghi âm)..."
                   className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
                 />
                 <input
@@ -706,7 +826,7 @@ export default function SpeakingBuilderPanel({
                   type="text"
                   value={q.prompt}
                   onChange={e => updateQuestionInPart('part3', idx, 'prompt', e.target.value)}
-                  placeholder="Nhập câu hỏi thảo luận học thuật Part 3..."
+                  placeholder="Nhập câu hỏi thảo luận Part 3 (hoặc để trống nếu chỉ dùng file ghi âm)..."
                   className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white"
                 />
                 <input

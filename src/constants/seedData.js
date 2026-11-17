@@ -72,6 +72,8 @@ export const createDefaultSpeakingSection = () => ({
   dailyMandatory: true,
   roomPassword: '',
   hasRoomPassword: false,
+  disableAiTts: false,
+  hidePromptTextWhenAudio: false,
   isForecast: false,
   autoAiGrade: true,
   part1SpeakSec: 45,
@@ -152,6 +154,8 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
     dailyMandatory: speakingTrack === 'daily' ? s.dailyMandatory !== false : Boolean(s.dailyMandatory),
     roomPassword: cleanRoomPassword,
     hasRoomPassword: Boolean(s.hasRoomPassword || cleanRoomPassword.trim().length > 0),
+    disableAiTts: Boolean(s.disableAiTts),
+    hidePromptTextWhenAudio: Boolean(s.hidePromptTextWhenAudio),
     isForecast: Boolean(s.isForecast),
     autoAiGrade: s.autoAiGrade !== false,
     part1SpeakSec: Math.max(15, Number(s.part1SpeakSec ?? def.part1SpeakSec) || 45),
@@ -204,14 +208,14 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
 
   if ((partFilter === 'all' || partFilter === 'part1') && sp.part1.enabled) {
     (sp.part1.questions || [])
-      .filter(q => String(q.prompt || '').trim())
+      .filter(q => Boolean(String(q.prompt || '').trim() || String(q.audioUrl || '').trim()))
       .forEach((q, idx) => {
         items.push({
           id: q.id || `sp1_${idx + 1}`,
           part: 1,
           partLabel: 'Part 1',
           topic: sp.part1.topic || 'Part 1 Interview',
-          prompt: q.prompt,
+          prompt: q.prompt || '',
           bullets: [],
           hint: q.hint || '',
           audioUrl: q.audioUrl || '',
@@ -222,13 +226,17 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
       });
   }
 
-  if ((partFilter === 'all' || partFilter === 'part2') && sp.part2.enabled && String(sp.part2.cueCardPrompt || sp.part2.title || '').trim()) {
+  if (
+    (partFilter === 'all' || partFilter === 'part2') &&
+    sp.part2.enabled &&
+    Boolean(String(sp.part2.cueCardPrompt || sp.part2.title || sp.part2.audioUrl || '').trim())
+  ) {
     items.push({
       id: 'sp2_cuecard',
       part: 2,
       partLabel: 'Part 2 Cue Card',
       topic: sp.part2.title || 'Individual Long Turn',
-      prompt: sp.part2.cueCardPrompt || sp.part2.title,
+      prompt: sp.part2.cueCardPrompt || sp.part2.title || '',
       bullets: (sp.part2.bullets || []).filter(Boolean),
       hint: sp.part2.followUpQuestion ? `Câu hỏi phụ gợi ý: ${sp.part2.followUpQuestion}` : '',
       audioUrl: sp.part2.audioUrl || '',
@@ -240,14 +248,14 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
 
   if ((partFilter === 'all' || partFilter === 'part3') && sp.part3.enabled) {
     (sp.part3.questions || [])
-      .filter(q => String(q.prompt || '').trim())
+      .filter(q => Boolean(String(q.prompt || '').trim() || String(q.audioUrl || '').trim()))
       .forEach((q, idx) => {
         items.push({
           id: q.id || `sp3_${idx + 1}`,
           part: 3,
           partLabel: 'Part 3 Discussion',
           topic: sp.part3.topic || 'Two-way Discussion',
-          prompt: q.prompt,
+          prompt: q.prompt || '',
           bullets: [],
           hint: q.hint || '',
           audioUrl: q.audioUrl || '',

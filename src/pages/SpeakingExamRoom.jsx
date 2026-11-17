@@ -12,7 +12,6 @@ import {
   RotateCcw,
   Send,
   Square,
-  Upload,
   Volume2
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
@@ -86,6 +85,7 @@ export default function SpeakingExamRoom({
   const [liveTranscript, setLiveTranscript] = useState('');
   const [prepRemainingSec, setPrepRemainingSec] = useState(0);
   const [part2Notes, setPart2Notes] = useState('');
+  const [promptPlayBlocked, setPromptPlayBlocked] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   // Grading + Celebration state
@@ -196,22 +196,44 @@ export default function SpeakingExamRoom({
       try {
         promptAudioRef.current.pause();
       } catch (_err) {}
-      promptAudioRef.current = null;
     }
   };
 
-  const speakPromptQuestion = (text, audioUrl = '') => {
+  const triggerPromptPlayback = (text, audioUrl = '', disableAiTts = false) => {
     stopPromptPlayback();
-    if (audioUrl && typeof Audio !== 'undefined') {
-      try {
-        const audio = new Audio(audioUrl);
-        promptAudioRef.current = audio;
-        audio.play().catch(() => {
-          if (text) speakPromptQuestion(text, '');
-        });
+    if (audioUrl) {
+      const audioEl = promptAudioRef.current;
+      if (audioEl && typeof audioEl.play === 'function') {
+        try {
+          audioEl.currentTime = 0;
+          const playPromise = audioEl.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(err => {
+              // Strictly NEVER fall back to AI TTS when teacher supplied an audio recording
+              if (err?.name !== 'AbortError') {
+                setPromptPlayBlocked(true);
+              }
+            });
+          }
+        } catch (_err) {
+          Promise.resolve().then(() => setPromptPlayBlocked(true));
+        }
         return;
-      } catch (_err) {}
+      }
+      if (typeof Audio !== 'undefined') {
+        try {
+          const fallbackEl = new Audio(audioUrl);
+          promptAudioRef.current = fallbackEl;
+          fallbackEl.play().catch(err => {
+            if (err?.name !== 'AbortError') setPromptPlayBlocked(true);
+          });
+        } catch (_err) {
+          Promise.resolve().then(() => setPromptPlayBlocked(true));
+        }
+      }
+      return;
     }
+    if (disableAiTts) return;
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
     try {
       const utter = new SpeechSynthesisUtterance(text);
@@ -221,13 +243,21 @@ export default function SpeakingExamRoom({
     } catch (_err) {}
   };
 
-  // Auto-read Examiner prompt or play uploaded Examiner audio when advancing to a question in ACTIVE phase
+  const speakPromptQuestion = (text, audioUrl = '') => {
+    setPromptPlayBlocked(false);
+    triggerPromptPlayback(text, audioUrl, spMeta.disableAiTts);
+  };
+
+  const triggerPromptPlaybackRef = useRef(triggerPromptPlayback);
+  triggerPromptPlaybackRef.current = triggerPromptPlayback;
+
+  // Auto-play teacher recording (or TTS only when no teacher audio & TTS enabled) when entering a question
   useEffect(() => {
-    if (phase === 'ACTIVE' && autoSpeakPrompt && (currentPromptText || currentPromptAudioUrl)) {
-      speakPromptQuestion(currentPromptText, currentPromptAudioUrl);
+    if (phase === 'ACTIVE' && autoSpeakPrompt && (currentPromptAudioUrl || (currentPromptText && !spMeta.disableAiTts))) {
+      triggerPromptPlaybackRef.current(currentPromptText, currentPromptAudioUrl, spMeta.disableAiTts);
     }
     return () => stopPromptPlayback();
-  }, [phase, currentIdx, autoSpeakPrompt, currentPromptText, currentPromptAudioUrl]);
+  }, [phase, currentIdx, autoSpeakPrompt, currentPromptText, currentPromptAudioUrl, spMeta.disableAiTts]);
 
   const startMeterFromStream = (stream) => {
     try {
@@ -326,44 +356,6 @@ export default function SpeakingExamRoom({
     setCurrentIdx(0);
     syncPrepForIndex(0);
     setPhase('ACTIVE');
-  };
-
-  const handleImportRecordedAudioFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !currentItem || isRecording) return;
-    if (file.size > 15 * 1024 * 1024) {
-      showToast?.('File ghi âm quá lớn (vui lòng chọn file dưới 15MB).', 'error');
-      return;
-    }
-    stopPromptPlayback();
-    const objUrl = URL.createObjectURL(file);
-    createdUrlsRef.current.push(objUrl);
-    let durationSec = 10;
-    try {
-      durationSec = await new Promise(resolve => {
-        const audio = new Audio();
-        audio.preload = 'metadata';
-        audio.onloadedmetadata = () => {
-          const d = Math.round(Number(audio.duration) || 0);
-          resolve(d > 0 && Number.isFinite(d) ? d : 10);
-        };
-        audio.onerror = () => resolve(10);
-        audio.src = objUrl;
-      });
-    } catch (_err) {}
-
-    setRecordingsByQid(prev => ({
-      ...prev,
-      [currentItem.id]: {
-        blob: file,
-        objectUrl: objUrl,
-        mimeType: cleanAudioMimeType(file.type || 'audio/mpeg'),
-        durationSec,
-        clientTranscript: ''
-      }
-    }));
-    showToast?.(`Đã nhập file ghi âm "${file.name}" (${durationSec}s) cho câu này!`);
   };
 
   const startSpeechRecognitionBackup = () => {
@@ -687,6 +679,10 @@ export default function SpeakingExamRoom({
   }
 
   const recordedCount = items.filter(it => (recordingsByQid[it.id]?.durationSec || 0) > 0).length;
+  const teacherAudioCount = items.filter(it => Boolean(it.audioUrl)).length;
+  const allHaveTeacherAudio = items.length > 0 && teacherAudioCount === items.length;
+  const hasTeacherAudioAny = teacherAudioCount > 0;
+  const hideQuestionTextNow = Boolean(currentItem?.audioUrl && (spMeta.hidePromptTextWhenAudio || !currentItem.prompt));
   const currentRec = currentItem ? recordingsByQid[currentItem.id] : null;
   const maxAllowedSec = currentItem?.speakSec || 45;
   const remainingSpeakSec = Math.max(0, maxAllowedSec - recordElapsedSec);
@@ -856,15 +852,29 @@ export default function SpeakingExamRoom({
               )}
             </div>
 
-            <label className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoSpeakPrompt}
-                onChange={e => setAutoSpeakPrompt(e.target.checked)}
-                className="w-4 h-4 accent-[#570DF8]"
-              />
-              <span>Giám khảo AI tự đọc câu hỏi bằng tiếng Anh khi sang câu mới</span>
-            </label>
+            {hasTeacherAudioAny && (
+              <div className="px-3.5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                🎧 Đề có {teacherAudioCount}/{items.length} câu dùng file ghi âm của Giáo viên — bạn sẽ nghe giọng thật và bấm Micro trả lời (không qua giọng AI đọc).
+              </div>
+            )}
+
+            {(hasTeacherAudioAny || !spMeta.disableAiTts) && (
+              <label className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoSpeakPrompt}
+                  onChange={e => setAutoSpeakPrompt(e.target.checked)}
+                  className="w-4 h-4 accent-[#570DF8]"
+                />
+                <span>
+                  {allHaveTeacherAudio
+                    ? 'Tự động phát file ghi âm câu hỏi của Giáo viên khi sang câu mới'
+                    : hasTeacherAudioAny
+                      ? 'Tự động phát Audio câu hỏi khi sang câu mới (ưu tiên file ghi âm Giáo viên)'
+                      : 'Giám khảo AI tự đọc câu hỏi bằng tiếng Anh khi sang câu mới'}
+                </span>
+              </label>
+            )}
 
             <button
               type="button"
@@ -923,19 +933,57 @@ export default function SpeakingExamRoom({
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
-                className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] hover:border-[#570DF8] text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
-              >
-                <Volume2 className="w-3.5 h-3.5 text-[#570DF8] dark:text-[#A78BFA]" />
-                <span>{currentItem.audioUrl ? 'Nghe File Audio Giám Khảo' : 'Nghe Giám Khảo Đọc'}</span>
-              </button>
+              {(currentItem.audioUrl || !spMeta.disableAiTts) && (
+                <button
+                  type="button"
+                  onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${
+                    currentItem.audioUrl
+                      ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-200'
+                      : 'bg-white dark:bg-[#23222D] border-pink-200 dark:border-[#34323F] hover:border-[#570DF8] text-slate-700 dark:text-slate-200'
+                  }`}
+                >
+                  <Volume2 className={`w-3.5 h-3.5 ${currentItem.audioUrl ? 'text-emerald-600 dark:text-emerald-300' : 'text-[#570DF8] dark:text-[#A78BFA]'}`} />
+                  <span>{currentItem.audioUrl ? 'Nghe Lại File Ghi Âm Giáo Viên' : 'Nghe Giám Khảo AI Đọc'}</span>
+                </button>
+              )}
             </div>
+
+            {currentItem.audioUrl && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-500/40 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                    <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    File Ghi Âm Câu Hỏi Của Giáo Viên
+                    {currentItem.audioFileName ? ` (${currentItem.audioFileName})` : ''}
+                  </span>
+                  {promptPlayBlocked && (
+                    <button
+                      type="button"
+                      onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold animate-pulse"
+                    >
+                      ▶ Bấm Phát Ngay
+                    </button>
+                  )}
+                </div>
+                <audio
+                  key={`${currentItem.id}-${currentItem.audioUrl}`}
+                  ref={promptAudioRef}
+                  controls
+                  preload="auto"
+                  src={currentItem.audioUrl}
+                  onPlay={() => setPromptPlayBlocked(false)}
+                  className="w-full h-10"
+                />
+              </div>
+            )}
 
             <div className="space-y-3">
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-snug">
-                {currentItem.prompt}
+                {hideQuestionTextNow
+                  ? '🎧 Hãy nghe kỹ file ghi âm câu hỏi của Giáo viên ở trên, sau đó bấm Micro để trả lời lại!'
+                  : currentItem.prompt}
               </h2>
 
               {Array.isArray(currentItem.bullets) && currentItem.bullets.length > 0 && (
@@ -1020,18 +1068,6 @@ export default function SpeakingExamRoom({
                             : 'Bắt Đầu Trả Lời & Ghi Âm'}
                         </span>
                       </button>
-                      {!isRealExamLocked && (
-                        <label className="cursor-pointer px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition">
-                          <Upload className="w-3.5 h-3.5 text-[#570DF8] dark:text-[#A78BFA]" />
-                          <span>Nhập File Ghi Âm</span>
-                          <input
-                            type="file"
-                            accept="audio/*"
-                            onChange={handleImportRecordedAudioFile}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
                     </div>
                   ) : (
                     <button

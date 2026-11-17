@@ -60,7 +60,7 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const LOGIN_RATE_WINDOW_MS = 5 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 15;
 const MAX_AUDIO_UPLOAD_BYTES = 15 * 1024 * 1024;
-const ALLOWED_AUDIO_MIMES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/x-m4a', 'audio/flac']);
+const ALLOWED_AUDIO_MIMES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/m4a', 'audio/mpeg', 'audio/mp3', 'audio/x-mpeg-3', 'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/vnd.wave', 'audio/aac', 'audio/x-m4a', 'audio/flac']);
 
 const GEMINI_AUDIO_PREFERRED_MODELS = [
   'gemini-2.5-flash',
