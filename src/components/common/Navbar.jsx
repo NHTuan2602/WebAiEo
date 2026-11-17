@@ -7,6 +7,7 @@ import {
   Gamepad2,
   Key,
   LogOut,
+  Mail,
   Megaphone,
   Mic,
   Moon,
@@ -26,9 +27,11 @@ export default function Navbar({
   dailySpeakingPendingCount = 0,
   darkMode,
   handleLogout,
+  mailConfigured = false,
   notifications = [],
   onMarkNotificationsRead,
   onOpenAccountSecurity,
+  onOpenMailConfig = null,
   onOpenNotificationTarget,
   onOpenSpeakingDaily,
   openMemberProfile,
@@ -213,21 +216,35 @@ export default function Navbar({
             {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#007A7A]" />}
           </button>
 
-          {/* AI Key config button strictly for Teacher */}
+          {/* AI Key & Email OTP config shortcuts strictly for Teacher/Admin */}
           {isTeacher && (
-            <button
-              type="button"
-              onClick={() => {
-                setApiTestState({ testing: false, ok: null, message: '', model: '' });
-                setShowApiKeyModal(true);
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-rose-50/80 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-700 transition border border-rose-200/80 dark:border-slate-700 shrink-0 whitespace-nowrap"
-              title="Cấu hình Google Gemini API Key"
-            >
-              <Key className="w-3.5 h-3.5 text-[#E17100] shrink-0" />
-              <span className="hidden xl:inline">Gemini Key</span>
-              <span className={`w-2 h-2 rounded-full shrink-0 ${aiApiKey?.trim() ? 'bg-[#059271]' : 'bg-slate-400'}`} />
-            </button>
+            <>
+              {onOpenMailConfig && (
+                <button
+                  type="button"
+                  onClick={onOpenMailConfig}
+                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-rose-50/80 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-[#EDFFFD] dark:hover:bg-slate-700 transition border border-rose-200/80 dark:border-slate-700 shrink-0 whitespace-nowrap"
+                  title={mailConfigured ? 'Email OTP đang bật — Bấm để xem hoặc chỉnh sửa' : 'Chưa cấu hình Email OTP — Bấm để cài Gmail SMTP / Resend'}
+                >
+                  <Mail className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                  <span className="hidden xl:inline">Email OTP</span>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${mailConfigured ? 'bg-[#059271]' : 'bg-amber-500'}`} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setApiTestState({ testing: false, ok: null, message: '', model: '' });
+                  setShowApiKeyModal(true);
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-rose-50/80 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-700 transition border border-rose-200/80 dark:border-slate-700 shrink-0 whitespace-nowrap"
+                title="Cấu hình Google Gemini API Key"
+              >
+                <Key className="w-3.5 h-3.5 text-[#E17100] shrink-0" />
+                <span className="hidden xl:inline">Gemini Key</span>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${aiApiKey?.trim() ? 'bg-[#059271]' : 'bg-slate-400'}`} />
+              </button>
+            </>
           )}
 
           <div className="flex items-center gap-1 shrink-0">

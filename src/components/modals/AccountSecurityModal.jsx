@@ -17,7 +17,9 @@ export default function AccountSecurityModal({
   isOpen,
   initialTab = 'password',
   currentUser,
+  mailConfigured = true,
   onClose,
+  onOpenMailConfig = null,
   onUserUpdated,
   onPasswordChanged,
   showToast
@@ -387,9 +389,38 @@ export default function AccountSecurityModal({
               )}
 
               {mailError && (
-                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-xs text-rose-700 dark:text-rose-300 font-semibold flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{mailError}</span>
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-xs text-rose-700 dark:text-rose-300 font-semibold space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{mailError}</span>
+                  </div>
+                  {(currentUser.role === 'teacher' || currentUser.isSuperAdmin) && onOpenMailConfig && (!mailConfigured || mailError.includes('chưa cấu hình')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose?.();
+                        onOpenMailConfig();
+                      }}
+                      className="w-full py-2 px-3 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition"
+                    >
+                      Mở Bảng Cấu Hình Email OTP Ngay →
+                    </button>
+                  )}
+                </div>
+              )}
+              {!mailError && (currentUser.role === 'teacher' || currentUser.isSuperAdmin) && onOpenMailConfig && !mailConfigured && (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between gap-2">
+                  <span className="font-bold">Máy chủ chưa cấu hình Email OTP.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose?.();
+                      onOpenMailConfig();
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-extrabold shrink-0"
+                  >
+                    Cài đặt ngay
+                  </button>
                 </div>
               )}
 

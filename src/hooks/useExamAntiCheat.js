@@ -318,7 +318,6 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       e.stopImmediatePropagation();
       const actionMap = { paste: 'dán (Paste)', cut: 'cắt (Cut)', copy: 'sao chép (Copy)' };
       if (decision.reason === 'external-paste-blocked') {
-        notifyRestricted('Chỉ được dán nội dung đã copy từ trong bài thi! Dán từ web/app bên ngoài bị cấm.');
         recordViolation('Chặn dán văn bản từ bên ngoài bài thi (External Paste Blocked)', {
           category: 'interaction',
           severity: 'high',
@@ -326,11 +325,6 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
           cooldownMs: 3000
         });
       } else {
-        notifyRestricted(
-          allowInternalCopyPaste
-            ? 'Thao tác sao chép/dán chỉ được phép từ nội dung bài thi vào ô trả lời!'
-            : 'Sao chép / dán đã bị khóa khi bật chống gian lận!'
-        );
         recordViolation(`Thử ${actionMap[e.type] || e.type} nội dung (Đã chặn)`, {
           category: 'interaction',
           severity: 'medium',
@@ -382,7 +376,9 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       e.stopPropagation();
       e.stopImmediatePropagation();
       const label = isDevToolsOrSource ? 'mở DevTools / Kiểm tra mã nguồn' : `phím tắt (${e.key.toUpperCase()})`;
-      notifyRestricted('Phím tắt này đã bị khóa trong khi làm bài thi!');
+      if (isDevToolsOrSource) {
+        notifyRestricted('Phím tắt này đã bị khóa trong khi làm bài thi!');
+      }
       recordViolation(`Thử dùng ${label} (Đã chặn)`, {
         category: isDevToolsOrSource ? 'extension' : 'interaction',
         severity: isDevToolsOrSource ? 'high' : 'medium',
@@ -411,11 +407,6 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      notifyRestricted(
-        allowInternalCopyPaste
-          ? 'Chỉ được dán nội dung đã copy từ trong bài thi!'
-          : 'Chức năng dán văn bản (Paste) đã bị khóa trong khi thi!'
-      );
       recordViolation('Cảnh báo: Phát hiện thao tác dán văn bản từ bên ngoài / vượt khóa clipboard', {
         category: 'extension',
         severity: 'high',

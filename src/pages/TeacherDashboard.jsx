@@ -27,6 +27,7 @@ import {
   Key,
   Layers,
   Lock,
+  Mail,
   Megaphone,
   Mic,
   Music,
@@ -73,6 +74,7 @@ import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import ClassManagerTab from '../components/teacher/ClassManagerTab';
 
 export default function TeacherDashboard({
+  aiConfigured = false,
   attempts,
   classesDb = {},
   copiedRoomPin,
@@ -103,6 +105,7 @@ export default function TeacherDashboard({
   onDeleteClass,
   onNotifyMissingDaily,
   onOpenAdminTitleManager,
+  onOpenApiKeyModal,
   onOpenMailConfig,
   onUpdateClassMembers,
   onUpsertClass,
@@ -906,49 +909,69 @@ export default function TeacherDashboard({
   const lobbyPlayersList = Object.values(room.lobbyPlayers || {});
   const leaderboardPlayers = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
 
+  const navSections = [
+    {
+      title: 'Giảng Dạy & Đề Thi',
+      items: [
+        { id: 'tests', label: 'Kho Đề Thi', count: fullExamTests.length, icon: BookOpen },
+        { id: 'skill_exercises', label: 'Bài Tập 4 Kỹ Năng', count: skillExercises.length, icon: Sparkles },
+        {
+          id: 'grading',
+          label: 'Chấm Bài & Giám Sát',
+          count: pendingGradingCount > 0 ? `${pendingGradingCount} chờ` : attempts.length,
+          highlightCount: pendingGradingCount > 0,
+          icon: PenTool
+        }
+      ]
+    },
+    {
+      title: 'Lớp Học & Thành Viên',
+      items: [
+        { id: 'classes', label: 'Quản Lý Lớp Học', count: Object.keys(classesDb || {}).length, icon: Layers },
+        { id: 'accounts', label: 'Tài Khoản Lớp', count: allAccounts.length, icon: Users },
+        { id: 'game_room', label: 'Phòng Game PIN', count: `#${currentRoomPin}`, icon: Trophy }
+      ]
+    }
+  ];
+
+  const allNavItems = navSections.flatMap(sec => sec.items);
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-7 space-y-6">
-      {/* Workspace Header Card (Clean Hierarchy — Operate Mode) */}
-      <div className="bg-[#FFF7FA] dark:bg-slate-900 rounded-2xl border border-pink-200/85 dark:border-slate-800 p-6 sm:p-7 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
-        <div className="space-y-1.5">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      {/* Compact Workspace Top Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/90 dark:border-slate-800">
+        <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Bảng Điều Khiển Giáo Viên
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Quản Lý &amp; Giảng Dạy
             </h1>
             {isViewerSuperAdmin && (
-              <span className="inline-flex items-center gap-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-500/40 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold">
                 <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
               </span>
             )}
           </div>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
-            Trung tâm Ms. Như IELTS Nha Trang — Quản lý đề thi thử, bài tập 4 kỹ năng, theo dõi học sinh chưa làm bài, chấm điểm AI và phòng Game PIN trực tuyến.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            IELTS Nha Trang — {fullExamTests.length} đề thi · {skillExercises.length} bài tập kỹ năng · {studentAccountsCount} học viên
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => openExamBuilder()}
-            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs sm:text-sm font-extrabold px-5 py-3 rounded-xl transition flex items-center gap-2"
+            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
           </button>
           <button
             type="button"
-            onClick={() => setTeacherHubTab('skill_exercises')}
-            className="bg-[#570DF8]/10 hover:bg-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD] hover:text-white border border-[#570DF8]/25 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-xl transition flex items-center gap-2"
-          >
-            <Sparkles className="w-4 h-4" /> Tạo Bài Tập 4 Kỹ Năng
-          </button>
-          <button
-            type="button"
             onClick={() => setShowNotifyModal(true)}
-            className="bg-amber-50 hover:bg-amber-500 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500 hover:text-white border border-amber-300 dark:border-amber-500/40 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-xl transition flex items-center gap-2"
+            className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5"
           >
-            <Bell className="w-4 h-4" /> Gửi Thông Báo
+            <Bell className="w-3.5 h-3.5 text-amber-500" /> Thông Báo
             {notifications.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-600/15 dark:bg-white/15 text-[10px] font-black tabular-nums">
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-black tabular-nums">
                 {notifications.length}
               </span>
             )}
@@ -956,32 +979,27 @@ export default function TeacherDashboard({
         </div>
       </div>
 
-      {/* Speaking Daily Missing Compliance Strip */}
+      {/* Slim Speaking Daily Missing Compliance Bar */}
       {speakingDailyCompliance.missingStudentSummaries.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 via-orange-50/70 to-rose-50 dark:from-amber-950/35 dark:via-slate-900 dark:to-rose-950/30 border border-amber-300 dark:border-amber-500/40 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 shadow-xs">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider">
-                <Flame className="w-3 h-3" /> Cảnh Báo Speaking Daily ({speakingDailyCompliance.todayKey})
-              </span>
-              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
-                Còn {speakingDailyCompliance.missingStudentSummaries.length} học viên chưa hoàn thành bài Speaking Daily bắt buộc
-              </h2>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
-              Chưa nộp:{' '}
-              <span className="font-bold text-rose-700 dark:text-rose-300">
-                {speakingDailyCompliance.missingStudentSummaries
-                  .slice(0, 6)
-                  .map(s => `${s.student.name || s.student.username} (${s.missingTests.length} bài)`)
-                  .join(', ')}
-                {speakingDailyCompliance.missingStudentSummaries.length > 6
-                  ? ` +${speakingDailyCompliance.missingStudentSummaries.length - 6} bạn khác`
-                  : ''}
-              </span>
-            </p>
+        <div className="bg-amber-50/90 dark:bg-amber-950/25 border border-amber-200 dark:border-amber-500/35 rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black uppercase">
+              <Flame className="w-3 h-3" /> Cảnh Báo Speaking Daily ({speakingDailyCompliance.todayKey})
+            </span>
+            <span className="font-bold text-slate-900 dark:text-white">
+              Còn {speakingDailyCompliance.missingStudentSummaries.length} HS chưa nộp:
+            </span>
+            <span className="text-rose-700 dark:text-rose-300 font-semibold truncate max-w-xl">
+              {speakingDailyCompliance.missingStudentSummaries
+                .slice(0, 6)
+                .map(s => `${s.student.name || s.student.username} (${s.missingTests.length})`)
+                .join(', ')}
+              {speakingDailyCompliance.missingStudentSummaries.length > 6
+                ? ` +${speakingDailyCompliance.missingStudentSummaries.length - 6}`
+                : ''}
+            </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {onNotifyMissingDaily && speakingDailyCompliance.mandatoryDailyTests.length > 0 && (() => {
               const primaryMissingReport =
                 speakingDailyCompliance.perTest.find(r => r.missingStudents.length > 0) ||
@@ -996,7 +1014,7 @@ export default function TeacherDashboard({
                       speakingDailyCompliance.missingStudentSummaries.map(s => s.student)
                     )
                   }
-                  className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition shadow-sm inline-flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition inline-flex items-center gap-1"
                 >
                   <Megaphone className="w-3.5 h-3.5" /> Báo &amp; Nhắc Ngay ({speakingDailyCompliance.missingStudentSummaries.length} HS)
                 </button>
@@ -1008,155 +1026,190 @@ export default function TeacherDashboard({
                 setExerciseSkillFilter('speaking');
                 setTeacherHubTab('skill_exercises');
               }}
-              className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold transition"
+              className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-amber-100/70 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-amber-200 dark:border-slate-700 text-xs font-bold transition"
             >
-              Xem Bài Speaking
+              Xem chi tiết
             </button>
           </div>
         </div>
       )}
 
-      {/* Interactive Overview KPI Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <button
-          type="button"
-          onClick={() => setTeacherHubTab('tests')}
-          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
-            teacherHubTab === 'tests'
-              ? 'bg-white dark:bg-slate-900 border-[#007A7A]/50 ring-2 ring-[#007A7A]/12 shadow-md'
-              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-[#007A7A]/40 hover:shadow-sm'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Kho Đề Thi</span>
-            <span className="w-8 h-8 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center">
-              <BookOpen className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{fullExamTests.length}</p>
-          <p className="text-[11px] text-[#007A7A] dark:text-[#1EE1D6] font-semibold mt-0.5">
-            {publicFullExamsCount} đề đang công khai
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTeacherHubTab('skill_exercises')}
-          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
-            teacherHubTab === 'skill_exercises'
-              ? 'bg-white dark:bg-slate-900 border-[#570DF8]/50 ring-2 ring-[#570DF8]/12 shadow-md'
-              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-[#570DF8]/40 hover:shadow-sm'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Bài Tập 4 Kỹ Năng</span>
-            <span className="w-8 h-8 rounded-xl bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{skillExercises.length}</p>
-          <p className="text-[11px] text-[#570DF8] dark:text-[#C4B5FD] font-semibold mt-0.5">
-            Speaking AI · L · R · W
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTeacherHubTab('grading')}
-          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
-            teacherHubTab === 'grading'
-              ? 'bg-white dark:bg-slate-900 border-amber-500/60 ring-2 ring-amber-500/12 shadow-md'
-              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-amber-400 hover:shadow-sm'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Bài Nộp &amp; Chấm AI</span>
-            <span className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300 flex items-center justify-center">
-              <PenTool className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{attempts.length}</p>
-          <p className={`text-[11px] font-semibold mt-0.5 ${pendingGradingCount > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-emerald-600 dark:text-emerald-400'}`}>
-            {pendingGradingCount > 0 ? `${pendingGradingCount} bài đang chờ chấm` : 'Đã chấm toàn bộ bài nộp'}
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTeacherHubTab('accounts')}
-          className={`text-left p-4 sm:p-5 rounded-2xl border transition-all group ${
-            (teacherHubTab === 'accounts' || teacherHubTab === 'students')
-              ? 'bg-white dark:bg-slate-900 border-indigo-500/50 ring-2 ring-indigo-500/12 shadow-md'
-              : 'bg-white/90 dark:bg-slate-900/90 border-pink-200/80 dark:border-slate-800 hover:border-indigo-400 hover:shadow-sm'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Học Viên &amp; Game</span>
-            <span className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{studentAccountsCount}</p>
-          <p className="text-[11px] text-indigo-600 dark:text-indigo-300 font-semibold mt-0.5">
-            PIN #{currentRoomPin} · {lobbyPlayersList.length} chờ
-          </p>
-        </button>
-      </div>
-
-      {/* Segmented Pill Workspace Navigation */}
-      <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-2xl p-1.5 shadow-xs flex flex-wrap gap-1.5">
-        {[
-          { id: 'tests', label: '1. Kho Đề Thi', count: fullExamTests.length, icon: BookOpen, activeCls: 'bg-[#007A7A] text-white shadow-sm' },
-          { id: 'skill_exercises', label: '2. Bài Tập 4 Kỹ Năng', count: skillExercises.length, icon: Sparkles, activeCls: 'bg-[#570DF8] text-white shadow-sm' },
-          { id: 'grading', label: '3. Chấm Bài & Giám Sát', count: attempts.length, icon: PenTool, activeCls: 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-sm' },
-          { id: 'game_room', label: '4. Phòng Game PIN', count: `PIN #${currentRoomPin}`, icon: Trophy, activeCls: 'bg-emerald-600 text-white shadow-sm' },
-          { id: 'accounts', label: '5. Tài Khoản Lớp', count: allAccounts.length, icon: Users, activeCls: 'bg-indigo-600 text-white shadow-sm' },
-          { id: 'classes', label: '6. Quản Lý Lớp Học', count: Object.keys(classesDb || {}).length, icon: Layers, activeCls: 'bg-sky-600 text-white shadow-sm' }
-        ].map(tab => {
-          const IconComp = tab.icon;
-          const isActive =
-            teacherHubTab === tab.id || (tab.id === 'accounts' && teacherHubTab === 'students');
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setTeacherHubTab(tab.id)}
-              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center gap-2 ${
-                isActive
-                  ? tab.activeCls
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-rose-50/70 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <IconComp className="w-4 h-4 shrink-0" />
-              <span>{tab.label}</span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-black tabular-nums ${
+      {/* Mobile Horizontal Quick Nav + Settings */}
+      <div className="lg:hidden space-y-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {allNavItems.map(tab => {
+            const IconComp = tab.icon;
+            const isActive = teacherHubTab === tab.id || (tab.id === 'accounts' && teacherHubTab === 'students');
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setTeacherHubTab(tab.id)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 flex items-center gap-1.5 border transition ${
                   isActive
-                    ? 'bg-white/20 text-white dark:bg-slate-900/20'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800'
                 }`}
               >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
+                <IconComp className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+                <span className={`text-[10px] font-black tabular-nums ${isActive ? 'opacity-90' : 'text-slate-400'}`}>
+                  ({tab.count})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {(onOpenMailConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenMailConfig && (
+              <button
+                type="button"
+                onClick={onOpenMailConfig}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border inline-flex items-center gap-1.5 ${
+                  mailConfigured
+                    ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
+                    : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-500/35'
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5" /> Email OTP: {mailConfigured ? 'Đang bật' : 'Chưa cài'}
+              </button>
+            )}
+            {onOpenApiKeyModal && (
+              <button
+                type="button"
+                onClick={onOpenApiKeyModal}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 inline-flex items-center gap-1.5"
+              >
+                <Key className="w-3.5 h-3.5 text-amber-500" /> Gemini AI Key
+              </button>
+            )}
+            {isViewerSuperAdmin && onOpenAdminTitleManager && (
+              <button
+                type="button"
+                onClick={() => onOpenAdminTitleManager(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/35 text-amber-800 dark:text-amber-200 inline-flex items-center gap-1.5"
+              >
+                <Crown className="w-3.5 h-3.5" /> Danh Hiệu
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Main 2-Column Workspace (Desktop Sidebar + Content Area) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)] gap-6 items-start">
+        <aside className="hidden lg:block bg-white/95 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3 space-y-5 sticky top-20">
+          {navSections.map(section => (
+            <div key={section.title} className="space-y-1">
+              <p className="px-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {section.title}
+              </p>
+              {section.items.map(tab => {
+                const IconComp = tab.icon;
+                const isActive =
+                  teacherHubTab === tab.id || (tab.id === 'accounts' && teacherHubTab === 'students');
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setTeacherHubTab(tab.id)}
+                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-2 ${
+                      isActive
+                        ? 'bg-[#007A7A] text-white'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2.5 min-w-0 truncate">
+                      <IconComp className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{tab.label}</span>
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black tabular-nums shrink-0 ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : tab.highlightCount
+                          ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+
+          {(onOpenMailConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
+              <p className="px-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Cài Đặt &amp; Quản Trị
+              </p>
+              {onOpenMailConfig && (
+                <button
+                  type="button"
+                  onClick={onOpenMailConfig}
+                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2"
+                >
+                  <span className="flex items-center gap-2.5 min-w-0 truncate">
+                    <Mail className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                    <span className="truncate">{mailConfigured ? 'Email OTP: Đang bật' : 'Cấu hình Email OTP'}</span>
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                      mailConfigured
+                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200'
+                    }`}
+                  >
+                    {mailConfigured ? 'Bật' : 'Cài đặt'}
+                  </span>
+                </button>
+              )}
+              {onOpenApiKeyModal && (
+                <button
+                  type="button"
+                  onClick={onOpenApiKeyModal}
+                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2"
+                >
+                  <span className="flex items-center gap-2.5 min-w-0 truncate">
+                    <Key className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span className="truncate">Gemini AI Key</span>
+                  </span>
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${aiConfigured ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                  />
+                </button>
+              )}
+              {isViewerSuperAdmin && onOpenAdminTitleManager && (
+                <button
+                  type="button"
+                  onClick={() => onOpenAdminTitleManager(null)}
+                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-50/80 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-200/80 dark:border-amber-500/30 transition flex items-center gap-2.5"
+                >
+                  <Crown className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0" />
+                  <span className="truncate">Quản Lý &amp; Tạo Danh Hiệu</span>
+                </button>
+              )}
+            </div>
+          )}
+        </aside>
+
+        <div className="min-w-0 space-y-5">
 
       {/* Tab 2: Kho Bài Tập 4 Kỹ Năng Riêng Biệt */}
       {teacherHubTab === 'skill_exercises' && (
         <div className="space-y-4">
-          <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-3xl p-5 space-y-3.5 shadow-xs">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" />
-                  Tạo Bài Tập Cho Từng Kỹ Năng Riêng Biệt
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Chọn kỹ năng để soạn bài tập nhanh (Speaking AI, Listening, Reading, Writing) tách biệt khỏi bộ Đề Thi IELTS.
-                </p>
-              </div>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 space-y-3">
+            <div>
+              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
+                Tạo Bài Tập Cho Từng Kỹ Năng Riêng Biệt
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Chọn kỹ năng để soạn bài tập nhanh (Speaking AI, Listening, Reading, Writing).
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {SKILL_EXERCISE_BUTTONS.map(sk => {
@@ -1166,7 +1219,7 @@ export default function TeacherDashboard({
                     key={sk.id}
                     type="button"
                     onClick={() => openSingleSkillBuilder?.(sk.id)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition flex items-center gap-1.5 shadow-xs ${sk.cls}`}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${sk.cls}`}
                   >
                     <IconComp className="w-3.5 h-3.5" />
                     <span>{sk.label}</span>
@@ -1177,7 +1230,7 @@ export default function TeacherDashboard({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-slate-900 p-1 rounded-xl border border-pink-200/80 dark:border-slate-800 text-xs font-bold">
+            <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200/90 dark:border-slate-800 text-xs font-bold">
               {[
                 { id: 'all', label: `Tất cả bài tập (${skillExercises.length})` },
                 { id: 'speaking', label: `Speaking AI (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'speaking').length})` },
@@ -1191,7 +1244,7 @@ export default function TeacherDashboard({
                   onClick={() => setExerciseSkillFilter(tab.id)}
                   className={`px-3 py-1.5 rounded-lg transition ${
                     exerciseSkillFilter === tab.id
-                      ? 'bg-[#570DF8] text-white shadow-xs'
+                      ? 'bg-[#007A7A] text-white'
                       : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
@@ -1209,7 +1262,7 @@ export default function TeacherDashboard({
                   onChange={e => setItemSearchQuery(e.target.value)}
                   placeholder="Tìm bài tập..."
                   aria-label="Tìm kiếm bài tập theo tiêu đề"
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#570DF8]"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
                 />
               </div>
               <button
@@ -1217,8 +1270,8 @@ export default function TeacherDashboard({
                 onClick={() => setOnlyIncompleteFilter(prev => !prev)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
                   onlyIncompleteFilter
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-pink-200/80 dark:border-slate-800 hover:border-rose-300'
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200/90 dark:border-slate-800 hover:border-rose-300'
                 }`}
               >
                 <AlertCircle className="w-3.5 h-3.5" />
@@ -1228,10 +1281,10 @@ export default function TeacherDashboard({
           </div>
 
           {filteredSkillExercises.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-pink-200/80 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200/90 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
               {onlyIncompleteFilter
                 ? 'Tất cả bài tập trong mục này đã được 100% học sinh hoàn thành!'
-                : 'Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút + Bài Tập Speaking AI / Listening / Reading / Writing phía trên để tạo ngay.'}
+                : 'Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút kỹ năng phía trên để tạo ngay.'}
             </div>
           ) : (
             <div className="space-y-3">
@@ -1244,13 +1297,13 @@ export default function TeacherDashboard({
       {/* Tab 1: Kho Đề Thi */}
       {teacherHubTab === 'tests' && (
         <div className="space-y-4">
-          <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-2xl p-4 sm:px-5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:px-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
                 Danh Sách Đề Thi IELTS ({fullExamTests.length})
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Đề thi chuẩn 3 phần Listening · Reading · Writing. Bấm <strong>Chưa làm: ... HS</strong> để kiểm tra và nhắc học sinh.
+                Đề thi chuẩn Listening · Reading · Writing ({publicFullExamsCount} đề công khai).
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1269,19 +1322,12 @@ export default function TeacherDashboard({
                 onClick={() => setOnlyIncompleteFilter(prev => !prev)}
                 className={`px-3 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
                   onlyIncompleteFilter
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    ? 'bg-rose-600 text-white border-rose-600'
                     : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
                 }`}
               >
                 <AlertCircle className="w-3.5 h-3.5" />
                 <span>{onlyIncompleteFilter ? 'Đang lọc: Còn HS chưa làm' : 'Lọc đề còn HS chưa làm'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => openExamBuilder()}
-                className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" /> + Tạo Đề Thi Mới
               </button>
             </div>
           </div>
@@ -1885,30 +1931,30 @@ export default function TeacherDashboard({
 
       {/* Tab 4: Tạo & Quản Lý Tài Khoản */}
       {(teacherHubTab === 'accounts' || teacherHubTab === 'students') && (
-        <div className="space-y-6">
-          {/* Header, Role Filters & Creation Actions */}
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="space-y-4">
+          {/* Clean Header, Role Filters & Creation Actions */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                  <Users className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                  <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
                   Tạo &amp; Quản Lý Tài Khoản Hệ Thống ({allAccounts.length})
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Chỉ Giáo viên mới có thể tạo, cấp mật khẩu, phân quyền hoặc xóa tài khoản đăng nhập. Học viên không thể tự đăng ký bên ngoài.
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Tạo, cấp mật khẩu, phân quyền hoặc xem hồ sơ học viên.
                 </p>
               </div>
 
-              <div className="w-full lg:w-auto flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setAddStudentMode('single');
                     setShowAddStudentModal(true);
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5"
+                  className="px-3.5 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition flex items-center gap-1.5"
                 >
-                  <UserPlus className="w-4 h-4" /> + Tạo 1 Tài Khoản
+                  <UserPlus className="w-3.5 h-3.5" /> + Tạo 1 Tài Khoản
                 </button>
                 <button
                   type="button"
@@ -1916,32 +1962,10 @@ export default function TeacherDashboard({
                     setAddStudentMode('bulk');
                     setShowAddStudentModal(true);
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 text-xs font-bold transition flex items-center gap-1.5"
                 >
-                  <Users className="w-4 h-4" /> Nhập Hàng Loạt
+                  <Users className="w-3.5 h-3.5" /> Nhập Hàng Loạt
                 </button>
-                {onOpenMailConfig && (
-                  <button
-                    type="button"
-                    onClick={onOpenMailConfig}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5 border ${
-                      mailConfigured
-                        ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
-                        : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-500/35'
-                    }`}
-                  >
-                    <Send className="w-4 h-4" /> {mailConfigured ? 'Email OTP: Đang bật' : 'Cấu hình Email OTP'}
-                  </button>
-                )}
-                {isViewerSuperAdmin && onOpenAdminTitleManager && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenAdminTitleManager(null)}
-                    className="px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5"
-                  >
-                    <Crown className="w-4 h-4" /> Quản Lý &amp; Tạo Danh Hiệu
-                  </button>
-                )}
               </div>
             </div>
 
@@ -2347,6 +2371,8 @@ export default function TeacherDashboard({
           showToast={showToast}
         />
       )}
+        </div>
+      </div>
 
       {/* Student Completion Status Modal for Any Test or Exercise */}
       {completionModalTestId && (() => {
@@ -2493,7 +2519,7 @@ export default function TeacherDashboard({
               <div className="flex-1 overflow-y-auto p-6 space-y-2.5">
                 {stats.totalStudents === 0 ? (
                   <div className="text-center py-10 text-sm text-slate-500 dark:text-slate-400">
-                    Chưa có tài khoản học sinh nào. Hãy tạo tài khoản học sinh ở tab <strong>5. Tạo &amp; Quản Lý Tài Khoản</strong>.
+                    Chưa có tài khoản học sinh nào. Hãy tạo tài khoản học sinh ở mục <strong>Tài Khoản Lớp</strong>.
                   </div>
                 ) : rowsToRender.length === 0 ? (
                   <div className="text-center py-10 text-sm text-slate-500 dark:text-slate-400">

@@ -5764,10 +5764,12 @@ export default function App() {
           dailySpeakingPendingCount={dailySpeakingPendingCount}
           darkMode={darkMode}
           handleLogout={handleLogout}
+          mailConfigured={mailConfigured}
           notifications={notifications}
           onDeleteNotification={handleDeleteNotification}
           onMarkNotificationsRead={handleMarkNotificationsRead}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
+          onOpenMailConfig={() => setShowMailConfigModal(true)}
           onOpenNotificationTarget={handleOpenNotificationTarget}
           onOpenSpeakingDaily={openSpeakingDaily}
           openMemberProfile={openMemberProfile}
@@ -6140,6 +6142,11 @@ export default function App() {
           setShowVocabModal={setShowVocabModal}
           setStudentPasswordDraft={setStudentPasswordDraft}
           mailConfigured={mailConfigured}
+          aiConfigured={Boolean(aiApiKey?.trim() || aiConfigured)}
+          onOpenApiKeyModal={() => {
+            setApiTestState({ testing: false, ok: null, message: '', model: '' });
+            setShowApiKeyModal(true);
+          }}
           onOpenMailConfig={() => setShowMailConfigModal(true)}
           setStudentSearchQuery={setStudentSearchQuery}
           setTeacherHubTab={setTeacherHubTab}
@@ -6263,7 +6270,9 @@ export default function App() {
           isOpen={true}
           initialTab={accountSecurityTab || 'password'}
           currentUser={currentUser}
+          mailConfigured={mailConfigured}
           onClose={() => setAccountSecurityTab(null)}
+          onOpenMailConfig={() => setShowMailConfigModal(true)}
           onUserUpdated={handleSyncAuthenticatedUser}
           onPasswordChanged={handleSyncRememberedPassword}
           showToast={showToast}

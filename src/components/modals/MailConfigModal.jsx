@@ -257,6 +257,28 @@ export default function MailConfigModal({
 
               {form.provider === 'smtp' && (
                 <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                      Cài đặt Gmail gửi mã xác minh OTP
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm(prev => ({
+                          ...prev,
+                          provider: 'smtp',
+                          smtpHost: 'smtp.gmail.com',
+                          smtpPort: 465,
+                          smtpSecure: true,
+                          smtpUser: 'wuyan2511@gmail.com',
+                          fromEmail: prev.fromEmail || 'wuyan2511@gmail.com'
+                        }))
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/35 text-[11px] font-extrabold transition"
+                    >
+                      Điền nhanh wuyan2511@gmail.com
+                    </button>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="col-span-2">
                       <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">SMTP Host</label>
@@ -314,7 +336,15 @@ export default function MailConfigModal({
                     </div>
                     <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                       Dùng <b>App Password 16 ký tự</b> (không dùng mật khẩu Gmail thường) tại{' '}
-                      <span className="font-mono text-[10px]">myaccount.google.com/apppasswords</span> (tự bỏ khoảng trắng; nếu Port 465 lỗi hãy thử Port 587).
+                      <a
+                        href="https://myaccount.google.com/apppasswords"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[10px] text-[#007A7A] dark:text-[#1EE1D6] underline hover:opacity-80"
+                      >
+                        myaccount.google.com/apppasswords
+                      </a>{' '}
+                      (tự bỏ khoảng trắng; nếu Port 465 lỗi hãy thử Port 587).
                     </p>
                   </div>
                 </div>
