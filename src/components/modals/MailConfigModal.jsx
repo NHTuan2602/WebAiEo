@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, Mail, Save, Send, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, Mail, Save, Send, X } from 'lucide-react';
 
 export default function MailConfigModal({
   isOpen,
@@ -10,6 +10,7 @@ export default function MailConfigModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
   const [error, setError] = useState('');
   const [testRecipient, setTestRecipient] = useState('');
   const [form, setForm] = useState({
@@ -272,7 +273,10 @@ export default function MailConfigModal({
                       <input
                         type="number"
                         value={form.smtpPort}
-                        onChange={e => setForm(prev => ({ ...prev, smtpPort: Number(e.target.value) || 465 }))}
+                        onChange={e => {
+                          const nextPort = Number(e.target.value) || 465;
+                          setForm(prev => ({ ...prev, smtpPort: nextPort, smtpSecure: nextPort === 465 }));
+                        }}
                         className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
                       />
                     </div>
@@ -291,13 +295,27 @@ export default function MailConfigModal({
                     <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Mật khẩu ứng dụng (App Password) {flags.hasSmtpPass ? '(Đã lưu — để trống nếu giữ nguyên)' : ''}
                     </label>
-                    <input
-                      type="password"
-                      value={form.smtpPass}
-                      onChange={e => setForm(prev => ({ ...prev, smtpPass: e.target.value }))}
-                      placeholder="16 ký tự App Password..."
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSmtpPass ? 'text' : 'password'}
+                        value={form.smtpPass}
+                        onChange={e => setForm(prev => ({ ...prev, smtpPass: e.target.value }))}
+                        placeholder="16 ký tự App Password..."
+                        className="w-full pl-3 pr-9 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpPass(s => !s)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-0.5"
+                        aria-label="Hiện hoặc ẩn App Password"
+                      >
+                        {showSmtpPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Dùng <b>App Password 16 ký tự</b> (không dùng mật khẩu Gmail thường) tại{' '}
+                      <span className="font-mono text-[10px]">myaccount.google.com/apppasswords</span> (tự bỏ khoảng trắng; nếu Port 465 lỗi hãy thử Port 587).
+                    </p>
                   </div>
                 </div>
               )}

@@ -379,6 +379,21 @@ function recordUserLoginDay(store, user, ts = Date.now()) {
   return true;
 }
 
+function mergeAcknowledgedTitleIds(existing, incoming) {
+  if (!Array.isArray(existing) && !Array.isArray(incoming)) return undefined;
+  const set = new Set();
+  const validId = /^[a-z0-9_]{1,40}$/i;
+  (Array.isArray(existing) ? existing : []).forEach(id => {
+    const clean = String(id || '').trim();
+    if (validId.test(clean)) set.add(clean);
+  });
+  (Array.isArray(incoming) ? incoming : []).forEach(id => {
+    const clean = String(id || '').trim();
+    if (validId.test(clean)) set.add(clean);
+  });
+  return Array.from(set).slice(0, 60);
+}
+
 function parseScheduleTimestampServer(val) {
   if (val === null || val === undefined || val === '') return null;
   if (typeof val === 'number') {
@@ -449,6 +464,9 @@ function sanitizeUserForViewer(user, viewer) {
   };
   if (viewer && (viewer.username === user.username || viewer.role === 'teacher')) {
     safe.email = typeof user.email === 'string' ? user.email : '';
+  }
+  if (viewer && viewer.username === user.username && Array.isArray(user.acknowledgedTitleIds)) {
+    safe.acknowledgedTitleIds = user.acknowledgedTitleIds;
   }
   if (viewer?.isSuperAdmin && user.isSuperAdmin) {
     safe.isSuperAdmin = true;
@@ -1490,6 +1508,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
 
   if (!isTeacher && prevUser) {
     // Student may only update non-privilege profile fields on own account
+    const mergedAckSelf = mergeAcknowledgedTitleIds(prevUser.acknowledgedTitleIds, rawUser.acknowledgedTitleIds);
     const cleanSelf = {
       ...prevUser,
       name: typeof rawUser.name === 'string' && rawUser.name.trim() ? rawUser.name.trim() : prevUser.name,
@@ -1506,6 +1525,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
       emailVerifiedAt: prevUser.emailVerifiedAt || null
     };
+    if (mergedAckSelf !== undefined) cleanSelf.acknowledgedTitleIds = mergedAckSelf;
     store.users[uname] = cleanSelf;
   } else {
     const incoming = { ...rawUser, username: uname };
@@ -1513,6 +1533,11 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     incoming.email = prevUser?.email || '';
     incoming.emailVerified = Boolean(prevUser?.email && prevUser?.emailVerified);
     incoming.emailVerifiedAt = prevUser?.emailVerifiedAt || null;
+    const mergedAckTeacher = prevUser
+      ? mergeAcknowledgedTitleIds(prevUser.acknowledgedTitleIds, incoming.acknowledgedTitleIds)
+      : mergeAcknowledgedTitleIds(['newbie'], incoming.acknowledgedTitleIds);
+    if (mergedAckTeacher !== undefined) incoming.acknowledgedTitleIds = mergedAckTeacher;
+    else delete incoming.acknowledgedTitleIds;
     incoming.avatarUrl = sanitizeMediaUrl(incoming.avatarUrl, prevUser?.avatarUrl || '', true);
     incoming.profileBannerId = typeof incoming.profileBannerId === 'string' && incoming.profileBannerId
       ? incoming.profileBannerId.slice(0, 40)

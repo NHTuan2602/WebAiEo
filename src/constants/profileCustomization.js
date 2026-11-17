@@ -611,3 +611,56 @@ export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}) {
   if (summary.isHidden) return null;
   return summary.title || null;
 }
+
+export const TITLE_DIFFICULTY_RANK = {
+  'Cực Khó': 5,
+  'Khó': 4,
+  'Thử Thách': 3,
+  'Cơ Bản': 2,
+  'Khởi Đầu': 1
+};
+
+export function sortTitlesByPrestige(items = []) {
+  const orderMap = new Map(STUDENT_TITLES.map((t, idx) => [t.id, idx]));
+  return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+    const rankDiff = (TITLE_DIFFICULTY_RANK[b?.difficulty] || 0) - (TITLE_DIFFICULTY_RANK[a?.difficulty] || 0);
+    if (rankDiff !== 0) return rankDiff;
+    return (orderMap.get(b?.id) ?? -1) - (orderMap.get(a?.id) ?? -1);
+  });
+}
+
+export function evaluateTitleUnlockNotification({
+  user,
+  titleSummary,
+  localAcknowledgedIds = [],
+  hasLocalBaseline = false
+}) {
+  if (!user || !titleSummary || titleSummary.isSystemAdmin) {
+    return { shouldPersistBaseline: false, baselineToSave: null, newlyUnlockedItems: [] };
+  }
+  const unlockedIds = Array.isArray(titleSummary.unlockedIds) ? titleSummary.unlockedIds : [];
+  const serverAck = Array.isArray(user.acknowledgedTitleIds) ? user.acknowledgedTitleIds : null;
+  const localAck = Array.isArray(localAcknowledgedIds) ? localAcknowledgedIds : [];
+  const hasBaseline = serverAck !== null || Boolean(hasLocalBaseline);
+
+  if (!hasBaseline) {
+    const seedIds = unlockedIds.length > 0 ? unlockedIds : ['newbie'];
+    return {
+      shouldPersistBaseline: true,
+      baselineToSave: seedIds,
+      newlyUnlockedItems: []
+    };
+  }
+
+  const seenSet = new Set([...(serverAck || []), ...localAck, 'newbie']);
+  const freshItems = (titleSummary.itemsWithProgress || []).filter(
+    item => item && item.unlocked && !seenSet.has(item.id)
+  );
+  const needsServerSync = serverAck === null && localAck.length > 0;
+
+  return {
+    shouldPersistBaseline: needsServerSync,
+    baselineToSave: needsServerSync ? Array.from(seenSet) : null,
+    newlyUnlockedItems: sortTitlesByPrestige(freshItems)
+  };
+}

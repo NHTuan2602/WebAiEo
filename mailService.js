@@ -34,7 +34,10 @@ export function getEffectiveMailConfig(store) {
       ? process.env.SMTP_SECURE !== 'false'
       : smtpPort === 465;
   const smtpUser = String(stored.smtpUser || process.env.SMTP_USER || '').trim();
-  const smtpPass = String(stored.smtpPass || process.env.SMTP_PASS || '').trim();
+  const rawSmtpPass = String(stored.smtpPass || process.env.SMTP_PASS || '').trim();
+  const smtpPass = /gmail\.com|googlemail\.com/i.test(smtpHost)
+    ? rawSmtpPass.replace(/\s+/g, '')
+    : rawSmtpPass;
   const fromEmail = String(
     stored.fromEmail ||
       process.env.MAIL_FROM ||

@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { normalizeBrandTeacherUser } from './constants/brandInfo';
 import {
+  resolveStudentTitleSummary,
+  evaluateTitleUnlockNotification
+} from './constants/profileCustomization';
+import {
   DEFAULT_VOCAB_TEXT,
   GAME_ROUND_TIME_LIMITS,
   DEFAULT_SECTION_ORDER,
@@ -63,6 +67,7 @@ import Navbar from './components/common/Navbar';
 import GlobalModals from './components/modals/GlobalModals';
 import AccountSecurityModal from './components/modals/AccountSecurityModal';
 import MailConfigModal from './components/modals/MailConfigModal';
+import TitleUnlockedCelebrationModal from './components/modals/TitleUnlockedCelebrationModal';
 import AuthScreen from './pages/AuthScreen';
 import StudentHome from './pages/StudentHome';
 import SkillPracticeHub from './pages/SkillPracticeHub';
@@ -93,6 +98,31 @@ const loadRememberedLogins = () => {
 const persistRememberedLogins = (list) => {
   try {
     localStorage.setItem(REMEMBERED_LOGINS_KEY, JSON.stringify((Array.isArray(list) ? list : []).slice(0, 5)));
+  } catch {}
+};
+
+const SEEN_TITLES_PREFIX = 'ielts_seen_titles_v1_';
+
+const loadLocalSeenTitles = (username) => {
+  const uname = String(username || '').trim().toLowerCase();
+  if (!uname) return { hasBaseline: false, ids: [] };
+  try {
+    const raw = localStorage.getItem(`${SEEN_TITLES_PREFIX}${uname}`);
+    if (!raw) return { hasBaseline: false, ids: [] };
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return { hasBaseline: false, ids: [] };
+    return { hasBaseline: true, ids: parsed.map(x => String(x || '').trim()).filter(Boolean) };
+  } catch {
+    return { hasBaseline: false, ids: [] };
+  }
+};
+
+const persistLocalSeenTitles = (username, ids) => {
+  const uname = String(username || '').trim().toLowerCase();
+  if (!uname) return;
+  try {
+    const clean = Array.from(new Set((Array.isArray(ids) ? ids : []).map(x => String(x || '').trim()).filter(Boolean))).slice(0, 60);
+    localStorage.setItem(`${SEEN_TITLES_PREFIX}${uname}`, JSON.stringify(clean));
   } catch {}
 };
 
@@ -269,6 +299,19 @@ export default function App() {
   const [accountSecurityTab, setAccountSecurityTab] = useState(null); // null | 'password' | 'email'
   const [showMailConfigModal, setShowMailConfigModal] = useState(false);
   const [mailConfigured, setMailConfigured] = useState(false);
+  const [syncHydrated, setSyncHydrated] = useState(false);
+  const [localSeenTitlesMap, setLocalSeenTitlesMap] = useState(() => {
+    try {
+      const rawUser = localStorage.getItem('ielts_current_user');
+      const parsed = rawUser ? JSON.parse(rawUser) : null;
+      if (!parsed?.username) return {};
+      const local = loadLocalSeenTitles(parsed.username);
+      return local.hasBaseline ? { [parsed.username.toLowerCase()]: local.ids } : {};
+    } catch {
+      return {};
+    }
+  });
+  const titleBaselinePersistedRef = useRef('');
   const [liveRankDeltas, setLiveRankDeltas] = useState({});
   const prevLiveRanksRef = useRef({});
 
@@ -434,8 +477,8 @@ export default function App() {
 
   // Update User Target Band / Display Name / Goal / Role / Avatar (Teacher or Student)
   const handleUpdateUserProfileFields = async (username, patch) => {
-    if (!username || !usersDb[username]) return;
-    const targetUser = usersDb[username];
+    const targetUser = (username && usersDb[username]) || (username && currentUser?.username === username ? currentUser : null);
+    if (!username || !targetUser) return;
     const nextRole =
       patch.role && currentUser?.role === 'teacher' && username !== currentUser?.username && !targetUser.isSuperAdmin
         ? (patch.role === 'teacher' ? 'teacher' : 'student')
@@ -447,6 +490,9 @@ export default function App() {
           ? Math.min(9.0, Math.max(4.0, Math.round((Number(patch.targetBand) || 7.0) * 2) / 2))
           : targetUser.targetBand;
     const nextAvatar = patch.avatarUrl !== undefined ? (patch.avatarUrl || '') : targetUser.avatarUrl;
+    const mergedAckIds = Array.isArray(patch.acknowledgedTitleIds)
+      ? Array.from(new Set([...(Array.isArray(targetUser.acknowledgedTitleIds) ? targetUser.acknowledgedTitleIds : []), ...patch.acknowledgedTitleIds]))
+      : targetUser.acknowledgedTitleIds;
     const updatedUser = {
       ...targetUser,
       role: nextRole,
@@ -458,7 +504,8 @@ export default function App() {
       ...(patch.profileCoverUrl !== undefined ? { profileCoverUrl: patch.profileCoverUrl || '' } : {}),
       ...(patch.avatarFrameId !== undefined ? { avatarFrameId: patch.avatarFrameId || 'none' } : {}),
       ...(patch.equippedTitleId !== undefined ? { equippedTitleId: patch.equippedTitleId || 'newbie' } : {}),
-      ...(patch.showTitleBadge !== undefined ? { showTitleBadge: Boolean(patch.showTitleBadge) } : {})
+      ...(patch.showTitleBadge !== undefined ? { showTitleBadge: Boolean(patch.showTitleBadge) } : {}),
+      ...(Array.isArray(mergedAckIds) ? { acknowledgedTitleIds: mergedAckIds } : {})
     };
     setUsersDb(prev => ({ ...prev, [username]: updatedUser }));
     if (currentUser?.username === username) {
@@ -473,21 +520,23 @@ export default function App() {
       await pullServerSyncState(true);
       return false;
     }
-    const isStylingOnly =
-      patch.profileBannerId !== undefined ||
-      patch.profileCoverUrl !== undefined ||
-      patch.avatarFrameId !== undefined ||
-      patch.equippedTitleId !== undefined ||
-      patch.showTitleBadge !== undefined;
-    showToast(
-      patch.customToast
-        ? patch.customToast
-        : isStylingOnly
-        ? `Đã cập nhật giao diện hồ sơ & danh hiệu cho ${updatedUser.name}!`
-        : updatedUser.role === 'teacher'
-        ? `Đã cập nhật tài khoản ${updatedUser.isSuperAdmin ? 'Quản trị' : 'Giáo viên'} ${updatedUser.name}!`
-        : `Đã cập nhật tài khoản ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`
-    );
+    if (!patch.silentToast) {
+      const isStylingOnly =
+        patch.profileBannerId !== undefined ||
+        patch.profileCoverUrl !== undefined ||
+        patch.avatarFrameId !== undefined ||
+        patch.equippedTitleId !== undefined ||
+        patch.showTitleBadge !== undefined;
+      showToast(
+        patch.customToast
+          ? patch.customToast
+          : isStylingOnly
+          ? `Đã cập nhật giao diện hồ sơ & danh hiệu cho ${updatedUser.name}!`
+          : updatedUser.role === 'teacher'
+          ? `Đã cập nhật tài khoản ${updatedUser.isSuperAdmin ? 'Quản trị' : 'Giáo viên'} ${updatedUser.name}!`
+          : `Đã cập nhật tài khoản ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`
+      );
+    }
   };
 
   // Teacher Action: Duplicate Test (defaults copy to private so students can't accidentally open it)
@@ -1193,7 +1242,18 @@ export default function App() {
       setCurrentUser(prev => {
         if (!prev || !snap.users[prev.username]) return prev;
         const remote = normalizeBrandTeacherUser(snap.users[prev.username]);
-        return JSON.stringify(prev) === JSON.stringify(remote) ? prev : { ...prev, ...remote };
+        const hasMergedAck = Array.isArray(prev.acknowledgedTitleIds) || Array.isArray(remote.acknowledgedTitleIds);
+        const mergedAckIds = hasMergedAck
+          ? Array.from(new Set([...(prev.acknowledgedTitleIds || []), ...(remote.acknowledgedTitleIds || [])]))
+          : undefined;
+        const nextUser = {
+          ...prev,
+          ...remote,
+          ...(hasMergedAck ? { acknowledgedTitleIds: mergedAckIds } : {})
+        };
+        if (JSON.stringify(prev) === JSON.stringify(nextUser)) return prev;
+        currentUserRef.current = nextUser;
+        return nextUser;
       });
     }
     if (Array.isArray(snap.customVocabTopics)) {
@@ -1382,6 +1442,10 @@ export default function App() {
 
         if (sessionData.authenticated && sessionData.user) {
           const cleanUser = normalizeBrandTeacherUser(sessionData.user);
+          const localSeen = loadLocalSeenTitles(cleanUser.username);
+          if (localSeen.hasBaseline) {
+            setLocalSeenTitlesMap(prev => ({ ...prev, [cleanUser.username.toLowerCase()]: localSeen.ids }));
+          }
           setCurrentUser(cleanUser);
           currentUserRef.current = cleanUser;
           if (sessionData.snapshot) {
@@ -1409,6 +1473,7 @@ export default function App() {
           }
         }
         bootSessionCheckedRef.current = true;
+        setSyncHydrated(true);
       }
     };
 
@@ -2647,9 +2712,29 @@ export default function App() {
       const cleanUser = normalizeBrandTeacherUser(nextUser);
       const targetKey = String(cleanUser.username || '').toLowerCase();
       currentUserRef.current = cleanUser;
-      setCurrentUser(cleanUser);
-      setUsersDb(prev => prev.map(u => (String(u.username || '').toLowerCase() === targetKey ? { ...u, ...cleanUser } : u)));
-      setSelectedProfileStudent(prev => (prev && String(prev.username || '').toLowerCase() === targetKey ? { ...prev, ...cleanUser } : prev));
+      setCurrentUser(prev => {
+        const mergedAck =
+          Array.isArray(prev?.acknowledgedTitleIds) || Array.isArray(cleanUser.acknowledgedTitleIds)
+            ? Array.from(new Set([...(prev?.acknowledgedTitleIds || []), ...(cleanUser.acknowledgedTitleIds || [])]))
+            : undefined;
+        return {
+          ...(prev || {}),
+          ...cleanUser,
+          ...(mergedAck ? { acknowledgedTitleIds: mergedAck } : {})
+        };
+      });
+      setUsersDb(prev => {
+        const prevMap = prev && typeof prev === 'object' ? prev : {};
+        const matchedKey =
+          Object.keys(prevMap).find(k => k.toLowerCase() === targetKey) || cleanUser.username;
+        return {
+          ...prevMap,
+          [matchedKey]: {
+            ...(prevMap[matchedKey] || {}),
+            ...cleanUser
+          }
+        };
+      });
     }
     if (nextSnap && typeof nextSnap === 'object') {
       applyRemoteSnapshotData.current?.(nextSnap);
@@ -2671,11 +2756,18 @@ export default function App() {
         persistRememberedLogins(nextList);
         return nextList;
       });
-      setUsersDb(prev => prev.map(u => (
-        String(u.username || '').toLowerCase() === cleanTarget
-          ? { ...u, password: cleanPass }
-          : u
-      )));
+      setUsersDb(prev => {
+        const prevMap = prev && typeof prev === 'object' ? prev : {};
+        const matchedKey = Object.keys(prevMap).find(k => k.toLowerCase() === cleanTarget);
+        if (!matchedKey) return prevMap;
+        return {
+          ...prevMap,
+          [matchedKey]: {
+            ...prevMap[matchedKey],
+            pass: cleanPass
+          }
+        };
+      });
       setAuthForm(prev => {
         const formUname = String(prev.username || '').trim().replace(/^@+/, '').toLowerCase();
         if (formUname === cleanTarget) {
@@ -2777,7 +2869,12 @@ export default function App() {
     setSelectedAttemptId(null);
     setSelectedProfileStudent(null);
     currentUserRef.current = loggedInUser;
+    const localSeen = loadLocalSeenTitles(loggedInUser.username);
+    if (localSeen.hasBaseline) {
+      setLocalSeenTitlesMap(prev => ({ ...prev, [loggedInUser.username.toLowerCase()]: localSeen.ids }));
+    }
     setCurrentUser(loggedInUser);
+    setSyncHydrated(true);
     if (loggedInUser.role === 'teacher') {
       setView('TEACHER_DASHBOARD');
       showToast(
@@ -2823,6 +2920,8 @@ export default function App() {
     setFocusedTestId(null);
     setAccountSecurityTab(null);
     setShowMailConfigModal(false);
+    setSyncHydrated(false);
+    titleBaselinePersistedRef.current = '';
     serverBonusTotalRef.current = 0;
     currentUserRef.current = null;
     setCurrentUser(null);
@@ -5236,6 +5335,82 @@ export default function App() {
   }, [view, gameRound, activeQuestion, gameSubState]);
 
 
+  const titleUnlockEval = (() => {
+    if (!syncHydrated || !currentUser?.username) {
+      return { shouldPersistBaseline: false, baselineToSave: null, newlyUnlockedItems: [] };
+    }
+    const unameKey = currentUser.username.toLowerCase();
+    const hasLocal = Object.prototype.hasOwnProperty.call(localSeenTitlesMap, unameKey);
+    const localAck = hasLocal ? localSeenTitlesMap[unameKey] : [];
+    const summary = resolveStudentTitleSummary(currentUser, attempts, roomsDb);
+    return evaluateTitleUnlockNotification({
+      user: currentUser,
+      titleSummary: summary,
+      localAcknowledgedIds: localAck,
+      hasLocalBaseline: hasLocal
+    });
+  })();
+
+  const handleUpdateUserProfileFieldsRef = useRef(null);
+  handleUpdateUserProfileFieldsRef.current = handleUpdateUserProfileFields;
+  const titleBaselineKey = (titleUnlockEval.baselineToSave || []).join(',');
+
+  useEffect(() => {
+    const uname = currentUser?.username;
+    if (!syncHydrated || !uname || !titleUnlockEval.shouldPersistBaseline || !titleBaselineKey) {
+      return;
+    }
+    const cacheKey = `${uname.toLowerCase()}:${titleBaselineKey}`;
+    if (titleBaselinePersistedRef.current === cacheKey) return;
+    titleBaselinePersistedRef.current = cacheKey;
+    const ids = titleBaselineKey.split(',').filter(Boolean);
+    persistLocalSeenTitles(uname, ids);
+    Promise.resolve().then(() => {
+      setLocalSeenTitlesMap(prev => ({ ...prev, [uname.toLowerCase()]: ids }));
+      handleUpdateUserProfileFieldsRef.current?.(uname, {
+        acknowledgedTitleIds: ids,
+        silentToast: true
+      });
+    });
+  }, [syncHydrated, currentUser?.username, titleUnlockEval.shouldPersistBaseline, titleBaselineKey]);
+
+  const canShowTitleCelebration =
+    syncHydrated &&
+    Boolean(currentUser?.username) &&
+    view !== 'AUTH' &&
+    view !== 'EXAM_MODE' &&
+    view !== 'SPEAKING_MODE' &&
+    !(view === 'GAME_ARENA' && gameSubState === 'PLAYING');
+
+  const activeCelebratingTitles = canShowTitleCelebration ? titleUnlockEval.newlyUnlockedItems : [];
+
+  const handleAcknowledgeTitles = ({ equipTitle = null, openProfile = false } = {}) => {
+    const uname = currentUser?.username;
+    if (!uname) return;
+    const unameKey = uname.toLowerCase();
+    const newlyIds = activeCelebratingTitles.map(item => item.id).filter(Boolean);
+    const mergedIds = Array.from(
+      new Set([
+        ...(Array.isArray(currentUser.acknowledgedTitleIds) ? currentUser.acknowledgedTitleIds : []),
+        ...(Array.isArray(localSeenTitlesMap[unameKey]) ? localSeenTitlesMap[unameKey] : []),
+        ...newlyIds,
+        'newbie'
+      ])
+    );
+    persistLocalSeenTitles(uname, mergedIds);
+    setLocalSeenTitlesMap(prev => ({ ...prev, [unameKey]: mergedIds }));
+    handleUpdateUserProfileFields(uname, {
+      acknowledgedTitleIds: mergedIds,
+      ...(equipTitle ? { equippedTitleId: equipTitle.id, showTitleBadge: true } : {}),
+      ...(equipTitle
+        ? { customToast: `Đã trang bị danh hiệu mới: ${equipTitle.icon} ${equipTitle.label}!` }
+        : { silentToast: true })
+    });
+    if (openProfile) {
+      openMemberProfile(uname, view);
+    }
+  };
+
   // ==========================================
   // MAIN VIEW ROUTER
   // ==========================================
@@ -5727,6 +5902,16 @@ export default function App() {
           onClose={() => setShowMailConfigModal(false)}
           onConfiguredChange={setMailConfigured}
           showToast={showToast}
+        />
+      )}
+
+      {activeCelebratingTitles.length > 0 && (
+        <TitleUnlockedCelebrationModal
+          key={activeCelebratingTitles.map(t => t.id).join(',')}
+          titles={activeCelebratingTitles}
+          onEquipTitle={item => handleAcknowledgeTitles({ equipTitle: item })}
+          onOpenProfile={() => handleAcknowledgeTitles({ openProfile: true })}
+          onDismiss={() => handleAcknowledgeTitles()}
         />
       )}
     </div>
