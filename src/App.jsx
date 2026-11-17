@@ -70,6 +70,28 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import GameArena from './pages/GameArena';
 import ExamBuilder from './pages/ExamBuilder';
 
+const REMEMBERED_LOGINS_KEY = 'ielts_remembered_logins_v1';
+const REMEMBER_PREF_KEY = 'ielts_remember_password_pref_v1';
+
+const loadRememberedLogins = () => {
+  try {
+    const raw = localStorage.getItem(REMEMBERED_LOGINS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(item => item && typeof item.username === 'string' && item.username.trim() && typeof item.password === 'string' && item.password)
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
+};
+
+const persistRememberedLogins = (list) => {
+  try {
+    localStorage.setItem(REMEMBERED_LOGINS_KEY, JSON.stringify((Array.isArray(list) ? list : []).slice(0, 5)));
+  } catch {}
+};
+
 // ==========================================
 // 2. MAIN APPLICATION COMPONENT
 // ==========================================
@@ -583,6 +605,16 @@ export default function App() {
       setUsersDb(prev => ({ ...prev, [uname]: updatedOffline }));
     }
     dispatchSyncAction('RESET_USER_PASSWORD', { username: uname, password: nextPass });
+    setRememberedLogins(prev => {
+      if (!prev.some(item => item.username.toLowerCase() === uname.toLowerCase())) return prev;
+      const updatedList = prev.map(item =>
+        item.username.toLowerCase() === uname.toLowerCase()
+          ? { ...item, password: nextPass, savedAt: Date.now() }
+          : item
+      );
+      persistRememberedLogins(updatedList);
+      return updatedList;
+    });
     setEditingStudentAccount(null);
     setStudentPasswordDraft('');
     showToast(`Đã đặt lại mật khẩu mới cho tài khoản ${baseUser.name || uname}!`);
@@ -835,8 +867,32 @@ export default function App() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   // Auth Form State (Login-only, accounts created strictly by Teachers)
-  const [authForm, setAuthForm] = useState({ username: '', password: '', fullName: '' });
+  const [rememberPassword, setRememberPassword] = useState(() => {
+    try {
+      return localStorage.getItem(REMEMBER_PREF_KEY) !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  const [rememberedLogins, setRememberedLogins] = useState(() => loadRememberedLogins());
+  const [authForm, setAuthForm] = useState(() => {
+    let shouldRemember = true;
+    try {
+      shouldRemember = localStorage.getItem(REMEMBER_PREF_KEY) !== 'false';
+    } catch {}
+    const list = loadRememberedLogins();
+    if (shouldRemember && list[0]) {
+      return { username: list[0].username, password: list[0].password, fullName: '' };
+    }
+    return { username: '', password: '', fullName: '' };
+  });
   const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(REMEMBER_PREF_KEY, rememberPassword ? 'true' : 'false');
+    } catch {}
+  }, [rememberPassword]);
 
   // Teacher Hub Sub-Tab ('tests', 'grading', 'game_room', 'accounts')
   const [teacherHubTab, setTeacherHubTab] = useState(() => (
@@ -2459,11 +2515,34 @@ export default function App() {
   // ==========================================
   // AUTHENTICATION HANDLERS
   // ==========================================
+  const handleSelectRememberedLogin = (entry) => {
+    if (!entry) return;
+    setAuthError('');
+    setRememberPassword(true);
+    setAuthForm({
+      username: entry.username || '',
+      password: entry.password || '',
+      fullName: ''
+    });
+  };
+
+  const handleRemoveRememberedLogin = (targetUsername) => {
+    const cleanTarget = String(targetUsername || '').toLowerCase();
+    setRememberedLogins(prev => {
+      const filtered = prev.filter(item => item.username.toLowerCase() !== cleanTarget);
+      persistRememberedLogins(filtered);
+      return filtered;
+    });
+    if (authForm.username.trim().replace(/^@+/, '').toLowerCase() === cleanTarget) {
+      setAuthForm(prev => ({ ...prev, password: '' }));
+    }
+  };
+
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
 
-    const uname = authForm.username.trim();
+    const uname = authForm.username.trim().replace(/^@+/, '');
     const pass = authForm.password.trim();
 
     if (!uname || !pass) {
@@ -2500,7 +2579,10 @@ export default function App() {
     }
 
     if (!serverResponded) {
-      const localUser = usersDb[uname];
+      const matchedOfflineKey = usersDb[uname]
+        ? uname
+        : Object.keys(usersDb || {}).find(k => k.toLowerCase() === uname.toLowerCase());
+      const localUser = matchedOfflineKey ? usersDb[matchedOfflineKey] : null;
       if (!localUser || localUser.pass !== pass) {
         setAuthError('Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
         return;
@@ -2508,6 +2590,26 @@ export default function App() {
       authEpochRef.current += 1;
       loggedInUser = normalizeBrandTeacherUser(localUser);
     }
+
+    setRememberedLogins(prev => {
+      const withoutCurr = prev.filter(
+        item => item.username.toLowerCase() !== loggedInUser.username.toLowerCase()
+      );
+      const nextList = rememberPassword
+        ? [
+            {
+              username: loggedInUser.username,
+              password: pass,
+              name: loggedInUser.name || loggedInUser.username,
+              role: loggedInUser.isSuperAdmin ? 'admin' : (loggedInUser.role || 'student'),
+              savedAt: Date.now()
+            },
+            ...withoutCurr
+          ].slice(0, 5)
+        : withoutCurr;
+      persistRememberedLogins(nextList);
+      return nextList;
+    });
 
     clearNavSession();
     setSelectedTestId(null);
@@ -2529,6 +2631,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    const prevUsername = currentUserRef.current?.username || currentUser?.username || '';
     authEpochRef.current += 1;
     fetch('/api/sync/auth/logout', { method: 'POST' }).catch(() => {});
     clearTimeout(autoNextTimerRef.current);
@@ -2557,7 +2660,15 @@ export default function App() {
     currentUserRef.current = null;
     setCurrentUser(null);
     setView('AUTH');
-    setAuthForm({ username: '', password: '', fullName: '' });
+    const savedList = loadRememberedLogins();
+    const matchedSaved = prevUsername
+      ? savedList.find(item => item.username.toLowerCase() === prevUsername.toLowerCase()) || savedList[0]
+      : savedList[0];
+    if (rememberPassword && matchedSaved) {
+      setAuthForm({ username: matchedSaved.username, password: matchedSaved.password, fullName: '' });
+    } else {
+      setAuthForm({ username: '', password: '', fullName: '' });
+    }
     setAuthError('');
   };
 
@@ -4934,9 +5045,14 @@ export default function App() {
           authForm={authForm}
           darkMode={darkMode}
           handleAuthSubmit={handleAuthSubmit}
+          onRemoveRememberedLogin={handleRemoveRememberedLogin}
+          onSelectRememberedLogin={handleSelectRememberedLogin}
+          rememberPassword={rememberPassword}
+          rememberedLogins={rememberedLogins}
           setAuthError={setAuthError}
           setAuthForm={setAuthForm}
           setDarkMode={setDarkMode}
+          setRememberPassword={setRememberPassword}
           setShowAuthPass={setShowAuthPass}
           showAuthPass={showAuthPass}
         />

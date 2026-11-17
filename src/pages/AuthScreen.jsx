@@ -16,7 +16,9 @@ import {
   Phone,
   ShieldCheck,
   Sparkles,
-  Sun
+  Sun,
+  UserCheck,
+  X
 } from 'lucide-react';
 import BrandContactFooter from '../components/common/BrandContactFooter';
 import { BRAND_INFO } from '../constants/brandInfo';
@@ -26,9 +28,14 @@ export default function AuthScreen({
   authForm,
   darkMode,
   handleAuthSubmit,
+  onRemoveRememberedLogin,
+  onSelectRememberedLogin,
+  rememberPassword = false,
+  rememberedLogins = [],
   setAuthError,
   setAuthForm,
   setDarkMode,
+  setRememberPassword,
   setShowAuthPass,
   showAuthPass
 }) {
@@ -241,34 +248,100 @@ export default function AuthScreen({
                 </div>
 
                 {authError && (
-                  <div className="p-3 bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 rounded-xl text-xs text-[#E7000B] dark:text-rose-300 mb-4 flex items-center gap-2 font-semibold">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>{authError}</span>
+                  <div className="p-3 bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 rounded-xl text-xs text-[#E7000B] dark:text-rose-300 mb-4 space-y-1">
+                    <div className="flex items-center gap-2 font-bold">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{authError}</span>
+                    </div>
+                    <p className="text-[11px] text-rose-700/90 dark:text-rose-200/80 pl-6 leading-relaxed">
+                      Kiểm tra lại Caps Lock, tắt gõ dấu tiếng Việt ở ô username (không cần nhập dấu @) và đảm bảo dùng đúng mật khẩu hiện tại trên hệ thống.
+                    </p>
                   </div>
                 )}
 
-                <form onSubmit={handleAuthSubmit} className="space-y-4">
+                {rememberedLogins.length > 0 && (
+                  <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/65 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                    <p className="text-[11px] font-bold text-[#314158] dark:text-slate-300 flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                      Tài khoản đã nhớ trên máy này (bấm để điền nhanh):
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {rememberedLogins.map(item => {
+                        const isSelected = authForm.username?.trim().toLowerCase() === item.username.toLowerCase();
+                        return (
+                          <div
+                            key={item.username}
+                            className={`inline-flex items-center gap-1 rounded-lg border text-[11px] font-bold transition ${
+                              isSelected
+                                ? 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] text-[#007A7A] dark:text-[#1EE1D6]'
+                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => onSelectRememberedLogin?.(item)}
+                              className="px-2.5 py-1 flex items-center gap-1.5 hover:opacity-80"
+                            >
+                              <span className="truncate max-w-[120px]">{item.name || item.username}</span>
+                              <span className="font-mono opacity-75">@{item.username}</span>
+                            </button>
+                            {onRemoveRememberedLogin && (
+                              <button
+                                type="button"
+                                onClick={() => onRemoveRememberedLogin(item.username)}
+                                className="pr-1.5 pl-0.5 py-1 text-slate-400 hover:text-rose-600 transition"
+                                title={`Quên mật khẩu đã lưu của ${item.username}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleAuthSubmit} autoComplete="on" className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#314158] dark:text-slate-300 mb-1.5">Tên đăng nhập</label>
+                    <label htmlFor="login-username" className="block text-xs font-bold text-[#314158] dark:text-slate-300 mb-1.5">Tên đăng nhập</label>
                     <input
+                      id="login-username"
+                      name="username"
                       type="text"
                       required
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       placeholder="Nhập username..."
                       value={authForm.username}
-                      onChange={e => setAuthForm({ ...authForm, username: e.target.value })}
+                      onChange={e => {
+                        if (authError) setAuthError?.('');
+                        setAuthForm({ ...authForm, username: e.target.value });
+                      }}
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-[#0F172B] dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-[#007A7A] focus:border-[#007A7A] focus:outline-none transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#314158] dark:text-slate-300 mb-1.5">Mật khẩu</label>
+                    <label htmlFor="login-password" className="block text-xs font-bold text-[#314158] dark:text-slate-300 mb-1.5">Mật khẩu</label>
                     <div className="relative">
                       <input
+                        id="login-password"
+                        name="password"
                         type={showAuthPass ? 'text' : 'password'}
                         required
+                        autoComplete="current-password"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder="Nhập mật khẩu..."
                         value={authForm.password}
-                        onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                        onChange={e => {
+                          if (authError) setAuthError?.('');
+                          setAuthForm({ ...authForm, password: e.target.value });
+                        }}
                         className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-[#0F172B] dark:text-slate-100 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-[#007A7A] focus:border-[#007A7A] focus:outline-none transition"
                       />
                       <button
@@ -276,11 +349,24 @@ export default function AuthScreen({
                         onClick={() => setShowAuthPass(v => !v)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#007A7A] dark:hover:text-[#1EE1D6]"
                         tabIndex={-1}
+                        aria-label={showAuthPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       >
                         {showAuthPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
+
+                  {setRememberPassword && (
+                    <label className="flex items-center gap-2 text-xs font-semibold text-[#314158] dark:text-slate-300 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(rememberPassword)}
+                        onChange={e => setRememberPassword(e.target.checked)}
+                        className="w-4 h-4 rounded accent-[#007A7A]"
+                      />
+                      <span>Nhớ tài khoản &amp; mật khẩu cho lần đăng nhập sau</span>
+                    </label>
+                  )}
 
                   <button
                     type="submit"

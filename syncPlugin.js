@@ -2226,18 +2226,25 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     if (req.method === 'POST' && reqUrl === '/auth/login') {
       try {
         const body = await readJsonBody(req);
-        const username = String(body?.username || '').trim();
+        const rawUsername = String(body?.username || '').trim().replace(/^@+/, '');
         const password = String(body?.password || '').trim();
         const ip = getClientIp(req);
 
-        if (!checkRateLimit(store._rateLimits, `login:${ip}:${username}`)) {
+        const matchedKey = rawUsername
+          ? (store.users?.[rawUsername]
+              ? rawUsername
+              : Object.keys(store.users || {}).find(k => k.toLowerCase() === rawUsername.toLowerCase()))
+          : null;
+        const rateKey = `login:${ip}:${(matchedKey || rawUsername).toLowerCase()}`;
+
+        if (!checkRateLimit(store._rateLimits, rateKey)) {
           res.statusCode = 429;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ ok: false, error: 'Thử đăng nhập sai quá nhiều lần. Vui lòng đợi vài phút rồi thử lại.' }));
           return;
         }
 
-        const user = username ? store.users?.[username] : null;
+        const user = matchedKey ? store.users?.[matchedKey] : null;
         if (!user || !(await verifyPasswordAsync(password, user))) {
           res.statusCode = 401;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
