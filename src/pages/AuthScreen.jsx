@@ -291,41 +291,14 @@ export default function AuthScreen({
                   </button>
                 </form>
 
-                {/* Quick Demo Logins */}
-                <div className="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#62748E] dark:text-slate-400 mb-2.5">
-                    Tài khoản mẫu có sẵn
+                  <p className="mt-5 pt-4 border-t border-slate-200/80 dark:border-slate-800 text-[11px] font-medium text-[#62748E] dark:text-slate-400 text-center">
+                    Tài khoản Giáo viên và Học viên được tạo &amp; cấp nội bộ bởi trung tâm.
                   </p>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthError('');
-                        setAuthForm({ username: 'hocsinh_01', password: '123456', fullName: '' });
-                      }}
-                      className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 border border-slate-200 dark:border-slate-700 hover:border-[#B5F5F1] rounded-xl transition text-left"
-                    >
-                      <span className="block text-xs font-bold text-[#0F172B] dark:text-slate-100">Học viên mẫu</span>
-                      <span className="font-mono text-[10px] text-[#62748E] dark:text-slate-400">hocsinh_01 / 123456</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthError('');
-                        setAuthForm({ username: 'teacher_ielts', password: '123456', fullName: '' });
-                      }}
-                      className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-orange-50 dark:hover:bg-orange-500/15 border border-slate-200 dark:border-slate-700 hover:border-orange-200 rounded-xl transition text-left"
-                    >
-                      <span className="block text-xs font-bold text-[#0F172B] dark:text-slate-100">Giáo viên ({BRAND_INFO.teacherName})</span>
-                      <span className="font-mono text-[10px] text-[#62748E] dark:text-slate-400">teacher_ielts / 123456</span>
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
 
       {/* Deep Navy Branded Footer Strip with Contact Info */}
       <footer className="bg-[#0F172B] text-slate-300 border-t border-slate-800 px-4 sm:px-6 py-8 sm:py-10">

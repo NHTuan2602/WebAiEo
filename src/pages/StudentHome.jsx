@@ -38,6 +38,7 @@ export default function StudentHome({
   setSelectedProfileStudent,
   setView,
   startExam,
+  supportAdminProfile = null,
   tests,
   usersDb = {}
 }) {
@@ -546,8 +547,8 @@ export default function StudentHome({
 
         {/* Clean Student Attempt History */}
         <section>
-          {/* Class Members Directory Strip (View Teacher & Peer Profiles) */}
-          {Object.keys(usersDb || {}).length > 0 && (
+          {/* Class Members Directory Strip (View Teacher, System Admin & Peer Profiles) */}
+          {(Object.keys(usersDb || {}).length > 0 || supportAdminProfile) && (
             <div className="mb-8 bg-[#FFF5F8] dark:bg-[#0F172B] border border-rose-200/85 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                 <div className="flex items-center gap-3">
@@ -556,7 +557,7 @@ export default function StudentHome({
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white">Thành Viên Lớp Học &amp; Hồ Sơ</h3>
-                    <p className="text-xs sm:text-sm text-[#62748E] dark:text-slate-400">Xem hồ sơ giáo viên và tiến độ học tập của các thành viên trong lớp</p>
+                    <p className="text-xs sm:text-sm text-[#62748E] dark:text-slate-400">Xem hồ sơ giáo viên, góp ý quản trị hệ thống và tiến độ học tập lớp học</p>
                   </div>
                 </div>
                 <button
@@ -576,61 +577,78 @@ export default function StudentHome({
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {Object.entries(usersDb || {})
-                  .filter(([uname, u]) => u && !u.isSuperAdmin && !u.hiddenFromTeacher && uname !== 'tuanpro123s')
-                  .sort(([uA, a], [uB, b]) => {
-                    if (a?.role === 'teacher' && b?.role !== 'teacher') return -1;
-                    if (a?.role !== 'teacher' && b?.role === 'teacher') return 1;
-                    if (uA === currentUser?.username) return -1;
-                    if (uB === currentUser?.username) return 1;
-                    return (a?.name || uA).localeCompare(b?.name || uB, 'vi');
-                  })
-                  .slice(0, 9)
-                  .map(([uname, u]) => {
-                    const isSelf = uname === currentUser?.username;
-                    const memberIsTeacher = u?.role === 'teacher';
-                    const memberAttCount = (attempts || []).filter(att => att.studentId === uname).length;
-                    return (
-                      <button
-                        key={uname}
-                        type="button"
-                        onClick={() => {
-                          if (openMemberProfile) {
-                            openMemberProfile(uname, 'HOME');
-                          } else {
-                            setPreviousView('HOME');
-                            setSelectedProfileStudent(uname);
-                            setView('STUDENT_PROFILE');
-                          }
-                        }}
-                        className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl border border-pink-200/90 dark:border-slate-800 bg-rose-50/55 dark:bg-slate-900/60 hover:border-[#007A7A] dark:hover:border-teal-500 hover:bg-[#EDFFFD]/70 dark:hover:bg-teal-950/30 transition text-left group"
-                      >
-                        <UserAvatarBadge user={{ ...u, username: uname }} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-extrabold text-[#0F172B] dark:text-white truncate group-hover:text-teal-700 dark:group-hover:text-teal-300">
-                              {u?.name || uname}
-                            </span>
-                            {isSelf && (
-                              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-rose-200/70 dark:bg-slate-700 text-rose-900 dark:text-slate-200 shrink-0">Bạn</span>
-                            )}
+                {(() => {
+                  const rawEntries = Object.entries(usersDb || {}).filter(
+                    ([uname, u]) => u && !u.isSuperAdmin && !u.hiddenFromTeacher && uname !== 'tuanpro123s'
+                  );
+                  if (supportAdminProfile?.username) {
+                    rawEntries.push([
+                      supportAdminProfile.username,
+                      { ...supportAdminProfile, isSystemAdmin: true }
+                    ]);
+                  }
+                  const rankOf = (u) => (u?.isSystemAdmin ? 1 : u?.role === 'teacher' ? 0 : 2);
+                  return rawEntries
+                    .sort(([uA, a], [uB, b]) => {
+                      if (rankOf(a) !== rankOf(b)) return rankOf(a) - rankOf(b);
+                      if (uA === currentUser?.username) return -1;
+                      if (uB === currentUser?.username) return 1;
+                      return (a?.name || uA).localeCompare(b?.name || uB, 'vi');
+                    })
+                    .slice(0, 9)
+                    .map(([uname, u]) => {
+                      const isSelf = uname === currentUser?.username;
+                      const memberIsAdmin = Boolean(u?.isSystemAdmin);
+                      const memberIsTeacher = !memberIsAdmin && u?.role === 'teacher';
+                      const memberAttCount = (attempts || []).filter(att => att.studentId === uname).length;
+                      return (
+                        <button
+                          key={uname}
+                          type="button"
+                          onClick={() => {
+                            if (openMemberProfile) {
+                              openMemberProfile(uname, 'HOME');
+                            } else {
+                              setPreviousView('HOME');
+                              setSelectedProfileStudent(uname);
+                              setView('STUDENT_PROFILE');
+                            }
+                          }}
+                          className={`flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl border transition text-left group ${
+                            memberIsAdmin
+                              ? 'border-purple-200/90 dark:border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20 hover:border-purple-500'
+                              : 'border-pink-200/90 dark:border-slate-800 bg-rose-50/55 dark:bg-slate-900/60 hover:border-[#007A7A] dark:hover:border-teal-500 hover:bg-[#EDFFFD]/70 dark:hover:bg-teal-950/30'
+                          }`}
+                        >
+                          <UserAvatarBadge user={{ ...u, username: uname }} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-extrabold text-[#0F172B] dark:text-white truncate group-hover:text-teal-700 dark:group-hover:text-teal-300">
+                                {u?.name || uname}
+                              </span>
+                              {isSelf && (
+                                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-rose-200/70 dark:bg-slate-700 text-rose-900 dark:text-slate-200 shrink-0">Bạn</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                memberIsAdmin
+                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'
+                                  : memberIsTeacher
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                                  : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300'
+                              }`}>
+                                {memberIsAdmin ? 'Quản trị hệ thống' : memberIsTeacher ? 'Giáo viên' : 'Học viên'}
+                              </span>
+                              <span className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                                {memberIsAdmin ? 'Góp ý tính năng' : memberIsTeacher ? 'Hồ sơ giảng viên' : `${memberAttCount} bài thi`}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                              memberIsTeacher
-                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                                : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300'
-                            }`}>
-                              {memberIsTeacher ? 'Giáo viên' : 'Học viên'}
-                            </span>
-                            <span className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                              {memberIsTeacher ? 'Hồ sơ giảng viên' : `${memberAttCount} bài thi`}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    });
+                })()}
               </div>
             </div>
           )}

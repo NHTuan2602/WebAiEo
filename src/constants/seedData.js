@@ -1052,173 +1052,10 @@ However, energy storage remains a critical bottleneck. Solar power output fluctu
   }
 ];
 
-export const DEFAULT_ATTEMPTS = [
-  {
-    id: 'att-101',
-    testId: 'test-1',
-    testTitle: 'IELTS Academic Practice Test 01 - Full Simulation',
-    studentId: 'hocsinh_01',
-    studentName: 'Nguyễn Văn A',
-    submittedAt: '2026-03-02 14:30',
-    answers: {
-      l1: 'A. To introduce key facilities to new students',
-      l2: '9',
-      l3: 'A. Student Affairs Office',
-      r1: 'A. Under 10%',
-      r2: 'FALSE',
-      r3: 'day-night',
-      w1: 'The given chart illustrates the global total solar power capacity measured in gigawatts between 2015 and 2025. Overall, there was a steady upward trend in capacity over the ten-year period, with substantial acceleration observed in the second half of the decade...',
-      w2: 'In recent years, the allocation of public funds has spark intense debate. While some argue that funding primary infrastructure like highways and hospitals is essential, I strongly believe that investing in renewable energy is more vital for long-term survival...'
-    },
-    antiCheatLogs: [
-      { timestamp: '14:05:12', skill: 'listening', event: 'Chuyển tab / Mất tập trung cửa sổ' },
-      { timestamp: '14:22:45', skill: 'reading', event: 'Mất focus trình duyệt' }
-    ],
-    tabSwitchCount: 2,
-    teacherGraded: true,
-    aiGraded: true,
-    scores: {
-      listening: { raw: 3, total: 3, band: 9.0 },
-      reading: { raw: 3, total: 3, band: 9.0 },
-      writing: { task1Band: 7.0, task2Band: 7.5, overallBand: 7.5 }
-    },
-    overallBand: 8.5,
-    teacherFeedback: 'Thí sinh làm bài rất tốt kỹ năng Listening và Reading. Phần Writing cấu trúc bài ổn, từ vựng phong phú, cần chú ý tính liên kết câu tốt hơn ở đoạn 2.'
-  },
-  {
-    id: 'att-102',
-    testId: 'test-1',
-    testTitle: 'IELTS Academic Practice Test 01 - Full Simulation',
-    studentId: 'hocsinh_01',
-    studentName: 'Nguyễn Văn A',
-    submittedAt: '2026-02-22 15:45',
-    answers: {
-      l1: 'A. To introduce key facilities to new students',
-      l2: '9',
-      l3: 'B. Main Security Desk',
-      r1: 'A. Under 10%',
-      r2: 'TRUE',
-      r3: 'day-night',
-      w1: 'The chart describes the development of solar energy generation worldwide from 2015 to 2025...',
-      w2: 'Many people debate whether government money should be spent on renewable power or standard infrastructure...'
-    },
-    antiCheatLogs: [
-      { timestamp: '15:10:02', skill: 'listening', event: 'Mất focus trình duyệt' }
-    ],
-    tabSwitchCount: 1,
-    teacherGraded: true,
-    aiGraded: true,
-    scores: {
-      listening: { raw: 2, total: 3, band: 7.5 },
-      reading: { raw: 2, total: 3, band: 7.5 },
-      writing: { task1Band: 7.0, task2Band: 7.0, overallBand: 7.0 }
-    },
-    overallBand: 7.5,
-    teacherFeedback: 'Tiến bộ rõ rệt ở phần Writing Task 2. Cần cẩn thận hơn khi đọc câu hỏi TRUE/FALSE/NOT GIVEN ở Reading.'
-  },
-  {
-    id: 'att-103',
-    testId: 'test-1',
-    testTitle: 'IELTS Academic Practice Test 01 - Full Simulation',
-    studentId: 'hocsinh_01',
-    studentName: 'Nguyễn Văn A',
-    submittedAt: '2026-02-10 09:15',
-    answers: {
-      l1: 'A. To introduce key facilities to new students',
-      l2: '10',
-      l3: 'B. Main Security Desk',
-      r1: 'D. Around 15%',
-      r2: 'TRUE',
-      r3: 'day-night',
-      w1: 'The graph gives information about solar power capacity between 2015 and 2025...',
-      w2: 'Nowadays energy is an important problem for every nation...'
-    },
-    antiCheatLogs: [
-      { timestamp: '09:20:11', skill: 'listening', event: 'Chuyển tab' },
-      { timestamp: '09:35:40', skill: 'reading', event: 'Chuột phải bị chặn' },
-      { timestamp: '09:44:18', skill: 'writing', event: 'Chuyển tab' }
-    ],
-    tabSwitchCount: 3,
-    teacherGraded: true,
-    aiGraded: true,
-    scores: {
-      listening: { raw: 1, total: 3, band: 6.0 },
-      reading: { raw: 1, total: 3, band: 6.0 },
-      writing: { task1Band: 6.0, task2Band: 6.5, overallBand: 6.5 }
-    },
-    overallBand: 6.5,
-    teacherFeedback: 'Lần thi đầu tiên để làm quen với hình thức thi trên máy tính (CD-IELTS). Cần quản lý thời gian tốt hơn.'
-  },
-  {
-    id: 'att-104',
-    testId: 'test-1',
-    testTitle: 'IELTS Academic Practice Test 01 - Full Simulation',
-    studentId: 'hocsinh_02',
-    studentName: 'Trần Thị Mai',
-    submittedAt: '2026-03-05 16:20',
-    answers: {
-      l1: 'A. To introduce key facilities to new students',
-      l2: '9',
-      l3: 'A. Student Affairs Office',
-      r1: 'A. Under 10%',
-      r2: 'FALSE',
-      r3: 'day-night',
-      w1: 'The presented graph portrays the progression of global solar electricity generation...',
-      w2: 'Sustainable energy versus foundational infrastructure represents a core dilemma for modern authorities...'
-    },
-    antiCheatLogs: [],
-    tabSwitchCount: 0,
-    teacherGraded: true,
-    aiGraded: true,
-    scores: {
-      listening: { raw: 3, total: 3, band: 9.0 },
-      reading: { raw: 2, total: 3, band: 7.5 },
-      writing: { task1Band: 7.0, task2Band: 7.5, overallBand: 7.5 }
-    },
-    overallBand: 8.0,
-    teacherFeedback: 'Bài làm rất chắc chắn, không có vi phạm gian lận nào. Kỹ năng Listening hoàn hảo!'
-  },
-  {
-    id: 'att-105',
-    testId: 'test-1',
-    testTitle: 'IELTS Academic Practice Test 01 - Full Simulation',
-    studentId: 'hocsinh_03',
-    studentName: 'Lê Hoàng Long',
-    submittedAt: '2026-03-01 11:15',
-    answers: {
-      l1: 'B. To collect student feedback on library services',
-      l2: '9',
-      l3: 'A. Student Affairs Office',
-      r1: 'A. Under 10%',
-      r2: 'NOT GIVEN',
-      r3: 'weather',
-      w1: 'The diagram shows the change in total solar capacity across decade...',
-      w2: 'Governments have many things to spend money on such as hospitals and green energy...'
-    },
-    antiCheatLogs: [
-      { timestamp: '11:20:12', skill: 'listening', event: 'Chuyển tab' },
-      { timestamp: '11:28:45', skill: 'reading', event: 'Chuyển tab' },
-      { timestamp: '11:35:10', skill: 'writing', event: 'Mất focus' },
-      { timestamp: '11:42:30', skill: 'writing', event: 'Chuyển tab' }
-    ],
-    tabSwitchCount: 4,
-    teacherGraded: true,
-    aiGraded: true,
-    scores: {
-      listening: { raw: 2, total: 3, band: 7.5 },
-      reading: { raw: 1, total: 3, band: 6.0 },
-      writing: { task1Band: 6.0, task2Band: 6.0, overallBand: 6.0 }
-    },
-    overallBand: 6.5,
-    teacherFeedback: 'Cần chú ý không rời tab trong quá trình làm bài thi. Cần củng cố từ vựng đọc hiểu học thuật.'
-  }
-];
+export const DEFAULT_ATTEMPTS = [];
 
 export const DEFAULT_USERS = {
-  'teacher_ielts': { username: 'teacher_ielts', pass: '123456', name: 'Ms. Như — IELTS Nha Trang', role: 'teacher', targetBand: 9.0, joinedDate: '2026-01-01' },
-  'hocsinh_01': { username: 'hocsinh_01', pass: '123456', name: 'Nguyễn Văn A', role: 'student', targetBand: 8.0, joinedDate: '2026-02-01' },
-  'hocsinh_02': { username: 'hocsinh_02', pass: '123456', name: 'Trần Thị Mai', role: 'student', targetBand: 7.5, joinedDate: '2026-02-15' },
-  'hocsinh_03': { username: 'hocsinh_03', pass: '123456', name: 'Lê Hoàng Long', role: 'student', targetBand: 7.0, joinedDate: '2026-02-20' }
+  'teacher_ielts': { username: 'teacher_ielts', pass: '123456', name: 'Ms. Như — IELTS Nha Trang', role: 'teacher', targetBand: 9.0, joinedDate: '2026-01-01' }
 };
 
 export const DEFAULT_ROOMS = {
@@ -1236,18 +1073,11 @@ export const DEFAULT_ROOMS = {
     liveMatch: {},
     chatMessages: [],
     rawVocab: DEFAULT_VOCAB_TEXT,
-    players: {
-      'Nguyễn Văn A': { name: 'Nguyễn Văn A', score: 1850, streak: 8, status: 'Vòng 3: Boss Speller', updatedAt: '14:32' },
-      'Trần Thị Mai': { name: 'Trần Thị Mai', score: 1420, streak: 5, status: 'Vòng 2: Gõ từ khuyết', updatedAt: '15:10' }
-    }
+    players: {}
   }
 };
 
-export const DEFAULT_TEACHER_NOTES = {
-  'hocsinh_01': 'Học sinh có tiến độ học tập rất xuất sắc, Band Overall đã tăng từ 6.5 lên 8.5 sau 3 lần thi. Kỹ năng Listening và Reading đã đạt mức 9.0 tuyệt đối. Cần tập trung thêm vào tính liên kết câu (Cohesion) trong Writing Task 2.',
-  'hocsinh_02': 'Thái độ làm bài nghiêm túc, không vi phạm chuyển tab. Kỹ năng Listening nghe bắt keyword rất nhạy (Band 9.0). Cần luyện thêm tốc độ đọc Scanning cho Passage 3 để nâng Band Reading lên 8.5+.',
-  'hocsinh_03': 'Cần lưu ý giữ tập trung trong phòng thi, hạn chế chuyển tab hoặc tra cứu từ điển bên ngoài. Cần rèn luyện thêm ngữ pháp câu phức và từ vựng học thuật cho Writing.'
-};
+export const DEFAULT_TEACHER_NOTES = {};
 
 export const CREWMATE_COLORS = [
   { id: 'red', label: 'Đỏ', fill: '#ef4444', shade: '#b91c1c' },

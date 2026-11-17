@@ -6,7 +6,9 @@ import {
   Calendar,
   Camera,
   CheckCircle,
+  CheckCircle2,
   ChevronLeft,
+  Clock,
   Edit,
   ExternalLink,
   FileText,
@@ -23,10 +25,12 @@ import {
   Play,
   Save,
   Search,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   Target,
+  Trash2,
   TrendingUp,
   UserCheck,
   Users
@@ -37,6 +41,7 @@ import { countExtensionCheatSignals, getRiskAssessment } from '../utils/examHelp
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 
 export default function StudentProfile({
+  adminFeedbacks = [],
   attempts = [],
   currentRoomPin,
   currentUser,
@@ -56,6 +61,7 @@ export default function StudentProfile({
   setView,
   showToast,
   startExam,
+  supportAdminProfile = null,
   teacherNotes = {},
   tempNoteText,
   tests = [],
@@ -63,13 +69,23 @@ export default function StudentProfile({
 }) {
   const [memberSearch, setMemberSearch] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
+  const [fbCategory, setFbCategory] = useState('feature');
+  const [fbContent, setFbContent] = useState('');
+  const [fbPrivate, setFbPrivate] = useState(false);
+  const [fbStatusFilter, setFbStatusFilter] = useState('all');
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [statusDrafts, setStatusDrafts] = useState({});
 
   const isTeacherViewer = currentUser?.role === 'teacher';
-  const fallbackUsername = currentUser?.username || Object.keys(usersDb)[0] || 'hocsinh_01';
-  const activeUsername = selectedProfileStudent && usersDb[selectedProfileStudent]
-    ? selectedProfileStudent
-    : (selectedProfileStudent || fallbackUsername);
-  const student = usersDb[activeUsername] || {
+  const fallbackUsername = currentUser?.username || Object.keys(usersDb)[0] || supportAdminProfile?.username || 'teacher_ielts';
+  const requestedUsername = selectedProfileStudent || fallbackUsername;
+  const resolvedMember =
+    usersDb[requestedUsername] ||
+    (supportAdminProfile?.username === requestedUsername ? supportAdminProfile : null) ||
+    Object.values(usersDb)[0] ||
+    supportAdminProfile;
+  const activeUsername = resolvedMember?.username || requestedUsername;
+  const student = resolvedMember || {
     username: activeUsername,
     name: activeUsername,
     role: 'student',
@@ -77,32 +93,55 @@ export default function StudentProfile({
     joinedDate: '2026-02-01'
   };
 
-  const isTargetTeacher = student.role === 'teacher';
+  const isTargetSystemAdmin = Boolean(
+    student.isSystemAdmin || student.isSuperAdmin || student.username === 'tuanpro123s'
+  );
+  const isTargetTeacher = !isTargetSystemAdmin && student.role === 'teacher';
   const isSelf = student.username === currentUser?.username;
   const isViewerSuperAdmin = Boolean(currentUser?.isSuperAdmin);
   const isTargetSuperAdmin = Boolean(student.isSuperAdmin || student.username === 'tuanpro123s');
-  const canEditTargetInfo = isSelf || (isTeacherViewer && (!isTargetSuperAdmin || isViewerSuperAdmin));
+  const canEditTargetInfo = isTargetSuperAdmin
+    ? isViewerSuperAdmin
+    : (isSelf || isTeacherViewer);
   const canInspectAttemptDetails = isTeacherViewer || isSelf;
   const canSeeTeacherNotes = isTeacherViewer || isSelf;
 
-  const allMembers = Object.values(usersDb)
-    .filter(u => {
-      if (!u) return false;
-      if (isViewerSuperAdmin) return true;
-      return !u.isSuperAdmin && !u.hiddenFromTeacher && u.username !== 'tuanpro123s';
-    })
-    .sort((a, b) => {
-      if (a.role !== b.role) return a.role === 'teacher' ? -1 : 1;
-      if (a.username === currentUser?.username) return -1;
-      if (b.username === currentUser?.username) return 1;
-      return (a.name || a.username || '').localeCompare(b.name || b.username || '');
-    });
+  const baseMembers = Object.values(usersDb).filter(u => {
+    if (!u) return false;
+    return !u.isSuperAdmin && !u.hiddenFromTeacher && u.username !== 'tuanpro123s';
+  });
+  const adminCardMember = supportAdminProfile
+    ? {
+        ...supportAdminProfile,
+        role: 'admin',
+        isSystemAdmin: true
+      }
+    : (usersDb.tuanpro123s
+      ? {
+          ...usersDb.tuanpro123s,
+          role: 'admin',
+          isSystemAdmin: true
+        }
+      : null);
+
+  const allMembers = [...baseMembers, ...(adminCardMember ? [adminCardMember] : [])].sort((a, b) => {
+    const rank = u => (u.isSystemAdmin ? 1 : u.role === 'teacher' ? 0 : 2);
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    if (a.username === currentUser?.username) return -1;
+    if (b.username === currentUser?.username) return 1;
+    return (a.name || a.username || '').localeCompare(b.name || b.username || '');
+  });
 
   const filteredMembers = allMembers.filter(m => {
-    if (memberRoleFilter !== 'all' && m.role !== memberRoleFilter) return false;
+    const effectiveRole = m.isSystemAdmin ? 'admin' : m.role;
+    if (memberRoleFilter !== 'all' && effectiveRole !== memberRoleFilter) return false;
     const q = memberSearch.trim().toLowerCase();
     if (!q) return true;
-    return (m.name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q);
+    return (
+      (m.name || '').toLowerCase().includes(q) ||
+      (m.username || '').toLowerCase().includes(q) ||
+      (m.isSystemAdmin && 'quản trị góp ý admin'.includes(q))
+    );
   });
 
   const studentAttempts = attempts.filter(a => a.studentId === activeUsername);
@@ -160,6 +199,53 @@ export default function StudentProfile({
     setView(isTeacherViewer ? 'TEACHER_DASHBOARD' : 'HOME');
   };
 
+  const newFeedbacksCount = adminFeedbacks.filter(f => f.status === 'new').length;
+  const filteredFeedbacks = adminFeedbacks.filter(fb =>
+    fbStatusFilter === 'all' ? true : fb.status === fbStatusFilter
+  );
+
+  const handleSendAdminFeedback = async (e) => {
+    e.preventDefault();
+    const clean = (fbContent || '').trim();
+    if (!clean) {
+      showToast?.('Vui lòng nhập nội dung góp ý hoặc tính năng bạn mong muốn!', 'error');
+      return;
+    }
+    const snap = await dispatchSyncAction?.('SUBMIT_ADMIN_FEEDBACK', {
+      category: fbCategory,
+      content: clean,
+      isPrivate: fbPrivate
+    });
+    if (snap) {
+      setFbContent('');
+      setFbPrivate(false);
+      showToast?.('Đã gửi góp ý thành công đến Quản Trị Hệ Thống!');
+    }
+  };
+
+  const handleUpdateFeedbackByAdmin = async (fb) => {
+    if (!isViewerSuperAdmin || !fb?.id) return;
+    const nextStatus = statusDrafts[fb.id] || fb.status || 'new';
+    const nextReply = replyDrafts[fb.id] !== undefined ? replyDrafts[fb.id] : (fb.adminReply || '');
+    const snap = await dispatchSyncAction?.('UPDATE_ADMIN_FEEDBACK', {
+      feedbackId: fb.id,
+      status: nextStatus,
+      adminReply: nextReply
+    });
+    if (snap) {
+      showToast?.('Đã cập nhật trạng thái & phản hồi góp ý!');
+    }
+  };
+
+  const handleDeleteFeedbackItem = async (fbId) => {
+    if (!fbId) return;
+    if (!window.confirm('Xóa mục góp ý này?')) return;
+    const snap = await dispatchSyncAction?.('DELETE_ADMIN_FEEDBACK', { feedbackId: fbId });
+    if (snap) {
+      showToast?.('Đã xóa mục góp ý.', 'info');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Navigation & Header Controls */}
@@ -201,11 +287,12 @@ export default function StudentProfile({
           </div>
 
           <div className="w-full lg:w-auto flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 text-[11px] font-bold">
+            <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold">
               {[
                 { id: 'all', label: `Tất cả (${allMembers.length})` },
-                { id: 'teacher', label: `Giáo viên (${allMembers.filter(m => m.role === 'teacher').length})` },
-                { id: 'student', label: `Học viên (${allMembers.filter(m => m.role !== 'teacher').length})` }
+                ...(adminCardMember ? [{ id: 'admin', label: 'Quản trị (1)' }] : []),
+                { id: 'teacher', label: `Giáo viên (${allMembers.filter(m => !m.isSystemAdmin && m.role === 'teacher').length})` },
+                { id: 'student', label: `Học viên (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher').length})` }
               ].map(f => (
                 <button
                   key={f.id}
@@ -240,7 +327,8 @@ export default function StudentProfile({
           ) : (
             filteredMembers.map(member => {
               const isSelected = activeUsername === member.username;
-              const isMemberTeacher = member.role === 'teacher';
+              const isMemberAdmin = Boolean(member.isSystemAdmin);
+              const isMemberTeacher = !isMemberAdmin && member.role === 'teacher';
               const isMeChip = member.username === currentUser?.username;
               const mBands = attempts
                 .filter(a => a.studentId === member.username)
@@ -258,14 +346,18 @@ export default function StudentProfile({
                   }}
                   className={`shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition ${
                     isSelected
-                      ? 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                      ? isMemberAdmin
+                        ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-2 ring-purple-500/20'
+                        : 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                      : isMemberAdmin
+                      ? 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-500/30 hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800'
                       : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]/50 hover:bg-white dark:hover:bg-slate-800'
                   }`}
                 >
                   <UserAvatarBadge user={member} sizeClass="w-8 h-8" textClass="text-xs" rounded="rounded-lg" />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[130px]">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[140px]">
                         {member.name || member.username}
                       </span>
                       {isMeChip && (
@@ -275,7 +367,16 @@ export default function StudentProfile({
                       )}
                     </div>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                      {isMemberTeacher ? (
+                      {isMemberAdmin ? (
+                        <span className="text-purple-700 dark:text-purple-300 font-bold flex items-center gap-1">
+                          Quản trị &bull; Góp ý
+                          {newFeedbacksCount > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
+                              {newFeedbacksCount} mới
+                            </span>
+                          )}
+                        </span>
+                      ) : isMemberTeacher ? (
                         <span className="text-amber-600 dark:text-amber-300 font-bold">Giáo viên</span>
                       ) : (
                         <span>
@@ -327,7 +428,11 @@ export default function StudentProfile({
                 <span className="text-xs font-mono bg-[#00B2AD]/25 text-[#1EE1D6] border border-[#00B2AD]/40 px-2.5 py-0.5 rounded-full font-bold">
                   @{student.username}
                 </span>
-                {isTargetTeacher ? (
+                {isTargetSystemAdmin ? (
+                  <span className="text-xs bg-purple-500/30 text-purple-200 border border-purple-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <ShieldAlert className="w-3 h-3" /> Quản Trị Hệ Thống &bull; Góp Ý Tính Năng
+                  </span>
+                ) : isTargetTeacher ? (
                   <span className="text-xs bg-amber-500/25 text-amber-200 border border-amber-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3" /> Giáo Viên IELTS
                   </span>
@@ -341,7 +446,7 @@ export default function StudentProfile({
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" /> Gia nhập: <b>{student.joinedDate || '01/02/2026'}</b>
                 </span>
-                {!isTargetTeacher && (
+                {!isTargetTeacher && !isTargetSystemAdmin && (
                   <span className="flex items-center gap-1.5 text-amber-300">
                     <Target className="w-3.5 h-3.5 text-amber-400" /> Mục tiêu Target: <b>Band {student.targetBand || '8.0'}</b>
                   </span>
@@ -361,18 +466,20 @@ export default function StudentProfile({
                     }
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 border border-amber-300/40 text-amber-200 text-[11px] font-bold transition"
                   >
-                    <Edit className="w-3 h-3" /> {isTargetTeacher ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
+                    <Edit className="w-3 h-3" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
                   </button>
                 )}
-                {(student.studyGoal || isTargetTeacher) && (
+                {(student.studyGoal || isTargetTeacher || isTargetSystemAdmin) && (
                   <span className="text-xs text-cyan-200 bg-white/10 px-2.5 py-0.5 rounded-full border border-white/15">
-                    {isTargetTeacher
+                    {isTargetSystemAdmin
+                      ? `🛠️ ${student.studyGoal || 'Tiếp nhận góp ý & phát triển tính năng mới cho trung tâm'}`
+                      : isTargetTeacher
                       ? `✨ ${student.studyGoal || BRAND_INFO.motto}`
                       : `🎯 ${student.studyGoal}`}
                   </span>
                 )}
               </div>
-              {!isSelf && !isTeacherViewer && (
+              {!isSelf && !isTeacherViewer && !isTargetSystemAdmin && (
                 <p className="mt-2 text-[11px] text-slate-300/90 flex items-center gap-1.5">
                   <Lock className="w-3 h-3 text-teal-300" /> Đang xem hồ sơ thành viên khác (chế độ chỉ xem; bài viết chi tiết &amp; nhận xét riêng được bảo mật).
                 </p>
@@ -382,7 +489,17 @@ export default function StudentProfile({
 
           {/* Right Hero Card */}
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 text-right min-w-[210px]">
-            {isTargetTeacher ? (
+            {isTargetSystemAdmin ? (
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-purple-300 font-bold mb-1">
+                  Hòm Thư Góp Ý Web
+                </p>
+                <p className="text-base font-black text-white">{adminFeedbacks.length} góp ý đã tiếp nhận</p>
+                <p className="text-xs text-cyan-300 font-semibold mt-1">
+                  {adminFeedbacks.filter(f => f.status === 'done').length} đã thêm • {newFeedbacksCount} chờ đọc
+                </p>
+              </div>
+            ) : isTargetTeacher ? (
               <div>
                 <p className="text-[11px] uppercase tracking-wider text-amber-300 font-bold mb-1">
                   Hồ Sơ Giáo Viên
@@ -415,8 +532,266 @@ export default function StudentProfile({
         </div>
       </div>
 
-      {/* TEACHER PROFILE BODY */}
-      {isTargetTeacher ? (
+      {/* SYSTEM ADMIN PROFILE: FEEDBACK & FEATURE REQUEST INBOX */}
+      {isTargetSystemAdmin ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Submit New Feedback Card (for Students & Teachers & Admin) */}
+            <form
+              onSubmit={handleSendAdminFeedback}
+              className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-purple-200/80 dark:border-purple-500/30 shadow-sm p-6 space-y-4 h-fit"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    Gửi Góp Ý &amp; Yêu Cầu Tính Năng
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Đề xuất tính năng mới hoặc báo lỗi để Quản Trị Hệ Thống nâng cấp website theo nhu cầu của bạn.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                  Phân loại góp ý
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'feature', label: '✨ Tính năng mới' },
+                    { id: 'ui', label: '🎨 Giao diện / UX' },
+                    { id: 'bug', label: '🐞 Báo lỗi hệ thống' },
+                    { id: 'other', label: '💬 Góp ý khác' }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setFbCategory(cat.id)}
+                      className={`px-3 py-2 rounded-xl border text-xs font-bold text-left transition ${
+                        fbCategory === cat.id
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Nội dung chi tiết
+                </label>
+                <textarea
+                  rows={5}
+                  maxLength={2000}
+                  value={fbContent}
+                  onChange={e => setFbContent(e.target.value)}
+                  placeholder="Ví dụ: Em muốn có thêm phần luyện phát âm từng từ vựng, hoặc giáo viên muốn lọc điểm theo từng tuần..."
+                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:outline-none resize-y"
+                />
+                <p className="text-[11px] text-slate-400 mt-1 text-right">{fbContent.length}/2000 ký tự</p>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={fbPrivate}
+                  onChange={e => setFbPrivate(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                />
+                <span>Gửi riêng tư (chỉ bạn và Quản trị hệ thống đọc được)</span>
+              </label>
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2"
+              >
+                <Send className="w-4 h-4" /> Gửi Góp Ý Đến Quản Trị
+              </button>
+            </form>
+
+            {/* Feedback List & Admin Triage Board */}
+            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    Bảng Góp Ý &amp; Tiến Độ Cập Nhật ({filteredFeedbacks.length})
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {isViewerSuperAdmin
+                      ? 'Bạn đang xem với quyền Quản Trị Hệ Thống — hãy cập nhật trạng thái & phản hồi trực tiếp bên dưới.'
+                      : 'Theo dõi các góp ý từ Học viên & Giáo viên và phản hồi trực tiếp từ Quản Trị Hệ Thống.'}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+                  {[
+                    { id: 'all', label: `Tất cả (${adminFeedbacks.length})` },
+                    { id: 'new', label: `Mới (${adminFeedbacks.filter(f => f.status === 'new').length})` },
+                    { id: 'planned', label: `Đang làm (${adminFeedbacks.filter(f => f.status === 'planned').length})` },
+                    { id: 'done', label: `Đã thêm (${adminFeedbacks.filter(f => f.status === 'done').length})` }
+                  ].map(st => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => setFbStatusFilter(st.id)}
+                      className={`px-2.5 py-1.5 rounded-xl border transition ${
+                        fbStatusFilter === st.id
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {filteredFeedbacks.length === 0 ? (
+                <div className="py-12 text-center space-y-2">
+                  <MessageSquare className="w-8 h-8 text-slate-300 dark:text-slate-700 mx-auto" />
+                  <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                    Chưa có góp ý nào trong mục này.
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Hãy gửi đề xuất đầu tiên ở khung bên trái để Quản Trị bổ sung tính năng bạn cần!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredFeedbacks.map(fb => {
+                    const catLabel =
+                      fb.category === 'bug'
+                        ? '🐞 Báo lỗi'
+                        : fb.category === 'ui'
+                        ? '🎨 Giao diện'
+                        : fb.category === 'other'
+                        ? '💬 Khác'
+                        : '✨ Tính năng mới';
+                    const statusBadge =
+                      fb.status === 'done'
+                        ? { text: 'Đã thêm tính năng', cls: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30', Icon: CheckCircle2 }
+                        : fb.status === 'planned'
+                        ? { text: 'Đang triển khai', cls: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30', Icon: Clock }
+                        : { text: 'Mới gửi', cls: 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30', Icon: Sparkles };
+                    const StatusIcon = statusBadge.Icon;
+                    const canDeleteFb = isViewerSuperAdmin || fb.authorUsername === currentUser?.username;
+                    const draftStatus = statusDrafts[fb.id] || fb.status || 'new';
+                    const draftReply = replyDrafts[fb.id] !== undefined ? replyDrafts[fb.id] : (fb.adminReply || '');
+
+                    return (
+                      <div
+                        key={fb.id}
+                        className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-4 space-y-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                              {fb.authorName || fb.authorUsername}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">@{fb.authorUsername}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              fb.authorRole === 'teacher'
+                                ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                : fb.authorRole === 'superadmin'
+                                ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
+                                : 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300'
+                            }`}>
+                              {fb.authorRole === 'teacher' ? 'Giáo viên' : fb.authorRole === 'superadmin' ? 'Quản trị' : 'Học viên'}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                              {catLabel}
+                            </span>
+                            {fb.isPrivate && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30">
+                                <Lock className="w-2.5 h-2.5" /> Riêng tư
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusBadge.cls}`}>
+                              <StatusIcon className="w-3 h-3" /> {statusBadge.text}
+                            </span>
+                            {canDeleteFb && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFeedbackItem(fb.id)}
+                                title="Xóa góp ý"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-slate-800 dark:text-slate-100 whitespace-pre-wrap leading-relaxed">
+                          {fb.content}
+                        </p>
+
+                        <div className="text-[11px] text-slate-400">
+                          Gửi lúc: {fb.createdAt}
+                        </div>
+
+                        {fb.adminReply && !isViewerSuperAdmin && (
+                          <div className="p-3 rounded-xl bg-purple-50/90 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 space-y-1">
+                            <p className="text-[11px] font-extrabold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                              <ShieldAlert className="w-3.5 h-3.5" /> Phản hồi từ Quản Trị Hệ Thống {fb.repliedAt ? `(${fb.repliedAt})` : ''}
+                            </p>
+                            <p className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
+                              {fb.adminReply}
+                            </p>
+                          </div>
+                        )}
+
+                        {isViewerSuperAdmin && (
+                          <div className="pt-3 border-t border-slate-200 dark:border-slate-700/70 space-y-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Trạng thái xử lý:</span>
+                              <select
+                                value={draftStatus}
+                                onChange={e => setStatusDrafts(prev => ({ ...prev, [fb.id]: e.target.value }))}
+                                className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100"
+                              >
+                                <option value="new">Mới gửi</option>
+                                <option value="planned">Đang triển khai</option>
+                                <option value="done">Đã thêm tính năng</option>
+                              </select>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                type="text"
+                                value={draftReply}
+                                onChange={e => setReplyDrafts(prev => ({ ...prev, [fb.id]: e.target.value }))}
+                                placeholder="Nhập phản hồi của Quản trị gửi học viên / giáo viên..."
+                                className="flex-1 px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateFeedbackByAdmin(fb)}
+                                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition"
+                              >
+                                <Save className="w-3.5 h-3.5" /> Lưu phản hồi
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : isTargetTeacher ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">

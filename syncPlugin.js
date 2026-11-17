@@ -14,6 +14,8 @@ import {
 export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
 const SUPER_ADMIN_USERNAME = 'tuanpro123s';
 const SUPER_ADMIN_DEFAULT_PASS = process.env.SUPER_ADMIN_PASS || '0938899046';
+const DEFAULT_TEACHER_USERNAME = 'teacher_ielts';
+const DEFAULT_TEACHER_PASS = process.env.TEACHER_DEFAULT_PASS || '123456';
 const SESSION_COOKIE_NAME = 'ielts_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const LOGIN_RATE_WINDOW_MS = 5 * 60 * 1000;
@@ -235,6 +237,29 @@ function ensureProtectedAccounts(store) {
       existingSuper.hiddenFromTeacher = true;
       changed = true;
     }
+  }
+
+  // Ensure a usable default teacher account always exists unless intentionally replaced by another teacher
+  const hasAnyRegularTeacher = Object.values(store.users).some(
+    u => u && u.role === 'teacher' && !u.isSuperAdmin && u.username !== SUPER_ADMIN_USERNAME && Boolean(u.passwordHash)
+  );
+  const existingDefaultTeacher = store.users[DEFAULT_TEACHER_USERNAME];
+  if (!existingDefaultTeacher && !hasAnyRegularTeacher && !(store.deletedUserIds || []).includes(DEFAULT_TEACHER_USERNAME)) {
+    store.users[DEFAULT_TEACHER_USERNAME] = {
+      username: DEFAULT_TEACHER_USERNAME,
+      name: 'Ms. Như — IELTS Nha Trang',
+      role: 'teacher',
+      targetBand: 9.0,
+      joinedDate: '2026-01-01',
+      avatarUrl: '/brand-avatar.jpg?v=2',
+      tokenVersion: 1,
+      passwordHash: hashPassword(DEFAULT_TEACHER_PASS)
+    };
+    changed = true;
+  } else if (existingDefaultTeacher && !existingDefaultTeacher.passwordHash) {
+    existingDefaultTeacher.passwordHash = hashPassword(DEFAULT_TEACHER_PASS);
+    existingDefaultTeacher.tokenVersion = existingDefaultTeacher.tokenVersion || 1;
+    changed = true;
   }
   return changed;
 }
@@ -525,6 +550,7 @@ function createInitialStore(audioDir = '') {
     teacherNotes: {},
     users: {},
     customVocabTopics: [],
+    adminFeedbacks: [],
     aiConfig: { geminiApiKey: '' },
     _authSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     _rateLimits: new Map(),
@@ -643,6 +669,9 @@ export function createPersistentSyncStore(persistFile = '') {
           if (Array.isArray(parsed.customVocabTopics)) {
             store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
           }
+          if (Array.isArray(parsed.adminFeedbacks)) {
+            store.adminFeedbacks = parsed.adminFeedbacks.filter(f => f?.id && f?.content);
+          }
           if (parsed.aiConfig && typeof parsed.aiConfig === 'object') {
             store.aiConfig = {
               geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
@@ -707,6 +736,28 @@ function readJsonBody(req) {
   });
 }
 
+function buildPublicAdminSnapshotFields(store, viewer) {
+  const superAdmin = store.users?.[SUPER_ADMIN_USERNAME];
+  const isViewerSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+  const supportAdminProfile = superAdmin ? {
+    username: SUPER_ADMIN_USERNAME,
+    name: superAdmin.name || 'Quản Trị Hệ Thống',
+    avatarUrl: superAdmin.avatarUrl || '',
+    role: 'admin',
+    isSystemAdmin: true,
+    joinedDate: superAdmin.joinedDate || '2026-01-01',
+    studyGoal: superAdmin.studyGoal || 'Quản trị hệ thống & Tiếp nhận góp ý nâng cấp tính năng cho Học viên và Giáo viên'
+  } : null;
+
+  const adminFeedbacks = (Array.isArray(store.adminFeedbacks) ? store.adminFeedbacks : []).filter(fb => {
+    if (!fb || !fb.id) return false;
+    if (!fb.isPrivate) return true;
+    return isViewerSuperAdmin || fb.authorUsername === viewer?.username;
+  });
+
+  return { supportAdminProfile, adminFeedbacks };
+}
+
 function getSnapshotForViewer(store, viewer = null) {
   pruneExpiredStoreChats(store, Date.now());
   const basePayload = {
@@ -726,7 +777,9 @@ function getSnapshotForViewer(store, viewer = null) {
       attempts: [],
       teacherNotes: {},
       users: {},
-      customVocabTopics: []
+      customVocabTopics: [],
+      supportAdminProfile: null,
+      adminFeedbacks: []
     };
   }
 
@@ -735,6 +788,7 @@ function getSnapshotForViewer(store, viewer = null) {
     const clean = sanitizeUserForViewer(u, viewer);
     if (clean) sanitizedUsers[uname] = clean;
   });
+  const adminFields = buildPublicAdminSnapshotFields(store, viewer);
 
   if (viewer.role === 'teacher') {
     const sanitizedRooms = {};
@@ -749,7 +803,8 @@ function getSnapshotForViewer(store, viewer = null) {
       attempts: store.attempts || [],
       teacherNotes: store.teacherNotes || {},
       users: sanitizedUsers,
-      customVocabTopics: store.customVocabTopics || []
+      customVocabTopics: store.customVocabTopics || [],
+      ...adminFields
     };
   }
 
@@ -788,7 +843,8 @@ function getSnapshotForViewer(store, viewer = null) {
     attempts: studentAttempts,
     teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
     users: sanitizedUsers,
-    customVocabTopics: store.customVocabTopics || []
+    customVocabTopics: store.customVocabTopics || [],
+    ...adminFields
   };
 }
 
@@ -1009,6 +1065,38 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: true };
     }
 
+    case 'SUBMIT_ADMIN_FEEDBACK': {
+      const content = String(payload?.content || '').trim();
+      if (!content) {
+        return { allowed: false, status: 400, error: 'Vui lòng nhập nội dung góp ý hoặc đề xuất tính năng.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'UPDATE_ADMIN_FEEDBACK': {
+      if (!isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới có quyền phản hồi và cập nhật trạng thái góp ý.' };
+      }
+      const fbId = String(payload?.feedbackId || '').trim();
+      const targetFb = (store.adminFeedbacks || []).find(f => f?.id === fbId);
+      if (!fbId || !targetFb) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy góp ý này.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'DELETE_ADMIN_FEEDBACK': {
+      const fbId = String(payload?.feedbackId || '').trim();
+      const targetFb = (store.adminFeedbacks || []).find(f => f?.id === fbId);
+      if (!fbId || !targetFb) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy góp ý này.' };
+      }
+      if (!isSuperAdmin && targetFb.authorUsername !== viewer.username) {
+        return { allowed: false, status: 403, error: 'Bạn chỉ có quyền xóa góp ý do chính mình gửi.' };
+      }
+      return { allowed: true };
+    }
+
     default:
       return { allowed: false, status: 400, error: 'Yêu cầu đồng bộ không hợp lệ.' };
   }
@@ -1124,10 +1212,15 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         if (payload.users && typeof payload.users === 'object') {
           Object.entries(payload.users).forEach(([uname, u]) => {
             if (!u || uname === SUPER_ADMIN_USERNAME) return;
+            const existingUser = store.users[uname];
+            if (existingUser?.passwordHash) return;
             const clean = { ...u };
             if (clean.pass && !clean.passwordHash) {
               clean.passwordHash = hashPassword(clean.pass);
+            } else if (!clean.passwordHash && uname === DEFAULT_TEACHER_USERNAME) {
+              clean.passwordHash = hashPassword(DEFAULT_TEACHER_PASS);
             }
+            if (!clean.passwordHash) return;
             delete clean.pass;
             delete clean.isSuperAdmin;
             delete clean.hiddenFromTeacher;
@@ -1681,6 +1774,64 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const prevKey = String(store.aiConfig?.geminiApiKey || '');
       if (nextKey !== prevKey) {
         store.aiConfig = { ...(store.aiConfig || {}), geminiApiKey: nextKey };
+        changed = true;
+      }
+      break;
+    }
+
+    case 'SUBMIT_ADMIN_FEEDBACK': {
+      const content = String(payload?.content || '').trim().slice(0, 2000);
+      if (!content || !viewer?.username) break;
+      const category = ['feature', 'bug', 'ui', 'other'].includes(payload?.category) ? payload.category : 'feature';
+      const item = {
+        id: `fb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        authorUsername: viewer.username,
+        authorName: viewer.name || viewer.username,
+        authorRole: viewer.isSuperAdmin ? 'superadmin' : (viewer.role === 'teacher' ? 'teacher' : 'student'),
+        category,
+        content,
+        isPrivate: Boolean(payload?.isPrivate),
+        createdAt: new Date().toLocaleString('vi-VN'),
+        status: 'new',
+        adminReply: '',
+        repliedAt: ''
+      };
+      const prevList = Array.isArray(store.adminFeedbacks) ? store.adminFeedbacks : [];
+      store.adminFeedbacks = [item, ...prevList].slice(0, 300);
+      changed = true;
+      break;
+    }
+
+    case 'UPDATE_ADMIN_FEEDBACK': {
+      const fbId = String(payload?.feedbackId || '').trim();
+      if (!fbId || !Array.isArray(store.adminFeedbacks)) break;
+      const idx = store.adminFeedbacks.findIndex(f => f?.id === fbId);
+      if (idx < 0) break;
+      const prevFb = store.adminFeedbacks[idx];
+      const nextStatus = ['new', 'planned', 'done'].includes(payload?.status) ? payload.status : prevFb.status;
+      const hasReplyField = typeof payload?.adminReply === 'string';
+      const nextReply = hasReplyField ? payload.adminReply.trim().slice(0, 2000) : (prevFb.adminReply || '');
+      const updatedFb = {
+        ...prevFb,
+        status: nextStatus,
+        adminReply: nextReply,
+        repliedAt: hasReplyField && nextReply ? new Date().toLocaleString('vi-VN') : (prevFb.repliedAt || '')
+      };
+      store.adminFeedbacks = [
+        ...store.adminFeedbacks.slice(0, idx),
+        updatedFb,
+        ...store.adminFeedbacks.slice(idx + 1)
+      ];
+      changed = true;
+      break;
+    }
+
+    case 'DELETE_ADMIN_FEEDBACK': {
+      const fbId = String(payload?.feedbackId || '').trim();
+      if (!fbId || !Array.isArray(store.adminFeedbacks)) break;
+      const filtered = store.adminFeedbacks.filter(f => f?.id !== fbId);
+      if (filtered.length !== store.adminFeedbacks.length) {
+        store.adminFeedbacks = filtered;
         changed = true;
       }
       break;

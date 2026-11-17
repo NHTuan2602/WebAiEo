@@ -256,6 +256,8 @@ export default function App() {
   const [skillHubTab, setSkillHubTab] = useState(() => initialNav.skillHubTab || 'speaking');
   const [speakingPartMode, setSpeakingPartMode] = useState(() => initialNav.speakingPartMode || 'full');
   const [aiConfigured, setAiConfigured] = useState(false);
+  const [supportAdminProfile, setSupportAdminProfile] = useState(null);
+  const [adminFeedbacks, setAdminFeedbacks] = useState([]);
   const [teacherNotes, setTeacherNotes] = useState(() => {
     const saved = localStorage.getItem('ielts_teacher_notes');
     if (saved) {
@@ -1053,6 +1055,12 @@ export default function App() {
       skipNextVocabTopicsBroadcastRef.current = true;
       setCustomVocabTopics(prev => (JSON.stringify(prev) === JSON.stringify(validTopics) ? prev : validTopics));
     }
+    if ('supportAdminProfile' in snap) {
+      setSupportAdminProfile(prev => (JSON.stringify(prev) === JSON.stringify(snap.supportAdminProfile) ? prev : snap.supportAdminProfile));
+    }
+    if (Array.isArray(snap.adminFeedbacks)) {
+      setAdminFeedbacks(prev => (JSON.stringify(prev) === JSON.stringify(snap.adminFeedbacks) ? prev : snap.adminFeedbacks));
+    }
   };
 
   const pullServerSyncState = async (forceApply = false) => {
@@ -1187,9 +1195,9 @@ export default function App() {
           await dispatchSyncAction('SEED_DEFAULTS', {
             rooms: roomsDb,
             tests,
-            attempts,
-            teacherNotes,
-            users: usersDb,
+            attempts: DEFAULT_ATTEMPTS,
+            teacherNotes: DEFAULT_TEACHER_NOTES,
+            users: DEFAULT_USERS,
             customVocabTopics
           });
           if (cancelled || bootEpoch !== authEpochRef.current) return;
@@ -2215,7 +2223,8 @@ export default function App() {
   };
 
   const openMemberProfile = (username, fromView = view) => {
-    const targetUsername = usersDb[username]
+    const isSupportAdminTarget = Boolean(username && supportAdminProfile?.username && username === supportAdminProfile.username);
+    const targetUsername = usersDb[username] || isSupportAdminTarget
       ? username
       : (currentUser?.username || Object.keys(usersDb || {})[0] || '');
     if (!targetUsername) return;
@@ -2415,6 +2424,8 @@ export default function App() {
     setSelectedProfileStudent(null);
     setJoinedRoomPin(null);
     setGameSubState('JOIN');
+    setSupportAdminProfile(null);
+    setAdminFeedbacks([]);
     currentUserRef.current = null;
     setCurrentUser(null);
     setView('AUTH');
@@ -4783,6 +4794,7 @@ export default function App() {
           setSelectedProfileStudent={setSelectedProfileStudent}
           setView={setView}
           startExam={startExam}
+          supportAdminProfile={supportAdminProfile}
           tests={tests}
           usersDb={usersDb}
         />
@@ -4834,6 +4846,7 @@ export default function App() {
 
       {view === 'STUDENT_PROFILE' && (
         <StudentProfile
+          adminFeedbacks={adminFeedbacks}
           attempts={attempts}
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
@@ -4853,6 +4866,7 @@ export default function App() {
           setView={setView}
           showToast={showToast}
           startExam={startExam}
+          supportAdminProfile={supportAdminProfile}
           teacherNotes={teacherNotes}
           tempNoteText={tempNoteText}
           tests={tests}
