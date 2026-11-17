@@ -6,45 +6,45 @@
 export const PROFILE_BANNERS = [
   {
     id: 'ocean',
-    name: 'Đại Dương Nha Trang',
-    desc: 'Gradient xanh ngọc lam sâu lắng mặc định',
-    heroClass: 'bg-gradient-to-r from-[#0F172B] via-[#003538] to-[#065B5B]',
-    previewClass: 'bg-gradient-to-r from-[#0F172B] via-[#003538] to-[#065B5B]'
+    name: 'Biển Sáng Nha Trang',
+    desc: 'Xanh trời và ngọc lam tươi sáng rạng rỡ',
+    heroClass: 'bg-gradient-to-br from-[#BAE6FD] via-[#5EEAD4] to-[#14B8A6]',
+    previewClass: 'bg-gradient-to-br from-[#BAE6FD] via-[#5EEAD4] to-[#14B8A6]'
+  },
+  {
+    id: 'sakura',
+    name: 'Anh Đào Pastel',
+    desc: 'Hồng phấn nhẹ nhàng sáng sủa, thấy rõ từng chi tiết',
+    heroClass: 'bg-gradient-to-br from-[#FFE4E6] via-[#FBCFE8] to-[#E9D5FF]',
+    previewClass: 'bg-gradient-to-br from-[#FFE4E6] via-[#FBCFE8] to-[#E9D5FF]'
+  },
+  {
+    id: 'sunset',
+    name: 'Nắng Mai Ấm Áp',
+    desc: 'Vàng nắng dịu hòa quyện sắc cam san hô tươi mới',
+    heroClass: 'bg-gradient-to-br from-[#FEF08A] via-[#FED7AA] to-[#FDA4AF]',
+    previewClass: 'bg-gradient-to-br from-[#FEF08A] via-[#FED7AA] to-[#FDA4AF]'
+  },
+  {
+    id: 'emerald',
+    name: 'Thảo Nguyên Xanh',
+    desc: 'Xanh bạc hà mát mắt giúp tập trung học tập',
+    heroClass: 'bg-gradient-to-br from-[#D1FAE5] via-[#6EE7B7] to-[#2DD4BF]',
+    previewClass: 'bg-gradient-to-br from-[#D1FAE5] via-[#6EE7B7] to-[#2DD4BF]'
   },
   {
     id: 'aurora',
     name: 'Cực Quang Tím Ngọc',
-    desc: 'Ánh sáng tím huyền ảo hòa quyện ngọc lam',
-    heroClass: 'bg-gradient-to-r from-[#1E1B4B] via-[#4C1D95] to-[#0F766E]',
-    previewClass: 'bg-gradient-to-r from-[#1E1B4B] via-[#4C1D95] to-[#0F766E]'
-  },
-  {
-    id: 'sakura',
-    name: 'Anh Đào Hoàng Hôn',
-    desc: 'Sắc hồng rượu vang ấm áp và nổi bật',
-    heroClass: 'bg-gradient-to-r from-[#4C0519] via-[#9D174D] to-[#701A75]',
-    previewClass: 'bg-gradient-to-r from-[#4C0519] via-[#9D174D] to-[#701A75]'
+    desc: 'Ánh sáng tím rực rỡ hòa quyện ngọc lam',
+    heroClass: 'bg-gradient-to-br from-[#312E81] via-[#6D28D9] to-[#0D9488]',
+    previewClass: 'bg-gradient-to-br from-[#312E81] via-[#6D28D9] to-[#0D9488]'
   },
   {
     id: 'cosmos',
     name: 'Đấu Trường Vũ Trụ',
     desc: 'Không gian thiên hà xanh thẫm tràn đầy năng lượng',
-    heroClass: 'bg-gradient-to-r from-[#06091A] via-[#1E3A8A] to-[#4338CA]',
-    previewClass: 'bg-gradient-to-r from-[#06091A] via-[#1E3A8A] to-[#4338CA]'
-  },
-  {
-    id: 'sunset',
-    name: 'Nắng Vàng Rực Rỡ',
-    desc: 'Tông cam hổ phách truyền cảm hứng bứt phá',
-    heroClass: 'bg-gradient-to-r from-[#451A03] via-[#9A3412] to-[#B45309]',
-    previewClass: 'bg-gradient-to-r from-[#451A03] via-[#9A3412] to-[#B45309]'
-  },
-  {
-    id: 'emerald',
-    name: 'Rừng Ngọc Lục Bảo',
-    desc: 'Tông xanh lá học thuật thanh lịch & tập trung',
-    heroClass: 'bg-gradient-to-r from-[#022C22] via-[#065F46] to-[#0F766E]',
-    previewClass: 'bg-gradient-to-r from-[#022C22] via-[#065F46] to-[#0F766E]'
+    heroClass: 'bg-gradient-to-br from-[#0F172A] via-[#1E3A8A] to-[#4F46E5]',
+    previewClass: 'bg-gradient-to-br from-[#0F172A] via-[#1E3A8A] to-[#4F46E5]'
   }
 ];
 

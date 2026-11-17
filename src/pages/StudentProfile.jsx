@@ -291,6 +291,15 @@ export default function StudentProfile({
     }
   };
 
+  const bestBandByStudent = new Map();
+  for (const att of attempts) {
+    if (!att?.studentId || typeof att.overallBand !== 'number') continue;
+    const prev = bestBandByStudent.get(att.studentId);
+    if (prev === undefined || att.overallBand > prev) {
+      bestBandByStudent.set(att.studentId, att.overallBand);
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Navigation & Header Controls */}
@@ -318,238 +327,55 @@ export default function StudentProfile({
         )}
       </div>
 
-      {/* Interactive Member Directory (Teachers & Classmates can view each other's profiles) */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-4 sm:p-5 mb-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 mb-3">
-          <div>
-            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
-              Danh Bạ Hồ Sơ Thành Viên ({filteredMembers.length}/{allMembers.length})
-            </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Giáo viên và các học viên có thể chọn bất kỳ thành viên nào bên dưới để xem hồ sơ, tiến trình và thành tích học tập.
-            </p>
-          </div>
+      {/* Facebook-Style Profile Header: Wide Bright Cover Banner Above + Separate Clean Info Section Below */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-rose-200/85 dark:border-slate-800 shadow-lg overflow-hidden mb-7">
+        {/* 1. Large Cover Photo / Banner Stage (zero dark fog so bright wallpapers stay crisp & vivid) */}
+        <div
+          className={`relative w-full h-52 sm:h-64 lg:h-72 overflow-hidden border-b border-slate-200/75 dark:border-slate-800 ${
+            hasCustomCover ? 'bg-slate-100 dark:bg-slate-800' : heroBanner.heroClass
+          }`}
+        >
+          {hasCustomCover && (
+            <img
+              src={student.profileCoverUrl}
+              alt={`Ảnh bìa của ${student.name || student.username}`}
+              className="w-full h-full object-cover object-center select-none"
+            />
+          )}
 
-          <div className="w-full lg:w-auto flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold">
-              {[
-                { id: 'all', label: `Tất cả (${allMembers.length})` },
-                ...(adminCardMember ? [{ id: 'admin', label: 'Quản trị (1)' }] : []),
-                { id: 'teacher', label: `Giáo viên (${allMembers.filter(m => !m.isSystemAdmin && m.role === 'teacher').length})` },
-                { id: 'student', label: `Học viên (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher').length})` }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setMemberRoleFilter(f.id)}
-                  className={`px-2.5 py-1.5 rounded-xl border transition ${
-                    memberRoleFilter === f.id
-                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <div className="relative flex-1 sm:w-56">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={memberSearch}
-                onChange={e => setMemberSearch(e.target.value)}
-                placeholder="Tìm tên hoặc @username..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {filteredMembers.length === 0 ? (
-            <p className="text-xs text-slate-400 py-2">Không tìm thấy thành viên nào khớp từ khóa "{memberSearch}".</p>
-          ) : (
-            filteredMembers.map(member => {
-              const isSelected = activeUsername === member.username;
-              const isMemberAdmin = Boolean(member.isSystemAdmin);
-              const isMemberTeacher = !isMemberAdmin && member.role === 'teacher';
-              const isMeChip = member.username === currentUser?.username;
-              const mBands = attempts
-                .filter(a => a.studentId === member.username)
-                .map(a => a.overallBand)
-                .filter(b => typeof b === 'number');
-              const mBest = mBands.length > 0 ? Math.max(...mBands) : null;
-
-              return (
-                <button
-                  key={member.username}
-                  type="button"
-                  onClick={() => {
-                    setSelectedProfileStudent(member.username);
-                    setTempNoteText('');
-                  }}
-                  className={`shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition ${
-                    isSelected
-                      ? isMemberAdmin
-                        ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-2 ring-purple-500/20'
-                        : 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
-                      : isMemberAdmin
-                      ? 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-500/30 hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800'
-                      : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]/50 hover:bg-white dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <UserAvatarBadge user={member} sizeClass="w-8 h-8" textClass="text-xs" rounded="rounded-lg" />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[140px]">
-                        {member.name || member.username}
-                      </span>
-                      {isMeChip && (
-                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                          Bạn
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                      {isMemberAdmin ? (
-                        <span className="text-purple-700 dark:text-purple-300 font-bold flex items-center gap-1">
-                          Quản trị &bull; Góp ý
-                          {newFeedbacksCount > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
-                              {newFeedbacksCount} mới
-                            </span>
-                          )}
-                        </span>
-                      ) : isMemberTeacher ? (
-                        <span className="text-amber-600 dark:text-amber-300 font-bold">Giáo viên</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 flex-wrap">
-                          {(() => {
-                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
-                            if (mTitle && !mTitle.isRoleBuiltIn) {
-                              return (
-                                <span className={`px-1.5 py-0.2 rounded-full border font-extrabold text-[9px] ${mTitle.badgeClass}`}>
-                                  {mTitle.icon} {mTitle.label}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                          <span>
-                            Target {member.targetBand || '7.5'}
-                            {mBest !== null ? ` • Best ${mBest}` : ''}
-                          </span>
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </button>
-              );
-            })
+          {canEditTargetInfo && (
+            <button
+              type="button"
+              onClick={openCustomizeModal}
+              className="absolute bottom-3.5 right-3.5 sm:bottom-4 sm:right-5 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-900 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-white border border-slate-200/90 dark:border-slate-700 text-xs font-extrabold shadow-md backdrop-blur-xs transition"
+            >
+              <Camera className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
+              <span>Đổi Ảnh Bìa</span>
+            </button>
           )}
         </div>
-      </div>
 
-      {/* Profile Hero Card */}
-      <div
-        className={`${hasCustomCover ? 'bg-slate-900' : heroBanner.heroClass} rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl mb-8 relative overflow-hidden`}
-        style={
-          hasCustomCover
-            ? {
-                backgroundImage: `url("${student.profileCoverUrl}")`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
-              }
-            : undefined
-        }
-      >
-        {hasCustomCover && (
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/85 via-slate-900/72 to-slate-950/80 pointer-events-none" />
-        )}
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex items-center gap-5">
-            <div className="shrink-0 flex flex-col items-center">
-              <UserAvatarBadge user={student} sizeClass="w-20 h-20" textClass="text-3xl" rounded="rounded-2xl" />
-              {canEditTargetInfo && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isSelf) {
-                      setShowAvatarModal(true);
-                    } else {
-                      setEditingTargetUser({
-                        username: student.username,
-                        name: student.name || '',
-                        role: student.role || 'student',
-                        targetBand: student.targetBand || 7.5,
-                        studyGoal: student.studyGoal || '',
-                        avatarUrl: student.avatarUrl || ''
-                      });
-                    }
-                  }}
-                  className="mt-2 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-[11px] font-bold text-white flex items-center gap-1 transition"
-                >
-                  <Camera className="w-3 h-3" /> Đổi Avatar
-                </button>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">{student.name}</h1>
-                <span className="text-xs font-mono bg-[#00B2AD]/25 text-[#1EE1D6] border border-[#00B2AD]/40 px-2.5 py-0.5 rounded-full font-bold">
-                  @{student.username}
-                </span>
-                {isTargetSystemAdmin ? (
-                  <span className="text-xs bg-purple-500/30 text-purple-200 border border-purple-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                    <ShieldAlert className="w-3 h-3" /> Quản Trị Hệ Thống &bull; Góp Ý Tính Năng
-                  </span>
-                ) : isTargetTeacher ? (
-                  <span className="text-xs bg-amber-500/25 text-amber-200 border border-amber-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Giáo Viên IELTS
-                  </span>
-                ) : (
-                  <>
-                    <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> Học Viên Chính Thức
-                    </span>
-                    {visibleTitle && !visibleTitle.isRoleBuiltIn && (
-                      <button
-                        type="button"
-                        onClick={() => setShowTitlesModal(true)}
-                        title="Bấm để xem bảng danh hiệu và cách đạt được"
-                        className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold border flex items-center gap-1 hover:scale-105 transition cursor-pointer ${visibleTitle.heroBadgeClass}`}
-                      >
-                        <span>{visibleTitle.icon}</span>
-                        <span>{visibleTitle.label}</span>
-                      </button>
-                    )}
-                    {isSelf && student.showTitleBadge === false && (
-                      <button
-                        type="button"
-                        onClick={() => setShowTitlesModal(true)}
-                        className="text-[11px] bg-white/10 hover:bg-white/20 text-slate-200 border border-white/25 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 transition"
-                      >
-                        <EyeOff className="w-3 h-3" /> Đang tắt danh hiệu
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-2.5 text-xs text-slate-300 flex-wrap">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" /> Gia nhập: <b>{student.joinedDate || '01/02/2026'}</b>
-                </span>
-                {!isTargetTeacher && !isTargetSystemAdmin && (
-                  <span className="flex items-center gap-1.5 text-amber-300">
-                    <Target className="w-3.5 h-3.5 text-amber-400" /> Mục tiêu Target: <b>Band {student.targetBand || '8.0'}</b>
-                  </span>
-                )}
+        {/* 2. Separate Profile Info & Controls Section Below Cover */}
+        <div className="px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 min-w-0">
+              {/* Overlapping Large Avatar */}
+              <div className="-mt-16 sm:-mt-20 relative shrink-0 w-fit">
+                <div className="p-1.5 rounded-full bg-white dark:bg-slate-900 shadow-xl inline-block">
+                  <UserAvatarBadge
+                    user={student}
+                    sizeClass="w-28 h-28 sm:w-36 sm:h-36"
+                    textClass="text-4xl sm:text-5xl"
+                    rounded="rounded-full"
+                  />
+                </div>
                 {canEditTargetInfo && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() =>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isSelf) {
+                        setShowAvatarModal(true);
+                      } else {
                         setEditingTargetUser({
                           username: student.username,
                           name: student.name || '',
@@ -557,101 +383,189 @@ export default function StudentProfile({
                           targetBand: student.targetBand || 7.5,
                           studyGoal: student.studyGoal || '',
                           avatarUrl: student.avatarUrl || ''
-                        })
+                        });
                       }
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 border border-amber-300/40 text-amber-200 text-[11px] font-bold transition"
-                    >
-                      <Edit className="w-3 h-3" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={openCustomizeModal}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-pink-500/25 hover:bg-pink-500/40 border border-pink-300/45 text-pink-100 text-[11px] font-bold transition"
-                    >
-                      <Palette className="w-3 h-3" /> Tùy Chỉnh Hình Nền & Khung
-                    </button>
-                  </>
-                )}
-                {!isTargetTeacher && !isTargetSystemAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => setShowTitlesModal(true)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-400/20 hover:bg-teal-400/35 border border-teal-300/45 text-teal-100 text-[11px] font-bold transition"
+                    }}
+                    title="Đổi Avatar"
+                    aria-label="Đổi Avatar"
+                    className="absolute bottom-2 right-1.5 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white border-2 border-white dark:border-slate-900 shadow-md flex items-center justify-center transition"
                   >
-                    <Trophy className="w-3 h-3" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 9})
+                    <Camera className="w-4 h-4" />
                   </button>
                 )}
-                {(student.studyGoal || isTargetTeacher || isTargetSystemAdmin) && (
-                  <span className="text-xs text-cyan-200 bg-white/10 px-2.5 py-0.5 rounded-full border border-white/15">
-                    {isTargetSystemAdmin
-                      ? `🛠️ ${student.studyGoal || 'Tiếp nhận góp ý & phát triển tính năng mới cho trung tâm'}`
-                      : isTargetTeacher
-                      ? `✨ ${student.studyGoal || BRAND_INFO.motto}`
-                      : `🎯 ${student.studyGoal}`}
+              </div>
+
+              {/* Clean High-Contrast Profile Identity & Action Buttons */}
+              <div className="space-y-2 min-w-0 sm:pb-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0F172B] dark:text-white leading-tight">
+                    {student.name}
+                  </h1>
+                  <span className="text-xs font-mono bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/35 px-2.5 py-0.5 rounded-full font-bold">
+                    @{student.username}
                   </span>
+                  {isTargetSystemAdmin ? (
+                    <span className="text-xs bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <ShieldAlert className="w-3 h-3" /> Quản Trị Hệ Thống &bull; Góp Ý Tính Năng
+                    </span>
+                  ) : isTargetTeacher ? (
+                    <span className="text-xs bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" /> Giáo Viên IELTS
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-xs bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" /> Học Viên Chính Thức
+                      </span>
+                      {visibleTitle && !visibleTitle.isRoleBuiltIn && (
+                        <button
+                          type="button"
+                          onClick={() => setShowTitlesModal(true)}
+                          title="Bấm để xem bảng danh hiệu và cách đạt được"
+                          className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold border flex items-center gap-1 hover:scale-105 transition cursor-pointer ${visibleTitle.badgeClass}`}
+                        >
+                          <span>{visibleTitle.icon}</span>
+                          <span>{visibleTitle.label}</span>
+                        </button>
+                      )}
+                      {isSelf && student.showTitleBadge === false && (
+                        <button
+                          type="button"
+                          onClick={() => setShowTitlesModal(true)}
+                          className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 transition"
+                        >
+                          <EyeOff className="w-3 h-3" /> Đang tắt danh hiệu
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> Gia nhập: <b className="text-slate-900 dark:text-white tabular-nums">{student.joinedDate || '01/02/2026'}</b>
+                  </span>
+                  {!isTargetTeacher && !isTargetSystemAdmin && (
+                    <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-semibold">
+                      <Target className="w-3.5 h-3.5 text-amber-500" /> Mục tiêu Target: <b>Band {student.targetBand || '8.0'}</b>
+                    </span>
+                  )}
+                  {(student.studyGoal || isTargetTeacher || isTargetSystemAdmin) && (
+                    <span className="text-xs text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                      {isTargetSystemAdmin
+                        ? `🛠️ ${student.studyGoal || 'Tiếp nhận góp ý & phát triển tính năng mới cho trung tâm'}`
+                        : isTargetTeacher
+                        ? `✨ ${student.studyGoal || BRAND_INFO.motto}`
+                        : `🎯 ${student.studyGoal}`}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  {canEditTargetInfo && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingTargetUser({
+                            username: student.username,
+                            name: student.name || '',
+                            role: student.role || 'student',
+                            targetBand: student.targetBand || 7.5,
+                            studyGoal: student.studyGoal || '',
+                            avatarUrl: student.avatarUrl || ''
+                          })
+                        }
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border border-amber-200 dark:border-amber-400/40 text-amber-800 dark:text-amber-200 text-xs font-bold transition"
+                      >
+                        <Edit className="w-3.5 h-3.5" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openCustomizeModal}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 dark:bg-pink-500/15 dark:hover:bg-pink-500/25 border border-pink-200 dark:border-pink-400/40 text-pink-800 dark:text-pink-200 text-xs font-bold transition"
+                      >
+                        <Palette className="w-3.5 h-3.5" /> Tùy Chỉnh Hình Nền &amp; Khung
+                      </button>
+                    </>
+                  )}
+                  {!isTargetTeacher && !isTargetSystemAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTitlesModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDFFFD] hover:bg-[#B5F5F1]/50 dark:bg-teal-500/15 dark:hover:bg-teal-500/25 border border-[#B5F5F1] dark:border-teal-400/40 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold transition"
+                    >
+                      <Trophy className="w-3.5 h-3.5" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 9})
+                    </button>
+                  )}
+                </div>
+
+                {!isSelf && !isTeacherViewer && !isTargetSystemAdmin && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-0.5">
+                    <Lock className="w-3 h-3 text-[#007A7A] dark:text-[#1EE1D6]" /> Đang xem hồ sơ thành viên khác (chế độ chỉ xem; bài viết chi tiết &amp; nhận xét riêng được bảo mật).
+                  </p>
                 )}
               </div>
-              {!isSelf && !isTeacherViewer && !isTargetSystemAdmin && (
-                <p className="mt-2 text-[11px] text-slate-300/90 flex items-center gap-1.5">
-                  <Lock className="w-3 h-3 text-teal-300" /> Đang xem hồ sơ thành viên khác (chế độ chỉ xem; bài viết chi tiết &amp; nhận xét riêng được bảo mật).
-                </p>
+            </div>
+
+            {/* Right Progress / Summary Card (on crisp neutral surface below cover) */}
+            <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-700 lg:text-right sm:min-w-[235px] shrink-0">
+              {isTargetSystemAdmin ? (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-purple-600 dark:text-purple-300 font-bold mb-1">
+                    Hòm Thư Góp Ý Web
+                  </p>
+                  <p className="text-base font-black text-slate-900 dark:text-white">{adminFeedbacks.length} góp ý đã tiếp nhận</p>
+                  <p className="text-xs text-[#007A7A] dark:text-[#1EE1D6] font-semibold mt-1">
+                    {adminFeedbacks.filter(f => f.status === 'done').length} đã thêm • {newFeedbacksCount} chờ đọc
+                  </p>
+                </div>
+              ) : isTargetTeacher ? (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-300 font-bold mb-1">
+                    Hồ Sơ Giáo Viên
+                  </p>
+                  <p className="text-base font-black text-slate-900 dark:text-white">{BRAND_INFO.siteName}</p>
+                  <p className="text-xs text-[#007A7A] dark:text-[#1EE1D6] font-semibold mt-1">
+                    {tests.length} đề thi • {totalGradedByTeacher} bài đã chấm
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold mb-1">Đánh Giá Tiến Độ</p>
+                  {highestBand ? (
+                    <div>
+                      <p className="text-2xl font-black text-[#007A7A] dark:text-[#1EE1D6] tabular-nums">
+                        Band {highestBand} <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">/ {student.targetBand || 8.0}</span>
+                      </p>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mt-1">
+                        {highestBand >= (student.targetBand || 8.0)
+                          ? '🎉 Đã đạt mục tiêu đề ra!'
+                          : `⚡ Còn ${((student.targetBand || 8.0) - highestBand).toFixed(1)} Band nữa để đạt mục tiêu`}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Chưa có kết quả bài thi</p>
+                  )}
+                </div>
               )}
             </div>
-          </div>
-
-          {/* Right Hero Card */}
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 text-right min-w-[210px]">
-            {isTargetSystemAdmin ? (
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-purple-300 font-bold mb-1">
-                  Hòm Thư Góp Ý Web
-                </p>
-                <p className="text-base font-black text-white">{adminFeedbacks.length} góp ý đã tiếp nhận</p>
-                <p className="text-xs text-cyan-300 font-semibold mt-1">
-                  {adminFeedbacks.filter(f => f.status === 'done').length} đã thêm • {newFeedbacksCount} chờ đọc
-                </p>
-              </div>
-            ) : isTargetTeacher ? (
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-amber-300 font-bold mb-1">
-                  Hồ Sơ Giáo Viên
-                </p>
-                <p className="text-base font-black text-white">{BRAND_INFO.siteName}</p>
-                <p className="text-xs text-cyan-300 font-semibold mt-1">
-                  {tests.length} đề thi • {totalGradedByTeacher} bài đã chấm
-                </p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-slate-300 font-bold mb-1">Đánh Giá Tiến Độ</p>
-                {highestBand ? (
-                  <div>
-                    <p className="text-2xl font-black text-amber-300">
-                      Band {highestBand} <span className="text-xs text-slate-300 font-normal">/ {student.targetBand || 8.0}</span>
-                    </p>
-                    <p className="text-xs text-cyan-300 font-semibold mt-1">
-                      {highestBand >= (student.targetBand || 8.0)
-                        ? '🎉 Đã đạt mục tiêu đề ra!'
-                        : `⚡ Còn ${((student.targetBand || 8.0) - highestBand).toFixed(1)} Band nữa để đạt mục tiêu`}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-300">Chưa có kết quả bài thi</p>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
 
+      {/* Main 2-Column Workspace: Left Profile Content + Right Sticky Member Directory */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="lg:col-span-8 space-y-6 min-w-0">
+
       {/* SYSTEM ADMIN PROFILE: FEEDBACK & FEATURE REQUEST INBOX */}
       {isTargetSystemAdmin ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
             {/* Submit New Feedback Card (for Students & Teachers & Admin) */}
             <form
               onSubmit={handleSendAdminFeedback}
-              className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-purple-200/80 dark:border-purple-500/30 shadow-sm p-6 space-y-4 h-fit"
+              className="xl:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-purple-200/80 dark:border-purple-500/30 shadow-sm p-6 space-y-4 h-fit"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 flex items-center justify-center">
@@ -728,7 +642,7 @@ export default function StudentProfile({
             </form>
 
             {/* Feedback List & Admin Triage Board */}
-            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 space-y-4">
+            <div className="xl:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div>
                   <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -905,7 +819,7 @@ export default function StudentProfile({
         </div>
       ) : isTargetTeacher ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-8">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
               <div className="p-3 bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] rounded-xl">
                 <BookOpen className="w-6 h-6" />
@@ -927,12 +841,12 @@ export default function StudentProfile({
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 rounded-xl">
+              <div className="p-3 bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 rounded-xl">
                 <Gamepad2 className="w-6 h-6" />
               </div>
               <div>
                 <p className="text-[11px] text-slate-400 font-bold uppercase">Phòng Đấu Game</p>
-                <p className="text-2xl font-black text-purple-600 dark:text-purple-400">{totalActiveRooms}</p>
+                <p className="text-2xl font-black text-rose-600 dark:text-rose-400">{totalActiveRooms}</p>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">PIN hiện tại: {currentRoomPin}</span>
               </div>
             </div>
@@ -1060,7 +974,7 @@ export default function StudentProfile({
       ) : (
         <>
           {/* 4 Summary Metric Cards (Student Profile) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-8">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
               <div className="p-3 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-xl">
                 <History className="w-6 h-6" />
@@ -1111,12 +1025,12 @@ export default function StudentProfile({
               </div>
             ) : (
               <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-                <div className="p-3 bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 rounded-xl">
+                <div className="p-3 bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-xl">
                   <Target className="w-6 h-6" />
                 </div>
                 <div>
                   <p className="text-[11px] text-slate-400 dark:text-slate-400 font-bold uppercase">Mục Tiêu Band</p>
-                  <p className="text-2xl font-black text-purple-600 dark:text-purple-400">
+                  <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
                     Band {student.targetBand || '8.0'}
                   </p>
                   <span className="text-[11px] block font-normal text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1159,7 +1073,7 @@ export default function StudentProfile({
         ) : (
           <div className="space-y-6">
             {/* Chronological Trajectory Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {chronologicalAttempts.map((att, idx) => (
                 <div
                   key={att.id}
@@ -1535,6 +1449,139 @@ export default function StudentProfile({
           </div>
         </div>
       </div>
+        </div>
+
+        {/* Right Sticky Sidebar: Member Directory (Góc phải như danh bạ thành viên / bạn bè) */}
+        <aside className="lg:col-span-4 lg:sticky lg:top-20 space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/85 dark:border-slate-800 shadow-sm p-4 sm:p-5 space-y-3.5">
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
+                Danh Bạ Hồ Sơ Thành Viên ({filteredMembers.length}/{allMembers.length})
+              </h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Chọn thành viên để xem nhanh hồ sơ, tiến trình &amp; góp ý.
+              </p>
+            </div>
+
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+                placeholder="Tìm tên hoặc @username..."
+                aria-label="Tìm thành viên theo tên hoặc username"
+                className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+              {[
+                { id: 'all', label: `Tất cả (${allMembers.length})` },
+                ...(adminCardMember ? [{ id: 'admin', label: 'Quản trị (1)' }] : []),
+                { id: 'teacher', label: `Giáo viên (${allMembers.filter(m => !m.isSystemAdmin && m.role === 'teacher').length})` },
+                { id: 'student', label: `Học viên (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher').length})` }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setMemberRoleFilter(f.id)}
+                  className={`px-2.5 py-1 rounded-lg border transition ${
+                    memberRoleFilter === f.id
+                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="max-h-[480px] overflow-y-auto space-y-2 pr-1">
+              {filteredMembers.length === 0 ? (
+                <p className="text-xs text-slate-400 py-4 text-center">
+                  Không tìm thấy thành viên nào khớp "{memberSearch}".
+                </p>
+              ) : (
+                filteredMembers.map(member => {
+                  const isSelected = activeUsername === member.username;
+                  const isMemberAdmin = Boolean(member.isSystemAdmin);
+                  const isMemberTeacher = !isMemberAdmin && member.role === 'teacher';
+                  const isMeChip = member.username === currentUser?.username;
+                  const mBest = bestBandByStudent.get(member.username) ?? null;
+
+                  return (
+                    <button
+                      key={member.username}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProfileStudent(member.username);
+                        setTempNoteText('');
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl border text-left transition ${
+                        isSelected
+                          ? isMemberAdmin
+                            ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-2 ring-purple-500/20'
+                            : 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                          : isMemberAdmin
+                          ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-200 dark:border-purple-500/30 hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800'
+                          : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]/50 hover:bg-white dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <UserAvatarBadge user={member} sizeClass="w-10 h-10" textClass="text-xs" rounded="rounded-xl" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            {member.name || member.username}
+                          </span>
+                          {isMeChip && (
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 shrink-0">
+                              Bạn
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 flex-wrap mt-0.5">
+                          {isMemberAdmin ? (
+                            <span className="text-purple-700 dark:text-purple-300 font-bold inline-flex items-center gap-1">
+                              Quản trị &bull; Góp ý
+                              {newFeedbacksCount > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
+                                  {newFeedbacksCount} mới
+                                </span>
+                              )}
+                            </span>
+                          ) : isMemberTeacher ? (
+                            <span className="text-amber-600 dark:text-amber-300 font-bold">Giáo viên</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 flex-wrap">
+                              {(() => {
+                                const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
+                                if (mTitle && !mTitle.isRoleBuiltIn) {
+                                  return (
+                                    <span className={`px-1.5 py-0.2 rounded-full border font-extrabold text-[9px] ${mTitle.badgeClass}`}>
+                                      {mTitle.icon} {mTitle.label}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              <span>
+                                Target {member.targetBand || '7.5'}
+                                {mBest !== null ? ` • Best ${mBest}` : ''}
+                              </span>
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </aside>
+      </div>
 
       {/* Modal: Bảng Danh Hiệu Học Viên & Cách Đạt Được */}
       {showTitlesModal && !isTargetTeacher && !isTargetSystemAdmin && titleSummary && (
@@ -1732,21 +1779,28 @@ export default function StudentProfile({
                   avatarFrameId: customDraft.avatarFrameId
                 };
                 return (
-                  <div
-                    className={`${previewCoverOk ? 'bg-slate-900' : previewBanner.heroClass} rounded-2xl p-4 text-white relative overflow-hidden border border-slate-800`}
-                    style={
-                      previewCoverOk
-                        ? { backgroundImage: `url("${customDraft.profileCoverUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                        : undefined
-                    }
-                  >
-                    {previewCoverOk && <div className="absolute inset-0 bg-slate-950/65 pointer-events-none" />}
-                    <div className="relative z-10 flex items-center gap-3.5">
-                      <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-2xl" />
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                    <div
+                      className={`h-24 w-full overflow-hidden border-b border-slate-200/80 dark:border-slate-700 ${
+                        previewCoverOk ? 'bg-slate-100 dark:bg-slate-800' : previewBanner.heroClass
+                      }`}
+                    >
+                      {previewCoverOk && (
+                        <img
+                          src={customDraft.profileCoverUrl}
+                          alt="Xem trước ảnh bìa"
+                          className="w-full h-full object-cover object-center"
+                        />
+                      )}
+                    </div>
+                    <div className="px-4 pb-3.5 pt-2 flex items-end gap-3">
+                      <div className="-mt-8 p-1 rounded-full bg-white dark:bg-slate-900 shadow-md shrink-0">
+                        <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-full" />
+                      </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-wider text-teal-200 font-bold">Xem trước trực tiếp</p>
-                        <p className="text-base font-extrabold truncate">{student.name}</p>
-                        <p className="text-xs text-slate-200 truncate">{customDraft.studyGoal || 'Mục tiêu chinh phục IELTS!'}</p>
+                        <p className="text-[10px] uppercase tracking-wider text-[#007A7A] dark:text-[#1EE1D6] font-bold">Xem trước trực tiếp</p>
+                        <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{student.name}</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 truncate">{customDraft.studyGoal || 'Mục tiêu chinh phục IELTS!'}</p>
                       </div>
                     </div>
                   </div>

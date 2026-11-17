@@ -282,7 +282,7 @@ export function compressAvatarImageFile(file, targetSize = 160) {
   });
 }
 
-export function compressBannerImageFile(file, targetWidth = 960, targetHeight = 320) {
+export function compressBannerImageFile(file, targetWidth = 1200, targetHeight = 420) {
   return new Promise((resolve, reject) => {
     if (!file || !file.type?.startsWith('image/')) {
       reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP).'));
@@ -312,7 +312,7 @@ export function compressBannerImageFile(file, targetWidth = 960, targetHeight = 
           sy = (img.height - sh) / 2;
         }
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
-        resolve(canvas.toDataURL('image/jpeg', 0.78));
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
       };
       img.src = reader.result;
     };
