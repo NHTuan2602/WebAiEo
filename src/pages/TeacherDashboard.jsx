@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_VOCAB_TEXT,
+  evaluateSpeakingDailyCompliance,
   evaluateTestSchedule,
   formatDurationVi,
   formatViDateTime,
@@ -62,8 +63,10 @@ import {
   getReadingPassages,
   getSpeakingQuestionItems,
   getUserClassIds,
-  normalizeExamConfig
+  normalizeExamConfig,
+  normalizeSpeakingSection
 } from '../constants/seedData';
+import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
@@ -75,6 +78,7 @@ export default function TeacherDashboard({
   copiedRoomPin,
   currentRoomPin,
   currentUser,
+  customTitles = [],
   expandedTeacherTestId,
   gradingFilters,
   handleBulkDeleteAccounts,
@@ -97,6 +101,8 @@ export default function TeacherDashboard({
   onCreateSkillForClass,
   onCreateTestForClass,
   onDeleteClass,
+  onNotifyMissingDaily,
+  onOpenAdminTitleManager,
   onOpenMailConfig,
   onUpdateClassMembers,
   onUpsertClass,
@@ -105,6 +111,7 @@ export default function TeacherDashboard({
   openSingleSkillBuilder,
   openTeacherGradingModal,
   roomsDb,
+  serverClockOffsetMs = 0,
   setAddStudentMode,
   setCopiedRoomPin,
   setCurrentRoomPin,
@@ -273,6 +280,14 @@ export default function TeacherDashboard({
   const skillExercises = (tests || []).filter(t => normalizeExamConfig(t).testMode === 'single_skill');
   const publicFullExamsCount = fullExamTests.filter(t => normalizeExamConfig(t).visibility !== 'private').length;
   const pendingGradingCount = (attempts || []).filter(a => !a.teacherGraded).length;
+  const speakingDailyCompliance = evaluateSpeakingDailyCompliance({
+    tests,
+    attempts,
+    usersDb,
+    classesDb,
+    viewerUser: currentUser,
+    nowMs: Date.now() + (serverClockOffsetMs || 0)
+  });
   const itemQuery = itemSearchQuery.trim().toLowerCase();
 
   const completionStatsById = {};
@@ -386,6 +401,24 @@ export default function TeacherDashboard({
                       ? `BÀI TẬP • ${cfg.focusSkill === 'speaking' ? 'SPEAKING AI' : (cfg.focusSkill || 'skill').toUpperCase()}`
                       : 'ĐỀ THI IELTS'}
                   </span>
+                  {isExercise && cfg.focusSkill === 'speaking' && (() => {
+                    const spMeta = normalizeSpeakingSection(t.speaking);
+                    if (spMeta.speakingTrack === 'daily') {
+                      return (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md border bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 shrink-0">
+                          🔥 DAILY {spMeta.dailyDate ? `• ${spMeta.dailyDate}` : ''}
+                        </span>
+                      );
+                    }
+                    if (spMeta.speakingTrack === 'exam_room') {
+                      return (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md border bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 shrink-0">
+                          🔒 PHÒNG THI {spMeta.hasRoomPassword || spMeta.roomPassword ? '(Có Pass)' : ''}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
                     {t.title}
                   </h3>
@@ -922,6 +955,66 @@ export default function TeacherDashboard({
           </button>
         </div>
       </div>
+
+      {/* Speaking Daily Missing Compliance Strip */}
+      {speakingDailyCompliance.missingStudentSummaries.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50/70 to-rose-50 dark:from-amber-950/35 dark:via-slate-900 dark:to-rose-950/30 border border-amber-300 dark:border-amber-500/40 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 shadow-xs">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider">
+                <Flame className="w-3 h-3" /> Cảnh Báo Speaking Daily ({speakingDailyCompliance.todayKey})
+              </span>
+              <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                Còn {speakingDailyCompliance.missingStudentSummaries.length} học viên chưa hoàn thành bài Speaking Daily bắt buộc
+              </h2>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+              Chưa nộp:{' '}
+              <span className="font-bold text-rose-700 dark:text-rose-300">
+                {speakingDailyCompliance.missingStudentSummaries
+                  .slice(0, 6)
+                  .map(s => `${s.student.name || s.student.username} (${s.missingTests.length} bài)`)
+                  .join(', ')}
+                {speakingDailyCompliance.missingStudentSummaries.length > 6
+                  ? ` +${speakingDailyCompliance.missingStudentSummaries.length - 6} bạn khác`
+                  : ''}
+              </span>
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {onNotifyMissingDaily && speakingDailyCompliance.mandatoryDailyTests.length > 0 && (() => {
+              const primaryMissingReport =
+                speakingDailyCompliance.perTest.find(r => r.missingStudents.length > 0) ||
+                speakingDailyCompliance.perTest[0];
+              if (!primaryMissingReport) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onNotifyMissingDaily(
+                      primaryMissingReport.test,
+                      speakingDailyCompliance.missingStudentSummaries.map(s => s.student)
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition shadow-sm inline-flex items-center gap-1.5"
+                >
+                  <Megaphone className="w-3.5 h-3.5" /> Báo &amp; Nhắc Ngay ({speakingDailyCompliance.missingStudentSummaries.length} HS)
+                </button>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => {
+                setExerciseSkillFilter('speaking');
+                setTeacherHubTab('skill_exercises');
+              }}
+              className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold transition"
+            >
+              Xem Bài Speaking
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Overview KPI Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -1840,6 +1933,15 @@ export default function TeacherDashboard({
                     <Send className="w-4 h-4" /> {mailConfigured ? 'Email OTP: Đang bật' : 'Cấu hình Email OTP'}
                   </button>
                 )}
+                {isViewerSuperAdmin && onOpenAdminTitleManager && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAdminTitleManager(null)}
+                    className="px-4 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <Crown className="w-4 h-4" /> Quản Lý &amp; Tạo Danh Hiệu
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2065,6 +2167,18 @@ export default function TeacherDashboard({
                                 <GraduationCap className="w-3.5 h-3.5 shrink-0" /> Học viên
                               </span>
                             )}
+                            {(() => {
+                              const accTitle = resolveVisibleTitleBadge(account, attempts, roomsDb, customTitles);
+                              if (!accTitle || accTitle.isRoleBuiltIn) return null;
+                              return (
+                                <div className="mt-1">
+                                  <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${accTitle.badgeClass}`}>
+                                    <span>{accTitle.icon}</span>
+                                    <span>{accTitle.label}</span>
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-4 text-center whitespace-nowrap">
                             {isTeacherAccount ? (
@@ -2132,6 +2246,16 @@ export default function TeacherDashboard({
                                   className="min-h-[34px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 whitespace-nowrap transition"
                                 >
                                   <Eye className="w-3.5 h-3.5 shrink-0" /> Hồ sơ
+                                </button>
+                              )}
+                              {isViewerSuperAdmin && !isSuperAdminAccount && onOpenAdminTitleManager && (
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenAdminTitleManager(account.username)}
+                                  className="min-h-[34px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 whitespace-nowrap transition"
+                                  title="Tặng hoặc gỡ danh hiệu cho tài khoản này"
+                                >
+                                  <Crown className="w-3.5 h-3.5 shrink-0" /> Danh Hiệu
                                 </button>
                               )}
                               <button

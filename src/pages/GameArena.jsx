@@ -65,6 +65,7 @@ export default function GameArena({
   copiedRoomPin,
   currentRoomPin,
   currentUser,
+  customTitles = [],
   darkMode = false,
   freezeCharges,
   gameCombo,
@@ -960,7 +961,7 @@ export default function GameArena({
                           <span className="truncate max-w-[105px]">{player.name}</span>
                         </button>
                         {(() => {
-                          const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb);
+                          const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb, customTitles);
                           if (!pTitle) return null;
                           return (
                             <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${pTitle.gameBadgeClass}`}>
@@ -1099,7 +1100,7 @@ export default function GameArena({
                           {isMemberTeacher ? 'Giáo viên' : 'Học viên'}
                         </span>
                         {(() => {
-                          const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
+                          const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles);
                           if (!mTitle || mTitle.isRoleBuiltIn) return null;
                           return (
                             <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${mTitle.gameBadgeClass}`}>
@@ -1347,7 +1348,7 @@ export default function GameArena({
                         />
                         <p className="font-extrabold text-sm text-[#0F172B] dark:text-white mt-1.5 truncate max-w-full">{p.name}</p>
                         {(() => {
-                          const podTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb);
+                          const podTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles);
                           if (!podTitle) return null;
                           return (
                             <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border mt-0.5 ${podTitle.gameBadgeClass}`}>
@@ -1444,7 +1445,7 @@ export default function GameArena({
                               {p.name}
                             </span>
                             {(() => {
-                              const rowTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb);
+                              const rowTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles);
                               if (!rowTitle) return null;
                               return (
                                 <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${rowTitle.gameBadgeClass}`}>
@@ -1663,7 +1664,7 @@ export default function GameArena({
                 {gameLives > 0 ? '❤️'.repeat(gameLives) : '💀'}
               </span>
               {(() => {
-                const selfTitle = resolveVisibleTitleBadge(currentUser, attempts, roomsDb);
+                const selfTitle = resolveVisibleTitleBadge(currentUser, attempts, roomsDb, customTitles);
                 if (!selfTitle) return null;
                 return (
                   <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${selfTitle.gameBadgeClass}`}>
@@ -1897,7 +1898,7 @@ export default function GameArena({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {topStandings.map((st, sIdx) => {
                         const isMe = st.username === currentUser?.username || st.name === currentUser?.name;
-                        const stTitle = st.username ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb) : null;
+                        const stTitle = st.username ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb, customTitles) : null;
                         return (
                           <div
                             key={st.username || st.name || sIdx}

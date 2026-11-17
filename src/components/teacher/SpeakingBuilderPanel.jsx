@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import {
+  Calendar,
   Clock,
+  Eye,
+  EyeOff,
   FileAudio,
+  Flame,
   Key,
   Loader2,
+  Lock,
   Mic,
   Plus,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Upload,
   Wand2
 } from 'lucide-react';
-import { createDefaultSpeakingSection, normalizeSpeakingSection } from '../../constants/seedData';
+import { createDefaultSpeakingSection, getVietnamTodayDateKey, normalizeSpeakingSection } from '../../constants/seedData';
 import { generateSpeakingQuestionsWithAI } from '../../utils/geminiGrader';
 import { uploadSpeakingRecording } from '../../utils/speakingApi';
 
@@ -27,6 +33,7 @@ export default function SpeakingBuilderPanel({
   const [aiTopic, setAiTopic] = useState('Sustainable Cities & Modern Education');
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadingKey, setUploadingKey] = useState('');
+  const [showRoomPass, setShowRoomPass] = useState(false);
 
   const patchSpeaking = (patch) => {
     onChangeSpeaking({
@@ -170,6 +177,10 @@ export default function SpeakingBuilderPanel({
     const fresh = createDefaultSpeakingSection();
     onChangeSpeaking({
       ...fresh,
+      speakingTrack: sp.speakingTrack,
+      dailyDate: sp.dailyDate,
+      dailyMandatory: sp.dailyMandatory,
+      roomPassword: sp.roomPassword,
       isForecast: sp.isForecast,
       autoAiGrade: sp.autoAiGrade
     });
@@ -339,7 +350,7 @@ export default function SpeakingBuilderPanel({
           <label className="col-span-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2 cursor-pointer">
             <div>
               <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-100">Gắn nhãn Đề Forecast</span>
-              <span className="block text-[10px] text-slate-500 dark:text-slate-400">Hiển thị trong mục Luyện Forecast kiểu Luyennoi</span>
+              <span className="block text-[10px] text-slate-500 dark:text-slate-400">Hiển thị thêm trong nhóm Đề Dự Đoán Forecast</span>
             </div>
             <input
               type="checkbox"
@@ -348,6 +359,125 @@ export default function SpeakingBuilderPanel({
               className="w-4 h-4 accent-[#570DF8]"
             />
           </label>
+        </div>
+
+        {/* Phân chia Chuyên Mục Speaking: Luyện Daily vs Thực Chiến Phòng Thi (Team Sắp Thi) */}
+        <div className="p-4 rounded-2xl bg-slate-50/90 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3.5">
+          <div>
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+              Phân Loại Mục Speaking AI
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Chia rõ mục <strong>1. Luyện Daily</strong> (quăng đề mỗi ngày · báo người chưa làm) và <strong>2. Luyện Thực Chiến Phòng Thi</strong> (Team sắp thi cần Password).
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {[
+              {
+                id: 'general',
+                title: 'Kho Speaking Chung / Forecast',
+                desc: 'Bài luyện tự chọn linh hoạt',
+                icon: Mic,
+                activeCls: 'border-slate-800 bg-slate-900 text-white dark:bg-white dark:text-slate-950'
+              },
+              {
+                id: 'daily',
+                title: '1. Luyện Speaking Daily',
+                desc: 'Quăng đề mỗi ngày · Báo ai chưa làm',
+                icon: Flame,
+                activeCls: 'border-orange-500 bg-orange-600 text-white shadow-sm'
+              },
+              {
+                id: 'exam_room',
+                title: '2. Phòng Thi Thực Chiến',
+                desc: 'Team sắp thi · Cần Password vào thi',
+                icon: Lock,
+                activeCls: 'border-[#570DF8] bg-[#570DF8] text-white shadow-sm'
+              }
+            ].map(opt => {
+              const IconC = opt.icon;
+              const active = sp.speakingTrack === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    patchSpeaking({
+                      speakingTrack: opt.id,
+                      ...(opt.id === 'daily' && !sp.dailyDate ? { dailyDate: getVietnamTodayDateKey(), dailyMandatory: true } : {})
+                    });
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition flex items-start gap-2.5 ${
+                    active
+                      ? opt.activeCls
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-400'
+                  }`}
+                >
+                  <IconC className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold leading-snug">{opt.title}</p>
+                    <p className={`text-[10px] mt-0.5 leading-snug ${active ? 'opacity-90' : 'text-slate-500 dark:text-slate-400'}`}>
+                      {opt.desc}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {sp.speakingTrack === 'daily' && (
+            <div className="p-3.5 rounded-xl bg-orange-50/90 dark:bg-orange-950/25 border border-orange-200 dark:border-orange-500/35 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              <div>
+                <label className="block text-[11px] font-bold text-orange-900 dark:text-orange-200 mb-1 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> Ngày giao bài Daily
+                </label>
+                <input
+                  type="date"
+                  value={sp.dailyDate || getVietnamTodayDateKey()}
+                  onChange={e => patchSpeaking({ dailyDate: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-orange-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                />
+              </div>
+              <label className="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/70 border border-orange-200/80 dark:border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={sp.dailyMandatory}
+                  onChange={e => patchSpeaking({ dailyMandatory: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 accent-orange-600"
+                />
+                <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
+                  <strong>Bắt buộc hoàn thành mỗi ngày</strong> — Tự động báo danh sách học viên chưa làm &amp; nhắc trên màn hình học viên.
+                </span>
+              </label>
+            </div>
+          )}
+
+          {sp.speakingTrack === 'exam_room' && (
+            <div className="p-3.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-500/35 space-y-2">
+              <label className="block text-[11px] font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#570DF8]" />
+                Mật khẩu Phòng Thi Thực Chiến (Cấp riêng cho Team sắp thi)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type={showRoomPass ? 'text' : 'password'}
+                  value={sp.roomPassword}
+                  onChange={e => patchSpeaking({ roomPassword: e.target.value, hasRoomPassword: Boolean(e.target.value.trim()) })}
+                  placeholder="VD: IELTSTEAM2026 (Để trống nếu không khóa mật khẩu)"
+                  className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRoomPass(v => !v)}
+                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300"
+                  title={showRoomPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
+                  {showRoomPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

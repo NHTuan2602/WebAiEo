@@ -16,10 +16,10 @@ import {
   Volume2
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import { formatViDateTime, getSpeakingQuestionItems, normalizeExamConfig } from '../constants/seedData';
+import { formatViDateTime, getSpeakingQuestionItems, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
 import { createUniqueAttemptId } from '../utils/examHelpers';
 import { cleanAudioMimeType, roundSpeakingBand } from '../utils/speakingAiEngine';
-import { pickSupportedAudioMimeType, requestAiSpeakingGrading, uploadSpeakingRecording } from '../utils/speakingApi';
+import { pickSupportedAudioMimeType, requestAiSpeakingGrading, uploadSpeakingRecording, verifySpeakingRoomPassword } from '../utils/speakingApi';
 import AudioLevelMeter from '../components/speaking/AudioLevelMeter';
 import SpeakingResultCelebrationModal from '../components/speaking/SpeakingResultCelebrationModal';
 
@@ -36,16 +36,33 @@ export default function SpeakingExamRoom({
   dispatchSyncAction,
   onAttemptCreated,
   onExitSpeaking,
+  onSpeakingRoomUnlocked,
   onViewResult,
   partMode = 'full',
   selectedTestId,
   showToast,
+  speakingUnlockTokens = {},
   tests = []
 }) {
   const activeTest = tests.find(t => t.id === selectedTestId);
   const cfg = normalizeExamConfig(activeTest);
+  const spMeta = normalizeSpeakingSection(activeTest?.speaking);
   const isTeacher = currentUser?.role === 'teacher';
-  const isRealExamLocked = cfg.maxAttempts > 0 && !isTeacher;
+  const isExamRoomMode = spMeta.speakingTrack === 'exam_room';
+  const isDailyMode = spMeta.speakingTrack === 'daily';
+  const isRealExamLocked = (cfg.maxAttempts > 0 || isExamRoomMode) && !isTeacher;
+  const existingUnlockToken = activeTest ? (speakingUnlockTokens?.[activeTest.id] || '') : '';
+  const [localUnlockToken, setLocalUnlockToken] = useState('');
+  const [roomPassInput, setRoomPassInput] = useState('');
+  const [roomPassError, setRoomPassError] = useState('');
+  const [verifyingRoomPass, setVerifyingRoomPass] = useState(false);
+
+  const effectiveUnlockToken = localUnlockToken || existingUnlockToken;
+  const requiresRoomPassword =
+    isExamRoomMode &&
+    !isTeacher &&
+    Boolean(spMeta.hasRoomPassword || spMeta.roomPassword) &&
+    !effectiveUnlockToken;
 
   const partFilterMap = {
     full: 'all',
@@ -279,6 +296,27 @@ export default function SpeakingExamRoom({
       setPrepRemainingSec(targetItem.prepSec);
     } else {
       setPrepRemainingSec(0);
+    }
+  };
+
+  const handleVerifyRoomPassword = async (e) => {
+    e?.preventDefault();
+    if (!activeTest || verifyingRoomPass) return;
+    setRoomPassError('');
+    setVerifyingRoomPass(true);
+    try {
+      const res = await verifySpeakingRoomPassword({
+        testId: activeTest.id,
+        password: roomPassInput
+      });
+      const tok = res?.unlockToken || 'unlocked';
+      setLocalUnlockToken(tok);
+      onSpeakingRoomUnlocked?.(activeTest.id, tok);
+      showToast?.('Đã xác nhận mật khẩu Phòng Thi Thực Chiến!', 'success');
+    } catch (err) {
+      setRoomPassError(err?.message || 'Mật khẩu Phòng Thi Thực Chiến chưa chính xác!');
+    } finally {
+      setVerifyingRoomPass(false);
     }
   };
 
@@ -601,6 +639,7 @@ export default function SpeakingExamRoom({
         tabSwitchCount: 0,
         teacherGraded: true,
         aiGraded: true,
+        ...(effectiveUnlockToken ? { speakingUnlockToken: effectiveUnlockToken } : {}),
         ...(evaluation?.aiGradingTicket ? { aiGradingTicket: evaluation.aiGradingTicket } : {}),
         scores: {
           listening: { raw: 0, total: 0, band: null },
@@ -671,6 +710,16 @@ export default function SpeakingExamRoom({
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#570DF8] text-white shrink-0">
                 {partMode === 'full' ? 'FULL TEST' : partMode.toUpperCase()}
               </span>
+              {isDailyMode && (
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-600 text-white shrink-0">
+                  Speaking Daily
+                </span>
+              )}
+              {isExamRoomMode && (
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-600 text-white shrink-0">
+                  Phòng Thi Thực Chiến
+                </span>
+              )}
               <h1 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
                 {activeTest.title}
               </h1>
@@ -711,8 +760,59 @@ export default function SpeakingExamRoom({
         </div>
       </header>
 
+      {/* PHASE 0: PASSWORD GATE FOR EXAM ROOM (TEAM SẮP THI) */}
+      {requiresRoomPassword && (
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+          <form
+            onSubmit={handleVerifyRoomPassword}
+            className="max-w-md w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 sm:p-8 shadow-xl space-y-5 text-center"
+          >
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center border border-[#570DF8]/30">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                Phòng Thi Thực Chiến • Team Sắp Thi
+              </span>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                Nhập Mật Khẩu Vào Phòng Thi
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Phòng thi <strong>{activeTest.title}</strong> được bảo vệ bằng mật khẩu dành riêng cho nhóm học viên chuẩn bị thi thật.
+              </p>
+            </div>
+
+            <div className="space-y-2 text-left">
+              <input
+                type="password"
+                autoFocus
+                required
+                value={roomPassInput}
+                onChange={e => setRoomPassInput(e.target.value)}
+                placeholder="Nhập mật khẩu phòng thi do giáo viên cấp..."
+                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#570DF8]"
+              />
+              {roomPassError && (
+                <p className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {roomPassError}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={verifyingRoomPass}
+              className="w-full py-3 rounded-2xl bg-[#570DF8] hover:bg-[#490AD2] disabled:opacity-60 text-white text-sm font-extrabold shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 transition"
+            >
+              <Lock className="w-4 h-4" />
+              <span>{verifyingRoomPass ? 'Đang kiểm tra mật khẩu...' : 'Mở Khóa Phòng Thi Thực Chiến'}</span>
+            </button>
+          </form>
+        </main>
+      )}
+
       {/* PHASE 1: MIC CHECK */}
-      {phase === 'MIC_CHECK' && (
+      {!requiresRoomPassword && phase === 'MIC_CHECK' && (
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
           <div className="max-w-lg w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 text-center">
             <img
@@ -779,7 +879,7 @@ export default function SpeakingExamRoom({
       )}
 
       {/* PHASE 2: ACTIVE INTERVIEW STAGE */}
-      {phase === 'ACTIVE' && currentItem && (
+      {!requiresRoomPassword && phase === 'ACTIVE' && currentItem && (
         <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
           {/* Luyennoi Progress Pips */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -881,6 +981,12 @@ export default function SpeakingExamRoom({
                 </div>
                 <textarea
                   rows={3}
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  data-gramm="false"
+                  data-gramm_editor="false"
                   value={part2Notes}
                   onChange={e => setPart2Notes(e.target.value)}
                   placeholder="Ghi chú nhanh dàn ý gạch đầu dòng (Bullet points) cho Cue Card Part 2 trong 1 phút chuẩn bị..."

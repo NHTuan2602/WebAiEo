@@ -23,12 +23,14 @@ import UserAvatarBadge from './UserAvatarBadge';
 export default function Navbar({
   aiApiKey,
   currentUser,
+  dailySpeakingPendingCount = 0,
   darkMode,
   handleLogout,
   notifications = [],
   onMarkNotificationsRead,
   onOpenAccountSecurity,
   onOpenNotificationTarget,
+  onOpenSpeakingDaily,
   openMemberProfile,
   openStudentGamePortal,
   setApiTestState,
@@ -116,6 +118,20 @@ export default function Navbar({
           >
             <Mic className="w-3.5 h-3.5 shrink-0" />
             <span>Bài Tập <span className="hidden xl:inline">4 Kỹ Năng</span></span>
+            {!isTeacher && dailySpeakingPendingCount > 0 && (
+              <span
+                onClick={e => {
+                  if (onOpenSpeakingDaily) {
+                    e.stopPropagation();
+                    onOpenSpeakingDaily();
+                  }
+                }}
+                className="px-1.5 py-0.2 rounded-full bg-orange-500 text-white text-[10px] font-black animate-pulse"
+                title={`Bạn còn ${dailySpeakingPendingCount} bài Speaking Daily chưa hoàn thành hôm nay`}
+              >
+                {dailySpeakingPendingCount} Daily
+              </span>
+            )}
           </button>
           <button
             type="button"

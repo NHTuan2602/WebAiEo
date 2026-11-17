@@ -50,6 +50,10 @@ export default function ClozeNoteSheet({
               }
             }}
             type="text"
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            autoComplete="off"
             readOnly={readOnlyPreview}
             value={readOnlyPreview ? (linkedQ?.correctAnswer || '') : value}
             placeholder={String(seg.blankNum)}

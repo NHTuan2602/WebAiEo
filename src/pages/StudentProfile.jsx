@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   Clock,
+  Crown,
   Edit,
   ExternalLink,
   Eye,
@@ -46,7 +47,7 @@ import {
   Crop
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import { formatDurationVi, normalizeExamConfig } from '../constants/seedData';
+import { canViewerSeeMember, formatDurationVi, normalizeExamConfig } from '../constants/seedData';
 import { countExtensionCheatSignals, getRiskAssessment, readImageFileAsDataUrl } from '../utils/examHelpers';
 import ImageCropperModal from '../components/modals/ImageCropperModal';
 import {
@@ -61,12 +62,16 @@ import UserAvatarBadge from '../components/common/UserAvatarBadge';
 export default function StudentProfile({
   adminFeedbacks = [],
   attempts = [],
+  classesDb = {},
   currentRoomPin,
   currentUser,
+  customTitles = [],
   dispatchSyncAction,
   handleTeacherOpenLobby,
   handleUpdateUserProfileFields,
+  onGrantUserTitles,
   onOpenAccountSecurity,
+  onOpenAdminTitleManager,
   openStudentGamePortal,
   previousView,
   roomsDb = {},
@@ -138,8 +143,8 @@ export default function StudentProfile({
     : (isSelf || isTeacherViewer);
   const canInspectAttemptDetails = isTeacherViewer || isSelf;
   const canSeeTeacherNotes = isTeacherViewer || isSelf;
-  const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb);
-  const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb);
+  const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb, customTitles);
+  const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles);
   const heroBanner = getProfileBannerById(student.profileBannerId);
   const hasCustomCover = Boolean(
     student.profileCoverUrl &&
@@ -160,7 +165,8 @@ export default function StudentProfile({
 
   const baseMembers = Object.values(usersDb).filter(u => {
     if (!u) return false;
-    return !u.isSuperAdmin && !u.hiddenFromTeacher && u.username !== 'tuanpro123s';
+    if (isViewerSuperAdmin) return !u.isSuperAdmin && !u.hiddenFromTeacher && u.username !== 'tuanpro123s';
+    return !u.isSuperAdmin && !u.hiddenFromTeacher && u.username !== 'tuanpro123s' && canViewerSeeMember(u, currentUser, classesDb);
   });
   const adminCardMember = supportAdminProfile
     ? {
@@ -501,6 +507,15 @@ export default function StudentProfile({
                   >
                     <Trophy className="w-3.5 h-3.5" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
                   </button>
+                  {isViewerSuperAdmin && !isTargetSystemAdmin && onOpenAdminTitleManager && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenAdminTitleManager(student.username)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-200 text-xs font-bold transition"
+                    >
+                      <Crown className="w-3.5 h-3.5" /> Tặng Danh Hiệu
+                    </button>
+                  )}
                   {isSelf && onOpenAccountSecurity && (
                     <>
                       <button
@@ -1595,7 +1610,7 @@ export default function StudentProfile({
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 flex-wrap mt-0.5">
                           {(() => {
-                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
+                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles);
                             if (isMemberAdmin) {
                               return (
                                 <>
@@ -1852,6 +1867,23 @@ export default function StudentProfile({
                             )}
                           </button>
                         )}
+                        {isViewerSuperAdmin && !isTargetSystemAdmin && onGrantUserTitles && !item.isRoleBuiltIn && item.id !== 'newbie' && (() => {
+                          const isGrantedToTarget = Array.isArray(student.grantedTitleIds) && student.grantedTitleIds.includes(item.id);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => onGrantUserTitles(student.username, [item.id], isGrantedToTarget ? 'remove' : 'add')}
+                              className={`mt-2 w-full py-1.5 rounded-xl text-[11px] font-extrabold transition flex items-center justify-center gap-1.5 border ${
+                                isGrantedToTarget
+                                  ? 'bg-amber-50 hover:bg-rose-50 dark:bg-amber-500/15 dark:hover:bg-rose-500/20 text-amber-800 hover:text-rose-700 dark:text-amber-200 border-amber-300 dark:border-amber-500/40'
+                                  : 'bg-slate-100 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-amber-500/20 text-slate-700 hover:text-amber-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              <Crown className="w-3 h-3" />
+                              {isGrantedToTarget ? '✓ Admin Đã Tặng (Bấm Gỡ)' : '+ Admin Tặng Danh Hiệu'}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

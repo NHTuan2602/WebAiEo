@@ -93,3 +93,19 @@ export async function requestAiSpeakingGrading({
     recordings
   });
 }
+
+export async function verifySpeakingRoomPassword({ testId, password = '' }) {
+  const res = await fetch('/api/sync/speaking/verify-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      testId: String(testId || '').trim(),
+      password: String(password || '').trim()
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || 'Mật khẩu phòng thi không chính xác!');
+  }
+  return data;
+}

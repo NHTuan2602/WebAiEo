@@ -10,6 +10,9 @@ import {
   DEFAULT_SECTION_ORDER,
   DEFAULT_SECTION_DURATIONS,
   canUserAccessTest,
+  canViewerSeeMember,
+  evaluateSpeakingDailyCompliance,
+  getVietnamTodayDateKey,
   normalizeExamConfig,
   evaluateTestSchedule,
   formatViDateTime,
@@ -68,6 +71,7 @@ import Navbar from './components/common/Navbar';
 import GlobalModals from './components/modals/GlobalModals';
 import AccountSecurityModal from './components/modals/AccountSecurityModal';
 import MailConfigModal from './components/modals/MailConfigModal';
+import AdminTitleManagerModal from './components/modals/AdminTitleManagerModal';
 import TitleUnlockedCelebrationModal from './components/modals/TitleUnlockedCelebrationModal';
 import AuthScreen from './pages/AuthScreen';
 import StudentHome from './pages/StudentHome';
@@ -286,6 +290,9 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [sentNotifications, setSentNotifications] = useState([]);
   const [classesDb, setClassesDb] = useState({});
+  const [customTitles, setCustomTitles] = useState([]);
+  const [speakingUnlockTokens, setSpeakingUnlockTokens] = useState({});
+  const [adminTitleModalState, setAdminTitleModalState] = useState({ isOpen: false, targetUsername: null });
   const [focusedTestId, setFocusedTestId] = useState(null);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
   const serverClockOffsetMsRef = useRef(0);
@@ -539,6 +546,45 @@ export default function App() {
           : `Đã cập nhật tài khoản ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`
       );
     }
+  };
+
+  // Super Admin Custom Titles & User Title Grants + Speaking Room Unlock
+  const handleUpsertCustomTitle = async (customTitleObj) => {
+    if (!currentUser?.isSuperAdmin || !customTitleObj?.label?.trim()) return false;
+    const snap = await dispatchSyncAction('UPSERT_CUSTOM_TITLE', { customTitle: customTitleObj });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
+    return true;
+  };
+
+  const handleDeleteCustomTitle = async (titleId) => {
+    if (!currentUser?.isSuperAdmin || !titleId) return false;
+    const snap = await dispatchSyncAction('DELETE_CUSTOM_TITLE', { titleId });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
+    showToast('Đã xóa danh hiệu tùy chỉnh.', 'info');
+    return true;
+  };
+
+  const handleGrantUserTitles = async (targetUsername, titleIds, mode = 'add') => {
+    if (!currentUser?.isSuperAdmin || !targetUsername) return false;
+    const cleanIds = (Array.isArray(titleIds) ? titleIds : [titleIds]).filter(Boolean);
+    const snap = await dispatchSyncAction('GRANT_USER_TITLES', {
+      username: targetUsername,
+      titleIds: cleanIds,
+      mode
+    });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
+    const targetName = usersDb[targetUsername]?.name || targetUsername;
+    showToast(
+      mode === 'remove'
+        ? `Đã gỡ danh hiệu khỏi tài khoản ${targetName}.`
+        : `Đã trao danh hiệu cho ${targetName}!`
+    );
+    return true;
+  };
+
+  const handleSpeakingRoomUnlocked = (testId, unlockToken) => {
+    if (!testId || !unlockToken) return;
+    setSpeakingUnlockTokens(prev => ({ ...prev, [testId]: unlockToken }));
   };
 
   // Teacher Action: Duplicate Test (defaults copy to private so students can't accidentally open it)
@@ -1188,6 +1234,9 @@ export default function App() {
         setNotifications([]);
         setSentNotifications([]);
         setClassesDb({});
+        setCustomTitles([]);
+        setSpeakingUnlockTokens({});
+        setAdminTitleModalState({ isOpen: false, targetUsername: null });
         setFocusedTestId(null);
         setJoinedRoomPin(null);
         setGameSubState('JOIN');
@@ -1276,6 +1325,9 @@ export default function App() {
     }
     if (snap.classes && typeof snap.classes === 'object') {
       setClassesDb(prev => (JSON.stringify(prev) === JSON.stringify(snap.classes) ? prev : snap.classes));
+    }
+    if (Array.isArray(snap.customTitles)) {
+      setCustomTitles(prev => (JSON.stringify(prev) === JSON.stringify(snap.customTitles) ? prev : snap.customTitles));
     }
     if (Array.isArray(snap.notifications)) {
       const nextNotifs = snap.notifications;
@@ -1805,7 +1857,8 @@ export default function App() {
     type = 'announcement',
     testId = '',
     roomPin = '',
-    targetClassIds = []
+    targetClassIds = [],
+    targetUsernames = []
   }) => {
     if (currentUser?.role !== 'teacher') return;
     const cleanTitle = String(title || '').trim();
@@ -1817,20 +1870,50 @@ export default function App() {
     const cleanTargetClasses = Array.isArray(targetClassIds)
       ? Array.from(new Set(targetClassIds.map(id => String(id || '').trim()).filter(Boolean)))
       : [];
+    const cleanTargetUsers = Array.isArray(targetUsernames)
+      ? Array.from(new Set(targetUsernames.map(u => String(u || '').trim()).filter(Boolean)))
+      : [];
     await dispatchSyncAction('CREATE_NOTIFICATION', {
       title: cleanTitle,
       message: cleanMessage,
       type,
       testId: testId || '',
       roomPin: roomPin || '',
-      targetClassIds: cleanTargetClasses
+      targetClassIds: cleanTargetClasses,
+      ...(cleanTargetUsers.length > 0 ? { targetUsernames: cleanTargetUsers } : {})
     });
     showToast(
-      cleanTargetClasses.length > 0
+      cleanTargetUsers.length > 0
+        ? `Đã gửi nhắc nhở tới ${cleanTargetUsers.length} học viên chưa hoàn thành!`
+        : cleanTargetClasses.length > 0
         ? `Đã phát thông báo tới ${cleanTargetClasses.length} lớp học đã chọn!`
         : 'Đã phát thông báo tới toàn bộ học viên!'
     );
     return true;
+  };
+
+  const handleNotifyMissingDaily = async (targetTest, missingUsers = []) => {
+    if (currentUser?.role !== 'teacher') return false;
+    const usernames = Array.from(
+      new Set(
+        (Array.isArray(missingUsers) ? missingUsers : [])
+          .map(u => (typeof u === 'string' ? u : u?.username))
+          .filter(Boolean)
+      )
+    );
+    if (usernames.length === 0) {
+      showToast('Tất cả học viên trong phạm vi đã hoàn thành bài Speaking Daily!', 'info');
+      return false;
+    }
+    const testTitle = targetTest?.title || 'Speaking Daily hôm nay';
+    return handleCreateNotification({
+      title: `Nhắc làm Speaking Daily: ${testTitle}`,
+      message: `${currentUser.name || 'Giáo viên'} nhắc bạn hoàn thành ngay bài "${testTitle}" (${usernames.length} bạn chưa nộp).`,
+      type: 'exercise',
+      testId: targetTest?.id || '',
+      targetClassIds: [],
+      targetUsernames: usernames
+    });
   };
 
   // Class Management Handlers (Create/Edit/Delete Classes & Roster Membership)
@@ -2003,9 +2086,13 @@ export default function App() {
           if (targetCfg.testMode === 'single_skill') {
             const spMeta = normalizeSpeakingSection(targetTest.speaking);
             const targetTab =
-              targetCfg.focusSkill === 'speaking' && spMeta.isForecast
-                ? 'forecast'
-                : targetCfg.focusSkill || 'speaking';
+              targetCfg.focusSkill === 'speaking' && spMeta.speakingTrack === 'daily'
+                ? 'speaking_daily'
+                : targetCfg.focusSkill === 'speaking' && spMeta.speakingTrack === 'exam_room'
+                  ? 'speaking_exam_room'
+                  : targetCfg.focusSkill === 'speaking' && spMeta.isForecast
+                    ? 'forecast'
+                    : targetCfg.focusSkill || 'speaking';
             setSkillHubTab(targetTab);
             setView('SKILL_HUB');
           } else {
@@ -2723,7 +2810,9 @@ export default function App() {
 
   const openMemberProfile = (username, fromView = view) => {
     const isSupportAdminTarget = Boolean(username && supportAdminProfile?.username && username === supportAdminProfile.username);
-    const targetUsername = usersDb[username] || isSupportAdminTarget
+    const candidateUser = usersDb[username];
+    const canSeeTarget = isSupportAdminTarget || (candidateUser && canViewerSeeMember(candidateUser, currentUser, classesDb));
+    const targetUsername = canSeeTarget
       ? username
       : (currentUser?.username || Object.keys(usersDb || {})[0] || '');
     if (!targetUsername) return;
@@ -3071,6 +3160,9 @@ export default function App() {
     seenNotifIdsRef.current = null;
     setNotifications([]);
     setSentNotifications([]);
+    setCustomTitles([]);
+    setSpeakingUnlockTokens({});
+    setAdminTitleModalState({ isOpen: false, targetUsername: null });
     setFocusedTestId(null);
     setAccountSecurityTab(null);
     setShowMailConfigModal(false);
@@ -4063,8 +4155,24 @@ export default function App() {
     setBuilderListeningIdx(0);
     setBuilderReadingIdx(0);
     const cleanClassIds = Array.isArray(initialClassIds) ? Array.from(new Set(initialClassIds.filter(Boolean))) : [];
+    const baseSingleForm = createEmptySingleSkillTestForm(skill);
+    let nextSpeaking = baseSingleForm.speaking;
+    if (skill === 'speaking' && view === 'SKILL_HUB') {
+      if (skillHubTab === 'speaking_daily') {
+        nextSpeaking = createDefaultSpeakingSection({
+          speakingTrack: 'daily',
+          dailyDate: getVietnamTodayDateKey(Date.now() + serverClockOffsetMsRef.current),
+          dailyMandatory: true
+        });
+      } else if (skillHubTab === 'speaking_exam_room') {
+        nextSpeaking = createDefaultSpeakingSection({
+          speakingTrack: 'exam_room'
+        });
+      }
+    }
     setTestForm({
-      ...createEmptySingleSkillTestForm(skill),
+      ...baseSingleForm,
+      speaking: nextSpeaking,
       assignedClassIds: cleanClassIds
     });
     setBuilderTab(skill);
@@ -5545,6 +5653,28 @@ export default function App() {
   }, [view, gameRound, activeQuestion, gameSubState]);
 
 
+  const dailySpeakingCompliance = (() => {
+    if (!syncHydrated || !currentUser?.username) {
+      return { myPendingDailyTests: [], missingStudentSummaries: [] };
+    }
+    return evaluateSpeakingDailyCompliance({
+      tests,
+      attempts,
+      usersDb,
+      classesDb,
+      viewerUser: currentUser,
+      nowMs: Date.now() + serverClockOffsetMs
+    });
+  })();
+  const dailySpeakingPendingCount = currentUser?.role === 'student'
+    ? (dailySpeakingCompliance.myPendingDailyTests?.length || 0)
+    : 0;
+  const openSpeakingDaily = () => {
+    setFocusedTestId(null);
+    setSkillHubTab('speaking_daily');
+    setView('SKILL_HUB');
+  };
+
   const titleUnlockEval = (() => {
     if (!syncHydrated || !currentUser?.username) {
       return { shouldPersistBaseline: false, baselineToSave: null, newlyUnlockedItems: [] };
@@ -5552,7 +5682,7 @@ export default function App() {
     const unameKey = currentUser.username.toLowerCase();
     const hasLocal = Object.prototype.hasOwnProperty.call(localSeenTitlesMap, unameKey);
     const localAck = hasLocal ? localSeenTitlesMap[unameKey] : [];
-    const summary = resolveStudentTitleSummary(currentUser, attempts, roomsDb);
+    const summary = resolveStudentTitleSummary(currentUser, attempts, roomsDb, customTitles);
     return evaluateTitleUnlockNotification({
       user: currentUser,
       titleSummary: summary,
@@ -5631,6 +5761,7 @@ export default function App() {
         <Navbar
           aiApiKey={aiApiKey}
           currentUser={currentUser}
+          dailySpeakingPendingCount={dailySpeakingPendingCount}
           darkMode={darkMode}
           handleLogout={handleLogout}
           notifications={notifications}
@@ -5638,6 +5769,7 @@ export default function App() {
           onMarkNotificationsRead={handleMarkNotificationsRead}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           onOpenNotificationTarget={handleOpenNotificationTarget}
+          onOpenSpeakingDaily={openSpeakingDaily}
           openMemberProfile={openMemberProfile}
           openStudentGamePortal={openStudentGamePortal}
           setApiTestState={setApiTestState}
@@ -5679,14 +5811,16 @@ export default function App() {
           attempts={attempts}
           classesDb={classesDb}
           currentUser={currentUser}
+          customTitles={customTitles}
           focusedTestId={focusedTestId}
           onClearFocusedTest={() => setFocusedTestId(null)}
           openMemberProfile={openMemberProfile}
-          openSkillPracticeHub={(tab = 'speaking') => {
+          openSkillPracticeHub={(tab = 'speaking_daily') => {
             setFocusedTestId(null);
             setSkillHubTab(tab);
             setView('SKILL_HUB');
           }}
+          openSpeakingDaily={openSpeakingDaily}
           openStudentGamePortal={openStudentGamePortal}
           roomsDb={roomsDb}
           serverClockOffsetMs={serverClockOffsetMs}
@@ -5715,6 +5849,7 @@ export default function App() {
             setSkillHubTab(nextTab);
           }}
           onClearFocusedTest={() => setFocusedTestId(null)}
+          onNotifyMissingDaily={handleNotifyMissingDaily}
           onOpenFullExamCatalog={() => {
             setFocusedTestId(null);
             setView('HOME');
@@ -5726,10 +5861,14 @@ export default function App() {
             setView('RESULT_VIEW');
           }}
           onOpenSkillBuilder={(skill, testToEdit = null) => openSingleSkillBuilder(skill, testToEdit)}
+          onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}
           onStartSpeakingExam={(testId, partMode = 'full') => startExam(testId, partMode)}
           serverClockOffsetMs={serverClockOffsetMs}
+          showToast={showToast}
+          speakingUnlockTokens={speakingUnlockTokens}
           tests={tests}
+          usersDb={usersDb}
         />
       )}
 
@@ -5743,6 +5882,7 @@ export default function App() {
             setSelectedTestId(null);
             setView('SKILL_HUB');
           }}
+          onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onViewResult={attId => {
             setSelectedAttemptId(attId);
             setPreviousView('SKILL_HUB');
@@ -5752,6 +5892,7 @@ export default function App() {
           partMode={speakingPartMode}
           selectedTestId={selectedTestId}
           showToast={showToast}
+          speakingUnlockTokens={speakingUnlockTokens}
           tests={tests}
         />
       )}
@@ -5760,11 +5901,15 @@ export default function App() {
         <StudentProfile
           adminFeedbacks={adminFeedbacks}
           attempts={attempts}
+          classesDb={classesDb}
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
+          customTitles={customTitles}
           dispatchSyncAction={dispatchSyncAction}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
+          onGrantUserTitles={handleGrantUserTitles}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
+          onOpenAdminTitleManager={targetUsername => setAdminTitleModalState({ isOpen: true, targetUsername: targetUsername || null })}
           openStudentGamePortal={openStudentGamePortal}
           previousView={previousView}
           roomsDb={roomsDb}
@@ -5799,6 +5944,7 @@ export default function App() {
           copiedRoomPin={copiedRoomPin}
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
+          customTitles={customTitles}
           darkMode={darkMode}
           freezeCharges={freezeCharges}
           gameCombo={gameCombo}
@@ -5968,6 +6114,8 @@ export default function App() {
           onCreateSkillForClass={(classId, skill = 'speaking') => openSingleSkillBuilder(skill, null, [classId])}
           onCreateTestForClass={classId => openExamBuilder(null, 'general', [classId])}
           onDeleteClass={handleDeleteClass}
+          onNotifyMissingDaily={handleNotifyMissingDaily}
+          onOpenAdminTitleManager={targetUsername => setAdminTitleModalState({ isOpen: true, targetUsername: targetUsername || null })}
           onUpdateClassMembers={handleUpdateClassMembers}
           onUpsertClass={handleUpsertClass}
           openExamBuilder={openExamBuilder}
@@ -5975,6 +6123,8 @@ export default function App() {
           openSingleSkillBuilder={openSingleSkillBuilder}
           openTeacherGradingModal={openTeacherGradingModal}
           roomsDb={roomsDb}
+          serverClockOffsetMs={serverClockOffsetMs}
+          customTitles={customTitles}
           setAddStudentMode={setAddStudentMode}
           setCopiedRoomPin={setCopiedRoomPin}
           setCurrentRoomPin={setCurrentRoomPin}
@@ -6126,6 +6276,23 @@ export default function App() {
           onClose={() => setShowMailConfigModal(false)}
           onConfiguredChange={setMailConfigured}
           showToast={showToast}
+        />
+      )}
+
+      {adminTitleModalState.isOpen && currentUser?.isSuperAdmin && (
+        <AdminTitleManagerModal
+          key={adminTitleModalState.targetUsername || 'all-users'}
+          attempts={attempts}
+          customTitles={customTitles}
+          initialTargetUsername={adminTitleModalState.targetUsername}
+          isOpen={true}
+          onClose={() => setAdminTitleModalState({ isOpen: false, targetUsername: null })}
+          onDeleteCustomTitle={handleDeleteCustomTitle}
+          onGrantUserTitles={handleGrantUserTitles}
+          onUpsertCustomTitle={handleUpsertCustomTitle}
+          roomsDb={roomsDb}
+          showToast={showToast}
+          usersDb={usersDb}
         />
       )}
 

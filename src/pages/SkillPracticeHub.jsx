@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
+  Calendar,
   CheckCircle2,
   Clock,
   Edit,
@@ -14,20 +16,27 @@ import {
   PenTool,
   Play,
   Plus,
-  Sparkles
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  X
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
 import {
   canUserAccessTest,
+  evaluateSpeakingDailyCompliance,
   evaluateTestSchedule,
   formatViDateTime,
   getAssignedClassNames,
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
+  getVietnamTodayDateKey,
   normalizeExamConfig,
   normalizeSpeakingSection
 } from '../constants/seedData';
+import { verifySpeakingRoomPassword } from '../utils/speakingApi';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 
 export default function SkillPracticeHub({
@@ -39,15 +48,24 @@ export default function SkillPracticeHub({
   focusedTestId = null,
   onChangeTab,
   onClearFocusedTest,
+  onNotifyMissingDaily,
   onOpenFullExamCatalog,
   onOpenResult,
   onOpenSkillBuilder,
+  onSpeakingRoomUnlocked,
   onStartSingleSkillExam,
   onStartSpeakingExam,
   serverClockOffsetMs = 0,
-  tests = []
+  showToast,
+  speakingUnlockTokens = {},
+  tests = [],
+  usersDb = {}
 }) {
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
+  const [passwordPromptTarget, setPasswordPromptTarget] = useState(null);
+  const [roomPassInput, setRoomPassInput] = useState('');
+  const [roomPassError, setRoomPassError] = useState('');
+  const [verifyingRoomPass, setVerifyingRoomPass] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 15_000);
@@ -55,6 +73,7 @@ export default function SkillPracticeHub({
   }, []);
   const isTeacher = currentUser?.role === 'teacher';
   const serverNowMs = nowMs + serverClockOffsetMs;
+  const todayKey = getVietnamTodayDateKey(serverNowMs);
 
   const singleSkillTests = tests.filter(t => {
     const cfg = normalizeExamConfig(t);
@@ -63,6 +82,12 @@ export default function SkillPracticeHub({
   });
 
   const speakingTests = singleSkillTests.filter(t => t.focusSkill === 'speaking');
+  const dailySpeakingTests = speakingTests.filter(
+    t => normalizeSpeakingSection(t.speaking).speakingTrack === 'daily'
+  );
+  const examRoomSpeakingTests = speakingTests.filter(
+    t => normalizeSpeakingSection(t.speaking).speakingTrack === 'exam_room'
+  );
   const listeningTests = singleSkillTests.filter(t => t.focusSkill === 'listening');
   const readingTests = singleSkillTests.filter(t => t.focusSkill === 'reading');
   const writingTests = singleSkillTests.filter(t => t.focusSkill === 'writing');
@@ -83,12 +108,68 @@ export default function SkillPracticeHub({
     .filter(b => typeof b === 'number' && b >= 0);
   const bestSpeakingBand = gradedSpeakingBands.length > 0 ? Math.max(...gradedSpeakingBands) : null;
 
-  const featuredSpeakingTest = speakingTests[0] || null;
-  const featuredSpMeta = featuredSpeakingTest ? normalizeSpeakingSection(featuredSpeakingTest.speaking) : null;
+  const dailyCompliance = evaluateSpeakingDailyCompliance({
+    tests: speakingTests,
+    attempts,
+    usersDb,
+    classesDb,
+    viewerUser: currentUser,
+    todayKey
+  });
+
+  const handleTriggerSpeakingStart = (test, partMode = 'full') => {
+    if (!test) return;
+    const sp = normalizeSpeakingSection(test.speaking);
+    const needsRoomPass =
+      sp.speakingTrack === 'exam_room' &&
+      !isTeacher &&
+      Boolean(sp.hasRoomPassword || sp.roomPassword) &&
+      !speakingUnlockTokens?.[test.id];
+    if (needsRoomPass) {
+      setPasswordPromptTarget({ test, partMode });
+      setRoomPassInput('');
+      setRoomPassError('');
+      return;
+    }
+    onStartSpeakingExam?.(test.id, partMode);
+  };
+
+  const handleSubmitRoomPassword = async (e) => {
+    e?.preventDefault();
+    if (!passwordPromptTarget?.test || verifyingRoomPass) return;
+    setRoomPassError('');
+    setVerifyingRoomPass(true);
+    try {
+      const res = await verifySpeakingRoomPassword({
+        testId: passwordPromptTarget.test.id,
+        password: roomPassInput
+      });
+      const tok = res?.unlockToken || 'unlocked';
+      onSpeakingRoomUnlocked?.(passwordPromptTarget.test.id, tok);
+      const { test, partMode } = passwordPromptTarget;
+      setPasswordPromptTarget(null);
+      setRoomPassInput('');
+      showToast?.('Đã mở khóa Phòng Thi Thực Chiến!', 'success');
+      onStartSpeakingExam?.(test.id, partMode);
+    } catch (err) {
+      setRoomPassError(err?.message || 'Mật khẩu Phòng Thi Thực Chiến chưa chính xác!');
+    } finally {
+      setVerifyingRoomPass(false);
+    }
+  };
 
   const navItems = [
-    { id: 'speaking', label: 'Bài Tập Speaking AI', icon: Mic, badge: speakingTests.length },
-    { id: 'forecast', label: 'Bài Tập Forecast', icon: Flame, badge: forecastTests.length },
+    {
+      id: 'speaking_daily',
+      label: '1. Speaking Daily',
+      icon: Flame,
+      badge: !isTeacher && dailyCompliance.myPendingDailyTests.length > 0
+        ? `${dailyCompliance.myPendingDailyTests.length} mới`
+        : dailySpeakingTests.length
+    },
+    { id: 'speaking_exam_room', label: '2. Phòng Thi Thực Chiến', icon: Lock, badge: examRoomSpeakingTests.length },
+    { id: 'speaking', label: 'Kho Speaking AI', icon: Mic, badge: speakingTests.length },
+    { id: 'forecast', label: 'Bài Tập Forecast', icon: Sparkles, badge: forecastTests.length },
     { id: 'listening', label: 'Bài Tập Listening', icon: Headphones, badge: listeningTests.length },
     { id: 'reading', label: 'Bài Tập Reading', icon: BookOpen, badge: readingTests.length },
     { id: 'writing', label: 'Bài Tập Writing', icon: PenTool, badge: writingTests.length }
@@ -395,8 +476,17 @@ export default function SkillPracticeHub({
 
         {/* MAIN LUYENNOI-STYLE WORKSPACE */}
         <main className="flex-1 min-w-0 space-y-8">
-          {(activeTab === 'speaking' || activeTab === 'forecast') ? (() => {
-            const activeSpeakingList = activeTab === 'forecast' ? forecastTests : speakingTests;
+          {['speaking', 'speaking_daily', 'speaking_exam_room', 'forecast'].includes(activeTab) ? (() => {
+            const activeSpeakingList =
+              activeTab === 'speaking_daily'
+                ? dailySpeakingTests
+                : activeTab === 'speaking_exam_room'
+                ? examRoomSpeakingTests
+                : activeTab === 'forecast'
+                ? forecastTests
+                : speakingTests;
+            const featuredSpeakingTest = activeSpeakingList[0] || null;
+            const featuredSpMeta = featuredSpeakingTest ? normalizeSpeakingSection(featuredSpeakingTest.speaking) : null;
             const focusedSpeakingMatch = focusedTestId ? activeSpeakingList.find(t => t.id === focusedTestId) : null;
             const displayedSpeakingList = focusedSpeakingMatch ? [focusedSpeakingMatch] : activeSpeakingList;
             const featuredSchedule = featuredSpeakingTest ? evaluateTestSchedule(featuredSpeakingTest, serverNowMs) : null;
@@ -407,6 +497,171 @@ export default function SkillPracticeHub({
 
             return (
             <>
+              {/* 2 Core Speaking Mode Switcher: Daily vs Exam Room (Team Sắp Thi 🔒) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => onChangeTab?.('speaking_daily')}
+                  className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
+                    activeTab === 'speaking_daily'
+                      ? 'bg-orange-600 text-white border-orange-600 shadow-md'
+                      : 'bg-[#FFF5F8] dark:bg-[#191820] border-pink-200 dark:border-[#2C2A35] hover:border-orange-400'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${activeTab === 'speaking_daily' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300'}`}>
+                    <Flame className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold flex items-center gap-1.5">
+                      <span>1. Speaking Daily ({dailySpeakingTests.length})</span>
+                    </p>
+                    <p className={`text-[11px] mt-0.5 leading-snug ${activeTab === 'speaking_daily' ? 'text-orange-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                      Bài nói bắt buộc mỗi ngày · Ai chưa xong sẽ báo
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onChangeTab?.('speaking_exam_room')}
+                  className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
+                    activeTab === 'speaking_exam_room'
+                      ? 'bg-[#570DF8] text-white border-[#570DF8] shadow-md'
+                      : 'bg-[#FFF5F8] dark:bg-[#191820] border-pink-200 dark:border-[#2C2A35] hover:border-[#570DF8]'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${activeTab === 'speaking_exam_room' ? 'bg-white/20 text-white' : 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD]'}`}>
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold">2. Thực Chiến Phòng Thi ({examRoomSpeakingTests.length})</p>
+                    <p className={`text-[11px] mt-0.5 leading-snug ${activeTab === 'speaking_exam_room' ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                      Team sắp thi thật · Yêu cầu nhập Password
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onChangeTab?.('speaking')}
+                  className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
+                    activeTab === 'speaking' || activeTab === 'forecast'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 border-slate-900 shadow-md'
+                      : 'bg-[#FFF5F8] dark:bg-[#191820] border-pink-200 dark:border-[#2C2A35] hover:border-slate-400'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${activeTab === 'speaking' || activeTab === 'forecast' ? 'bg-white/15 text-amber-300 dark:bg-slate-900/15 dark:text-amber-600' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                    <Mic className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold">Tất Cả &amp; Forecast ({speakingTests.length})</p>
+                    <p className={`text-[11px] mt-0.5 leading-snug ${activeTab === 'speaking' || activeTab === 'forecast' ? 'opacity-80' : 'text-slate-500 dark:text-slate-400'}`}>
+                      Kho bài luyện Speaking &amp; Đề Forecast
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Daily Compliance Alert Strip for Students OR Teacher Missing Tracker */}
+              {!isTeacher && dailyCompliance.myPendingDailyTests.length > 0 && (
+                <div className="rounded-3xl bg-gradient-to-r from-rose-500/15 via-orange-500/15 to-amber-500/10 border-2 border-orange-400/70 dark:border-orange-500/50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-orange-600 text-white flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs sm:text-sm font-extrabold text-rose-800 dark:text-rose-200">
+                        🔥 Bắt Buộc Hôm Nay: Bạn còn {dailyCompliance.myPendingDailyTests.length} bài Speaking Daily chưa hoàn thành!
+                      </p>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                        Đề chờ hoàn thành: <strong>{dailyCompliance.myPendingDailyTests.map(d => d.title).join(', ')}</strong>. Hãy hoàn thành sớm để hệ thống ghi nhận đạt Daily!
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerSpeakingStart(dailyCompliance.myPendingDailyTests[0], 'full')}
+                    className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-extrabold shrink-0 shadow-sm inline-flex items-center gap-1.5 transition"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" /> Làm Bài Daily Ngay →
+                  </button>
+                </div>
+              )}
+
+              {!isTeacher && activeTab === 'speaking_daily' && dailyCompliance.myDailyTests.length > 0 && dailyCompliance.myPendingDailyTests.length === 0 && (
+                <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/40 px-4 py-3 flex items-center gap-2.5 text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" /> Tuyệt vời! Bạn đã hoàn thành toàn bộ Speaking Daily bắt buộc hôm nay.
+                </div>
+              )}
+
+              {isTeacher && activeTab === 'speaking_daily' && dailyCompliance.perTest.length > 0 && (
+                <div className="rounded-3xl bg-white/95 dark:bg-slate-900 border border-orange-200 dark:border-orange-500/35 p-5 space-y-4 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Users className="w-4 h-4 text-orange-600" />
+                        Báo Cáo Speaking Daily: Ai Chưa Hoàn Thành ({dailyCompliance.missingStudentSummaries.length} HS)
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Tự động đối chiếu học viên trong lớp/hệ thống với bài nộp Speaking Daily. Học viên chưa nộp sẽ hiển thị bên dưới để báo nhắc ngay.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {dailyCompliance.perTest.map(row => (
+                      <div
+                        key={row.test.id}
+                        className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-2.5"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-extrabold text-slate-900 dark:text-white">{row.test.title}</span>
+                            {row.dailyDate && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300 inline-flex items-center gap-1">
+                                <Calendar className="w-3 h-3" /> {row.dailyDate}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] font-extrabold">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                              ✓ Đã nộp: {row.doneStudents.length}/{row.targetStudents.length}
+                            </span>
+                            {row.missingStudents.length > 0 && onNotifyMissingDaily && (
+                              <button
+                                type="button"
+                                onClick={() => onNotifyMissingDaily(row.test, row.missingStudents)}
+                                className="px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-extrabold inline-flex items-center gap-1 shadow-xs transition"
+                              >
+                                <Send className="w-3 h-3" /> Báo &amp; Nhắc {row.missingStudents.length} HS Chưa Làm
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {row.missingStudents.length === 0 ? (
+                          <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                            ✓ 100% học viên mục tiêu đã hoàn thành bài Daily này!
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mr-1">Chưa hoàn thành:</span>
+                            {row.missingStudents.map(stu => (
+                              <span
+                                key={stu.username}
+                                className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-200 border border-rose-200 dark:border-rose-500/40"
+                              >
+                                {stu.name || stu.username} (@{stu.username})
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {focusedSpeakingMatch && onClearFocusedTest && (
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/40 border border-[#007A7A]/40 dark:border-[#1EE1D6]/30">
                   <span className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
@@ -417,7 +672,7 @@ export default function SkillPracticeHub({
                     onClick={onClearFocusedTest}
                     className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-[#007A7A] transition"
                   >
-                    ← Xem tất cả bài {activeTab === 'forecast' ? 'Forecast' : 'Speaking AI'} ({activeSpeakingList.length})
+                    ← Xem tất cả ({activeSpeakingList.length})
                   </button>
                 </div>
               )}
@@ -429,17 +684,31 @@ export default function SkillPracticeHub({
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#570DF8]/12 dark:bg-[#570DF8]/25 border border-[#570DF8]/25 text-[#570DF8] dark:text-[#C4B5FD] text-[11px] font-bold">
                     <Mic className="w-3.5 h-3.5" />
                     <span>
-                      {activeTab === 'forecast'
+                      {activeTab === 'speaking_daily'
+                        ? 'Mục 1: Speaking Daily — Hoàn Thành Mỗi Ngày · Nhắc Người Chưa Làm'
+                        : activeTab === 'speaking_exam_room'
+                        ? 'Mục 2: Phòng Thi Thực Chiến — Team Sắp Thi (Cần Password)'
+                        : activeTab === 'forecast'
                         ? 'Kho Đề Dự Đoán Forecast IELTS Speaking Mới Nhất'
                         : 'Phòng Thi IELTS Speaking AI • Ghi Âm & Chấm 4 Tiêu Chí'}
                     </span>
                   </div>
 
                   <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    {activeTab === 'forecast' ? 'Luyện Forecast' : 'Thi thử'}
+                    {activeTab === 'speaking_daily'
+                      ? 'Speaking Daily'
+                      : activeTab === 'speaking_exam_room'
+                      ? 'Phòng Thi Thực Chiến'
+                      : activeTab === 'forecast'
+                      ? 'Luyện Forecast'
+                      : 'Thi thử'}
                   </h1>
                   <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
-                    {activeTab === 'forecast'
+                    {activeTab === 'speaking_daily'
+                      ? 'Bài luyện nói cập nhật hàng ngày cho cả lớp. Mọi học viên cần hoàn thành đúng ngày; hệ thống sẽ báo ngay những bạn chưa làm.'
+                      : activeTab === 'speaking_exam_room'
+                      ? 'Phòng luyện thực chiến mô phỏng áp lực phòng thi thật dành cho team sắp đi thi — yêu cầu mật khẩu giáo viên cấp mới vào thi được.'
+                      : activeTab === 'forecast'
                       ? 'Luyện phản xạ từng Part 1, Cue Card Part 2 và Discussion Part 3 theo bộ câu hỏi Forecast giáo viên biên soạn.'
                       : 'Nhận điểm sát thi thật, tự động lưu file ghi âm lên hệ thống để AI phân tích 4 tiêu chí (Fluency, Lexical, Grammar, Pronunciation) và góp ý nâng Band.'}
                   </p>
@@ -450,15 +719,23 @@ export default function SkillPracticeHub({
                         <button
                           type="button"
                           disabled={featuredLocked}
-                          onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'full')}
+                          onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'full')}
                           className={`px-7 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wide flex items-center gap-2 transition ${
                             featuredLocked
                               ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                               : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-lg shadow-indigo-900/20 active:scale-[0.99]'
                           }`}
                         >
-                          {featuredLocked ? <Lock className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                          <span>{featuredLocked ? 'Đã Khóa / Hết Hạn' : 'FULL TEST'}</span>
+                          {featuredLocked || (!isTeacher && featuredSpMeta?.speakingTrack === 'exam_room' && featuredSpMeta?.hasRoomPassword && !speakingUnlockTokens?.[featuredSpeakingTest.id])
+                            ? <Lock className="w-4 h-4" />
+                            : <Mic className="w-4 h-4" />}
+                          <span>
+                            {featuredLocked
+                              ? 'Đã Khóa / Hết Hạn'
+                              : !isTeacher && featuredSpMeta?.speakingTrack === 'exam_room' && featuredSpMeta?.hasRoomPassword && !speakingUnlockTokens?.[featuredSpeakingTest.id]
+                              ? 'NHẬP PASS & THI FULL TEST'
+                              : 'FULL TEST'}
+                          </span>
                         </button>
                         {isTeacher && (
                           <button
@@ -479,7 +756,7 @@ export default function SkillPracticeHub({
                           <button
                             type="button"
                             disabled={featuredLocked || !featuredSpMeta?.part1?.enabled}
-                            onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'part1')}
+                            onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'part1')}
                             className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
                           >
                             THI PART 1
@@ -487,7 +764,7 @@ export default function SkillPracticeHub({
                           <button
                             type="button"
                             disabled={featuredLocked || !featuredSpMeta?.part2?.enabled}
-                            onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'part2')}
+                            onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'part2')}
                             className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
                           >
                             THI PART 2
@@ -495,7 +772,7 @@ export default function SkillPracticeHub({
                           <button
                             type="button"
                             disabled={featuredLocked || !featuredSpMeta?.part3?.enabled}
-                            onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'part3')}
+                            onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'part3')}
                             className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
                           >
                             THI PART 3
@@ -505,7 +782,7 @@ export default function SkillPracticeHub({
                     </div>
                   ) : (
                     <div className="p-4 rounded-2xl bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] text-xs text-slate-600 dark:text-slate-300">
-                      Chưa có bài tập Speaking công khai. {isTeacher ? 'Bấm "Tạo Bài Tập Kỹ Năng Mới" bên trái để tạo bài tập Speaking đầu tiên.' : 'Vui lòng chờ giáo viên mở bài tập Speaking.'}
+                      Chưa có bài tập nào trong mục này. {isTeacher ? 'Bấm "Tạo Bài Tập Kỹ Năng Mới" và chọn phân loại tương ứng để đăng bài ngay.' : 'Vui lòng chờ giáo viên mở bài tập Speaking.'}
                     </div>
                   )}
                 </div>
@@ -522,7 +799,13 @@ export default function SkillPracticeHub({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
-                      {activeTab === 'forecast' ? 'Danh Sách Bài Tập Forecast Speaking' : 'Danh Sách Bài Tập Speaking Do Giáo Viên Tạo'}
+                      {activeTab === 'speaking_daily'
+                        ? 'Danh Sách Bài Speaking Daily'
+                        : activeTab === 'speaking_exam_room'
+                        ? 'Phòng Thi Thực Chiến (Team Sắp Thi 🔒)'
+                        : activeTab === 'forecast'
+                        ? 'Danh Sách Bài Tập Forecast Speaking'
+                        : 'Danh Sách Bài Tập Speaking Do Giáo Viên Tạo'}
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       Chọn làm trọn bộ 3 Part hoặc chọn thi nhanh 1 Part tùy thích
@@ -560,6 +843,16 @@ export default function SkillPracticeHub({
                         <div className="space-y-2.5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
+                              {sp.speakingTrack === 'daily' && (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-orange-600 text-white">
+                                  🔥 Daily {sp.dailyDate || ''}
+                                </span>
+                              )}
+                              {sp.speakingTrack === 'exam_room' && (
+                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-rose-600 text-white inline-flex items-center gap-1">
+                                  <Lock className="w-2.5 h-2.5" /> Phòng Thi Thực Chiến
+                                </span>
+                              )}
                               {sp.isForecast && (
                                 <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
                                   Forecast
@@ -568,6 +861,17 @@ export default function SkillPracticeHub({
                               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD]">
                                 {totalItems} câu · AI Chấm 4 Tiêu Chí
                               </span>
+                              {sp.speakingTrack === 'daily' && !isTeacher && (
+                                usedCount > 0 ? (
+                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                    ✓ Đã hoàn thành
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+                                    Chưa làm
+                                  </span>
+                                )
+                              )}
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
                               {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
@@ -627,21 +931,29 @@ export default function SkillPracticeHub({
                           <button
                             type="button"
                             disabled={isLocked}
-                            onClick={() => onStartSpeakingExam?.(test.id, 'full')}
+                            onClick={() => handleTriggerSpeakingStart(test, 'full')}
                             className={`flex-1 py-2.5 px-3.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
                               isLocked
                                 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                                 : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
                             }`}
                           >
-                            {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                            <span>{isLocked ? lockText : 'Full Test'}</span>
+                            {isLocked || (!isTeacher && sp.speakingTrack === 'exam_room' && sp.hasRoomPassword && !speakingUnlockTokens?.[test.id])
+                              ? <Lock className="w-3.5 h-3.5" />
+                              : <Play className="w-3.5 h-3.5 fill-current" />}
+                            <span>
+                              {isLocked
+                                ? lockText
+                                : !isTeacher && sp.speakingTrack === 'exam_room' && sp.hasRoomPassword && !speakingUnlockTokens?.[test.id]
+                                ? 'Mật Khẩu · Vào Thi'
+                                : 'Full Test'}
+                            </span>
                           </button>
 
                           {!isLocked && p1Count > 0 && (
                             <button
                               type="button"
-                              onClick={() => onStartSpeakingExam?.(test.id, 'part1')}
+                              onClick={() => handleTriggerSpeakingStart(test, 'part1')}
                               className="px-3 py-2.5 rounded-xl bg-white dark:bg-[#23222B] hover:border-[#570DF8] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-700 dark:text-slate-200"
                             >
                               P1
@@ -650,7 +962,7 @@ export default function SkillPracticeHub({
                           {!isLocked && p2Count > 0 && (
                             <button
                               type="button"
-                              onClick={() => onStartSpeakingExam?.(test.id, 'part2')}
+                              onClick={() => handleTriggerSpeakingStart(test, 'part2')}
                               className="px-3 py-2.5 rounded-xl bg-white dark:bg-[#23222B] hover:border-[#570DF8] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-700 dark:text-slate-200"
                             >
                               P2
@@ -659,7 +971,7 @@ export default function SkillPracticeHub({
                           {!isLocked && p3Count > 0 && (
                             <button
                               type="button"
-                              onClick={() => onStartSpeakingExam?.(test.id, 'part3')}
+                              onClick={() => handleTriggerSpeakingStart(test, 'part3')}
                               className="px-3 py-2.5 rounded-xl bg-white dark:bg-[#23222B] hover:border-[#570DF8] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-700 dark:text-slate-200"
                             >
                               P3
@@ -759,6 +1071,82 @@ export default function SkillPracticeHub({
           )}
         </main>
       </div>
+
+      {/* Modal Nhập Mật Khẩu Phòng Thi Thực Chiến Speaking (Team Sắp Thi) */}
+      {passwordPromptTarget && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPasswordPromptTarget(null)}
+        >
+          <form
+            onSubmit={handleSubmitRoomPassword}
+            onClick={e => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 border border-pink-200 dark:border-[#34323F] rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center shrink-0">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                    Team Sắp Thi · Phòng Thi Thực Chiến
+                  </span>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-snug">
+                    {passwordPromptTarget.test?.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPasswordPromptTarget(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Vui lòng nhập <strong>Mật khẩu Phòng Thi</strong> do giáo viên cung cấp để mở khóa vào làm bài.
+            </p>
+
+            <div className="space-y-1.5">
+              <input
+                type="password"
+                autoFocus
+                required
+                value={roomPassInput}
+                onChange={e => setRoomPassInput(e.target.value)}
+                placeholder="Nhập mật khẩu phòng thi..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#570DF8]"
+              />
+              {roomPassError && (
+                <p className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {roomPassError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPasswordPromptTarget(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={verifyingRoomPass}
+                className="px-5 py-2 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] disabled:opacity-60 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>{verifyingRoomPass ? 'Đang kiểm tra...' : 'Mở Khóa & Vào Thi'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

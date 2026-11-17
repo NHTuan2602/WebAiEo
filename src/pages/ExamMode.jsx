@@ -1213,6 +1213,14 @@ export default function ExamMode({
                 <textarea
                   data-exam-copy-source="true"
                   data-exam-answer-input="true"
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  data-gramm="false"
+                  data-gramm_editor="false"
+                  data-enable-grammarly="false"
+                  data-lt-active="false"
                   value={examState.answers[currentWritingKey] || ''}
                   onChange={e =>
                     setExamState(prev => ({

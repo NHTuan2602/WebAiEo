@@ -67,6 +67,11 @@ export const ALL_SKILL_OPTIONS = ['listening', 'reading', 'writing', 'speaking']
 export const DEFAULT_SECTION_DURATIONS = { listening: 15, reading: 20, writing: 25, speaking: 14 };
 
 export const createDefaultSpeakingSection = () => ({
+  speakingTrack: 'general', // 'daily' | 'exam_room' | 'general'
+  dailyDate: '',
+  dailyMandatory: true,
+  roomPassword: '',
+  hasRoomPassword: false,
   isForecast: false,
   autoAiGrade: true,
   part1SpeakSec: 45,
@@ -136,7 +141,17 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
   const p2 = s.part2 && typeof s.part2 === 'object' ? s.part2 : {};
   const p3 = s.part3 && typeof s.part3 === 'object' ? s.part3 : {};
 
+  const speakingTrack = ['daily', 'exam_room', 'general'].includes(s.speakingTrack)
+    ? s.speakingTrack
+    : 'general';
+  const cleanRoomPassword = String(s.roomPassword || '');
+
   return {
+    speakingTrack,
+    dailyDate: String(s.dailyDate || '').trim().slice(0, 10),
+    dailyMandatory: speakingTrack === 'daily' ? s.dailyMandatory !== false : Boolean(s.dailyMandatory),
+    roomPassword: cleanRoomPassword,
+    hasRoomPassword: Boolean(s.hasRoomPassword || cleanRoomPassword.trim().length > 0),
     isForecast: Boolean(s.isForecast),
     autoAiGrade: s.autoAiGrade !== false,
     part1SpeakSec: Math.max(15, Number(s.part1SpeakSec ?? def.part1SpeakSec) || 45),
@@ -347,6 +362,127 @@ export const getAssignedClassNames = (testOrIds, classesDb) => {
       return cls ? { id, name: cls.name || id } : null;
     })
     .filter(Boolean);
+};
+
+export const getVietnamTodayDateKey = (nowMs = Date.now()) =>
+  new Date((Number(nowMs) || Date.now()) + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+export const canViewerSeeMember = (member, viewerUser, classesDb = {}) => {
+  if (!member || !member.username) return false;
+  if (!viewerUser) return false;
+  const viewerIsAdmin = Boolean(viewerUser.isSuperAdmin || viewerUser.isSystemAdmin);
+  const viewerIsTeacher = viewerUser.role === 'teacher';
+  const memberIsAdmin = Boolean(member.isSystemAdmin || member.isSuperAdmin || member.role === 'admin');
+  const memberIsTeacher = !memberIsAdmin && member.role === 'teacher';
+
+  if (viewerIsAdmin) return true;
+  if (member.hiddenFromTeacher || member.isSuperAdmin) return memberIsAdmin;
+  if (viewerIsTeacher) return true;
+
+  // Strict student isolation: only self + Teachers + System Admin + classmates sharing >= 1 class
+  if (member.username === viewerUser.username) return true;
+  if (memberIsAdmin || memberIsTeacher) return true;
+
+  const myClassIds = getUserClassIds(classesDb, viewerUser.username);
+  if (myClassIds.length === 0) return false;
+  const peerClassIds = getUserClassIds(classesDb, member.username);
+  return myClassIds.some(cid => peerClassIds.includes(cid));
+};
+
+export const evaluateSpeakingDailyCompliance = ({
+  tests = [],
+  attempts = [],
+  usersDb = {},
+  classesDb = {},
+  viewerUser = null,
+  nowMs = null,
+  todayKey = ''
+} = {}) => {
+  const effectiveTodayKey = todayKey || getVietnamTodayDateKey(nowMs || Date.now());
+  const dailyTests = (Array.isArray(tests) ? tests : []).filter(t => {
+    const cfg = normalizeExamConfig(t);
+    const sp = normalizeSpeakingSection(t?.speaking);
+    return cfg.testMode === 'single_skill' && cfg.focusSkill === 'speaking' && sp.speakingTrack === 'daily';
+  });
+
+  const mandatoryDailyTests = dailyTests.filter(t => {
+    const cfg = normalizeExamConfig(t);
+    const sp = normalizeSpeakingSection(t?.speaking);
+    return cfg.visibility !== 'private' && sp.dailyMandatory !== false;
+  });
+
+  const allStudents = Object.values(usersDb || {}).filter(
+    u => u && u.role !== 'teacher' && u.role !== 'admin' && !u.isSuperAdmin && !u.isSystemAdmin && !u.hiddenFromTeacher
+  );
+
+  const attemptPairSet = new Set();
+  (Array.isArray(attempts) ? attempts : []).forEach(att => {
+    const uname = String(att?.studentId || att?.studentUsername || '').trim();
+    if (uname && att?.testId) {
+      attemptPairSet.add(`${att.testId}::${uname}`);
+    }
+  });
+
+  const perTest = mandatoryDailyTests.map(test => {
+    const cfg = normalizeExamConfig(test);
+    const sp = normalizeSpeakingSection(test?.speaking);
+    const targetStudents =
+      cfg.assignedClassIds.length > 0
+        ? allStudents.filter(stu =>
+            getUserClassIds(classesDb, stu.username).some(cid => cfg.assignedClassIds.includes(cid))
+          )
+        : allStudents;
+
+    const doneStudents = [];
+    const missingStudents = [];
+    targetStudents.forEach(stu => {
+      if (attemptPairSet.has(`${test.id}::${stu.username}`)) {
+        doneStudents.push(stu);
+      } else {
+        missingStudents.push(stu);
+      }
+    });
+
+    return {
+      test,
+      dailyDate: sp.dailyDate || '',
+      isToday: Boolean(sp.dailyDate && sp.dailyDate === effectiveTodayKey),
+      targetStudents,
+      doneStudents,
+      missingStudents
+    };
+  });
+
+  const missingStudentsMap = new Map();
+  perTest.forEach(entry => {
+    entry.missingStudents.forEach(stu => {
+      if (!missingStudentsMap.has(stu.username)) {
+        missingStudentsMap.set(stu.username, { student: stu, missingTests: [] });
+      }
+      missingStudentsMap.get(stu.username).missingTests.push(entry.test);
+    });
+  });
+
+  const myDailyTests = viewerUser
+    ? mandatoryDailyTests.filter(t => canUserAccessTest(t, classesDb, viewerUser))
+    : [];
+  const myPendingDailyTests = viewerUser
+    ? myDailyTests.filter(t => !attemptPairSet.has(`${t.id}::${viewerUser.username}`))
+    : [];
+  const myCompletedDailyTests = viewerUser
+    ? myDailyTests.filter(t => attemptPairSet.has(`${t.id}::${viewerUser.username}`))
+    : [];
+
+  return {
+    todayKey: effectiveTodayKey,
+    dailyTests,
+    mandatoryDailyTests,
+    perTest,
+    missingStudentSummaries: Array.from(missingStudentsMap.values()),
+    myDailyTests,
+    myPendingDailyTests,
+    myCompletedDailyTests
+  };
 };
 
 export const evaluateTestSchedule = (testOrCfg, nowMs = Date.now()) => {

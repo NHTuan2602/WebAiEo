@@ -458,6 +458,7 @@ function sanitizeUserForViewer(user, viewer) {
     avatarFrameId: typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
     equippedTitleId: typeof user.equippedTitleId === 'string' && user.equippedTitleId ? user.equippedTitleId : 'newbie',
     showTitleBadge: user.showTitleBadge !== false,
+    grantedTitleIds: Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String).filter(Boolean) : [],
     loginDays: Array.isArray(user.loginDays) ? user.loginDays : [],
     emailVerified: Boolean(user.email && user.emailVerified),
     maskedEmail: user.email && user.emailVerified ? maskEmailAddress(user.email) : ''
@@ -506,6 +507,14 @@ function stripAnswerKeysFromTest(test) {
       ...clone.writing,
       task1: clone.writing.task1 ? { ...clone.writing.task1, modelAnswer: '' } : undefined,
       task2: clone.writing.task2 ? { ...clone.writing.task2, modelAnswer: '' } : undefined
+    };
+  }
+  if (clone.speaking && typeof clone.speaking === 'object') {
+    const rawPass = String(clone.speaking.roomPassword || '').trim();
+    clone.speaking = {
+      ...clone.speaking,
+      roomPassword: '',
+      hasRoomPassword: Boolean(clone.speaking.hasRoomPassword || rawPass.length > 0)
     };
   }
   return clone;
@@ -723,6 +732,7 @@ function createInitialStore(audioDir = '') {
     teacherNotes: {},
     users: {},
     customVocabTopics: [],
+    customTitles: [],
     adminFeedbacks: [],
     notifications: [],
     aiConfig: { geminiApiKey: '' },
@@ -743,6 +753,7 @@ function createInitialStore(audioDir = '') {
     _localMutated: false,
     _rateLimits: new Map(),
     _otpChallenges: new Map(),
+    _unlockedSpeakingRooms: new Map(),
     _audioDir: audioDir,
     _audioMem: new Map()
   };
@@ -856,6 +867,9 @@ function applyParsedStoreSnapshot(store, parsed) {
   if (Array.isArray(parsed.customVocabTopics)) {
     store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
   }
+  if (Array.isArray(parsed.customTitles)) {
+    store.customTitles = parsed.customTitles.filter(t => t?.id && t?.label).slice(0, 60);
+  }
   if (Array.isArray(parsed.adminFeedbacks)) {
     store.adminFeedbacks = parsed.adminFeedbacks.filter(f => f?.id && f?.content);
   }
@@ -938,7 +952,7 @@ export function createPersistentSyncStore(persistFile = '') {
     const tmpFile = `${persistFile}.${process.pid}.${Date.now()}.tmp`;
     try {
       fs.mkdirSync(path.dirname(persistFile), { recursive: true });
-      const { _audioDir, _audioMem, _rateLimits, _otpChallenges, _bootId, _localMutated, ...serializableStore } = store;
+      const { _audioDir, _audioMem, _rateLimits, _otpChallenges, _unlockedSpeakingRooms, _bootId, _localMutated, ...serializableStore } = store;
       const serialized = JSON.stringify(serializableStore);
       fs.writeFileSync(tmpFile, serialized, 'utf8');
       if (fs.existsSync(persistFile) && backupFile) {
@@ -1040,6 +1054,12 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     username: SUPER_ADMIN_USERNAME,
     name: superAdmin.name || 'Quản Trị Hệ Thống',
     avatarUrl: superAdmin.avatarUrl || '',
+    profileBannerId: superAdmin.profileBannerId || 'ocean',
+    profileCoverUrl: superAdmin.profileCoverUrl || '',
+    avatarFrameId: superAdmin.avatarFrameId || 'none',
+    equippedTitleId: superAdmin.equippedTitleId || 'newbie',
+    showTitleBadge: superAdmin.showTitleBadge !== false,
+    grantedTitleIds: Array.isArray(superAdmin.grantedTitleIds) ? superAdmin.grantedTitleIds : [],
     role: 'admin',
     isSystemAdmin: true,
     joinedDate: superAdmin.joinedDate || '2026-01-01',
@@ -1115,6 +1135,9 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
   if (!title || !message) return null;
   const type = ['exam', 'exercise', 'game', 'announcement'].includes(notif.type) ? notif.type : 'announcement';
   const targetClassIds = normalizeClassIdList(notif.targetClassIds);
+  const targetUsernames = Array.isArray(notif.targetUsernames)
+    ? Array.from(new Set(notif.targetUsernames.map(u => String(u || '').trim()).filter(Boolean))).slice(0, 100)
+    : [];
   const targetClassNames = Array.isArray(notif.targetClassNames)
     ? notif.targetClassNames.map(s => String(s || '').trim()).filter(Boolean).slice(0, 12)
     : resolveClassNamesByIds(store, targetClassIds);
@@ -1127,6 +1150,7 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
     roomPin: notif.roomPin ? String(notif.roomPin) : '',
     targetClassIds,
     targetClassNames,
+    targetUsernames,
     createdBy: notif.createdBy || viewer?.username || 'teacher_ielts',
     createdByName: notif.createdByName || viewer?.name || 'Giáo viên',
     createdAt: notif.createdAt || new Date().toLocaleString('vi-VN'),
@@ -1149,6 +1173,7 @@ function serializeNotificationItem(n, uname = '') {
     roomPin: n.roomPin || '',
     targetClassIds: normalizeClassIdList(n.targetClassIds),
     targetClassNames: Array.isArray(n.targetClassNames) ? n.targetClassNames : [],
+    targetUsernames: Array.isArray(n.targetUsernames) ? n.targetUsernames : [],
     createdBy: n.createdBy || '',
     createdByName: n.createdByName || '',
     createdAt: n.createdAt || '',
@@ -1164,11 +1189,16 @@ function serializeNotificationsForViewer(store, viewer) {
   }
   const list = Array.isArray(store.notifications) ? store.notifications : [];
   const uname = viewer.username || '';
+  const unameLower = uname.toLowerCase();
   const viewerClassSet = getViewerClassIdSet(store, uname);
   const testsById = new Map((Array.isArray(store.tests) ? store.tests : []).map(t => [t?.id, t]));
   return list
     .filter(n => {
       if (!n || (n.createdBy && n.createdBy === uname)) return false;
+      const targetUsers = Array.isArray(n.targetUsernames) ? n.targetUsernames.map(u => String(u || '').toLowerCase()).filter(Boolean) : [];
+      if (targetUsers.length > 0 && !targetUsers.includes(unameLower)) {
+        return false;
+      }
       const nClasses = normalizeClassIdList(n.targetClassIds);
       if (nClasses.length > 0 && !nClasses.some(cid => viewerClassSet.has(cid))) {
         return false;
@@ -1217,6 +1247,7 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: {},
       users: {},
       customVocabTopics: [],
+      customTitles: [],
       supportAdminProfile: null,
       adminFeedbacks: [],
       notifications: [],
@@ -1225,9 +1256,35 @@ function getSnapshotForViewer(store, viewer = null) {
   }
 
   const sanitizedUsers = {};
+  const isViewerTeacherOrAdmin = viewer.role === 'teacher' || Boolean(viewer.isSuperAdmin);
+  const viewerClassSet = isViewerTeacherOrAdmin ? new Set() : getViewerClassIdSet(store, viewer.username);
+  const sameClassPeerSet = new Set();
+  if (!isViewerTeacherOrAdmin) {
+    viewerClassSet.forEach(cid => {
+      const cls = store.classes?.[cid];
+      if (cls && Array.isArray(cls.studentUsernames)) {
+        cls.studentUsernames.forEach(u => {
+          const cleanLower = String(u || '').trim().toLowerCase();
+          if (cleanLower) sameClassPeerSet.add(cleanLower);
+        });
+      }
+    });
+  }
+
   Object.entries(store.users || {}).forEach(([uname, u]) => {
     const clean = sanitizeUserForViewer(u, viewer);
-    if (clean) sanitizedUsers[uname] = clean;
+    if (!clean) return;
+    if (!isViewerTeacherOrAdmin) {
+      const uLower = uname.toLowerCase();
+      const vLower = String(viewer.username || '').toLowerCase();
+      const isSelf = uLower === vLower;
+      const isTeacherRole = clean.role === 'teacher';
+      const isSameClassPeer = sameClassPeerSet.has(uLower);
+      if (!isSelf && !isTeacherRole && !isSameClassPeer) {
+        return;
+      }
+    }
+    sanitizedUsers[uname] = clean;
   });
   const adminFields = buildPublicAdminSnapshotFields(store, viewer);
   const notifications = serializeNotificationsForViewer(store, viewer);
@@ -1248,14 +1305,14 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: store.teacherNotes || {},
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
+      customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
       ...adminFields,
       notifications,
       sentNotifications
     };
   }
 
-  // Strict student view: hide private tests & tests assigned only to other classes, strip keys before viewing answers allowed, redact peer details & room passwords
-  const viewerClassSet = getViewerClassIdSet(store, viewer.username);
+  // Strict student view: hide private tests & other-class tests, strip keys & Speaking exam-room passwords, isolate peers by class
   const studentClasses = {};
   Object.entries(store.classes || {}).forEach(([cid, cls]) => {
     if (cls && viewerClassSet.has(cls.id || cid)) {
@@ -1264,7 +1321,9 @@ function getSnapshotForViewer(store, viewer = null) {
         name: cls.name,
         description: cls.description || '',
         color: cls.color || 'teal',
-        studentUsernames: [viewer.username]
+        studentUsernames: Array.isArray(cls.studentUsernames)
+          ? cls.studentUsernames.filter(u => Boolean(sanitizedUsers[u]))
+          : [viewer.username]
       };
     }
   });
@@ -1283,13 +1342,33 @@ function getSnapshotForViewer(store, viewer = null) {
     })
     .map(t => {
       const canSeeKeys = Boolean(t?.allowViewAnswers) && submittedTestIds.has(t.id);
-      return canSeeKeys ? t : stripAnswerKeysFromTest(t);
+      const safeTest = canSeeKeys ? t : stripAnswerKeysFromTest(t);
+      if (safeTest?.speaking && typeof safeTest.speaking === 'object') {
+        const rawPass = String(safeTest.speaking.roomPassword || '').trim();
+        return {
+          ...safeTest,
+          speaking: {
+            ...safeTest.speaking,
+            roomPassword: '',
+            hasRoomPassword: Boolean(safeTest.speaking.hasRoomPassword || rawPass.length > 0)
+          }
+        };
+      }
+      return safeTest;
     });
 
-  const studentAttempts = (store.attempts || []).map(att => {
-    const isMine = att.studentId === viewer.username || att.studentUsername === viewer.username;
-    return isMine ? att : sanitizeAttemptForPeer(att);
-  });
+  const studentAttempts = (store.attempts || [])
+    .filter(att => {
+      if (!att) return false;
+      const attStuLower = String(att.studentId || att.studentUsername || '').trim().toLowerCase();
+      if (attStuLower === String(viewer.username || '').toLowerCase()) return true;
+      if (sameClassPeerSet.has(attStuLower)) return true;
+      return store.users?.[att.studentId]?.role === 'teacher';
+    })
+    .map(att => {
+      const isMine = att.studentId === viewer.username || att.studentUsername === viewer.username;
+      return isMine ? att : sanitizeAttemptForPeer(att);
+    });
 
   const studentRooms = {};
   Object.entries(store.rooms || {}).forEach(([pin, r]) => {
@@ -1310,6 +1389,7 @@ function getSnapshotForViewer(store, viewer = null) {
     teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
+    customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
     ...adminFields,
     notifications,
     sentNotifications: []
@@ -1492,6 +1572,31 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         }
         const test = (store.tests || []).find(t => t.id === att.testId);
         if (test && !existingAtt) {
+          const assigned = normalizeClassIdList(test.assignedClassIds);
+          if (assigned.length > 0) {
+            const viewerClsSet = getViewerClassIdSet(store, viewer.username);
+            if (!assigned.some(cid => viewerClsSet.has(cid))) {
+              return { allowed: false, status: 403, error: 'Đề / bài tập này chỉ giao riêng cho các lớp học được chỉ định.' };
+            }
+          }
+          const isSpExamRoom =
+            test.testMode === 'single_skill' &&
+            test.focusSkill === 'speaking' &&
+            test.speaking?.speakingTrack === 'exam_room';
+          const spRoomPass = String(test.speaking?.roomPassword || '').trim();
+          if (isSpExamRoom && spRoomPass) {
+            const unlockedMem = Boolean(store._unlockedSpeakingRooms?.has(`${viewer.username}::${test.id}`));
+            const unlockPayload = att.speakingUnlockToken ? verifyToken(att.speakingUnlockToken, store._authSecret) : null;
+            const unlockedTokenOk = Boolean(
+              unlockPayload &&
+              unlockPayload.kind === 'speaking_unlock' &&
+              unlockPayload.username === viewer.username &&
+              unlockPayload.testId === test.id
+            );
+            if (!unlockedMem && !unlockedTokenOk) {
+              return { allowed: false, status: 403, error: 'Phòng thi Speaking Thực Chiến yêu cầu nhập đúng mật khẩu trước khi vào thi/nộp bài.' };
+            }
+          }
           const nowMs = Date.now();
           const openAtMs = parseScheduleTimestampServer(test.openAt);
           const dueAtMs = parseScheduleTimestampServer(test.dueAt);
@@ -1583,6 +1688,15 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: true };
     }
 
+    case 'UPSERT_CUSTOM_TITLE':
+    case 'DELETE_CUSTOM_TITLE':
+    case 'GRANT_USER_TITLES': {
+      if (!isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới có quyền tạo hoặc trao tặng danh hiệu!' };
+      }
+      return { allowed: true };
+    }
+
     case 'MARK_NOTIFICATIONS_READ': {
       return { allowed: true };
     }
@@ -1628,6 +1742,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
+      grantedTitleIds: Array.isArray(prevUser.grantedTitleIds) ? prevUser.grantedTitleIds : [],
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
       emailVerifiedAt: prevUser.emailVerifiedAt || null
@@ -1637,6 +1752,15 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
   } else {
     const incoming = { ...rawUser, username: uname };
     incoming.loginDays = mergeLoginDays(prevUser?.loginDays, incoming.loginDays);
+    if (!isSuperAdmin) {
+      incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
+    } else if (incoming.grantedTitleIds !== undefined) {
+      incoming.grantedTitleIds = Array.isArray(incoming.grantedTitleIds)
+        ? Array.from(new Set(incoming.grantedTitleIds.map(id => String(id || '').trim()).filter(Boolean)))
+        : [];
+    } else {
+      incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
+    }
     incoming.email = prevUser?.email || '';
     incoming.emailVerified = Boolean(prevUser?.email && prevUser?.emailVerified);
     incoming.emailVerifiedAt = prevUser?.emailVerifiedAt || null;
@@ -1735,6 +1859,15 @@ function notifyPublishedTest(store, testObj, viewer = null, explicitClassIds = n
   const classNames = resolveClassNamesByIds(store, targetClassIds);
   const classHint = classNames.length > 0 ? ` [Lớp: ${classNames.join(', ')}]` : '';
   const isExercise = testObj.testMode === 'single_skill';
+  const isSpeakingDaily =
+    isExercise && testObj.focusSkill === 'speaking' && testObj.speaking?.speakingTrack === 'daily';
+  const isSpeakingExamRoom =
+    isExercise && testObj.focusSkill === 'speaking' && testObj.speaking?.speakingTrack === 'exam_room';
+  const speakingTag = isSpeakingDaily
+    ? ' [Speaking Daily]'
+    : isSpeakingExamRoom
+    ? ' [Phòng Thi Thực Chiến]'
+    : '';
   const dueAt = parseScheduleTimestampServer(testObj.dueAt);
   const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(testObj.scheduleMode)
     ? testObj.scheduleMode
@@ -1746,8 +1879,14 @@ function notifyPublishedTest(store, testObj, viewer = null, explicitClassIds = n
     store,
     {
       type: isExercise ? 'exercise' : 'exam',
-      title: isExercise ? `Bài tập mới${classHint}!` : `Đề thi IELTS mới${classHint}!`,
-      message: `${viewer?.name || 'Giáo viên'} vừa giao ${isExercise ? 'bài tập' : 'đề thi'} "${testObj.title}"${classHint}${deadlineHint}. Nhấn vào thông báo để xem chi tiết!`,
+      title: isSpeakingDaily
+        ? `Speaking Daily Hôm Nay${classHint}!`
+        : isExercise
+        ? `Bài tập mới${speakingTag}${classHint}!`
+        : `Đề thi IELTS mới${classHint}!`,
+      message: isSpeakingDaily
+        ? `${viewer?.name || 'Giáo viên'} vừa mở bài Speaking Daily "${testObj.title}"${classHint}${deadlineHint}. Tất cả học viên cần hoàn thành hôm nay (hệ thống báo người chưa làm)!`
+        : `${viewer?.name || 'Giáo viên'} vừa giao ${isExercise ? 'bài tập' : 'đề thi'} "${testObj.title}"${classHint}${deadlineHint}. Nhấn vào thông báo để xem chi tiết!`,
       testId: testObj.id,
       targetClassIds,
       targetClassNames: classNames
@@ -1796,6 +1935,12 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             delete clean.hiddenFromTeacher;
             clean.tokenVersion = clean.tokenVersion || 1;
             store.users[uname] = clean;
+          });
+        }
+        if (payload.classes && typeof payload.classes === 'object') {
+          Object.entries(payload.classes).forEach(([cid, cObj]) => {
+            const norm = normalizeClassRecord(cObj, cid);
+            if (norm) store.classes[norm.id] = norm;
           });
         }
         if (Array.isArray(payload.customVocabTopics)) {
@@ -2361,6 +2506,86 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       break;
     }
 
+    case 'UPSERT_CUSTOM_TITLE': {
+      const raw = payload?.customTitle || payload;
+      const id = String(raw?.id || '').trim().slice(0, 64);
+      const label = String(raw?.label || '').trim().slice(0, 60);
+      if (!id || !label) break;
+      const allowedThemes = new Set(['amber', 'teal', 'rose', 'violet', 'emerald', 'sky']);
+      const colorKey = allowedThemes.has(raw?.colorKey) ? raw.colorKey : 'amber';
+      const item = {
+        id,
+        label,
+        icon: String(raw?.icon || '🏅').trim().slice(0, 10) || '🏅',
+        tier: String(raw?.tier || 'Đặc Biệt').trim().slice(0, 30) || 'Đặc Biệt',
+        difficulty: String(raw?.difficulty || 'Đặc Biệt').trim().slice(0, 24) || 'Đặc Biệt',
+        conditionText:
+          String(raw?.conditionText || 'Danh hiệu đặc biệt do Quản Trị Hệ Thống trao tặng.').trim().slice(0, 180),
+        colorKey,
+        createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+        createdAt: Number(raw?.createdAt) || Date.now()
+      };
+      const prev = Array.isArray(store.customTitles) ? store.customTitles : [];
+      const idx = prev.findIndex(t => t?.id === id);
+      store.customTitles = idx >= 0
+        ? prev.map((t, i) => (i === idx ? { ...t, ...item } : t))
+        : [...prev, item];
+      changed = true;
+      break;
+    }
+
+    case 'DELETE_CUSTOM_TITLE': {
+      const tid = String(payload?.titleId || payload?.id || '').trim();
+      if (!tid) break;
+      const prev = Array.isArray(store.customTitles) ? store.customTitles : [];
+      const next = prev.filter(t => t?.id !== tid);
+      if (next.length !== prev.length) {
+        store.customTitles = next;
+        Object.entries(store.users || {}).forEach(([uname, u]) => {
+          if (!u) return;
+          const hadGranted = Array.isArray(u.grantedTitleIds) && u.grantedTitleIds.includes(tid);
+          const hadEquipped = u.equippedTitleId === tid;
+          if (hadGranted || hadEquipped) {
+            store.users[uname] = {
+              ...u,
+              ...(hadGranted ? { grantedTitleIds: u.grantedTitleIds.filter(x => x !== tid) } : {}),
+              ...(hadEquipped ? { equippedTitleId: 'newbie' } : {})
+            };
+          }
+        });
+        changed = true;
+      }
+      break;
+    }
+
+    case 'GRANT_USER_TITLES': {
+      const targetKey = findUserKeyInStore(store, payload?.username);
+      const targetUser = targetKey ? store.users?.[targetKey] : null;
+      if (!targetKey || !targetUser) break;
+      const mode = ['add', 'remove', 'set'].includes(payload?.mode) ? payload.mode : 'add';
+      const incomingIds = Array.isArray(payload?.titleIds)
+        ? Array.from(new Set(payload.titleIds.map(id => String(id || '').trim()).filter(Boolean)))
+        : payload?.titleId
+        ? [String(payload.titleId).trim()]
+        : [];
+      const curr = Array.isArray(targetUser.grantedTitleIds) ? targetUser.grantedTitleIds : [];
+      let nextGranted = curr;
+      if (mode === 'set') {
+        nextGranted = incomingIds;
+      } else if (mode === 'add') {
+        nextGranted = Array.from(new Set([...curr, ...incomingIds]));
+      } else if (mode === 'remove') {
+        const dropSet = new Set(incomingIds);
+        nextGranted = curr.filter(id => !dropSet.has(id));
+      }
+      store.users[targetKey] = {
+        ...targetUser,
+        grantedTitleIds: nextGranted
+      };
+      changed = true;
+      break;
+    }
+
     case 'UPSERT_ATTEMPT': {
       let attempt = payload.attempt;
       if (!attempt?.id) break;
@@ -2772,6 +2997,9 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'DELETE_CLASS',
   'UPDATE_CLASS_MEMBERS',
   'ASSIGN_TEST_CLASSES',
+  'UPSERT_CUSTOM_TITLE',
+  'DELETE_CUSTOM_TITLE',
+  'GRANT_USER_TITLES',
   'SEED_DEFAULTS'
 ]);
 
@@ -3425,6 +3653,63 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       return;
     }
 
+    if (req.method === 'POST' && reqUrl === '/speaking/verify-password') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để vào phòng thi Speaking Thực Chiến.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const testId = String(body?.testId || '').trim();
+        const password = String(body?.password || '').trim();
+        const ip = getClientIp(req);
+        if (!checkRateLimit(store._rateLimits, `spk_room:${ip}:${viewer.username}`, 25, 5 * 60 * 1000)) {
+          sendJsonResponse(res, 429, { ok: false, error: 'Nhập sai mật khẩu phòng thi quá nhiều lần. Vui lòng thử lại sau ít phút.' });
+          return;
+        }
+        const targetTest = (store.tests || []).find(t => t?.id === testId);
+        if (!targetTest) {
+          sendJsonResponse(res, 404, { ok: false, error: 'Không tìm thấy bài thi Speaking này.' });
+          return;
+        }
+        const isTeacherViewer = viewer.role === 'teacher' || Boolean(viewer.isSuperAdmin);
+        if (!isTeacherViewer) {
+          if ((targetTest.visibility || 'public') === 'private') {
+            sendJsonResponse(res, 403, { ok: false, error: 'Bài thi này đang ở chế độ riêng tư.' });
+            return;
+          }
+          const assigned = normalizeClassIdList(targetTest.assignedClassIds);
+          if (assigned.length > 0) {
+            const vClasses = getViewerClassIdSet(store, viewer.username);
+            if (!assigned.some(cid => vClasses.has(cid))) {
+              sendJsonResponse(res, 403, { ok: false, error: 'Bạn không thuộc lớp học được giao bài thi này.' });
+              return;
+            }
+          }
+          const expectedPass = String(targetTest.speaking?.roomPassword || '').trim();
+          if (expectedPass && expectedPass !== password) {
+            sendJsonResponse(res, 403, { ok: false, error: 'Mật khẩu Phòng Thi Thực Chiến chưa chính xác!' });
+            return;
+          }
+        }
+        if (!store._unlockedSpeakingRooms) store._unlockedSpeakingRooms = new Map();
+        store._unlockedSpeakingRooms.set(`${viewer.username}::${targetTest.id}`, Date.now());
+        const unlockToken = signToken(
+          {
+            kind: 'speaking_unlock',
+            username: viewer.username,
+            testId: targetTest.id,
+            exp: Date.now() + 12 * 60 * 60 * 1000
+          },
+          store._authSecret
+        );
+        sendJsonResponse(res, 200, { ok: true, unlockToken });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Xác nhận mật khẩu phòng thi thất bại.' });
+      }
+      return;
+    }
+
     if (req.method === 'POST' && reqUrl === '/game/join') {
       if (!viewer) {
         res.statusCode = 401;
@@ -3573,7 +3858,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         res.end(JSON.stringify({ ok: false, error: 'Audio recording not found' }));
         return;
       }
-      if (viewer.role !== 'teacher' && record.meta?.username && record.meta.username !== viewer.username) {
+      const ownerName = record.meta?.username || '';
+      const ownerIsTeacher = Boolean(ownerName && store.users?.[ownerName]?.role === 'teacher');
+      const isQuestionPromptAudio = rawId.startsWith('spk_prompt_') || ownerIsTeacher;
+      if (viewer.role !== 'teacher' && !isQuestionPromptAudio && ownerName && ownerName !== viewer.username) {
         res.statusCode = 403;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify({ ok: false, error: 'Bạn không có quyền truy cập bản ghi âm này.' }));

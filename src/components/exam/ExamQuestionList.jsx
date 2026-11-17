@@ -281,6 +281,10 @@ export default function ExamQuestionList({
               <div className="pl-1 pt-1">
                 <input
                   type="text"
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  autoComplete="off"
                   placeholder={`${displayNum}`}
                   value={answers?.[q.id] || ''}
                   onChange={e => onAnswerChange?.(q.id, e.target.value)}

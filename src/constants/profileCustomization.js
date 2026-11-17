@@ -442,6 +442,79 @@ export const STUDENT_TITLES = [
 
 export const PROFILE_TITLES = STUDENT_TITLES;
 
+export const CUSTOM_TITLE_THEMES = {
+  amber: {
+    label: 'Vàng Hoàng Kim',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400/60',
+    heroBadgeClass: 'bg-amber-500/35 text-amber-100 border-amber-300/70',
+    gameBadgeClass: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/25 dark:text-amber-200 dark:border-amber-400/60'
+  },
+  teal: {
+    label: 'Ngọc Lam',
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-300 dark:bg-teal-500/20 dark:text-teal-200 dark:border-teal-400/60',
+    heroBadgeClass: 'bg-teal-500/35 text-teal-100 border-teal-300/70',
+    gameBadgeClass: 'bg-teal-100 text-teal-900 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/60'
+  },
+  rose: {
+    label: 'Hồng Ruby',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-400/60',
+    heroBadgeClass: 'bg-rose-500/35 text-rose-100 border-rose-300/70',
+    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60'
+  },
+  violet: {
+    label: 'Tím Hoàng Gia',
+    badgeClass: 'bg-purple-50 text-purple-800 border-purple-300 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-400/60',
+    heroBadgeClass: 'bg-purple-500/35 text-purple-100 border-purple-300/70',
+    gameBadgeClass: 'bg-purple-100 text-purple-900 border-purple-400 dark:bg-purple-500/25 dark:text-purple-200 dark:border-purple-400/60'
+  },
+  emerald: {
+    label: 'Lục Bảo',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/60',
+    heroBadgeClass: 'bg-emerald-500/35 text-emerald-100 border-emerald-300/70',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/60'
+  },
+  sky: {
+    label: 'Xanh Thiên Thanh',
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-400/60',
+    heroBadgeClass: 'bg-sky-500/35 text-sky-100 border-sky-300/70',
+    gameBadgeClass: 'bg-sky-100 text-sky-900 border-sky-400 dark:bg-sky-500/25 dark:text-sky-200 dark:border-sky-400/60'
+  }
+};
+
+export function normalizeCustomTitle(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || '').trim().slice(0, 64);
+  const label = String(raw.label || '').trim().slice(0, 60);
+  if (!id || !label) return null;
+  const colorKey = Object.prototype.hasOwnProperty.call(CUSTOM_TITLE_THEMES, raw.colorKey)
+    ? raw.colorKey
+    : 'amber';
+  const theme = CUSTOM_TITLE_THEMES[colorKey];
+  return {
+    id,
+    label,
+    icon: String(raw.icon || '🏅').trim().slice(0, 10) || '🏅',
+    tier: String(raw.tier || 'Đặc Biệt').trim().slice(0, 30) || 'Đặc Biệt',
+    difficulty: String(raw.difficulty || 'Đặc Biệt').trim().slice(0, 24) || 'Đặc Biệt',
+    conditionText:
+      String(raw.conditionText || 'Danh hiệu đặc biệt do Quản Trị Hệ Thống trao tặng.').trim().slice(0, 180),
+    colorKey,
+    badgeClass: theme.badgeClass,
+    heroBadgeClass: theme.heroBadgeClass,
+    gameBadgeClass: theme.gameBadgeClass,
+    isCustomTitle: true,
+    createdBy: String(raw.createdBy || 'tuanpro123s'),
+    createdAt: Number(raw.createdAt) || 0
+  };
+}
+
+export function getAllCatalogTitles(customTitles = []) {
+  const customList = (Array.isArray(customTitles) ? customTitles : [])
+    .map(normalizeCustomTitle)
+    .filter(Boolean);
+  return [...STUDENT_TITLES, ...customList];
+}
+
 export function getProfileBannerById(bannerId) {
   return PROFILE_BANNERS.find(b => b.id === bannerId) || PROFILE_BANNERS[0];
 }
@@ -519,12 +592,19 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
 export function computeStudentTitleProgress(username, attempts = [], roomsDb = {}, options = {}) {
   const opts = options && typeof options === 'object' ? options : {};
   const userObj = 'loginDays' in opts || 'username' in opts ? opts : (opts.user || null);
+  const customTitles = Array.isArray(opts.customTitles) ? opts.customTitles : [];
   const unlockAll = Boolean(opts.unlockAll || userObj?.isSuperAdmin || userObj?.isSystemAdmin || username === 'tuanpro123s');
+  const grantedSet = new Set(Array.isArray(userObj?.grantedTitleIds) ? userObj.grantedTitleIds.map(String) : []);
   const stats = computeStudentStats(username, attempts, roomsDb, userObj);
+  const catalog = getAllCatalogTitles(customTitles);
 
-  const itemsWithProgress = STUDENT_TITLES.map(t => {
-    const unlocked = unlockAll || Boolean(t.isUnlocked(stats));
-    const progress = t.getProgress(stats);
+  const itemsWithProgress = catalog.map(t => {
+    const unlockedByGrant = grantedSet.has(t.id);
+    const unlockedByMetric = typeof t.isUnlocked === 'function' ? Boolean(t.isUnlocked(stats)) : false;
+    const unlocked = unlockAll || unlockedByGrant || unlockedByMetric;
+    const progress = typeof t.getProgress === 'function'
+      ? t.getProgress(stats)
+      : { pct: unlocked ? 100 : 0, text: unlocked ? 'Quản trị trao tặng' : 'Chờ Quản trị trao tặng' };
     return {
       id: t.id,
       label: t.label,
@@ -535,10 +615,15 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       badgeClass: t.badgeClass,
       heroBadgeClass: t.heroBadgeClass,
       gameBadgeClass: t.gameBadgeClass,
+      isCustomTitle: Boolean(t.isCustomTitle),
+      colorKey: t.colorKey || 'amber',
       unlocked,
+      unlockedByGrant,
       progressPct: unlocked ? 100 : progress.pct,
       progressText: unlockAll
         ? 'Mở khóa tự động (Đặc quyền Quản trị)'
+        : unlockedByGrant
+        ? '👑 Quản trị trao tặng'
         : unlocked
         ? 'Đã mở khóa'
         : progress.text
@@ -577,7 +662,7 @@ export function resolveRoleBuiltInTitle(user) {
   return null;
 }
 
-export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}) {
+export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}, customTitles = []) {
   if (!user) return null;
   const isSystemAdmin = Boolean(user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s');
   const isTeacher = !isSystemAdmin && user.role === 'teacher';
@@ -585,12 +670,16 @@ export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}) {
 
   const progress = computeStudentTitleProgress(user.username, attempts, roomsDb, {
     unlockAll: isSystemAdmin,
-    user
+    user,
+    customTitles
   });
 
   const preferredId = String(user.equippedTitleId || '').trim();
   const preferred = progress.itemsWithProgress.find(item => item.id === preferredId && item.unlocked);
-  const activeTitle = preferred || progress.itemsWithProgress[0];
+  const firstGrantedOrUnlocked =
+    progress.itemsWithProgress.find(item => item.unlockedByGrant && item.unlocked) ||
+    progress.itemsWithProgress[0];
+  const activeTitle = preferred || firstGrantedOrUnlocked;
   const isHidden = user.showTitleBadge === false;
 
   return {
@@ -605,14 +694,15 @@ export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}) {
   };
 }
 
-export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}) {
-  const summary = resolveStudentTitleSummary(user, attempts, roomsDb);
+export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}, customTitles = []) {
+  const summary = resolveStudentTitleSummary(user, attempts, roomsDb, customTitles);
   if (!summary) return null;
   if (summary.isHidden) return null;
   return summary.title || null;
 }
 
 export const TITLE_DIFFICULTY_RANK = {
+  'Đặc Biệt': 6,
   'Cực Khó': 5,
   'Khó': 4,
   'Thử Thách': 3,

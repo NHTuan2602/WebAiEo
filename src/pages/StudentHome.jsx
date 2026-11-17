@@ -17,7 +17,7 @@ import {
   Sparkles,
   TrendingUp
 } from 'lucide-react';
-import { canUserAccessTest, evaluateTestSchedule, formatViDateTime, getAssignedClassNames, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import { canUserAccessTest, canViewerSeeMember, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, getAssignedClassNames, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
 import { BRAND_INFO } from '../constants/brandInfo';
 import { loadExamDraft } from '../utils/sessionPersistence';
 import BrandContactFooter from '../components/common/BrandContactFooter';
@@ -29,10 +29,12 @@ export default function StudentHome({
   attempts,
   classesDb = {},
   currentUser,
+  customTitles = [],
   focusedTestId = null,
   onClearFocusedTest,
   openMemberProfile,
   openSkillPracticeHub,
+  openSpeakingDaily,
   openStudentGamePortal,
   roomsDb = {},
   serverClockOffsetMs = 0,
@@ -91,6 +93,13 @@ export default function StudentHome({
     return !(cfg.maxAttempts > 0 && used >= cfg.maxAttempts) && (isTeacher || !sched.lockedBySchedule);
   }) || fullExamTests[0];
   const firstTestHasDraft = firstPlayableTest ? Boolean(draftByTestId[firstPlayableTest.id]) : false;
+  const dailyCompliance = evaluateSpeakingDailyCompliance({
+    tests,
+    attempts,
+    usersDb,
+    classesDb,
+    viewerUser: currentUser
+  });
 
   const skillGuides = [
     {
@@ -146,6 +155,29 @@ export default function StudentHome({
 
   return (
     <div className="space-y-10">
+      {/* Daily Speaking Mandatory Alert Banner */}
+      {!matchedFocusedTest && !isTeacher && dailyCompliance.myPendingDailyTests.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="rounded-2xl bg-gradient-to-r from-rose-500/15 via-orange-500/15 to-amber-500/10 border-2 border-orange-400/70 dark:border-orange-500/50 p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div>
+              <p className="text-xs sm:text-sm font-extrabold text-rose-800 dark:text-rose-200">
+                🔥 Nhắc Nhở Speaking Daily Hôm Nay: Bạn còn {dailyCompliance.myPendingDailyTests.length} bài bắt buộc chưa hoàn thành!
+              </p>
+              <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                Bài chờ làm: <strong>{dailyCompliance.myPendingDailyTests.map(d => d.title).join(', ')}</strong>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => (openSpeakingDaily ? openSpeakingDaily() : openSkillPracticeHub?.())}
+              className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-extrabold shrink-0 shadow-xs transition"
+            >
+              Vào Luyện Speaking Daily Ngay →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Soft Pastel Hero Section (collapsed when notification opens a specific exam card) */}
       {!matchedFocusedTest && (
       <section className="lexi-hero-surface border-b border-pink-200/90 dark:border-slate-800">
@@ -626,7 +658,11 @@ export default function StudentHome({
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white">Thành Viên Lớp Học &amp; Hồ Sơ</h3>
-                    <p className="text-xs sm:text-sm text-[#62748E] dark:text-slate-400">Xem hồ sơ giáo viên, góp ý quản trị hệ thống và tiến độ học tập lớp học</p>
+                    <p className="text-xs sm:text-sm text-[#62748E] dark:text-slate-400">
+                      {isTeacher
+                        ? 'Xem hồ sơ giáo viên, góp ý quản trị hệ thống và tiến độ học tập lớp học'
+                        : 'Chỉ hiển thị học viên cùng lớp với bạn, Giáo viên & Quản trị hệ thống'}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -648,7 +684,12 @@ export default function StudentHome({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {(() => {
                   const rawEntries = Object.entries(usersDb || {}).filter(
-                    ([uname, u]) => u && !u.isSuperAdmin && !u.hiddenFromTeacher && uname !== 'tuanpro123s'
+                    ([uname, u]) =>
+                      u &&
+                      !u.isSuperAdmin &&
+                      !u.hiddenFromTeacher &&
+                      uname !== 'tuanpro123s' &&
+                      canViewerSeeMember({ ...u, username: uname }, currentUser, classesDb)
                   );
                   if (supportAdminProfile?.username) {
                     rawEntries.push([
@@ -701,7 +742,7 @@ export default function StudentHome({
                             </div>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {(() => {
-                                const mTitle = resolveVisibleTitleBadge({ ...u, username: uname }, attempts, roomsDb);
+                                const mTitle = resolveVisibleTitleBadge({ ...u, username: uname }, attempts, roomsDb, customTitles);
                                 if (memberIsAdmin) {
                                   return (
                                     <>
