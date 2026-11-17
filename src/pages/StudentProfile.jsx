@@ -40,6 +40,7 @@ import {
   Trash2,
   TrendingUp,
   Trophy,
+  Unlock,
   Upload,
   UserCheck,
   Users,
@@ -53,10 +54,14 @@ import ImageCropperModal from '../components/modals/ImageCropperModal';
 import {
   AVATAR_FRAMES,
   PROFILE_BANNERS,
+  formatVndCurrency,
   getProfileBannerById,
+  hasCustomCoverPermission,
+  normalizePaymentConfig,
   resolveStudentTitleSummary,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
+import CoverUnlockQrCard from '../components/common/CoverUnlockQrCard';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 
 export default function StudentProfile({
@@ -72,7 +77,10 @@ export default function StudentProfile({
   onGrantUserTitles,
   onOpenAccountSecurity,
   onOpenAdminTitleManager,
+  onRequestCoverUnlock = null,
+  onToggleUserCoverUnlock = null,
   openStudentGamePortal,
+  paymentConfig = null,
   previousView,
   roomsDb = {},
   selectedProfileStudent,
@@ -104,6 +112,8 @@ export default function StudentProfile({
   const [titleFilter, setTitleFilter] = useState('all');
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
+  const [isRequestingCoverUnlock, setIsRequestingCoverUnlock] = useState(false);
+  const [isTogglingCoverUnlock, setIsTogglingCoverUnlock] = useState(false);
   const [coverCropSource, setCoverCropSource] = useState('');
   const [customDraft, setCustomDraft] = useState({
     profileBannerId: 'ocean',
@@ -146,7 +156,12 @@ export default function StudentProfile({
   const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb, customTitles);
   const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles);
   const heroBanner = getProfileBannerById(student.profileBannerId);
+  const studentHasCoverPermission = hasCustomCoverPermission(student);
+  const canUseCustomCover = canEditTargetInfo && (isTeacherViewer || studentHasCoverPermission);
+  const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
+  const unlockPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
   const hasCustomCover = Boolean(
+    studentHasCoverPermission &&
     student.profileCoverUrl &&
     (student.profileCoverUrl.startsWith('data:image/') || student.profileCoverUrl.startsWith('https://'))
   );
@@ -514,6 +529,40 @@ export default function StudentProfile({
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-200 text-xs font-bold transition"
                     >
                       <Crown className="w-3.5 h-3.5" /> Tặng Danh Hiệu
+                    </button>
+                  )}
+                  {isTeacherViewer && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserCoverUnlock && (
+                    <button
+                      type="button"
+                      disabled={isTogglingCoverUnlock}
+                      onClick={async () => {
+                        if (studentHasCoverPermission && !window.confirm(`Khóa lại quyền tải Ảnh Nền Riêng của ${student.name || student.username}?`)) {
+                          return;
+                        }
+                        setIsTogglingCoverUnlock(true);
+                        await onToggleUserCoverUnlock(student.username, !studentHasCoverPermission);
+                        setIsTogglingCoverUnlock(false);
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
+                        studentHasCoverPermission
+                          ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-emerald-200 dark:border-emerald-500/35 text-emerald-700 dark:text-emerald-300'
+                          : student.coverUnlockRequestedAt > 0
+                          ? 'bg-amber-500 hover:bg-amber-600 border-amber-600 text-white shadow-xs'
+                          : 'bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-amber-500/15 border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-200'
+                      }`}
+                    >
+                      {studentHasCoverPermission ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã Mở Ảnh Nền
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="w-3.5 h-3.5" />{' '}
+                          {student.coverUnlockRequestedAt > 0
+                            ? `Duyệt Mở Ảnh Nền (${unlockPriceLabel})`
+                            : `Mở Khóa Ảnh Nền (${unlockPriceLabel})`}
+                        </>
+                      )}
                     </button>
                   )}
                   {isSelf && onOpenAccountSecurity && (
@@ -1929,6 +1978,7 @@ export default function StudentProfile({
               {(() => {
                 const previewBanner = getProfileBannerById(customDraft.profileBannerId);
                 const previewCoverOk = Boolean(
+                  canUseCustomCover &&
                   customDraft.profileCoverUrl &&
                   (customDraft.profileCoverUrl.startsWith('data:image/') || customDraft.profileCoverUrl.startsWith('https://'))
                 );
@@ -1993,57 +2043,87 @@ export default function StudentProfile({
                 </div>
               </div>
 
-              {/* Custom Wallpaper Image Upload or URL */}
+              {/* Custom Wallpaper Image Upload or 5k Paywall */}
               <div className="space-y-2">
-                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Hoặc Tải Ảnh Hình Nền Riêng Từ Máy
-                </label>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold cursor-pointer hover:opacity-90 transition">
-                    <Upload className="w-3.5 h-3.5" /> Chọn Ảnh Hình Nền
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async e => {
-                        const file = e.target.files?.[0];
-                        e.target.value = '';
-                        if (!file) return;
-                        try {
-                          const rawDataUrl = await readImageFileAsDataUrl(file);
-                          setCoverCropSource(rawDataUrl);
-                        } catch (err) {
-                          showToast?.(err?.message || 'Không thể tải ảnh hình nền.', 'error');
-                        }
-                      }}
-                    />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Hoặc Tải Ảnh Hình Nền Riêng Từ Máy
                   </label>
-                  {customDraft.profileCoverUrl?.startsWith('data:image/') && (
-                    <button
-                      type="button"
-                      onClick={() => setCoverCropSource(customDraft.profileCoverUrl)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#EDFFFD] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-teal-200 dark:border-teal-800 text-xs font-bold hover:bg-teal-100/70 transition"
-                    >
-                      <Crop className="w-3.5 h-3.5" /> Cắt lại ảnh nền
-                    </button>
-                  )}
-                  {customDraft.profileCoverUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setCustomDraft(prev => ({ ...prev, profileCoverUrl: '' }))}
-                      className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-500/30"
-                    >
-                      Xóa ảnh nền riêng
-                    </button>
+                  {canUseCustomCover ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                      <CheckCircle2 className="w-3 h-3" />{' '}
+                      {isTargetTeacher || isTargetSystemAdmin ? 'Miễn phí Giáo viên / Admin' : 'Đã mở khóa Ảnh Nền Riêng'}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/40 text-[10px] font-extrabold text-amber-800 dark:text-amber-200">
+                      <Lock className="w-3 h-3" /> Giá mở khóa {unlockPriceLabel}
+                    </span>
                   )}
                 </div>
-                <input
-                  type="url"
-                  value={customDraft.profileCoverUrl?.startsWith('https://') ? customDraft.profileCoverUrl : ''}
-                  onChange={e => setCustomDraft(prev => ({ ...prev, profileCoverUrl: e.target.value.trim() }))}
-                  placeholder="Hoặc dán URL ảnh https://... (tùy chọn)"
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100"
-                />
+
+                {canUseCustomCover ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold cursor-pointer hover:opacity-90 transition">
+                        <Upload className="w-3.5 h-3.5" /> Chọn Ảnh Hình Nền
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async e => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            if (!file) return;
+                            try {
+                              const rawDataUrl = await readImageFileAsDataUrl(file);
+                              setCoverCropSource(rawDataUrl);
+                            } catch (err) {
+                              showToast?.(err?.message || 'Không thể tải ảnh hình nền.', 'error');
+                            }
+                          }}
+                        />
+                      </label>
+                      {customDraft.profileCoverUrl?.startsWith('data:image/') && (
+                        <button
+                          type="button"
+                          onClick={() => setCoverCropSource(customDraft.profileCoverUrl)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#EDFFFD] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-teal-200 dark:border-teal-800 text-xs font-bold hover:bg-teal-100/70 transition"
+                        >
+                          <Crop className="w-3.5 h-3.5" /> Cắt lại ảnh nền
+                        </button>
+                      )}
+                      {customDraft.profileCoverUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomDraft(prev => ({ ...prev, profileCoverUrl: '' }))}
+                          className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-500/30"
+                        >
+                          Xóa ảnh nền riêng
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="url"
+                      value={customDraft.profileCoverUrl?.startsWith('https://') ? customDraft.profileCoverUrl : ''}
+                      onChange={e => setCustomDraft(prev => ({ ...prev, profileCoverUrl: e.target.value.trim() }))}
+                      placeholder="Hoặc dán URL ảnh https://... (tùy chọn)"
+                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100"
+                    />
+                  </>
+                ) : (
+                  <CoverUnlockQrCard
+                    username={student.username}
+                    paymentConfig={paymentConfig}
+                    requestedAt={student.coverUnlockRequestedAt}
+                    requesting={isRequestingCoverUnlock}
+                    onRequestUnlock={onRequestCoverUnlock ? async () => {
+                      setIsRequestingCoverUnlock(true);
+                      await onRequestCoverUnlock();
+                      setIsRequestingCoverUnlock(false);
+                    } : null}
+                    showToast={showToast}
+                  />
+                )}
               </div>
 
               {/* Avatar Frame Picker */}
@@ -2121,7 +2201,10 @@ export default function StudentProfile({
                 onClick={async () => {
                   if (!handleUpdateUserProfileFields || isSavingProfileTheme) return;
                   setIsSavingProfileTheme(true);
-                  await handleUpdateUserProfileFields(student.username, customDraft);
+                  const safeDraft = canUseCustomCover
+                    ? customDraft
+                    : { ...customDraft, profileCoverUrl: '' };
+                  await handleUpdateUserProfileFields(student.username, safeDraft);
                   setIsSavingProfileTheme(false);
                   setShowCustomizeModal(false);
                 }}

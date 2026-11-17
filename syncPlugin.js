@@ -20,6 +20,11 @@ import {
   maskEmailAddress,
   sendTransactionalEmail
 } from './mailService.js';
+import {
+  formatVndCurrency,
+  hasCustomCoverPermission,
+  normalizePaymentConfig
+} from './src/constants/profileCustomization.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -461,6 +466,10 @@ function sanitizeUserForViewer(user, viewer) {
     equippedTitleId: typeof user.equippedTitleId === 'string' && user.equippedTitleId ? user.equippedTitleId : 'newbie',
     showTitleBadge: user.showTitleBadge !== false,
     grantedTitleIds: Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String).filter(Boolean) : [],
+    customCoverUnlocked: hasCustomCoverPermission(user),
+    customCoverUnlockedAt: Number(user.customCoverUnlockedAt) || 0,
+    customCoverUnlockedBy: typeof user.customCoverUnlockedBy === 'string' ? user.customCoverUnlockedBy : '',
+    coverUnlockRequestedAt: Number(user.coverUnlockRequestedAt) || 0,
     loginDays: Array.isArray(user.loginDays) ? user.loginDays : [],
     emailVerified: Boolean(user.email && user.emailVerified),
     maskedEmail: user.email && user.emailVerified ? maskEmailAddress(user.email) : ''
@@ -738,6 +747,7 @@ function createInitialStore(audioDir = '') {
     adminFeedbacks: [],
     notifications: [],
     aiConfig: { geminiApiKey: '' },
+    paymentConfig: normalizePaymentConfig({}),
     mailConfig: {
       provider: 'none',
       resendApiKey: '',
@@ -883,6 +893,9 @@ function applyParsedStoreSnapshot(store, parsed) {
     store.aiConfig = {
       geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
     };
+  }
+  if (parsed.paymentConfig && typeof parsed.paymentConfig === 'object') {
+    store.paymentConfig = normalizePaymentConfig(parsed.paymentConfig);
   }
   if (parsed.mailConfig && typeof parsed.mailConfig === 'object') {
     store.mailConfig = {
@@ -1252,6 +1265,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: {},
       customVocabTopics: [],
       customTitles: [],
+      paymentConfig: null,
       supportAdminProfile: null,
       adminFeedbacks: [],
       notifications: [],
@@ -1310,6 +1324,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
+      paymentConfig: normalizePaymentConfig(store.paymentConfig),
       ...adminFields,
       notifications,
       sentNotifications
@@ -1394,6 +1409,7 @@ function getSnapshotForViewer(store, viewer = null) {
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
     customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
+    paymentConfig: normalizePaymentConfig(store.paymentConfig),
     ...adminFields,
     notifications,
     sentNotifications: []
@@ -1437,6 +1453,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'UPSERT_VOCAB_TOPIC',
     'DELETE_VOCAB_TOPIC',
     'SET_AI_CONFIG',
+    'UPDATE_PAYMENT_CONFIG',
     'CREATE_NOTIFICATION',
     'DELETE_NOTIFICATION'
   ]);
@@ -1558,7 +1575,39 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         if (payload.user.role === 'teacher' || payload.user.isSuperAdmin) {
           return { allowed: false, status: 403, error: 'Không có quyền nâng cấp vai trò tài khoản.' };
         }
+        const incomingCover = String(payload.user.profileCoverUrl || '').trim();
+        if (incomingCover && !hasCustomCoverPermission(targetExisting || viewer)) {
+          const priceLabel = formatVndCurrency(store.paymentConfig?.coverUnlockPrice);
+          return {
+            allowed: false,
+            status: 403,
+            error: `Tính năng tải Ảnh Nền Riêng có giá ${priceLabel}. Vui lòng chuyển khoản và chờ Giáo viên/Quản trị mở khóa!`
+          };
+        }
         return { allowed: true };
+      }
+      return { allowed: true };
+    }
+
+    case 'TOGGLE_USER_COVER_UNLOCK': {
+      if (!isTeacher) {
+        return { allowed: false, status: 403, error: 'Chỉ Giáo viên hoặc Quản trị mới có quyền mở khóa Ảnh Nền cho học viên.' };
+      }
+      const targetKey = findUserKeyInStore(store, payload?.username);
+      const targetUser = targetKey ? store.users?.[targetKey] : null;
+      if (!targetKey || !targetUser) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy tài khoản học viên.' };
+      }
+      if ((targetUser.isSuperAdmin || targetKey === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Không thể chỉnh sửa tài khoản Quản trị hệ thống.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'REQUEST_COVER_UNLOCK': {
+      const me = store.users?.[viewer.username] || viewer;
+      if (hasCustomCoverPermission(me)) {
+        return { allowed: false, status: 400, error: 'Tài khoản của bạn đã mở khóa quyền Ảnh Nền Riêng rồi!' };
       }
       return { allowed: true };
     }
@@ -1734,6 +1783,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
   if (!isTeacher && prevUser) {
     // Student may only update non-privilege profile fields on own account
     const mergedAckSelf = mergeAcknowledgedTitleIds(prevUser.acknowledgedTitleIds, rawUser.acknowledgedTitleIds);
+    const hasCoverPerm = hasCustomCoverPermission(prevUser);
     const cleanSelf = {
       ...prevUser,
       name: typeof rawUser.name === 'string' && rawUser.name.trim() ? rawUser.name.trim() : prevUser.name,
@@ -1741,12 +1791,16 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       targetBand: rawUser.targetBand ?? prevUser.targetBand,
       studyGoal: rawUser.studyGoal ?? prevUser.studyGoal,
       profileBannerId: typeof rawUser.profileBannerId === 'string' && rawUser.profileBannerId ? rawUser.profileBannerId.slice(0, 40) : (prevUser.profileBannerId || 'ocean'),
-      profileCoverUrl: sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, false),
+      profileCoverUrl: hasCoverPerm ? sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, false) : '',
       avatarFrameId: typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none'),
       equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
       grantedTitleIds: Array.isArray(prevUser.grantedTitleIds) ? prevUser.grantedTitleIds : [],
+      customCoverUnlocked: Boolean(prevUser.customCoverUnlocked),
+      customCoverUnlockedAt: Number(prevUser.customCoverUnlockedAt) || 0,
+      customCoverUnlockedBy: typeof prevUser.customCoverUnlockedBy === 'string' ? prevUser.customCoverUnlockedBy : '',
+      coverUnlockRequestedAt: Number(prevUser.coverUnlockRequestedAt) || 0,
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
       emailVerifiedAt: prevUser.emailVerifiedAt || null
@@ -1765,6 +1819,19 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     } else {
       incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
     }
+    incoming.customCoverUnlocked =
+      incoming.customCoverUnlocked !== undefined
+        ? Boolean(incoming.customCoverUnlocked)
+        : Boolean(prevUser?.customCoverUnlocked);
+    incoming.customCoverUnlockedAt = incoming.customCoverUnlocked
+      ? (Number(prevUser?.customCoverUnlockedAt) || Date.now())
+      : 0;
+    incoming.customCoverUnlockedBy = incoming.customCoverUnlocked
+      ? (typeof prevUser?.customCoverUnlockedBy === 'string' && prevUser.customCoverUnlockedBy
+          ? prevUser.customCoverUnlockedBy
+          : (viewer?.username || ''))
+      : '';
+    incoming.coverUnlockRequestedAt = incoming.customCoverUnlocked ? 0 : (Number(prevUser?.coverUnlockRequestedAt) || 0);
     incoming.email = prevUser?.email || '';
     incoming.emailVerified = Boolean(prevUser?.email && prevUser?.emailVerified);
     incoming.emailVerifiedAt = prevUser?.emailVerifiedAt || null;
@@ -2590,6 +2657,56 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       break;
     }
 
+    case 'TOGGLE_USER_COVER_UNLOCK': {
+      const targetKey = findUserKeyInStore(store, payload?.username);
+      const targetUser = targetKey ? store.users?.[targetKey] : null;
+      if (!targetKey || !targetUser) break;
+      const unlocked = payload?.unlocked !== false;
+      store.users[targetKey] = {
+        ...targetUser,
+        customCoverUnlocked: unlocked,
+        customCoverUnlockedAt: unlocked ? Date.now() : 0,
+        customCoverUnlockedBy: unlocked ? (viewer?.username || '') : '',
+        coverUnlockRequestedAt: 0,
+        profileCoverUrl: unlocked ? (targetUser.profileCoverUrl || '') : ''
+      };
+      if (unlocked && targetUser.role !== 'teacher') {
+        const priceLabel = formatVndCurrency(store.paymentConfig?.coverUnlockPrice);
+        appendStoreNotification(
+          store,
+          {
+            title: '🖼️ Đã mở khóa Ảnh Nền Riêng!',
+            message: `${viewer?.name || 'Giáo viên'} đã xác nhận thanh toán ${priceLabel} và mở khóa quyền tải Ảnh Nền / Ảnh Bìa riêng cho hồ sơ của bạn.`,
+            type: 'announcement',
+            targetUsernames: [targetKey],
+            createdBy: viewer?.username || 'teacher_ielts',
+            createdByName: viewer?.name || 'Giáo viên'
+          },
+          viewer
+        );
+      }
+      changed = true;
+      break;
+    }
+
+    case 'REQUEST_COVER_UNLOCK': {
+      const uname = viewer?.username ? findUserKeyInStore(store, viewer.username) || viewer.username : '';
+      const targetUser = uname ? store.users?.[uname] : null;
+      if (!uname || !targetUser || hasCustomCoverPermission(targetUser)) break;
+      store.users[uname] = {
+        ...targetUser,
+        coverUnlockRequestedAt: Date.now()
+      };
+      changed = true;
+      break;
+    }
+
+    case 'UPDATE_PAYMENT_CONFIG': {
+      store.paymentConfig = normalizePaymentConfig(payload?.paymentConfig || payload);
+      changed = true;
+      break;
+    }
+
     case 'UPSERT_ATTEMPT': {
       let attempt = payload.attempt;
       if (!attempt?.id) break;
@@ -3004,6 +3121,9 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'UPSERT_CUSTOM_TITLE',
   'DELETE_CUSTOM_TITLE',
   'GRANT_USER_TITLES',
+  'TOGGLE_USER_COVER_UNLOCK',
+  'REQUEST_COVER_UNLOCK',
+  'UPDATE_PAYMENT_CONFIG',
   'SEED_DEFAULTS'
 ]);
 

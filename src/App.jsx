@@ -71,6 +71,7 @@ import Navbar from './components/common/Navbar';
 import GlobalModals from './components/modals/GlobalModals';
 import AccountSecurityModal from './components/modals/AccountSecurityModal';
 import MailConfigModal from './components/modals/MailConfigModal';
+import PaymentConfigModal from './components/modals/PaymentConfigModal';
 import AdminTitleManagerModal from './components/modals/AdminTitleManagerModal';
 import TitleUnlockedCelebrationModal from './components/modals/TitleUnlockedCelebrationModal';
 import AuthScreen from './pages/AuthScreen';
@@ -308,6 +309,8 @@ export default function App() {
   const [accountSecurityTab, setAccountSecurityTab] = useState(null); // null | 'password' | 'email'
   const [showMailConfigModal, setShowMailConfigModal] = useState(false);
   const [mailConfigured, setMailConfigured] = useState(false);
+  const [showPaymentConfigModal, setShowPaymentConfigModal] = useState(false);
+  const [paymentConfig, setPaymentConfig] = useState(null);
   const [syncHydrated, setSyncHydrated] = useState(false);
   const [localSeenTitlesMap, setLocalSeenTitlesMap] = useState(() => {
     try {
@@ -579,6 +582,40 @@ export default function App() {
         ? `Đã gỡ danh hiệu khỏi tài khoản ${targetName}.`
         : `Đã trao danh hiệu cho ${targetName}!`
     );
+    return true;
+  };
+
+  const handleToggleUserCoverUnlock = async (targetUsername, unlocked = true) => {
+    if (currentUser?.role !== 'teacher' || !targetUsername) return false;
+    const snap = await dispatchSyncAction('TOGGLE_USER_COVER_UNLOCK', {
+      username: targetUsername,
+      unlocked: Boolean(unlocked)
+    });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
+    const targetName = usersDb[targetUsername]?.name || targetUsername;
+    showToast(
+      unlocked
+        ? `Đã mở khóa quyền tải Ảnh Nền Riêng cho ${targetName}!`
+        : `Đã khóa lại quyền tải Ảnh Nền Riêng của ${targetName}.`,
+      unlocked ? 'success' : 'info'
+    );
+    return true;
+  };
+
+  const handleRequestCoverUnlock = async () => {
+    if (!currentUser?.username) return false;
+    const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', {});
+    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
+    showToast('Đã gửi yêu cầu mở khóa 5.000đ tới Giáo viên / Quản trị!');
+    return true;
+  };
+
+  const handleUpdatePaymentConfig = async (nextConfig) => {
+    if (currentUser?.role !== 'teacher') return false;
+    const snap = await dispatchSyncAction('UPDATE_PAYMENT_CONFIG', { paymentConfig: nextConfig });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
+    if (nextConfig) setPaymentConfig(nextConfig);
+    showToast('Đã lưu cấu hình QR chuyển khoản mở khóa Ảnh Nền!');
     return true;
   };
 
@@ -1328,6 +1365,9 @@ export default function App() {
     }
     if (Array.isArray(snap.customTitles)) {
       setCustomTitles(prev => (JSON.stringify(prev) === JSON.stringify(snap.customTitles) ? prev : snap.customTitles));
+    }
+    if (snap.paymentConfig && typeof snap.paymentConfig === 'object') {
+      setPaymentConfig(prev => (JSON.stringify(prev) === JSON.stringify(snap.paymentConfig) ? prev : snap.paymentConfig));
     }
     if (Array.isArray(snap.notifications)) {
       const nextNotifs = snap.notifications;
@@ -3166,6 +3206,8 @@ export default function App() {
     setFocusedTestId(null);
     setAccountSecurityTab(null);
     setShowMailConfigModal(false);
+    setShowPaymentConfigModal(false);
+    setPaymentConfig(null);
     setSyncHydrated(false);
     titleBaselinePersistedRef.current = '';
     serverBonusTotalRef.current = 0;
@@ -5912,7 +5954,10 @@ export default function App() {
           onGrantUserTitles={handleGrantUserTitles}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           onOpenAdminTitleManager={targetUsername => setAdminTitleModalState({ isOpen: true, targetUsername: targetUsername || null })}
+          onRequestCoverUnlock={handleRequestCoverUnlock}
+          onToggleUserCoverUnlock={handleToggleUserCoverUnlock}
           openStudentGamePortal={openStudentGamePortal}
+          paymentConfig={paymentConfig}
           previousView={previousView}
           roomsDb={roomsDb}
           selectedProfileStudent={selectedProfileStudent}
@@ -6148,6 +6193,9 @@ export default function App() {
             setShowApiKeyModal(true);
           }}
           onOpenMailConfig={() => setShowMailConfigModal(true)}
+          onOpenPaymentConfig={() => setShowPaymentConfigModal(true)}
+          onToggleUserCoverUnlock={handleToggleUserCoverUnlock}
+          paymentConfig={paymentConfig}
           setStudentSearchQuery={setStudentSearchQuery}
           setTeacherHubTab={setTeacherHubTab}
           setView={setView}
@@ -6284,6 +6332,16 @@ export default function App() {
           isOpen={true}
           onClose={() => setShowMailConfigModal(false)}
           onConfiguredChange={setMailConfigured}
+          showToast={showToast}
+        />
+      )}
+
+      {showPaymentConfigModal && currentUser?.role === 'teacher' && (
+        <PaymentConfigModal
+          isOpen={true}
+          paymentConfig={paymentConfig}
+          onClose={() => setShowPaymentConfigModal(false)}
+          onSave={handleUpdatePaymentConfig}
           showToast={showToast}
         />
       )}

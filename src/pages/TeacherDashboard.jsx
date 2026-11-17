@@ -34,6 +34,7 @@ import {
   PenTool,
   Play,
   Plus,
+  QrCode,
   RefreshCw,
   Rocket,
   Search,
@@ -67,7 +68,12 @@ import {
   normalizeExamConfig,
   normalizeSpeakingSection
 } from '../constants/seedData';
-import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
+import {
+  formatVndCurrency,
+  hasCustomCoverPermission,
+  normalizePaymentConfig,
+  resolveVisibleTitleBadge
+} from '../constants/profileCustomization';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
@@ -107,12 +113,15 @@ export default function TeacherDashboard({
   onOpenAdminTitleManager,
   onOpenApiKeyModal,
   onOpenMailConfig,
+  onOpenPaymentConfig = null,
+  onToggleUserCoverUnlock = null,
   onUpdateClassMembers,
   onUpsertClass,
   openExamBuilder,
   openMemberProfile,
   openSingleSkillBuilder,
   openTeacherGradingModal,
+  paymentConfig = null,
   roomsDb,
   serverClockOffsetMs = 0,
   setAddStudentMode,
@@ -200,8 +209,20 @@ export default function TeacherDashboard({
   const teacherAccountsCount = allAccounts.filter(u => u.role === 'teacher' && !u.isSuperAdmin).length;
   const studentAccounts = allAccounts.filter(u => u.role === 'student');
   const studentAccountsCount = studentAccounts.length;
+  const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
+  const qrConfigured = Boolean(normalizedPayCfg.customQrUrl || (normalizedPayCfg.bankCode && normalizedPayCfg.accountNumber));
+  const coverPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
+  const pendingCoverRequestCount = studentAccounts.filter(
+    u => !hasCustomCoverPermission(u) && Number(u.coverUnlockRequestedAt) > 0
+  ).length;
   const filteredAccounts = allAccounts.filter(u => {
-    if (accountRoleFilter !== 'all' && u.role !== accountRoleFilter) return false;
+    if (accountRoleFilter === 'cover_pending') {
+      if (u.role !== 'student' || hasCustomCoverPermission(u) || !(Number(u.coverUnlockRequestedAt) > 0)) {
+        return false;
+      }
+    } else if (accountRoleFilter !== 'all' && u.role !== accountRoleFilter) {
+      return false;
+    }
     const q = studentSearchQuery.toLowerCase();
     return (u.name || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q);
   });
@@ -1060,7 +1081,7 @@ export default function TeacherDashboard({
             );
           })}
         </div>
-        {(onOpenMailConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
+        {(onOpenMailConfig || onOpenPaymentConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
           <div className="flex flex-wrap items-center gap-2">
             {onOpenMailConfig && (
               <button
@@ -1073,6 +1094,19 @@ export default function TeacherDashboard({
                 }`}
               >
                 <Mail className="w-3.5 h-3.5" /> Email OTP: {mailConfigured ? 'Đang bật' : 'Chưa cài'}
+              </button>
+            )}
+            {onOpenPaymentConfig && (
+              <button
+                type="button"
+                onClick={onOpenPaymentConfig}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border inline-flex items-center gap-1.5 ${
+                  qrConfigured
+                    ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
+                    : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-500/35'
+                }`}
+              >
+                <QrCode className="w-3.5 h-3.5" /> QR Ảnh Nền ({coverPriceLabel})
               </button>
             )}
             {onOpenApiKeyModal && (
@@ -1141,7 +1175,7 @@ export default function TeacherDashboard({
             </div>
           ))}
 
-          {(onOpenMailConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
+          {(onOpenMailConfig || onOpenPaymentConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
               <p className="px-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Cài Đặt &amp; Quản Trị
@@ -1164,6 +1198,27 @@ export default function TeacherDashboard({
                     }`}
                   >
                     {mailConfigured ? 'Bật' : 'Cài đặt'}
+                  </span>
+                </button>
+              )}
+              {onOpenPaymentConfig && (
+                <button
+                  type="button"
+                  onClick={onOpenPaymentConfig}
+                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2"
+                >
+                  <span className="flex items-center gap-2.5 min-w-0 truncate">
+                    <QrCode className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                    <span className="truncate">QR Ảnh Nền ({coverPriceLabel})</span>
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                      qrConfigured
+                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200'
+                    }`}
+                  >
+                    {qrConfigured ? 'Đã cài' : 'Cài đặt'}
                   </span>
                 </button>
               )}
@@ -1946,6 +2001,15 @@ export default function TeacherDashboard({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                {onOpenPaymentConfig && (
+                  <button
+                    type="button"
+                    onClick={onOpenPaymentConfig}
+                    className="px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold transition flex items-center gap-1.5"
+                  >
+                    <QrCode className="w-3.5 h-3.5" /> Cài Đặt QR ({coverPriceLabel})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -2004,6 +2068,19 @@ export default function TeacherDashboard({
                 >
                   <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên ({teacherAccountsCount})
                 </button>
+                {pendingCoverRequestCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAccountRoleFilter('cover_pending')}
+                    className={`px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 ${
+                      accountRoleFilter === 'cover_pending'
+                        ? 'bg-rose-600 text-white border-rose-600'
+                        : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-500/40 hover:bg-amber-100'
+                    }`}
+                  >
+                    <Unlock className="w-3.5 h-3.5" /> Chờ duyệt ảnh nền {coverPriceLabel} ({pendingCoverRequestCount})
+                  </button>
+                )}
               </div>
 
               <div className="relative w-full sm:w-72">
@@ -2157,6 +2234,45 @@ export default function TeacherDashboard({
                                     ? `✓ Email OTP: ${account.email || account.maskedEmail}`
                                     : 'Chưa liên kết Email OTP'}
                                 </p>
+                                {account.role === 'student' && onToggleUserCoverUnlock && (() => {
+                                  const isCoverUnlocked = hasCustomCoverPermission(account);
+                                  const isPendingCover = !isCoverUnlocked && Number(account.coverUnlockRequestedAt) > 0;
+                                  return (
+                                    <div className="mt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (isCoverUnlocked && !window.confirm(`Khóa lại quyền tải Ảnh Nền Riêng của ${account.name || account.username}?`)) {
+                                            return;
+                                          }
+                                          onToggleUserCoverUnlock(account.username, !isCoverUnlocked);
+                                        }}
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition ${
+                                          isCoverUnlocked
+                                            ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35 hover:bg-emerald-100'
+                                            : isPendingCover
+                                            ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600 shadow-xs'
+                                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400 hover:text-amber-700 dark:hover:text-amber-300'
+                                        }`}
+                                        title={isCoverUnlocked ? 'Bấm để khóa lại quyền tải ảnh nền' : `Bấm để mở khóa quyền Ảnh Nền Riêng (${coverPriceLabel})`}
+                                      >
+                                        {isCoverUnlocked ? (
+                                          <>
+                                            <CheckCircle2 className="w-2.5 h-2.5" /> Mở Ảnh Nền
+                                          </>
+                                        ) : isPendingCover ? (
+                                          <>
+                                            <Unlock className="w-2.5 h-2.5" /> Duyệt Mở Ảnh Nền ({coverPriceLabel})
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Lock className="w-2.5 h-2.5" /> Khóa Ảnh Nền ({coverPriceLabel})
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                })()}
                                 {account.role === 'student' && (() => {
                                   const clsIds = getUserClassIds(classesDb, account.username);
                                   const clsNames = getAssignedClassNames(clsIds, classesDb);

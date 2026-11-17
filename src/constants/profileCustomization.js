@@ -754,3 +754,108 @@ export function evaluateTitleUnlockNotification({
     newlyUnlockedItems: sortTitlesByPrestige(freshItems)
   };
 }
+
+// ==========================================
+// CUSTOM PROFILE COVER UNLOCK (5.000đ / VIETQR)
+// ==========================================
+
+export const CUSTOM_COVER_UNLOCK_PRICE_VND = 5000;
+
+export const VIETQR_BANK_OPTIONS = [
+  { code: 'MB', name: 'MB Bank (Quân Đội)' },
+  { code: 'VCB', name: 'Vietcombank' },
+  { code: 'TCB', name: 'Techcombank' },
+  { code: 'BIDV', name: 'BIDV' },
+  { code: 'ICB', name: 'VietinBank' },
+  { code: 'ACB', name: 'ACB' },
+  { code: 'VPB', name: 'VPBank' },
+  { code: 'TPB', name: 'TPBank' },
+  { code: 'STB', name: 'Sacombank' },
+  { code: 'SHB', name: 'SHB' },
+  { code: 'VIB', name: 'VIB' },
+  { code: 'MSB', name: 'MSB' },
+  { code: 'HDB', name: 'HDBank' },
+  { code: 'OCB', name: 'OCB' },
+  { code: 'CAKE', name: 'CAKE by VPBank' },
+  { code: 'TIMO', name: 'Timo (BVBank)' }
+];
+
+export function hasCustomCoverPermission(user) {
+  if (!user || typeof user !== 'object') return false;
+  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
+  if (user.role === 'teacher') return true;
+  return Boolean(user.customCoverUnlocked);
+}
+
+export function formatVndCurrency(amount = CUSTOM_COVER_UNLOCK_PRICE_VND) {
+  const num = Number(amount);
+  const safe = Number.isFinite(num) && num >= 0 ? Math.round(num) : CUSTOM_COVER_UNLOCK_PRICE_VND;
+  return `${safe.toLocaleString('vi-VN')}đ`;
+}
+
+export function buildCoverUnlockTransferNote(username = '') {
+  const cleaned = String(username || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+    .slice(0, 24);
+  return `MOKHOANEN ${cleaned || 'HOCVIEN'}`;
+}
+
+export function normalizePaymentConfig(raw = {}) {
+  const obj = raw && typeof raw === 'object' ? raw : {};
+  const rawPrice = Number(obj.coverUnlockPrice);
+  const coverUnlockPrice =
+    Number.isFinite(rawPrice) && rawPrice >= 0
+      ? Math.min(10_000_000, Math.round(rawPrice))
+      : CUSTOM_COVER_UNLOCK_PRICE_VND;
+
+  const bankCode = String(obj.bankCode || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 20);
+  const matchedBank = VIETQR_BANK_OPTIONS.find(b => b.code === bankCode);
+  const bankName = String(obj.bankName || matchedBank?.name || '').trim().slice(0, 80);
+  const accountNumber = String(obj.accountNumber || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .slice(0, 40);
+  const accountName = String(obj.accountName || '').trim().slice(0, 80);
+  const paymentNoteHint = String(obj.paymentNoteHint || '').trim().slice(0, 160);
+
+  const rawQr = String(obj.customQrUrl || '').trim();
+  const customQrUrl =
+    (rawQr.startsWith('data:image/') || rawQr.startsWith('https://')) && rawQr.length <= 500_000
+      ? rawQr
+      : '';
+
+  return {
+    coverUnlockPrice,
+    bankCode,
+    bankName,
+    accountNumber,
+    accountName,
+    customQrUrl,
+    paymentNoteHint
+  };
+}
+
+export function buildVietQrImageUrl({
+  bankCode = '',
+  accountNumber = '',
+  accountName = '',
+  amount = CUSTOM_COVER_UNLOCK_PRICE_VND,
+  addInfo = ''
+} = {}) {
+  const cleanBank = String(bankCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cleanAccount = String(accountNumber || '').trim().replace(/[^a-zA-Z0-9]/g, '');
+  if (!cleanBank || !cleanAccount || cleanAccount.length < 4) return '';
+  const safeAmount = Math.max(0, Math.round(Number(amount) || CUSTOM_COVER_UNLOCK_PRICE_VND));
+  const params = new URLSearchParams();
+  if (safeAmount > 0) params.set('amount', String(safeAmount));
+  if (addInfo) params.set('addInfo', String(addInfo).trim().slice(0, 60));
+  if (accountName) params.set('accountName', String(accountName).trim().slice(0, 80));
+  const query = params.toString();
+  return `https://img.vietqr.io/image/${encodeURIComponent(cleanBank)}-${encodeURIComponent(cleanAccount)}-compact2.png${query ? `?${query}` : ''}`;
+}
