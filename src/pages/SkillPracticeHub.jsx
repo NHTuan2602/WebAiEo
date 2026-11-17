@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   BookOpen,
@@ -17,7 +17,15 @@ import {
   Sparkles
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import { getListeningTracks, getReadingPassages, getSpeakingQuestionItems, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
+import {
+  evaluateTestSchedule,
+  formatViDateTime,
+  getListeningTracks,
+  getReadingPassages,
+  getSpeakingQuestionItems,
+  normalizeExamConfig,
+  normalizeSpeakingSection
+} from '../constants/seedData';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 
 export default function SkillPracticeHub({
@@ -25,16 +33,25 @@ export default function SkillPracticeHub({
   aiConfigured = false,
   attempts = [],
   currentUser,
+  focusedTestId = null,
   onChangeTab,
+  onClearFocusedTest,
   onOpenFullExamCatalog,
   onOpenResult,
   onOpenSkillBuilder,
   onStartSingleSkillExam,
   onStartSpeakingExam,
+  serverClockOffsetMs = 0,
   tests = []
 }) {
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, []);
   const isTeacher = currentUser?.role === 'teacher';
+  const serverNowMs = nowMs + serverClockOffsetMs;
 
   const singleSkillTests = tests.filter(t => {
     const cfg = normalizeExamConfig(t);
@@ -82,6 +99,8 @@ export default function SkillPracticeHub({
     };
     const meta = metaMap[skillId] || metaMap.reading;
     const IconComp = meta.icon;
+    const focusedMatch = focusedTestId ? list.find(t => t.id === focusedTestId) : null;
+    const displayedList = focusedMatch ? [focusedMatch] : list;
 
     return (
       <div className="space-y-6">
@@ -108,7 +127,22 @@ export default function SkillPracticeHub({
           )}
         </div>
 
-        {list.length === 0 ? (
+        {focusedMatch && onClearFocusedTest && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/40 border border-[#007A7A]/40 dark:border-[#1EE1D6]/30">
+            <span className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
+              📌 Đang hiển thị bài tập từ thông báo
+            </span>
+            <button
+              type="button"
+              onClick={onClearFocusedTest}
+              className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-[#007A7A] transition"
+            >
+              ← Xem tất cả bài {meta.name} ({list.length})
+            </button>
+          </div>
+        )}
+
+        {displayedList.length === 0 ? (
           <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-dashed border-pink-300 dark:border-[#34323F] rounded-3xl p-10 text-center space-y-3">
             <IconComp className="w-10 h-10 mx-auto text-slate-400" />
             <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
@@ -122,10 +156,17 @@ export default function SkillPracticeHub({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {list.map(test => {
+            {displayedList.map(test => {
               const cfg = normalizeExamConfig(test);
+              const schedule = evaluateTestSchedule(cfg, serverNowMs);
               const usedCount = myAttempts.filter(a => a.testId === test.id).length;
               const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
+              const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
+              const lockText = isExhausted
+                ? 'Đã hết lượt'
+                : schedule.notYetOpen
+                ? `Mở lúc ${formatViDateTime(schedule.openAt)}`
+                : 'Đã hết hạn nộp';
               const qCount =
                 skillId === 'listening'
                   ? (test.listening?.questions?.length || 0)
@@ -142,7 +183,11 @@ export default function SkillPracticeHub({
               return (
                 <div
                   key={test.id}
-                  className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-2xl p-5 flex flex-col justify-between gap-4 hover:border-[#570DF8]/60 transition"
+                  className={`bg-[#FFF5F8] dark:bg-[#191820] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition ${
+                    focusedMatch?.id === test.id
+                      ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                      : 'border-pink-200/90 dark:border-[#2C2A35] hover:border-[#570DF8]/60'
+                  }`}
                 >
                   <div className="space-y-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -170,21 +215,40 @@ export default function SkillPracticeHub({
                     <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                       Nội dung: {subCountLabel}
                     </p>
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                      {cfg.scheduleMode === 'flexible' ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
+                        </span>
+                      ) : schedule.lockedBySchedule ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> {schedule.notYetOpen ? `Mở lúc ${formatViDateTime(schedule.openAt)}` : `Đã hết hạn (${formatViDateTime(schedule.dueAt)})`}
+                        </span>
+                      ) : schedule.isLateWindow ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn cho làm (báo trễ)
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      disabled={isExhausted}
+                      disabled={isLocked}
                       onClick={() => onStartSingleSkillExam?.(test.id)}
                       className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
-                        isExhausted
+                        isLocked
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                           : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
                       }`}
                     >
-                      {isExhausted ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                      <span>{isExhausted ? 'Đã hết lượt' : `Bắt đầu làm ${skillId.toUpperCase()}`}</span>
+                      {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                      <span>{isLocked ? lockText : `Bắt đầu làm ${skillId.toUpperCase()}`}</span>
                     </button>
                     {isTeacher && (
                       <button
@@ -320,9 +384,35 @@ export default function SkillPracticeHub({
 
         {/* MAIN LUYENNOI-STYLE WORKSPACE */}
         <main className="flex-1 min-w-0 space-y-8">
-          {(activeTab === 'speaking' || activeTab === 'forecast') ? (
+          {(activeTab === 'speaking' || activeTab === 'forecast') ? (() => {
+            const activeSpeakingList = activeTab === 'forecast' ? forecastTests : speakingTests;
+            const focusedSpeakingMatch = focusedTestId ? activeSpeakingList.find(t => t.id === focusedTestId) : null;
+            const displayedSpeakingList = focusedSpeakingMatch ? [focusedSpeakingMatch] : activeSpeakingList;
+            const featuredSchedule = featuredSpeakingTest ? evaluateTestSchedule(featuredSpeakingTest, serverNowMs) : null;
+            const featuredUsedCount = featuredSpeakingTest ? myAttempts.filter(a => a.testId === featuredSpeakingTest.id).length : 0;
+            const featuredCfg = featuredSpeakingTest ? normalizeExamConfig(featuredSpeakingTest) : null;
+            const featuredExhausted = Boolean(featuredCfg && featuredCfg.maxAttempts > 0 && featuredUsedCount >= featuredCfg.maxAttempts);
+            const featuredLocked = featuredExhausted || Boolean(!isTeacher && featuredSchedule?.lockedBySchedule);
+
+            return (
             <>
-              {/* Hero Row + Heatmap (Matching Luyennoi /take-test/home Screenshot!) */}
+              {focusedSpeakingMatch && onClearFocusedTest && (
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/40 border border-[#007A7A]/40 dark:border-[#1EE1D6]/30">
+                  <span className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
+                    📌 Đang hiển thị bài tập từ thông báo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onClearFocusedTest}
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-[#007A7A] transition"
+                  >
+                    ← Xem tất cả bài {activeTab === 'forecast' ? 'Forecast' : 'Speaking AI'} ({activeSpeakingList.length})
+                  </button>
+                </div>
+              )}
+
+              {/* Hero Row + Heatmap (hidden when focused from a notification so only that card renders) */}
+              {!focusedSpeakingMatch && (
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-center">
                 <div className="xl:col-span-7 space-y-4">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#570DF8]/12 dark:bg-[#570DF8]/25 border border-[#570DF8]/25 text-[#570DF8] dark:text-[#C4B5FD] text-[11px] font-bold">
@@ -348,11 +438,16 @@ export default function SkillPracticeHub({
                       <div className="flex flex-wrap items-center gap-3">
                         <button
                           type="button"
+                          disabled={featuredLocked}
                           onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'full')}
-                          className="px-7 py-3 rounded-2xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-sm font-extrabold uppercase tracking-wide shadow-lg shadow-indigo-900/20 flex items-center gap-2 transition active:scale-[0.99]"
+                          className={`px-7 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wide flex items-center gap-2 transition ${
+                            featuredLocked
+                              ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                              : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-lg shadow-indigo-900/20 active:scale-[0.99]'
+                          }`}
                         >
-                          <Mic className="w-4 h-4" />
-                          <span>FULL TEST</span>
+                          {featuredLocked ? <Lock className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                          <span>{featuredLocked ? 'Đã Khóa / Hết Hạn' : 'FULL TEST'}</span>
                         </button>
                         {isTeacher && (
                           <button
@@ -372,7 +467,7 @@ export default function SkillPracticeHub({
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            disabled={!featuredSpMeta?.part1?.enabled}
+                            disabled={featuredLocked || !featuredSpMeta?.part1?.enabled}
                             onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'part1')}
                             className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
                           >
@@ -380,7 +475,7 @@ export default function SkillPracticeHub({
                           </button>
                           <button
                             type="button"
-                            disabled={!featuredSpMeta?.part2?.enabled}
+                            disabled={featuredLocked || !featuredSpMeta?.part2?.enabled}
                             onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'part2')}
                             className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
                           >
@@ -388,7 +483,7 @@ export default function SkillPracticeHub({
                           </button>
                           <button
                             type="button"
-                            disabled={!featuredSpMeta?.part3?.enabled}
+                            disabled={featuredLocked || !featuredSpMeta?.part3?.enabled}
                             onClick={() => onStartSpeakingExam?.(featuredSpeakingTest.id, 'part3')}
                             className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
                           >
@@ -409,6 +504,7 @@ export default function SkillPracticeHub({
                   <SpeakingHeatmapCard attempts={myAttempts} />
                 </div>
               </div>
+              )}
 
               {/* Kho Bài Tập Speaking Của Lớp */}
               <section className="space-y-4">
@@ -424,8 +520,9 @@ export default function SkillPracticeHub({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(activeTab === 'forecast' ? forecastTests : speakingTests).map(test => {
+                  {displayedSpeakingList.map(test => {
                     const cfg = normalizeExamConfig(test);
+                    const schedule = evaluateTestSchedule(cfg, serverNowMs);
                     const sp = normalizeSpeakingSection(test.speaking);
                     const totalItems = getSpeakingQuestionItems(sp, 'all').length;
                     const p1Count = sp.part1.enabled ? (sp.part1.questions?.length || 0) : 0;
@@ -433,11 +530,21 @@ export default function SkillPracticeHub({
                     const p3Count = sp.part3.enabled ? (sp.part3.questions?.length || 0) : 0;
                     const usedCount = myAttempts.filter(a => a.testId === test.id).length;
                     const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
+                    const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
+                    const lockText = isExhausted
+                      ? 'Đã hết lượt'
+                      : schedule.notYetOpen
+                      ? `Mở lúc ${formatViDateTime(schedule.openAt)}`
+                      : 'Đã hết hạn nộp';
 
                     return (
                       <div
                         key={test.id}
-                        className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-2xl p-5 flex flex-col justify-between gap-4 hover:border-[#570DF8]/60 transition"
+                        className={`bg-[#FFF5F8] dark:bg-[#191820] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition ${
+                          focusedSpeakingMatch?.id === test.id
+                            ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                            : 'border-pink-200/90 dark:border-[#2C2A35] hover:border-[#570DF8]/60'
+                        }`}
                       >
                         <div className="space-y-2.5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -475,24 +582,44 @@ export default function SkillPracticeHub({
                             {p2Count > 0 && <span className="px-2 py-0.5 rounded-lg bg-white/80 dark:bg-[#23222B] border border-pink-200/70 dark:border-[#34323F]">P2: Cue Card</span>}
                             {p3Count > 0 && <span className="px-2 py-0.5 rounded-lg bg-white/80 dark:bg-[#23222B] border border-pink-200/70 dark:border-[#34323F]">P3: {p3Count} câu</span>}
                           </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                            {cfg.scheduleMode === 'flexible' ? (
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
+                              </span>
+                            ) : schedule.lockedBySchedule ? (
+                              <span className="px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> {schedule.notYetOpen ? `Mở lúc ${formatViDateTime(schedule.openAt)}` : `Đã hết hạn (${formatViDateTime(schedule.dueAt)})`}
+                              </span>
+                            ) : schedule.isLateWindow ? (
+                              <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn cho làm (báo trễ)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           <button
                             type="button"
-                            disabled={isExhausted}
+                            disabled={isLocked}
                             onClick={() => onStartSpeakingExam?.(test.id, 'full')}
                             className={`flex-1 py-2.5 px-3.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
-                              isExhausted
+                              isLocked
                                 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                                 : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
                             }`}
                           >
-                            {isExhausted ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                            <span>{isExhausted ? 'Đã hết lượt' : 'Full Test'}</span>
+                            {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                            <span>{isLocked ? lockText : 'Full Test'}</span>
                           </button>
 
-                          {!isExhausted && p1Count > 0 && (
+                          {!isLocked && p1Count > 0 && (
                             <button
                               type="button"
                               onClick={() => onStartSpeakingExam?.(test.id, 'part1')}
@@ -501,7 +628,7 @@ export default function SkillPracticeHub({
                               P1
                             </button>
                           )}
-                          {!isExhausted && p2Count > 0 && (
+                          {!isLocked && p2Count > 0 && (
                             <button
                               type="button"
                               onClick={() => onStartSpeakingExam?.(test.id, 'part2')}
@@ -510,7 +637,7 @@ export default function SkillPracticeHub({
                               P2
                             </button>
                           )}
-                          {!isExhausted && p3Count > 0 && (
+                          {!isLocked && p3Count > 0 && (
                             <button
                               type="button"
                               onClick={() => onStartSpeakingExam?.(test.id, 'part3')}
@@ -600,7 +727,8 @@ export default function SkillPracticeHub({
                 )}
               </section>
             </>
-          ) : (
+            );
+          })() : (
             renderSkillTestCards(
               activeTab,
               activeTab === 'listening'

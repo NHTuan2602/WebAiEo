@@ -87,13 +87,74 @@ export const AVATAR_FRAMES = [
   }
 ];
 
+export function getVietnamDateKey(ts = Date.now()) {
+  const num = Number(ts) || Date.now();
+  return new Date(num + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function dateKeyToDayIndex(dateKey) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || '').trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return Math.floor(Date.UTC(y, mo - 1, d) / 86_400_000);
+}
+
+export function computeLoginDayMetrics(loginDays = [], todayKey = getVietnamDateKey()) {
+  const dayIndices = Array.from(
+    new Set(
+      (Array.isArray(loginDays) ? loginDays : [])
+        .map(dateKeyToDayIndex)
+        .filter(v => v !== null)
+    )
+  ).sort((a, b) => a - b);
+
+  if (dayIndices.length === 0) {
+    return { totalLoginDays: 0, currentStreak: 0, bestStreak: 0 };
+  }
+
+  let bestStreak = 1;
+  let running = 1;
+  for (let i = 1; i < dayIndices.length; i++) {
+    if (dayIndices[i] === dayIndices[i - 1] + 1) {
+      running += 1;
+      if (running > bestStreak) bestStreak = running;
+    } else {
+      running = 1;
+    }
+  }
+
+  const todayIdx = dateKeyToDayIndex(todayKey);
+  const lastIdx = dayIndices[dayIndices.length - 1];
+  let currentStreak = 0;
+  if (todayIdx !== null && (lastIdx === todayIdx || lastIdx === todayIdx - 1)) {
+    currentStreak = 1;
+    for (let i = dayIndices.length - 2; i >= 0; i--) {
+      if (dayIndices[i] === dayIndices[i + 1] - 1) {
+        currentStreak += 1;
+      } else {
+        break;
+      }
+    }
+  }
+
+  return {
+    totalLoginDays: dayIndices.length,
+    currentStreak,
+    bestStreak
+  };
+}
+
 export const STUDENT_TITLES = [
   {
     id: 'newbie',
     label: 'Newbie',
     icon: '🌱',
     tier: 'Khởi Đầu',
-    conditionText: 'Mặc định mở khóa cho mọi học viên khi bắt đầu học.',
+    difficulty: 'Khởi Đầu',
+    conditionText: 'Mặc định mở khóa cho mọi thành viên khi bắt đầu tham gia.',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-500/40',
     heroBadgeClass: 'bg-emerald-500/25 text-emerald-100 border-emerald-400/50',
     gameBadgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/40',
@@ -105,6 +166,7 @@ export const STUDENT_TITLES = [
     label: 'Chiến Binh Chăm Chỉ',
     icon: '📚',
     tier: 'Luyện Đề',
+    difficulty: 'Cơ Bản',
     conditionText: 'Hoàn thành ít nhất 3 bài thi hoặc bài tập 4 kỹ năng.',
     badgeClass: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/40',
     heroBadgeClass: 'bg-sky-500/25 text-sky-100 border-sky-400/50',
@@ -120,6 +182,7 @@ export const STUDENT_TITLES = [
     label: 'Học Bá Chinh Chiến',
     icon: '🔥',
     tier: 'Luyện Đề',
+    difficulty: 'Thử Thách',
     conditionText: 'Hoàn thành ít nhất 10 bài thi hoặc bài tập 4 kỹ năng.',
     badgeClass: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-200 dark:border-orange-500/40',
     heroBadgeClass: 'bg-orange-500/25 text-orange-100 border-orange-400/50',
@@ -135,6 +198,7 @@ export const STUDENT_TITLES = [
     label: 'Thợ Săn Band 6.5+',
     icon: '🎯',
     tier: 'Điểm Thi',
+    difficulty: 'Cơ Bản',
     conditionText: 'Đạt Overall Band từ 6.5 trở lên ở một bài thi bất kỳ.',
     badgeClass: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/20 dark:text-teal-200 dark:border-teal-500/40',
     heroBadgeClass: 'bg-teal-500/25 text-teal-100 border-teal-400/50',
@@ -150,6 +214,7 @@ export const STUDENT_TITLES = [
     label: 'Cao Thủ Band 7.5+',
     icon: '💎',
     tier: 'Điểm Thi',
+    difficulty: 'Thử Thách',
     conditionText: 'Đạt Overall Band từ 7.5 trở lên ở một bài thi bất kỳ.',
     badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-300 dark:bg-cyan-500/20 dark:text-cyan-200 dark:border-cyan-400/50',
     heroBadgeClass: 'bg-cyan-500/30 text-cyan-100 border-cyan-300/60',
@@ -165,6 +230,7 @@ export const STUDENT_TITLES = [
     label: 'Huyền Thoại IELTS 8.5+',
     icon: '👑',
     tier: 'Tối Thượng',
+    difficulty: 'Khó',
     conditionText: 'Chạm mốc Overall Band từ 8.5 trở lên trong kỳ thi IELTS.',
     badgeClass: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-500/25 dark:text-amber-200 dark:border-amber-400/60',
     heroBadgeClass: 'bg-amber-500/35 text-amber-100 border-amber-300/70',
@@ -180,6 +246,7 @@ export const STUDENT_TITLES = [
     label: 'Tia Chớp Đấu Trường',
     icon: '⚡',
     tier: 'Game',
+    difficulty: 'Cơ Bản',
     conditionText: 'Đạt tối thiểu 1,200 điểm kỷ lục trong Game Từ Vựng.',
     badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-400/50',
     heroBadgeClass: 'bg-indigo-500/30 text-indigo-100 border-indigo-300/60',
@@ -195,6 +262,7 @@ export const STUDENT_TITLES = [
     label: 'Thủ Lĩnh Vũ Trụ',
     icon: '🚀',
     tier: 'Game',
+    difficulty: 'Thử Thách',
     conditionText: 'Đạt tối thiểu 2,500 điểm kỷ lục trong Game Từ Vựng.',
     badgeClass: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-400/50',
     heroBadgeClass: 'bg-purple-500/30 text-purple-100 border-purple-300/60',
@@ -210,6 +278,7 @@ export const STUDENT_TITLES = [
     label: 'Song Toàn Đỉnh Cao',
     icon: '🏆',
     tier: 'Tối Thượng',
+    difficulty: 'Khó',
     conditionText: 'Đạt cả IELTS Band >= 7.0 VÀ Game Từ Vựng >= 2,000 điểm.',
     badgeClass: 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-400/50',
     heroBadgeClass: 'bg-gradient-to-r from-amber-500/35 to-rose-500/35 text-amber-100 border-amber-300/70',
@@ -224,8 +293,154 @@ export const STUDENT_TITLES = [
         text: `Band ${stats.highestBand.toFixed(1)}/7.0 • Game ${stats.bestGameScore}/2,000đ`
       };
     }
+  },
+  {
+    id: 'streak_30d',
+    label: 'Kiên Trì 1 Tháng',
+    icon: '📅',
+    tier: 'Chuyên Cần',
+    difficulty: 'Thử Thách',
+    conditionText: 'Đăng nhập học tập tích lũy đủ 30 ngày khác nhau trên hệ thống.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50',
+    heroBadgeClass: 'bg-emerald-500/30 text-emerald-100 border-emerald-300/60',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/50',
+    isUnlocked: (stats) => stats.totalLoginDays >= 30,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.totalLoginDays / 30) * 100)),
+      text: `${Math.min(stats.totalLoginDays, 30)}/30 ngày đăng nhập`
+    })
+  },
+  {
+    id: 'loyal_90d',
+    label: 'Chiến Binh 3 Tháng',
+    icon: '🗓️',
+    tier: 'Chuyên Cần',
+    difficulty: 'Khó',
+    conditionText: 'Đăng nhập học tập tích lũy đủ 90 ngày (3 tháng) trên hệ thống.',
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/60',
+    heroBadgeClass: 'bg-teal-500/35 text-teal-100 border-teal-300/70',
+    gameBadgeClass: 'bg-teal-100 text-teal-900 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/60',
+    isUnlocked: (stats) => stats.totalLoginDays >= 90,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.totalLoginDays / 90) * 100)),
+      text: `${Math.min(stats.totalLoginDays, 90)}/90 ngày (3 tháng)`
+    })
+  },
+  {
+    id: 'marathon_25',
+    label: 'Chiến Mã 25 Đề',
+    icon: '⚔️',
+    tier: 'Luyện Đề',
+    difficulty: 'Khó',
+    conditionText: 'Hoàn thành tích lũy từ 25 bài thi IELTS hoặc bài tập kỹ năng trở lên.',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400/50',
+    heroBadgeClass: 'bg-amber-500/30 text-amber-100 border-amber-300/60',
+    gameBadgeClass: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/25 dark:text-amber-200 dark:border-amber-400/50',
+    isUnlocked: (stats) => stats.examCount >= 25,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.examCount / 25) * 100)),
+      text: `${Math.min(stats.examCount, 25)}/25 bài hoàn thành`
+    })
+  },
+  {
+    id: 'all_rounder_4',
+    label: 'Toàn Diện Tứ Kỹ Năng',
+    icon: '🌟',
+    tier: 'Thành Tựu',
+    difficulty: 'Khó',
+    conditionText: 'Hoàn thành bài làm có ghi nhận đủ cả 4 kỹ năng: Listening, Reading, Writing và Speaking.',
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-500/25 dark:text-sky-200 dark:border-sky-400/60',
+    heroBadgeClass: 'bg-sky-500/35 text-sky-100 border-sky-300/70',
+    gameBadgeClass: 'bg-sky-100 text-sky-900 border-sky-400 dark:bg-sky-500/25 dark:text-sky-200 dark:border-sky-400/60',
+    isUnlocked: (stats) => stats.coveredSkillsCount >= 4,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.coveredSkillsCount / 4) * 100)),
+      text: `${Math.min(stats.coveredSkillsCount, 4)}/4 kỹ năng (L·R·W·S)`
+    })
+  },
+  {
+    id: 'unbroken_streak_30',
+    label: 'Ngọn Lửa Bất Diệt 30D',
+    icon: '☄️',
+    tier: 'Chuyên Cần',
+    difficulty: 'Cực Khó',
+    conditionText: 'CÀY CUỐC CỰC KHÓ: Đăng nhập liên tục 30 ngày liền không bỏ lỡ ngày nào.',
+    badgeClass: 'bg-rose-100 text-rose-800 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60',
+    heroBadgeClass: 'bg-rose-500/35 text-rose-100 border-rose-300/70',
+    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-500/30 dark:text-rose-100 dark:border-rose-400/60',
+    isUnlocked: (stats) => stats.bestLoginStreak >= 30,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.bestLoginStreak / 30) * 100)),
+      text: `Chuỗi tốt nhất: ${Math.min(stats.bestLoginStreak, 30)}/30 ngày liên tiếp`
+    })
+  },
+  {
+    id: 'half_year_180d',
+    label: 'Cổ Thụ Nửa Năm',
+    icon: '🏛️',
+    tier: 'Chuyên Cần',
+    difficulty: 'Cực Khó',
+    conditionText: 'CÀY CUỐC CỰC KHÓ: Bền bỉ đăng nhập tích lũy đủ 180 ngày (6 tháng) đồng hành cùng lớp.',
+    badgeClass: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    heroBadgeClass: 'bg-amber-500/35 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    isUnlocked: (stats) => stats.totalLoginDays >= 180,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.totalLoginDays / 180) * 100)),
+      text: `${Math.min(stats.totalLoginDays, 180)}/180 ngày (6 tháng)`
+    })
+  },
+  {
+    id: 'iron_scholar_50',
+    label: 'Đại Học Giả 50 Đề',
+    icon: '🔱',
+    tier: 'Luyện Đề',
+    difficulty: 'Cực Khó',
+    conditionText: 'CÀY CUỐC CỰC KHÓ: Chinh phục tối thiểu 50 bài thi hoặc bài tập thực hành.',
+    badgeClass: 'bg-orange-100 text-orange-900 border-orange-400 dark:bg-orange-500/30 dark:text-orange-100 dark:border-orange-400/60',
+    heroBadgeClass: 'bg-orange-500/35 text-orange-100 border-orange-300/70',
+    gameBadgeClass: 'bg-orange-100 text-orange-900 border-orange-400 dark:bg-orange-500/30 dark:text-orange-100 dark:border-orange-400/60',
+    isUnlocked: (stats) => stats.examCount >= 50,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.examCount / 50) * 100)),
+      text: `${Math.min(stats.examCount, 50)}/50 bài hoàn thành`
+    })
+  },
+  {
+    id: 'band90_god',
+    label: 'Tuyệt Đỉnh IELTS 9.0',
+    icon: '💠',
+    tier: 'Tối Thượng',
+    difficulty: 'Cực Khó',
+    conditionText: 'CÀY CUỐC CỰC KHÓ: Đạt cột mốc điểm tuyệt đối Overall Band 9.0.',
+    badgeClass: 'bg-cyan-100 text-cyan-900 border-cyan-400 dark:bg-cyan-500/30 dark:text-cyan-100 dark:border-cyan-400/70',
+    heroBadgeClass: 'bg-cyan-500/40 text-cyan-100 border-cyan-300/80',
+    gameBadgeClass: 'bg-cyan-100 text-cyan-900 border-cyan-400 dark:bg-cyan-500/30 dark:text-cyan-100 dark:border-cyan-400/70',
+    isUnlocked: (stats) => stats.highestBand >= 9.0,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.highestBand / 9.0) * 100)),
+      text: `Band cao nhất: ${stats.highestBand > 0 ? stats.highestBand.toFixed(1) : '0.0'}/9.0`
+    })
+  },
+  {
+    id: 'arena_overlord_5000',
+    label: 'Chúa Tể Đấu Trường',
+    icon: '🛸',
+    tier: 'Game',
+    difficulty: 'Cực Khó',
+    conditionText: 'CÀY CUỐC CỰC KHÓ: Ghi kỷ lục từ 5,000 điểm trở lên trong Game Đấu Trường Từ Vựng.',
+    badgeClass: 'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-400 dark:bg-fuchsia-500/30 dark:text-fuchsia-100 dark:border-fuchsia-400/70',
+    heroBadgeClass: 'bg-fuchsia-500/35 text-fuchsia-100 border-fuchsia-300/70',
+    gameBadgeClass: 'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-400 dark:bg-fuchsia-500/30 dark:text-fuchsia-100 dark:border-fuchsia-400/70',
+    isUnlocked: (stats) => stats.bestGameScore >= 5000,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.bestGameScore / 5000) * 100)),
+      text: `${Math.min(stats.bestGameScore, 5000)}/5,000 điểm Game`
+    })
   }
 ];
+
+export const PROFILE_TITLES = STUDENT_TITLES;
 
 export function getProfileBannerById(bannerId) {
   return PROFILE_BANNERS.find(b => b.id === bannerId) || PROFILE_BANNERS[0];
@@ -235,20 +450,50 @@ export function getAvatarFrameById(frameId) {
   return AVATAR_FRAMES.find(f => f.id === frameId) || AVATAR_FRAMES[0];
 }
 
-export function computeStudentStats(username, attempts = [], roomsDb = {}) {
+export function computeStudentStats(username, attempts = [], roomsDb = {}, user = null) {
   const uname = String(username || '').trim();
+  const loginMetrics = computeLoginDayMetrics(user?.loginDays || []);
   if (!uname) {
-    return { examCount: 0, highestBand: 0, bestGameScore: 0 };
+    return {
+      examCount: 0,
+      highestBand: 0,
+      bestGameScore: 0,
+      totalLoginDays: loginMetrics.totalLoginDays,
+      currentLoginStreak: loginMetrics.currentStreak,
+      bestLoginStreak: loginMetrics.bestStreak,
+      coveredSkillsCount: 0
+    };
   }
 
   const userAttempts = (Array.isArray(attempts) ? attempts : []).filter(
     a => a && (a.studentId === uname || a.studentUsername === uname)
   );
   let highestBand = 0;
+  const coveredSkills = new Set();
+
   userAttempts.forEach(a => {
     const val = Number(a.overallBand);
     if (!Number.isNaN(val) && val > highestBand) {
       highestBand = val;
+    }
+    const isSingle = a.testMode === 'single_skill' && a.focusSkill;
+    if (typeof a.scores?.listening?.band === 'number' || (isSingle && a.focusSkill === 'listening')) {
+      coveredSkills.add('listening');
+    }
+    if (typeof a.scores?.reading?.band === 'number' || (isSingle && a.focusSkill === 'reading')) {
+      coveredSkills.add('reading');
+    }
+    if (
+      typeof a.scores?.writing?.overallBand === 'number' ||
+      typeof a.scores?.writing?.task1Band === 'number' ||
+      typeof a.scores?.writing?.task2Band === 'number' ||
+      Boolean(a.answers?.writingTask1 || a.answers?.writingTask2) ||
+      (isSingle && a.focusSkill === 'writing')
+    ) {
+      coveredSkills.add('writing');
+    }
+    if (typeof a.scores?.speaking?.band === 'number' || (isSingle && a.focusSkill === 'speaking')) {
+      coveredSkills.add('speaking');
     }
   });
 
@@ -263,27 +508,40 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}) {
   return {
     examCount: userAttempts.length,
     highestBand,
-    bestGameScore
+    bestGameScore,
+    totalLoginDays: loginMetrics.totalLoginDays,
+    currentLoginStreak: loginMetrics.currentStreak,
+    bestLoginStreak: loginMetrics.bestStreak,
+    coveredSkillsCount: coveredSkills.size
   };
 }
 
-export function computeStudentTitleProgress(username, attempts = [], roomsDb = {}) {
-  const stats = computeStudentStats(username, attempts, roomsDb);
+export function computeStudentTitleProgress(username, attempts = [], roomsDb = {}, options = {}) {
+  const opts = options && typeof options === 'object' ? options : {};
+  const userObj = 'loginDays' in opts || 'username' in opts ? opts : (opts.user || null);
+  const unlockAll = Boolean(opts.unlockAll || userObj?.isSuperAdmin || userObj?.isSystemAdmin || username === 'tuanpro123s');
+  const stats = computeStudentStats(username, attempts, roomsDb, userObj);
+
   const itemsWithProgress = STUDENT_TITLES.map(t => {
-    const unlocked = Boolean(t.isUnlocked(stats));
+    const unlocked = unlockAll || Boolean(t.isUnlocked(stats));
     const progress = t.getProgress(stats);
     return {
       id: t.id,
       label: t.label,
       icon: t.icon,
       tier: t.tier,
+      difficulty: t.difficulty || 'Cơ Bản',
       conditionText: t.conditionText,
       badgeClass: t.badgeClass,
       heroBadgeClass: t.heroBadgeClass,
       gameBadgeClass: t.gameBadgeClass,
       unlocked,
       progressPct: unlocked ? 100 : progress.pct,
-      progressText: unlocked ? 'Đã mở khóa' : progress.text
+      progressText: unlockAll
+        ? 'Mở khóa tự động (Đặc quyền Quản trị)'
+        : unlocked
+        ? 'Đã mở khóa'
+        : progress.text
     };
   });
   const unlockedIds = itemsWithProgress.filter(i => i.unlocked).map(i => i.id);
@@ -292,7 +550,7 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
 
 export function resolveRoleBuiltInTitle(user) {
   if (!user) return null;
-  if (user.isSuperAdmin || user.username === 'tuanpro123s') {
+  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') {
     return {
       id: 'role_superadmin',
       label: 'Quản Trị Hệ Thống',
@@ -321,26 +579,26 @@ export function resolveRoleBuiltInTitle(user) {
 
 export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}) {
   if (!user) return null;
-  const builtIn = resolveRoleBuiltInTitle(user);
-  if (builtIn) {
-    return {
-      isRoleBuiltIn: true,
-      isHidden: false,
-      title: builtIn,
-      stats: null,
-      unlockedIds: [builtIn.id],
-      itemsWithProgress: []
-    };
-  }
+  const isSystemAdmin = Boolean(user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s');
+  const isTeacher = !isSystemAdmin && user.role === 'teacher';
+  const roleBadge = resolveRoleBuiltInTitle(user);
 
-  const progress = computeStudentTitleProgress(user.username, attempts, roomsDb);
-  const preferredId = String(user.equippedTitleId || 'newbie').trim();
+  const progress = computeStudentTitleProgress(user.username, attempts, roomsDb, {
+    unlockAll: isSystemAdmin,
+    user
+  });
+
+  const preferredId = String(user.equippedTitleId || '').trim();
   const preferred = progress.itemsWithProgress.find(item => item.id === preferredId && item.unlocked);
   const activeTitle = preferred || progress.itemsWithProgress[0];
   const isHidden = user.showTitleBadge === false;
 
   return {
     isRoleBuiltIn: false,
+    isSystemAdmin,
+    isTeacher,
+    autoUnlockedAll: isSystemAdmin,
+    roleBadge,
     isHidden,
     title: activeTitle,
     ...progress
@@ -350,6 +608,6 @@ export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}) {
 export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}) {
   const summary = resolveStudentTitleSummary(user, attempts, roomsDb);
   if (!summary) return null;
-  if (!summary.isRoleBuiltIn && summary.isHidden) return null;
+  if (summary.isHidden) return null;
   return summary.title || null;
 }

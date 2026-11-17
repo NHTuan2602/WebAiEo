@@ -310,6 +310,82 @@ function checkRateLimit(bucketMap, key, limit = LOGIN_MAX_ATTEMPTS, windowMs = L
   return true;
 }
 
+function getLocalDateKeyVi(ts = Date.now()) {
+  const num = Number(ts) || Date.now();
+  return new Date(num + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function mergeLoginDays(existing, incoming) {
+  const validPattern = /^\d{4}-\d{2}-\d{2}$/;
+  const set = new Set();
+  (Array.isArray(existing) ? existing : []).forEach(d => {
+    const s = String(d || '').trim();
+    if (validPattern.test(s)) set.add(s);
+  });
+  (Array.isArray(incoming) ? incoming : []).forEach(d => {
+    const s = String(d || '').trim();
+    if (validPattern.test(s)) set.add(s);
+  });
+  return Array.from(set).sort().slice(-1500);
+}
+
+function recordUserLoginDay(store, user, ts = Date.now()) {
+  if (!store || !user || !user.username) return false;
+  const target = store.users?.[user.username] || user;
+  const dateKey = getLocalDateKeyVi(ts);
+  const existing = Array.isArray(target.loginDays) ? target.loginDays : [];
+  if (existing.includes(dateKey)) return false;
+  target.loginDays = mergeLoginDays(existing, [dateKey]);
+  store._localMutated = true;
+  return true;
+}
+
+function parseScheduleTimestampServer(val) {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'number') {
+    return Number.isFinite(val) && val > 0 ? val : null;
+  }
+  const str = String(val).trim();
+  if (!str) return null;
+  const num = Number(str);
+  if (Number.isFinite(num) && num > 0) return num;
+  const parsed = Date.parse(str);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function formatViDateTimeServer(tsMs) {
+  const num = parseScheduleTimestampServer(tsMs);
+  if (!num) return '';
+  const d = new Date(num + 7 * 60 * 60 * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} ${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+}
+
+function computeTestTimelinessServer(testObj, submittedAtMs) {
+  const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(testObj?.scheduleMode)
+    ? testObj.scheduleMode
+    : 'flexible';
+  const dueAt = parseScheduleTimestampServer(testObj?.dueAt);
+  if (scheduleMode === 'flexible' || !dueAt) {
+    return { timelinessStatus: 'flexible', lateByMinutes: 0, dueAtSnapshot: dueAt || null, scheduleModeSnapshot: scheduleMode };
+  }
+  const diffMs = submittedAtMs - dueAt;
+  if (diffMs > 0) {
+    return {
+      timelinessStatus: 'late',
+      lateByMinutes: Math.max(1, Math.round(diffMs / 60_000)),
+      dueAtSnapshot: dueAt,
+      scheduleModeSnapshot: scheduleMode
+    };
+  }
+  return {
+    timelinessStatus: 'on_time',
+    lateByMinutes: 0,
+    dueAtSnapshot: dueAt,
+    scheduleModeSnapshot: scheduleMode
+  };
+}
+
 function sanitizeUserForViewer(user, viewer) {
   if (!user || typeof user !== 'object') return null;
   if ((user.isSuperAdmin || user.hiddenFromTeacher || user.username === SUPER_ADMIN_USERNAME) && !viewer?.isSuperAdmin) {
@@ -327,7 +403,8 @@ function sanitizeUserForViewer(user, viewer) {
     profileCoverUrl: typeof user.profileCoverUrl === 'string' ? user.profileCoverUrl : '',
     avatarFrameId: typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
     equippedTitleId: typeof user.equippedTitleId === 'string' && user.equippedTitleId ? user.equippedTitleId : 'newbie',
-    showTitleBadge: user.showTitleBadge !== false
+    showTitleBadge: user.showTitleBadge !== false,
+    loginDays: Array.isArray(user.loginDays) ? user.loginDays : []
   };
   if (viewer?.isSuperAdmin && user.isSuperAdmin) {
     safe.isSuperAdmin = true;
@@ -383,7 +460,11 @@ function sanitizeAttemptForPeer(att) {
     speakingPartMode: att.speakingPartMode,
     studentId: att.studentId,
     studentName: att.studentName,
+    startedAt: att.startedAt || '',
     submittedAt: att.submittedAt,
+    durationSeconds: Number(att.durationSeconds) || 0,
+    timelinessStatus: att.timelinessStatus || 'flexible',
+    lateByMinutes: Number(att.lateByMinutes) || 0,
     teacherGraded: Boolean(att.teacherGraded),
     aiGraded: Boolean(att.aiGraded),
     overallBand: att.overallBand ?? null,
@@ -899,26 +980,47 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
   return item;
 }
 
+function serializeNotificationItem(n, uname = '') {
+  const readArr = Array.isArray(n.readBy) ? n.readBy : [];
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    type: n.type || 'announcement',
+    testId: n.testId || '',
+    roomPin: n.roomPin || '',
+    createdBy: n.createdBy || '',
+    createdByName: n.createdByName || '',
+    createdAt: n.createdAt || '',
+    timestamp: Number(n.timestamp) || 0,
+    isRead: Boolean(uname && readArr.includes(uname)),
+    readCount: readArr.length
+  };
+}
+
 function serializeNotificationsForViewer(store, viewer) {
+  if (!viewer || viewer.role === 'teacher' || viewer.isSuperAdmin) {
+    return [];
+  }
   const list = Array.isArray(store.notifications) ? store.notifications : [];
-  const uname = viewer?.username || '';
-  return list.map(n => {
-    const readArr = Array.isArray(n.readBy) ? n.readBy : [];
-    return {
-      id: n.id,
-      title: n.title,
-      message: n.message,
-      type: n.type || 'announcement',
-      testId: n.testId || '',
-      roomPin: n.roomPin || '',
-      createdBy: n.createdBy || '',
-      createdByName: n.createdByName || '',
-      createdAt: n.createdAt || '',
-      timestamp: Number(n.timestamp) || 0,
-      isRead: Boolean(uname && readArr.includes(uname)),
-      readCount: readArr.length
-    };
-  });
+  const uname = viewer.username || '';
+  const testsById = new Map((Array.isArray(store.tests) ? store.tests : []).map(t => [t?.id, t]));
+  return list
+    .filter(n => {
+      if (!n || (n.createdBy && n.createdBy === uname)) return false;
+      if (n.testId) {
+        const linked = testsById.get(n.testId);
+        if (linked && (linked.visibility || 'public') === 'private') return false;
+      }
+      return true;
+    })
+    .map(n => serializeNotificationItem(n, uname));
+}
+
+function serializeSentNotificationsForTeacher(store, viewer) {
+  if (!viewer || viewer.role !== 'teacher') return [];
+  const list = Array.isArray(store.notifications) ? store.notifications : [];
+  return list.map(n => serializeNotificationItem(n, viewer.username || ''));
 }
 
 function getSnapshotForViewer(store, viewer = null) {
@@ -944,7 +1046,8 @@ function getSnapshotForViewer(store, viewer = null) {
       customVocabTopics: [],
       supportAdminProfile: null,
       adminFeedbacks: [],
-      notifications: []
+      notifications: [],
+      sentNotifications: []
     };
   }
 
@@ -955,6 +1058,7 @@ function getSnapshotForViewer(store, viewer = null) {
   });
   const adminFields = buildPublicAdminSnapshotFields(store, viewer);
   const notifications = serializeNotificationsForViewer(store, viewer);
+  const sentNotifications = serializeSentNotificationsForTeacher(store, viewer);
 
   if (viewer.role === 'teacher') {
     const sanitizedRooms = {};
@@ -971,7 +1075,8 @@ function getSnapshotForViewer(store, viewer = null) {
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
       ...adminFields,
-      notifications
+      notifications,
+      sentNotifications
     };
   }
 
@@ -1012,7 +1117,8 @@ function getSnapshotForViewer(store, viewer = null) {
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
     ...adminFields,
-    notifications
+    notifications,
+    sentNotifications: []
   };
 }
 
@@ -1187,6 +1293,17 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
           return { allowed: false, status: 403, error: 'Bài đã chấm điểm không thể tự ý chỉnh sửa.' };
         }
         const test = (store.tests || []).find(t => t.id === att.testId);
+        if (test && !existingAtt) {
+          const nowMs = Date.now();
+          const openAtMs = parseScheduleTimestampServer(test.openAt);
+          const dueAtMs = parseScheduleTimestampServer(test.dueAt);
+          if (openAtMs && nowMs < openAtMs) {
+            return { allowed: false, status: 403, error: `Bài làm này chưa mở (Mở lúc ${formatViDateTimeServer(openAtMs)}).` };
+          }
+          if (test.scheduleMode === 'deadline_lock' && dueAtMs && nowMs > dueAtMs + 30_000) {
+            return { allowed: false, status: 403, error: `Bài làm này đã hết hạn nộp lúc ${formatViDateTimeServer(dueAtMs)}.` };
+          }
+        }
         if (test && Number(test.maxAttempts) > 0 && !existingAtt) {
           const prevCount = (store.attempts || []).filter(
             a => a.testId === test.id && (a.studentId === viewer.username || a.studentUsername === viewer.username)
@@ -1310,11 +1427,13 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       profileCoverUrl: sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, false),
       avatarFrameId: typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none'),
       equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
-      showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false)
+      showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
+      loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays)
     };
     store.users[uname] = cleanSelf;
   } else {
     const incoming = { ...rawUser, username: uname };
+    incoming.loginDays = mergeLoginDays(prevUser?.loginDays, incoming.loginDays);
     incoming.avatarUrl = sanitizeMediaUrl(incoming.avatarUrl, prevUser?.avatarUrl || '', true);
     incoming.profileBannerId = typeof incoming.profileBannerId === 'string' && incoming.profileBannerId
       ? incoming.profileBannerId.slice(0, 40)
@@ -1799,8 +1918,19 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'UPSERT_TEST': {
-      const test = payload.test;
-      if (!test?.id) break;
+      const rawTest = payload.test;
+      if (!rawTest?.id) break;
+      const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(rawTest.scheduleMode)
+        ? rawTest.scheduleMode
+        : 'flexible';
+      const openAt = parseScheduleTimestampServer(rawTest.openAt);
+      const dueAt = parseScheduleTimestampServer(rawTest.dueAt);
+      const test = {
+        ...rawTest,
+        scheduleMode,
+        openAt,
+        dueAt
+      };
       const idx = store.tests.findIndex(t => t.id === test.id);
       const prevTest = idx >= 0 ? store.tests[idx] : null;
       const wasPublicBefore = prevTest ? (prevTest.visibility || 'public') !== 'private' : false;
@@ -1812,12 +1942,15 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       }
       if (isPublicNow && !wasPublicBefore) {
         const isExercise = test.testMode === 'single_skill';
+        const deadlineHint = scheduleMode !== 'flexible' && dueAt
+          ? ` (Hạn nộp: ${formatViDateTimeServer(dueAt)}${scheduleMode === 'deadline_lock' ? ' — khóa khi quá giờ' : ''})`
+          : '';
         appendStoreNotification(
           store,
           {
             type: isExercise ? 'exercise' : 'exam',
             title: isExercise ? 'Bài tập kỹ năng mới!' : 'Đề thi IELTS mới vừa mở!',
-            message: `${viewer?.name || 'Giáo viên'} vừa đăng ${isExercise ? 'bài tập' : 'đề thi'} "${test.title}". Nhấn để làm bài ngay!`,
+            message: `${viewer?.name || 'Giáo viên'} vừa đăng ${isExercise ? 'bài tập' : 'đề thi'} "${test.title}"${deadlineHint}. Nhấn vào thông báo để xem chi tiết!`,
             testId: test.id
           },
           viewer
@@ -1859,12 +1992,16 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       });
       if (publishedTest) {
         const isExercise = publishedTest.testMode === 'single_skill';
+        const pubDue = parseScheduleTimestampServer(publishedTest.dueAt);
+        const deadlineHint = publishedTest.scheduleMode !== 'flexible' && pubDue
+          ? ` (Hạn nộp: ${formatViDateTimeServer(pubDue)}${publishedTest.scheduleMode === 'deadline_lock' ? ' — khóa khi quá giờ' : ''})`
+          : '';
         appendStoreNotification(
           store,
           {
             type: isExercise ? 'exercise' : 'exam',
             title: isExercise ? 'Bài tập mới vừa được công khai!' : 'Đề thi mới vừa được công khai!',
-            message: `${viewer?.name || 'Giáo viên'} vừa mở "${publishedTest.title}". Học viên có thể vào làm bài ngay!`,
+            message: `${viewer?.name || 'Giáo viên'} vừa mở "${publishedTest.title}"${deadlineHint}. Nhấn vào thông báo để xem chi tiết bài này!`,
             testId: publishedTest.id
           },
           viewer
@@ -1955,10 +2092,25 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           finalFeedback = typeof validTicket.overallFeedback === 'string' ? validTicket.overallFeedback : '';
         }
 
+        const submittedAtMs = Date.now();
+        const timeliness = computeTestTimelinessServer(testObj, submittedAtMs);
+        const rawDuration = Math.max(0, Math.round(Number(attempt.durationSeconds) || 0));
+        const rawStartedAtMs = parseScheduleTimestampServer(attempt.startedAtMs);
+
         attempt = {
           ...attempt,
           studentId: viewer.username,
           studentName: viewer.name || attempt.studentName,
+          startedAtMs: rawStartedAtMs || Math.max(1, submittedAtMs - rawDuration * 1000),
+          startedAt: typeof attempt.startedAt === 'string' && attempt.startedAt
+            ? attempt.startedAt.slice(0, 60)
+            : formatViDateTimeServer(rawStartedAtMs || submittedAtMs),
+          submittedAtMs,
+          submittedAt: typeof attempt.submittedAt === 'string' && attempt.submittedAt
+            ? attempt.submittedAt.slice(0, 60)
+            : formatViDateTimeServer(submittedAtMs),
+          durationSeconds: rawDuration,
+          ...timeliness,
           scores: sanitizedScores,
           overallBand: finalOverallBand,
           teacherGraded: finalTeacherGraded,
@@ -1966,6 +2118,16 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           teacherFeedback: finalFeedback
         };
         delete attempt.aiGradingTicket;
+      } else {
+        const testObj = (store.tests || []).find(t => t.id === attempt.testId);
+        const submittedAtMs = parseScheduleTimestampServer(attempt.submittedAtMs) || Date.now();
+        const timeliness = computeTestTimelinessServer(testObj, submittedAtMs);
+        attempt = {
+          ...attempt,
+          submittedAtMs,
+          durationSeconds: Math.max(0, Math.round(Number(attempt.durationSeconds) || 0)),
+          ...timeliness
+        };
       }
 
       const idx = store.attempts.findIndex(a => a.id === attempt.id);
@@ -2372,6 +2534,12 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           return;
         }
 
+        if (recordUserLoginDay(store, user)) {
+          store.version += 1;
+          onChanged?.(store);
+          scheduleBroadcast(50);
+        }
+
         const sid = crypto.randomBytes(8).toString('hex');
         const token = signToken(
           {
@@ -2413,6 +2581,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'GET' && reqUrl === '/auth/session') {
+      if (viewer && recordUserLoginDay(store, viewer)) {
+        store.version += 1;
+        onChanged?.(store);
+        scheduleBroadcast(50);
+      }
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
       res.statusCode = 200;
@@ -2673,6 +2846,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'GET' && reqUrl === '/state') {
+      if (viewer && recordUserLoginDay(store, viewer)) {
+        store.version += 1;
+        onChanged?.(store);
+        scheduleBroadcast(50);
+      }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
@@ -2681,6 +2859,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'GET' && reqUrl === '/stream') {
+      if (viewer && recordUserLoginDay(store, viewer)) {
+        store.version += 1;
+        onChanged?.(store);
+        scheduleBroadcast(50);
+      }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');

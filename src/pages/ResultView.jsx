@@ -19,6 +19,7 @@ import {
   Unlock,
   XCircle
 } from 'lucide-react';
+import { formatDurationVi } from '../constants/seedData';
 import { getWordCount, isObjectiveAnswerCorrect } from '../utils/examHelpers';
 
 export default function ResultView({
@@ -179,7 +180,34 @@ export default function ResultView({
               )}
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">{attempt.testTitle}</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Thí sinh: <b>{attempt.studentName}</b> • Nộp ngày: {attempt.submittedAt}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Thí sinh: <b>{attempt.studentName}</b></span>
+              {attempt.startedAt && (
+                <>
+                  <span>•</span>
+                  <span>Bắt đầu: {attempt.startedAt}</span>
+                </>
+              )}
+              <span>•</span>
+              <span>Nộp lúc: <b>{attempt.submittedAt}</b></span>
+              {Number(attempt.durationSeconds) > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1 text-[#007A7A] dark:text-[#1EE1D6] font-bold">
+                    <Clock className="w-3 h-3" /> Thời lượng: {formatDurationVi(attempt.durationSeconds)}
+                  </span>
+                </>
+              )}
+              {attempt.timelinessStatus === 'late' ? (
+                <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold text-[10px]">
+                  Nộp muộn{attempt.lateByMinutes ? ` ${attempt.lateByMinutes}p` : ''}
+                </span>
+              ) : attempt.timelinessStatus === 'on_time' ? (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
+                  Đúng hạn
+                </span>
+              ) : null}
+            </p>
           </div>
 
           <div className="bg-[#0F172B] dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[150px] shadow border border-slate-800 dark:border-slate-700">

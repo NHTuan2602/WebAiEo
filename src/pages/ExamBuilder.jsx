@@ -27,10 +27,13 @@ import {
 } from 'lucide-react';
 import {
   ALL_SKILL_OPTIONS,
+  formatViDateTime,
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
-  normalizeExamConfig
+  normalizeExamConfig,
+  parseScheduleTimestamp,
+  toDatetimeLocalInputValue
 } from '../constants/seedData';
 import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../utils/clozeHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
@@ -824,6 +827,140 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Schedule / Deadline Configuration */}
+          <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Hẹn Giờ Mở Đề &amp; Hạn Chót Nộp Bài
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Chọn khóa hẳn bài khi quá giờ, hoặc cho làm bất kỳ lúc nào (hệ thống luôn ghi nhận ngày giờ bắt đầu, lúc nộp &amp; tổng thời gian làm của từng học viên).
+                </p>
+              </div>
+              {cfg.scheduleMode !== 'flexible' && cfg.dueAt && (
+                <span className="text-[11px] font-extrabold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 shrink-0">
+                  Hạn: {formatViDateTime(cfg.dueAt)}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              {[
+                {
+                  id: 'flexible',
+                  title: '🕒 Làm khi nào cũng được',
+                  desc: 'Mở tự do 24/7, vẫn ghi lại thời gian làm & lúc nộp của từng học viên.'
+                },
+                {
+                  id: 'deadline_lock',
+                  title: '🔒 Hẹn giờ — Khóa khi quá giờ',
+                  desc: 'Hết giờ quy định hệ thống tự khóa, học viên không vào làm hoặc nộp được nữa.'
+                },
+                {
+                  id: 'deadline_track',
+                  title: '⏱️ Hẹn giờ — Quá giờ vẫn cho làm',
+                  desc: 'Vượt hạn vẫn cho nộp, nhưng bảng điểm tự đánh dấu nộp muộn (trễ bao nhiêu phút).'
+                }
+              ].map(opt => {
+                const active = cfg.scheduleMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() =>
+                      setTestForm(prev => {
+                        const defaultDue = prev.dueAt || Date.now() + 24 * 60 * 60 * 1000;
+                        return {
+                          ...prev,
+                          scheduleMode: opt.id,
+                          dueAt: opt.id === 'flexible' ? null : defaultDue
+                        };
+                      })
+                    }
+                    className={`p-3.5 rounded-xl border text-left transition ${
+                      active
+                        ? 'bg-[#EDFFFD] dark:bg-teal-950/45 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                    }`}
+                  >
+                    <p className="text-xs font-extrabold text-slate-900 dark:text-white">{opt.title}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{opt.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {cfg.scheduleMode !== 'flexible' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Hạn Chót Nộp Bài (Ngày &amp; Giờ) *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={toDatetimeLocalInputValue(cfg.dueAt)}
+                    onChange={e =>
+                      setTestForm(prev => ({
+                        ...prev,
+                        dueAt: parseScheduleTimestamp(e.target.value)
+                      }))
+                    }
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                  />
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {[
+                      { label: '+1 giờ', ms: 3_600_000 },
+                      { label: '+24 giờ', ms: 86_400_000 },
+                      { label: '+3 ngày', ms: 3 * 86_400_000 },
+                      { label: '+7 ngày', ms: 7 * 86_400_000 }
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setTestForm(prev => ({ ...prev, dueAt: Date.now() + preset.ms }))}
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-[#007A7A] text-[10px] font-bold text-slate-700 dark:text-slate-200 transition"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Giờ Bắt Đầu Mở Đề (Tùy chọn)
+                    </label>
+                    {cfg.openAt && (
+                      <button
+                        type="button"
+                        onClick={() => setTestForm(prev => ({ ...prev, openAt: null }))}
+                        className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                      >
+                        Mở ngay lập tức
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={toDatetimeLocalInputValue(cfg.openAt)}
+                    onChange={e =>
+                      setTestForm(prev => ({
+                        ...prev,
+                        openAt: parseScheduleTimestamp(e.target.value)
+                      }))
+                    }
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    {cfg.openAt ? `Học viên sẽ vào làm được từ ${formatViDateTime(cfg.openAt)}.` : 'Bỏ trống để học viên làm được ngay sau khi công khai.'}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Per-Skill Durations & Sequential Section Order */}

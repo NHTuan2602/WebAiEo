@@ -6,6 +6,8 @@ import {
   DEFAULT_SECTION_ORDER,
   DEFAULT_SECTION_DURATIONS,
   normalizeExamConfig,
+  evaluateTestSchedule,
+  formatViDateTime,
   getReadingPassages,
   getListeningTracks,
   createEmptyTestForm,
@@ -249,6 +251,10 @@ export default function App() {
   const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
   const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
   const [notifications, setNotifications] = useState([]);
+  const [sentNotifications, setSentNotifications] = useState([]);
+  const [focusedTestId, setFocusedTestId] = useState(null);
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
+  const serverClockOffsetMsRef = useRef(0);
   const seenNotifIdsRef = useRef(null);
   const serverBonusTotalRef = useRef(0);
   const [lobbyChatInput, setLobbyChatInput] = useState('');
@@ -1101,6 +1107,11 @@ export default function App() {
   const applyRemoteSnapshotData = useRef(null);
   applyRemoteSnapshotData.current = (snap) => {
     if (!snap || typeof snap !== 'object') return;
+    if (typeof snap.serverTime === 'number' && Number.isFinite(snap.serverTime)) {
+      const offset = snap.serverTime - Date.now();
+      serverClockOffsetMsRef.current = offset;
+      setServerClockOffsetMs(prev => (Math.abs(prev - offset) > 5000 ? offset : prev));
+    }
     if (snap.authenticated === false) {
       lastSyncVersionRef.current = -1;
       if (snap.bootId) {
@@ -1115,6 +1126,8 @@ export default function App() {
         setCurrentUser(null);
         seenNotifIdsRef.current = null;
         setNotifications([]);
+        setSentNotifications([]);
+        setFocusedTestId(null);
         setJoinedRoomPin(null);
         setGameSubState('JOIN');
         setView('AUTH');
@@ -1183,9 +1196,14 @@ export default function App() {
     if (Array.isArray(snap.adminFeedbacks)) {
       setAdminFeedbacks(prev => (JSON.stringify(prev) === JSON.stringify(snap.adminFeedbacks) ? prev : snap.adminFeedbacks));
     }
+    if (Array.isArray(snap.sentNotifications)) {
+      setSentNotifications(prev => (JSON.stringify(prev) === JSON.stringify(snap.sentNotifications) ? prev : snap.sentNotifications));
+    }
     if (Array.isArray(snap.notifications)) {
       const nextNotifs = snap.notifications;
-      if (seenNotifIdsRef.current !== null && currentUserRef.current?.username) {
+      const viewerRole = currentUserRef.current?.role;
+      const isViewerTeacherOrAdmin = viewerRole === 'teacher' || Boolean(currentUserRef.current?.isSuperAdmin);
+      if (!isViewerTeacherOrAdmin && seenNotifIdsRef.current !== null && currentUserRef.current?.username) {
         const freshlyArrived = nextNotifs.find(
           n => n && !n.isRead && !seenNotifIdsRef.current.has(n.id) && n.createdBy !== currentUserRef.current?.username
         );
@@ -1752,7 +1770,19 @@ export default function App() {
           setExpandedTeacherTestId(targetTest.id);
           setView('TEACHER_DASHBOARD');
         } else {
-          startExam(targetTest.id);
+          setFocusedTestId(targetTest.id);
+          const targetCfg = normalizeExamConfig(targetTest);
+          if (targetCfg.testMode === 'single_skill') {
+            const spMeta = normalizeSpeakingSection(targetTest.speaking);
+            const targetTab =
+              targetCfg.focusSkill === 'speaking' && spMeta.isForecast
+                ? 'forecast'
+                : targetCfg.focusSkill || 'speaking';
+            setSkillHubTab(targetTab);
+            setView('SKILL_HUB');
+          } else {
+            setView('HOME');
+          }
         }
       } else {
         showToast('Đề thi liên kết với thông báo này hiện không còn khả dụng hoặc đang ẩn.', 'info');
@@ -2731,6 +2761,8 @@ export default function App() {
     setAdminFeedbacks([]);
     seenNotifIdsRef.current = null;
     setNotifications([]);
+    setSentNotifications([]);
+    setFocusedTestId(null);
     serverBonusTotalRef.current = 0;
     currentUserRef.current = null;
     setCurrentUser(null);
@@ -2773,6 +2805,17 @@ export default function App() {
       return;
     }
 
+    const serverNowMs = Date.now() + serverClockOffsetMsRef.current;
+    const schedule = evaluateTestSchedule(cfg, serverNowMs);
+    if (currentUser?.role !== 'teacher' && schedule.lockedBySchedule) {
+      if (schedule.notYetOpen) {
+        showToast(`Bài làm này chưa đến giờ mở (Mở lúc ${formatViDateTime(schedule.openAt)}).`, 'error');
+      } else {
+        showToast(`Bài làm này đã hết hạn nộp lúc ${formatViDateTime(schedule.dueAt)}!`, 'error');
+      }
+      return;
+    }
+
     if (currentUser?.role !== 'teacher' && cfg.maxAttempts > 0) {
       const usedCount = attempts.filter(
         a => (a.studentId === currentUser?.username || a.studentUsername === currentUser?.username) && a.testId === testId
@@ -2797,10 +2840,19 @@ export default function App() {
 
     const restoredDraft = loadExamDraft(currentUser?.username, testId, tests);
     if (restoredDraft) {
-      setExamState(restoredDraft);
+      setExamState({
+        ...restoredDraft,
+        startedAtMs: restoredDraft.startedAtMs || serverNowMs,
+        startedAt: restoredDraft.startedAt || formatViDateTime(restoredDraft.startedAtMs || serverNowMs)
+      });
       showToast('Đã tự động khôi phục bài làm dở trước đó của bạn!', 'info');
     } else {
-      setExamState(buildInitialExamState(test));
+      setExamState({
+        ...buildInitialExamState(test),
+        startedAtMs: serverNowMs,
+        startedAt: formatViDateTime(serverNowMs),
+        accumulatedSeconds: 0
+      });
     }
     setView('EXAM_MODE');
   };
@@ -2938,6 +2990,22 @@ export default function App() {
     const singleObjectiveBand =
       cfg.focusSkill === 'listening' ? lBand : cfg.focusSkill === 'reading' ? rBand : null;
 
+    const activeSkillTotalSecs = (cfg.durations[examState.skill] || 15) * 60;
+    const currentSectionElapsed = Math.max(0, activeSkillTotalSecs - (Number(examState.timeRemaining) || 0));
+    const durationSeconds = Math.max(1, Math.round((Number(examState.accumulatedSeconds) || 0) + currentSectionElapsed));
+    const submittedAtMs = Date.now() + serverClockOffsetMsRef.current;
+    const startedAtMs = Number(examState.startedAtMs) || Math.max(1, submittedAtMs - durationSeconds * 1000);
+    const startedAt = examState.startedAt || formatViDateTime(startedAtMs);
+    const dueAtMs = cfg.dueAt ? Number(cfg.dueAt) : null;
+    const timelinessStatus = cfg.scheduleMode === 'flexible' || !dueAtMs
+      ? 'flexible'
+      : submittedAtMs > dueAtMs
+      ? 'late'
+      : 'on_time';
+    const lateByMinutes = timelinessStatus === 'late' && dueAtMs
+      ? Math.max(1, Math.round((submittedAtMs - dueAtMs) / 60_000))
+      : 0;
+
     const newAttempt = {
       id: createUniqueAttemptId('att', currentUser?.username),
       testId: activeTest.id,
@@ -2946,7 +3014,13 @@ export default function App() {
       focusSkill: cfg.focusSkill,
       studentId: currentUser?.username || 'std_guest',
       studentName: currentUser?.name || 'Học sinh',
-      submittedAt: new Date().toLocaleString('vi-VN'),
+      startedAtMs,
+      startedAt,
+      submittedAtMs,
+      submittedAt: formatViDateTime(submittedAtMs),
+      durationSeconds,
+      timelinessStatus,
+      lateByMinutes,
       answers: examState.answers,
       antiCheatLogs: examState.antiCheatLogs,
       tabSwitchCount: examState.tabSwitchCount,
@@ -3004,15 +3078,21 @@ export default function App() {
     const nextDurationSecs = (cfg.durations[nextSkill] || 15) * 60;
     const skillNames = { listening: 'Listening', reading: 'Reading', writing: 'Writing' };
 
-    setExamState(prev => ({
-      ...prev,
-      sectionIdx: nextIdx,
-      skill: nextSkill,
-      timeRemaining: nextDurationSecs,
-      visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), nextSkill])),
-      listeningTrackIdx: 0,
-      readingPassageIdx: 0
-    }));
+    setExamState(prev => {
+      const prevSkill = prev.skill || cfg.order[currentIdx];
+      const prevAllocatedSecs = (cfg.durations[prevSkill] || 15) * 60;
+      const prevSpentSecs = Math.max(0, prevAllocatedSecs - (Number(prev.timeRemaining) || 0));
+      return {
+        ...prev,
+        sectionIdx: nextIdx,
+        skill: nextSkill,
+        timeRemaining: nextDurationSecs,
+        accumulatedSeconds: (Number(prev.accumulatedSeconds) || 0) + prevSpentSecs,
+        visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), nextSkill])),
+        listeningTrackIdx: 0,
+        readingPassageIdx: 0
+      };
+    });
     showToast(
       isAutoTimeout
         ? `Hết giờ phần trước — Tự động chuyển sang ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
@@ -3822,6 +3902,16 @@ export default function App() {
       return;
     }
     const cfg = normalizeExamConfig(testForm);
+    if (cfg.scheduleMode !== 'flexible' && !cfg.dueAt) {
+      setBuilderTab('general');
+      showToast('Vui lòng chọn Hạn chót nộp bài (hoặc chuyển sang Làm khi nào cũng được)!', 'error');
+      return;
+    }
+    if (cfg.openAt && cfg.dueAt && cfg.openAt >= cfg.dueAt) {
+      setBuilderTab('general');
+      showToast('Giờ bắt đầu mở đề phải sớm hơn Hạn chót nộp bài!', 'error');
+      return;
+    }
     const tracks = getListeningTracks(testForm.listening);
     const firstTrack = tracks[0] || {};
     const passages = getReadingPassages(testForm.reading);
@@ -3862,6 +3952,9 @@ export default function App() {
       sequentialMode: cfg.sequentialMode,
       allowEarlyNextSection: cfg.allowEarlyNextSection,
       antiCheatEnabled: cfg.antiCheatEnabled,
+      scheduleMode: cfg.scheduleMode,
+      openAt: cfg.openAt,
+      dueAt: cfg.dueAt,
       sectionOrder: cfg.order,
       sectionDurations: cfg.durations,
       speaking: normalizeSpeakingSection(testForm.speaking),
@@ -5137,13 +5230,17 @@ export default function App() {
         <StudentHome
           attempts={attempts}
           currentUser={currentUser}
+          focusedTestId={focusedTestId}
+          onClearFocusedTest={() => setFocusedTestId(null)}
           openMemberProfile={openMemberProfile}
           openSkillPracticeHub={(tab = 'speaking') => {
+            setFocusedTestId(null);
             setSkillHubTab(tab);
             setView('SKILL_HUB');
           }}
           openStudentGamePortal={openStudentGamePortal}
           roomsDb={roomsDb}
+          serverClockOffsetMs={serverClockOffsetMs}
           setEditingTargetUser={setEditingTargetUser}
           setPreviousView={setPreviousView}
           setSelectedAttemptId={setSelectedAttemptId}
@@ -5162,8 +5259,16 @@ export default function App() {
           aiConfigured={aiConfigured}
           attempts={attempts}
           currentUser={currentUser}
-          onChangeTab={setSkillHubTab}
-          onOpenFullExamCatalog={() => setView('HOME')}
+          focusedTestId={focusedTestId}
+          onChangeTab={nextTab => {
+            setFocusedTestId(null);
+            setSkillHubTab(nextTab);
+          }}
+          onClearFocusedTest={() => setFocusedTestId(null)}
+          onOpenFullExamCatalog={() => {
+            setFocusedTestId(null);
+            setView('HOME');
+          }}
           onOpenResult={attId => {
             setSelectedAttemptId(attId);
             setPreviousView('SKILL_HUB');
@@ -5173,6 +5278,7 @@ export default function App() {
           onOpenSkillBuilder={(skill, testToEdit = null) => openSingleSkillBuilder(skill, testToEdit)}
           onStartSingleSkillExam={testId => startExam(testId)}
           onStartSpeakingExam={(testId, partMode = 'full') => startExam(testId, partMode)}
+          serverClockOffsetMs={serverClockOffsetMs}
           tests={tests}
         />
       )}
@@ -5401,7 +5507,7 @@ export default function App() {
           handleTeacherOpenLobby={handleTeacherOpenLobby}
           handleTeacherResetLobby={handleTeacherResetLobby}
           initGameCampaign={initGameCampaign}
-          notifications={notifications}
+          notifications={sentNotifications}
           openExamBuilder={openExamBuilder}
           openMemberProfile={openMemberProfile}
           openSingleSkillBuilder={openSingleSkillBuilder}

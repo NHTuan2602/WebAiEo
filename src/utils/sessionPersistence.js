@@ -42,7 +42,10 @@ export function buildInitialExamState(test = null) {
     showAllListeningQs: false,
     readingPassageIdx: 0,
     showAllReadingQs: false,
-    writingTaskIdx: 0
+    writingTaskIdx: 0,
+    startedAt: '',
+    startedAtMs: null,
+    accumulatedSeconds: 0
   };
 }
 
@@ -83,7 +86,10 @@ export function loadExamDraft(username, testId, testsList = []) {
       showAllListeningQs: Boolean(parsed.showAllListeningQs),
       readingPassageIdx: Number(parsed.readingPassageIdx) || 0,
       showAllReadingQs: Boolean(parsed.showAllReadingQs),
-      writingTaskIdx: Number(parsed.writingTaskIdx) === 1 ? 1 : 0
+      writingTaskIdx: Number(parsed.writingTaskIdx) === 1 ? 1 : 0,
+      startedAt: typeof parsed.startedAt === 'string' ? parsed.startedAt : '',
+      startedAtMs: Number(parsed.startedAtMs) > 0 ? Number(parsed.startedAtMs) : null,
+      accumulatedSeconds: Math.max(0, Number(parsed.accumulatedSeconds) || 0)
     };
   } catch (_err) {
     return null;

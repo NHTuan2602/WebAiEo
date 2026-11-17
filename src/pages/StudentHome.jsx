@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BookOpen,
   CheckCircle2,
@@ -17,7 +17,7 @@ import {
   Sparkles,
   TrendingUp
 } from 'lucide-react';
-import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import { evaluateTestSchedule, formatViDateTime, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
 import { BRAND_INFO } from '../constants/brandInfo';
 import { loadExamDraft } from '../utils/sessionPersistence';
 import BrandContactFooter from '../components/common/BrandContactFooter';
@@ -28,10 +28,13 @@ import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
 export default function StudentHome({
   attempts,
   currentUser,
+  focusedTestId = null,
+  onClearFocusedTest,
   openMemberProfile,
   openSkillPracticeHub,
   openStudentGamePortal,
   roomsDb = {},
+  serverClockOffsetMs = 0,
   setEditingTargetUser,
   setPreviousView,
   setSelectedAttemptId,
@@ -43,17 +46,26 @@ export default function StudentHome({
   usersDb = {}
 }) {
   const [testFilter, setTestFilter] = useState('all');
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, []);
   const isTeacher = currentUser?.role === 'teacher';
+  const serverNowMs = nowMs + serverClockOffsetMs;
 
   const visibleTests = tests.filter(t => isTeacher || normalizeExamConfig(t).visibility !== 'private');
   const fullExamTests = visibleTests.filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
   const singleSkillCount = visibleTests.filter(t => normalizeExamConfig(t).testMode === 'single_skill').length;
-  const filteredTests = fullExamTests.filter(t => {
-    const cfg = normalizeExamConfig(t);
-    if (testFilter === 'unlimited') return cfg.maxAttempts === 0;
-    if (testFilter === 'limited') return cfg.maxAttempts > 0;
-    return true;
-  });
+  const matchedFocusedTest = focusedTestId ? fullExamTests.find(t => t.id === focusedTestId) : null;
+  const filteredTests = matchedFocusedTest
+    ? [matchedFocusedTest]
+    : fullExamTests.filter(t => {
+        const cfg = normalizeExamConfig(t);
+        if (testFilter === 'unlimited') return cfg.maxAttempts === 0;
+        if (testFilter === 'limited') return cfg.maxAttempts > 0;
+        return true;
+      });
 
   const studentAttempts = attempts.filter(
     a => a.studentId === currentUser?.username || a.studentUsername === currentUser?.username
@@ -74,7 +86,8 @@ export default function StudentHome({
   const firstPlayableTest = fullExamTests.find(t => {
     const cfg = normalizeExamConfig(t);
     const used = studentAttempts.filter(a => a.testId === t.id).length;
-    return !(cfg.maxAttempts > 0 && used >= cfg.maxAttempts);
+    const sched = evaluateTestSchedule(cfg, serverNowMs);
+    return !(cfg.maxAttempts > 0 && used >= cfg.maxAttempts) && (isTeacher || !sched.lockedBySchedule);
   }) || fullExamTests[0];
   const firstTestHasDraft = firstPlayableTest ? Boolean(draftByTestId[firstPlayableTest.id]) : false;
 
@@ -132,7 +145,8 @@ export default function StudentHome({
 
   return (
     <div className="space-y-10">
-      {/* Soft Pastel Hero Section */}
+      {/* Soft Pastel Hero Section (collapsed when notification opens a specific exam card) */}
+      {!matchedFocusedTest && (
       <section className="lexi-hero-surface border-b border-pink-200/90 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-11">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-center">
@@ -280,9 +294,11 @@ export default function StudentHome({
           </div>
         </div>
       </section>
+      )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 ${matchedFocusedTest ? 'pt-8 pb-6 space-y-6' : 'space-y-10'}`}>
         {/* Distinct 4-Card Learning Metrics (no duplication with hero target card) */}
+        {!matchedFocusedTest && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center shrink-0 border border-[#B5F5F1] dark:border-teal-500/30">
@@ -332,6 +348,7 @@ export default function StudentHome({
             </div>
           </button>
         </div>
+        )}
 
         {/* Section: Thi Thử Theo Bộ Đề */}
         <section id="lexiprep-exam-catalog">
@@ -345,8 +362,22 @@ export default function StudentHome({
               </p>
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex items-center flex-wrap gap-1.5 bg-[#FFF5F8] dark:bg-[#0F172B] p-1.5 rounded-xl border border-pink-200/90 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
+            {/* Filter Pills or Focused Reset */}
+            {matchedFocusedTest && onClearFocusedTest ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-[#EDFFFD] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/35">
+                  📌 Đề thi từ thông báo
+                </span>
+                <button
+                  type="button"
+                  onClick={onClearFocusedTest}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-[#007A7A] text-xs font-bold text-slate-700 dark:text-slate-200 transition"
+                >
+                  ← Xem toàn bộ {fullExamTests.length} đề thi
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center flex-wrap gap-1.5 bg-[#FFF5F8] dark:bg-[#0F172B] p-1.5 rounded-xl border border-pink-200/90 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
               {[
                 { id: 'all', label: `Tất cả đề thi (${fullExamTests.length})` },
                 { id: 'unlimited', label: 'Luyện tập tự do' },
@@ -366,6 +397,7 @@ export default function StudentHome({
                 </button>
               ))}
             </div>
+            )}
           </div>
 
           {filteredTests.length === 0 ? (
@@ -375,11 +407,14 @@ export default function StudentHome({
                 : 'Không có bộ đề nào trong bộ lọc này. Hãy chuyển sang tab "Tất cả".'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className={`grid gap-5 ${matchedFocusedTest ? 'grid-cols-1 max-w-xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
               {filteredTests.map(test => {
                 const cfg = normalizeExamConfig(test);
+                const schedule = evaluateTestSchedule(cfg, serverNowMs);
                 const myUsedCount = studentAttempts.filter(a => a.testId === test.id).length;
                 const isExhausted = cfg.maxAttempts > 0 && myUsedCount >= cfg.maxAttempts;
+                const isLockedBySchedule = !isTeacher && schedule.lockedBySchedule;
+                const isButtonDisabled = isExhausted || isLockedBySchedule;
                 const skillShort = { listening: 'L', reading: 'R', writing: 'W' };
                 const totalMins = cfg.order.reduce((sum, s) => sum + (cfg.durations[s] || 0), 0);
                 const hasDraft = Boolean(draftByTestId[test.id]);
@@ -389,7 +424,11 @@ export default function StudentHome({
                 return (
                   <div
                     key={test.id}
-                    className="lexi-card bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border border-pink-200/90 dark:border-slate-800 p-6 flex flex-col justify-between hover:border-[#007A7A]/60 dark:hover:border-teal-500/50"
+                    className={`lexi-card bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border p-6 flex flex-col justify-between ${
+                      matchedFocusedTest?.id === test.id
+                        ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                        : 'border-pink-200/90 dark:border-slate-800 hover:border-[#007A7A]/60 dark:hover:border-teal-500/50'
+                    }`}
                   >
                     <div>
                       <div className="flex flex-wrap justify-between items-center gap-2 mb-3.5">
@@ -467,23 +506,49 @@ export default function StudentHome({
                           )}
                         </div>
                       </div>
+
+                      <div className="mb-4 flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                        {cfg.scheduleMode === 'flexible' ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
+                          </span>
+                        ) : schedule.lockedBySchedule ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> {schedule.notYetOpen ? `Mở lúc ${formatViDateTime(schedule.openAt)}` : `Đã hết hạn (${formatViDateTime(schedule.dueAt)})`}
+                          </span>
+                        ) : schedule.isLateWindow ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn mở (báo trễ)
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <button
                       onClick={() => startExam(test.id)}
-                      disabled={isExhausted}
+                      disabled={isButtonDisabled}
                       className={`w-full font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm ${
-                        isExhausted
+                        isButtonDisabled
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed'
                           : hasDraft
                           ? 'bg-[#1447E6] hover:bg-[#1C398E] text-white'
                           : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                       }`}
                     >
-                      {isExhausted ? (
+                      {isButtonDisabled ? (
                         <>
                           <Lock className="w-3.5 h-3.5" />
-                          <span>Đã hết lượt làm bài ({myUsedCount}/{cfg.maxAttempts})</span>
+                          <span>
+                            {isExhausted
+                              ? `Đã hết lượt làm bài (${myUsedCount}/${cfg.maxAttempts})`
+                              : schedule.notYetOpen
+                              ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
+                              : 'Đã hết hạn nộp bài'}
+                          </span>
                         </>
                       ) : (
                         <>
@@ -629,16 +694,30 @@ export default function StudentHome({
                                 const mTitle = resolveVisibleTitleBadge({ ...u, username: uname }, attempts, roomsDb);
                                 if (memberIsAdmin) {
                                   return (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
-                                      <ShieldCheck className="w-3 h-3" /> Quản trị hệ thống
-                                    </span>
+                                    <>
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
+                                        <ShieldCheck className="w-3 h-3" /> Quản trị hệ thống
+                                      </span>
+                                      {mTitle && (
+                                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${mTitle.badgeClass}`}>
+                                          {mTitle.icon} {mTitle.label}
+                                        </span>
+                                      )}
+                                    </>
                                   );
                                 }
                                 if (memberIsTeacher) {
                                   return (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                      <ShieldCheck className="w-3 h-3" /> Giáo viên IELTS
-                                    </span>
+                                    <>
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                        <ShieldCheck className="w-3 h-3" /> Giáo viên IELTS
+                                      </span>
+                                      {mTitle && (
+                                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${mTitle.badgeClass}`}>
+                                          {mTitle.icon} {mTitle.label}
+                                        </span>
+                                      )}
+                                    </>
                                   );
                                 }
                                 return (

@@ -15,7 +15,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import { getSpeakingQuestionItems, normalizeExamConfig } from '../constants/seedData';
+import { formatViDateTime, getSpeakingQuestionItems, normalizeExamConfig } from '../constants/seedData';
 import { createUniqueAttemptId } from '../utils/examHelpers';
 import { cleanAudioMimeType, roundSpeakingBand } from '../utils/speakingAiEngine';
 import { pickSupportedAudioMimeType, requestAiSpeakingGrading, uploadSpeakingRecording } from '../utils/speakingApi';
@@ -78,6 +78,7 @@ export default function SpeakingExamRoom({
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const recordStartedAtRef = useRef(0);
+  const examStartedAtRef = useRef(0);
   const recognitionRef = useRef(null);
   const liveTranscriptRef = useRef('');
   const audioCtxRef = useRef(null);
@@ -87,6 +88,10 @@ export default function SpeakingExamRoom({
   const prepTimerRef = useRef(null);
   const createdUrlsRef = useRef([]);
   const submitLockRef = useRef(false);
+
+  useEffect(() => {
+    examStartedAtRef.current = Date.now();
+  }, [selectedTestId]);
 
   const stopMeterLoop = () => {
     if (meterRafRef.current) {
@@ -477,6 +482,19 @@ export default function SpeakingExamRoom({
         };
       });
 
+      const submittedAtMs = Date.now();
+      const startedAtMs = examStartedAtRef.current > 0 ? examStartedAtRef.current : submittedAtMs;
+      const durationSeconds = Math.max(1, Math.round((submittedAtMs - startedAtMs) / 1000));
+      const dueAt = cfg.dueAt ? Number(cfg.dueAt) : null;
+      const timelinessStatus = cfg.scheduleMode === 'flexible' || !dueAt
+        ? 'flexible'
+        : submittedAtMs > dueAt
+        ? 'late'
+        : 'on_time';
+      const lateByMinutes = timelinessStatus === 'late' && dueAt
+        ? Math.max(1, Math.round((submittedAtMs - dueAt) / 60_000))
+        : 0;
+
       const newAttempt = {
         id: attemptId,
         testId: activeTest.id,
@@ -486,7 +504,13 @@ export default function SpeakingExamRoom({
         speakingPartMode: partMode,
         studentId: currentUser?.username || 'std_guest',
         studentName: currentUser?.name || 'Học viên',
-        submittedAt: new Date().toLocaleString('vi-VN'),
+        startedAtMs,
+        startedAt: formatViDateTime(startedAtMs),
+        submittedAtMs,
+        submittedAt: formatViDateTime(submittedAtMs),
+        durationSeconds,
+        timelinessStatus,
+        lateByMinutes,
         answers: {
           part2Notes,
           speakingRecordingsCount: enrichedRecordings.filter(r => r.durationSec > 0).length

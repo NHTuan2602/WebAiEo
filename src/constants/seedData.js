@@ -234,6 +234,19 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
   return items;
 };
 
+export const parseScheduleTimestamp = (val) => {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'number') {
+    return Number.isFinite(val) && val > 0 ? val : null;
+  }
+  const str = String(val).trim();
+  if (!str) return null;
+  const num = Number(str);
+  if (Number.isFinite(num) && num > 0) return num;
+  const parsed = Date.parse(str);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 export const normalizeExamConfig = (test) => {
   const testMode = test?.testMode === 'single_skill' ? 'single_skill' : 'full_exam';
   const focusSkill = testMode === 'single_skill' && ALL_SKILL_OPTIONS.includes(test?.focusSkill)
@@ -259,6 +272,12 @@ export const normalizeExamConfig = (test) => {
     speaking: Math.max(1, Number(rawDurations.speaking ?? DEFAULT_SECTION_DURATIONS.speaking) || 14)
   };
 
+  const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(test?.scheduleMode)
+    ? test.scheduleMode
+    : 'flexible';
+  const openAt = parseScheduleTimestamp(test?.openAt);
+  const dueAt = parseScheduleTimestamp(test?.dueAt);
+
   return {
     testMode,
     focusSkill,
@@ -267,9 +286,60 @@ export const normalizeExamConfig = (test) => {
     sequentialMode: testMode === 'single_skill' ? false : test?.sequentialMode !== false,
     allowEarlyNextSection: testMode === 'single_skill' ? true : !!test?.allowEarlyNextSection,
     antiCheatEnabled: test?.antiCheatEnabled !== false,
+    scheduleMode,
+    openAt,
+    dueAt,
     order,
     durations
   };
+};
+
+export const evaluateTestSchedule = (testOrCfg, nowMs = Date.now()) => {
+  const cfg = testOrCfg && Array.isArray(testOrCfg.order) && 'scheduleMode' in testOrCfg
+    ? testOrCfg
+    : normalizeExamConfig(testOrCfg);
+  const notYetOpen = Boolean(cfg.openAt && nowMs < cfg.openAt);
+  const hasDue = Boolean(cfg.scheduleMode !== 'flexible' && cfg.dueAt);
+  const pastDue = Boolean(hasDue && nowMs > cfg.dueAt);
+  const lockedBySchedule = notYetOpen || (cfg.scheduleMode === 'deadline_lock' && pastDue);
+  const isLateWindow = cfg.scheduleMode === 'deadline_track' && pastDue;
+  return {
+    scheduleMode: cfg.scheduleMode,
+    openAt: cfg.openAt,
+    dueAt: cfg.dueAt,
+    notYetOpen,
+    hasDue,
+    pastDue,
+    lockedBySchedule,
+    isLateWindow
+  };
+};
+
+export const formatViDateTime = (tsMs) => {
+  const num = parseScheduleTimestamp(tsMs);
+  if (!num) return '';
+  const d = new Date(num);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
+export const toDatetimeLocalInputValue = (tsMs) => {
+  const num = parseScheduleTimestamp(tsMs);
+  if (!num) return '';
+  const d = new Date(num);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+export const formatDurationVi = (totalSeconds) => {
+  const secs = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  if (!secs) return '';
+  const hrs = Math.floor(secs / 3600);
+  const mins = Math.floor((secs % 3600) / 60);
+  const rem = secs % 60;
+  if (hrs > 0) return `${hrs}g ${mins}p ${rem}s`;
+  if (mins > 0) return rem > 0 ? `${mins}p ${rem}s` : `${mins} phút`;
+  return `${rem} giây`;
 };
 
 export const getReadingPassages = (readingObj) => {

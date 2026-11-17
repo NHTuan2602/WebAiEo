@@ -53,6 +53,9 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_VOCAB_TEXT,
+  evaluateTestSchedule,
+  formatDurationVi,
+  formatViDateTime,
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
@@ -380,6 +383,22 @@ export default function TeacherDashboard({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0">
+            {cfg.scheduleMode !== 'flexible' && cfg.dueAt && (() => {
+              const sched = evaluateTestSchedule(cfg);
+              return (
+                <span
+                  className={`min-h-[32px] text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 border ${
+                    sched.lockedBySchedule
+                      ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
+                      : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+                  }`}
+                >
+                  <Clock className="w-3 h-3" />
+                  {cfg.scheduleMode === 'deadline_lock' ? 'Khóa sau ' : 'Hạn '}
+                  {formatViDateTime(cfg.dueAt)}
+                </span>
+              );
+            })()}
             <button
               type="button"
               onClick={() => handleOpenCompletionModal(t.id)}
@@ -1342,7 +1361,27 @@ export default function TeacherDashboard({
                           <span>{att.testTitle}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{att.submittedAt}</td>
+                      <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-slate-700 dark:text-slate-200">{att.submittedAt}</p>
+                          {(att.startedAt || Number(att.durationSeconds) > 0) && (
+                            <p className="text-[11px] text-slate-400">
+                              {att.startedAt ? `Bắt đầu: ${att.startedAt}` : ''}
+                              {att.startedAt && Number(att.durationSeconds) > 0 ? ' • ' : ''}
+                              {Number(att.durationSeconds) > 0 ? `Thời lượng: ${formatDurationVi(att.durationSeconds)}` : ''}
+                            </p>
+                          )}
+                          {att.timelinessStatus === 'late' ? (
+                            <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300">
+                              Nộp muộn{att.lateByMinutes ? ` ${att.lateByMinutes}p` : ''}
+                            </span>
+                          ) : att.timelinessStatus === 'on_time' ? (
+                            <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                              Đúng hạn
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-center">
                         <div className="inline-flex flex-col items-center gap-1">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${risk.color}`}>
@@ -2286,6 +2325,12 @@ export default function TeacherDashboard({
                               ) : (
                                 <span>
                                   Nộp gần nhất: <strong>{row.latestAttempt?.submittedAt}</strong>
+                                  {Number(row.latestAttempt?.durationSeconds) > 0 && (
+                                    <> · Thời lượng: <strong>{formatDurationVi(row.latestAttempt.durationSeconds)}</strong></>
+                                  )}
+                                  {row.latestAttempt?.timelinessStatus === 'late' && (
+                                    <> · <span className="text-rose-600 dark:text-rose-400 font-bold">Nộp muộn{row.latestAttempt.lateByMinutes ? ` ${row.latestAttempt.lateByMinutes}p` : ''}</span></>
+                                  )}
                                   {row.bestBand !== null ? (
                                     <> · Band cao nhất: <strong className="text-[#007A7A] dark:text-[#1EE1D6]">{row.bestBand}</strong></>
                                   ) : row.hasPendingGrade ? (

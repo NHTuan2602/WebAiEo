@@ -44,7 +44,7 @@ import {
   Crop
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import { normalizeExamConfig } from '../constants/seedData';
+import { formatDurationVi, normalizeExamConfig } from '../constants/seedData';
 import { countExtensionCheatSignals, getRiskAssessment, readImageFileAsDataUrl } from '../utils/examHelpers';
 import ImageCropperModal from '../components/modals/ImageCropperModal';
 import {
@@ -93,6 +93,7 @@ export default function StudentProfile({
   const [replyDrafts, setReplyDrafts] = useState({});
   const [statusDrafts, setStatusDrafts] = useState({});
   const [showTitlesModal, setShowTitlesModal] = useState(false);
+  const [titleFilter, setTitleFilter] = useState('all');
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
   const [coverCropSource, setCoverCropSource] = useState('');
@@ -416,31 +417,29 @@ export default function StudentProfile({
                       <ShieldCheck className="w-3 h-3" /> Giáo Viên IELTS
                     </span>
                   ) : (
-                    <>
-                      <span className="text-xs bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> Học Viên Chính Thức
-                      </span>
-                      {visibleTitle && !visibleTitle.isRoleBuiltIn && (
-                        <button
-                          type="button"
-                          onClick={() => setShowTitlesModal(true)}
-                          title="Bấm để xem bảng danh hiệu và cách đạt được"
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold border flex items-center gap-1 hover:scale-105 transition cursor-pointer ${visibleTitle.badgeClass}`}
-                        >
-                          <span>{visibleTitle.icon}</span>
-                          <span>{visibleTitle.label}</span>
-                        </button>
-                      )}
-                      {isSelf && student.showTitleBadge === false && (
-                        <button
-                          type="button"
-                          onClick={() => setShowTitlesModal(true)}
-                          className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 transition"
-                        >
-                          <EyeOff className="w-3 h-3" /> Đang tắt danh hiệu
-                        </button>
-                      )}
-                    </>
+                    <span className="text-xs bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Học Viên Chính Thức
+                    </span>
+                  )}
+                  {visibleTitle && !visibleTitle.isRoleBuiltIn && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTitlesModal(true)}
+                      title="Bấm để xem bảng danh hiệu và cách đạt được"
+                      className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold border flex items-center gap-1 hover:scale-105 transition cursor-pointer ${visibleTitle.badgeClass}`}
+                    >
+                      <span>{visibleTitle.icon}</span>
+                      <span>{visibleTitle.label}</span>
+                    </button>
+                  )}
+                  {isSelf && student.showTitleBadge === false && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTitlesModal(true)}
+                      className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 transition"
+                    >
+                      <EyeOff className="w-3 h-3" /> Đang tắt danh hiệu
+                    </button>
                   )}
                 </div>
 
@@ -492,15 +491,13 @@ export default function StudentProfile({
                       </button>
                     </>
                   )}
-                  {!isTargetTeacher && !isTargetSystemAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => setShowTitlesModal(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDFFFD] hover:bg-[#B5F5F1]/50 dark:bg-teal-500/15 dark:hover:bg-teal-500/25 border border-[#B5F5F1] dark:border-teal-400/40 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold transition"
-                    >
-                      <Trophy className="w-3.5 h-3.5" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 9})
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowTitlesModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDFFFD] hover:bg-[#B5F5F1]/50 dark:bg-teal-500/15 dark:hover:bg-teal-500/25 border border-[#B5F5F1] dark:border-teal-400/40 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold transition"
+                  >
+                    <Trophy className="w-3.5 h-3.5" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
+                  </button>
                 </div>
 
                 {!isSelf && !isTeacherViewer && !isTargetSystemAdmin && (
@@ -1086,7 +1083,7 @@ export default function StudentProfile({
                       : 'bg-slate-50/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/80 shadow-sm'
                   }`}
                 >
-                  <div className="flex justify-between items-start mb-3">
+                  <div className="flex justify-between items-start gap-2 mb-3">
                     <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg ${
                       idx === chronologicalAttempts.length - 1
                         ? 'bg-[#007A7A] text-white'
@@ -1094,7 +1091,15 @@ export default function StudentProfile({
                     }`}>
                       Lần thi #{idx + 1} {idx === chronologicalAttempts.length - 1 ? '(Gần nhất)' : ''}
                     </span>
-                    <span className="text-xs text-slate-400 dark:text-slate-400 font-medium">{att.submittedAt}</span>
+                    <div className="text-right">
+                      <span className="text-xs text-slate-400 dark:text-slate-400 font-medium block">{att.submittedAt}</span>
+                      {Number(att.durationSeconds) > 0 && (
+                        <span className="text-[10px] font-bold text-[#007A7A] dark:text-[#1EE1D6] block">
+                          ⏱️ {formatDurationVi(att.durationSeconds)}
+                          {att.timelinessStatus === 'late' ? ` • Trễ ${att.lateByMinutes || 1}p` : ''}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <p className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-3 line-clamp-1">{att.testTitle}</p>
@@ -1289,7 +1294,25 @@ export default function StudentProfile({
                         <p className="font-bold text-slate-900 dark:text-white">{att.testTitle}</p>
                         <span className="text-[10px] text-slate-400 font-mono">ID: {att.id} • Lần thi #{studentAttempts.length - idx}</span>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">{att.submittedAt}</td>
+                      <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="space-y-0.5">
+                          <span className="font-semibold text-slate-700 dark:text-slate-200 block">{att.submittedAt}</span>
+                          {Number(att.durationSeconds) > 0 && (
+                            <span className="text-[11px] text-slate-400 block">
+                              Làm trong {formatDurationVi(att.durationSeconds)}
+                            </span>
+                          )}
+                          {att.timelinessStatus === 'late' ? (
+                            <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300">
+                              Nộp muộn{att.lateByMinutes ? ` ${att.lateByMinutes}p` : ''}
+                            </span>
+                          ) : att.timelinessStatus === 'on_time' ? (
+                            <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                              Đúng hạn
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-center">
                         <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores?.listening?.band ?? '-'}</span>
                         <span className="text-[11px] text-slate-400 block font-normal">({att.scores?.listening?.raw || 0}/{att.scores?.listening?.total || 0} câu)</span>
@@ -1545,36 +1568,53 @@ export default function StudentProfile({
                           )}
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 flex-wrap mt-0.5">
-                          {isMemberAdmin ? (
-                            <span className="text-purple-700 dark:text-purple-300 font-bold inline-flex items-center gap-1">
-                              Quản trị &bull; Góp ý
-                              {newFeedbacksCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
-                                  {newFeedbacksCount} mới
-                                </span>
-                              )}
-                            </span>
-                          ) : isMemberTeacher ? (
-                            <span className="text-amber-600 dark:text-amber-300 font-bold">Giáo viên</span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 flex-wrap">
-                              {(() => {
-                                const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
-                                if (mTitle && !mTitle.isRoleBuiltIn) {
-                                  return (
+                          {(() => {
+                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
+                            if (isMemberAdmin) {
+                              return (
+                                <>
+                                  <span className="text-purple-700 dark:text-purple-300 font-bold inline-flex items-center gap-1">
+                                    Quản trị &bull; Góp ý
+                                    {newFeedbacksCount > 0 && (
+                                      <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
+                                        {newFeedbacksCount} mới
+                                      </span>
+                                    )}
+                                  </span>
+                                  {mTitle && !mTitle.isRoleBuiltIn && (
                                     <span className={`px-1.5 py-0.2 rounded-full border font-extrabold text-[9px] ${mTitle.badgeClass}`}>
                                       {mTitle.icon} {mTitle.label}
                                     </span>
-                                  );
-                                }
-                                return null;
-                              })()}
-                              <span>
-                                Target {member.targetBand || '7.5'}
-                                {mBest !== null ? ` • Best ${mBest}` : ''}
+                                  )}
+                                </>
+                              );
+                            }
+                            if (isMemberTeacher) {
+                              return (
+                                <>
+                                  <span className="text-amber-600 dark:text-amber-300 font-bold">Giáo viên</span>
+                                  {mTitle && !mTitle.isRoleBuiltIn && (
+                                    <span className={`px-1.5 py-0.2 rounded-full border font-extrabold text-[9px] ${mTitle.badgeClass}`}>
+                                      {mTitle.icon} {mTitle.label}
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1 flex-wrap">
+                                {mTitle && !mTitle.isRoleBuiltIn && (
+                                  <span className={`px-1.5 py-0.2 rounded-full border font-extrabold text-[9px] ${mTitle.badgeClass}`}>
+                                    {mTitle.icon} {mTitle.label}
+                                  </span>
+                                )}
+                                <span>
+                                  Target {member.targetBand || '7.5'}
+                                  {mBest !== null ? ` • Best ${mBest}` : ''}
+                                </span>
                               </span>
-                            </span>
-                          )}
+                            );
+                          })()}
                         </p>
                       </div>
                     </button>
@@ -1586,8 +1626,24 @@ export default function StudentProfile({
         </aside>
       </div>
 
-      {/* Modal: Bảng Danh Hiệu Học Viên & Cách Đạt Được */}
-      {showTitlesModal && !isTargetTeacher && !isTargetSystemAdmin && titleSummary && (
+      {/* Modal: Bảng Danh Hiệu & Cách Đạt Được (Học viên, Giáo viên & Quản trị) */}
+      {showTitlesModal && titleSummary && (() => {
+        const allTitleItems = titleSummary.itemsWithProgress || [];
+        const hardTitleCount = allTitleItems.filter(i => i.difficulty === 'Khó' || i.difficulty === 'Cực Khó').length;
+        const filteredTitles = allTitleItems.filter(item => {
+          if (titleFilter === 'unlocked') return item.unlocked;
+          if (titleFilter === 'locked') return !item.unlocked;
+          if (titleFilter === 'hard') return item.difficulty === 'Khó' || item.difficulty === 'Cực Khó';
+          return true;
+        });
+        const diffBadgeCls = (diff) => {
+          if (diff === 'Cực Khó') return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/40';
+          if (diff === 'Khó') return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/40';
+          if (diff === 'Thử Thách') return 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/40';
+          return 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+        };
+
+        return (
         <div
           className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowTitlesModal(false)}
@@ -1599,10 +1655,14 @@ export default function StudentProfile({
             <div className="px-6 py-4 bg-gradient-to-r from-[#0F172B] via-[#003538] to-[#065B5B] text-white flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-amber-300" /> Bảng Danh Hiệu Học Viên — {student.name}
+                  <Trophy className="w-5 h-5 text-amber-300" /> Bảng Danh Hiệu — {student.name}
                 </h3>
                 <p className="text-xs text-teal-100/90 mt-0.5">
-                  Dành riêng cho Học viên (Giảng viên &amp; Quản trị có huy hiệu chức vụ cố định). Hoàn thành bài thi &amp; chơi Game để mở khóa toàn bộ!
+                  {titleSummary.autoUnlockedAll
+                    ? 'Đặc quyền Quản trị Hệ thống: Tự động mở khóa 100% tất cả danh hiệu hiện tại và mọi danh hiệu mới trong tương lai!'
+                    : isTargetTeacher
+                    ? 'Giảng viên & Học viên đều có thể cày mở khóa, trang bị hoặc bật/tắt Danh Hiệu trên hồ sơ và Đấu Trường.'
+                    : 'Hoàn thành bài thi, chơi Game & duy trì ngày đăng nhập (kể cả mốc 3 tháng, 6 tháng) để mở khóa toàn bộ!'}
                 </p>
               </div>
               <button
@@ -1615,12 +1675,14 @@ export default function StudentProfile({
             </div>
 
             <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
-              {/* Student Metrics Summary + Visibility Switch */}
+              {/* Metrics Summary + Visibility Switch */}
               <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#FDF2F6] dark:bg-slate-800/70 border border-pink-200/80 dark:border-slate-700">
-                <div className="flex flex-wrap items-center gap-4 text-xs">
-                  <span>📝 Số bài đã làm: <b className="text-slate-900 dark:text-white">{titleSummary.stats?.examCount || 0} bài</b></span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                  <span>📝 Số bài làm: <b className="text-slate-900 dark:text-white">{titleSummary.stats?.examCount || 0} bài</b></span>
                   <span>🎯 Band cao nhất: <b className="text-[#007A7A] dark:text-[#1EE1D6]">{titleSummary.stats?.highestBand ? titleSummary.stats.highestBand.toFixed(1) : '0.0'}</b></span>
-                  <span>🎮 Game kỷ lục: <b className="text-purple-700 dark:text-purple-300">{titleSummary.stats?.bestGameScore || 0}đ</b></span>
+                  <span>🎮 Game kỷ lục: <b className="text-amber-700 dark:text-amber-300">{titleSummary.stats?.bestGameScore || 0}đ</b></span>
+                  <span>📅 Đăng nhập: <b className="text-slate-900 dark:text-white">{titleSummary.stats?.totalLoginDays || 0} ngày</b> (Chuỗi {titleSummary.stats?.bestLoginStreak || 0}N)</span>
+                  <span>🌟 Kỹ năng: <b className="text-slate-900 dark:text-white">{titleSummary.stats?.coveredSkillsCount || 0}/4</b></span>
                 </div>
 
                 {isSelf && handleUpdateUserProfileFields && (
@@ -1646,8 +1708,36 @@ export default function StudentProfile({
                 )}
               </div>
 
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'all', label: `Tất cả (${allTitleItems.length})` },
+                  { id: 'unlocked', label: `Đã mở (${titleSummary.unlockedIds?.length || 0})` },
+                  { id: 'locked', label: `Chưa mở (${Math.max(0, allTitleItems.length - (titleSummary.unlockedIds?.length || 0))})` },
+                  { id: 'hard', label: `Khó & Cực Khó (${hardTitleCount})` }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setTitleFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                      titleFilter === tab.id
+                        ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {filteredTitles.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  Không có danh hiệu nào trong nhóm lọc này.
+                </div>
+              ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {titleSummary.itemsWithProgress.map(item => {
+                {filteredTitles.map(item => {
                   const isEquipped = titleSummary.title?.id === item.id;
                   return (
                     <div
@@ -1667,9 +1757,14 @@ export default function StudentProfile({
                               {item.icon}
                             </span>
                             <div className="min-w-0">
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                                {item.tier}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                                  {item.tier}
+                                </span>
+                                <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border ${diffBadgeCls(item.difficulty)}`}>
+                                  {item.difficulty}
+                                </span>
+                              </div>
                               <h4 className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
                                 {item.label}
                               </h4>
@@ -1736,10 +1831,12 @@ export default function StudentProfile({
                   );
                 })}
               </div>
+              )}
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Modal: Tùy Chỉnh Giao Diện Profile (Hình nền + Khung Avatar + Khẩu hiệu) */}
       {showCustomizeModal && canEditTargetInfo && (

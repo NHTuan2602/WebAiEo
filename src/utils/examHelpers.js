@@ -127,7 +127,7 @@ export function buildRoomInviteLink(pin) {
 }
 
 export function exportAttemptsToCsv(attemptRows = []) {
-  const headers = ['Học viên', 'Tài khoản', 'Đề thi', 'Phân loại', 'Ngày nộp', 'Listening', 'Reading', 'Writing', 'Speaking', 'Overall', 'Chuyển Tab', 'Trạng thái'];
+  const headers = ['Học viên', 'Tài khoản', 'Đề thi', 'Phân loại', 'Bắt đầu lúc', 'Ngày nộp', 'Thời lượng (giây)', 'Trạng thái hạn', 'Listening', 'Reading', 'Writing', 'Speaking', 'Overall', 'Chuyển Tab', 'Trạng thái'];
   const csvEscape = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
   const lines = [
     headers.map(csvEscape).join(','),
@@ -139,12 +139,20 @@ export function exportAttemptsToCsv(attemptRows = []) {
       const overall = att.overallBand ?? '-';
       const modeTag = att.testMode === 'single_skill' ? `Bài tập ${(att.focusSkill || '').toUpperCase()}` : 'Đề Thi IELTS';
       const statusLabel = att.teacherGraded ? (att.aiGraded ? 'AI Đã Chấm' : 'GV Đã Chấm') : 'Chờ Chấm';
+      const timelinessLabel = att.timelinessStatus === 'late'
+        ? `Nộp muộn${att.lateByMinutes ? ` (${att.lateByMinutes}p)` : ''}`
+        : att.timelinessStatus === 'on_time'
+        ? 'Đúng hạn'
+        : 'Tự do';
       return [
         att.studentName || '',
         att.studentId || '',
         att.testTitle || '',
         modeTag,
+        att.startedAt || '',
         att.submittedAt || '',
+        Number(att.durationSeconds) > 0 ? Number(att.durationSeconds) : '',
+        timelinessLabel,
         lBand,
         rBand,
         wBand,

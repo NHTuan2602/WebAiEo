@@ -24,6 +24,7 @@ import {
   X
 } from 'lucide-react';
 import {
+  formatViDateTime,
   getListeningAudioKey,
   getListeningTracks,
   getReadingPassages,
@@ -412,6 +413,11 @@ export default function ExamMode({
                 <Clock className="w-3 h-3 text-amber-500" />
                 {formatTime(examState.timeRemaining)}
               </span>
+              {cfg.scheduleMode !== 'flexible' && cfg.dueAt && (
+                <span className="hidden lg:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                  Hạn: {formatViDateTime(cfg.dueAt)}
+                </span>
+              )}
               {examState.skill === 'listening' && isPlayingAudio && (
                 <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-[#111827] dark:text-amber-300 ml-1">
                   <Volume2 className="w-3.5 h-3.5" /> Audio is playing
