@@ -1853,18 +1853,26 @@ export default function App() {
 
   // Update Account Avatar & propagate to Lobby Character
   const handleUpdateUserAvatar = async (newAvatarUrl) => {
-    if (!currentUser) return;
+    if (!currentUser) return false;
     const updatedUser = { ...currentUser, avatarUrl: newAvatarUrl || '' };
-    currentUserRef.current = updatedUser;
-    setCurrentUser(updatedUser);
-    setUsersDb(prev => ({ ...prev, [currentUser.username]: updatedUser }));
-
     const nextColor = newAvatarUrl
       ? 'avatar'
       : (myCrewColor === 'avatar' ? 'cyan' : myCrewColor);
+    const activePin = joinedRoomPin || currentRoomPin;
+
+    const snap = await dispatchSyncAction('UPSERT_USER', { username: currentUser.username, user: updatedUser });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) {
+      await pullServerSyncState(true);
+      return false;
+    }
+
+    if (!snap) {
+      currentUserRef.current = updatedUser;
+      setCurrentUser(updatedUser);
+      setUsersDb(prev => ({ ...prev, [currentUser.username]: updatedUser }));
+    }
     setMyCrewColor(nextColor);
 
-    const activePin = joinedRoomPin || currentRoomPin;
     setRoomsDb(prev => {
       const next = { ...prev };
       Object.entries(next).forEach(([pin, r]) => {
@@ -1884,7 +1892,6 @@ export default function App() {
       return next;
     });
 
-    await dispatchSyncAction('UPSERT_USER', { username: currentUser.username, user: updatedUser });
     if (activePin && roomsDb[activePin]?.lobbyPlayers?.[currentUser.username]) {
       await dispatchSyncAction('UPDATE_LOBBY_PLAYER', {
         pin: activePin,
@@ -1892,7 +1899,12 @@ export default function App() {
         patch: { avatarUrl: newAvatarUrl || '', colorId: nextColor }
       });
     }
-    showToast(newAvatarUrl ? 'Đã cập nhật Avatar & bật chế độ Mặt Avatar cho nhân vật!' : 'Đã gỡ ảnh Avatar tài khoản.');
+    if (!snap && !serverSyncConnectedRef.current) {
+      showToast('Không kết nối được server — Avatar chỉ mới lưu tạm trên máy này.', 'error');
+      return false;
+    }
+    showToast(newAvatarUrl ? 'Đã lưu Avatar lên hệ thống & bật chế độ Mặt Avatar!' : 'Đã gỡ ảnh Avatar tài khoản.');
+    return true;
   };
 
   // Lobby & Room Flow Actions

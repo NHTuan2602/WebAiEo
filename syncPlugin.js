@@ -716,20 +716,39 @@ export function createPersistentSyncStore(persistFile = '') {
   const audioDir = persistFile ? path.join(path.dirname(persistFile), 'audio') : '';
   const store = createInitialStore(audioDir);
   const bootTimestamp = Date.now();
+  const backupFile = persistFile ? `${persistFile}.bak` : '';
   let lastDiskMtimeMs = 0;
   let lastStatCheckedAt = 0;
   let hadExistingFile = false;
+  let loadedFromDisk = false;
+
+  const tryLoadJsonFile = (filePath) => {
+    if (!filePath || !fs.existsSync(filePath)) return false;
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    applyParsedStoreSnapshot(store, parsed);
+    lastDiskMtimeMs = fs.statSync(filePath).mtimeMs || Date.now();
+    return true;
+  };
 
   if (persistFile) {
     try {
       if (fs.existsSync(persistFile)) {
         hadExistingFile = true;
-        lastDiskMtimeMs = fs.statSync(persistFile).mtimeMs || 0;
-        const parsed = JSON.parse(fs.readFileSync(persistFile, 'utf8'));
-        applyParsedStoreSnapshot(store, parsed);
+        loadedFromDisk = tryLoadJsonFile(persistFile);
       }
-    } catch {
-      // Fall back cleanly to a fresh in-memory store if state file is corrupt or unreadable
+    } catch (err) {
+      console.error(`[LexiPrep Sync] Failed reading primary store (${persistFile}), trying backup:`, err?.message || err);
+    }
+    if (!loadedFromDisk && backupFile && fs.existsSync(backupFile)) {
+      try {
+        loadedFromDisk = tryLoadJsonFile(backupFile);
+        if (loadedFromDisk) {
+          console.warn(`[LexiPrep Sync] Recovered store cleanly from backup: ${backupFile}`);
+        }
+      } catch (bakErr) {
+        console.error(`[LexiPrep Sync] Failed reading backup store (${backupFile}):`, bakErr?.message || bakErr);
+      }
     }
   }
   const protectedChanged = ensureProtectedAccounts(store);
@@ -741,19 +760,25 @@ export function createPersistentSyncStore(persistFile = '') {
     try {
       fs.mkdirSync(path.dirname(persistFile), { recursive: true });
       const { _audioDir, _audioMem, _rateLimits, _bootId, _localMutated, ...serializableStore } = store;
-      fs.writeFileSync(tmpFile, JSON.stringify(serializableStore), 'utf8');
+      const serialized = JSON.stringify(serializableStore);
+      fs.writeFileSync(tmpFile, serialized, 'utf8');
+      if (fs.existsSync(persistFile) && backupFile) {
+        try {
+          fs.copyFileSync(persistFile, backupFile);
+        } catch {}
+      }
       fs.renameSync(tmpFile, persistFile);
       lastDiskMtimeMs = fs.statSync(persistFile).mtimeMs || Date.now();
-    } catch {
+    } catch (err) {
+      console.error(`[LexiPrep Sync] Failed persisting store to ${persistFile}:`, err?.message || err);
       try {
         if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
       } catch {}
-      // Ignore read-only filesystem errors so realtime relay never crashes
     }
   };
 
   // Persist protected default accounts & _authSecret immediately when initializing a fresh store file
-  if (persistFile && (!hadExistingFile || protectedChanged)) {
+  if (persistFile && (!hadExistingFile || (loadedFromDisk && protectedChanged))) {
     writeStoreSync();
   }
 
@@ -1262,10 +1287,11 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     return false;
   }
 
-  const sanitizeCoverUrl = (val, prevVal = '') => {
+  const sanitizeMediaUrl = (val, prevVal = '', allowRelativeBrand = false) => {
     if (val === undefined) return prevVal || '';
     const str = String(val || '').trim();
     if (!str) return '';
+    if (allowRelativeBrand && str.startsWith('/brand-avatar.jpg')) return str;
     if ((str.startsWith('data:image/') || str.startsWith('https://')) && str.length <= 500_000) {
       return str;
     }
@@ -1277,11 +1303,11 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     const cleanSelf = {
       ...prevUser,
       name: typeof rawUser.name === 'string' && rawUser.name.trim() ? rawUser.name.trim() : prevUser.name,
-      avatarUrl: rawUser.avatarUrl ?? prevUser.avatarUrl,
+      avatarUrl: sanitizeMediaUrl(rawUser.avatarUrl, prevUser.avatarUrl, true),
       targetBand: rawUser.targetBand ?? prevUser.targetBand,
       studyGoal: rawUser.studyGoal ?? prevUser.studyGoal,
       profileBannerId: typeof rawUser.profileBannerId === 'string' && rawUser.profileBannerId ? rawUser.profileBannerId.slice(0, 40) : (prevUser.profileBannerId || 'ocean'),
-      profileCoverUrl: sanitizeCoverUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl),
+      profileCoverUrl: sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, false),
       avatarFrameId: typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none'),
       equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false)
@@ -1289,10 +1315,11 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     store.users[uname] = cleanSelf;
   } else {
     const incoming = { ...rawUser, username: uname };
+    incoming.avatarUrl = sanitizeMediaUrl(incoming.avatarUrl, prevUser?.avatarUrl || '', true);
     incoming.profileBannerId = typeof incoming.profileBannerId === 'string' && incoming.profileBannerId
       ? incoming.profileBannerId.slice(0, 40)
       : (prevUser?.profileBannerId || 'ocean');
-    incoming.profileCoverUrl = sanitizeCoverUrl(incoming.profileCoverUrl, prevUser?.profileCoverUrl || '');
+    incoming.profileCoverUrl = sanitizeMediaUrl(incoming.profileCoverUrl, prevUser?.profileCoverUrl || '', false);
     incoming.avatarFrameId = typeof incoming.avatarFrameId === 'string' && incoming.avatarFrameId
       ? incoming.avatarFrameId.slice(0, 40)
       : (prevUser?.avatarFrameId || 'none');
@@ -2258,7 +2285,16 @@ async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMod
   throw lastErr || new Error('Không tìm thấy model Gemini hỗ trợ chấm Speaking audio.');
 }
 
-export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null, { syncFromDiskIfNewer = null } = {}) {
+const IMMEDIATE_PERSIST_ACTIONS = new Set([
+  'UPSERT_USER',
+  'UPSERT_USERS_BULK',
+  'RESET_USER_PASSWORD',
+  'DELETE_USER',
+  'DELETE_USERS_BULK',
+  'SEED_DEFAULTS'
+]);
+
+export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null, { syncFromDiskIfNewer = null, onFlush = null } = {}) {
   const sseClientUsers = new WeakMap();
   let broadcastTimer = null;
 
@@ -2718,7 +2754,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               }
             }
           }
-          onChanged?.(store);
+          if (IMMEDIATE_PERSIST_ACTIONS.has(body.type) && onFlush) {
+            onFlush(store);
+          } else {
+            onChanged?.(store);
+          }
           scheduleBroadcast(50);
         }
         res.statusCode = 200;
@@ -2743,11 +2783,11 @@ export function lexiprepSyncPlugin({ persistFile = process.env.SYNC_STATE_FILE |
   return {
     name: 'lexiprep-realtime-sync',
     configureServer(server) {
-      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist, { syncFromDiskIfNewer });
+      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist, { syncFromDiskIfNewer, onFlush: flushPersist });
       server.httpServer?.once('close', () => flushPersist());
     },
     configurePreviewServer(server) {
-      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist, { syncFromDiskIfNewer });
+      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist, { syncFromDiskIfNewer, onFlush: flushPersist });
       server.httpServer?.once('close', () => flushPersist());
     }
   };

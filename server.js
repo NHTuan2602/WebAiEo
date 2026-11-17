@@ -89,7 +89,7 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
     store,
     sseClients,
     schedulePersist,
-    { syncFromDiskIfNewer }
+    { syncFromDiskIfNewer, onFlush: flushPersist }
   );
 
   const server = http.createServer((req, res) => {
