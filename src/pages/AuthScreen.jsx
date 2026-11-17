@@ -21,7 +21,6 @@ import {
   Phone,
   Send,
   ShieldCheck,
-  Sparkles,
   Sun,
   UserCheck,
   X
@@ -174,7 +173,6 @@ export default function AuthScreen({
     }
   };
   const highlights = [
-    'Luyện với AI chấm Writing',
     'Giao diện thi máy chuẩn IDP/BC',
     'Listening & Reading đa chủ đề',
     'Highlight & Notes trực tiếp',
@@ -284,11 +282,11 @@ export default function AuthScreen({
 
               <div className="lexi-card bg-[#FFF5F8] dark:bg-slate-900/90 rounded-2xl p-4 border border-rose-200/80 dark:border-slate-800">
                 <div className="w-9 h-9 rounded-xl bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1447E6] dark:text-blue-300 flex items-center justify-center mb-3 border border-[#DBEAFE] dark:border-blue-500/30">
-                  <Sparkles className="w-4 h-4" />
+                  <UserCheck className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-sm text-[#0F172B] dark:text-white">AI &amp; Giáo Viên Chấm</h3>
+                <h3 className="font-bold text-sm text-[#0F172B] dark:text-white">Giáo Viên Chấm &amp; Chữa Bài</h3>
                 <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1 leading-relaxed">
-                  Chấm Listening/Reading tự động, phân tích 4 tiêu chí Writing &amp; lưu tiến trình F5.
+                  Chấm Listening/Reading tự động, Giáo viên nhận xét chi tiết bài Writing &amp; lưu tiến trình F5.
                 </p>
               </div>
 
