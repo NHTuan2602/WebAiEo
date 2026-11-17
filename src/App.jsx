@@ -903,6 +903,7 @@ export default function App() {
 
   const serverSyncConnectedRef = useRef(false);
   const bootSessionCheckedRef = useRef(false);
+  const authEpochRef = useRef(0);
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
 
@@ -993,6 +994,8 @@ export default function App() {
         setAiConfigured(snap.aiConfigured);
       }
       if (bootSessionCheckedRef.current && currentUserRef.current) {
+        authEpochRef.current += 1;
+        currentUserRef.current = null;
         setCurrentUser(null);
         setJoinedRoomPin(null);
         setGameSubState('JOIN');
@@ -1053,12 +1056,20 @@ export default function App() {
   };
 
   const pullServerSyncState = async (forceApply = false) => {
+    const epochAtStart = authEpochRef.current;
     try {
       const res = await fetch('/api/sync/state', { cache: 'no-store' });
       if (!res.ok) return null;
       const snap = await res.json();
+      if (epochAtStart !== authEpochRef.current) return null;
       serverSyncConnectedRef.current = true;
       setServerSyncConnected(true);
+      if (snap?.authenticated === false && !currentUserRef.current && !forceApply) {
+        if (typeof snap.aiConfigured === 'boolean') {
+          setAiConfigured(snap.aiConfigured);
+        }
+        return snap;
+      }
       if (forceApply || (typeof snap?.version === 'number' && snap.version > lastSyncVersionRef.current) || snap?.authenticated === false) {
         applyRemoteSnapshotData.current?.(snap);
       }
@@ -1083,6 +1094,8 @@ export default function App() {
         const errData = await res.json().catch(() => ({}));
         const errMsg = errData?.error || `Thao tác bị từ chối (${res.status}).`;
         if (res.status === 401) {
+          authEpochRef.current += 1;
+          currentUserRef.current = null;
           setCurrentUser(null);
           setJoinedRoomPin(null);
           setGameSubState('JOIN');
@@ -1150,11 +1163,11 @@ export default function App() {
     };
     window.addEventListener('storage', handleStorageEvent);
 
-    // Bootstrap cross-browser relay server state + SSE stream + 1.5s fallback poll
+    // Bootstrap cross-browser relay server state on mount
     let cancelled = false;
-    let evtSource = null;
 
     const initServerSync = async () => {
+      const bootEpoch = authEpochRef.current;
       let sessionData = null;
       try {
         const res = await fetch('/api/sync/auth/session', { cache: 'no-store' });
@@ -1167,7 +1180,7 @@ export default function App() {
         serverSyncConnectedRef.current = false;
         setServerSyncConnected(false);
       }
-      if (cancelled) return;
+      if (cancelled || bootEpoch !== authEpochRef.current) return;
 
       if (sessionData) {
         if (!sessionData.snapshot?.seeded) {
@@ -1179,14 +1192,14 @@ export default function App() {
             users: usersDb,
             customVocabTopics
           });
-          if (cancelled) return;
+          if (cancelled || bootEpoch !== authEpochRef.current) return;
           try {
             const refreshed = await fetch('/api/sync/auth/session', { cache: 'no-store' });
             if (refreshed.ok) {
               sessionData = await refreshed.json();
             }
           } catch (_err) {}
-          if (cancelled) return;
+          if (cancelled || bootEpoch !== authEpochRef.current) return;
         }
 
         if (sessionData.authenticated && sessionData.user) {
@@ -1219,10 +1232,30 @@ export default function App() {
         }
         bootSessionCheckedRef.current = true;
       }
+    };
 
-      if (cancelled || typeof EventSource === 'undefined') return;
+    initServerSync();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('storage', handleStorageEvent);
+      syncChannelRef.current?.close();
+      syncChannelRef.current = null;
+    };
+  }, []);
+
+  // Reconnect SSE stream & poll fallback whenever authenticated user changes (prevents stale pre-login stream logout)
+  useEffect(() => {
+    const activeUsername = currentUser?.username;
+    if (!activeUsername) return undefined;
+
+    const streamEpoch = authEpochRef.current;
+    let evtSource = null;
+
+    if (typeof EventSource !== 'undefined') {
       evtSource = new EventSource('/api/sync/stream');
       evtSource.addEventListener('sync', (e) => {
+        if (streamEpoch !== authEpochRef.current) return;
         try {
           const parsed = JSON.parse(e.data);
           serverSyncConnectedRef.current = true;
@@ -1231,25 +1264,22 @@ export default function App() {
         } catch (_err) {}
       });
       evtSource.onerror = () => {
+        if (streamEpoch !== authEpochRef.current) return;
         serverSyncConnectedRef.current = false;
         setServerSyncConnected(false);
       };
-    };
+    }
 
-    initServerSync();
     const pollTimer = setInterval(() => {
+      if (streamEpoch !== authEpochRef.current) return;
       pullServerSyncState(false);
     }, 1500);
 
     return () => {
-      cancelled = true;
       clearInterval(pollTimer);
       evtSource?.close();
-      window.removeEventListener('storage', handleStorageEvent);
-      syncChannelRef.current?.close();
-      syncChannelRef.current = null;
     };
-  }, []);
+  }, [currentUser?.username]);
 
   // Tick timer for Crewmate speech bubbles + 10-minute chat cycle sweep + auto-scroll Lobby Chat while in Lobby
   useEffect(() => {
@@ -1720,6 +1750,8 @@ export default function App() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 401) {
+          authEpochRef.current += 1;
+          currentUserRef.current = null;
           setCurrentUser(null);
           setView('AUTH');
         }
@@ -2305,6 +2337,7 @@ export default function App() {
       return;
     }
 
+    authEpochRef.current += 1;
     let serverResponded = false;
     let loggedInUser = null;
     try {
@@ -2321,6 +2354,7 @@ export default function App() {
         setAuthError(data?.error || 'Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
         return;
       }
+      authEpochRef.current += 1;
       bootSessionCheckedRef.current = true;
       loggedInUser = normalizeBrandTeacherUser(data.user);
       if (data.snapshot) {
@@ -2337,6 +2371,7 @@ export default function App() {
         setAuthError('Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
         return;
       }
+      authEpochRef.current += 1;
       loggedInUser = normalizeBrandTeacherUser(localUser);
     }
 
@@ -2360,6 +2395,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    authEpochRef.current += 1;
     fetch('/api/sync/auth/logout', { method: 'POST' }).catch(() => {});
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);

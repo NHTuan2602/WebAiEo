@@ -1823,10 +1823,16 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         continue;
       }
       try {
-        const uname = sseClientUsers.get(res);
-        const viewer = uname ? store.users?.[uname] || null : null;
+        const sessionInfo = sseClientUsers.get(res);
+        if (!sessionInfo?.username) continue;
+        const userRec = store.users?.[sessionInfo.username] || null;
+        const sessionStillValid = Boolean(userRec && (userRec.tokenVersion || 1) === sessionInfo.tokenVersion);
+        const viewer = sessionStillValid ? userRec : null;
         const dataStr = `event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`;
         res.write(dataStr);
+        if (!sessionStillValid) {
+          sseClients.delete(res);
+        }
       } catch (_err) {
         sseClients.delete(res);
       }
@@ -2193,7 +2199,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       res.flushHeaders?.();
 
       sseClients.add(res);
-      sseClientUsers.set(res, viewer?.username || null);
+      sseClientUsers.set(res, viewer ? { username: viewer.username, tokenVersion: viewer.tokenVersion || 1 } : null);
       res.write(`event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`);
 
       const keepAlive = setInterval(() => {
