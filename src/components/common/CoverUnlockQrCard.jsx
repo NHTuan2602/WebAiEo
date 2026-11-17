@@ -1,15 +1,21 @@
 import { useState } from 'react';
-import { Check, CheckCircle2, Clock, Copy, CreditCard, Lock, QrCode, Send, Settings, Sparkles } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Copy, CreditCard, Lock, Phone, QrCode, Send, Settings, Sparkles } from 'lucide-react';
+import { ADMIN_PAYMENT_CONTACT } from '../../constants/brandInfo';
 import {
   buildCoverUnlockTransferNote,
   buildVietQrImageUrl,
   formatVndCurrency,
+  getTitlePriceVnd,
   normalizePaymentConfig
 } from '../../constants/profileCustomization';
 
 export default function CoverUnlockQrCard({
   username = '',
   orderCode = '',
+  itemType = 'cover',
+  itemId = '',
+  itemTitle = '',
+  itemPrice = null,
   paymentConfig = null,
   requestedAt = 0,
   isPreview = false,
@@ -22,17 +28,31 @@ export default function CoverUnlockQrCard({
 
   const cfg = normalizePaymentConfig(paymentConfig || {});
   const autoVerifyEnabled = Boolean(paymentConfig?.autoVerifyEnabled);
-  const priceLabel = formatVndCurrency(cfg.coverUnlockPrice);
+  const resolvedAmount =
+    itemPrice !== null && itemPrice !== undefined
+      ? Math.max(0, Number(itemPrice) || 0)
+      : itemType === 'title'
+      ? getTitlePriceVnd(itemId, cfg)
+      : cfg.coverUnlockPrice;
+  const priceLabel = formatVndCurrency(resolvedAmount);
   const transferNote = buildCoverUnlockTransferNote(username, orderCode);
   const vietQrUrl = buildVietQrImageUrl({
     bankCode: cfg.bankCode,
     accountNumber: cfg.accountNumber,
     accountName: cfg.accountName,
-    amount: cfg.coverUnlockPrice,
+    amount: resolvedAmount,
     addInfo: transferNote
   });
   const activeQrUrl = cfg.customQrUrl || vietQrUrl;
   const hasBankDetails = Boolean(cfg.accountNumber && (cfg.bankCode || cfg.bankName));
+  const headingText = itemType === 'title' && itemTitle
+    ? `Mua Danh Hiệu VIP: ${itemTitle}`
+    : 'Mở Khóa Tải Ảnh Nền Riêng';
+  const subText = itemType === 'title'
+    ? 'Quét mã VietQR để sở hữu vĩnh viễn danh hiệu Phú Quý nổi bật trên Hồ sơ & Đấu Trường Từ Vựng!'
+    : autoVerifyEnabled
+    ? 'Quét mã QR bằng app Ngân hàng bất kỳ — hệ thống sẽ tự động mở khóa ngay sau khi nhận đủ tiền!'
+    : 'Quét mã QR chuyển khoản 1 lần để sử dụng tính năng tải & cắt ảnh nền riêng vĩnh viễn.';
 
   const copyText = async (value, fieldKey, label) => {
     if (!value) return;
@@ -52,12 +72,10 @@ export default function CoverUnlockQrCard({
         <div className="space-y-0.5 min-w-0">
           <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
             <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>Mở Khóa Tải Ảnh Nền Riêng</span>
+            <span>{headingText}</span>
           </p>
           <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-            {autoVerifyEnabled
-              ? 'Quét mã QR bằng app Ngân hàng bất kỳ — hệ thống sẽ tự động mở khóa ngay sau khi nhận đủ tiền!'
-              : 'Quét mã QR chuyển khoản 1 lần để sử dụng tính năng tải & cắt ảnh nền riêng vĩnh viễn.'}
+            {subText}
           </p>
         </div>
         <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white text-xs font-black shadow-xs tabular-nums">
@@ -139,7 +157,7 @@ export default function CoverUnlockQrCard({
                 </div>
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                Giữ nguyên nội dung <b>{transferNote}</b> khi chuyển để hệ thống khớp đúng tài khoản của bạn.
+                Giữ nguyên nội dung <b>{transferNote}</b> khi chuyển để hệ thống khớp đúng đơn hàng.
               </p>
             </div>
 
@@ -155,10 +173,10 @@ export default function CoverUnlockQrCard({
           <Settings className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1 text-xs">
             <p className="font-extrabold text-slate-900 dark:text-white">
-              Chưa cài đặt Số Tài Khoản Ngân Hàng nhận mã QR
+              Quản Trị Hệ Thống chưa cấu hình Số Tài Khoản Ngân Hàng nhận mã QR
             </p>
             <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-              Giáo viên / Quản trị viên hãy vào <b>Quản Lý &amp; Giảng Dạy → Tài Khoản Lớp → QR Ảnh Nền ({priceLabel})</b> để điền Ngân hàng &amp; Số tài khoản. Sau khi lưu, mã VietQR sẽ hiện tự động ở đây để học viên quét ngay!
+              Chỉ <b>Quản Trị Viên</b> mới có thể cài đặt tài khoản nhận tiền tại <b>Quản Lý &amp; Giảng Dạy → QR &amp; Giá Tiền</b>. Cần hỗ trợ ngay, liên hệ Quản Trị Viên: <b>{ADMIN_PAYMENT_CONTACT.phoneRaw}</b>.
             </p>
           </div>
         </div>
@@ -179,7 +197,7 @@ export default function CoverUnlockQrCard({
                   onClick={onRequestUnlock}
                   className="shrink-0 text-[10px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline whitespace-nowrap"
                 >
-                  {requestedAt > 0 ? '✓ Đã báo giáo viên' : 'Báo kiểm tra thủ công'}
+                  {requestedAt > 0 ? '✓ Đã báo Quản trị' : 'Báo Quản trị kiểm tra'}
                 </button>
               )}
             </div>
@@ -188,12 +206,12 @@ export default function CoverUnlockQrCard({
               {requestedAt > 0 ? (
                 <div className="flex-1 px-3 py-2 rounded-xl bg-amber-100/90 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/40 text-[11px] font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
-                  <span>Đã gửi yêu cầu mở khóa — đang chờ Giáo viên xác nhận giao dịch!</span>
+                  <span>Đã gửi yêu cầu mở khóa — đang chờ Quản Trị Viên xác nhận giao dịch!</span>
                 </div>
               ) : (
                 <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                  <span>Quét QR {priceLabel} xong, bấm nút bên cạnh để xác nhận:</span>
+                  <span>Quét QR {priceLabel} xong, bấm nút bên cạnh để báo Quản Trị Viên duyệt:</span>
                 </p>
               )}
               {onRequestUnlock && (
@@ -207,12 +225,33 @@ export default function CoverUnlockQrCard({
                   {requesting
                     ? 'Đang gửi...'
                     : requestedAt > 0
-                    ? 'Nhắc lại yêu cầu'
+                    ? 'Nhắc lại Quản trị'
                     : `Tôi đã chuyển ${priceLabel}`}
                 </button>
               )}
             </div>
           )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-700 text-[11px]">
+            <span className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
+              <span>Hỗ trợ thanh toán / duyệt nhanh ({ADMIN_PAYMENT_CONTACT.label}):</span>
+              <a
+                href={ADMIN_PAYMENT_CONTACT.phoneHref}
+                className="font-mono font-extrabold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
+              >
+                {ADMIN_PAYMENT_CONTACT.phoneRaw}
+              </a>
+            </span>
+            <a
+              href={ADMIN_PAYMENT_CONTACT.zaloUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 rounded-lg bg-[#007A7A]/10 dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] font-extrabold text-[10px] hover:bg-[#007A7A]/20 transition"
+            >
+              Nhắn Zalo Admin
+            </a>
+          </div>
         </div>
       )}
     </div>

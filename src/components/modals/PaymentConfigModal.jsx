@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Check, CheckCircle2, Copy, Eye, EyeOff, QrCode, Save, ShieldCheck, Trash2, Upload, Webhook, X } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Crown, Eye, EyeOff, QrCode, Save, ShieldCheck, Trash2, Upload, Webhook, X } from 'lucide-react';
+import { ADMIN_PAYMENT_CONTACT } from '../../constants/brandInfo';
 import {
   CUSTOM_COVER_UNLOCK_PRICE_VND,
+  PAID_SHOP_TITLES,
   VIETQR_BANK_OPTIONS,
   formatVndCurrency,
   normalizePaymentConfig
@@ -125,7 +127,7 @@ export default function PaymentConfigModal({
         return;
       }
       onSaved?.(data.config);
-      showToast?.('Đã lưu cấu hình QR & Webhook thanh toán!');
+      showToast?.('Đã lưu bảng giá, QR & cấu hình Webhook Quản Trị!');
       onClose?.();
     } catch {
       setError('Lỗi kết nối tới máy chủ.');
@@ -143,7 +145,7 @@ export default function PaymentConfigModal({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-y-auto shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 sticky top-0 z-10">
@@ -151,10 +153,10 @@ export default function PaymentConfigModal({
             <QrCode className="w-5 h-5 text-[#1EE1D6]" />
             <div>
               <h3 id="payment-config-title" className="text-sm sm:text-base font-extrabold">
-                Cài Đặt QR &amp; Tự Động Mở Khóa ({formatVndCurrency(draft.coverUnlockPrice)})
+                Quản Trị Giá Tiền, VietQR &amp; Tự Động Mở Khóa ({formatVndCurrency(draft.coverUnlockPrice)})
               </h3>
               <p className="text-[11px] text-slate-300">
-                Học viên bấm nút là bung mã VietQR quét liền — nối SePay / PayOS để quét xong tự động mở khóa 24/7.
+                Chỉ Quản Trị Hệ Thống mới có quyền sửa bảng giá, tài khoản nhận tiền &amp; hỗ trợ giao dịch (SĐT/Zalo: {ADMIN_PAYMENT_CONTACT.phoneRaw}).
               </p>
             </div>
           </div>
@@ -180,7 +182,7 @@ export default function PaymentConfigModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Phí mở khóa (VNĐ)
+                    Giá mở Ảnh Nền Riêng (VNĐ)
                   </label>
                   <input
                     type="number"
@@ -224,7 +226,7 @@ export default function PaymentConfigModal({
                     type="text"
                     value={draft.accountNumber}
                     onChange={e => setDraft(prev => ({ ...prev, accountNumber: e.target.value.replace(/\s+/g, '') }))}
-                    placeholder="vd: 0123456789"
+                    placeholder="vd: 0367073526"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
                   />
                 </div>
@@ -236,9 +238,44 @@ export default function PaymentConfigModal({
                     type="text"
                     value={draft.accountName}
                     onChange={e => setDraft(prev => ({ ...prev, accountName: e.target.value }))}
-                    placeholder="vd: PHAM THI QUYNH NHU"
+                    placeholder="vd: NGUYEN HOANG TUAN"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs uppercase"
                   />
+                </div>
+              </div>
+
+              {/* Editable Prices for VIP Paid Titles */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/35 space-y-2.5">
+                <p className="text-[11px] font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  Bảng Giá Danh Hiệu VIP (VNĐ)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {PAID_SHOP_TITLES.map(t => (
+                    <div key={t.id}>
+                      <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-0.5 truncate">
+                        {t.icon} {t.label}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={10000000}
+                        step={1000}
+                        value={draft.paidTitlePrices?.[t.id] ?? t.defaultPriceVnd}
+                        onChange={e => {
+                          const val = e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0);
+                          setDraft(prev => ({
+                            ...prev,
+                            paidTitlePrices: {
+                              ...(prev.paidTitlePrices || {}),
+                              [t.id]: val
+                            }
+                          }));
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-amber-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -343,7 +380,7 @@ export default function PaymentConfigModal({
                 </div>
                 <p className="text-[10px] text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed flex items-start gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>Nếu chưa nhập API Key, học viên vẫn bấm là có mã QR ngay và gửi yêu cầu để Giáo viên duyệt tay 1 chạm.</span>
+                  <span>Khi chưa nhập API Key, học viên vẫn quét được QR và liên hệ SĐT/Zalo Quản trị {ADMIN_PAYMENT_CONTACT.phoneRaw} để duyệt nhanh.</span>
                 </p>
               </div>
             </div>
@@ -383,7 +420,7 @@ export default function PaymentConfigModal({
               disabled={saving}
               className="px-5 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow flex items-center gap-1.5"
             >
-              <Save className="w-3.5 h-3.5" /> {saving ? 'Đang lưu...' : 'Lưu Cấu Hình QR'}
+              <Save className="w-3.5 h-3.5" /> {saving ? 'Đang lưu...' : 'Lưu Bảng Giá & QR'}
             </button>
           </div>
         </form>

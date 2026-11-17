@@ -1081,7 +1081,7 @@ export default function TeacherDashboard({
             );
           })}
         </div>
-        {(onOpenMailConfig || onOpenPaymentConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
+        {(onOpenMailConfig || (isViewerSuperAdmin && onOpenPaymentConfig) || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
           <div className="flex flex-wrap items-center gap-2">
             {onOpenMailConfig && (
               <button
@@ -1096,7 +1096,7 @@ export default function TeacherDashboard({
                 <Mail className="w-3.5 h-3.5" /> Email OTP: {mailConfigured ? 'Đang bật' : 'Chưa cài'}
               </button>
             )}
-            {onOpenPaymentConfig && (
+            {isViewerSuperAdmin && onOpenPaymentConfig && (
               <button
                 type="button"
                 onClick={onOpenPaymentConfig}
@@ -1106,7 +1106,7 @@ export default function TeacherDashboard({
                     : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-500/35'
                 }`}
               >
-                <QrCode className="w-3.5 h-3.5" /> QR Ảnh Nền ({coverPriceLabel})
+                <QrCode className="w-3.5 h-3.5" /> QR &amp; Giá Tiền ({coverPriceLabel})
               </button>
             )}
             {onOpenApiKeyModal && (
@@ -1175,7 +1175,7 @@ export default function TeacherDashboard({
             </div>
           ))}
 
-          {(onOpenMailConfig || onOpenPaymentConfig || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
+          {(onOpenMailConfig || (isViewerSuperAdmin && onOpenPaymentConfig) || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
               <p className="px-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Cài Đặt &amp; Quản Trị
@@ -1201,7 +1201,7 @@ export default function TeacherDashboard({
                   </span>
                 </button>
               )}
-              {onOpenPaymentConfig && (
+              {isViewerSuperAdmin && onOpenPaymentConfig && (
                 <button
                   type="button"
                   onClick={onOpenPaymentConfig}
@@ -1209,7 +1209,7 @@ export default function TeacherDashboard({
                 >
                   <span className="flex items-center gap-2.5 min-w-0 truncate">
                     <QrCode className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
-                    <span className="truncate">QR Ảnh Nền ({coverPriceLabel})</span>
+                    <span className="truncate">QR &amp; Giá Tiền ({coverPriceLabel})</span>
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
@@ -2001,13 +2001,13 @@ export default function TeacherDashboard({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                {onOpenPaymentConfig && (
+                {isViewerSuperAdmin && onOpenPaymentConfig && (
                   <button
                     type="button"
                     onClick={onOpenPaymentConfig}
                     className="px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold transition flex items-center gap-1.5"
                   >
-                    <QrCode className="w-3.5 h-3.5" /> Cài Đặt QR ({coverPriceLabel})
+                    <QrCode className="w-3.5 h-3.5" /> QR &amp; Giá Tiền ({coverPriceLabel})
                   </button>
                 )}
                 <button
@@ -2068,7 +2068,7 @@ export default function TeacherDashboard({
                 >
                   <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên ({teacherAccountsCount})
                 </button>
-                {pendingCoverRequestCount > 0 && (
+                {isViewerSuperAdmin && pendingCoverRequestCount > 0 && (
                   <button
                     type="button"
                     onClick={() => setAccountRoleFilter('cover_pending')}
@@ -2234,7 +2234,7 @@ export default function TeacherDashboard({
                                     ? `✓ Email OTP: ${account.email || account.maskedEmail}`
                                     : 'Chưa liên kết Email OTP'}
                                 </p>
-                                {account.role === 'student' && onToggleUserCoverUnlock && (() => {
+                                {isViewerSuperAdmin && account.role === 'student' && onToggleUserCoverUnlock && (() => {
                                   const isCoverUnlocked = hasCustomCoverPermission(account);
                                   const isPendingCover = !isCoverUnlocked && Number(account.coverUnlockRequestedAt) > 0;
                                   return (

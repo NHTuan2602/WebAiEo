@@ -1,14 +1,24 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, ImagePlus, Loader2, QrCode, RefreshCw, Sparkles, X } from 'lucide-react';
-import { formatVndCurrency, hasCustomCoverPermission, normalizePaymentConfig } from '../../constants/profileCustomization';
+import { Award, CheckCircle2, ImagePlus, Loader2, QrCode, RefreshCw, Sparkles, X } from 'lucide-react';
+import {
+  formatVndCurrency,
+  getTitlePriceVnd,
+  hasCustomCoverPermission,
+  normalizePaymentConfig
+} from '../../constants/profileCustomization';
 import CoverUnlockQrCard from '../common/CoverUnlockQrCard';
 
 export default function CoverCheckoutModal({
   isOpen,
+  itemType = 'cover',
+  itemId = '',
+  itemLabel = '',
+  itemPrice = null,
   currentUser = null,
   paymentConfig = null,
   onClose,
   onUnlockedReady = null,
+  onEquipPurchasedTitle = null,
   onRequestUnlock = null,
   onPullSync = null,
   showToast = null
@@ -19,11 +29,31 @@ export default function CoverCheckoutModal({
   const [checkingNow, setCheckingNow] = useState(false);
   const [error, setError] = useState('');
 
-  const isUnlocked = hasCustomCoverPermission(currentUser);
+  const isTitleOrder = itemType === 'title' && Boolean(itemId);
+  const isUnlocked = isTitleOrder
+    ? Boolean(
+        currentUser?.isSuperAdmin ||
+        currentUser?.username === 'tuanpro123s' ||
+        (Array.isArray(currentUser?.purchasedTitleIds) && currentUser.purchasedTitleIds.includes(itemId)) ||
+        (Array.isArray(currentUser?.grantedTitleIds) && currentUser.grantedTitleIds.includes(itemId))
+      )
+    : hasCustomCoverPermission(currentUser);
+
   const activePayCfg = livePayCfg || paymentConfig;
   const effectiveCfg = normalizePaymentConfig(activePayCfg || {});
-  const priceLabel = formatVndCurrency(effectiveCfg.coverUnlockPrice);
+  const resolvedAmount =
+    order?.amount !== undefined
+      ? order.amount
+      : itemPrice !== null && itemPrice !== undefined
+      ? itemPrice
+      : isTitleOrder
+      ? getTitlePriceVnd(itemId, effectiveCfg)
+      : effectiveCfg.coverUnlockPrice;
+  const priceLabel = formatVndCurrency(resolvedAmount);
   const creating = isOpen && !isUnlocked && !order && !error;
+  const pendingRequestedAt = isTitleOrder
+    ? (currentUser?.paidTitleRequested?.titleId === itemId ? currentUser.paidTitleRequested.requestedAt : 0)
+    : (currentUser?.coverUnlockRequestedAt || 0);
 
   useEffect(() => {
     if (!isOpen || isUnlocked) return undefined;
@@ -31,7 +61,7 @@ export default function CoverCheckoutModal({
     fetch('/api/sync/payment/create-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({ itemType: isTitleOrder ? 'title' : 'cover', itemId: isTitleOrder ? itemId : '' })
     })
       .then(r => r.json())
       .then(data => {
@@ -54,7 +84,7 @@ export default function CoverCheckoutModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isUnlocked, onPullSync]);
+  }, [isOpen, isUnlocked, isTitleOrder, itemId, onPullSync]);
 
   // Poll order status every 3s while checkout modal stays open (backup alongside instant SSE)
   useEffect(() => {
@@ -82,9 +112,9 @@ export default function CoverCheckoutModal({
       const data = await res.json().catch(() => ({}));
       if (data?.unlocked || data?.order?.status === 'paid') {
         await onPullSync?.();
-        showToast?.('🎉 Đã xác nhận thanh toán & mở khóa Ảnh Nền Riêng!');
+        showToast?.(isTitleOrder ? `🎉 Đã mở khóa danh hiệu ${itemLabel}!` : '🎉 Đã xác nhận thanh toán & mở khóa Ảnh Nền Riêng!');
       } else {
-        showToast?.('Hệ thống chưa nhận được giao dịch khớp mã đơn. Nếu vừa chuyển, đợi 3–5 giây nhé!', 'info');
+        showToast?.('Hệ thống chưa nhận được giao dịch khớp mã đơn. Nếu vừa chuyển, đợi 3–5 giây hoặc liên hệ Zalo 0367073526!', 'info');
       }
     } catch {
       showToast?.('Không thể kiểm tra trạng thái lúc này.', 'error');
@@ -110,13 +140,13 @@ export default function CoverCheckoutModal({
             <QrCode className="w-5 h-5 text-[#1EE1D6]" />
             <div>
               <h3 id="cover-checkout-title" className="text-sm sm:text-base font-extrabold flex items-center gap-2 flex-wrap">
-                <span>Mở Khóa Ảnh Nền Riêng</span>
+                <span>{isTitleOrder ? `Mua Danh Hiệu ${itemLabel || 'VIP'}` : 'Mở Khóa Ảnh Nền Riêng'}</span>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-black tabular-nums">
                   {priceLabel}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-300">
-                {order?.orderCode ? `Mã đơn thanh toán: #${order.orderCode}` : 'Quét mã VietQR để mở khóa tải & cắt ảnh bìa cá nhân'}
+                {order?.orderCode ? `Mã đơn thanh toán: #${order.orderCode}` : 'Quét mã VietQR để mở khóa tự động trên hệ thống'}
               </p>
             </div>
           </div>
@@ -137,20 +167,36 @@ export default function CoverCheckoutModal({
                 <CheckCircle2 className="w-7 h-7" />
               </div>
               <h4 className="text-base font-extrabold text-emerald-900 dark:text-emerald-200">
-                Thanh toán thành công — Đã mở khóa Ảnh Nền Riêng!
+                {isTitleOrder
+                  ? `Thanh toán thành công — Đã sở hữu ${itemLabel || 'Danh Hiệu VIP'}!`
+                  : 'Thanh toán thành công — Đã mở khóa Ảnh Nền Riêng!'}
               </h4>
               <p className="text-xs text-emerald-800/90 dark:text-emerald-300 leading-relaxed">
-                Tài khoản <b>@{currentUser?.username}</b> đã được mở khóa quyền tải ảnh nền từ máy, cắt khung &amp; dán link ảnh riêng vĩnh viễn.
+                {isTitleOrder
+                  ? `Tài khoản @${currentUser?.username} đã mở khóa vĩnh viễn danh hiệu ${itemLabel}.`
+                  : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng vĩnh viễn.`}
               </p>
               <button
                 type="button"
                 onClick={() => {
                   onClose?.();
-                  onUnlockedReady?.();
+                  if (isTitleOrder) {
+                    onEquipPurchasedTitle?.(itemId);
+                  } else {
+                    onUnlockedReady?.();
+                  }
                 }}
                 className="px-5 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow inline-flex items-center gap-2"
               >
-                <ImagePlus className="w-4 h-4" /> Tải &amp; Cắt Ảnh Nền Ngay
+                {isTitleOrder ? (
+                  <>
+                    <Award className="w-4 h-4" /> Đeo Danh Hiệu Ngay
+                  </>
+                ) : (
+                  <>
+                    <ImagePlus className="w-4 h-4" /> Tải &amp; Cắt Ảnh Nền Ngay
+                  </>
+                )}
               </button>
             </div>
           ) : creating && !order ? (
@@ -167,12 +213,16 @@ export default function CoverCheckoutModal({
               <CoverUnlockQrCard
                 username={currentUser?.username || ''}
                 orderCode={order?.orderCode || ''}
+                itemType={isTitleOrder ? 'title' : 'cover'}
+                itemId={itemId}
+                itemTitle={itemLabel}
+                itemPrice={resolvedAmount}
                 paymentConfig={activePayCfg}
-                requestedAt={currentUser?.coverUnlockRequestedAt || 0}
+                requestedAt={pendingRequestedAt}
                 requesting={requestingManual}
                 onRequestUnlock={onRequestUnlock ? async () => {
                   setRequestingManual(true);
-                  await onRequestUnlock();
+                  await onRequestUnlock(isTitleOrder ? { itemType: 'title', itemId } : {});
                   setRequestingManual(false);
                 } : null}
                 showToast={showToast}
@@ -180,7 +230,7 @@ export default function CoverCheckoutModal({
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Tự động cập nhật ngay khi thanh toán thành công
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Tự động cập nhật ngay khi nhận tiền
                 </span>
                 <div className="flex items-center gap-2">
                   <button

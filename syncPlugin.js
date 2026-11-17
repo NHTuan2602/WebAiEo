@@ -21,7 +21,9 @@ import {
   sendTransactionalEmail
 } from './mailService.js';
 import {
+  PAID_SHOP_TITLES,
   formatVndCurrency,
+  getTitlePriceVnd,
   hasCustomCoverPermission,
   normalizePaymentConfig
 } from './src/constants/profileCustomization.js';
@@ -520,13 +522,20 @@ function sanitizeUserForViewer(user, viewer) {
     profileBannerId: typeof user.profileBannerId === 'string' && user.profileBannerId ? user.profileBannerId : 'ocean',
     profileCoverUrl: typeof user.profileCoverUrl === 'string' ? user.profileCoverUrl : '',
     avatarFrameId: typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
-    equippedTitleId: typeof user.equippedTitleId === 'string' && user.equippedTitleId ? user.equippedTitleId : 'newbie',
+    equippedTitleId:
+      typeof user.equippedTitleId === 'string' && user.equippedTitleId
+        ? user.equippedTitleId
+        : (user.role === 'teacher' || user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME)
+        ? 'staff_ielts_10'
+        : 'newbie',
     showTitleBadge: user.showTitleBadge !== false,
     grantedTitleIds: Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String).filter(Boolean) : [],
+    purchasedTitleIds: Array.isArray(user.purchasedTitleIds) ? user.purchasedTitleIds.map(String).filter(Boolean) : [],
     customCoverUnlocked: hasCustomCoverPermission(user),
     customCoverUnlockedAt: Number(user.customCoverUnlockedAt) || 0,
     customCoverUnlockedBy: typeof user.customCoverUnlockedBy === 'string' ? user.customCoverUnlockedBy : '',
     coverUnlockRequestedAt: Number(user.coverUnlockRequestedAt) || 0,
+    paidTitleRequested: user.paidTitleRequested && typeof user.paidTitleRequested === 'object' ? user.paidTitleRequested : null,
     loginDays: Array.isArray(user.loginDays) ? user.loginDays : [],
     emailVerified: Boolean(user.email && user.emailVerified),
     maskedEmail: user.email && user.emailVerified ? maskEmailAddress(user.email) : ''
@@ -1146,9 +1155,10 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     profileBannerId: superAdmin.profileBannerId || 'ocean',
     profileCoverUrl: superAdmin.profileCoverUrl || '',
     avatarFrameId: superAdmin.avatarFrameId || 'none',
-    equippedTitleId: superAdmin.equippedTitleId || 'newbie',
+    equippedTitleId: superAdmin.equippedTitleId || 'staff_ielts_10',
     showTitleBadge: superAdmin.showTitleBadge !== false,
     grantedTitleIds: Array.isArray(superAdmin.grantedTitleIds) ? superAdmin.grantedTitleIds : [],
+    purchasedTitleIds: Array.isArray(superAdmin.purchasedTitleIds) ? superAdmin.purchasedTitleIds : [],
     role: 'admin',
     isSystemAdmin: true,
     joinedDate: superAdmin.joinedDate || '2026-01-01',
@@ -1525,7 +1535,6 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'UPSERT_VOCAB_TOPIC',
     'DELETE_VOCAB_TOPIC',
     'SET_AI_CONFIG',
-    'UPDATE_PAYMENT_CONFIG',
     'CREATE_NOTIFICATION',
     'DELETE_NOTIFICATION'
   ]);
@@ -1653,7 +1662,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
           return {
             allowed: false,
             status: 403,
-            error: `Tính năng tải Ảnh Nền Riêng có giá ${priceLabel}. Vui lòng chuyển khoản và chờ Giáo viên/Quản trị mở khóa!`
+            error: `Tính năng tải Ảnh Nền Riêng có giá ${priceLabel}. Vui lòng thanh toán QR để mở khóa tự động hoặc liên hệ Quản Trị Viên (0367 073 526)!`
           };
         }
         return { allowed: true };
@@ -1661,23 +1670,42 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: true };
     }
 
+    case 'UPDATE_PAYMENT_CONFIG': {
+      if (!isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản Trị Hệ Thống mới có quyền chỉnh giá tiền & cấu hình thanh toán!' };
+      }
+      return { allowed: true };
+    }
+
     case 'TOGGLE_USER_COVER_UNLOCK': {
-      if (!isTeacher) {
-        return { allowed: false, status: 403, error: 'Chỉ Giáo viên hoặc Quản trị mới có quyền mở khóa Ảnh Nền cho học viên.' };
+      if (!isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản Trị Hệ Thống mới có quyền mở khóa / khóa quyền thu phí của học viên!' };
       }
       const targetKey = findUserKeyInStore(store, payload?.username);
       const targetUser = targetKey ? store.users?.[targetKey] : null;
       if (!targetKey || !targetUser) {
         return { allowed: false, status: 404, error: 'Không tìm thấy tài khoản học viên.' };
       }
-      if ((targetUser.isSuperAdmin || targetKey === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
-        return { allowed: false, status: 403, error: 'Không thể chỉnh sửa tài khoản Quản trị hệ thống.' };
-      }
       return { allowed: true };
     }
 
     case 'REQUEST_COVER_UNLOCK': {
       const me = store.users?.[viewer.username] || viewer;
+      if (payload?.itemType === 'title') {
+        const titleId = String(payload?.itemId || '').trim();
+        const paidTitle = PAID_SHOP_TITLES.find(t => t.id === titleId);
+        if (!paidTitle) {
+          return { allowed: false, status: 400, error: 'Danh hiệu không hợp lệ.' };
+        }
+        const alreadyOwned =
+          isSuperAdmin ||
+          (Array.isArray(me.purchasedTitleIds) && me.purchasedTitleIds.includes(titleId)) ||
+          (Array.isArray(me.grantedTitleIds) && me.grantedTitleIds.includes(titleId));
+        if (alreadyOwned) {
+          return { allowed: false, status: 400, error: 'Tài khoản của bạn đã sở hữu danh hiệu này rồi!' };
+        }
+        return { allowed: true };
+      }
       if (hasCustomCoverPermission(me)) {
         return { allowed: false, status: 400, error: 'Tài khoản của bạn đã mở khóa quyền Ảnh Nền Riêng rồi!' };
       }
@@ -1869,10 +1897,12 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
       grantedTitleIds: Array.isArray(prevUser.grantedTitleIds) ? prevUser.grantedTitleIds : [],
+      purchasedTitleIds: Array.isArray(prevUser.purchasedTitleIds) ? prevUser.purchasedTitleIds : [],
       customCoverUnlocked: Boolean(prevUser.customCoverUnlocked),
       customCoverUnlockedAt: Number(prevUser.customCoverUnlockedAt) || 0,
       customCoverUnlockedBy: typeof prevUser.customCoverUnlockedBy === 'string' ? prevUser.customCoverUnlockedBy : '',
       coverUnlockRequestedAt: Number(prevUser.coverUnlockRequestedAt) || 0,
+      paidTitleRequested: prevUser.paidTitleRequested || null,
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
       emailVerifiedAt: prevUser.emailVerifiedAt || null
@@ -1884,17 +1914,28 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     incoming.loginDays = mergeLoginDays(prevUser?.loginDays, incoming.loginDays);
     if (!isSuperAdmin) {
       incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
-    } else if (incoming.grantedTitleIds !== undefined) {
-      incoming.grantedTitleIds = Array.isArray(incoming.grantedTitleIds)
-        ? Array.from(new Set(incoming.grantedTitleIds.map(id => String(id || '').trim()).filter(Boolean)))
-        : [];
+      incoming.purchasedTitleIds = Array.isArray(prevUser?.purchasedTitleIds) ? prevUser.purchasedTitleIds : [];
+      incoming.customCoverUnlocked = Boolean(prevUser?.customCoverUnlocked);
     } else {
-      incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
+      if (incoming.grantedTitleIds !== undefined) {
+        incoming.grantedTitleIds = Array.isArray(incoming.grantedTitleIds)
+          ? Array.from(new Set(incoming.grantedTitleIds.map(id => String(id || '').trim()).filter(Boolean)))
+          : [];
+      } else {
+        incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
+      }
+      if (incoming.purchasedTitleIds !== undefined) {
+        incoming.purchasedTitleIds = Array.isArray(incoming.purchasedTitleIds)
+          ? Array.from(new Set(incoming.purchasedTitleIds.map(id => String(id || '').trim()).filter(Boolean)))
+          : [];
+      } else {
+        incoming.purchasedTitleIds = Array.isArray(prevUser?.purchasedTitleIds) ? prevUser.purchasedTitleIds : [];
+      }
+      incoming.customCoverUnlocked =
+        incoming.customCoverUnlocked !== undefined
+          ? Boolean(incoming.customCoverUnlocked)
+          : Boolean(prevUser?.customCoverUnlocked);
     }
-    incoming.customCoverUnlocked =
-      incoming.customCoverUnlocked !== undefined
-        ? Boolean(incoming.customCoverUnlocked)
-        : Boolean(prevUser?.customCoverUnlocked);
     incoming.customCoverUnlockedAt = incoming.customCoverUnlocked
       ? (Number(prevUser?.customCoverUnlockedAt) || Date.now())
       : 0;
@@ -1904,6 +1945,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
           : (viewer?.username || ''))
       : '';
     incoming.coverUnlockRequestedAt = incoming.customCoverUnlocked ? 0 : (Number(prevUser?.coverUnlockRequestedAt) || 0);
+    incoming.paidTitleRequested = prevUser?.paidTitleRequested || null;
     incoming.email = prevUser?.email || '';
     incoming.emailVerified = Boolean(prevUser?.email && prevUser?.emailVerified);
     incoming.emailVerifiedAt = prevUser?.emailVerifiedAt || null;
@@ -1920,9 +1962,13 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     incoming.avatarFrameId = typeof incoming.avatarFrameId === 'string' && incoming.avatarFrameId
       ? incoming.avatarFrameId.slice(0, 40)
       : (prevUser?.avatarFrameId || 'none');
+    const defaultRoleTitle =
+      incoming.role === 'teacher' || prevUser?.role === 'teacher' || uname === SUPER_ADMIN_USERNAME
+        ? 'staff_ielts_10'
+        : 'newbie';
     incoming.equippedTitleId = typeof incoming.equippedTitleId === 'string' && incoming.equippedTitleId
       ? incoming.equippedTitleId.slice(0, 40)
-      : (prevUser?.equippedTitleId || 'newbie');
+      : (prevUser?.equippedTitleId || defaultRoleTitle);
     incoming.showTitleBadge = incoming.showTitleBadge !== undefined
       ? Boolean(incoming.showTitleBadge)
       : (prevUser?.showTitleBadge !== false);
@@ -2721,9 +2767,12 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         const dropSet = new Set(incomingIds);
         nextGranted = curr.filter(id => !dropSet.has(id));
       }
+      const clearPendingTitle =
+        targetUser.paidTitleRequested?.titleId && nextGranted.includes(targetUser.paidTitleRequested.titleId);
       store.users[targetKey] = {
         ...targetUser,
-        grantedTitleIds: nextGranted
+        grantedTitleIds: nextGranted,
+        ...(clearPendingTitle ? { paidTitleRequested: null } : {})
       };
       changed = true;
       break;
@@ -2748,11 +2797,11 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           store,
           {
             title: '🖼️ Đã mở khóa Ảnh Nền Riêng!',
-            message: `${viewer?.name || 'Giáo viên'} đã xác nhận thanh toán ${priceLabel} và mở khóa quyền tải Ảnh Nền / Ảnh Bìa riêng cho hồ sơ của bạn.`,
+            message: `Quản Trị Hệ Thống đã xác nhận thanh toán ${priceLabel} và mở khóa quyền tải Ảnh Nền / Ảnh Bìa riêng cho hồ sơ của bạn.`,
             type: 'announcement',
             targetUsernames: [targetKey],
-            createdBy: viewer?.username || 'teacher_ielts',
-            createdByName: viewer?.name || 'Giáo viên'
+            createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+            createdByName: viewer?.name || 'Quản Trị Hệ Thống'
           },
           viewer
         );
@@ -2764,7 +2813,22 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     case 'REQUEST_COVER_UNLOCK': {
       const uname = viewer?.username ? findUserKeyInStore(store, viewer.username) || viewer.username : '';
       const targetUser = uname ? store.users?.[uname] : null;
-      if (!uname || !targetUser || hasCustomCoverPermission(targetUser)) break;
+      if (!uname || !targetUser) break;
+      if (payload?.itemType === 'title') {
+        const paidTitle = PAID_SHOP_TITLES.find(t => t.id === payload?.itemId);
+        if (!paidTitle) break;
+        store.users[uname] = {
+          ...targetUser,
+          paidTitleRequested: {
+            titleId: paidTitle.id,
+            titleLabel: `${paidTitle.icon} ${paidTitle.label}`,
+            requestedAt: Date.now()
+          }
+        };
+        changed = true;
+        break;
+      }
+      if (hasCustomCoverPermission(targetUser)) break;
       store.users[uname] = {
         ...targetUser,
         coverUnlockRequestedAt: Date.now()
@@ -3859,8 +3923,9 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'GET' && reqUrl === '/payment/config') {
-      if (!viewer || viewer.role !== 'teacher') {
-        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên mới xem được cấu hình thanh toán.' });
+      const isViewerSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+      if (!isViewerSuperAdmin) {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Quản Trị Hệ Thống mới xem được cấu hình giá tiền & thanh toán.' });
         return;
       }
       sendJsonResponse(res, 200, { ok: true, config: getPublicPaymentConfigSummary(store) });
@@ -3868,8 +3933,9 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'POST' && reqUrl === '/payment/config') {
-      if (!viewer || viewer.role !== 'teacher') {
-        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên mới được cấu hình tài khoản nhận tiền.' });
+      const isViewerSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+      if (!isViewerSuperAdmin) {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Quản Trị Hệ Thống mới có quyền chỉnh giá tiền & tài khoản nhận thanh toán!' });
         return;
       }
       try {
@@ -3904,50 +3970,88 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để tạo mã thanh toán.' });
         return;
       }
-      const viewerUser = store.users?.[viewer.username] || viewer;
-      if (hasCustomCoverPermission(viewerUser)) {
+      try {
+        const body = await readJsonBody(req);
+        const viewerUser = store.users?.[viewer.username] || viewer;
+        const cfg = getPublicPaymentConfigSummary(store);
+        const isTitleOrder = body?.itemType === 'title';
+        const itemType = isTitleOrder ? 'title' : 'cover';
+        let itemId = '';
+        let itemLabel = 'Mở khóa Ảnh Nền Riêng';
+        let amount = cfg.coverUnlockPrice;
+        let alreadyUnlocked = hasCustomCoverPermission(viewerUser);
+
+        if (isTitleOrder) {
+          itemId = String(body?.itemId || '').trim();
+          const paidTitle = PAID_SHOP_TITLES.find(t => t.id === itemId);
+          if (!paidTitle) {
+            sendJsonResponse(res, 400, { ok: false, error: 'Danh hiệu không hợp lệ hoặc không bán trong cửa hàng.' });
+            return;
+          }
+          itemLabel = `${paidTitle.icon} ${paidTitle.label}`;
+          amount = getTitlePriceVnd(paidTitle, cfg);
+          alreadyUnlocked = Boolean(
+            viewerUser?.isSuperAdmin ||
+            viewerUser?.username === SUPER_ADMIN_USERNAME ||
+            (Array.isArray(viewerUser?.purchasedTitleIds) && viewerUser.purchasedTitleIds.includes(itemId)) ||
+            (Array.isArray(viewerUser?.grantedTitleIds) && viewerUser.grantedTitleIds.includes(itemId))
+          );
+        }
+
+        if (alreadyUnlocked) {
+          sendJsonResponse(res, 200, {
+            ok: true,
+            alreadyUnlocked: true,
+            paymentConfig: cfg
+          });
+          return;
+        }
+        if (!Array.isArray(store.paymentOrders)) store.paymentOrders = [];
+        const now = Date.now();
+        let activeOrder = store.paymentOrders.find(
+          o =>
+            o &&
+            o.username === viewer.username &&
+            (o.itemType || 'cover') === itemType &&
+            (o.itemId || '') === itemId &&
+            o.status === 'pending' &&
+            Number(o.amount) === amount &&
+            o.expiresAt > now + 5 * 60 * 1000
+        );
+        if (!activeOrder) {
+          const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+          activeOrder = {
+            id: `ord_${now}_${suffix}`,
+            orderCode: `MKN${suffix}`,
+            numericOrderCode: crypto.randomInt(10_000_000, 999_999_999),
+            username: viewer.username,
+            itemType,
+            itemId,
+            itemLabel,
+            amount,
+            status: 'pending',
+            createdAt: now,
+            expiresAt: now + 30 * 60 * 1000,
+            paidAt: 0,
+            paidAmount: 0,
+            txId: '',
+            gateway: ''
+          };
+          store.paymentOrders = [activeOrder, ...store.paymentOrders].slice(0, 500);
+          store.version += 1;
+          store._localMutated = true;
+          if (onFlush) onFlush(store);
+          else onChanged?.(store);
+        }
         sendJsonResponse(res, 200, {
           ok: true,
-          alreadyUnlocked: true,
-          paymentConfig: getPublicPaymentConfigSummary(store)
+          alreadyUnlocked: false,
+          order: activeOrder,
+          paymentConfig: cfg
         });
-        return;
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Không thể khởi tạo đơn hàng.' });
       }
-      if (!Array.isArray(store.paymentOrders)) store.paymentOrders = [];
-      const cfg = getPublicPaymentConfigSummary(store);
-      const amount = cfg.coverUnlockPrice;
-      const now = Date.now();
-      let activeOrder = store.paymentOrders.find(
-        o => o && o.username === viewer.username && o.status === 'pending' && Number(o.amount) === amount && o.expiresAt > now + 5 * 60 * 1000
-      );
-      if (!activeOrder) {
-        const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
-        activeOrder = {
-          id: `ord_${now}_${suffix}`,
-          orderCode: `MKN${suffix}`,
-          numericOrderCode: crypto.randomInt(10_000_000, 999_999_999),
-          username: viewer.username,
-          amount,
-          status: 'pending',
-          createdAt: now,
-          expiresAt: now + 30 * 60 * 1000,
-          paidAt: 0,
-          paidAmount: 0,
-          txId: '',
-          gateway: ''
-        };
-        store.paymentOrders = [activeOrder, ...store.paymentOrders].slice(0, 500);
-        store.version += 1;
-        store._localMutated = true;
-        if (onFlush) onFlush(store);
-        else onChanged?.(store);
-      }
-      sendJsonResponse(res, 200, {
-        ok: true,
-        alreadyUnlocked: false,
-        order: activeOrder,
-        paymentConfig: cfg
-      });
       return;
     }
 
@@ -3959,12 +4063,20 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       const parsedUrl = new URL(req.url || '/', 'http://localhost');
       const code = String(parsedUrl.searchParams.get('code') || '').trim().toUpperCase();
       const viewerUser = store.users?.[viewer.username] || viewer;
+      const isViewerSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
       const matched = (store.paymentOrders || []).find(
-        o => o && o.orderCode === code && (o.username === viewer.username || viewer.role === 'teacher')
+        o => o && o.orderCode === code && (o.username === viewer.username || isViewerSuperAdmin)
       );
+      const itemUnlocked = matched?.itemType === 'title'
+        ? Boolean(
+            isViewerSuperAdmin ||
+            (Array.isArray(viewerUser?.purchasedTitleIds) && viewerUser.purchasedTitleIds.includes(matched.itemId)) ||
+            (Array.isArray(viewerUser?.grantedTitleIds) && viewerUser.grantedTitleIds.includes(matched.itemId))
+          )
+        : hasCustomCoverPermission(viewerUser);
       sendJsonResponse(res, 200, {
         ok: true,
-        unlocked: hasCustomCoverPermission(viewerUser),
+        unlocked: itemUnlocked,
         order: matched || null
       });
       return;
@@ -4066,25 +4178,47 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         matchedOrder.gateway = gateway;
 
         if (targetKey && targetUser) {
-          store.users[targetKey] = {
-            ...targetUser,
-            customCoverUnlocked: true,
-            customCoverUnlockedAt: Date.now(),
-            customCoverUnlockedBy: `auto_${gateway}`,
-            coverUnlockRequestedAt: 0
-          };
-          appendStoreNotification(
-            store,
-            {
-              title: '🎉 Đã mở khóa Ảnh Nền Riêng tự động!',
-              message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ ngay bây giờ!`,
-              type: 'announcement',
-              targetUsernames: [targetKey],
-              createdBy: 'teacher_ielts',
-              createdByName: 'Hệ Thống Thanh Toán Tự Động'
-            },
-            null
-          );
+          if (matchedOrder.itemType === 'title' && matchedOrder.itemId) {
+            const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds : [];
+            const nextPurchased = Array.from(new Set([...prevPurchased, matchedOrder.itemId]));
+            store.users[targetKey] = {
+              ...targetUser,
+              purchasedTitleIds: nextPurchased,
+              ...(targetUser.paidTitleRequested?.titleId === matchedOrder.itemId ? { paidTitleRequested: null } : {})
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '🎉 Đã mở khóa Danh Hiệu VIP tự động!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId}.`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+          } else {
+            store.users[targetKey] = {
+              ...targetUser,
+              customCoverUnlocked: true,
+              customCoverUnlockedAt: Date.now(),
+              customCoverUnlockedBy: `auto_${gateway}`,
+              coverUnlockRequestedAt: 0
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '🎉 Đã mở khóa Ảnh Nền Riêng tự động!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ ngay bây giờ!`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+          }
         }
 
         store.version += 1;

@@ -22,6 +22,14 @@ export const BRAND_INFO = {
   avatarUrl: '/brand-avatar.jpg?v=2'
 };
 
+export const ADMIN_PAYMENT_CONTACT = {
+  phoneDisplay: '0367 073 526',
+  phoneRaw: '0367073526',
+  phoneHref: 'tel:0367073526',
+  zaloUrl: 'https://zalo.me/0367073526',
+  label: 'Quản Trị Viên'
+};
+
 /**
  * Migrate untouched legacy seed teacher account names and apply Ms. Như default brand avatar.
  */

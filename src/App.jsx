@@ -586,7 +586,7 @@ export default function App() {
   };
 
   const handleToggleUserCoverUnlock = async (targetUsername, unlocked = true) => {
-    if (currentUser?.role !== 'teacher' || !targetUsername) return false;
+    if (!currentUser?.isSuperAdmin || !targetUsername) return false;
     const snap = await dispatchSyncAction('TOGGLE_USER_COVER_UNLOCK', {
       username: targetUsername,
       unlocked: Boolean(unlocked)
@@ -602,11 +602,14 @@ export default function App() {
     return true;
   };
 
-  const handleRequestCoverUnlock = async () => {
+  const handleRequestCoverUnlock = async (reqOpts = {}) => {
     if (!currentUser?.username) return false;
-    const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', {});
+    const payload = reqOpts?.itemType === 'title' && reqOpts?.itemId
+      ? { itemType: 'title', itemId: reqOpts.itemId }
+      : {};
+    const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', payload);
     if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
-    showToast('Đã gửi yêu cầu mở khóa 5.000đ tới Giáo viên / Quản trị!');
+    showToast('Đã gửi yêu cầu xác nhận thanh toán tới Quản Trị Hệ Thống (SĐT/Zalo: 0367073526)!');
     return true;
   };
 
@@ -5947,7 +5950,7 @@ export default function App() {
           onOpenAdminTitleManager={targetUsername => setAdminTitleModalState({ isOpen: true, targetUsername: targetUsername || null })}
           onPullSync={() => pullServerSyncState(true)}
           onRequestCoverUnlock={handleRequestCoverUnlock}
-          onToggleUserCoverUnlock={handleToggleUserCoverUnlock}
+          onToggleUserCoverUnlock={currentUser?.isSuperAdmin ? handleToggleUserCoverUnlock : undefined}
           openStudentGamePortal={openStudentGamePortal}
           paymentConfig={paymentConfig}
           previousView={previousView}
@@ -6185,8 +6188,8 @@ export default function App() {
             setShowApiKeyModal(true);
           }}
           onOpenMailConfig={() => setShowMailConfigModal(true)}
-          onOpenPaymentConfig={() => setShowPaymentConfigModal(true)}
-          onToggleUserCoverUnlock={handleToggleUserCoverUnlock}
+          onOpenPaymentConfig={currentUser?.isSuperAdmin ? () => setShowPaymentConfigModal(true) : undefined}
+          onToggleUserCoverUnlock={currentUser?.isSuperAdmin ? handleToggleUserCoverUnlock : undefined}
           paymentConfig={paymentConfig}
           setStudentSearchQuery={setStudentSearchQuery}
           setTeacherHubTab={setTeacherHubTab}
@@ -6328,7 +6331,7 @@ export default function App() {
         />
       )}
 
-      {showPaymentConfigModal && currentUser?.role === 'teacher' && (
+      {showPaymentConfigModal && currentUser?.isSuperAdmin && (
         <PaymentConfigModal
           isOpen={true}
           paymentConfig={paymentConfig}

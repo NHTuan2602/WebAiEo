@@ -437,8 +437,124 @@ export const STUDENT_TITLES = [
       pct: Math.min(100, Math.round((stats.bestGameScore / 5000) * 100)),
       text: `${Math.min(stats.bestGameScore, 5000)}/5,000 điểm Game`
     })
+  },
+  {
+    id: 'vip_thieu_gia',
+    label: 'Thiếu Gia Luyện Đề',
+    icon: '💰',
+    tier: 'Cửa Hàng VIP',
+    difficulty: 'Phú Quý',
+    isPaidTitle: true,
+    defaultPriceVnd: 10000,
+    conditionText: 'Danh hiệu Phú Quý: Sở hữu qua thanh toán QR ủng hộ hoặc Quản Trị Hệ Thống trao tặng.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-400 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/60',
+    heroBadgeClass: 'bg-emerald-500/35 text-emerald-100 border-emerald-300/75',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/60',
+    isUnlocked: () => false,
+    getProgress: (_stats, _user, priceVnd = 10000) => ({
+      pct: 0,
+      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+    })
+  },
+  {
+    id: 'vip_manh_thuong_quan',
+    label: 'Mạnh Thường Quân',
+    icon: '🥂',
+    tier: 'Cửa Hàng VIP',
+    difficulty: 'Phú Quý',
+    isPaidTitle: true,
+    defaultPriceVnd: 15000,
+    conditionText: 'Danh hiệu Phú Quý: Nhà tài trợ nhiệt huyết đồng hành cùng hệ thống IELTS.',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60',
+    heroBadgeClass: 'bg-rose-500/35 text-rose-100 border-rose-300/75',
+    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60',
+    isUnlocked: () => false,
+    getProgress: (_stats, _user, priceVnd = 15000) => ({
+      pct: 0,
+      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+    })
+  },
+  {
+    id: 'vip_dai_gia',
+    label: 'Đại Gia IELTS',
+    icon: '💸',
+    tier: 'Cửa Hàng VIP',
+    difficulty: 'Phú Quý',
+    isPaidTitle: true,
+    defaultPriceVnd: 20000,
+    conditionText: 'Danh hiệu Phú Quý: Đẳng cấp Đại Gia nổi bật rực rỡ trên Hồ sơ & Đấu Trường Từ Vựng.',
+    badgeClass: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    heroBadgeClass: 'bg-amber-500/40 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-amber-100 text-amber-950 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    isUnlocked: () => false,
+    getProgress: (_stats, _user, priceVnd = 20000) => ({
+      pct: 0,
+      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+    })
+  },
+  {
+    id: 'vip_ty_phu',
+    label: 'Tỷ Phú Tri Thức',
+    icon: '⚜️',
+    tier: 'Cửa Hàng VIP',
+    difficulty: 'Phú Quý',
+    isPaidTitle: true,
+    defaultPriceVnd: 50000,
+    conditionText: 'Danh hiệu Phú Quý Đỉnh Cao: Biểu tượng Tỷ Phú sang trọng bậc nhất trên toàn hệ thống.',
+    badgeClass: 'bg-gradient-to-r from-amber-100 via-yellow-100 to-rose-100 text-amber-950 border-amber-400 dark:from-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    heroBadgeClass: 'bg-gradient-to-r from-amber-500/45 to-rose-500/40 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-gradient-to-r from-amber-100 to-rose-100 text-amber-950 border-amber-400 dark:from-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    isUnlocked: () => false,
+    getProgress: (_stats, _user, priceVnd = 50000) => ({
+      pct: 0,
+      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+    })
+  },
+  {
+    id: 'staff_ielts_10',
+    label: '10.0 IELTS Huyền Thoại',
+    icon: '🎖️',
+    tier: 'Độc Quyền GV & QT',
+    difficulty: 'Độc Quyền',
+    isStaffOnly: true,
+    conditionText: 'Đặc quyền tối thượng dành riêng cho Giáo Viên IELTS & Quản Trị Hệ Thống — biểu tượng đỉnh cao 10.0 IELTS.',
+    badgeClass: 'bg-gradient-to-r from-purple-100 via-amber-100 to-rose-100 text-amber-950 border-amber-400 dark:from-purple-600/35 dark:via-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/75',
+    heroBadgeClass: 'bg-gradient-to-r from-amber-500/45 via-purple-500/40 to-rose-500/40 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-gradient-to-r from-purple-100 via-amber-100 to-rose-100 text-amber-950 border-amber-400 dark:from-purple-600/35 dark:via-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/75',
+    isUnlocked: (_stats, userObj) => Boolean(
+      userObj &&
+      (userObj.role === 'teacher' || userObj.isSuperAdmin || userObj.isSystemAdmin || userObj.username === 'tuanpro123s')
+    ),
+    getProgress: (_stats, userObj) => {
+      const ok = Boolean(
+        userObj &&
+        (userObj.role === 'teacher' || userObj.isSuperAdmin || userObj.isSystemAdmin || userObj.username === 'tuanpro123s')
+      );
+      return {
+        pct: ok ? 100 : 0,
+        text: ok ? '🎖️ Độc quyền Giáo Viên & Quản Trị' : 'Chỉ dành riêng cho Giáo Viên & Quản Trị'
+      };
+    }
   }
 ];
+
+export const PAID_SHOP_TITLES = STUDENT_TITLES.filter(t => Boolean(t.isPaidTitle));
+
+export function getPaidTitleDefaultPrices() {
+  const out = {};
+  PAID_SHOP_TITLES.forEach(t => {
+    out[t.id] = Number(t.defaultPriceVnd) || 20000;
+  });
+  return out;
+}
+
+export function getTitlePriceVnd(titleOrId, paymentConfig = null) {
+  const tid = typeof titleOrId === 'string' ? titleOrId : titleOrId?.id;
+  const matched = PAID_SHOP_TITLES.find(t => t.id === tid);
+  const fallback = Number((typeof titleOrId === 'object' && titleOrId?.defaultPriceVnd) || matched?.defaultPriceVnd || 20000);
+  const configured = Number(paymentConfig?.paidTitlePrices?.[tid]);
+  return Number.isFinite(configured) && configured >= 0 ? Math.min(10_000_000, Math.round(configured)) : fallback;
+}
 
 export const PROFILE_TITLES = STUDENT_TITLES;
 
@@ -593,17 +709,21 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
   const opts = options && typeof options === 'object' ? options : {};
   const userObj = 'loginDays' in opts || 'username' in opts ? opts : (opts.user || null);
   const customTitles = Array.isArray(opts.customTitles) ? opts.customTitles : [];
+  const paymentConfig = opts.paymentConfig || null;
   const unlockAll = Boolean(opts.unlockAll || userObj?.isSuperAdmin || userObj?.isSystemAdmin || username === 'tuanpro123s');
   const grantedSet = new Set(Array.isArray(userObj?.grantedTitleIds) ? userObj.grantedTitleIds.map(String) : []);
+  const purchasedSet = new Set(Array.isArray(userObj?.purchasedTitleIds) ? userObj.purchasedTitleIds.map(String) : []);
   const stats = computeStudentStats(username, attempts, roomsDb, userObj);
   const catalog = getAllCatalogTitles(customTitles);
 
   const itemsWithProgress = catalog.map(t => {
     const unlockedByGrant = grantedSet.has(t.id);
-    const unlockedByMetric = typeof t.isUnlocked === 'function' ? Boolean(t.isUnlocked(stats)) : false;
-    const unlocked = unlockAll || unlockedByGrant || unlockedByMetric;
+    const unlockedByPurchase = purchasedSet.has(t.id);
+    const unlockedByMetric = typeof t.isUnlocked === 'function' ? Boolean(t.isUnlocked(stats, userObj)) : false;
+    const unlocked = unlockAll || unlockedByGrant || unlockedByPurchase || unlockedByMetric;
+    const priceVnd = t.isPaidTitle ? getTitlePriceVnd(t, paymentConfig) : 0;
     const progress = typeof t.getProgress === 'function'
-      ? t.getProgress(stats)
+      ? t.getProgress(stats, userObj, priceVnd)
       : { pct: unlocked ? 100 : 0, text: unlocked ? 'Quản trị trao tặng' : 'Chờ Quản trị trao tặng' };
     return {
       id: t.id,
@@ -616,14 +736,20 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       heroBadgeClass: t.heroBadgeClass,
       gameBadgeClass: t.gameBadgeClass,
       isCustomTitle: Boolean(t.isCustomTitle),
+      isPaidTitle: Boolean(t.isPaidTitle),
+      isStaffOnly: Boolean(t.isStaffOnly),
+      priceVnd,
       colorKey: t.colorKey || 'amber',
       unlocked,
       unlockedByGrant,
+      unlockedByPurchase,
       progressPct: unlocked ? 100 : progress.pct,
       progressText: unlockAll
         ? 'Mở khóa tự động (Đặc quyền Quản trị)'
         : unlockedByGrant
         ? '👑 Quản trị trao tặng'
+        : unlockedByPurchase
+        ? '💎 Đã mua mở khóa'
         : unlocked
         ? 'Đã mở khóa'
         : progress.text
@@ -662,7 +788,7 @@ export function resolveRoleBuiltInTitle(user) {
   return null;
 }
 
-export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}, customTitles = []) {
+export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}, customTitles = [], paymentConfig = null) {
   if (!user) return null;
   const isSystemAdmin = Boolean(user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s');
   const isTeacher = !isSystemAdmin && user.role === 'teacher';
@@ -671,12 +797,17 @@ export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}, cu
   const progress = computeStudentTitleProgress(user.username, attempts, roomsDb, {
     unlockAll: isSystemAdmin,
     user,
-    customTitles
+    customTitles,
+    paymentConfig
   });
 
   const preferredId = String(user.equippedTitleId || '').trim();
   const preferred = progress.itemsWithProgress.find(item => item.id === preferredId && item.unlocked);
+  const staffDefault = (isSystemAdmin || isTeacher)
+    ? progress.itemsWithProgress.find(item => item.id === 'staff_ielts_10' && item.unlocked)
+    : null;
   const firstGrantedOrUnlocked =
+    staffDefault ||
     progress.itemsWithProgress.find(item => item.unlockedByGrant && item.unlocked) ||
     progress.itemsWithProgress[0];
   const activeTitle = preferred || firstGrantedOrUnlocked;
@@ -694,14 +825,16 @@ export function resolveStudentTitleSummary(user, attempts = [], roomsDb = {}, cu
   };
 }
 
-export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}, customTitles = []) {
-  const summary = resolveStudentTitleSummary(user, attempts, roomsDb, customTitles);
+export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}, customTitles = [], paymentConfig = null) {
+  const summary = resolveStudentTitleSummary(user, attempts, roomsDb, customTitles, paymentConfig);
   if (!summary) return null;
   if (summary.isHidden) return null;
   return summary.title || null;
 }
 
 export const TITLE_DIFFICULTY_RANK = {
+  'Độc Quyền': 7,
+  'Phú Quý': 6,
   'Đặc Biệt': 6,
   'Cực Khó': 5,
   'Khó': 4,
@@ -836,6 +969,16 @@ export function normalizePaymentConfig(raw = {}) {
       ? rawQr
       : '';
 
+  const rawPaidPrices = obj.paidTitlePrices && typeof obj.paidTitlePrices === 'object' ? obj.paidTitlePrices : {};
+  const paidTitlePrices = {};
+  PAID_SHOP_TITLES.forEach(t => {
+    const p = Number(rawPaidPrices[t.id]);
+    paidTitlePrices[t.id] =
+      Number.isFinite(p) && p >= 0
+        ? Math.min(10_000_000, Math.round(p))
+        : Number(t.defaultPriceVnd) || 20000;
+  });
+
   return {
     coverUnlockPrice,
     bankCode,
@@ -843,7 +986,8 @@ export function normalizePaymentConfig(raw = {}) {
     accountNumber,
     accountName,
     customQrUrl,
-    paymentNoteHint
+    paymentNoteHint,
+    paidTitlePrices
   };
 }
 

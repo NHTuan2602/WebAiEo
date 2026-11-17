@@ -112,7 +112,7 @@ export default function StudentProfile({
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [titleFilter, setTitleFilter] = useState('all');
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
-  const [showCoverCheckoutModal, setShowCoverCheckoutModal] = useState(false);
+  const [checkoutModalState, setCheckoutModalState] = useState(null);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
   const [isTogglingCoverUnlock, setIsTogglingCoverUnlock] = useState(false);
   const [coverCropSource, setCoverCropSource] = useState('');
@@ -154,8 +154,8 @@ export default function StudentProfile({
     : (isSelf || isTeacherViewer);
   const canInspectAttemptDetails = isTeacherViewer || isSelf;
   const canSeeTeacherNotes = isTeacherViewer || isSelf;
-  const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb, customTitles);
-  const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles);
+  const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb, customTitles, paymentConfig);
+  const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles, paymentConfig);
   const heroBanner = getProfileBannerById(student.profileBannerId);
   const studentHasCoverPermission = hasCustomCoverPermission(student);
   const canUseCustomCover = canEditTargetInfo && (isTeacherViewer || studentHasCoverPermission);
@@ -377,7 +377,7 @@ export default function StudentProfile({
               {isSelf && !studentHasCoverPermission && (
                 <button
                   type="button"
-                  onClick={() => setShowCoverCheckoutModal(true)}
+                  onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Ảnh Nền Riêng', itemPrice: normalizedPayCfg.coverUnlockPrice })}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold shadow-md transition"
                 >
                   <Lock className="w-3.5 h-3.5" />
@@ -544,7 +544,7 @@ export default function StudentProfile({
                       <Crown className="w-3.5 h-3.5" /> Tặng Danh Hiệu
                     </button>
                   )}
-                  {isTeacherViewer && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserCoverUnlock && (
+                  {isViewerSuperAdmin && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserCoverUnlock && (
                     <button
                       type="button"
                       disabled={isTogglingCoverUnlock}
@@ -1733,13 +1733,17 @@ export default function StudentProfile({
       {showTitlesModal && titleSummary && (() => {
         const allTitleItems = titleSummary.itemsWithProgress || [];
         const hardTitleCount = allTitleItems.filter(i => i.difficulty === 'Khó' || i.difficulty === 'Cực Khó').length;
+        const vipTitleCount = allTitleItems.filter(i => i.isPaidTitle).length;
         const filteredTitles = allTitleItems.filter(item => {
           if (titleFilter === 'unlocked') return item.unlocked;
           if (titleFilter === 'locked') return !item.unlocked;
+          if (titleFilter === 'vip') return item.isPaidTitle;
           if (titleFilter === 'hard') return item.difficulty === 'Khó' || item.difficulty === 'Cực Khó';
           return true;
         });
         const diffBadgeCls = (diff) => {
+          if (diff === 'Độc Quyền') return 'bg-purple-100 text-purple-900 border-purple-400 dark:bg-purple-500/25 dark:text-purple-200 dark:border-purple-400/50';
+          if (diff === 'Phú Quý') return 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 border-amber-400 dark:from-amber-500/25 dark:to-yellow-500/25 dark:text-amber-100 dark:border-amber-400/60';
           if (diff === 'Cực Khó') return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/40';
           if (diff === 'Khó') return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/40';
           if (diff === 'Thử Thách') return 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/40';
@@ -1815,6 +1819,7 @@ export default function StudentProfile({
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { id: 'all', label: `Tất cả (${allTitleItems.length})` },
+                  { id: 'vip', label: `💎 Cửa Hàng VIP (${vipTitleCount})` },
                   { id: 'unlocked', label: `Đã mở (${titleSummary.unlockedIds?.length || 0})` },
                   { id: 'locked', label: `Chưa mở (${Math.max(0, allTitleItems.length - (titleSummary.unlockedIds?.length || 0))})` },
                   { id: 'hard', label: `Khó & Cực Khó (${hardTitleCount})` }
@@ -1927,6 +1932,23 @@ export default function StudentProfile({
                             ) : (
                               'Trang Bị Danh Hiệu Này'
                             )}
+                          </button>
+                        )}
+                        {isSelf && !item.unlocked && item.isPaidTitle && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowTitlesModal(false);
+                              setCheckoutModalState({
+                                itemType: 'title',
+                                itemId: item.id,
+                                itemLabel: `${item.icon} ${item.label}`,
+                                itemPrice: item.priceVnd
+                              });
+                            }}
+                            className="w-full py-2 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" /> Mua Mở Khóa ({formatVndCurrency(item.priceVnd)})
                           </button>
                         )}
                         {isViewerSuperAdmin && !isTargetSystemAdmin && onGrantUserTitles && !item.isRoleBuiltIn && item.id !== 'newbie' && (() => {
@@ -2138,7 +2160,7 @@ export default function StudentProfile({
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowCoverCheckoutModal(true)}
+                      onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Ảnh Nền Riêng', itemPrice: normalizedPayCfg.coverUnlockPrice })}
                       className="shrink-0 px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow-sm inline-flex items-center justify-center gap-1.5"
                     >
                       <Sparkles className="w-3.5 h-3.5" /> Mở QR Thanh Toán ({unlockPriceLabel})
@@ -2251,13 +2273,25 @@ export default function StudentProfile({
         }}
       />
 
-      {showCoverCheckoutModal && isSelf && (
+      {Boolean(checkoutModalState) && isSelf && (
         <CoverCheckoutModal
           isOpen={true}
+          itemType={checkoutModalState.itemType || 'cover'}
+          itemId={checkoutModalState.itemId || ''}
+          itemLabel={checkoutModalState.itemLabel || ''}
+          itemPrice={checkoutModalState.itemPrice}
           currentUser={student}
           paymentConfig={paymentConfig}
-          onClose={() => setShowCoverCheckoutModal(false)}
+          onClose={() => setCheckoutModalState(null)}
           onUnlockedReady={() => openCustomizeModal()}
+          onEquipPurchasedTitle={tid => {
+            if (!tid || !handleUpdateUserProfileFields) return;
+            handleUpdateUserProfileFields(student.username, {
+              equippedTitleId: tid,
+              showTitleBadge: true,
+              customToast: `Đã đeo danh hiệu mới!`
+            });
+          }}
           onRequestUnlock={onRequestCoverUnlock}
           onPullSync={onPullSync}
           showToast={showToast}
