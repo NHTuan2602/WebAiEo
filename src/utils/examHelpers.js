@@ -254,7 +254,93 @@ export function parseRawVocabText(rawText, seedStr = null) {
   return parsedItems;
 }
 
-export function compressAvatarImageFile(file, targetSize = 160) {
+export const MAX_CROP_DATA_URL_LENGTH = 450_000;
+
+export function clampCropZoom(zoom) {
+  const num = Number(zoom);
+  if (!Number.isFinite(num)) return 1;
+  return Math.min(4, Math.max(1, num));
+}
+
+export function clampCropPan(pan) {
+  const num = Number(pan);
+  if (!Number.isFinite(num)) return 0;
+  return Math.min(1, Math.max(-1, num));
+}
+
+export function normalizeCropRotation(rotation) {
+  const num = Number(rotation) || 0;
+  const snapped = Math.round(num / 90) * 90;
+  return ((snapped % 360) + 360) % 360;
+}
+
+export function computeCropLayout(imgWidth, imgHeight, targetWidth, targetHeight, cropOptions = {}) {
+  const safeImgW = Math.max(1, Number(imgWidth) || 1);
+  const safeImgH = Math.max(1, Number(imgHeight) || 1);
+  const safeTargetW = Math.max(1, Number(targetWidth) || 1);
+  const safeTargetH = Math.max(1, Number(targetHeight) || 1);
+
+  const rot = normalizeCropRotation(cropOptions.rotation);
+  const effW = rot === 90 || rot === 270 ? safeImgH : safeImgW;
+  const effH = rot === 90 || rot === 270 ? safeImgW : safeImgH;
+
+  const baseScale = Math.max(safeTargetW / effW, safeTargetH / effH);
+  const zoom = clampCropZoom(cropOptions.zoom);
+  const scale = baseScale * zoom;
+
+  const drawW = safeImgW * scale;
+  const drawH = safeImgH * scale;
+  const boundW = effW * scale;
+  const boundH = effH * scale;
+
+  const maxOffsetX = Math.max(0, (boundW - safeTargetW) / 2);
+  const maxOffsetY = Math.max(0, (boundH - safeTargetH) / 2);
+  const panX = clampCropPan(cropOptions.panX);
+  const panY = clampCropPan(cropOptions.panY);
+  const offsetX = panX * maxOffsetX;
+  const offsetY = panY * maxOffsetY;
+
+  return {
+    rot,
+    effW,
+    effH,
+    baseScale,
+    zoom,
+    scale,
+    drawW,
+    drawH,
+    boundW,
+    boundH,
+    maxOffsetX,
+    maxOffsetY,
+    panX,
+    panY,
+    offsetX,
+    offsetY,
+    centerX: safeTargetW / 2 + offsetX,
+    centerY: safeTargetH / 2 + offsetY,
+  };
+}
+
+export function drawCroppedImageToContext(ctx, img, targetWidth, targetHeight, cropOptions = {}) {
+  if (!ctx || !img) return null;
+  const imgW = img.naturalWidth || img.width || 1;
+  const imgH = img.naturalHeight || img.height || 1;
+  const layout = computeCropLayout(imgW, imgH, targetWidth, targetHeight, cropOptions);
+
+  ctx.save();
+  ctx.fillStyle = cropOptions.backgroundColor || '#ffffff';
+  ctx.fillRect(0, 0, targetWidth, targetHeight);
+  ctx.translate(layout.centerX, layout.centerY);
+  if (layout.rot) {
+    ctx.rotate((layout.rot * Math.PI) / 180);
+  }
+  ctx.drawImage(img, -layout.drawW / 2, -layout.drawH / 2, layout.drawW, layout.drawH);
+  ctx.restore();
+  return layout;
+}
+
+export function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     if (!file || !file.type?.startsWith('image/')) {
       reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP).'));
@@ -262,61 +348,88 @@ export function compressAvatarImageFile(file, targetSize = 160) {
     }
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'));
-    reader.onload = () => {
-      const img = new window.Image();
-      img.onerror = () => reject(new Error('Không thể xử lý định dạng ảnh này.'));
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = targetSize;
-        canvas.height = targetSize;
-        const ctx = canvas.getContext('2d');
-        const minSide = Math.min(img.width, img.height);
-        const sx = (img.width - minSide) / 2;
-        const sy = (img.height - minSide) / 2;
-        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
-        resolve(canvas.toDataURL('image/jpeg', 0.84));
-      };
-      img.src = reader.result;
-    };
+    reader.onload = () => resolve(String(reader.result || ''));
     reader.readAsDataURL(file);
   });
 }
 
-export function compressBannerImageFile(file, targetWidth = 1200, targetHeight = 420) {
+export function loadImageElement(src) {
   return new Promise((resolve, reject) => {
-    if (!file || !file.type?.startsWith('image/')) {
-      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP).'));
+    if (typeof window === 'undefined' || !src) {
+      reject(new Error('Không thể xử lý hình ảnh ngoài trình duyệt.'));
       return;
     }
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'));
-    reader.onload = () => {
-      const img = new window.Image();
-      img.onerror = () => reject(new Error('Không thể xử lý định dạng ảnh này.'));
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-        const targetRatio = targetWidth / targetHeight;
-        const srcRatio = img.width / Math.max(1, img.height);
-        let sx = 0;
-        let sy = 0;
-        let sw = img.width;
-        let sh = img.height;
-        if (srcRatio > targetRatio) {
-          sw = img.height * targetRatio;
-          sx = (img.width - sw) / 2;
-        } else {
-          sh = img.width / targetRatio;
-          sy = (img.height - sh) / 2;
-        }
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+    const img = new window.Image();
+    if (!String(src).startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onerror = () => reject(new Error('Không thể xử lý định dạng ảnh này.'));
+    img.onload = () => resolve(img);
+    img.src = src;
+  });
+}
+
+function encodeCanvasWithinLimit(canvas, initialQuality = 0.84, maxLength = MAX_CROP_DATA_URL_LENGTH) {
+  const candidates = [initialQuality, 0.78, 0.7, 0.6, 0.5]
+    .filter((q, idx, arr) => q <= initialQuality && arr.indexOf(q) === idx);
+  let lastDataUrl = '';
+  for (const q of candidates) {
+    lastDataUrl = canvas.toDataURL('image/jpeg', q);
+    if (lastDataUrl.length <= maxLength) {
+      return lastDataUrl;
+    }
+  }
+  const scaled = document.createElement('canvas');
+  scaled.width = Math.max(120, Math.round(canvas.width * 0.8));
+  scaled.height = Math.max(120, Math.round(canvas.height * 0.8));
+  const sCtx = scaled.getContext('2d');
+  if (sCtx) {
+    sCtx.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+    return scaled.toDataURL('image/jpeg', 0.72);
+  }
+  return lastDataUrl;
+}
+
+export async function exportCroppedImageDataUrl(src, {
+  targetWidth = 240,
+  targetHeight = 240,
+  zoom = 1,
+  panX = 0,
+  panY = 0,
+  rotation = 0,
+  initialQuality = 0.85,
+} = {}) {
+  const img = await loadImageElement(src);
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Trình duyệt không hỗ trợ xử lý khung vẽ ảnh.');
+  }
+  drawCroppedImageToContext(ctx, img, targetWidth, targetHeight, { zoom, panX, panY, rotation });
+  try {
+    return encodeCanvasWithinLimit(canvas, initialQuality, MAX_CROP_DATA_URL_LENGTH);
+  } catch {
+    throw new Error('Không thể cắt trực tiếp ảnh từ liên kết ngoài. Vui lòng tải tệp ảnh từ máy lên.');
+  }
+}
+
+export async function compressAvatarImageFile(file, targetSize = 160) {
+  const dataUrl = await readImageFileAsDataUrl(file);
+  return exportCroppedImageDataUrl(dataUrl, {
+    targetWidth: targetSize,
+    targetHeight: targetSize,
+    initialQuality: 0.84,
+  });
+}
+
+export async function compressBannerImageFile(file, targetWidth = 1200, targetHeight = 420) {
+  const dataUrl = await readImageFileAsDataUrl(file);
+  return exportCroppedImageDataUrl(dataUrl, {
+    targetWidth,
+    targetHeight,
+    initialQuality: 0.82,
   });
 }
 

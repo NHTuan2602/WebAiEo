@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Camera,
   CheckCircle,
+  Crop,
   Edit,
   Key,
   Loader2,
@@ -17,10 +18,11 @@ import {
   X
 } from 'lucide-react';
 import { DEFAULT_VOCAB_TEXT, VOCAB_PRESETS } from '../../constants/seedData';
-import { compressAvatarImageFile, normalizeRoomObject, parseBulkStudentsText, parseRawVocabText } from '../../utils/examHelpers';
+import { normalizeRoomObject, parseBulkStudentsText, parseRawVocabText, readImageFileAsDataUrl } from '../../utils/examHelpers';
 import UserAvatarBadge from '../../components/common/UserAvatarBadge';
 import AnimalPilotAvatar from '../../components/common/AnimalPilotAvatar';
 import TeacherGradingModal from './TeacherGradingModal';
+import ImageCropperModal from './ImageCropperModal';
 
 export default function GlobalModals({
   addStudentMode,
@@ -88,6 +90,7 @@ export default function GlobalModals({
   const [showNewTopicForm, setShowNewTopicForm] = useState(false);
   const [newTopicLabel, setNewTopicLabel] = useState('');
   const [newTopicText, setNewTopicText] = useState('');
+  const [avatarCropState, setAvatarCropState] = useState(null);
 
   return (
     <>
@@ -227,14 +230,23 @@ export default function GlobalModals({
                         e.target.value = '';
                         if (!file) return;
                         try {
-                          const compressed = await compressAvatarImageFile(file, 160);
-                          setEditingTargetUser(prev => (prev ? { ...prev, avatarUrl: compressed } : prev));
+                          const rawDataUrl = await readImageFileAsDataUrl(file);
+                          setAvatarCropState({ sourceUrl: rawDataUrl, target: 'editing_avatar' });
                         } catch (err) {
                           showToast(err.message || 'Không thể xử lý ảnh này!', 'error');
                         }
                       }}
                     />
                   </label>
+                  {editingTargetUser.avatarUrl?.startsWith('data:image/') && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatarCropState({ sourceUrl: editingTargetUser.avatarUrl, target: 'editing_avatar' })}
+                      className="px-2 py-1 rounded-lg bg-[#EDFFFD] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-teal-200 dark:border-teal-800 text-[11px] font-bold hover:bg-teal-100/70 transition inline-flex items-center gap-1"
+                    >
+                      <Crop className="w-3 h-3" /> Cắt ảnh
+                    </button>
+                  )}
                   {editingTargetUser.avatarUrl && (
                     <button
                       type="button"
@@ -1014,8 +1026,8 @@ export default function GlobalModals({
                   e.target.value = '';
                   if (!file) return;
                   try {
-                    const compressed = await compressAvatarImageFile(file, 160);
-                    handleUpdateUserAvatar(compressed);
+                    const rawDataUrl = await readImageFileAsDataUrl(file);
+                    setAvatarCropState({ sourceUrl: rawDataUrl, target: 'self_avatar' });
                   } catch (err) {
                     showToast(err.message || 'Không thể xử lý ảnh này!', 'error');
                   }
@@ -1024,7 +1036,16 @@ export default function GlobalModals({
             </label>
 
             {currentUser.avatarUrl && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {currentUser.avatarUrl.startsWith('data:image/') && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarCropState({ sourceUrl: currentUser.avatarUrl, target: 'self_avatar' })}
+                    className="flex-1 min-w-[110px] py-2 px-3 rounded-xl bg-[#EDFFFD] dark:bg-teal-950/50 hover:bg-teal-100/70 dark:hover:bg-teal-900/50 border border-teal-200 dark:border-teal-800 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold transition inline-flex items-center justify-center gap-1.5"
+                  >
+                    <Crop className="w-3.5 h-3.5" /> Cắt Ảnh
+                  </button>
+                )}
                 {myCrewColor !== 'avatar' && (
                   <button
                     type="button"
@@ -1076,6 +1097,24 @@ export default function GlobalModals({
         setGradingScores={setGradingScores}
       />
     )}
+
+    <ImageCropperModal
+      isOpen={Boolean(avatarCropState?.sourceUrl)}
+      sourceUrl={avatarCropState?.sourceUrl || ''}
+      mode="avatar"
+      confirmLabel="Lưu Ảnh Đại Diện"
+      onCancel={() => setAvatarCropState(null)}
+      onError={msg => showToast(msg || 'Không thể cắt ảnh đại diện.', 'error')}
+      onConfirm={croppedUrl => {
+        const target = avatarCropState?.target;
+        setAvatarCropState(null);
+        if (target === 'editing_avatar') {
+          setEditingTargetUser(prev => (prev ? { ...prev, avatarUrl: croppedUrl } : prev));
+        } else {
+          handleUpdateUserAvatar(croppedUrl);
+        }
+      }}
+    />
 
     {/* Global Floating Toast */}
     {globalToast.visible && (

@@ -40,11 +40,13 @@ import {
   Upload,
   UserCheck,
   Users,
-  X
+  X,
+  Crop
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
 import { normalizeExamConfig } from '../constants/seedData';
-import { countExtensionCheatSignals, getRiskAssessment, compressBannerImageFile } from '../utils/examHelpers';
+import { countExtensionCheatSignals, getRiskAssessment, readImageFileAsDataUrl } from '../utils/examHelpers';
+import ImageCropperModal from '../components/modals/ImageCropperModal';
 import {
   AVATAR_FRAMES,
   PROFILE_BANNERS,
@@ -93,6 +95,7 @@ export default function StudentProfile({
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
+  const [coverCropSource, setCoverCropSource] = useState('');
   const [customDraft, setCustomDraft] = useState({
     profileBannerId: 'ocean',
     profileCoverUrl: '',
@@ -1852,14 +1855,23 @@ export default function StudentProfile({
                         e.target.value = '';
                         if (!file) return;
                         try {
-                          const compressed = await compressBannerImageFile(file);
-                          setCustomDraft(prev => ({ ...prev, profileCoverUrl: compressed }));
+                          const rawDataUrl = await readImageFileAsDataUrl(file);
+                          setCoverCropSource(rawDataUrl);
                         } catch (err) {
                           showToast?.(err?.message || 'Không thể tải ảnh hình nền.', 'error');
                         }
                       }}
                     />
                   </label>
+                  {customDraft.profileCoverUrl?.startsWith('data:image/') && (
+                    <button
+                      type="button"
+                      onClick={() => setCoverCropSource(customDraft.profileCoverUrl)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#EDFFFD] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-teal-200 dark:border-teal-800 text-xs font-bold hover:bg-teal-100/70 transition"
+                    >
+                      <Crop className="w-3.5 h-3.5" /> Cắt lại ảnh nền
+                    </button>
+                  )}
                   {customDraft.profileCoverUrl && (
                     <button
                       type="button"
@@ -1966,6 +1978,19 @@ export default function StudentProfile({
           </div>
         </div>
       )}
+
+      <ImageCropperModal
+        isOpen={Boolean(coverCropSource)}
+        sourceUrl={coverCropSource}
+        mode="banner"
+        confirmLabel="Dùng Ảnh Nền Đã Cắt"
+        onCancel={() => setCoverCropSource('')}
+        onError={msg => showToast?.(msg || 'Không thể cắt ảnh hình nền.', 'error')}
+        onConfirm={croppedUrl => {
+          setCustomDraft(prev => ({ ...prev, profileCoverUrl: croppedUrl }));
+          setCoverCropSource('');
+        }}
+      />
     </div>
   );
 }
