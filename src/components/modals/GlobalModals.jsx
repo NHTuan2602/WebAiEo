@@ -944,13 +944,22 @@ export default function GlobalModals({
               Quyền Quản Trị Hệ Thống: Có thể đặt lại mật khẩu mới cho mọi Giáo viên &amp; Học viên (tự động đăng xuất phiên cũ).
             </div>
           )}
-          <div className="mb-4">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mật khẩu mới</label>
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Mật khẩu mới</label>
+              <button
+                type="button"
+                onClick={() => setStudentPasswordDraft('123456')}
+                className="text-[11px] font-extrabold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
+              >
+                Đặt MK mặc định (123456)
+              </button>
+            </div>
             <input
               type="text"
               value={studentPasswordDraft}
               onChange={e => setStudentPasswordDraft(e.target.value)}
-              placeholder="Nhập mật khẩu mới..."
+              placeholder="Nhập mật khẩu mới hoặc chọn 123456..."
               className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
               required
             />

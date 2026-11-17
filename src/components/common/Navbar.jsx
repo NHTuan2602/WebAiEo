@@ -27,6 +27,7 @@ export default function Navbar({
   handleLogout,
   notifications = [],
   onMarkNotificationsRead,
+  onOpenAccountSecurity,
   onOpenNotificationTarget,
   openMemberProfile,
   openStudentGamePortal,
@@ -238,6 +239,17 @@ export default function Navbar({
             >
               <Camera className="w-4 h-4" />
             </button>
+            {onOpenAccountSecurity && (
+              <button
+                type="button"
+                onClick={() => onOpenAccountSecurity('password')}
+                className="inline-flex p-2 rounded-xl text-[#62748E] dark:text-slate-400 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] transition border border-rose-200/80 dark:border-slate-700"
+                title="Đổi mật khẩu & Email nhận mã OTP"
+                aria-label="Đổi mật khẩu & Email OTP"
+              >
+                <Key className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {!isTeacher && !currentUser?.isSuperAdmin && (

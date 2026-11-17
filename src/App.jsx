@@ -61,6 +61,8 @@ import {
 import { useExamAntiCheat } from './hooks/useExamAntiCheat';
 import Navbar from './components/common/Navbar';
 import GlobalModals from './components/modals/GlobalModals';
+import AccountSecurityModal from './components/modals/AccountSecurityModal';
+import MailConfigModal from './components/modals/MailConfigModal';
 import AuthScreen from './pages/AuthScreen';
 import StudentHome from './pages/StudentHome';
 import SkillPracticeHub from './pages/SkillPracticeHub';
@@ -264,6 +266,9 @@ export default function App() {
   const [apiTestState, setApiTestState] = useState({ testing: false, ok: null, message: '', model: '' });
   const [showAuthPass, setShowAuthPass] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [accountSecurityTab, setAccountSecurityTab] = useState(null); // null | 'password' | 'email'
+  const [showMailConfigModal, setShowMailConfigModal] = useState(false);
+  const [mailConfigured, setMailConfigured] = useState(false);
   const [liveRankDeltas, setLiveRankDeltas] = useState({});
   const prevLiveRanksRef = useRef({});
 
@@ -1120,6 +1125,9 @@ export default function App() {
       if (typeof snap.aiConfigured === 'boolean') {
         setAiConfigured(snap.aiConfigured);
       }
+      if (typeof snap.mailConfigured === 'boolean') {
+        setMailConfigured(snap.mailConfigured);
+      }
       if (bootSessionCheckedRef.current && currentUserRef.current) {
         authEpochRef.current += 1;
         currentUserRef.current = null;
@@ -1147,6 +1155,9 @@ export default function App() {
     }
     if (typeof snap.aiConfigured === 'boolean') {
       setAiConfigured(snap.aiConfigured);
+    }
+    if (typeof snap.mailConfigured === 'boolean') {
+      setMailConfigured(snap.mailConfigured);
     }
     if (snap.rooms && typeof snap.rooms === 'object' && (Object.keys(snap.rooms).length > 0 || snap.seeded)) {
       const normalized = {};
@@ -2631,6 +2642,53 @@ export default function App() {
     }
   };
 
+  const handleSyncAuthenticatedUser = (nextUser, nextSnap) => {
+    if (nextUser && typeof nextUser === 'object') {
+      const cleanUser = normalizeBrandTeacherUser(nextUser);
+      const targetKey = String(cleanUser.username || '').toLowerCase();
+      currentUserRef.current = cleanUser;
+      setCurrentUser(cleanUser);
+      setUsersDb(prev => prev.map(u => (String(u.username || '').toLowerCase() === targetKey ? { ...u, ...cleanUser } : u)));
+      setSelectedProfileStudent(prev => (prev && String(prev.username || '').toLowerCase() === targetKey ? { ...prev, ...cleanUser } : prev));
+    }
+    if (nextSnap && typeof nextSnap === 'object') {
+      applyRemoteSnapshotData.current?.(nextSnap);
+    }
+  };
+
+  const handleSyncRememberedPassword = (targetUsername, nextPassword, nextSnap, nextUser) => {
+    const cleanTarget = String(targetUsername || '').trim().replace(/^@+/, '').toLowerCase();
+    const cleanPass = String(nextPassword || '');
+    if (cleanTarget && cleanPass) {
+      setRememberedLogins(prev => {
+        const exists = prev.some(item => String(item.username || '').toLowerCase() === cleanTarget);
+        if (!exists) return prev;
+        const nextList = prev.map(item =>
+          String(item.username || '').toLowerCase() === cleanTarget
+            ? { ...item, password: cleanPass }
+            : item
+        );
+        persistRememberedLogins(nextList);
+        return nextList;
+      });
+      setUsersDb(prev => prev.map(u => (
+        String(u.username || '').toLowerCase() === cleanTarget
+          ? { ...u, password: cleanPass }
+          : u
+      )));
+      setAuthForm(prev => {
+        const formUname = String(prev.username || '').trim().replace(/^@+/, '').toLowerCase();
+        if (formUname === cleanTarget) {
+          return { ...prev, password: cleanPass };
+        }
+        return prev;
+      });
+    }
+    if (nextUser || nextSnap) {
+      handleSyncAuthenticatedUser(nextUser, nextSnap);
+    }
+  };
+
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -2763,6 +2821,8 @@ export default function App() {
     setNotifications([]);
     setSentNotifications([]);
     setFocusedTestId(null);
+    setAccountSecurityTab(null);
+    setShowMailConfigModal(false);
     serverBonusTotalRef.current = 0;
     currentUserRef.current = null;
     setCurrentUser(null);
@@ -5191,6 +5251,7 @@ export default function App() {
           notifications={notifications}
           onDeleteNotification={handleDeleteNotification}
           onMarkNotificationsRead={handleMarkNotificationsRead}
+          onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           onOpenNotificationTarget={handleOpenNotificationTarget}
           openMemberProfile={openMemberProfile}
           openStudentGamePortal={openStudentGamePortal}
@@ -5213,6 +5274,7 @@ export default function App() {
           authForm={authForm}
           darkMode={darkMode}
           handleAuthSubmit={handleAuthSubmit}
+          onPasswordRecovered={handleSyncRememberedPassword}
           onRemoveRememberedLogin={handleRemoveRememberedLogin}
           onSelectRememberedLogin={handleSelectRememberedLogin}
           rememberPassword={rememberPassword}
@@ -5223,6 +5285,7 @@ export default function App() {
           setRememberPassword={setRememberPassword}
           setShowAuthPass={setShowAuthPass}
           showAuthPass={showAuthPass}
+          showToast={showToast}
         />
       )}
 
@@ -5314,6 +5377,7 @@ export default function App() {
           currentUser={currentUser}
           dispatchSyncAction={dispatchSyncAction}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
+          onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           openStudentGamePortal={openStudentGamePortal}
           previousView={previousView}
           roomsDb={roomsDb}
@@ -5527,6 +5591,8 @@ export default function App() {
           setShowCreateRoomModal={setShowCreateRoomModal}
           setShowVocabModal={setShowVocabModal}
           setStudentPasswordDraft={setStudentPasswordDraft}
+          mailConfigured={mailConfigured}
+          onOpenMailConfig={() => setShowMailConfigModal(true)}
           setStudentSearchQuery={setStudentSearchQuery}
           setTeacherHubTab={setTeacherHubTab}
           setView={setView}
@@ -5641,6 +5707,28 @@ export default function App() {
         studentPasswordDraft={studentPasswordDraft}
         zoomedReadingImg={zoomedReadingImg}
       />
+
+      {Boolean(accountSecurityTab) && (
+        <AccountSecurityModal
+          key={`${accountSecurityTab}-${currentUser?.username || 'anon'}`}
+          isOpen={true}
+          initialTab={accountSecurityTab || 'password'}
+          currentUser={currentUser}
+          onClose={() => setAccountSecurityTab(null)}
+          onUserUpdated={handleSyncAuthenticatedUser}
+          onPasswordChanged={handleSyncRememberedPassword}
+          showToast={showToast}
+        />
+      )}
+
+      {showMailConfigModal && currentUser?.role === 'teacher' && (
+        <MailConfigModal
+          isOpen={true}
+          onClose={() => setShowMailConfigModal(false)}
+          onConfiguredChange={setMailConfigured}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }

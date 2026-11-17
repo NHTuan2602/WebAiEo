@@ -86,7 +86,9 @@ export default function TeacherDashboard({
   handleTeacherOpenLobby,
   handleTeacherResetLobby,
   initGameCampaign,
+  mailConfigured = false,
   notifications = [],
+  onOpenMailConfig,
   openExamBuilder,
   openMemberProfile,
   openSingleSkillBuilder,
@@ -1789,6 +1791,19 @@ export default function TeacherDashboard({
                 >
                   <Users className="w-4 h-4" /> Nhập Hàng Loạt
                 </button>
+                {onOpenMailConfig && (
+                  <button
+                    type="button"
+                    onClick={onOpenMailConfig}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition shadow-sm flex items-center justify-center gap-1.5 border ${
+                      mailConfigured
+                        ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
+                        : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-500/35'
+                    }`}
+                  >
+                    <Send className="w-4 h-4" /> {mailConfigured ? 'Email OTP: Đang bật' : 'Cấu hình Email OTP'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1975,6 +1990,11 @@ export default function TeacherDashboard({
                                   )}
                                 </div>
                                 <p className="text-xs text-slate-400 font-mono mt-0.5">@{account.username}</p>
+                                <p className={`text-[10px] font-bold mt-0.5 ${account.emailVerified ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                                  {account.emailVerified
+                                    ? `✓ Email OTP: ${account.email || account.maskedEmail}`
+                                    : 'Chưa liên kết Email OTP'}
+                                </p>
                               </div>
                             </div>
                           </td>

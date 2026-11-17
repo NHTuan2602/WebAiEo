@@ -20,7 +20,9 @@ import {
   GraduationCap,
   Headphones,
   History,
+  Key,
   Lock,
+  Mail,
   MapPin,
   MessageSquare,
   Palette,
@@ -64,6 +66,7 @@ export default function StudentProfile({
   dispatchSyncAction,
   handleTeacherOpenLobby,
   handleUpdateUserProfileFields,
+  onOpenAccountSecurity,
   openStudentGamePortal,
   previousView,
   roomsDb = {},
@@ -498,6 +501,29 @@ export default function StudentProfile({
                   >
                     <Trophy className="w-3.5 h-3.5" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
                   </button>
+                  {isSelf && onOpenAccountSecurity && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onOpenAccountSecurity('password')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold transition"
+                      >
+                        <Key className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Đổi Mật Khẩu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onOpenAccountSecurity('email')}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
+                          student.emailVerified
+                            ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-emerald-200 dark:border-emerald-500/35 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border-amber-200 dark:border-amber-500/35 text-amber-800 dark:text-amber-200'
+                        }`}
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                        {student.emailVerified ? `Email OTP ✓ (${student.maskedEmail || student.email})` : 'Liên Kết Email OTP'}
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {!isSelf && !isTeacherViewer && !isTargetSystemAdmin && (

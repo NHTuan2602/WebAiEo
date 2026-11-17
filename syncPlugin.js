@@ -10,6 +10,45 @@ import {
   normalizeSpeakingEvaluation,
   simulateAISpeakingGrading
 } from './src/utils/speakingAiEngine.js';
+import {
+  buildOtpEmailContent,
+  getEffectiveMailConfig,
+  getPublicMailConfigSummary,
+  isValidEmailAddress,
+  maskEmailAddress,
+  sendTransactionalEmail
+} from './mailService.js';
+
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_VERIFY_ATTEMPTS = 5;
+
+function hashOtpSecret(code, secret) {
+  return crypto.createHmac('sha256', String(secret || 'otp')).update(String(code || '')).digest('hex');
+}
+
+function timingSafeHexMatch(hexA, hexB) {
+  try {
+    const a = Buffer.from(String(hexA || ''), 'hex');
+    const b = Buffer.from(String(hexB || ''), 'hex');
+    return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+function getOtpMap(store) {
+  if (!store._otpChallenges || !(store._otpChallenges instanceof Map)) {
+    store._otpChallenges = new Map();
+  }
+  const now = Date.now();
+  if (store._otpChallenges.size > 200) {
+    for (const [k, rec] of store._otpChallenges.entries()) {
+      if (!rec || rec.expiresAt <= now) store._otpChallenges.delete(k);
+    }
+  }
+  return store._otpChallenges;
+}
 
 export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
 const SUPER_ADMIN_USERNAME = 'tuanpro123s';
@@ -404,8 +443,13 @@ function sanitizeUserForViewer(user, viewer) {
     avatarFrameId: typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
     equippedTitleId: typeof user.equippedTitleId === 'string' && user.equippedTitleId ? user.equippedTitleId : 'newbie',
     showTitleBadge: user.showTitleBadge !== false,
-    loginDays: Array.isArray(user.loginDays) ? user.loginDays : []
+    loginDays: Array.isArray(user.loginDays) ? user.loginDays : [],
+    emailVerified: Boolean(user.email && user.emailVerified),
+    maskedEmail: user.email && user.emailVerified ? maskEmailAddress(user.email) : ''
   };
+  if (viewer && (viewer.username === user.username || viewer.role === 'teacher')) {
+    safe.email = typeof user.email === 'string' ? user.email : '';
+  }
   if (viewer?.isSuperAdmin && user.isSuperAdmin) {
     safe.isSuperAdmin = true;
     safe.hiddenFromTeacher = true;
@@ -663,10 +707,23 @@ function createInitialStore(audioDir = '') {
     adminFeedbacks: [],
     notifications: [],
     aiConfig: { geminiApiKey: '' },
+    mailConfig: {
+      provider: 'none',
+      resendApiKey: '',
+      brevoApiKey: '',
+      smtpHost: '',
+      smtpPort: 465,
+      smtpSecure: true,
+      smtpUser: '',
+      smtpPass: '',
+      fromEmail: '',
+      fromName: 'IELTS Nha Trang — Ms. Như'
+    },
     _authSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     _bootId: crypto.randomUUID(),
     _localMutated: false,
     _rateLimits: new Map(),
+    _otpChallenges: new Map(),
     _audioDir: audioDir,
     _audioMem: new Map()
   };
@@ -784,6 +841,21 @@ function applyParsedStoreSnapshot(store, parsed) {
       geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
     };
   }
+  if (parsed.mailConfig && typeof parsed.mailConfig === 'object') {
+    store.mailConfig = {
+      ...(store.mailConfig || {}),
+      provider: ['resend', 'brevo', 'smtp', 'none'].includes(parsed.mailConfig.provider) ? parsed.mailConfig.provider : 'none',
+      resendApiKey: String(parsed.mailConfig.resendApiKey || '').trim(),
+      brevoApiKey: String(parsed.mailConfig.brevoApiKey || '').trim(),
+      smtpHost: String(parsed.mailConfig.smtpHost || '').trim(),
+      smtpPort: Number(parsed.mailConfig.smtpPort) || 465,
+      smtpSecure: parsed.mailConfig.smtpSecure !== false,
+      smtpUser: String(parsed.mailConfig.smtpUser || '').trim(),
+      smtpPass: String(parsed.mailConfig.smtpPass || '').trim(),
+      fromEmail: String(parsed.mailConfig.fromEmail || '').trim(),
+      fromName: String(parsed.mailConfig.fromName || 'IELTS Nha Trang — Ms. Như').trim()
+    };
+  }
   if (typeof parsed._authSecret === 'string' && parsed._authSecret.length >= 32) {
     store._authSecret = parsed._authSecret;
   }
@@ -840,7 +912,7 @@ export function createPersistentSyncStore(persistFile = '') {
     const tmpFile = `${persistFile}.${process.pid}.${Date.now()}.tmp`;
     try {
       fs.mkdirSync(path.dirname(persistFile), { recursive: true });
-      const { _audioDir, _audioMem, _rateLimits, _bootId, _localMutated, ...serializableStore } = store;
+      const { _audioDir, _audioMem, _rateLimits, _otpChallenges, _bootId, _localMutated, ...serializableStore } = store;
       const serialized = JSON.stringify(serializableStore);
       fs.writeFileSync(tmpFile, serialized, 'utf8');
       if (fs.existsSync(persistFile) && backupFile) {
@@ -1031,7 +1103,8 @@ function getSnapshotForViewer(store, viewer = null) {
     version: store.version,
     seeded: store.seeded,
     serverTime: Date.now(),
-    aiConfigured: Boolean(getEffectiveGeminiKey(store))
+    aiConfigured: Boolean(getEffectiveGeminiKey(store)),
+    mailConfigured: getEffectiveMailConfig(store).configured
   };
 
   if (!viewer) {
@@ -1428,12 +1501,18 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       avatarFrameId: typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none'),
       equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
-      loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays)
+      loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
+      email: prevUser.email || '',
+      emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
+      emailVerifiedAt: prevUser.emailVerifiedAt || null
     };
     store.users[uname] = cleanSelf;
   } else {
     const incoming = { ...rawUser, username: uname };
     incoming.loginDays = mergeLoginDays(prevUser?.loginDays, incoming.loginDays);
+    incoming.email = prevUser?.email || '';
+    incoming.emailVerified = Boolean(prevUser?.email && prevUser?.emailVerified);
+    incoming.emailVerifiedAt = prevUser?.emailVerifiedAt || null;
     incoming.avatarUrl = sanitizeMediaUrl(incoming.avatarUrl, prevUser?.avatarUrl || '', true);
     incoming.profileBannerId = typeof incoming.profileBannerId === 'string' && incoming.profileBannerId
       ? incoming.profileBannerId.slice(0, 40)
@@ -2456,7 +2535,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'SEED_DEFAULTS'
 ]);
 
-export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null, { syncFromDiskIfNewer = null, onFlush = null } = {}) {
+export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null, { syncFromDiskIfNewer = null, onFlush = null, sendMailFn = sendTransactionalEmail } = {}) {
   const sseClientUsers = new WeakMap();
   let broadcastTimer = null;
 
@@ -2502,6 +2581,49 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
   }, 10000);
   chatSweepTimer.unref?.();
+
+  const sendJsonResponse = (res, statusCode, dataObj) => {
+    res.statusCode = statusCode;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify(dataObj));
+  };
+
+  const refreshActiveSessionCookie = (req, res, viewerPayload, activeUser) => {
+    if (!activeUser?.username) return;
+    const nextVer = activeUser.tokenVersion || 1;
+    const viewerSid = viewerPayload?.sid || crypto.randomBytes(8).toString('hex');
+    const refreshedToken = signToken(
+      {
+        username: activeUser.username,
+        role: activeUser.role,
+        isSuperAdmin: Boolean(activeUser.isSuperAdmin),
+        tokenVersion: nextVer,
+        sid: viewerSid,
+        exp: Date.now() + SESSION_TTL_MS
+      },
+      store._authSecret
+    );
+    res.setHeader('Set-Cookie', buildSessionCookieHeader(req, refreshedToken, SESSION_TTL_MS / 1000));
+    if (viewerPayload?.sid) {
+      for (const sseRes of sseClients) {
+        const info = sseClientUsers.get(sseRes);
+        if (info && info.username === activeUser.username && info.sid === viewerPayload.sid) {
+          info.tokenVersion = nextVer;
+        }
+      }
+    }
+  };
+
+  const clearLoginLimitsForUsername = (uname) => {
+    if (!uname || !store._rateLimits) return;
+    const suffix = `:${uname.toLowerCase()}`;
+    for (const key of store._rateLimits.keys()) {
+      if (key.startsWith('login:') && key.endsWith(suffix)) {
+        store._rateLimits.delete(key);
+      }
+    }
+  };
 
   middlewares.use('/api/sync', async (req, res, next) => {
     const reqUrl = (req.url || '/').split('?')[0];
@@ -2597,6 +2719,469 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           snapshot: getSnapshotForViewer(store, viewer)
         })
       );
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/change-password') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để đổi mật khẩu.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const oldPassword = String(body?.oldPassword || '').trim();
+        const newPassword = String(body?.newPassword || '').trim();
+        const ip = getClientIp(req);
+        if (!checkRateLimit(store._rateLimits, `chgpass:${ip}:${viewer.username.toLowerCase()}`, 12, 5 * 60 * 1000)) {
+          sendJsonResponse(res, 429, { ok: false, error: 'Bạn thao tác quá nhiều lần. Vui lòng đợi vài phút rồi thử lại.' });
+          return;
+        }
+        if (!oldPassword || !newPassword) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Vui lòng nhập đầy đủ mật khẩu cũ và mật khẩu mới.' });
+          return;
+        }
+        if (newPassword.length < 4 || newPassword.length > 128) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Mật khẩu mới phải dài từ 4 đến 128 ký tự.' });
+          return;
+        }
+        const target = store.users?.[viewer.username];
+        if (!target || !(await verifyPasswordAsync(oldPassword, target))) {
+          sendJsonResponse(res, 403, { ok: false, error: 'Mật khẩu cũ không chính xác!' });
+          return;
+        }
+        if (newPassword === oldPassword) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Mật khẩu mới phải khác mật khẩu cũ.' });
+          return;
+        }
+        const updated = {
+          ...target,
+          passwordHash: hashPassword(newPassword),
+          tokenVersion: (target.tokenVersion || 1) + 1
+        };
+        delete updated.pass;
+        store.users[viewer.username] = updated;
+        store.version += 1;
+        store._localMutated = true;
+        clearLoginLimitsForUsername(viewer.username);
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        refreshActiveSessionCookie(req, res, viewerPayload, updated);
+        scheduleBroadcast(50);
+        sendJsonResponse(res, 200, {
+          ok: true,
+          message: 'Đổi mật khẩu thành công!',
+          user: sanitizeUserForViewer(updated, updated),
+          snapshot: getSnapshotForViewer(store, updated)
+        });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Không thể đổi mật khẩu.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/email/send-verification') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để liên kết email.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const cleanEmail = String(body?.email || '').trim().toLowerCase();
+        if (!isValidEmailAddress(cleanEmail)) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Địa chỉ email không hợp lệ. Vui lòng kiểm tra lại.' });
+          return;
+        }
+        const target = store.users?.[viewer.username];
+        if (!target) {
+          sendJsonResponse(res, 404, { ok: false, error: 'Không tìm thấy tài khoản.' });
+          return;
+        }
+        if (target.emailVerified && target.email === cleanEmail) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Email này đã được xác minh và liên kết sẵn rồi.' });
+          return;
+        }
+        if (!checkRateLimit(store._rateLimits, `email_send:${viewer.username.toLowerCase()}`, 10, 15 * 60 * 1000)) {
+          sendJsonResponse(res, 429, { ok: false, error: 'Bạn đã gửi quá nhiều yêu cầu xác minh. Vui lòng thử lại sau ít phút.' });
+          return;
+        }
+        const otpMap = getOtpMap(store);
+        const key = `verify:${viewer.username}`;
+        const existingChallenge = otpMap.get(key);
+        const now = Date.now();
+        if (existingChallenge && existingChallenge.cooldownUntil > now) {
+          const waitSecs = Math.max(1, Math.ceil((existingChallenge.cooldownUntil - now) / 1000));
+          sendJsonResponse(res, 429, { ok: false, error: `Vui lòng đợi ${waitSecs} giây trước khi gửi lại mã OTP.` });
+          return;
+        }
+        const otpCode = String(crypto.randomInt(100000, 1000000));
+        otpMap.set(key, {
+          email: cleanEmail,
+          otpHash: hashOtpSecret(otpCode, store._authSecret),
+          expiresAt: now + OTP_TTL_MS,
+          cooldownUntil: now + OTP_RESEND_COOLDOWN_MS,
+          attemptsLeft: OTP_MAX_VERIFY_ATTEMPTS
+        });
+        try {
+          const content = buildOtpEmailContent({
+            purpose: 'verify_email',
+            otpCode,
+            username: viewer.username,
+            displayName: target.name || viewer.username,
+            expiresMinutes: 10
+          });
+          await sendMailFn(store, { to: cleanEmail, ...content });
+        } catch (mailErr) {
+          otpMap.delete(key);
+          const status = mailErr?.code === 'MAIL_NOT_CONFIGURED' ? 503 : 502;
+          sendJsonResponse(res, status, {
+            ok: false,
+            mailError: true,
+            error: mailErr?.message || 'Không thể gửi email xác minh lúc này.'
+          });
+          return;
+        }
+        sendJsonResponse(res, 200, {
+          ok: true,
+          maskedEmail: maskEmailAddress(cleanEmail),
+          expiresInMinutes: 10,
+          cooldownSeconds: 60,
+          message: `Đã gửi mã xác minh OTP (6 chữ số) tới ${maskEmailAddress(cleanEmail)}.`
+        });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Yêu cầu xác minh email thất bại.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/email/verify') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const cleanEmail = String(body?.email || '').trim().toLowerCase();
+        const otp = String(body?.otp || '').trim();
+        const otpMap = getOtpMap(store);
+        const key = `verify:${viewer.username}`;
+        const challenge = otpMap.get(key);
+        const now = Date.now();
+        if (!challenge || challenge.expiresAt <= now) {
+          otpMap.delete(key);
+          sendJsonResponse(res, 400, { ok: false, error: 'Mã OTP đã hết hạn hoặc chưa được yêu cầu. Vui lòng gửi lại mã mới.' });
+          return;
+        }
+        if (cleanEmail && challenge.email !== cleanEmail) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Email xác minh không khớp với email đã gửi OTP.' });
+          return;
+        }
+        if (!/^\d{6}$/.test(otp)) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Mã OTP phải gồm đúng 6 chữ số.' });
+          return;
+        }
+        const candidateHash = hashOtpSecret(otp, store._authSecret);
+        if (!timingSafeHexMatch(candidateHash, challenge.otpHash)) {
+          challenge.attemptsLeft -= 1;
+          if (challenge.attemptsLeft <= 0) {
+            otpMap.delete(key);
+            sendJsonResponse(res, 400, { ok: false, error: 'Bạn đã nhập sai OTP quá số lần cho phép. Vui lòng gửi lại mã mới.' });
+            return;
+          }
+          sendJsonResponse(res, 400, { ok: false, error: `Mã OTP không chính xác (còn ${challenge.attemptsLeft} lần thử).` });
+          return;
+        }
+        otpMap.delete(key);
+        const target = store.users?.[viewer.username];
+        if (!target) {
+          sendJsonResponse(res, 404, { ok: false, error: 'Không tìm thấy tài khoản.' });
+          return;
+        }
+        const updated = {
+          ...target,
+          email: challenge.email,
+          emailVerified: true,
+          emailVerifiedAt: now
+        };
+        store.users[viewer.username] = updated;
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(50);
+        sendJsonResponse(res, 200, {
+          ok: true,
+          message: `Đã xác minh & liên kết email ${maskEmailAddress(updated.email)} thành công!`,
+          user: sanitizeUserForViewer(updated, updated),
+          snapshot: getSnapshotForViewer(store, updated)
+        });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Xác minh OTP thất bại.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/email/unlink') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const password = String(body?.password || '').trim();
+        const target = store.users?.[viewer.username];
+        if (!target || !(await verifyPasswordAsync(password, target))) {
+          sendJsonResponse(res, 403, { ok: false, error: 'Vui lòng nhập đúng mật khẩu hiện tại để gỡ liên kết email.' });
+          return;
+        }
+        const updated = { ...target, email: '', emailVerified: false, emailVerifiedAt: null };
+        store.users[viewer.username] = updated;
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(50);
+        sendJsonResponse(res, 200, {
+          ok: true,
+          message: 'Đã gỡ liên kết email khôi phục.',
+          user: sanitizeUserForViewer(updated, updated),
+          snapshot: getSnapshotForViewer(store, updated)
+        });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Không thể gỡ liên kết email.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/forgot-password/request') {
+      try {
+        const body = await readJsonBody(req);
+        const rawUsername = normalizeUsernameKey(body?.username || '');
+        const ip = getClientIp(req);
+        if (!rawUsername) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Vui lòng nhập tên đăng nhập tài khoản.' });
+          return;
+        }
+        if (!checkRateLimit(store._rateLimits, `forgot_ip:${ip}`, 20, 15 * 60 * 1000)) {
+          sendJsonResponse(res, 429, { ok: false, error: 'Bạn đã thử quá nhiều lần. Vui lòng đợi ít phút hoặc liên hệ Giáo viên.' });
+          return;
+        }
+        const matchedKey = findUserKeyInStore(store, rawUsername);
+        const target = matchedKey ? store.users?.[matchedKey] : null;
+        if (!target) {
+          sendJsonResponse(res, 200, {
+            ok: true,
+            accountFound: false,
+            hasVerifiedEmail: false,
+            message: 'Không tìm thấy tên tài khoản này trên hệ thống. Vui lòng kiểm tra lại chính tả (không gõ dấu @) hoặc liên hệ Giáo viên để được hỗ trợ.'
+          });
+          return;
+        }
+        if (!target.email || !target.emailVerified) {
+          sendJsonResponse(res, 200, {
+            ok: true,
+            accountFound: true,
+            hasVerifiedEmail: false,
+            username: target.username,
+            message: 'Tài khoản này chưa liên kết hoặc chưa xác minh email khôi phục. Vui lòng liên hệ Giáo viên (Ms. Như) để đổi lại mật khẩu mặc định.'
+          });
+          return;
+        }
+        const otpMap = getOtpMap(store);
+        const key = `reset:${target.username}`;
+        const existingChallenge = otpMap.get(key);
+        const now = Date.now();
+        if (existingChallenge && existingChallenge.cooldownUntil > now) {
+          const waitSecs = Math.max(1, Math.ceil((existingChallenge.cooldownUntil - now) / 1000));
+          sendJsonResponse(res, 429, { ok: false, error: `Mã OTP vừa được gửi. Vui lòng đợi ${waitSecs} giây để gửi lại.` });
+          return;
+        }
+        const otpCode = String(crypto.randomInt(100000, 1000000));
+        otpMap.set(key, {
+          email: target.email,
+          otpHash: hashOtpSecret(otpCode, store._authSecret),
+          expiresAt: now + OTP_TTL_MS,
+          cooldownUntil: now + OTP_RESEND_COOLDOWN_MS,
+          attemptsLeft: OTP_MAX_VERIFY_ATTEMPTS
+        });
+        try {
+          const content = buildOtpEmailContent({
+            purpose: 'forgot_password',
+            otpCode,
+            username: target.username,
+            displayName: target.name || target.username,
+            expiresMinutes: 10
+          });
+          await sendMailFn(store, { to: target.email, ...content });
+        } catch (mailErr) {
+          otpMap.delete(key);
+          const status = mailErr?.code === 'MAIL_NOT_CONFIGURED' ? 503 : 502;
+          sendJsonResponse(res, status, {
+            ok: false,
+            mailError: true,
+            accountFound: true,
+            hasVerifiedEmail: true,
+            username: target.username,
+            maskedEmail: maskEmailAddress(target.email),
+            error:
+              mailErr?.code === 'MAIL_NOT_CONFIGURED'
+                ? 'Tài khoản đã liên kết email, nhưng máy chủ chưa cấu hình dịch vụ gửi email OTP. Vui lòng liên hệ Giáo viên để đổi lại mật khẩu mặc định.'
+                : `Không thể gửi mã OTP qua email (${mailErr?.message || 'lỗi kết nối'}). Vui lòng thử lại hoặc liên hệ Giáo viên.`
+          });
+          return;
+        }
+        sendJsonResponse(res, 200, {
+          ok: true,
+          accountFound: true,
+          hasVerifiedEmail: true,
+          username: target.username,
+          maskedEmail: maskEmailAddress(target.email),
+          expiresInMinutes: 10,
+          cooldownSeconds: 60,
+          message: `Mã OTP xác minh đã được gửi về email đã xác minh (${maskEmailAddress(target.email)}).`
+        });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Không thể xử lý yêu cầu quên mật khẩu.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/forgot-password/reset') {
+      try {
+        const body = await readJsonBody(req);
+        const rawUsername = normalizeUsernameKey(body?.username || '');
+        const otp = String(body?.otp || '').trim();
+        const newPassword = String(body?.newPassword || '').trim();
+        const ip = getClientIp(req);
+        const matchedKey = rawUsername ? findUserKeyInStore(store, rawUsername) : null;
+        if (!matchedKey || !store.users?.[matchedKey]) {
+          sendJsonResponse(res, 404, { ok: false, error: 'Không tìm thấy tài khoản.' });
+          return;
+        }
+        if (!checkRateLimit(store._rateLimits, `forgot_rst:${ip}:${matchedKey.toLowerCase()}`, 12, 10 * 60 * 1000)) {
+          sendJsonResponse(res, 429, { ok: false, error: 'Thử sai quá nhiều lần. Vui lòng đợi ít phút rồi thử lại.' });
+          return;
+        }
+        if (!/^\d{6}$/.test(otp)) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Mã OTP phải gồm đúng 6 chữ số.' });
+          return;
+        }
+        if (newPassword.length < 4 || newPassword.length > 128) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Mật khẩu mới phải dài từ 4 đến 128 ký tự.' });
+          return;
+        }
+        const otpMap = getOtpMap(store);
+        const key = `reset:${matchedKey}`;
+        const challenge = otpMap.get(key);
+        const now = Date.now();
+        if (!challenge || challenge.expiresAt <= now) {
+          otpMap.delete(key);
+          sendJsonResponse(res, 400, { ok: false, error: 'Mã OTP đã hết hạn hoặc không tồn tại. Vui lòng yêu cầu gửi lại mã mới.' });
+          return;
+        }
+        const candidateHash = hashOtpSecret(otp, store._authSecret);
+        if (!timingSafeHexMatch(candidateHash, challenge.otpHash)) {
+          challenge.attemptsLeft -= 1;
+          if (challenge.attemptsLeft <= 0) {
+            otpMap.delete(key);
+            sendJsonResponse(res, 400, { ok: false, error: 'Bạn đã nhập sai OTP quá 5 lần. Vui lòng bấm gửi lại mã OTP mới.' });
+            return;
+          }
+          sendJsonResponse(res, 400, { ok: false, error: `Mã OTP không đúng (còn ${challenge.attemptsLeft} lần thử).` });
+          return;
+        }
+        otpMap.delete(key);
+        const target = store.users[matchedKey];
+        const updated = {
+          ...target,
+          passwordHash: hashPassword(newPassword),
+          tokenVersion: (target.tokenVersion || 1) + 1
+        };
+        delete updated.pass;
+        store.users[matchedKey] = updated;
+        store.version += 1;
+        store._localMutated = true;
+        clearLoginLimitsForUsername(matchedKey);
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(50);
+        sendJsonResponse(res, 200, {
+          ok: true,
+          username: matchedKey,
+          message: 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới ngay bây giờ.'
+        });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Đặt lại mật khẩu thất bại.' });
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl === '/mail/config') {
+      if (!viewer || viewer.role !== 'teacher') {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên mới xem được cấu hình Email.' });
+        return;
+      }
+      sendJsonResponse(res, 200, { ok: true, config: getPublicMailConfigSummary(store) });
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/mail/config') {
+      if (!viewer || viewer.role !== 'teacher') {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên mới được cấu hình dịch vụ Email.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const prev = store.mailConfig || {};
+        const nextProvider = ['resend', 'brevo', 'smtp', 'none'].includes(body?.provider) ? body.provider : prev.provider || 'none';
+        store.mailConfig = {
+          provider: nextProvider,
+          resendApiKey: body?.clearResendKey ? '' : (String(body?.resendApiKey || '').trim() || prev.resendApiKey || ''),
+          brevoApiKey: body?.clearBrevoKey ? '' : (String(body?.brevoApiKey || '').trim() || prev.brevoApiKey || ''),
+          smtpHost: body?.smtpHost !== undefined ? String(body.smtpHost).trim() : (prev.smtpHost || ''),
+          smtpPort: body?.smtpPort !== undefined ? (Number(body.smtpPort) || 465) : (prev.smtpPort || 465),
+          smtpSecure: body?.smtpSecure !== undefined ? Boolean(body.smtpSecure) : (prev.smtpSecure !== false),
+          smtpUser: body?.smtpUser !== undefined ? String(body.smtpUser).trim() : (prev.smtpUser || ''),
+          smtpPass: body?.clearSmtpPass ? '' : (String(body?.smtpPass || '').trim() || prev.smtpPass || ''),
+          fromEmail: body?.fromEmail !== undefined ? String(body.fromEmail).trim() : (prev.fromEmail || ''),
+          fromName: body?.fromName !== undefined ? String(body.fromName).trim() : (prev.fromName || 'IELTS Nha Trang — Ms. Như')
+        };
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(50);
+        sendJsonResponse(res, 200, { ok: true, config: getPublicMailConfigSummary(store) });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Lưu cấu hình email thất bại.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/mail/test') {
+      if (!viewer || viewer.role !== 'teacher') {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên mới được thử gửi email.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const to = String(body?.to || '').trim().toLowerCase();
+        if (!isValidEmailAddress(to)) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Vui lòng nhập email người nhận hợp lệ.' });
+          return;
+        }
+        const content = buildOtpEmailContent({
+          purpose: 'verify_email',
+          otpCode: '123456',
+          username: viewer.username,
+          displayName: viewer.name || viewer.username,
+          expiresMinutes: 10
+        });
+        const result = await sendMailFn(store, { to, ...content });
+        sendJsonResponse(res, 200, { ok: true, result });
+      } catch (err) {
+        const status = err?.code === 'MAIL_NOT_CONFIGURED' ? 503 : 502;
+        sendJsonResponse(res, status, { ok: false, error: err?.message || 'Gửi email thử nghiệm thất bại.' });
+      }
       return;
     }
 
@@ -2911,30 +3496,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         if (changed) {
           if (body.type === 'RESET_USER_PASSWORD' && viewer) {
             const targetKey = findUserKeyInStore(store, body.payload?.username);
+            if (targetKey) clearLoginLimitsForUsername(targetKey);
             if (targetKey && targetKey === viewer.username && store.users[targetKey]) {
               activeViewer = store.users[targetKey];
-              const nextVer = activeViewer.tokenVersion || 1;
-              const viewerSid = viewerPayload?.sid || crypto.randomBytes(8).toString('hex');
-              const refreshedToken = signToken(
-                {
-                  username: activeViewer.username,
-                  role: activeViewer.role,
-                  isSuperAdmin: Boolean(activeViewer.isSuperAdmin),
-                  tokenVersion: nextVer,
-                  sid: viewerSid,
-                  exp: Date.now() + SESSION_TTL_MS
-                },
-                store._authSecret
-              );
-              res.setHeader('Set-Cookie', buildSessionCookieHeader(req, refreshedToken, SESSION_TTL_MS / 1000));
-              if (viewerPayload?.sid) {
-                for (const sseRes of sseClients) {
-                  const info = sseClientUsers.get(sseRes);
-                  if (info && info.username === activeViewer.username && info.sid === viewerPayload.sid) {
-                    info.tokenVersion = nextVer;
-                  }
-                }
-              }
+              refreshActiveSessionCookie(req, res, viewerPayload, activeViewer);
             }
           }
           if (IMMEDIATE_PERSIST_ACTIONS.has(body.type) && onFlush) {

@@ -1,0 +1,345 @@
+import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Loader2, Mail, Save, Send, X } from 'lucide-react';
+
+export default function MailConfigModal({
+  isOpen,
+  onClose,
+  onConfiguredChange,
+  showToast
+}) {
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [error, setError] = useState('');
+  const [testRecipient, setTestRecipient] = useState('');
+  const [form, setForm] = useState({
+    provider: 'smtp',
+    fromEmail: '',
+    fromName: 'IELTS Nha Trang — Ms. Như',
+    resendApiKey: '',
+    brevoApiKey: '',
+    smtpHost: 'smtp.gmail.com',
+    smtpPort: 465,
+    smtpSecure: true,
+    smtpUser: '',
+    smtpPass: ''
+  });
+  const [flags, setFlags] = useState({
+    configured: false,
+    hasResendKey: false,
+    hasBrevoKey: false,
+    hasSmtpPass: false
+  });
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let cancelled = false;
+    fetch('/api/sync/mail/config', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        setLoading(false);
+        if (!data?.ok || !data.config) return;
+        const c = data.config;
+        setError('');
+        setFlags({
+          configured: Boolean(c.configured),
+          hasResendKey: Boolean(c.hasResendKey),
+          hasBrevoKey: Boolean(c.hasBrevoKey),
+          hasSmtpPass: Boolean(c.hasSmtpPass)
+        });
+        setForm(prev => ({
+          ...prev,
+          provider: c.provider && c.provider !== 'none' ? c.provider : 'smtp',
+          fromEmail: c.fromEmail || '',
+          fromName: c.fromName || 'IELTS Nha Trang — Ms. Như',
+          smtpHost: c.smtpHost || 'smtp.gmail.com',
+          smtpPort: Number(c.smtpPort) || 465,
+          smtpSecure: c.smtpSecure !== false,
+          smtpUser: c.smtpUser || '',
+          resendApiKey: '',
+          brevoApiKey: '',
+          smtpPass: ''
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSave = async e => {
+    e.preventDefault();
+    if (saving) return;
+    setError('');
+    setSaving(true);
+    try {
+      const res = await fetch('/api/sync/mail/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(data?.error || 'Không thể lưu cấu hình Email.');
+        return;
+      }
+      const c = data.config || {};
+      setFlags({
+        configured: Boolean(c.configured),
+        hasResendKey: Boolean(c.hasResendKey),
+        hasBrevoKey: Boolean(c.hasBrevoKey),
+        hasSmtpPass: Boolean(c.hasSmtpPass)
+      });
+      onConfiguredChange?.(Boolean(c.configured));
+      showToast?.(c.configured ? 'Đã lưu cấu hình Email gửi mã OTP thành công!' : 'Đã lưu cấu hình (hiện chưa đủ thông tin kích hoạt).');
+    } catch {
+      setError('Lỗi kết nối tới máy chủ.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    if (testing || !testRecipient.trim()) return;
+    setError('');
+    setTesting(true);
+    try {
+      const res = await fetch('/api/sync/mail/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: testRecipient.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(data?.error || 'Gửi mail thử thất bại.');
+        return;
+      }
+      showToast?.(`Đã gửi email thử nghiệm tới ${testRecipient.trim()}!`);
+    } catch {
+      setError('Lỗi kết nối khi gửi email thử.');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mail-config-title"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 sticky top-0 z-10">
+          <div className="flex items-center gap-2.5">
+            <Mail className="w-5 h-5 text-[#1EE1D6]" />
+            <div>
+              <h3 id="mail-config-title" className="text-sm sm:text-base font-extrabold">
+                Cấu Hình Dịch Vụ Gửi Email OTP
+              </h3>
+              <p className="text-[11px] text-slate-300">
+                Dùng Gmail SMTP (App Password) hoặc Resend / Brevo API để gửi mã xác minh cho học viên.
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="p-5 sm:p-6 space-y-4">
+          {loading ? (
+            <div className="py-8 flex justify-center text-slate-500 text-xs gap-2 items-center">
+              <Loader2 className="w-4 h-4 animate-spin" /> Đang tải cấu hình...
+            </div>
+          ) : (
+            <>
+              <div className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 ${
+                flags.configured
+                  ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200'
+              }`}>
+                {flags.configured ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                <span>{flags.configured ? 'Hệ thống gửi Email OTP đang sẵn sàng.' : 'Chưa kích hoạt gửi Email OTP — Hãy điền cấu hình bên dưới.'}</span>
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-xs text-rose-700 dark:text-rose-300 font-semibold">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Nhà cung cấp gửi Email</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'smtp', label: 'Gmail / SMTP' },
+                    { id: 'resend', label: 'Resend API' },
+                    { id: 'brevo', label: 'Brevo API' }
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, provider: opt.id }))}
+                      className={`py-2 px-3 rounded-xl text-xs font-extrabold border transition ${
+                        form.provider === opt.id
+                          ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Tên hiển thị người gửi</label>
+                  <input
+                    type="text"
+                    value={form.fromName}
+                    onChange={e => setForm(prev => ({ ...prev, fromName: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Email gửi (From)</label>
+                  <input
+                    type="email"
+                    value={form.fromEmail}
+                    onChange={e => setForm(prev => ({ ...prev, fromEmail: e.target.value }))}
+                    placeholder="vd: center@gmail.com"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+
+              {form.provider === 'resend' && (
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Resend API Key {flags.hasResendKey ? '(Đã lưu — để trống nếu giữ nguyên)' : '*'}
+                  </label>
+                  <input
+                    type="password"
+                    value={form.resendApiKey}
+                    onChange={e => setForm(prev => ({ ...prev, resendApiKey: e.target.value }))}
+                    placeholder="re_..."
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                  />
+                </div>
+              )}
+
+              {form.provider === 'brevo' && (
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Brevo API Key {flags.hasBrevoKey ? '(Đã lưu — để trống nếu giữ nguyên)' : '*'}
+                  </label>
+                  <input
+                    type="password"
+                    value={form.brevoApiKey}
+                    onChange={e => setForm(prev => ({ ...prev, brevoApiKey: e.target.value }))}
+                    placeholder="xkeysib-..."
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                  />
+                </div>
+              )}
+
+              {form.provider === 'smtp' && (
+                <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">SMTP Host</label>
+                      <input
+                        type="text"
+                        value={form.smtpHost}
+                        onChange={e => setForm(prev => ({ ...prev, smtpHost: e.target.value }))}
+                        placeholder="smtp.gmail.com"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Port</label>
+                      <input
+                        type="number"
+                        value={form.smtpPort}
+                        onChange={e => setForm(prev => ({ ...prev, smtpPort: Number(e.target.value) || 465 }))}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Tài khoản Gmail / SMTP User</label>
+                    <input
+                      type="text"
+                      value={form.smtpUser}
+                      onChange={e => setForm(prev => ({ ...prev, smtpUser: e.target.value }))}
+                      placeholder="vd: emailcuaban@gmail.com"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Mật khẩu ứng dụng (App Password) {flags.hasSmtpPass ? '(Đã lưu — để trống nếu giữ nguyên)' : ''}
+                    </label>
+                    <input
+                      type="password"
+                      value={form.smtpPass}
+                      onChange={e => setForm(prev => ({ ...prev, smtpPass: e.target.value }))}
+                      placeholder="16 ký tự App Password..."
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">Gửi thư kiểm tra nhanh (sau khi Lưu)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={testRecipient}
+                    onChange={e => setTestRecipient(e.target.value)}
+                    placeholder="Email nhận thử nghiệm..."
+                    className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendTest}
+                    disabled={testing || !testRecipient.trim()}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Gửi thử
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                  Đóng
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-[1.5] py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {saving ? 'Đang lưu...' : 'Lưu Cấu Hình Email'}
+                </button>
+              </div>
+            </>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
