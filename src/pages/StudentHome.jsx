@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Award,
   BookOpen,
   CheckCircle2,
   Clock,
@@ -16,7 +15,6 @@ import {
   Play,
   ShieldCheck,
   Sparkles,
-  Target,
   TrendingUp
 } from 'lucide-react';
 import { getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
@@ -62,15 +60,23 @@ export default function StudentHome({
   );
   const gradedBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number' && b >= 0);
   const bestOverallBand = gradedBands.length > 0 ? Math.max(...gradedBands) : null;
+  const bestGameScore = Object.values(roomsDb || {}).reduce((best, r) => {
+    const uname = currentUser?.username;
+    if (!uname) return best;
+    const rec = Math.max(Number(r?.players?.[uname]?.score) || 0, Number(r?.liveMatch?.[uname]?.score) || 0);
+    return rec > best ? rec : best;
+  }, 0);
+  const draftByTestId = {};
+  fullExamTests.forEach(t => {
+    draftByTestId[t.id] = Boolean(loadExamDraft(currentUser?.username, t.id, tests));
+  });
 
   const firstPlayableTest = fullExamTests.find(t => {
     const cfg = normalizeExamConfig(t);
     const used = studentAttempts.filter(a => a.testId === t.id).length;
     return !(cfg.maxAttempts > 0 && used >= cfg.maxAttempts);
   }) || fullExamTests[0];
-  const firstTestHasDraft = firstPlayableTest
-    ? Boolean(loadExamDraft(currentUser?.username, firstPlayableTest.id, tests))
-    : false;
+  const firstTestHasDraft = firstPlayableTest ? Boolean(draftByTestId[firstPlayableTest.id]) : false;
 
   const skillGuides = [
     {
@@ -192,18 +198,19 @@ export default function StudentHome({
 
             {/* Right Compact Personal Target Card */}
             <div className="lg:col-span-4">
-              <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 sm:p-6 border border-rose-200/85 dark:border-slate-800 shadow-[0_14px_34px_-12px_rgba(190,24,93,0.10)] space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 sm:p-6 border border-rose-200/85 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#007A7A] dark:text-[#1EE1D6]">
-                      Mục Tiêu Học Tập
-                    </p>
-                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white mt-0.5">
-                      Lộ trình cá nhân
+                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white">
+                      Mục Tiêu &amp; Lộ Trình Cá Nhân
                     </h2>
+                    <p className="text-xs text-[#62748E] dark:text-slate-400 mt-0.5">
+                      Theo dõi Band điểm thực tế so với đích đến
+                    </p>
                   </div>
                   {currentUser && (
                     <button
+                      type="button"
                       onClick={() =>
                         setEditingTargetUser({
                           username: currentUser.username,
@@ -213,8 +220,9 @@ export default function StudentHome({
                           avatarUrl: currentUser.avatarUrl || ''
                         })
                       }
+                      aria-label="Chỉnh sửa mục tiêu Band"
                       title="Chỉnh sửa mục tiêu Band"
-                      className="p-2 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] transition border border-[#B5F5F1] dark:border-teal-500/30"
+                      className="p-2.5 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] transition border border-[#B5F5F1] dark:border-teal-500/30 shrink-0"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
@@ -274,87 +282,71 @@ export default function StudentHome({
       </section>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
-        {/* Clean 4-Card Learning Metrics */}
+        {/* Distinct 4-Card Learning Metrics (no duplication with hero target card) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center gap-4">
+          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center shrink-0 border border-[#B5F5F1] dark:border-teal-500/30">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Đề thi khả dụng</p>
-              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-white tabular-nums">{visibleTests.length}</p>
+              <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Đề thi trọn bộ</p>
+              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-white tabular-nums">{fullExamTests.length}</p>
             </div>
           </div>
 
-          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center gap-4">
+          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center shrink-0 border border-[#570DF8]/25">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Bài tập 4 kỹ năng</p>
+              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-white tabular-nums">{singleSkillCount}</p>
+            </div>
+          </div>
+
+          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1447E6] dark:text-blue-400 flex items-center justify-center shrink-0 border border-[#DBEAFE] dark:border-blue-500/30">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Bài thi đã nộp</p>
+              <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Lượt bài đã nộp</p>
               <p className="text-2xl font-extrabold text-[#0F172B] dark:text-white tabular-nums">{studentAttempts.length}</p>
             </div>
           </div>
 
-          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-[#ECFDF5] dark:bg-emerald-500/15 text-[#059271] dark:text-emerald-400 flex items-center justify-center shrink-0 border border-[#9FF5E1] dark:border-emerald-500/30">
-              <Award className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Band cao nhất</p>
-              <p className="text-2xl font-extrabold text-[#059271] dark:text-emerald-400 tabular-nums">
-                {bestOverallBand !== null ? bestOverallBand : '--'}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 shadow-xs flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={openStudentGamePortal}
+            className="lexi-card text-left bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl p-5 border border-pink-200/90 dark:border-slate-800 flex items-center justify-between gap-3 hover:border-[#F25220]/50"
+          >
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-[#E17100] dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-200/80 dark:border-amber-500/30">
-                <Target className="w-5 h-5" />
+              <div className="w-11 h-11 rounded-xl bg-orange-50 dark:bg-orange-500/15 text-[#F25220] dark:text-orange-300 flex items-center justify-center shrink-0 border border-orange-200/80 dark:border-orange-500/30">
+                <Gamepad2 className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Mục tiêu Band</p>
-                <p className="text-2xl font-extrabold text-[#0F172B] dark:text-white tabular-nums">{currentUser?.targetBand || '8.0'}</p>
+                <p className="text-xs text-[#62748E] dark:text-slate-400 font-semibold">Kỷ lục Game lớp</p>
+                <p className="text-2xl font-extrabold text-[#F25220] dark:text-orange-300 tabular-nums truncate">
+                  {bestGameScore > 0 ? `${bestGameScore}đ` : 'Chơi ngay'}
+                </p>
               </div>
             </div>
-            {currentUser && (
-              <button
-                onClick={() =>
-                  setEditingTargetUser({
-                    username: currentUser.username,
-                    name: currentUser.name || '',
-                    targetBand: currentUser.targetBand || 7.5,
-                    studyGoal: currentUser.studyGoal || '',
-                    avatarUrl: currentUser.avatarUrl || ''
-                  })
-                }
-                title="Chỉnh sửa mục tiêu Band"
-                className="p-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-[#E17100] dark:text-amber-300 transition shrink-0"
-              >
-                <Edit className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+          </button>
         </div>
 
         {/* Section: Thi Thử Theo Bộ Đề */}
         <section id="lexiprep-exam-catalog">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-5">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#007A7A] dark:text-[#1EE1D6] mb-1">
-                <Sparkles className="w-3.5 h-3.5" /> Kho Đề Thi Chính Thức
-              </div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white tracking-tight">
                 Thi Thử Theo Bộ Đề IELTS
               </h2>
-              <p className="text-xs sm:text-sm text-[#62748E] dark:text-slate-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-[#62748E] dark:text-slate-400 mt-1">
                 Chọn bộ đề phù hợp để luyện tập tự do hoặc thi thử đánh giá năng lực theo chuẩn thời gian từng kỹ năng
               </p>
             </div>
 
             {/* Filter Pills */}
-            <div className="flex items-center gap-1.5 bg-[#FFF5F8] dark:bg-[#0F172B] p-1 rounded-xl border border-pink-200/90 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
+            <div className="flex items-center flex-wrap gap-1.5 bg-[#FFF5F8] dark:bg-[#0F172B] p-1.5 rounded-xl border border-pink-200/90 dark:border-slate-800 text-xs font-bold self-start sm:self-auto">
               {[
                 { id: 'all', label: `Tất cả đề thi (${fullExamTests.length})` },
                 { id: 'unlimited', label: 'Luyện tập tự do' },
@@ -364,9 +356,9 @@ export default function StudentHome({
                   key={tab.id}
                   type="button"
                   onClick={() => setTestFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
+                  className={`px-3.5 py-2 rounded-lg transition whitespace-nowrap ${
                     testFilter === tab.id
-                      ? 'bg-[#007A7A] text-white shadow-xs'
+                      ? 'bg-[#007A7A] text-white'
                       : 'text-[#62748E] dark:text-slate-400 hover:text-[#0F172B] dark:hover:text-white'
                   }`}
                 >
@@ -390,7 +382,7 @@ export default function StudentHome({
                 const isExhausted = cfg.maxAttempts > 0 && myUsedCount >= cfg.maxAttempts;
                 const skillShort = { listening: 'L', reading: 'R', writing: 'W' };
                 const totalMins = cfg.order.reduce((sum, s) => sum + (cfg.durations[s] || 0), 0);
-                const hasDraft = Boolean(loadExamDraft(currentUser?.username, test.id, tests));
+                const hasDraft = Boolean(draftByTestId[test.id]);
                 const trackCount = getListeningTracks(test.listening).length;
                 const passageCount = getReadingPassages(test.reading).length;
 
@@ -551,7 +543,7 @@ export default function StudentHome({
         <section>
           {/* Class Members Directory Strip (View Teacher, System Admin & Peer Profiles) */}
           {(Object.keys(usersDb || {}).length > 0 || supportAdminProfile) && (
-            <div className="mb-8 bg-[#FFF5F8] dark:bg-[#0F172B] border border-rose-200/85 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <div className="mb-8 bg-[#FFF5F8] dark:bg-[#0F172B] border border-rose-200/85 dark:border-slate-800 rounded-2xl p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 flex items-center justify-center text-[#007A7A] dark:text-[#1EE1D6]">
@@ -637,15 +629,15 @@ export default function StudentHome({
                                 const mTitle = resolveVisibleTitleBadge({ ...u, username: uname }, attempts, roomsDb);
                                 if (memberIsAdmin) {
                                   return (
-                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
-                                      🛡️ Quản trị hệ thống
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
+                                      <ShieldCheck className="w-3 h-3" /> Quản trị hệ thống
                                     </span>
                                   );
                                 }
                                 if (memberIsTeacher) {
                                   return (
-                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                      👩‍🏫 Giáo viên IELTS
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                      <ShieldCheck className="w-3 h-3" /> Giáo viên IELTS
                                     </span>
                                   );
                                 }
@@ -703,7 +695,7 @@ export default function StudentHome({
               Bạn chưa hoàn thành bài thi nào. Hãy chọn một đề thi ở phía trên để bắt đầu!
             </div>
           ) : (
-            <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border border-pink-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border border-pink-200/90 dark:border-slate-800 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-[#314158] dark:text-slate-300">
                   <thead className="bg-rose-50/85 dark:bg-slate-800/70 border-b border-pink-200/90 dark:border-slate-800 text-xs text-[#62748E] dark:text-slate-400 font-bold">

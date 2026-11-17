@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  BarChart2,
   Bell,
   BookOpen,
   Check,
@@ -16,14 +17,18 @@ import {
   Eye,
   EyeOff,
   Filter,
+  Flame,
   Gamepad2,
   Globe,
   GraduationCap,
   Headphones,
+  Image as ImageIcon,
+  Infinity as InfinityIcon,
   Key,
   Lock,
   Megaphone,
   Mic,
+  Music,
   PenTool,
   Play,
   Plus,
@@ -42,6 +47,7 @@ import {
   UserMinus,
   UserPlus,
   Users,
+  Volume2,
   Wifi,
   X
 } from 'lucide-react';
@@ -243,9 +249,14 @@ export default function TeacherDashboard({
   const pendingGradingCount = (attempts || []).filter(a => !a.teacherGraded).length;
   const itemQuery = itemSearchQuery.trim().toLowerCase();
 
+  const completionStatsById = {};
+  (tests || []).forEach(t => {
+    if (t?.id) completionStatsById[t.id] = getTestCompletionStats(t.id);
+  });
+
   const matchesItemFilters = (item) => {
     if (itemQuery && !(item.title || '').toLowerCase().includes(itemQuery)) return false;
-    if (onlyIncompleteFilter && getTestCompletionStats(item.id).missingList.length === 0) return false;
+    if (onlyIncompleteFilter && (completionStatsById[item.id]?.missingList?.length || 0) === 0) return false;
     return true;
   };
 
@@ -268,121 +279,112 @@ export default function TeacherDashboard({
     const isPrivate = cfg.visibility === 'private';
     const isExpanded = expandedTeacherTestId === t.id;
     const entityLabel = isExercise ? 'bài tập' : 'đề thi';
-    const stats = getTestCompletionStats(t.id);
+    const stats = completionStatsById[t.id] || getTestCompletionStats(t.id);
     const completionPct = stats.totalStudents > 0
       ? Math.round((stats.doneList.length / stats.totalStudents) * 100)
       : 0;
+    const toggleExpandCard = () => setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id));
 
     return (
       <div
         key={t.id}
-        className={`bg-white dark:bg-slate-900 rounded-2xl border transition-all ${
+        className={`bg-[#FFFDFD] dark:bg-slate-900 rounded-2xl border transition-colors ${
           isExpanded
-            ? 'border-[#007A7A]/50 dark:border-[#1EE1D6]/40 ring-2 ring-[#007A7A]/12 shadow-lg p-5 sm:p-6'
-            : 'border-pink-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-pink-300 dark:hover:border-slate-700'
+            ? 'border-[#007A7A]/60 dark:border-[#1EE1D6]/45 ring-2 ring-[#007A7A]/12 p-5 sm:p-6'
+            : 'border-pink-200/85 dark:border-slate-800 hover:border-[#007A7A]/45 dark:hover:border-slate-700'
         }`}
       >
-        {/* Minimal Header Row: Title + Công khai / Chỉ mình tôi */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id))}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setExpandedTeacherTestId(prev => (prev === t.id ? null : t.id));
-            }
-          }}
-          aria-expanded={isExpanded}
-          className={`w-full flex items-center justify-between gap-3 text-left cursor-pointer select-none ${
-            isExpanded ? '' : 'px-5 py-4'
-          }`}
-        >
-          {renamingTestId === t.id ? (
-            <div
-              className="flex flex-wrap items-center gap-1.5 flex-1 min-w-[220px]"
-              onClick={e => e.stopPropagation()}
-            >
-              <input
-                type="text"
-                autoFocus
-                value={renameDraft}
-                onChange={e => setRenameDraft(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleCommitInlineRename(t.id);
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault();
+        {/* Clean Header Row with Non-Nested Sibling Interactive Controls (WCAG A11y safe) */}
+        <div className={`w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isExpanded ? '' : 'px-5 py-4'}`}>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {renamingTestId === t.id ? (
+              <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-[220px]">
+                <input
+                  type="text"
+                  autoFocus
+                  aria-label={`Tên ${entityLabel} mới`}
+                  value={renameDraft}
+                  onChange={e => setRenameDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleCommitInlineRename(t.id);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setRenamingTestId(null);
+                      setRenameDraft('');
+                    }
+                  }}
+                  placeholder={`Nhập tên ${entityLabel} mới...`}
+                  className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border-2 border-[#007A7A] dark:border-[#1EE1D6] text-xs sm:text-sm font-bold text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCommitInlineRename(t.id)}
+                  className="px-3 py-1.5 min-h-[34px] rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold flex items-center gap-1"
+                  title="Lưu tên mới (Enter)"
+                >
+                  <Check className="w-3.5 h-3.5" /> Lưu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     setRenamingTestId(null);
                     setRenameDraft('');
-                  }
-                }}
-                placeholder={`Nhập tên ${entityLabel} mới...`}
-                className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border-2 border-[#007A7A] dark:border-[#1EE1D6] text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => handleCommitInlineRename(t.id)}
-                className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs"
-                title="Lưu tên mới (Enter)"
-              >
-                <Check className="w-3.5 h-3.5" /> Lưu
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setRenamingTestId(null);
-                  setRenameDraft('');
-                }}
-                className="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-bold flex items-center gap-1"
-                title="Hủy (Esc)"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <span
-                className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
-                  isExercise
-                    ? cfg.focusSkill === 'speaking'
-                      ? 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30'
-                      : 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30'
-                    : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
-                }`}
-              >
-                {isExercise
-                  ? `BÀI TẬP • ${cfg.focusSkill === 'speaking' ? 'SPEAKING AI' : (cfg.focusSkill || 'skill').toUpperCase()}`
-                  : 'ĐỀ THI IELTS'}
-              </span>
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
-                {t.title}
-              </h3>
-              <button
-                type="button"
-                onClick={e => {
-                  e.stopPropagation();
-                  setRenamingTestId(t.id);
-                  setRenameDraft(t.title || '');
-                }}
-                title={`Đổi nhanh tên ${entityLabel} ngay tại đây`}
-                className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/20 text-slate-600 dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
-              >
-                <Edit className="w-3 h-3" /> Đổi tên
-              </button>
-            </div>
-          )}
+                  }}
+                  aria-label="Hủy đổi tên"
+                  className="px-2.5 py-1.5 min-h-[34px] rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-bold flex items-center gap-1"
+                  title="Hủy (Esc)"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={toggleExpandCard}
+                  aria-expanded={isExpanded}
+                  className="flex-1 min-w-0 flex flex-wrap items-center gap-2 text-left py-1 rounded-lg hover:opacity-90 transition"
+                >
+                  <span
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${
+                      isExercise
+                        ? cfg.focusSkill === 'speaking'
+                          ? 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/30'
+                          : 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30'
+                        : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
+                    }`}
+                  >
+                    {isExercise
+                      ? `BÀI TẬP • ${cfg.focusSkill === 'speaking' ? 'SPEAKING AI' : (cfg.focusSkill || 'skill').toUpperCase()}`
+                      : 'ĐỀ THI IELTS'}
+                  </span>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
+                    {t.title}
+                  </h3>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenamingTestId(t.id);
+                    setRenameDraft(t.title || '');
+                  }}
+                  title={`Đổi nhanh tên ${entityLabel} ngay tại đây`}
+                  className="min-h-[32px] text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/20 text-slate-600 dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
+                >
+                  <Edit className="w-3 h-3" /> Đổi tên
+                </button>
+              </>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0">
             <button
               type="button"
-              onClick={e => {
-                e.stopPropagation();
-                handleOpenCompletionModal(t.id);
-              }}
+              onClick={() => handleOpenCompletionModal(t.id)}
               title="Kiểm tra học sinh đã làm và chưa làm bài này"
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
+              className={`min-h-[32px] text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
                 stats.totalStudents === 0
                   ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                   : stats.missingList.length > 0
@@ -407,12 +409,9 @@ export default function TeacherDashboard({
 
             <button
               type="button"
-              onClick={e => {
-                e.stopPropagation();
-                toggleTestVisibility(t.id);
-              }}
+              onClick={() => toggleTestVisibility(t.id)}
               title="Bấm để chuyển Công khai / Chỉ mình tôi thấy"
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
+              className={`min-h-[32px] text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
                 isPrivate
                   ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/25'
                   : 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
@@ -422,11 +421,19 @@ export default function TeacherDashboard({
               {isPrivate ? 'Chỉ mình tôi' : 'Công khai'}
             </button>
 
-            <ChevronDown
-              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                isExpanded ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
-              }`}
-            />
+            <button
+              type="button"
+              onClick={toggleExpandCard}
+              aria-label={isExpanded ? `Thu gọn ${t.title}` : `Mở rộng ${t.title}`}
+              aria-expanded={isExpanded}
+              className="p-1.5 min-h-[32px] min-w-[32px] rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition"
+            >
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                  isExpanded ? 'rotate-180 text-[#007A7A] dark:text-[#1EE1D6]' : ''
+                }`}
+              />
+            </button>
           </div>
         </div>
 
@@ -458,13 +465,14 @@ export default function TeacherDashboard({
                       <span className="text-[11px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
                         Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
                       </span>
-                      <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
-                        ⏱ {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold px-2 py-0.5 rounded-md">
+                        <Clock className="w-3 h-3 text-slate-500" /> {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
                       </span>
                     </>
                   )}
-                  <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
-                    {cfg.maxAttempts === 0 ? '∞ Luyện tự do' : `🔒 Tối đa ${cfg.maxAttempts} lần`}
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-md">
+                    {cfg.maxAttempts === 0 ? <InfinityIcon className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                    {cfg.maxAttempts === 0 ? 'Luyện tự do' : `Tối đa ${cfg.maxAttempts} lần`}
                   </span>
                   {!isExercise && cfg.sequentialMode && (
                     <span className="text-[10px] bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-md">
@@ -473,27 +481,27 @@ export default function TeacherDashboard({
                   )}
                   {(!isExercise || cfg.focusSkill === 'listening') && (
                     hasListeningAudio ? (
-                      <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        🎵 {listeningTracksCount > 1 ? `${listeningTracksCount} chủ đề nghe` : 'Đã đính kèm Audio'}
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
+                        <Music className="w-3 h-3" /> {listeningTracksCount > 1 ? `${listeningTracksCount} chủ đề nghe` : 'Đã đính kèm Audio'}
                       </span>
                     ) : listeningTracksCount > 1 || hasListeningImg ? (
-                      <span className="text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        🎧 {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-500/30">
+                        <Headphones className="w-3 h-3" /> {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
                       </span>
                     ) : (
-                      <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
-                        🔊 Dùng AI Voice (TTS)
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-2 py-0.5 rounded-md">
+                        <Volume2 className="w-3 h-3" /> Dùng AI Voice (TTS)
                       </span>
                     )
                   )}
                   {(!isExercise || cfg.focusSkill === 'reading') && (hasReadingImg || passagesCount > 1) && (
-                    <span className="text-[10px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30">
-                      🖼️ {passagesCount} bài Reading
+                    <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-500/30">
+                      <ImageIcon className="w-3 h-3" /> {passagesCount} bài Reading
                     </span>
                   )}
                   {(!isExercise || cfg.focusSkill === 'writing') && t.writing?.task1?.imageUrl && (
-                    <span className="text-[10px] bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-500/30">
-                      📊 Có biểu đồ Task 1
+                    <span className="inline-flex items-center gap-1 text-[10px] bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-500/30">
+                      <BarChart2 className="w-3 h-3" /> Có biểu đồ Task 1
                     </span>
                   )}
                 </div>
@@ -811,25 +819,21 @@ export default function TeacherDashboard({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-7 space-y-6">
-      {/* Studio Hero Header Card (Clean & Hierarchy-Driven) */}
-      <div className="bg-white/95 dark:bg-slate-900 rounded-3xl border border-pink-200/80 dark:border-slate-800 shadow-[0_14px_38px_-18px_rgba(15,23,42,0.12)] p-6 sm:p-7 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
+      {/* Workspace Header Card (Clean Hierarchy — Operate Mode) */}
+      <div className="bg-[#FFF7FA] dark:bg-slate-900 rounded-2xl border border-pink-200/85 dark:border-slate-800 p-6 sm:p-7 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="inline-flex items-center gap-2 bg-[#FFF5F8] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-pink-200 dark:border-teal-500/30 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider">
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Trung Tâm Điều Hành • Ms. Như IELTS Nha Trang</span>
-            </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              Bảng Điều Khiển Giáo Viên
+            </h1>
             {isViewerSuperAdmin && (
               <span className="inline-flex items-center gap-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-500/40 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider">
                 <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
               </span>
             )}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Bảng Điều Khiển Giáo Viên
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
-            Quản lý đề thi thử IELTS, bài tập 4 kỹ năng, theo dõi học sinh chưa làm bài, chấm điểm AI và phòng Game PIN trực tuyến.
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
+            Trung tâm Ms. Như IELTS Nha Trang — Quản lý đề thi thử, bài tập 4 kỹ năng, theo dõi học sinh chưa làm bài, chấm điểm AI và phòng Game PIN trực tuyến.
           </p>
         </div>
 
@@ -837,21 +841,21 @@ export default function TeacherDashboard({
           <button
             type="button"
             onClick={() => openExamBuilder()}
-            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs sm:text-sm font-extrabold px-5 py-3 rounded-2xl shadow-md shadow-teal-900/15 transition flex items-center gap-2"
+            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs sm:text-sm font-extrabold px-5 py-3 rounded-xl transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
           </button>
           <button
             type="button"
             onClick={() => setTeacherHubTab('skill_exercises')}
-            className="bg-[#570DF8]/10 hover:bg-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD] hover:text-white border border-[#570DF8]/25 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-2xl transition flex items-center gap-2"
+            className="bg-[#570DF8]/10 hover:bg-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD] hover:text-white border border-[#570DF8]/25 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-xl transition flex items-center gap-2"
           >
             <Sparkles className="w-4 h-4" /> Tạo Bài Tập 4 Kỹ Năng
           </button>
           <button
             type="button"
             onClick={() => setShowNotifyModal(true)}
-            className="bg-amber-50 hover:bg-amber-500 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500 hover:text-white border border-amber-300 dark:border-amber-500/40 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-2xl transition flex items-center gap-2"
+            className="bg-amber-50 hover:bg-amber-500 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500 hover:text-white border border-amber-300 dark:border-amber-500/40 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-xl transition flex items-center gap-2"
           >
             <Bell className="w-4 h-4" /> Gửi Thông Báo
             {notifications.length > 0 && (
@@ -1054,6 +1058,7 @@ export default function TeacherDashboard({
                   value={itemSearchQuery}
                   onChange={e => setItemSearchQuery(e.target.value)}
                   placeholder="Tìm bài tập..."
+                  aria-label="Tìm kiếm bài tập theo tiêu đề"
                   className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#570DF8]"
                 />
               </div>
@@ -1198,9 +1203,10 @@ export default function TeacherDashboard({
                 <Filter className="w-3.5 h-3.5" /> Lọc:
               </span>
               <select
+                aria-label="Lọc theo đề thi hoặc bài tập"
                 value={gradingFilters.testId}
                 onChange={e => setGradingFilters(prev => ({ ...prev, testId: e.target.value }))}
-                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 max-w-[200px]"
+                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 max-w-[200px]"
               >
                 <option value="all">Tất cả đề thi &amp; bài tập</option>
                 {uniqueAttemptTests.map(([tid, title]) => (
@@ -1208,29 +1214,35 @@ export default function TeacherDashboard({
                 ))}
               </select>
               <select
+                aria-label="Lọc theo trạng thái chấm"
                 value={gradingFilters.status}
                 onChange={e => setGradingFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
               >
                 <option value="all">Tất cả trạng thái</option>
                 <option value="pending">Chờ chấm Writing</option>
                 <option value="graded">Đã chấm xong</option>
               </select>
               <select
+                aria-label="Lọc theo mức cảnh báo chuyển tab"
                 value={gradingFilters.risk}
                 onChange={e => setGradingFilters(prev => ({ ...prev, risk: e.target.value }))}
-                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
               >
                 <option value="all">Mọi mức độ tab</option>
                 <option value="risk">Nghi gian lận (≥3 tab)</option>
               </select>
-              <input
-                type="text"
-                placeholder="🔍 Tên học viên..."
-                value={gradingFilters.search}
-                onChange={e => setGradingFilters(prev => ({ ...prev, search: e.target.value }))}
-                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 w-44 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="relative w-44 sm:w-52">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  aria-label="Tìm theo tên học viên"
+                  placeholder="Tên học viên..."
+                  value={gradingFilters.search}
+                  onChange={e => setGradingFilters(prev => ({ ...prev, search: e.target.value }))}
+                  className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100"
+                />
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {orphanAttemptsCount > 0 && handlePurgeOrphanAttempts && (
@@ -1384,7 +1396,8 @@ export default function TeacherDashboard({
                               setPreviousView('TEACHER_DASHBOARD');
                               setView('RESULT_VIEW');
                             }}
-                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-teal-500/15 text-slate-600 hover:text-[#007A7A] dark:text-slate-300 dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition"
+                            aria-label={`Xem chi tiết bài làm của ${att.studentName}`}
+                            className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-teal-500/15 text-slate-600 hover:text-[#007A7A] dark:text-slate-300 dark:hover:text-[#1EE1D6] border border-slate-200 dark:border-slate-700 transition"
                             title="Xem chi tiết từng câu & bài làm"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -1392,7 +1405,8 @@ export default function TeacherDashboard({
                           <button
                             type="button"
                             onClick={() => handleDeleteAttempt(att)}
-                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
+                            aria-label={`Xóa lượt thi của ${att.studentName}`}
+                            className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition"
                             title="Xóa lượt thi này để mở khóa cho học viên thi lại"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1652,8 +1666,19 @@ export default function TeacherDashboard({
                   ) : (
                     leaderboardPlayers.map((p, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                        <td className="px-6 py-3.5 font-bold text-amber-500">
-                          {idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`}
+                        <td className="px-6 py-3.5 font-bold">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-black tabular-nums ${
+                            idx === 0
+                              ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                              : idx === 1
+                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
+                              : idx === 2
+                              ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-800 dark:text-orange-300'
+                              : 'text-slate-500 dark:text-slate-400'
+                          }`}>
+                            {idx === 0 && <Crown className="w-3 h-3" />}
+                            #{idx + 1}
+                          </span>
                         </td>
                         <td className="px-6 py-3.5 font-bold text-slate-900 dark:text-white">{p.name}</td>
                         <td className="px-6 py-3.5 text-xs text-slate-600 dark:text-slate-300">
@@ -1671,8 +1696,12 @@ export default function TeacherDashboard({
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-3.5 text-center font-extrabold text-blue-600 dark:text-blue-400">{p.score}đ</td>
-                        <td className="px-6 py-3.5 text-center font-bold text-amber-600 dark:text-amber-400">🔥 {p.streak}</td>
+                        <td className="px-6 py-3.5 text-center font-extrabold text-[#007A7A] dark:text-[#1EE1D6] tabular-nums">{p.score}đ</td>
+                        <td className="px-6 py-3.5 text-center font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                          <span className="inline-flex items-center gap-1">
+                            <Flame className="w-3.5 h-3.5" /> {p.streak}
+                          </span>
+                        </td>
                         <td className="px-6 py-3.5 text-right text-xs text-slate-400">{p.updatedAt}</td>
                       </tr>
                     ))
@@ -1761,13 +1790,17 @@ export default function TeacherDashboard({
                 </button>
               </div>
 
-              <input
-                type="text"
-                placeholder="🔍 Tìm theo tên hoặc @username..."
-                value={studentSearchQuery}
-                onChange={e => setStudentSearchQuery(e.target.value)}
-                className="w-full sm:w-72 px-4 py-2 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none font-medium"
-              />
+              <div className="relative w-full sm:w-72">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  aria-label="Tìm theo tên hoặc tên đăng nhập"
+                  placeholder="Tìm theo tên hoặc @username..."
+                  value={studentSearchQuery}
+                  onChange={e => setStudentSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl font-medium"
+                />
+              </div>
             </div>
 
             {validSelectedUsernames.length > 0 && handleBulkDeleteAccounts && (
@@ -1808,10 +1841,10 @@ export default function TeacherDashboard({
               selectableFilteredNames.every(uname => validSelectedUsernames.includes(uname));
 
             return (
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase whitespace-nowrap">
                   <tr>
                     <th className="pl-5 pr-2 py-4 w-10">
                       <input
@@ -1831,11 +1864,11 @@ export default function TeacherDashboard({
                       />
                     </th>
                     <th className="px-4 py-4">Tài Khoản</th>
-                    <th className="px-6 py-4 text-center">Vai Trò</th>
-                    <th className="px-6 py-4 text-center">Mục Tiêu / Ghi Chú</th>
-                    <th className="px-6 py-4 text-center">Hoạt Động</th>
-                    <th className="px-6 py-4 text-center">Ngày Tạo</th>
-                    <th className="px-6 py-4 text-right">Thao Tác</th>
+                    <th className="px-4 py-4 text-center">Vai Trò</th>
+                    <th className="px-4 py-4 text-center">Mục Tiêu / Ghi Chú</th>
+                    <th className="px-4 py-4 text-center">Hoạt Động</th>
+                    <th className="px-4 py-4 text-center">Ngày Tạo</th>
+                    <th className="px-4 py-4 text-right">Thao Tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1906,22 +1939,22 @@ export default function TeacherDashboard({
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-4 py-4 text-center whitespace-nowrap">
                             {isSuperAdminAccount ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
-                                <ShieldAlert className="w-3.5 h-3.5" /> Super Admin
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 whitespace-nowrap">
+                                <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> Super Admin
                               </span>
                             ) : isTeacherAccount ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
-                                <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 whitespace-nowrap">
+                                <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Giáo viên
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
-                                <GraduationCap className="w-3.5 h-3.5" /> Học viên
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 whitespace-nowrap">
+                                <GraduationCap className="w-3.5 h-3.5 shrink-0" /> Học viên
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-4 py-4 text-center whitespace-nowrap">
                             {isTeacherAccount ? (
                               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 Quản trị &amp; Ra đề
@@ -1941,11 +1974,11 @@ export default function TeacherDashboard({
                                     })
                                   }
                                   title="Chỉnh sửa Target Band & thông tin tài khoản"
-                                  className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full transition"
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full whitespace-nowrap transition"
                                 >
-                                  <Target className="w-3.5 h-3.5 text-amber-500" />
+                                  <Target className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                                   Band {account.targetBand || '7.5'}
-                                  <Edit className="w-3 h-3 opacity-70" />
+                                  <Edit className="w-3 h-3 opacity-70 shrink-0" />
                                 </button>
                                 {account.studyGoal && (
                                   <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 max-w-[160px] mx-auto truncate" title={account.studyGoal}>
@@ -1955,18 +1988,18 @@ export default function TeacherDashboard({
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-4 py-4 text-center whitespace-nowrap">
                             {isTeacherAccount ? (
                               <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                                 Toàn quyền quản lý
                               </span>
                             ) : studentAttempts.length > 0 ? (
-                              <div className="inline-flex items-center gap-1.5 text-xs">
-                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-2.5 py-1 rounded-md font-extrabold">
+                              <div className="inline-flex items-center gap-1.5 text-xs whitespace-nowrap">
+                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-2.5 py-1 rounded-md font-extrabold tabular-nums">
                                   {studentAttempts.length} bài
                                 </span>
                                 {bestBand !== null ? (
-                                  <span className="font-black text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2.5 py-1 rounded-md">
+                                  <span className="font-black text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2.5 py-1 rounded-md tabular-nums">
                                     Best {bestBand}
                                   </span>
                                 ) : null}
@@ -1975,18 +2008,18 @@ export default function TeacherDashboard({
                               <span className="text-xs text-slate-400">Chưa làm bài</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400">
+                          <td className="px-4 py-4 text-center text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
                             {account.joinedDate || '-'}
                           </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="inline-flex items-center gap-1.5">
+                          <td className="px-4 py-4 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                               {openMemberProfile && (
                                 <button
                                   type="button"
                                   onClick={() => openMemberProfile(account.username, 'TEACHER_DASHBOARD')}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 transition"
+                                  className="min-h-[34px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 whitespace-nowrap transition"
                                 >
-                                  <Eye className="w-3.5 h-3.5" /> Hồ sơ
+                                  <Eye className="w-3.5 h-3.5 shrink-0" /> Hồ sơ
                                 </button>
                               )}
                               <button
@@ -2001,10 +2034,10 @@ export default function TeacherDashboard({
                                     avatarUrl: account.avatarUrl || ''
                                   })
                                 }
-                                className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition inline-flex items-center gap-1"
+                                className="min-h-[34px] px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 border border-slate-200 dark:border-slate-700 text-xs font-bold whitespace-nowrap transition inline-flex items-center gap-1"
                                 title="Sửa thông tin & phân quyền tài khoản"
                               >
-                                <Edit className="w-3.5 h-3.5" /> Sửa
+                                <Edit className="w-3.5 h-3.5 shrink-0" /> Sửa
                               </button>
                               <button
                                 type="button"
@@ -2014,7 +2047,7 @@ export default function TeacherDashboard({
                                   setEditingStudentAccount(account);
                                   setStudentPasswordDraft('');
                                 }}
-                                className={`px-2.5 py-2 rounded-xl border text-xs font-bold transition inline-flex items-center gap-1 ${
+                                className={`min-h-[34px] px-2.5 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap transition inline-flex items-center gap-1 ${
                                   canResetAccountPass
                                     ? 'bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-500/15 text-slate-700 dark:text-slate-200 hover:text-amber-700 dark:hover:text-amber-300 border-slate-200 dark:border-slate-700'
                                     : 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed'
@@ -2025,13 +2058,13 @@ export default function TeacherDashboard({
                                     : 'Chỉ Quản trị hệ thống mới có quyền đổi mật khẩu Giáo viên khác'
                                 }
                               >
-                                <Key className="w-3.5 h-3.5" /> Đổi MK
+                                <Key className="w-3.5 h-3.5 shrink-0" /> Đổi MK
                               </button>
                               <button
                                 type="button"
                                 disabled={disableDelete}
                                 onClick={() => !disableDelete && handleDeleteAccount(account)}
-                                className={`px-2.5 py-2 rounded-xl border text-xs font-bold transition inline-flex items-center gap-1 ${
+                                className={`min-h-[34px] px-2.5 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap transition inline-flex items-center gap-1 ${
                                   disableDelete
                                     ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed'
                                     : 'bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
@@ -2044,7 +2077,7 @@ export default function TeacherDashboard({
                                     : 'Xóa tài khoản này'
                                 }
                               >
-                                <Trash2 className="w-3.5 h-3.5" /> Xóa
+                                <Trash2 className="w-3.5 h-3.5 shrink-0" /> Xóa
                               </button>
                             </div>
                           </td>
@@ -2094,7 +2127,10 @@ export default function TeacherDashboard({
             onClick={() => setCompletionModalTestId(null)}
           >
             <div
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col overflow-hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Kiểm tra tiến độ: ${targetItem.title}`}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -2123,7 +2159,8 @@ export default function TeacherDashboard({
                 <button
                   type="button"
                   onClick={() => setCompletionModalTestId(null)}
-                  className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white transition"
+                  aria-label="Đóng hộp thoại kiểm tra tiến độ"
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white transition"
                   title="Đóng"
                 >
                   <X className="w-4 h-4" />

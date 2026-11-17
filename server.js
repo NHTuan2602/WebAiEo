@@ -62,12 +62,20 @@ function sendStaticFile(res, filePath, isAsset) {
     'Cache-Control',
     isAsset ? 'public, max-age=31536000, immutable' : 'no-store'
   );
-  fs.createReadStream(filePath).pipe(res);
+  const stream = fs.createReadStream(filePath);
+  stream.on('error', () => {
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    }
+    res.end('Internal asset read error');
+  });
+  stream.pipe(res);
 }
 
 /** Start the standalone production HTTP + SSE sync server. */
 export function createProductionServer({ port = Number(process.env.PORT) || 4173, host = process.env.HOST || '0.0.0.0', persistFile = resolvePersistPath() } = {}) {
-  const { store, schedulePersist } = createPersistentSyncStore(persistFile);
+  const { store, schedulePersist, flushPersist } = createPersistentSyncStore(persistFile);
   const sseClients = new Set();
   const middlewares = [];
 
@@ -132,10 +140,40 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
     console.log(`[Luyện Thi IELTS Nha Trang] Persistent storage: ${storagePath}`);
   });
 
+  let shuttingDown = false;
+  server.gracefulShutdown = (signal = 'SIGTERM') => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[Luyện Thi IELTS Nha Trang] Graceful shutdown requested (${signal})...`);
+    try {
+      flushPersist?.();
+    } catch {}
+    for (const clientRes of sseClients) {
+      try {
+        clientRes.end();
+      } catch {}
+    }
+    sseClients.clear();
+    const forceTimer = setTimeout(() => process.exit(0), 2500);
+    forceTimer.unref?.();
+    server.close(() => {
+      clearTimeout(forceTimer);
+      process.exit(0);
+    });
+  };
+
   return server;
 }
 
 const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
 if (isMainModule) {
-  createProductionServer();
+  const activeServer = createProductionServer();
+  process.on('SIGTERM', () => activeServer.gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => activeServer.gracefulShutdown('SIGINT'));
+  process.on('unhandledRejection', err => {
+    console.error('[Luyện Thi IELTS Nha Trang] Unhandled rejection:', err);
+  });
+  process.on('uncaughtException', err => {
+    console.error('[Luyện Thi IELTS Nha Trang] Uncaught exception:', err);
+  });
 }

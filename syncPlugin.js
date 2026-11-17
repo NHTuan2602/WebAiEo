@@ -700,25 +700,38 @@ export function createPersistentSyncStore(persistFile = '') {
   ensureProtectedAccounts(store);
 
   let writeTimer = null;
+  const writeStoreSync = () => {
+    if (!persistFile) return;
+    try {
+      fs.mkdirSync(path.dirname(persistFile), { recursive: true });
+      const tmpFile = `${persistFile}.tmp`;
+      const { _audioDir, _audioMem, _rateLimits, ...serializableStore } = store;
+      fs.writeFileSync(tmpFile, JSON.stringify(serializableStore), 'utf8');
+      fs.renameSync(tmpFile, persistFile);
+    } catch {
+      // Ignore read-only filesystem errors so realtime relay never crashes
+    }
+  };
+
   const schedulePersist = () => {
     if (!persistFile) return;
     if (writeTimer) clearTimeout(writeTimer);
     writeTimer = setTimeout(() => {
       writeTimer = null;
-      try {
-        fs.mkdirSync(path.dirname(persistFile), { recursive: true });
-        const tmpFile = `${persistFile}.tmp`;
-        const { _audioDir, _audioMem, _rateLimits, ...serializableStore } = store;
-        fs.writeFileSync(tmpFile, JSON.stringify(serializableStore), 'utf8');
-        fs.renameSync(tmpFile, persistFile);
-      } catch {
-        // Ignore read-only filesystem errors so realtime relay never crashes
-      }
+      writeStoreSync();
     }, 200);
     writeTimer.unref?.();
   };
 
-  return { store, schedulePersist };
+  const flushPersist = () => {
+    if (writeTimer) {
+      clearTimeout(writeTimer);
+      writeTimer = null;
+    }
+    writeStoreSync();
+  };
+
+  return { store, schedulePersist, flushPersist };
 }
 
 function readJsonBody(req) {
