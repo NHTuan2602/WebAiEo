@@ -21,18 +21,37 @@ export function isValidEmailAddress(email) {
   return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(clean);
 }
 
+export function isValidAppsScriptUrl(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || '').trim());
+    return (
+      u.protocol === 'https:' &&
+      u.hostname === 'script.google.com' &&
+      u.pathname.startsWith('/macros/')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getEffectiveMailConfig(store) {
   const stored = store?.mailConfig && typeof store.mailConfig === 'object' ? store.mailConfig : {};
   const resendApiKey = String(stored.resendApiKey || process.env.RESEND_API_KEY || '').trim();
   const brevoApiKey = String(stored.brevoApiKey || process.env.BREVO_API_KEY || '').trim();
+  const rawAppsScriptUrl = String(stored.appsScriptUrl || process.env.APPS_SCRIPT_MAIL_URL || '').trim();
+  const appsScriptUrl = isValidAppsScriptUrl(rawAppsScriptUrl) ? rawAppsScriptUrl : '';
   const smtpHost = String(stored.smtpHost || process.env.SMTP_HOST || '').trim();
   const smtpPort = Number(stored.smtpPort || process.env.SMTP_PORT || 465) || 465;
   const smtpSecure =
-    stored.smtpSecure !== undefined
+    smtpPort === 465
+      ? true
+      : smtpPort === 587
+      ? false
+      : stored.smtpSecure !== undefined
       ? Boolean(stored.smtpSecure)
       : process.env.SMTP_SECURE !== undefined
       ? process.env.SMTP_SECURE !== 'false'
-      : smtpPort === 465;
+      : false;
   const smtpUser = String(stored.smtpUser || process.env.SMTP_USER || '').trim();
   const rawSmtpPass = String(stored.smtpPass || process.env.SMTP_PASS || '').trim();
   const smtpPass = /gmail\.com|googlemail\.com/i.test(smtpHost)
@@ -46,11 +65,13 @@ export function getEffectiveMailConfig(store) {
   ).trim();
   const fromName = String(stored.fromName || process.env.MAIL_FROM_NAME || 'IELTS Nha Trang — Ms. Như').trim();
 
-  const explicitProvider = ['resend', 'brevo', 'smtp'].includes(stored.provider) ? stored.provider : '';
+  const explicitProvider = ['resend', 'brevo', 'smtp', 'apps_script'].includes(stored.provider) ? stored.provider : '';
   let provider = 'none';
-  if (explicitProvider === 'resend' && resendApiKey) provider = 'resend';
+  if (explicitProvider === 'apps_script' && appsScriptUrl) provider = 'apps_script';
+  else if (explicitProvider === 'resend' && resendApiKey) provider = 'resend';
   else if (explicitProvider === 'brevo' && brevoApiKey) provider = 'brevo';
   else if (explicitProvider === 'smtp' && smtpHost && smtpUser && smtpPass) provider = 'smtp';
+  else if (appsScriptUrl) provider = 'apps_script';
   else if (resendApiKey) provider = 'resend';
   else if (brevoApiKey) provider = 'brevo';
   else if (smtpHost && smtpUser && smtpPass) provider = 'smtp';
@@ -60,6 +81,7 @@ export function getEffectiveMailConfig(store) {
     provider,
     resendApiKey,
     brevoApiKey,
+    appsScriptUrl,
     smtpHost,
     smtpPort,
     smtpSecure,
@@ -83,6 +105,7 @@ export function getPublicMailConfigSummary(store) {
     smtpUser: cfg.smtpUser,
     hasResendKey: Boolean(cfg.resendApiKey),
     hasBrevoKey: Boolean(cfg.brevoApiKey),
+    hasAppsScriptUrl: Boolean(cfg.appsScriptUrl),
     hasSmtpPass: Boolean(cfg.smtpPass)
   };
 }
@@ -130,6 +153,68 @@ async function sendViaBrevoApi(cfg, { to, subject, html, text }) {
   return { ok: true, provider: 'brevo', messageId: data?.messageId || '' };
 }
 
+async function sendViaAppsScript(cfg, { to, subject, html, text }) {
+  if (!isValidAppsScriptUrl(cfg.appsScriptUrl)) {
+    throw new Error('URL Google Apps Script phải bắt đầu bằng https://script.google.com/macros/...');
+  }
+  const resp = await fetch(cfg.appsScriptUrl, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to,
+      subject,
+      html,
+      text,
+      fromName: cfg.fromName,
+      replyTo: cfg.fromEmail || ''
+    })
+  });
+  const rawText = await resp.text();
+  if (!resp.ok) {
+    throw new Error(`Apps Script HTTP ${resp.status}`);
+  }
+  if (/^\s*<!doctype|^\s*<html/i.test(rawText)) {
+    throw new Error('Apps Script trả về trang HTML đăng nhập — hãy kiểm tra quyền Deploy chọn "Who has access: Anyone (Bất kỳ ai)".');
+  }
+  let parsed = null;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    parsed = null;
+  }
+  if (parsed && parsed.ok === false) {
+    throw new Error(parsed.error || 'Apps Script báo lỗi gửi email.');
+  }
+  return { ok: true, provider: 'apps_script' };
+}
+
+export function formatTransportErrorDetails(err) {
+  if (!err) return { codes: [], message: '' };
+  const inner = Array.isArray(err.errors) && err.errors.length > 0 ? err.errors : [err];
+  const codes = [];
+  const msgs = [];
+  if (err.code) codes.push(err.code);
+  inner.forEach(item => {
+    if (item?.code && !codes.includes(item.code)) codes.push(item.code);
+    if (item?.message) msgs.push(item.message);
+  });
+  if (err.message && !msgs.includes(err.message)) msgs.unshift(err.message);
+  return {
+    codes: Array.from(new Set(codes)),
+    message: msgs.filter(Boolean).join(' | ')
+  };
+}
+
+export function formatMailTransportError(err, fallback = 'Gửi email thất bại.') {
+  if (!err) return fallback;
+  const details = formatTransportErrorDetails(err);
+  if (err.message && String(err.message).trim()) return err.message;
+  if (details.message) return details.message;
+  if (details.codes.length > 0) return `Lỗi kết nối dịch vụ email (${details.codes.join(', ')}).`;
+  return fallback;
+}
+
 function createSmtpLineReader(socket) {
   let buffer = '';
   const pendingResolvers = [];
@@ -150,10 +235,12 @@ function createSmtpLineReader(socket) {
     }
   };
 
-  socket.on('data', chunk => {
+  const onData = chunk => {
     buffer += chunk.toString('utf8');
     flush();
-  });
+  };
+
+  socket.on('data', onData);
 
   const failAll = err => {
     closedErr = err;
@@ -162,8 +249,9 @@ function createSmtpLineReader(socket) {
     }
   };
 
+  const onClose = () => failAll(new Error('SMTP connection closed unexpectedly'));
   socket.on('error', failAll);
-  socket.on('close', () => failAll(new Error('SMTP connection closed unexpectedly')));
+  socket.on('close', onClose);
 
   const readReply = (timeoutMs = 12_000) => {
     if (queuedLines.length > 0 && /^\d{3} /.test(queuedLines[queuedLines.length - 1])) {
@@ -193,13 +281,16 @@ function createSmtpLineReader(socket) {
   };
 
   const rebindSocket = nextSocket => {
+    try {
+      socket.removeListener('data', onData);
+      socket.removeListener('error', failAll);
+      socket.removeListener('close', onClose);
+    } catch {}
     socket = nextSocket;
     buffer = '';
     queuedLines.length = 0;
-    socket.on('data', chunk => {
-      buffer += chunk.toString('utf8');
-      flush();
-    });
+    closedErr = null;
+    socket.on('data', onData);
     socket.on('error', failAll);
     socket.on('close', () => failAll(new Error('SMTP TLS connection closed')));
   };
@@ -210,25 +301,34 @@ function createSmtpLineReader(socket) {
 async function sendViaSmtpNode(cfg, { to, subject, html, text }) {
   const host = cfg.smtpHost;
   const port = Number(cfg.smtpPort) || 465;
-  const useImplicitTls = cfg.smtpSecure || port === 465;
+  const useImplicitTls = port === 465 || (Boolean(cfg.smtpSecure) && port !== 587);
 
-  let socket = await new Promise((resolve, reject) => {
-    const conn = useImplicitTls
-      ? tls.connect({ host, port, servername: host, rejectUnauthorized: true })
-      : net.connect({ host, port });
-    const timer = setTimeout(() => {
-      conn.destroy();
-      reject(new Error('Không thể kết nối tới máy chủ SMTP (timeout).'));
-    }, 12_000);
-    conn.once(useImplicitTls ? 'secureConnect' : 'connect', () => {
-      clearTimeout(timer);
-      resolve(conn);
+  let socket;
+  try {
+    socket = await new Promise((resolve, reject) => {
+      const conn = useImplicitTls
+        ? tls.connect({ host, port, servername: host, rejectUnauthorized: true })
+        : net.connect({ host, port });
+      const timer = setTimeout(() => {
+        conn.destroy();
+        reject(new Error('SMTP_CONNECT_TIMEOUT'));
+      }, 12_000);
+      conn.once(useImplicitTls ? 'secureConnect' : 'connect', () => {
+        clearTimeout(timer);
+        resolve(conn);
+      });
+      conn.once('error', err => {
+        clearTimeout(timer);
+        reject(err);
+      });
     });
-    conn.once('error', err => {
-      clearTimeout(timer);
-      reject(err);
-    });
-  });
+  } catch (connErr) {
+    const info = formatTransportErrorDetails(connErr);
+    const codeTag = info.codes.join(', ') || (info.message === 'SMTP_CONNECT_TIMEOUT' ? 'TIMEOUT' : info.message || 'BLOCKED');
+    throw new Error(
+      `Không thể kết nối SMTP ${host}:${port} (${codeTag}). Máy chủ Railway gói Free/Trial/Hobby CHẶN cổng SMTP 465/587 ra ngoài — hãy chuyển sang tab "Gmail (HTTPS)" hoặc "Brevo API" để gửi bằng ${cfg.smtpUser || cfg.fromEmail || 'Gmail của bạn'} qua HTTPS (cổng 443).`
+    );
+  }
 
   const reader = createSmtpLineReader(socket);
   const sendCmd = async (cmd, expectedCodes) => {
@@ -304,17 +404,28 @@ async function sendViaSmtpNode(cfg, { to, subject, html, text }) {
 export async function sendTransactionalEmail(store, { to, subject, html, text }) {
   const cfg = getEffectiveMailConfig(store);
   if (!cfg.configured) {
-    const err = new Error('Máy chủ chưa cấu hình dịch vụ gửi email (SMTP / Resend API).');
+    const err = new Error('Máy chủ chưa cấu hình dịch vụ gửi email (Apps Script / Brevo / Resend / SMTP).');
     err.code = 'MAIL_NOT_CONFIGURED';
     throw err;
   }
-  if (cfg.provider === 'resend') {
-    return sendViaResendApi(cfg, { to, subject, html, text });
+  try {
+    if (cfg.provider === 'apps_script') {
+      return await sendViaAppsScript(cfg, { to, subject, html, text });
+    }
+    if (cfg.provider === 'resend') {
+      return await sendViaResendApi(cfg, { to, subject, html, text });
+    }
+    if (cfg.provider === 'brevo') {
+      return await sendViaBrevoApi(cfg, { to, subject, html, text });
+    }
+    return await sendViaSmtpNode(cfg, { to, subject, html, text });
+  } catch (err) {
+    const details = formatTransportErrorDetails(err);
+    if (!err?.message && (details.message || details.codes.length > 0)) {
+      throw new Error(formatMailTransportError(err));
+    }
+    throw err;
   }
-  if (cfg.provider === 'brevo') {
-    return sendViaBrevoApi(cfg, { to, subject, html, text });
-  }
-  return sendViaSmtpNode(cfg, { to, subject, html, text });
 }
 
 function escapeHtml(val) {

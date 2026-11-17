@@ -1,8 +1,26 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2, Mail, Save, Send, X } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Copy, Eye, EyeOff, Loader2, Mail, Save, Send, X } from 'lucide-react';
+
+const APPS_SCRIPT_CODE = `function doPost(e) {
+  try {
+    var d = JSON.parse(e.postData.contents);
+    MailApp.sendEmail({
+      to: d.to,
+      subject: d.subject,
+      htmlBody: d.html || d.text,
+      name: d.fromName || 'IELTS Nha Trang'
+    });
+    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err && err.message ? err.message : String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
 
 export default function MailConfigModal({
   isOpen,
+  initialProvider = null,
   onClose,
   onConfiguredChange,
   showToast
@@ -13,12 +31,14 @@ export default function MailConfigModal({
   const [showSmtpPass, setShowSmtpPass] = useState(false);
   const [error, setError] = useState('');
   const [testRecipient, setTestRecipient] = useState('');
+  const [copiedScript, setCopiedScript] = useState(false);
   const [form, setForm] = useState({
-    provider: 'smtp',
+    provider: initialProvider || 'apps_script',
     fromEmail: '',
     fromName: 'IELTS Nha Trang — Ms. Như',
     resendApiKey: '',
     brevoApiKey: '',
+    appsScriptUrl: '',
     smtpHost: 'smtp.gmail.com',
     smtpPort: 465,
     smtpSecure: true,
@@ -29,6 +49,7 @@ export default function MailConfigModal({
     configured: false,
     hasResendKey: false,
     hasBrevoKey: false,
+    hasAppsScriptUrl: false,
     hasSmtpPass: false
   });
 
@@ -47,11 +68,12 @@ export default function MailConfigModal({
           configured: Boolean(c.configured),
           hasResendKey: Boolean(c.hasResendKey),
           hasBrevoKey: Boolean(c.hasBrevoKey),
+          hasAppsScriptUrl: Boolean(c.hasAppsScriptUrl),
           hasSmtpPass: Boolean(c.hasSmtpPass)
         });
         setForm(prev => ({
           ...prev,
-          provider: c.provider && c.provider !== 'none' ? c.provider : 'smtp',
+          provider: c.provider && c.provider !== 'none' ? c.provider : (initialProvider || 'apps_script'),
           fromEmail: c.fromEmail || '',
           fromName: c.fromName || 'IELTS Nha Trang — Ms. Như',
           smtpHost: c.smtpHost || 'smtp.gmail.com',
@@ -60,6 +82,7 @@ export default function MailConfigModal({
           smtpUser: c.smtpUser || '',
           resendApiKey: '',
           brevoApiKey: '',
+          appsScriptUrl: '',
           smtpPass: ''
         }));
       })
@@ -69,7 +92,7 @@ export default function MailConfigModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, initialProvider]);
 
   if (!isOpen) return null;
 
@@ -94,6 +117,7 @@ export default function MailConfigModal({
         configured: Boolean(c.configured),
         hasResendKey: Boolean(c.hasResendKey),
         hasBrevoKey: Boolean(c.hasBrevoKey),
+        hasAppsScriptUrl: Boolean(c.hasAppsScriptUrl),
         hasSmtpPass: Boolean(c.hasSmtpPass)
       });
       onConfiguredChange?.(Boolean(c.configured));
@@ -148,7 +172,7 @@ export default function MailConfigModal({
                 Cấu Hình Dịch Vụ Gửi Email OTP
               </h3>
               <p className="text-[11px] text-slate-300">
-                Dùng Gmail SMTP (App Password) hoặc Resend / Brevo API để gửi mã xác minh cho học viên.
+                Dùng Gmail (HTTPS Apps Script), Brevo / Resend API hoặc Gmail SMTP để gửi mã xác minh cho học viên.
               </p>
             </div>
           </div>
@@ -181,17 +205,18 @@ export default function MailConfigModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Nhà cung cấp gửi Email</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { id: 'smtp', label: 'Gmail / SMTP' },
+                    { id: 'apps_script', label: 'Gmail (HTTPS)' },
+                    { id: 'brevo', label: 'Brevo API' },
                     { id: 'resend', label: 'Resend API' },
-                    { id: 'brevo', label: 'Brevo API' }
+                    { id: 'smtp', label: 'Gmail / SMTP' }
                   ].map(opt => (
                     <button
                       key={opt.id}
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, provider: opt.id }))}
-                      className={`py-2 px-3 rounded-xl text-xs font-extrabold border transition ${
+                      className={`py-2 px-2.5 rounded-xl text-[11px] font-extrabold border transition ${
                         form.provider === opt.id
                           ? 'bg-[#007A7A] text-white border-[#007A7A]'
                           : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
@@ -225,6 +250,61 @@ export default function MailConfigModal({
                 </div>
               </div>
 
+              {form.provider === 'apps_script' && (
+                <div className="space-y-3 p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/35">
+                  <div className="space-y-1 text-[11px] text-slate-700 dark:text-slate-200 leading-relaxed">
+                    <p className="font-extrabold text-emerald-800 dark:text-emerald-300">
+                      ✓ Chạy ổn định 100% trên Railway miễn phí &amp; gửi trực tiếp bằng wuyan2511@gmail.com
+                    </p>
+                    <p>
+                      1. Đăng nhập Gmail <b>wuyan2511@gmail.com</b> và mở{' '}
+                      <a
+                        href="https://script.google.com/home/start"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-[#007A7A] dark:text-[#1EE1D6] underline"
+                      >
+                        script.google.com
+                      </a>{' '}
+                      → bấm <b>Dự án mới (New project)</b>.
+                    </p>
+                    <p>2. Xóa hết code mẫu, dán đoạn code bên dưới → bấm <b>Deploy → New deployment → Web app</b> (<b>Execute as: Me</b>, <b>Who has access: Anyone</b>).</p>
+                    <p>3. Copy link <b>Web app URL</b> (dạng <code className="font-mono text-[10px]">https://script.google.com/macros/s/.../exec</code>) dán vào ô dưới đây:</p>
+                  </div>
+
+                  <div className="relative">
+                    <pre className="p-2.5 rounded-xl bg-slate-900 text-slate-100 text-[10px] font-mono overflow-x-auto leading-relaxed">
+                      {APPS_SCRIPT_CODE}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(APPS_SCRIPT_CODE);
+                        setCopiedScript(true);
+                        setTimeout(() => setCopiedScript(false), 1800);
+                      }}
+                      className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-[10px] font-bold inline-flex items-center gap-1"
+                    >
+                      {copiedScript ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      {copiedScript ? 'Đã chép' : 'Copy Code'}
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Google Apps Script Web App URL {flags.hasAppsScriptUrl ? '(Đã lưu — để trống nếu giữ nguyên)' : '*'}
+                    </label>
+                    <input
+                      type="url"
+                      value={form.appsScriptUrl}
+                      onChange={e => setForm(prev => ({ ...prev, appsScriptUrl: e.target.value }))}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
               {form.provider === 'resend' && (
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -257,6 +337,9 @@ export default function MailConfigModal({
 
               {form.provider === 'smtp' && (
                 <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/35 text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
+                    <b>Lưu ý Railway:</b> Gói Free/Trial/Hobby của Railway <b>chặn kết nối SMTP cổng 465 &amp; 587</b> nên bấm Gửi thử trên web sẽ báo lỗi. Hãy dùng tab <b>Gmail (HTTPS)</b> hoặc <b>Brevo API</b> ở trên để gửi qua cổng 443.
+                  </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
                     <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
                       Cài đặt Gmail gửi mã xác minh OTP

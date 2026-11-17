@@ -12,8 +12,10 @@ import {
 } from './src/utils/speakingAiEngine.js';
 import {
   buildOtpEmailContent,
+  formatMailTransportError,
   getEffectiveMailConfig,
   getPublicMailConfigSummary,
+  isValidAppsScriptUrl,
   isValidEmailAddress,
   maskEmailAddress,
   sendTransactionalEmail
@@ -740,6 +742,7 @@ function createInitialStore(audioDir = '') {
       provider: 'none',
       resendApiKey: '',
       brevoApiKey: '',
+      appsScriptUrl: '',
       smtpHost: '',
       smtpPort: 465,
       smtpSecure: true,
@@ -884,9 +887,10 @@ function applyParsedStoreSnapshot(store, parsed) {
   if (parsed.mailConfig && typeof parsed.mailConfig === 'object') {
     store.mailConfig = {
       ...(store.mailConfig || {}),
-      provider: ['resend', 'brevo', 'smtp', 'none'].includes(parsed.mailConfig.provider) ? parsed.mailConfig.provider : 'none',
+      provider: ['resend', 'brevo', 'smtp', 'apps_script', 'none'].includes(parsed.mailConfig.provider) ? parsed.mailConfig.provider : 'none',
       resendApiKey: String(parsed.mailConfig.resendApiKey || '').trim(),
       brevoApiKey: String(parsed.mailConfig.brevoApiKey || '').trim(),
+      appsScriptUrl: String(parsed.mailConfig.appsScriptUrl || '').trim(),
       smtpHost: String(parsed.mailConfig.smtpHost || '').trim(),
       smtpPort: Number(parsed.mailConfig.smtpPort) || 465,
       smtpSecure: parsed.mailConfig.smtpSecure !== false,
@@ -3304,7 +3308,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           sendJsonResponse(res, status, {
             ok: false,
             mailError: true,
-            error: mailErr?.message || 'Không thể gửi email xác minh lúc này.'
+            error: formatMailTransportError(mailErr, 'Không thể gửi email xác minh lúc này.')
           });
           return;
         }
@@ -3493,7 +3497,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             error:
               mailErr?.code === 'MAIL_NOT_CONFIGURED'
                 ? 'Tài khoản đã liên kết email, nhưng máy chủ chưa cấu hình dịch vụ gửi email OTP. Vui lòng liên hệ Giáo viên để đổi lại mật khẩu mặc định.'
-                : `Không thể gửi mã OTP qua email (${mailErr?.message || 'lỗi kết nối'}). Vui lòng thử lại hoặc liên hệ Giáo viên.`
+                : `Không thể gửi mã OTP qua email (${formatMailTransportError(mailErr, 'lỗi kết nối')}). Vui lòng thử lại hoặc liên hệ Giáo viên.`
           });
           return;
         }
@@ -3600,11 +3604,20 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       try {
         const body = await readJsonBody(req);
         const prev = store.mailConfig || {};
-        const nextProvider = ['resend', 'brevo', 'smtp', 'none'].includes(body?.provider) ? body.provider : prev.provider || 'none';
+        const nextProvider = ['resend', 'brevo', 'smtp', 'apps_script', 'none'].includes(body?.provider) ? body.provider : prev.provider || 'none';
+        const rawAppsScriptUrl = body?.clearAppsScriptUrl ? '' : String(body?.appsScriptUrl || '').trim();
+        if (rawAppsScriptUrl && !isValidAppsScriptUrl(rawAppsScriptUrl)) {
+          sendJsonResponse(res, 400, {
+            ok: false,
+            error: 'URL Google Apps Script chưa đúng định dạng Web App (/exec). Hãy nhấn Deploy -> Web app và dán link bắt đầu bằng https://script.google.com/macros/...'
+          });
+          return;
+        }
         store.mailConfig = {
           provider: nextProvider,
           resendApiKey: body?.clearResendKey ? '' : (String(body?.resendApiKey || '').trim() || prev.resendApiKey || ''),
           brevoApiKey: body?.clearBrevoKey ? '' : (String(body?.brevoApiKey || '').trim() || prev.brevoApiKey || ''),
+          appsScriptUrl: body?.clearAppsScriptUrl ? '' : (rawAppsScriptUrl || prev.appsScriptUrl || ''),
           smtpHost: body?.smtpHost !== undefined ? String(body.smtpHost).trim() : (prev.smtpHost || ''),
           smtpPort: body?.smtpPort !== undefined ? (Number(body.smtpPort) || 465) : (prev.smtpPort || 465),
           smtpSecure: body?.smtpSecure !== undefined ? Boolean(body.smtpSecure) : (prev.smtpSecure !== false),
@@ -3648,7 +3661,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         sendJsonResponse(res, 200, { ok: true, result });
       } catch (err) {
         const status = err?.code === 'MAIL_NOT_CONFIGURED' ? 503 : 502;
-        sendJsonResponse(res, status, { ok: false, error: err?.message || 'Gửi email thử nghiệm thất bại.' });
+        sendJsonResponse(res, status, { ok: false, error: formatMailTransportError(err, 'Gửi email thử nghiệm thất bại.') });
       }
       return;
     }
