@@ -457,7 +457,11 @@ export default function App() {
         setMyCrewColor(nextAvatar ? 'avatar' : (myCrewColor === 'avatar' ? 'cyan' : myCrewColor));
       }
     }
-    await dispatchSyncAction('UPSERT_USER', { username, user: updatedUser });
+    const snap = await dispatchSyncAction('UPSERT_USER', { username, user: updatedUser });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) {
+      await pullServerSyncState(true);
+      return false;
+    }
     const isStylingOnly =
       patch.profileBannerId !== undefined ||
       patch.profileCoverUrl !== undefined ||
@@ -515,7 +519,7 @@ export default function App() {
   };
 
   // Teacher Action: Create Single or Bulk Accounts (Strictly Teacher Only)
-  const handleSaveNewStudents = (e) => {
+  const handleSaveNewStudents = async (e) => {
     if (e) e.preventDefault();
     if (currentUser?.role !== 'teacher') {
       showToast('Chỉ Giáo viên mới có quyền tạo tài khoản mới!', 'error');
@@ -524,7 +528,7 @@ export default function App() {
     const today = new Date().toISOString().split('T')[0];
 
     if (addStudentMode === 'single') {
-      const uname = (newStudentForm.username || '').trim().replace(/\s+/g, '_');
+      const uname = (newStudentForm.username || '').trim().replace(/^@+/, '').replace(/\s+/g, '_');
       const pass = (newStudentForm.password || '').trim();
       const name = (newStudentForm.name || '').trim() || uname;
       const role = newStudentForm.role === 'teacher' ? 'teacher' : 'student';
@@ -535,13 +539,21 @@ export default function App() {
         showToast('Vui lòng nhập tên đăng nhập và mật khẩu tài khoản!', 'error');
         return;
       }
-      if (usersDb[uname]) {
+      const hasDuplicate = Object.keys(usersDb || {}).some(
+        k => k.replace(/^@+/, '').toLowerCase() === uname.toLowerCase()
+      );
+      if (hasDuplicate) {
         showToast(`Tài khoản "${uname}" đã tồn tại!`, 'error');
         return;
       }
       const userObj = { username: uname, pass, name, role, targetBand: band, joinedDate: today };
-      setUsersDb(prev => ({ ...prev, [uname]: userObj }));
-      dispatchSyncAction('UPSERT_USER', { username: uname, user: userObj });
+      const snap = await dispatchSyncAction('UPSERT_USER', { username: uname, user: userObj });
+      if (!snap && lastSyncRejectionStatusRef.current > 0) {
+        return;
+      }
+      if (!snap) {
+        setUsersDb(prev => ({ ...prev, [uname]: userObj }));
+      }
       setNewStudentForm({ username: '', name: '', password: '123', targetBand: 7.0, role: 'student' });
       setShowAddStudentModal(false);
       showToast(`Đã tạo tài khoản ${role === 'teacher' ? 'Giáo viên' : 'Học viên'} "${name}" (@${uname})!`);
@@ -553,13 +565,17 @@ export default function App() {
       showToast('Không có dòng hợp lệ. Định dạng: username | Họ tên | mật khẩu | targetBand', 'error');
       return;
     }
+    const existingKeysLower = new Set(
+      Object.keys(usersDb || {}).map(k => k.replace(/^@+/, '').toLowerCase())
+    );
     const createdUsers = {};
     let skipped = 0;
     parsedList.forEach(item => {
-      if (usersDb[item.username] || createdUsers[item.username]) {
+      if (existingKeysLower.has(item.username.toLowerCase()) || createdUsers[item.username]) {
         skipped++;
         return;
       }
+      existingKeysLower.add(item.username.toLowerCase());
       createdUsers[item.username] = {
         username: item.username,
         pass: item.pass,
@@ -574,20 +590,29 @@ export default function App() {
       showToast('Tất cả tên tài khoản trong danh sách đều đã tồn tại!', 'error');
       return;
     }
-    setUsersDb(prev => ({ ...prev, ...createdUsers }));
-    dispatchSyncAction('UPSERT_USERS_BULK', { users: addedEntries.map(([, user]) => user) });
+    const snap = await dispatchSyncAction('UPSERT_USERS_BULK', { users: addedEntries.map(([, user]) => user) });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) {
+      return;
+    }
+    if (!snap) {
+      setUsersDb(prev => ({ ...prev, ...createdUsers }));
+    }
     setShowAddStudentModal(false);
     showToast(`Đã thêm ${addedEntries.length} học viên${skipped > 0 ? ` (bỏ qua ${skipped} tài khoản trùng)` : ''}!`);
   };
 
   // Teacher Action: Reset Account Password
-  const handleResetStudentPassword = (e) => {
+  const handleResetStudentPassword = async (e) => {
     if (e) e.preventDefault();
     if (currentUser?.role !== 'teacher' || !editingStudentAccount) return;
-    const uname = editingStudentAccount.username;
+    const rawUname = String(editingStudentAccount.username || '').trim();
+    const matchedLocalKey = usersDb[rawUname]
+      ? rawUname
+      : (Object.keys(usersDb || {}).find(k => k.replace(/^@+/, '').toLowerCase() === rawUname.replace(/^@+/, '').toLowerCase()) || rawUname);
+    const uname = matchedLocalKey;
     const baseUser = usersDb[uname] || editingStudentAccount;
     const isActorSuperAdmin = Boolean(currentUser?.isSuperAdmin);
-    if ((baseUser.isSuperAdmin || uname === 'tuanpro123s') && !isActorSuperAdmin) {
+    if ((baseUser.isSuperAdmin || uname.replace(/^@+/, '').toLowerCase() === 'tuanpro123s') && !isActorSuperAdmin) {
       showToast('Không có quyền thao tác trên tài khoản Quản trị hệ thống!', 'error');
       return;
     }
@@ -600,15 +625,23 @@ export default function App() {
       showToast('Mật khẩu mới không được để trống!', 'error');
       return;
     }
-    if (!serverSyncConnected) {
+    const snap = await dispatchSyncAction('RESET_USER_PASSWORD', { username: uname, password: nextPass });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) {
+      if (lastSyncRejectionStatusRef.current === 404) {
+        setEditingStudentAccount(null);
+        setStudentPasswordDraft('');
+        await pullServerSyncState(true);
+      }
+      return;
+    }
+    if (!snap && !serverSyncConnectedRef.current) {
       const updatedOffline = { ...baseUser, pass: nextPass };
       setUsersDb(prev => ({ ...prev, [uname]: updatedOffline }));
     }
-    dispatchSyncAction('RESET_USER_PASSWORD', { username: uname, password: nextPass });
     setRememberedLogins(prev => {
-      if (!prev.some(item => item.username.toLowerCase() === uname.toLowerCase())) return prev;
+      if (!prev.some(item => item.username.toLowerCase() === uname.replace(/^@+/, '').toLowerCase())) return prev;
       const updatedList = prev.map(item =>
-        item.username.toLowerCase() === uname.toLowerCase()
+        item.username.toLowerCase() === uname.replace(/^@+/, '').toLowerCase()
           ? { ...item, password: nextPass, savedAt: Date.now() }
           : item
       );
@@ -971,6 +1004,8 @@ export default function App() {
   const skipNextUsersBroadcastRef = useRef(false);
   const skipNextVocabTopicsBroadcastRef = useRef(false);
   const lastSyncVersionRef = useRef(-1);
+  const lastBootIdRef = useRef('');
+  const lastSyncRejectionStatusRef = useRef(0);
   const chatScrollRef = useRef(null);
   const roomsDbRef = useRef(roomsDb);
   const lastAutoClearKeyRef = useRef('');
@@ -1067,6 +1102,10 @@ export default function App() {
   applyRemoteSnapshotData.current = (snap) => {
     if (!snap || typeof snap !== 'object') return;
     if (snap.authenticated === false) {
+      lastSyncVersionRef.current = -1;
+      if (snap.bootId) {
+        lastBootIdRef.current = snap.bootId;
+      }
       if (typeof snap.aiConfigured === 'boolean') {
         setAiConfigured(snap.aiConfigured);
       }
@@ -1082,6 +1121,12 @@ export default function App() {
         showToast('Phiên đăng nhập đã hết hạn hoặc mật khẩu vừa được thay đổi. Vui lòng đăng nhập lại.', 'info');
       }
       return;
+    }
+    if (snap.bootId) {
+      if (lastBootIdRef.current && snap.bootId !== lastBootIdRef.current) {
+        lastSyncVersionRef.current = -1;
+      }
+      lastBootIdRef.current = snap.bootId;
     }
     if (typeof snap.version === 'number') {
       if (snap.version < lastSyncVersionRef.current) return;
@@ -1163,12 +1208,14 @@ export default function App() {
       serverSyncConnectedRef.current = true;
       setServerSyncConnected(true);
       if (snap?.authenticated === false && !currentUserRef.current && !forceApply) {
+        if (snap.bootId) lastBootIdRef.current = snap.bootId;
         if (typeof snap.aiConfigured === 'boolean') {
           setAiConfigured(snap.aiConfigured);
         }
         return snap;
       }
-      if (forceApply || (typeof snap?.version === 'number' && snap.version > lastSyncVersionRef.current) || snap?.authenticated === false) {
+      const isNewBoot = Boolean(snap?.bootId && lastBootIdRef.current && snap.bootId !== lastBootIdRef.current);
+      if (forceApply || isNewBoot || (typeof snap?.version === 'number' && snap.version > lastSyncVersionRef.current) || snap?.authenticated === false) {
         applyRemoteSnapshotData.current?.(snap);
       }
       return snap;
@@ -1180,6 +1227,7 @@ export default function App() {
   };
 
   const dispatchSyncAction = async (type, payload) => {
+    lastSyncRejectionStatusRef.current = 0;
     try {
       const res = await fetch('/api/sync/action', {
         method: 'POST',
@@ -1189,10 +1237,12 @@ export default function App() {
       serverSyncConnectedRef.current = true;
       setServerSyncConnected(true);
       if (!res.ok) {
+        lastSyncRejectionStatusRef.current = res.status;
         const errData = await res.json().catch(() => ({}));
         const errMsg = errData?.error || `Thao tác bị từ chối (${res.status}).`;
         if (res.status === 401) {
           authEpochRef.current += 1;
+          lastSyncVersionRef.current = -1;
           currentUserRef.current = null;
           setCurrentUser(null);
           setJoinedRoomPin(null);
@@ -1208,6 +1258,7 @@ export default function App() {
       }
       return data?.snapshot || null;
     } catch (_err) {
+      lastSyncRejectionStatusRef.current = 0;
       serverSyncConnectedRef.current = false;
       setServerSyncConnected(false);
       return null;
@@ -2564,11 +2615,21 @@ export default function App() {
       setServerSyncConnected(true);
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.user) {
-        setAuthError(data?.error || 'Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.');
+        const usedStaleRemembered =
+          res.status === 401 &&
+          rememberedLogins.some(
+            item => item.username.toLowerCase() === uname.toLowerCase() && item.password === pass
+          );
+        setAuthError(
+          usedStaleRemembered
+            ? 'Mật khẩu đã lưu trên máy không khớp với mật khẩu hiện tại trên server (mật khẩu có thể đã được đổi hoặc server vừa khởi tạo lại). Vui lòng nhập mật khẩu hiện tại.'
+            : (data?.error || 'Sai tên đăng nhập hoặc mật khẩu! Lưu ý: tài khoản do Giáo viên tạo và cấp.')
+        );
         return;
       }
       authEpochRef.current += 1;
       bootSessionCheckedRef.current = true;
+      lastSyncVersionRef.current = -1;
       loggedInUser = normalizeBrandTeacherUser(data.user);
       if (data.snapshot) {
         applyRemoteSnapshotData.current?.(data.snapshot);
@@ -2633,6 +2694,8 @@ export default function App() {
   const handleLogout = () => {
     const prevUsername = currentUserRef.current?.username || currentUser?.username || '';
     authEpochRef.current += 1;
+    lastSyncVersionRef.current = -1;
+    lastBootIdRef.current = '';
     fetch('/api/sync/auth/logout', { method: 'POST' }).catch(() => {});
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);

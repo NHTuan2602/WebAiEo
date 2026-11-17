@@ -170,7 +170,7 @@ export function parseBulkStudentsText(rawText) {
   const lines = String(rawText || '').split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#'));
   return lines.map(line => {
     const parts = line.includes('|') ? line.split('|') : line.split(',');
-    const username = (parts[0] || '').trim().replace(/\s+/g, '_');
+    const username = (parts[0] || '').trim().replace(/^@+/, '').replace(/\s+/g, '_');
     const name = (parts[1] || username).trim();
     const pass = (parts[2] || '123').trim();
     const rawBand = parseFloat((parts[3] || '7.0').trim());

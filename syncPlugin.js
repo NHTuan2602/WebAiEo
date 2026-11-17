@@ -146,13 +146,35 @@ function parseCookies(req) {
   return out;
 }
 
-function resolveSessionUser(req, store) {
+/** Normalize account handles consistently (strip leading @, collapse spaces). */
+function normalizeUsernameKey(raw = '') {
+  return String(raw || '').trim().replace(/^@+/, '').replace(/\s+/g, '_');
+}
+
+/** Resolve the canonical key in `store.users` ignoring leading `@` and casing. */
+function findUserKeyInStore(store, rawUsername = '') {
+  const normalized = normalizeUsernameKey(rawUsername);
+  if (!normalized || !store?.users || typeof store.users !== 'object') return null;
+  if (store.users[normalized]) return normalized;
+  const rawTrimmed = String(rawUsername || '').trim();
+  if (rawTrimmed && store.users[rawTrimmed]) return rawTrimmed;
+  const lower = normalized.toLowerCase();
+  return Object.keys(store.users).find(k => normalizeUsernameKey(k).toLowerCase() === lower) || null;
+}
+
+function resolveSessionPayload(req, store) {
   const cookies = parseCookies(req);
   const token = cookies[SESSION_COOKIE_NAME];
   if (!token || !store?._authSecret) return null;
   const payload = verifyToken(token, store._authSecret);
-  if (!payload?.username) return null;
-  const user = store.users?.[payload.username];
+  return payload?.username ? payload : null;
+}
+
+function resolveSessionUser(req, store) {
+  const payload = resolveSessionPayload(req, store);
+  if (!payload) return null;
+  const matchedKey = findUserKeyInStore(store, payload.username);
+  const user = matchedKey ? store.users[matchedKey] : null;
   if (!user) return null;
   if ((user.tokenVersion || 1) !== (payload.tokenVersion || 1)) return null;
   return user;
@@ -561,6 +583,8 @@ function createInitialStore(audioDir = '') {
     notifications: [],
     aiConfig: { geminiApiKey: '' },
     _authSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+    _bootId: crypto.randomUUID(),
+    _localMutated: false,
     _rateLimits: new Map(),
     _audioDir: audioDir,
     _audioMem: new Map()
@@ -631,6 +655,59 @@ function loadAudioRecord(store, rawId) {
   return store._audioMem?.get(safeId) || null;
 }
 
+/** Hydrate persisted JSON state into `store`, keeping malformed/missing fields safe. */
+function applyParsedStoreSnapshot(store, parsed) {
+  if (!parsed || typeof parsed !== 'object') return;
+  store.version = Number(parsed.version) || 0;
+  store.seeded = Boolean(parsed.seeded);
+  if (parsed.seededTags && typeof parsed.seededTags === 'object') {
+    store.seededTags = { ...parsed.seededTags };
+  }
+  if (Array.isArray(parsed.deletedTestIds)) {
+    store.deletedTestIds = parsed.deletedTestIds;
+  }
+  if (Array.isArray(parsed.deletedUserIds)) {
+    store.deletedUserIds = parsed.deletedUserIds;
+  }
+  if (parsed.rooms && typeof parsed.rooms === 'object') {
+    store.rooms = {};
+    Object.entries(parsed.rooms).forEach(([pin, r]) => {
+      store.rooms[pin] = normalizeServerRoom(r, pin);
+    });
+  }
+  if (Array.isArray(parsed.tests)) store.tests = parsed.tests;
+  if (Array.isArray(parsed.attempts)) store.attempts = parsed.attempts;
+  if (parsed.teacherNotes && typeof parsed.teacherNotes === 'object') {
+    store.teacherNotes = parsed.teacherNotes;
+  }
+  if (parsed.users && typeof parsed.users === 'object') {
+    store.users = parsed.users;
+    if (store.users.teacher_ielts?.name === 'Thầy Minh IELTS Master') {
+      store.users.teacher_ielts = {
+        ...store.users.teacher_ielts,
+        name: 'Ms. Như — IELTS Nha Trang'
+      };
+    }
+  }
+  if (Array.isArray(parsed.customVocabTopics)) {
+    store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+  }
+  if (Array.isArray(parsed.adminFeedbacks)) {
+    store.adminFeedbacks = parsed.adminFeedbacks.filter(f => f?.id && f?.content);
+  }
+  if (Array.isArray(parsed.notifications)) {
+    store.notifications = parsed.notifications.filter(n => n?.id && n?.title).slice(0, 80);
+  }
+  if (parsed.aiConfig && typeof parsed.aiConfig === 'object') {
+    store.aiConfig = {
+      geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
+    };
+  }
+  if (typeof parsed._authSecret === 'string' && parsed._authSecret.length >= 32) {
+    store._authSecret = parsed._authSecret;
+  }
+}
+
 /**
  * Create a sync store optionally backed by a JSON file on disk (debounced writes).
  * Keeps existing in-memory behavior when `persistFile` is empty.
@@ -638,79 +715,71 @@ function loadAudioRecord(store, rawId) {
 export function createPersistentSyncStore(persistFile = '') {
   const audioDir = persistFile ? path.join(path.dirname(persistFile), 'audio') : '';
   const store = createInitialStore(audioDir);
+  const bootTimestamp = Date.now();
+  let lastDiskMtimeMs = 0;
+  let lastStatCheckedAt = 0;
+  let hadExistingFile = false;
 
   if (persistFile) {
     try {
       if (fs.existsSync(persistFile)) {
+        hadExistingFile = true;
+        lastDiskMtimeMs = fs.statSync(persistFile).mtimeMs || 0;
         const parsed = JSON.parse(fs.readFileSync(persistFile, 'utf8'));
-        if (parsed && typeof parsed === 'object') {
-          store.version = Number(parsed.version) || 0;
-          store.seeded = Boolean(parsed.seeded);
-          if (parsed.seededTags && typeof parsed.seededTags === 'object') {
-            store.seededTags = { ...parsed.seededTags };
-          }
-          if (Array.isArray(parsed.deletedTestIds)) {
-            store.deletedTestIds = parsed.deletedTestIds;
-          }
-          if (Array.isArray(parsed.deletedUserIds)) {
-            store.deletedUserIds = parsed.deletedUserIds;
-          }
-          if (parsed.rooms && typeof parsed.rooms === 'object') {
-            Object.entries(parsed.rooms).forEach(([pin, r]) => {
-              store.rooms[pin] = normalizeServerRoom(r, pin);
-            });
-          }
-          if (Array.isArray(parsed.tests)) store.tests = parsed.tests;
-          if (Array.isArray(parsed.attempts)) store.attempts = parsed.attempts;
-          if (parsed.teacherNotes && typeof parsed.teacherNotes === 'object') {
-            store.teacherNotes = parsed.teacherNotes;
-          }
-          if (parsed.users && typeof parsed.users === 'object') {
-            store.users = parsed.users;
-            if (store.users.teacher_ielts?.name === 'Thầy Minh IELTS Master') {
-              store.users.teacher_ielts = {
-                ...store.users.teacher_ielts,
-                name: 'Ms. Như — IELTS Nha Trang'
-              };
-            }
-          }
-          if (Array.isArray(parsed.customVocabTopics)) {
-            store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
-          }
-          if (Array.isArray(parsed.adminFeedbacks)) {
-            store.adminFeedbacks = parsed.adminFeedbacks.filter(f => f?.id && f?.content);
-          }
-          if (Array.isArray(parsed.notifications)) {
-            store.notifications = parsed.notifications.filter(n => n?.id && n?.title).slice(0, 80);
-          }
-          if (parsed.aiConfig && typeof parsed.aiConfig === 'object') {
-            store.aiConfig = {
-              geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
-            };
-          }
-          if (typeof parsed._authSecret === 'string' && parsed._authSecret.length >= 32) {
-            store._authSecret = parsed._authSecret;
-          }
-        }
+        applyParsedStoreSnapshot(store, parsed);
       }
     } catch {
       // Fall back cleanly to a fresh in-memory store if state file is corrupt or unreadable
     }
   }
-  ensureProtectedAccounts(store);
+  const protectedChanged = ensureProtectedAccounts(store);
 
   let writeTimer = null;
   const writeStoreSync = () => {
     if (!persistFile) return;
+    const tmpFile = `${persistFile}.${process.pid}.${Date.now()}.tmp`;
     try {
       fs.mkdirSync(path.dirname(persistFile), { recursive: true });
-      const tmpFile = `${persistFile}.tmp`;
-      const { _audioDir, _audioMem, _rateLimits, ...serializableStore } = store;
+      const { _audioDir, _audioMem, _rateLimits, _bootId, _localMutated, ...serializableStore } = store;
       fs.writeFileSync(tmpFile, JSON.stringify(serializableStore), 'utf8');
       fs.renameSync(tmpFile, persistFile);
+      lastDiskMtimeMs = fs.statSync(persistFile).mtimeMs || Date.now();
     } catch {
+      try {
+        if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+      } catch {}
       // Ignore read-only filesystem errors so realtime relay never crashes
     }
+  };
+
+  // Persist protected default accounts & _authSecret immediately when initializing a fresh store file
+  if (persistFile && (!hadExistingFile || protectedChanged)) {
+    writeStoreSync();
+  }
+
+  /**
+   * During overlapping rolling deployments, adopt the old container's final SIGTERM flush
+   * if disk has a newer higher-version snapshot and this instance has not mutated yet.
+   */
+  const syncFromDiskIfNewer = () => {
+    if (!persistFile || store._localMutated) return false;
+    const now = Date.now();
+    if (now - bootTimestamp > 30_000) return false;
+    if (now - lastStatCheckedAt < 350) return false;
+    lastStatCheckedAt = now;
+    try {
+      if (!fs.existsSync(persistFile)) return false;
+      const stat = fs.statSync(persistFile);
+      if (!stat || stat.mtimeMs <= lastDiskMtimeMs + 1) return false;
+      const parsed = JSON.parse(fs.readFileSync(persistFile, 'utf8'));
+      lastDiskMtimeMs = stat.mtimeMs;
+      if (parsed && typeof parsed === 'object' && Number(parsed.version) > Number(store.version)) {
+        applyParsedStoreSnapshot(store, parsed);
+        ensureProtectedAccounts(store);
+        return true;
+      }
+    } catch {}
+    return false;
   };
 
   const schedulePersist = () => {
@@ -731,7 +800,7 @@ export function createPersistentSyncStore(persistFile = '') {
     writeStoreSync();
   };
 
-  return { store, schedulePersist, flushPersist };
+  return { store, schedulePersist, flushPersist, syncFromDiskIfNewer };
 }
 
 function readJsonBody(req) {
@@ -831,6 +900,7 @@ function getSnapshotForViewer(store, viewer = null) {
   pruneExpiredStoreChats(store, Date.now());
   const basePayload = {
     authenticated: Boolean(viewer),
+    bootId: store._bootId || '',
     version: store.version,
     seeded: store.seeded,
     serverTime: Date.now(),
@@ -967,18 +1037,18 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
 
   switch (type) {
     case 'RESET_USER_PASSWORD': {
-      const targetUsername = String(payload?.username || '').trim();
-      const targetUser = store.users?.[targetUsername];
-      if (!targetUsername || !targetUser) {
+      const targetKey = findUserKeyInStore(store, payload?.username);
+      const targetUser = targetKey ? store.users?.[targetKey] : null;
+      if (!targetKey || !targetUser) {
         return { allowed: false, status: 404, error: 'Không tìm thấy tài khoản.' };
       }
       if (!isTeacher) {
         return { allowed: false, status: 403, error: 'Không có quyền đặt lại mật khẩu.' };
       }
-      if ((targetUser.isSuperAdmin || targetUsername === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
+      if ((targetUser.isSuperAdmin || targetKey === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Không có quyền thao tác trên tài khoản Quản trị hệ thống.' };
       }
-      if (targetUser.role === 'teacher' && targetUsername !== viewer.username && !isSuperAdmin) {
+      if (targetUser.role === 'teacher' && targetKey !== viewer.username && !isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới có thể đổi mật khẩu của tài khoản Giáo viên khác.' };
       }
       return { allowed: true };
@@ -988,17 +1058,17 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       if (!isTeacher) {
         return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới được xóa tài khoản.' };
       }
-      const targetUsername = String(payload?.username || '').trim();
-      const targetUser = store.users?.[targetUsername];
-      if (!targetUsername || targetUsername === SUPER_ADMIN_USERNAME || targetUser?.isSuperAdmin) {
+      const targetKey = findUserKeyInStore(store, payload?.username) || normalizeUsernameKey(payload?.username);
+      const targetUser = store.users?.[targetKey];
+      if (!targetKey || targetKey === SUPER_ADMIN_USERNAME || targetUser?.isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Không thể xóa tài khoản Quản trị hệ thống.' };
       }
-      if (targetUsername === viewer.username) {
+      if (targetKey === viewer.username) {
         return { allowed: false, status: 403, error: 'Không thể tự xóa tài khoản đang đăng nhập.' };
       }
       if (targetUser?.role === 'teacher') {
         const remainingTeachers = Object.values(store.users || {}).filter(
-          u => u && u.role === 'teacher' && !u.isSuperAdmin && u.username !== SUPER_ADMIN_USERNAME && u.username !== targetUsername
+          u => u && u.role === 'teacher' && !u.isSuperAdmin && u.username !== SUPER_ADMIN_USERNAME && u.username !== targetKey
         ).length;
         if (remainingTeachers < 1) {
           return { allowed: false, status: 403, error: 'Cần giữ lại ít nhất 1 tài khoản Giáo viên trong hệ thống.' };
@@ -1012,7 +1082,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới được xóa tài khoản.' };
       }
       const rawNames = Array.isArray(payload?.usernames)
-        ? [...new Set(payload.usernames.map(u => String(u || '').trim()).filter(Boolean))]
+        ? [...new Set(payload.usernames.map(u => findUserKeyInStore(store, u) || normalizeUsernameKey(u)).filter(Boolean))]
         : [];
       if (rawNames.length === 0) {
         return { allowed: false, status: 400, error: 'Chưa chọn tài khoản nào để xóa.' };
@@ -1046,7 +1116,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         return { allowed: false, status: 400, error: 'Tối đa 500 tài khoản mỗi lần nhập.' };
       }
       for (const item of rawUsers) {
-        const uname = String(item?.username || '').trim();
+        const uname = findUserKeyInStore(store, item?.username) || normalizeUsernameKey(item?.username);
         if (!uname) {
           return { allowed: false, status: 400, error: 'Có dòng tài khoản thiếu tên đăng nhập.' };
         }
@@ -1059,7 +1129,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'UPSERT_USER': {
-      const uname = String(payload?.username || payload?.user?.username || '').trim();
+      const uname = findUserKeyInStore(store, payload?.username || payload?.user?.username)
+        || normalizeUsernameKey(payload?.username || payload?.user?.username);
       if (!uname || !payload?.user) {
         return { allowed: false, status: 400, error: 'Thiếu thông tin tài khoản.' };
       }
@@ -1181,7 +1252,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
   }
 }
 
-function upsertSingleUserInStore(store, uname, rawUser, viewer) {
+function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
+  const uname = findUserKeyInStore(store, rawUname) || normalizeUsernameKey(rawUname);
   if (!uname || !rawUser) return false;
   const prevUser = store.users?.[uname];
   const isTeacher = viewer?.role === 'teacher';
@@ -1898,9 +1970,9 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'RESET_USER_PASSWORD': {
-      const uname = String(payload.username || '').trim();
+      const uname = findUserKeyInStore(store, payload.username);
       const nextPass = String(payload.password || '').trim();
-      const target = store.users?.[uname];
+      const target = uname ? store.users?.[uname] : null;
       if (!uname || !target || !nextPass) break;
       const updated = {
         ...target,
@@ -1914,8 +1986,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'UPSERT_USER': {
-      const uname = String(payload.username || payload.user?.username || '').trim();
-      if (upsertSingleUserInStore(store, uname, payload.user, viewer)) {
+      const rawUname = payload.username || payload.user?.username || '';
+      if (upsertSingleUserInStore(store, rawUname, payload.user, viewer)) {
         changed = true;
       }
       break;
@@ -1924,8 +1996,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     case 'UPSERT_USERS_BULK': {
       const rawUsers = Array.isArray(payload.users) ? payload.users : [];
       for (const item of rawUsers) {
-        const uname = String(item?.username || '').trim();
-        if (upsertSingleUserInStore(store, uname, item, viewer)) {
+        if (upsertSingleUserInStore(store, item?.username || '', item, viewer)) {
           changed = true;
         }
       }
@@ -1933,7 +2004,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'DELETE_USER': {
-      const uname = String(payload.username || '').trim();
+      const uname = findUserKeyInStore(store, payload.username) || normalizeUsernameKey(payload.username);
       if (deleteSingleUserFromStore(store, uname, { purgeAttempts: Boolean(payload.purgeAttempts), viewerUsername: viewer?.username || '' })) {
         changed = true;
       }
@@ -1944,7 +2015,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const rawNames = Array.isArray(payload.usernames) ? payload.usernames : [];
       const purgeAttempts = payload.purgeAttempts !== false;
       for (const rawName of rawNames) {
-        const uname = String(rawName || '').trim();
+        const uname = findUserKeyInStore(store, rawName) || normalizeUsernameKey(rawName);
         if (deleteSingleUserFromStore(store, uname, { purgeAttempts, viewerUsername: viewer?.username || '' })) {
           changed = true;
         }
@@ -2066,6 +2137,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
 
   if (changed) {
     store.version += 1;
+    store._localMutated = true;
   }
   return changed;
 }
@@ -2186,7 +2258,7 @@ async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMod
   throw lastErr || new Error('Không tìm thấy model Gemini hỗ trợ chấm Speaking audio.');
 }
 
-export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null) {
+export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null, { syncFromDiskIfNewer = null } = {}) {
   const sseClientUsers = new WeakMap();
   let broadcastTimer = null;
 
@@ -2199,7 +2271,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       try {
         const sessionInfo = sseClientUsers.get(res);
         if (!sessionInfo?.username) continue;
-        const userRec = store.users?.[sessionInfo.username] || null;
+        const matchedKey = findUserKeyInStore(store, sessionInfo.username);
+        const userRec = matchedKey ? store.users?.[matchedKey] : null;
         const sessionStillValid = Boolean(userRec && (userRec.tokenVersion || 1) === sessionInfo.tokenVersion);
         const viewer = sessionStillValid ? userRec : null;
         const dataStr = `event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`;
@@ -2234,20 +2307,18 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
 
   middlewares.use('/api/sync', async (req, res, next) => {
     const reqUrl = (req.url || '/').split('?')[0];
+    syncFromDiskIfNewer?.();
+    const viewerPayload = resolveSessionPayload(req, store);
     const viewer = resolveSessionUser(req, store);
 
     if (req.method === 'POST' && reqUrl === '/auth/login') {
       try {
         const body = await readJsonBody(req);
-        const rawUsername = String(body?.username || '').trim().replace(/^@+/, '');
+        const rawUsername = normalizeUsernameKey(body?.username || '');
         const password = String(body?.password || '').trim();
         const ip = getClientIp(req);
 
-        const matchedKey = rawUsername
-          ? (store.users?.[rawUsername]
-              ? rawUsername
-              : Object.keys(store.users || {}).find(k => k.toLowerCase() === rawUsername.toLowerCase()))
-          : null;
+        const matchedKey = rawUsername ? findUserKeyInStore(store, rawUsername) : null;
         const rateKey = `login:${ip}:${(matchedKey || rawUsername).toLowerCase()}`;
 
         if (!checkRateLimit(store._rateLimits, rateKey)) {
@@ -2265,12 +2336,14 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           return;
         }
 
+        const sid = crypto.randomBytes(8).toString('hex');
         const token = signToken(
           {
             username: user.username,
             role: user.role,
             isSuperAdmin: Boolean(user.isSuperAdmin),
             tokenVersion: user.tokenVersion || 1,
+            sid,
             exp: Date.now() + SESSION_TTL_MS
           },
           store._authSecret
@@ -2580,7 +2653,12 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       res.flushHeaders?.();
 
       sseClients.add(res);
-      sseClientUsers.set(res, viewer ? { username: viewer.username, tokenVersion: viewer.tokenVersion || 1 } : null);
+      sseClientUsers.set(
+        res,
+        viewer
+          ? { username: viewer.username, tokenVersion: viewer.tokenVersion || 1, sid: viewerPayload?.sid || '' }
+          : null
+      );
       res.write(`event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`);
 
       const keepAlive = setInterval(() => {
@@ -2610,13 +2688,42 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           return;
         }
         const changed = applySyncAction(store, body.type, body.payload, viewer);
+        let activeViewer = viewer;
         if (changed) {
+          if (body.type === 'RESET_USER_PASSWORD' && viewer) {
+            const targetKey = findUserKeyInStore(store, body.payload?.username);
+            if (targetKey && targetKey === viewer.username && store.users[targetKey]) {
+              activeViewer = store.users[targetKey];
+              const nextVer = activeViewer.tokenVersion || 1;
+              const viewerSid = viewerPayload?.sid || crypto.randomBytes(8).toString('hex');
+              const refreshedToken = signToken(
+                {
+                  username: activeViewer.username,
+                  role: activeViewer.role,
+                  isSuperAdmin: Boolean(activeViewer.isSuperAdmin),
+                  tokenVersion: nextVer,
+                  sid: viewerSid,
+                  exp: Date.now() + SESSION_TTL_MS
+                },
+                store._authSecret
+              );
+              res.setHeader('Set-Cookie', buildSessionCookieHeader(req, refreshedToken, SESSION_TTL_MS / 1000));
+              if (viewerPayload?.sid) {
+                for (const sseRes of sseClients) {
+                  const info = sseClientUsers.get(sseRes);
+                  if (info && info.username === activeViewer.username && info.sid === viewerPayload.sid) {
+                    info.tokenVersion = nextVer;
+                  }
+                }
+              }
+            }
+          }
           onChanged?.(store);
           scheduleBroadcast(50);
         }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ ok: true, snapshot: getSnapshotForViewer(store, viewer) }));
+        res.end(JSON.stringify({ ok: true, snapshot: getSnapshotForViewer(store, activeViewer) }));
       } catch (err) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -2630,16 +2737,18 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
 }
 
 export function lexiprepSyncPlugin({ persistFile = process.env.SYNC_STATE_FILE || '' } = {}) {
-  const { store, schedulePersist } = createPersistentSyncStore(persistFile);
+  const { store, schedulePersist, flushPersist, syncFromDiskIfNewer } = createPersistentSyncStore(persistFile);
   const sseClients = new Set();
 
   return {
     name: 'lexiprep-realtime-sync',
     configureServer(server) {
-      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist);
+      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist, { syncFromDiskIfNewer });
+      server.httpServer?.once('close', () => flushPersist());
     },
     configurePreviewServer(server) {
-      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist);
+      attachSyncMiddleware(server.middlewares, store, sseClients, schedulePersist, { syncFromDiskIfNewer });
+      server.httpServer?.once('close', () => flushPersist());
     }
   };
 }

@@ -34,7 +34,12 @@ function resolvePersistPath() {
   if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
     return path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'lexiprep-sync-state.json');
   }
-  return path.join(__dirname, '.data', 'sync-state.json');
+  const unifiedLocalPath = path.join(__dirname, '.data', 'dev-sync-state.json');
+  const legacyLocalPath = path.join(__dirname, '.data', 'sync-state.json');
+  if (!fs.existsSync(unifiedLocalPath) && fs.existsSync(legacyLocalPath)) {
+    return legacyLocalPath;
+  }
+  return unifiedLocalPath;
 }
 
 /** Safely resolve a request URL inside DIST_DIR, blocking directory traversal. */
@@ -75,7 +80,7 @@ function sendStaticFile(res, filePath, isAsset) {
 
 /** Start the standalone production HTTP + SSE sync server. */
 export function createProductionServer({ port = Number(process.env.PORT) || 4173, host = process.env.HOST || '0.0.0.0', persistFile = resolvePersistPath() } = {}) {
-  const { store, schedulePersist, flushPersist } = createPersistentSyncStore(persistFile);
+  const { store, schedulePersist, flushPersist, syncFromDiskIfNewer } = createPersistentSyncStore(persistFile);
   const sseClients = new Set();
   const middlewares = [];
 
@@ -83,7 +88,8 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
     { use: (route, fn) => middlewares.push({ route, fn }) },
     store,
     sseClients,
-    schedulePersist
+    schedulePersist,
+    { syncFromDiskIfNewer }
   );
 
   const server = http.createServer((req, res) => {
@@ -133,11 +139,8 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
   });
 
   server.listen(port, host, () => {
-    const storagePath = process.env.RAILWAY_VOLUME_MOUNT_PATH
-      ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'lexiprep-sync-state.json')
-      : path.join(process.cwd(), '.data', 'dev-sync-state.json');
     console.log(`[Luyện Thi IELTS Nha Trang] Production server listening at http://${host}:${port}`);
-    console.log(`[Luyện Thi IELTS Nha Trang] Persistent storage: ${storagePath}`);
+    console.log(`[Luyện Thi IELTS Nha Trang] Persistent storage: ${persistFile || 'in-memory'}`);
   });
 
   let shuttingDown = false;
