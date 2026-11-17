@@ -13,6 +13,7 @@ import {
   Headphones,
   HelpCircle,
   Image,
+  Layers,
   Lock,
   Mic,
   PenTool,
@@ -23,7 +24,8 @@ import {
   Sparkles,
   Trash2,
   Unlock,
-  Upload
+  Upload,
+  Users
 } from 'lucide-react';
 import {
   ALL_SKILL_OPTIONS,
@@ -47,6 +49,7 @@ export default function ExamBuilder({
   builderListeningIdx,
   builderReadingIdx,
   builderTab,
+  classesDb = {},
   currentUser,
   editingTest,
   handleAudioFileUpload,
@@ -829,6 +832,77 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             </div>
           </div>
 
+          {/* Class Scope Assignment Card */}
+          {(() => {
+            const classList = Object.values(classesDb || {}).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+            const assignedIds = Array.isArray(cfg.assignedClassIds) ? cfg.assignedClassIds : [];
+            const isAllClasses = assignedIds.length === 0;
+            const toggleAssignedClass = (cid) => {
+              setTestForm(prev => {
+                const curr = Array.isArray(prev.assignedClassIds) ? prev.assignedClassIds : [];
+                const next = curr.includes(cid) ? curr.filter(x => x !== cid) : [...curr, cid];
+                return { ...prev, assignedClassIds: next };
+              });
+            };
+            return (
+              <div className="p-5 rounded-2xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-500/30 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                      Giao Đề / Bài Tập Theo Lớp Học
+                    </h3>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                      Chọn <strong>Tất cả học viên</strong> hoặc chỉ định riêng một vài lớp (chỉ học viên trong lớp được chọn mới nhìn thấy bài và nhận thông báo).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTestForm(prev => ({ ...prev, assignedClassIds: [] }))}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                      isAllClasses
+                        ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5 inline mr-1" />
+                    Tất cả học viên
+                  </button>
+                </div>
+
+                {classList.length === 0 ? (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                    Chưa có lớp học nào. Giáo viên có thể tạo lớp tại tab <strong>6. Quản Lý Lớp Học</strong> trên Bảng Điều Khiển.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {classList.map(cls => {
+                      const active = assignedIds.includes(cls.id);
+                      return (
+                        <button
+                          key={cls.id}
+                          type="button"
+                          onClick={() => toggleAssignedClass(cls.id)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            active
+                              ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-sky-400'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{cls.name}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${active ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+                            {cls.studentUsernames?.length || 0} HS
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Schedule / Deadline Configuration */}
           <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1104,43 +1178,61 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           </div>
 
           {/* Stealth Anti-Cheat Control Card (Hidden from Student UI) */}
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-rose-50 via-amber-50/70 to-slate-50 dark:from-rose-950/35 dark:via-slate-800/80 dark:to-slate-900 border border-rose-200 dark:border-rose-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className={`p-3 rounded-2xl ${cfg.antiCheatEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
-                {cfg.antiCheatEnabled ? <ShieldCheck className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-rose-50 via-amber-50/70 to-slate-50 dark:from-rose-950/35 dark:via-slate-800/80 dark:to-slate-900 border border-rose-200 dark:border-rose-500/30 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className={`p-3 rounded-2xl ${cfg.antiCheatEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                  {cfg.antiCheatEnabled ? <ShieldCheck className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
+                    Chế Độ Chống Gian Lận &amp; Kiểm Tra Extension
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 dark:bg-slate-800 border border-slate-700">
+                      Ẩn với học sinh
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed max-w-xl">
+                    Khi bật, hệ thống đếm số lần rời tab/mất focus, phát hiện mở panel bên hông trình duyệt (từ điển/dịch), khóa DevTools &amp; Extension can thiệp, đồng thời chặn dán văn bản từ bên ngoài (web/ChatGPT/Google Dịch).
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
-                  Chế Độ Chống Gian Lận &amp; Kiểm Tra Extension
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 dark:bg-slate-800 border border-slate-700">
-                    Ẩn với học sinh
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed max-w-xl">
-                  Khi bật, hệ thống đếm số lần rời tab/mất focus, khóa chuột phải &amp; copy/paste/DevTools (vẫn giữ tính năng Highlight Reading/Listening), đồng thời quét DOM và tính toàn vẹn API trình duyệt để phát hiện Extension hỗ trợ hoặc lách luật. Tắt đi nếu muốn cho học sinh luyện tập tự do. Trạng thái này hoàn toàn ẩn ở màn hình danh sách đề của học sinh.
-                </p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setTestForm(prev => ({ ...prev, antiCheatEnabled: !cfg.antiCheatEnabled }))}
+                className={`px-5 py-3 rounded-xl text-xs font-extrabold flex items-center gap-2 transition shadow-sm flex-shrink-0 ${
+                  cfg.antiCheatEnabled
+                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                    : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700'
+                }`}
+              >
+                {cfg.antiCheatEnabled ? (
+                  <>
+                    <ShieldCheck className="w-4 h-4" /> Đang Bật Chống Gian Lận
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="w-4 h-4" /> Đang Tắt (Luyện Tập Tự Do)
+                  </>
+                )}
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setTestForm(prev => ({ ...prev, antiCheatEnabled: !cfg.antiCheatEnabled }))}
-              className={`px-5 py-3 rounded-xl text-xs font-extrabold flex items-center gap-2 transition shadow-sm flex-shrink-0 ${
-                cfg.antiCheatEnabled
-                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700'
-              }`}
-            >
-              {cfg.antiCheatEnabled ? (
-                <>
-                  <ShieldCheck className="w-4 h-4" /> Đang Bật Chống Gian Lận
-                </>
-              ) : (
-                <>
-                  <EyeOff className="w-4 h-4" /> Đang Tắt (Luyện Tập Tự Do)
-                </>
-              )}
-            </button>
+            {cfg.antiCheatEnabled && (
+              <div className="pt-3 border-t border-rose-200/70 dark:border-rose-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cfg.allowInternalCopyPaste}
+                    onChange={e => setTestForm(prev => ({ ...prev, allowInternalCopyPaste: e.target.checked }))}
+                    className="mt-0.5 w-4 h-4 accent-indigo-600 rounded"
+                  />
+                  <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
+                    <strong>Cho phép Copy/Paste NỘI BỘ trong bài thi</strong> — Học viên có thể Ctrl+C / Ctrl+V văn bản từ chính Đề đọc, Ngữ cảnh, Câu hỏi sang ô trả lời Writing/Fill-blank, nhưng vẫn <strong>CẤM 100%</strong> mọi thao tác dán văn bản copy từ web/app bên ngoài.
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
         </div>
         );

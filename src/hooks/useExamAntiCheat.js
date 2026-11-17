@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 // Chỉ nhận diện nhóm tiện ích hỗ trợ Copy/Paste hoặc mở khóa chuột phải
 const COPY_PASTE_EXTENSION_SIGNATURES = [
@@ -23,14 +23,138 @@ const COPY_PASTE_EXTENSION_SIGNATURES = [
 const isNativeFn = (fn) =>
   typeof fn === 'function' && Function.prototype.toString.call(fn).includes('[native code]');
 
-export function useExamAntiCheat({ enabled, setExamState, showToast }) {
+export const normalizeInternalClipboardText = (text = '') =>
+  String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .trim();
+
+export const evaluateInternalClipboardAction = ({
+  actionType,
+  allowInternalCopyPaste = true,
+  selectedText = '',
+  clipboardText = '',
+  isInternalSource = false,
+  isAnswerTarget = false,
+  lastInternalText = ''
+} = {}) => {
+  if (!allowInternalCopyPaste) {
+    return { allowed: false, reason: 'strict-locked', nextInternalText: '' };
+  }
+  if (actionType === 'copy') {
+    const cleanSelected = normalizeInternalClipboardText(selectedText);
+    if (isInternalSource && cleanSelected.length > 0) {
+      return { allowed: true, reason: 'internal-copy', nextInternalText: cleanSelected };
+    }
+    return { allowed: false, reason: 'outside-exam-source', nextInternalText: lastInternalText };
+  }
+  if (actionType === 'cut') {
+    const cleanSelected = normalizeInternalClipboardText(selectedText);
+    if (isAnswerTarget && cleanSelected.length > 0) {
+      return { allowed: true, reason: 'internal-cut', nextInternalText: cleanSelected };
+    }
+    return { allowed: false, reason: 'cut-non-answer', nextInternalText: lastInternalText };
+  }
+  if (actionType === 'paste') {
+    const cleanClip = normalizeInternalClipboardText(clipboardText);
+    const cleanStored = normalizeInternalClipboardText(lastInternalText);
+    if (isAnswerTarget && cleanStored.length > 0 && cleanClip === cleanStored) {
+      return { allowed: true, reason: 'internal-paste', nextInternalText: cleanStored };
+    }
+    return { allowed: false, reason: 'external-paste-blocked', nextInternalText: cleanStored };
+  }
+  return { allowed: false, reason: 'unknown', nextInternalText: lastInternalText };
+};
+
+export const detectSidePanelResize = ({
+  prevInnerWidth = 0,
+  prevOuterWidth = 0,
+  prevDpr = 1,
+  nextInnerWidth = 0,
+  nextOuterWidth = 0,
+  nextDpr = 1
+} = {}) => {
+  if (prevInnerWidth <= 0 || prevOuterWidth <= 0 || nextInnerWidth <= 0 || nextOuterWidth <= 0) {
+    return { detected: false, deltaInner: 0 };
+  }
+  const deltaInner = prevInnerWidth - nextInnerWidth;
+  const deltaOuter = Math.abs(nextOuterWidth - prevOuterWidth);
+  const deltaDpr = Math.abs((Number(nextDpr) || 1) - (Number(prevDpr) || 1));
+  return {
+    detected: deltaInner >= 180 && deltaOuter < 40 && deltaDpr < 0.02,
+    deltaInner
+  };
+};
+
+const resolveDomElement = (node) => {
+  if (!node) return null;
+  if (node.nodeType === 1) return node;
+  if (node.nodeType === 3) return node.parentElement || null;
+  return null;
+};
+
+const isElementInsideExamSource = (node) => {
+  const el = resolveDomElement(node);
+  return Boolean(el && typeof el.closest === 'function' && el.closest('[data-exam-copy-source="true"]'));
+};
+
+const isElementEditableExamInput = (node) => {
+  const el = resolveDomElement(node);
+  if (!el) return false;
+  const tag = String(el.tagName || '').toUpperCase();
+  if (tag === 'TEXTAREA') return !el.readOnly && !el.disabled;
+  if (tag === 'INPUT') {
+    const type = String(el.type || 'text').toLowerCase();
+    return ['text', 'search', ''].includes(type) && !el.readOnly && !el.disabled;
+  }
+  return Boolean(el.isContentEditable);
+};
+
+const extractSelectedTextForClipboard = () => {
+  const active = document.activeElement;
+  if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) {
+    const start = typeof active.selectionStart === 'number' ? active.selectionStart : 0;
+    const end = typeof active.selectionEnd === 'number' ? active.selectionEnd : 0;
+    if (end > start && typeof active.value === 'string') {
+      return {
+        text: active.value.slice(start, end),
+        anchorNode: active,
+        focusNode: active
+      };
+    }
+  }
+  const sel = window.getSelection?.();
+  return {
+    text: sel ? sel.toString() : '',
+    anchorNode: sel?.anchorNode || null,
+    focusNode: sel?.focusNode || null
+  };
+};
+
+export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setExamState, showToast }) {
   const antiCheatToastRef = useRef(null);
   const setExamStateRef = useRef(null);
+  const internalClipboardRef = useRef('');
+  const lastValidInternalPasteAtRef = useRef(0);
 
   useEffect(() => {
     antiCheatToastRef.current = showToast;
     setExamStateRef.current = setExamState;
   });
+
+  const recordInternalCopy = useCallback(async (rawText) => {
+    const clean = normalizeInternalClipboardText(rawText);
+    if (!clean) return false;
+    internalClipboardRef.current = clean;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(String(rawText || ''));
+      }
+    } catch (_err) {
+      // Ignore browser clipboard write permission denial; internal buffer still tracks it.
+    }
+    return true;
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -38,6 +162,11 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
     const seenSignatures = new Map();
     const pendingTimers = new Set();
     let lastTabCountedAt = 0;
+    const viewportSnapshot = {
+      innerWidth: window.innerWidth || 0,
+      outerWidth: window.outerWidth || 0,
+      dpr: window.devicePixelRatio || 1
+    };
     let lastToastAt = 0;
     let blurConfirmTimer = null;
     let awayAlreadyRecorded = document.visibilityState === 'hidden' || !document.hasFocus();
@@ -155,17 +284,60 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
     };
 
     const handleClipboardCapture = (e) => {
+      const selInfo = extractSelectedTextForClipboard();
+      const isInternalSource =
+        isElementInsideExamSource(e.target) ||
+        isElementInsideExamSource(document.activeElement) ||
+        isElementInsideExamSource(selInfo.anchorNode) ||
+        isElementInsideExamSource(selInfo.focusNode);
+      const isAnswerTarget =
+        isElementEditableExamInput(e.target) || isElementEditableExamInput(document.activeElement);
+      const pastedRaw = e.type === 'paste' ? (e.clipboardData?.getData('text/plain') ?? '') : '';
+
+      const decision = evaluateInternalClipboardAction({
+        actionType: e.type,
+        allowInternalCopyPaste,
+        selectedText: selInfo.text,
+        clipboardText: pastedRaw,
+        isInternalSource,
+        isAnswerTarget,
+        lastInternalText: internalClipboardRef.current
+      });
+
+      if (decision.allowed) {
+        if (e.type === 'copy' || e.type === 'cut') {
+          internalClipboardRef.current = decision.nextInternalText;
+        } else if (e.type === 'paste') {
+          lastValidInternalPasteAtRef.current = Date.now();
+        }
+        return;
+      }
+
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       const actionMap = { paste: 'dán (Paste)', cut: 'cắt (Cut)', copy: 'sao chép (Copy)' };
-      notifyRestricted('Sao chép / dán đã bị khóa khi bật chống gian lận!');
-      recordViolation(`Thử ${actionMap[e.type] || e.type} nội dung (Đã chặn)`, {
-        category: 'interaction',
-        severity: 'medium',
-        dedupKey: `clip-${e.type}`,
-        cooldownMs: 3000
-      });
+      if (decision.reason === 'external-paste-blocked') {
+        notifyRestricted('Chỉ được dán nội dung đã copy từ trong bài thi! Dán từ web/app bên ngoài bị cấm.');
+        recordViolation('Chặn dán văn bản từ bên ngoài bài thi (External Paste Blocked)', {
+          category: 'interaction',
+          severity: 'high',
+          dedupKey: 'external-paste-blocked',
+          cooldownMs: 3000
+        });
+      } else {
+        notifyRestricted(
+          allowInternalCopyPaste
+            ? 'Thao tác sao chép/dán chỉ được phép từ nội dung bài thi vào ô trả lời!'
+            : 'Sao chép / dán đã bị khóa khi bật chống gian lận!'
+        );
+        recordViolation(`Thử ${actionMap[e.type] || e.type} nội dung (Đã chặn)`, {
+          category: 'interaction',
+          severity: 'medium',
+          dedupKey: `clip-${e.type}`,
+          cooldownMs: 3000
+        });
+      }
       trackTimer(() => {
         if (!e.defaultPrevented) {
           recordViolation(`Cảnh báo: Thao tác ${actionMap[e.type] || e.type} đã vượt khóa bảo vệ (Extension hỗ trợ Copy/Paste)`, {
@@ -181,12 +353,30 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
     const handleKeyDownCapture = (e) => {
       const keyLower = (e.key || '').toLowerCase();
       const hasMod = e.ctrlKey || e.metaKey;
-      const isClipboardShortcut = hasMod && ['c', 'v', 'x'].includes(keyLower);
+      const isCopyCutPasteKey = hasMod && ['c', 'v', 'x'].includes(keyLower);
       const isDevToolsOrSource =
         e.key === 'F12' ||
         (hasMod && e.shiftKey && ['i', 'j', 'c'].includes(keyLower)) ||
         (hasMod && keyLower === 'u');
-      if (!isClipboardShortcut && !isDevToolsOrSource) return;
+
+      if (!isCopyCutPasteKey && !isDevToolsOrSource) return;
+
+      if (allowInternalCopyPaste && isCopyCutPasteKey && !e.shiftKey) {
+        if (keyLower === 'v') {
+          // Let paste event fire so we can synchronously inspect clipboardData against internalClipboardRef.current
+          return;
+        }
+        const selInfo = extractSelectedTextForClipboard();
+        const canInternalCopyCut =
+          keyLower === 'c'
+            ? isElementInsideExamSource(e.target) ||
+              isElementInsideExamSource(document.activeElement) ||
+              isElementInsideExamSource(selInfo.anchorNode)
+            : isElementEditableExamInput(e.target) || isElementEditableExamInput(document.activeElement);
+        if (canInternalCopyCut) {
+          return;
+        }
+      }
 
       e.preventDefault();
       e.stopPropagation();
@@ -204,16 +394,66 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
     // Chặn dự phòng nếu extension lách sự kiện paste để chèn thẳng dữ liệu vào ô nhập (giữ nguyên bộ gõ tiếng Việt)
     const handleBeforeInputCapture = (e) => {
       if (e.inputType !== 'insertFromPaste') return;
+      if (allowInternalCopyPaste && Date.now() - lastValidInternalPasteAtRef.current <= 400) {
+        return;
+      }
+      const incoming = normalizeInternalClipboardText(
+        e.data ?? e.dataTransfer?.getData('text/plain') ?? ''
+      );
+      if (
+        allowInternalCopyPaste &&
+        incoming.length > 0 &&
+        incoming === internalClipboardRef.current &&
+        isElementEditableExamInput(e.target)
+      ) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      notifyRestricted('Chức năng dán văn bản (Paste) đã bị khóa trong khi thi!');
-      recordViolation('Cảnh báo: Phát hiện thao tác dán văn bản vượt khóa clipboard (Extension hỗ trợ Paste)', {
+      notifyRestricted(
+        allowInternalCopyPaste
+          ? 'Chỉ được dán nội dung đã copy từ trong bài thi!'
+          : 'Chức năng dán văn bản (Paste) đã bị khóa trong khi thi!'
+      );
+      recordViolation('Cảnh báo: Phát hiện thao tác dán văn bản từ bên ngoài / vượt khóa clipboard', {
         category: 'extension',
         severity: 'high',
         dedupKey: 'bypass-beforeinput-paste',
         cooldownMs: 4000
       });
+    };
+
+    const handleWindowResizeDetectSidePanel = () => {
+      const nextInnerWidth = window.innerWidth || 0;
+      const nextOuterWidth = window.outerWidth || 0;
+      const nextDpr = window.devicePixelRatio || 1;
+      const check = detectSidePanelResize({
+        prevInnerWidth: viewportSnapshot.innerWidth,
+        prevOuterWidth: viewportSnapshot.outerWidth,
+        prevDpr: viewportSnapshot.dpr,
+        nextInnerWidth,
+        nextOuterWidth,
+        nextDpr
+      });
+      viewportSnapshot.innerWidth = nextInnerWidth;
+      viewportSnapshot.outerWidth = nextOuterWidth;
+      viewportSnapshot.dpr = nextDpr;
+
+      if (check.detected) {
+        notifyRestricted(
+          `Cảnh báo: Khung màn hình bị thu hẹp đột ngột (-${check.deltaInner}px). Hệ thống đã ghi nhận nghi vấn mở Panel Từ điển / Dịch bên hông!`
+        );
+        recordViolation(
+          `Phát hiện nghi vấn mở Panel bên hông trình duyệt / Từ điển & Dịch (Chiều rộng vùng thi giảm -${check.deltaInner}px)`,
+          {
+            category: 'extension',
+            severity: 'high',
+            dedupKey: 'side-panel-resize',
+            cooldownMs: 8000
+          }
+        );
+      }
     };
 
     // Chỉ kiểm tra 2 nhóm: (1) Extension mở khóa Copy/Paste/Chuột phải, (2) Extension giả mạo/chặn đếm out-tab
@@ -319,6 +559,7 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
     window.addEventListener('paste', handleClipboardCapture, true);
     window.addEventListener('beforeinput', handleBeforeInputCapture, true);
     window.addEventListener('keydown', handleKeyDownCapture, true);
+    window.addEventListener('resize', handleWindowResizeDetectSidePanel);
 
     return () => {
       clearInterval(heartbeatTimer);
@@ -335,6 +576,9 @@ export function useExamAntiCheat({ enabled, setExamState, showToast }) {
       window.removeEventListener('paste', handleClipboardCapture, true);
       window.removeEventListener('beforeinput', handleBeforeInputCapture, true);
       window.removeEventListener('keydown', handleKeyDownCapture, true);
+      window.removeEventListener('resize', handleWindowResizeDetectSidePanel);
     };
-  }, [enabled]);
+  }, [enabled, allowInternalCopyPaste]);
+
+  return { recordInternalCopy };
 }

@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import {
   Clock,
+  FileAudio,
   Key,
   Loader2,
   Mic,
   Plus,
   Sparkles,
   Trash2,
+  Upload,
   Wand2
 } from 'lucide-react';
 import { createDefaultSpeakingSection, normalizeSpeakingSection } from '../../constants/seedData';
 import { generateSpeakingQuestionsWithAI } from '../../utils/geminiGrader';
+import { uploadSpeakingRecording } from '../../utils/speakingApi';
 
 export default function SpeakingBuilderPanel({
   aiApiKey,
@@ -23,6 +26,7 @@ export default function SpeakingBuilderPanel({
   const sp = normalizeSpeakingSection(speakingData);
   const [aiTopic, setAiTopic] = useState('Sustainable Cities & Modern Education');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState('');
 
   const patchSpeaking = (patch) => {
     onChangeSpeaking({
@@ -47,7 +51,9 @@ export default function SpeakingBuilderPanel({
       {
         id: `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
         prompt: '',
-        hint: ''
+        hint: '',
+        audioUrl: '',
+        audioFileName: ''
       }
     ];
     patchPart(partKey, { enabled: true, questions: nextList });
@@ -58,6 +64,101 @@ export default function SpeakingBuilderPanel({
       idx === qIdx ? { ...q, [field]: val } : q
     );
     patchPart(partKey, { questions: nextList });
+  };
+
+  const patchQuestionFieldsInPart = (partKey, qIdx, fields) => {
+    const nextList = (sp[partKey]?.questions || []).map((q, idx) =>
+      idx === qIdx ? { ...q, ...fields } : q
+    );
+    patchPart(partKey, { questions: nextList });
+  };
+
+  const handleUploadQuestionAudio = async (file, uploadKey, onApplyAudio) => {
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      showToast?.('File ghi âm quá lớn (vui lòng chọn file dưới 15MB hoặc dán Link URL).', 'error');
+      return;
+    }
+    setUploadingKey(uploadKey);
+    try {
+      const audioId = `spk_prompt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const uploaded = await uploadSpeakingRecording({
+        blob: file,
+        audioId,
+        mimeType: file.type || 'audio/mpeg',
+        questionId: uploadKey
+      });
+      onApplyAudio({
+        audioUrl: uploaded.audioUrl,
+        audioFileName: file.name
+      });
+      showToast?.(`Đã tải lên file ghi âm "${file.name}"!`);
+    } catch (_err) {
+      if (file.size <= 3 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (reader.result) {
+            onApplyAudio({ audioUrl: String(reader.result), audioFileName: file.name });
+            showToast?.(`Đã đính kèm cục bộ file "${file.name}".`);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        showToast?.('Không thể tải file lên server (hãy thử file nhỏ hơn 3MB hoặc dán Link Audio URL).', 'error');
+      }
+    } finally {
+      setUploadingKey('');
+    }
+  };
+
+  const renderAudioAttachmentBox = ({ uploadKey, audioUrl = '', audioFileName = '', onApplyAudio }) => {
+    const isBusy = uploadingKey === uploadKey;
+    return (
+      <div className="pt-2 mt-1 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#570DF8]/10 hover:bg-[#570DF8]/20 text-[#570DF8] dark:text-[#C4B5FD] border border-[#570DF8]/25 text-[11px] font-bold transition">
+            {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            <span>{isBusy ? 'Đang tải...' : 'Nhập File Ghi Âm (.mp3/.wav/.m4a)'}</span>
+            <input
+              type="file"
+              accept="audio/*"
+              disabled={isBusy}
+              onChange={e => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) handleUploadQuestionAudio(file, uploadKey, onApplyAudio);
+              }}
+              className="hidden"
+            />
+          </label>
+          <input
+            type="url"
+            value={audioUrl.startsWith('data:') ? '' : audioUrl}
+            onChange={e => onApplyAudio({ audioUrl: e.target.value.trim(), audioFileName: '' })}
+            placeholder="Hoặc dán Link Audio URL ngoài (tùy chọn)..."
+            className="flex-1 min-w-[200px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-200"
+          />
+          {audioUrl && (
+            <button
+              type="button"
+              onClick={() => onApplyAudio({ audioUrl: '', audioFileName: '' })}
+              className="px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition"
+            >
+              Xóa Audio
+            </button>
+          )}
+        </div>
+        {audioUrl && (
+          <div className="flex flex-wrap items-center gap-2.5 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
+            <FileAudio className="w-4 h-4 text-[#570DF8] shrink-0" />
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate max-w-[180px]">
+              {audioFileName || 'File ghi âm câu hỏi'}
+            </span>
+            <audio controls src={audioUrl} className="h-8 flex-1 min-w-[180px]" />
+          </div>
+        )}
+      </div>
+    );
   };
 
   const removeQuestionInPart = (partKey, qIdx) => {
@@ -315,6 +416,12 @@ export default function SpeakingBuilderPanel({
                   placeholder="Gợi ý ý tưởng / từ vựng (tùy chọn)..."
                   className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300"
                 />
+                {renderAudioAttachmentBox({
+                  uploadKey: `part1-${q.id || idx}`,
+                  audioUrl: q.audioUrl || '',
+                  audioFileName: q.audioFileName || '',
+                  onApplyAudio: fields => patchQuestionFieldsInPart('part1', idx, fields)
+                })}
               </div>
             ))}
           </div>
@@ -404,6 +511,13 @@ export default function SpeakingBuilderPanel({
                 </div>
               ))}
             </div>
+
+            {renderAudioAttachmentBox({
+              uploadKey: 'part2-cuecard',
+              audioUrl: sp.part2.audioUrl || '',
+              audioFileName: sp.part2.audioFileName || '',
+              onApplyAudio: fields => patchPart('part2', fields)
+            })}
           </div>
         )}
       </div>
@@ -472,6 +586,12 @@ export default function SpeakingBuilderPanel({
                   placeholder="Gợi ý hướng phân tích / từ vựng (tùy chọn)..."
                   className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300"
                 />
+                {renderAudioAttachmentBox({
+                  uploadKey: `part3-${q.id || idx}`,
+                  audioUrl: q.audioUrl || '',
+                  audioFileName: q.audioFileName || '',
+                  onApplyAudio: fields => patchQuestionFieldsInPart('part3', idx, fields)
+                })}
               </div>
             ))}
           </div>

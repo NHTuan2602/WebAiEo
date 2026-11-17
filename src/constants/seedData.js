@@ -150,7 +150,9 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
         ? p1.questions.map((q, idx) => ({
             id: q?.id || `sp1_${idx + 1}`,
             prompt: String(q?.prompt || '').trim(),
-            hint: String(q?.hint || '').trim()
+            hint: String(q?.hint || '').trim(),
+            audioUrl: String(q?.audioUrl || '').trim(),
+            audioFileName: String(q?.audioFileName || '').trim()
           }))
         : def.part1.questions
     },
@@ -161,7 +163,9 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
       bullets: Array.isArray(p2.bullets)
         ? p2.bullets.map(b => String(b || '').trim())
         : def.part2.bullets,
-      followUpQuestion: String(p2.followUpQuestion ?? '')
+      followUpQuestion: String(p2.followUpQuestion ?? ''),
+      audioUrl: String(p2.audioUrl || '').trim(),
+      audioFileName: String(p2.audioFileName || '').trim()
     },
     part3: {
       enabled: p3.enabled !== false,
@@ -170,7 +174,9 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
         ? p3.questions.map((q, idx) => ({
             id: q?.id || `sp3_${idx + 1}`,
             prompt: String(q?.prompt || '').trim(),
-            hint: String(q?.hint || '').trim()
+            hint: String(q?.hint || '').trim(),
+            audioUrl: String(q?.audioUrl || '').trim(),
+            audioFileName: String(q?.audioFileName || '').trim()
           }))
         : def.part3.questions
     }
@@ -193,6 +199,8 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
           prompt: q.prompt,
           bullets: [],
           hint: q.hint || '',
+          audioUrl: q.audioUrl || '',
+          audioFileName: q.audioFileName || '',
           prepSec: 0,
           speakSec: sp.part1SpeakSec
         });
@@ -208,6 +216,8 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
       prompt: sp.part2.cueCardPrompt || sp.part2.title,
       bullets: (sp.part2.bullets || []).filter(Boolean),
       hint: sp.part2.followUpQuestion ? `Câu hỏi phụ gợi ý: ${sp.part2.followUpQuestion}` : '',
+      audioUrl: sp.part2.audioUrl || '',
+      audioFileName: sp.part2.audioFileName || '',
       prepSec: sp.part2PrepSec,
       speakSec: sp.part2SpeakSec
     });
@@ -225,6 +235,8 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
           prompt: q.prompt,
           bullets: [],
           hint: q.hint || '',
+          audioUrl: q.audioUrl || '',
+          audioFileName: q.audioFileName || '',
           prepSec: 0,
           speakSec: sp.part3SpeakSec
         });
@@ -278,6 +290,10 @@ export const normalizeExamConfig = (test) => {
   const openAt = parseScheduleTimestamp(test?.openAt);
   const dueAt = parseScheduleTimestamp(test?.dueAt);
 
+  const assignedClassIds = Array.isArray(test?.assignedClassIds)
+    ? Array.from(new Set(test.assignedClassIds.map(id => String(id || '').trim()).filter(Boolean)))
+    : [];
+
   return {
     testMode,
     focusSkill,
@@ -286,12 +302,51 @@ export const normalizeExamConfig = (test) => {
     sequentialMode: testMode === 'single_skill' ? false : test?.sequentialMode !== false,
     allowEarlyNextSection: testMode === 'single_skill' ? true : !!test?.allowEarlyNextSection,
     antiCheatEnabled: test?.antiCheatEnabled !== false,
+    allowInternalCopyPaste: test?.allowInternalCopyPaste !== false,
+    assignedClassIds,
     scheduleMode,
     openAt,
     dueAt,
     order,
     durations
   };
+};
+
+export const getUserClassIds = (classesDb, username) => {
+  const uname = String(username || '').trim();
+  if (!uname || !classesDb || typeof classesDb !== 'object') return [];
+  return Object.values(classesDb)
+    .filter(cls => cls && Array.isArray(cls.studentUsernames) && cls.studentUsernames.includes(uname))
+    .map(cls => cls.id)
+    .filter(Boolean);
+};
+
+export const canUserAccessTest = (test, classesDb, currentUser) => {
+  if (!test) return false;
+  const role = currentUser?.role || 'student';
+  if (role === 'teacher' || role === 'admin') return true;
+  const cfg = normalizeExamConfig(test);
+  if (cfg.visibility === 'private') return false;
+  if (!Array.isArray(cfg.assignedClassIds) || cfg.assignedClassIds.length === 0) {
+    return true;
+  }
+  const myClassIds = getUserClassIds(classesDb, currentUser?.username);
+  return cfg.assignedClassIds.some(cid => myClassIds.includes(cid));
+};
+
+export const getAssignedClassNames = (testOrIds, classesDb) => {
+  const ids = Array.isArray(testOrIds)
+    ? testOrIds
+    : normalizeExamConfig(testOrIds).assignedClassIds;
+  if (!Array.isArray(ids) || ids.length === 0 || !classesDb || typeof classesDb !== 'object') {
+    return [];
+  }
+  return ids
+    .map(id => {
+      const cls = classesDb[id];
+      return cls ? { id, name: cls.name || id } : null;
+    })
+    .filter(Boolean);
 };
 
 export const evaluateTestSchedule = (testOrCfg, nowMs = Date.now()) => {
@@ -410,6 +465,8 @@ export const createEmptyTestForm = () => ({
   sequentialMode: true,
   allowEarlyNextSection: false,
   antiCheatEnabled: true,
+  allowInternalCopyPaste: true,
+  assignedClassIds: [],
   sectionOrder: [...DEFAULT_SECTION_ORDER],
   sectionDurations: { ...DEFAULT_SECTION_DURATIONS },
   maxAudioPlays: 1,

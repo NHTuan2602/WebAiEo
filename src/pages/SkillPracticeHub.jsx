@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
 import {
+  canUserAccessTest,
   evaluateTestSchedule,
   formatViDateTime,
+  getAssignedClassNames,
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
@@ -32,6 +34,7 @@ export default function SkillPracticeHub({
   activeTab = 'speaking',
   aiConfigured = false,
   attempts = [],
+  classesDb = {},
   currentUser,
   focusedTestId = null,
   onChangeTab,
@@ -56,7 +59,7 @@ export default function SkillPracticeHub({
   const singleSkillTests = tests.filter(t => {
     const cfg = normalizeExamConfig(t);
     if (cfg.testMode !== 'single_skill') return false;
-    return isTeacher || cfg.visibility !== 'private';
+    return canUserAccessTest(t, classesDb, currentUser);
   });
 
   const speakingTests = singleSkillTests.filter(t => t.focusSkill === 'speaking');
@@ -194,7 +197,15 @@ export default function SkillPracticeHub({
                       <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${meta.bg} ${meta.color}`}>
                         {skillId.toUpperCase()} ONLY • {cfg.durations[skillId]} phút
                       </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
+                          <span
+                            key={cls.id}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30"
+                          >
+                            Lớp {cls.name}
+                          </span>
+                        ))}
                         {isTeacher && cfg.visibility === 'private' && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 flex items-center gap-1">
                             <EyeOff className="w-3 h-3" /> Đang ẩn
@@ -558,7 +569,15 @@ export default function SkillPracticeHub({
                                 {totalItems} câu · AI Chấm 4 Tiêu Chí
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
+                                <span
+                                  key={cls.id}
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30"
+                                >
+                                  Lớp {cls.name}
+                                </span>
+                              ))}
                               {isTeacher && cfg.visibility === 'private' && (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
                                   Đang ẩn

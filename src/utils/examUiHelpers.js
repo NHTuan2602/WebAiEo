@@ -100,13 +100,13 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
 /** Split text cleanly into plain and <mark>-highlighted runs for XSS-safe passage rendering. */
 export function segmentTextWithHighlights(text = '', highlights = []) {
   const source = String(text || '');
-  if (!source) return [{ text: '', color: null }];
+  if (!source) return [{ text: '', color: null, highlightId: null }];
   const validHighlights = (Array.isArray(highlights) ? highlights : [])
-    .filter(h => h?.text && String(h.text).trim().length >= 3)
-    .map(h => ({ phrase: String(h.text).trim(), color: h.color || '#fef08a' }));
+    .filter(h => h?.text && String(h.text).trim().length >= 2)
+    .map(h => ({ id: h.id ?? null, phrase: String(h.text).trim(), color: h.color || '#fef08a' }));
 
   if (validHighlights.length === 0) {
-    return [{ text: source, color: null }];
+    return [{ text: source, color: null, highlightId: null }];
   }
 
   const runs = [];
@@ -118,21 +118,24 @@ export function segmentTextWithHighlights(text = '', highlights = []) {
 
     for (const h of validHighlights) {
       const idx = source.indexOf(h.phrase, cursor);
-      if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
+      if (
+        idx !== -1 &&
+        (earliestIdx === -1 || idx < earliestIdx || (idx === earliestIdx && h.phrase.length > matched.phrase.length))
+      ) {
         earliestIdx = idx;
         matched = h;
       }
     }
 
     if (earliestIdx === -1 || !matched) {
-      runs.push({ text: source.slice(cursor), color: null });
+      runs.push({ text: source.slice(cursor), color: null, highlightId: null });
       break;
     }
 
     if (earliestIdx > cursor) {
-      runs.push({ text: source.slice(cursor, earliestIdx), color: null });
+      runs.push({ text: source.slice(cursor, earliestIdx), color: null, highlightId: null });
     }
-    runs.push({ text: matched.phrase, color: matched.color });
+    runs.push({ text: matched.phrase, color: matched.color, highlightId: matched.id });
     cursor = earliestIdx + matched.phrase.length;
   }
 

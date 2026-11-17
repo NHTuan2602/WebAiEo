@@ -25,6 +25,7 @@ import {
   Image as ImageIcon,
   Infinity as InfinityIcon,
   Key,
+  Layers,
   Lock,
   Megaphone,
   Mic,
@@ -56,17 +57,21 @@ import {
   evaluateTestSchedule,
   formatDurationVi,
   formatViDateTime,
+  getAssignedClassNames,
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
+  getUserClassIds,
   normalizeExamConfig
 } from '../constants/seedData';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
+import ClassManagerTab from '../components/teacher/ClassManagerTab';
 
 export default function TeacherDashboard({
   attempts,
+  classesDb = {},
   copiedRoomPin,
   currentRoomPin,
   currentUser,
@@ -88,7 +93,13 @@ export default function TeacherDashboard({
   initGameCampaign,
   mailConfigured = false,
   notifications = [],
+  onAssignTestClasses,
+  onCreateSkillForClass,
+  onCreateTestForClass,
+  onDeleteClass,
   onOpenMailConfig,
+  onUpdateClassMembers,
+  onUpsertClass,
   openExamBuilder,
   openMemberProfile,
   openSingleSkillBuilder,
@@ -140,7 +151,8 @@ export default function TeacherDashboard({
     message: '',
     type: 'announcement',
     testId: '',
-    roomPin: ''
+    roomPin: '',
+    targetClassIds: []
   });
   const [notifySending, setNotifySending] = useState(false);
 
@@ -185,6 +197,15 @@ export default function TeacherDashboard({
   });
 
   const getTestCompletionStats = (testId) => {
+    const targetTest = (tests || []).find(t => t.id === testId);
+    const targetCfg = normalizeExamConfig(targetTest);
+    const assignedClassSet = new Set(targetCfg.assignedClassIds || []);
+    const eligibleStudents =
+      assignedClassSet.size > 0
+        ? studentAccounts.filter(stu =>
+            getUserClassIds(classesDb, stu.username).some(cid => assignedClassSet.has(cid))
+          )
+        : studentAccounts;
     const testAttempts = (attempts || []).filter(a => a.testId === testId);
     const byStudent = new Map();
     for (const att of testAttempts) {
@@ -196,7 +217,7 @@ export default function TeacherDashboard({
     }
     const doneList = [];
     const missingList = [];
-    for (const stu of studentAccounts) {
+    for (const stu of eligibleStudents) {
       const stuAttempts = byStudent.get(stu.username) || [];
       const uniqueMap = new Map();
       stuAttempts.forEach(a => uniqueMap.set(a.id, a));
@@ -219,7 +240,7 @@ export default function TeacherDashboard({
       }
     }
     return {
-      totalStudents: studentAccounts.length,
+      totalStudents: eligibleStudents.length,
       doneList,
       missingList,
       totalSubmissions: testAttempts.length
@@ -523,6 +544,20 @@ export default function TeacherDashboard({
                   {(!isExercise || cfg.focusSkill === 'writing') && t.writing?.task1?.imageUrl && (
                     <span className="inline-flex items-center gap-1 text-[10px] bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-500/30">
                       <BarChart2 className="w-3 h-3" /> Có biểu đồ Task 1
+                    </span>
+                  )}
+                  {getAssignedClassNames(cfg.assignedClassIds, classesDb).length > 0 ? (
+                    getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
+                      <span
+                        key={cls.id}
+                        className="inline-flex items-center gap-1 text-[10px] bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 font-bold px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-500/30"
+                      >
+                        <Layers className="w-3 h-3" /> Lớp: {cls.name}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold px-2 py-0.5 rounded-md">
+                      <Globe className="w-3 h-3" /> Tất cả lớp
                     </span>
                   )}
                 </div>
@@ -982,7 +1017,8 @@ export default function TeacherDashboard({
           { id: 'skill_exercises', label: '2. Bài Tập 4 Kỹ Năng', count: skillExercises.length, icon: Sparkles, activeCls: 'bg-[#570DF8] text-white shadow-sm' },
           { id: 'grading', label: '3. Chấm Bài & Giám Sát', count: attempts.length, icon: PenTool, activeCls: 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-sm' },
           { id: 'game_room', label: '4. Phòng Game PIN', count: `PIN #${currentRoomPin}`, icon: Trophy, activeCls: 'bg-emerald-600 text-white shadow-sm' },
-          { id: 'accounts', label: '5. Tài Khoản Lớp', count: allAccounts.length, icon: Users, activeCls: 'bg-indigo-600 text-white shadow-sm' }
+          { id: 'accounts', label: '5. Tài Khoản Lớp', count: allAccounts.length, icon: Users, activeCls: 'bg-indigo-600 text-white shadow-sm' },
+          { id: 'classes', label: '6. Quản Lý Lớp Học', count: Object.keys(classesDb || {}).length, icon: Layers, activeCls: 'bg-sky-600 text-white shadow-sm' }
         ].map(tab => {
           const IconComp = tab.icon;
           const isActive =
@@ -1995,6 +2031,23 @@ export default function TeacherDashboard({
                                     ? `✓ Email OTP: ${account.email || account.maskedEmail}`
                                     : 'Chưa liên kết Email OTP'}
                                 </p>
+                                {account.role === 'student' && (() => {
+                                  const clsIds = getUserClassIds(classesDb, account.username);
+                                  const clsNames = getAssignedClassNames(clsIds, classesDb);
+                                  if (clsNames.length === 0) return null;
+                                  return (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {clsNames.map(c => (
+                                        <span
+                                          key={c.id}
+                                          className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-sky-50 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30"
+                                        >
+                                          {c.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </td>
@@ -2151,6 +2204,24 @@ export default function TeacherDashboard({
             );
           })()}
         </div>
+      )}
+
+      {/* Tab 6: Quản Lý Lớp Học */}
+      {teacherHubTab === 'classes' && (
+        <ClassManagerTab
+          classesDb={classesDb}
+          usersDb={usersDb}
+          tests={tests}
+          onUpsertClass={onUpsertClass}
+          onDeleteClass={onDeleteClass}
+          onUpdateClassMembers={onUpdateClassMembers}
+          onAssignTestClasses={onAssignTestClasses}
+          onCreateTestForClass={onCreateTestForClass}
+          onCreateSkillForClass={onCreateSkillForClass}
+          openMemberProfile={openMemberProfile}
+          openExamBuilder={openExamBuilder}
+          showToast={showToast}
+        />
       )}
 
       {/* Student Completion Status Modal for Any Test or Exercise */}
@@ -2449,7 +2520,7 @@ export default function TeacherDashboard({
                   const ok = await handleCreateNotification(notifyForm);
                   setNotifySending(false);
                   if (ok !== false) {
-                    setNotifyForm({ title: '', message: '', type: 'announcement', testId: '', roomPin: '' });
+                    setNotifyForm({ title: '', message: '', type: 'announcement', testId: '', roomPin: '', targetClassIds: [] });
                   }
                 }}
                 className="space-y-3.5 bg-slate-50/90 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4"
@@ -2536,13 +2607,67 @@ export default function TeacherDashboard({
                   />
                 </div>
 
+                {Object.keys(classesDb || {}).length > 0 && (
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-sky-600" />
+                        Đối tượng nhận thông báo
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setNotifyForm(prev => ({ ...prev, targetClassIds: [] }))}
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-lg transition ${
+                          !notifyForm.targetClassIds?.length
+                            ? 'bg-sky-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                        }`}
+                      >
+                        Tất cả học viên
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.values(classesDb).map(cls => {
+                        const selected = (notifyForm.targetClassIds || []).includes(cls.id);
+                        return (
+                          <button
+                            key={cls.id}
+                            type="button"
+                            onClick={() =>
+                              setNotifyForm(prev => {
+                                const curr = Array.isArray(prev.targetClassIds) ? prev.targetClassIds : [];
+                                const next = curr.includes(cls.id)
+                                  ? curr.filter(id => id !== cls.id)
+                                  : [...curr, cls.id];
+                                return { ...prev, targetClassIds: next };
+                              })
+                            }
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                              selected
+                                ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                                : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400'
+                            }`}
+                          >
+                            {selected ? '✓ ' : ''}{cls.name} ({cls.studentUsernames?.length || 0} HS)
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={notifySending}
                     className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-extrabold transition shadow flex items-center gap-1.5"
                   >
-                    <Send className="w-3.5 h-3.5" /> {notifySending ? 'Đang gửi...' : 'Phát Thông Báo Tới Toàn Lớp'}
+                    <Send className="w-3.5 h-3.5" />
+                    {notifySending
+                      ? 'Đang gửi...'
+                      : notifyForm.targetClassIds?.length > 0
+                      ? `Phát Thông Báo Tới ${notifyForm.targetClassIds.length} Lớp Đã Chọn`
+                      : 'Phát Thông Báo Tới Toàn Lớp'}
                   </button>
                 </div>
               </form>

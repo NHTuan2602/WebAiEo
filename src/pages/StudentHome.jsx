@@ -17,7 +17,7 @@ import {
   Sparkles,
   TrendingUp
 } from 'lucide-react';
-import { evaluateTestSchedule, formatViDateTime, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import { canUserAccessTest, evaluateTestSchedule, formatViDateTime, getAssignedClassNames, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
 import { BRAND_INFO } from '../constants/brandInfo';
 import { loadExamDraft } from '../utils/sessionPersistence';
 import BrandContactFooter from '../components/common/BrandContactFooter';
@@ -27,6 +27,7 @@ import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
 
 export default function StudentHome({
   attempts,
+  classesDb = {},
   currentUser,
   focusedTestId = null,
   onClearFocusedTest,
@@ -54,7 +55,7 @@ export default function StudentHome({
   const isTeacher = currentUser?.role === 'teacher';
   const serverNowMs = nowMs + serverClockOffsetMs;
 
-  const visibleTests = tests.filter(t => isTeacher || normalizeExamConfig(t).visibility !== 'private');
+  const visibleTests = tests.filter(t => canUserAccessTest(t, classesDb, currentUser));
   const fullExamTests = visibleTests.filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
   const singleSkillCount = visibleTests.filter(t => normalizeExamConfig(t).testMode === 'single_skill').length;
   const matchedFocusedTest = focusedTestId ? fullExamTests.find(t => t.id === focusedTestId) : null;
@@ -455,6 +456,15 @@ export default function StudentHome({
                           <EyeOff className="w-3 h-3" /> Đang Ẩn — Giáo viên xem trước
                         </div>
                       )}
+
+                      {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
+                        <div
+                          key={cls.id}
+                          className="mb-3 inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 mr-1.5"
+                        >
+                          <ClassMembersIcon className="w-3 h-3" /> Lớp: {cls.name}
+                        </div>
+                      ))}
 
                       {hasDraft && !isExhausted && (
                         <div className="mb-3 inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1447E6] dark:text-blue-300 border border-[#DBEAFE] dark:border-blue-500/30">

@@ -14,6 +14,7 @@ export default function ClozeNoteSheet({
   onToggleBookmark,
   questions = [],
   readOnlyPreview = false,
+  renderText = null,
   scopeField = 'trackIdx',
   scopeIdx = 0
 }) {
@@ -31,7 +32,7 @@ export default function ClozeNoteSheet({
   const renderSegments = (segments) =>
     segments.map((seg, idx) => {
       if (seg.type === 'text') {
-        return <span key={idx}>{seg.value}</span>;
+        return <span key={idx}>{typeof renderText === 'function' ? renderText(seg.value) : seg.value}</span>;
       }
 
       const linkedQ = resolveQuestionForBlank(questions, seg.blankNum, scopeField, scopeIdx);
@@ -124,7 +125,11 @@ export default function ClozeNoteSheet({
   };
 
   return (
-    <div onMouseUp={onPassageTextSelect} className="font-exam space-y-3 select-text text-left">
+    <div
+      onMouseUp={onPassageTextSelect}
+      data-exam-copy-source={readOnlyPreview ? undefined : 'true'}
+      className="font-exam space-y-3 select-text text-left"
+    >
       {preambleLines.length > 0 && (
         <div className="space-y-1.5">
           {preambleLines.map(line =>

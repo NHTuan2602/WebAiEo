@@ -9,6 +9,7 @@ import {
   GAME_ROUND_TIME_LIMITS,
   DEFAULT_SECTION_ORDER,
   DEFAULT_SECTION_DURATIONS,
+  canUserAccessTest,
   normalizeExamConfig,
   evaluateTestSchedule,
   formatViDateTime,
@@ -284,6 +285,7 @@ export default function App() {
   const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
   const [notifications, setNotifications] = useState([]);
   const [sentNotifications, setSentNotifications] = useState([]);
+  const [classesDb, setClassesDb] = useState({});
   const [focusedTestId, setFocusedTestId] = useState(null);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
   const serverClockOffsetMsRef = useRef(0);
@@ -912,6 +914,7 @@ export default function App() {
   const [audioProgress, setAudioProgress] = useState({ currentTime: 0, duration: 0 });
   const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState(false);
   const [selectedPassageText, setSelectedPassageText] = useState('');
+  const [selectionCoords, setSelectionCoords] = useState(null);
   const examAudioRef = useRef(null);
 
   // Dark Mode State
@@ -1184,6 +1187,7 @@ export default function App() {
         seenNotifIdsRef.current = null;
         setNotifications([]);
         setSentNotifications([]);
+        setClassesDb({});
         setFocusedTestId(null);
         setJoinedRoomPin(null);
         setGameSubState('JOIN');
@@ -1269,6 +1273,9 @@ export default function App() {
     }
     if (Array.isArray(snap.sentNotifications)) {
       setSentNotifications(prev => (JSON.stringify(prev) === JSON.stringify(snap.sentNotifications) ? prev : snap.sentNotifications));
+    }
+    if (snap.classes && typeof snap.classes === 'object') {
+      setClassesDb(prev => (JSON.stringify(prev) === JSON.stringify(snap.classes) ? prev : snap.classes));
     }
     if (Array.isArray(snap.notifications)) {
       const nextNotifs = snap.notifications;
@@ -1791,8 +1798,15 @@ export default function App() {
     }, 3000);
   };
 
-  // Notification Handlers (Announcements & Auto-Exam Alerts)
-  const handleCreateNotification = async ({ title, message, type = 'announcement', testId = '', roomPin = '' }) => {
+  // Notification Handlers (Announcements, Class Targets & Auto-Exam Alerts)
+  const handleCreateNotification = async ({
+    title,
+    message,
+    type = 'announcement',
+    testId = '',
+    roomPin = '',
+    targetClassIds = []
+  }) => {
     if (currentUser?.role !== 'teacher') return;
     const cleanTitle = String(title || '').trim();
     const cleanMessage = String(message || '').trim();
@@ -1800,14 +1814,152 @@ export default function App() {
       showToast('Vui lòng nhập đầy đủ Tiêu đề và Nội dung thông báo!', 'error');
       return false;
     }
+    const cleanTargetClasses = Array.isArray(targetClassIds)
+      ? Array.from(new Set(targetClassIds.map(id => String(id || '').trim()).filter(Boolean)))
+      : [];
     await dispatchSyncAction('CREATE_NOTIFICATION', {
       title: cleanTitle,
       message: cleanMessage,
       type,
       testId: testId || '',
-      roomPin: roomPin || ''
+      roomPin: roomPin || '',
+      targetClassIds: cleanTargetClasses
     });
-    showToast('Đã phát thông báo tới toàn bộ học viên!');
+    showToast(
+      cleanTargetClasses.length > 0
+        ? `Đã phát thông báo tới ${cleanTargetClasses.length} lớp học đã chọn!`
+        : 'Đã phát thông báo tới toàn bộ học viên!'
+    );
+    return true;
+  };
+
+  // Class Management Handlers (Create/Edit/Delete Classes & Roster Membership)
+  const handleUpsertClass = async (classPayload) => {
+    if (currentUser?.role !== 'teacher' || !classPayload?.name) return false;
+    const cleanId = String(classPayload.id || `cls_${Date.now()}`).trim();
+    const existing = classesDb[cleanId];
+    const nextClass = {
+      id: cleanId,
+      name: String(classPayload.name || '').trim(),
+      description: String(classPayload.description || '').trim(),
+      color: classPayload.color || existing?.color || 'teal',
+      studentUsernames: Array.isArray(classPayload.studentUsernames)
+        ? Array.from(new Set(classPayload.studentUsernames.map(u => String(u || '').trim()).filter(Boolean)))
+        : (existing?.studentUsernames || []),
+      createdBy: existing?.createdBy || currentUser.username,
+      createdAt: existing?.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    setClassesDb(prev => ({ ...prev, [cleanId]: nextClass }));
+    await dispatchSyncAction('UPSERT_CLASS', { classObj: nextClass });
+    showToast(existing ? `Đã cập nhật lớp "${nextClass.name}"` : `Đã tạo lớp mới "${nextClass.name}"!`);
+    return true;
+  };
+
+  const handleDeleteClass = async (classId) => {
+    if (currentUser?.role !== 'teacher' || !classId || !classesDb[classId]) return false;
+    const deletedName = classesDb[classId].name || classId;
+    setClassesDb(prev => {
+      const next = { ...prev };
+      delete next[classId];
+      return next;
+    });
+    setTests(prev =>
+      prev.map(t => {
+        if (!Array.isArray(t?.assignedClassIds) || !t.assignedClassIds.includes(classId)) return t;
+        const remaining = t.assignedClassIds.filter(id => id !== classId);
+        return {
+          ...t,
+          assignedClassIds: remaining,
+          visibility: remaining.length === 0 ? 'private' : t.visibility
+        };
+      })
+    );
+    await dispatchSyncAction('DELETE_CLASS', { classId });
+    showToast(`Đã xóa lớp "${deletedName}".`);
+    return true;
+  };
+
+  const handleUpdateClassMembers = async (classId, modeOrOpts = 'set', usernamesArg = []) => {
+    if (currentUser?.role !== 'teacher' || !classId || !classesDb[classId]) return false;
+    const mode =
+      typeof modeOrOpts === 'string' && ['add', 'remove', 'set'].includes(modeOrOpts)
+        ? modeOrOpts
+        : 'set';
+    const rawUsernames = Array.isArray(usernamesArg)
+      ? usernamesArg
+      : Array.isArray(modeOrOpts?.usernames)
+      ? modeOrOpts.usernames
+      : [];
+    const usernames = Array.from(new Set(rawUsernames.map(u => String(u || '').trim()).filter(Boolean)));
+    if (usernames.length === 0 && mode !== 'set') return false;
+
+    setClassesDb(prev => {
+      const target = prev[classId];
+      if (!target) return prev;
+      const current = Array.isArray(target.studentUsernames) ? target.studentUsernames : [];
+      let nextMembers = current;
+      if (mode === 'set') {
+        nextMembers = usernames;
+      } else if (mode === 'add') {
+        nextMembers = Array.from(new Set([...current, ...usernames]));
+      } else if (mode === 'remove') {
+        const removeLower = new Set(usernames.map(u => u.toLowerCase()));
+        nextMembers = current.filter(u => !removeLower.has(String(u).toLowerCase()));
+      }
+      return {
+        ...prev,
+        [classId]: { ...target, studentUsernames: nextMembers, updatedAt: Date.now() }
+      };
+    });
+    await dispatchSyncAction('UPDATE_CLASS_MEMBERS', { classId, mode, usernames });
+    if (mode === 'add') {
+      showToast(`Đã thêm ${usernames.length} học viên vào lớp "${classesDb[classId].name}".`);
+    } else if (mode === 'remove') {
+      showToast(`Đã kích ${usernames.length} học viên khỏi lớp "${classesDb[classId].name}".`, 'info');
+    } else {
+      showToast(`Đã cập nhật danh sách học viên lớp "${classesDb[classId].name}".`);
+    }
+    return true;
+  };
+
+  const handleAssignTestClasses = async (testId, assignedClassIds = [], options = {}) => {
+    if (currentUser?.role !== 'teacher' || !testId) return false;
+    const cleanIds = Array.from(new Set((Array.isArray(assignedClassIds) ? assignedClassIds : []).filter(Boolean)));
+    const publish = Boolean(options?.publish);
+    const notify = options?.notify !== false;
+    const makePrivateIfEmpty = Boolean(options?.makePrivateIfEmpty);
+    setTests(prev =>
+      prev.map(t =>
+        t.id === testId
+          ? {
+              ...t,
+              assignedClassIds: cleanIds,
+              ...(publish
+                ? { visibility: 'public' }
+                : makePrivateIfEmpty && cleanIds.length === 0
+                ? { visibility: 'private' }
+                : {})
+            }
+          : t
+      )
+    );
+    await dispatchSyncAction('ASSIGN_TEST_CLASSES', {
+      testId,
+      assignedClassIds: cleanIds,
+      publish,
+      notify,
+      makePrivateIfEmpty
+    });
+    if (notify) {
+      showToast(
+        cleanIds.length > 0
+          ? `Đã giao bài tới ${cleanIds.length} lớp học và gửi thông báo tới học viên trong lớp!`
+          : 'Đã cập nhật bài thi mở cho toàn bộ học viên!'
+      );
+    } else {
+      showToast('Đã gỡ bài khỏi lớp học.');
+    }
     return true;
   };
 
@@ -2646,11 +2798,13 @@ export default function App() {
   // STEALTH ANTI-CHEAT, RIGHT-CLICK LOCK & EXTENSION DETECTOR
   // ==========================================
   const activeExamTestForAntiCheat = tests.find(t => t.id === selectedTestId);
+  const activeExamCfgForAntiCheat = normalizeExamConfig(activeExamTestForAntiCheat);
   const isExamAntiCheatEnabled =
-    view === 'EXAM_MODE' && normalizeExamConfig(activeExamTestForAntiCheat).antiCheatEnabled;
+    view === 'EXAM_MODE' && activeExamCfgForAntiCheat.antiCheatEnabled;
 
-  useExamAntiCheat({
+  const { recordInternalCopy } = useExamAntiCheat({
     enabled: isExamAntiCheatEnabled,
+    allowInternalCopyPaste: activeExamCfgForAntiCheat.allowInternalCopyPaste,
     setExamState,
     showToast
   });
@@ -2961,6 +3115,10 @@ export default function App() {
     const cfg = normalizeExamConfig(test);
     if (cfg.visibility === 'private' && currentUser?.role !== 'teacher') {
       showToast('Đề thi này đang ở chế độ riêng tư (Giáo viên chưa công khai).');
+      return;
+    }
+    if (!canUserAccessTest(test, classesDb, currentUser)) {
+      showToast('Đề / bài tập này chỉ giao riêng cho các lớp học được chỉ định.', 'error');
       return;
     }
 
@@ -3411,8 +3569,11 @@ export default function App() {
           ...r,
           transcript: ev?.transcript || r.transcript || r.clientTranscript || '',
           band: ev?.band ?? r.band ?? 0,
+          criteria: ev?.criteria || r.criteria || null,
+          fluencyMetrics: ev?.fluencyMetrics || r.fluencyMetrics || null,
           feedback: ev?.feedback || r.feedback || '',
           grammarVocabularyFixes: ev?.grammarVocabularyFixes || r.grammarVocabularyFixes || [],
+          vocabularyUpgrades: ev?.vocabularyUpgrades || r.vocabularyUpgrades || [],
           upgradedSample: ev?.upgradedSample || r.upgradedSample || ''
         };
       });
@@ -3686,20 +3847,53 @@ export default function App() {
   };
 
   // Highlighter and Notes
+  const dismissSelectionToolbar = () => {
+    setSelectedPassageText('');
+    setSelectionCoords(null);
+  };
+
   const handlePassageTextSelect = () => {
     const selection = window.getSelection();
-    if (selection && selection.toString().trim()) {
-      setSelectedPassageText(selection.toString().trim());
+    const selectedText = selection ? selection.toString().trim() : '';
+    if (!selectedText) {
+      return;
     }
+    let nextCoords = null;
+    try {
+      if (selection.rangeCount > 0) {
+        const rect = selection.getRangeAt(0).getBoundingClientRect();
+        if (rect && (rect.width > 0 || rect.height > 0)) {
+          const vw = window.innerWidth || 1280;
+          const vh = window.innerHeight || 720;
+          const centerX = rect.left + rect.width / 2;
+          const clampedX = Math.max(175, Math.min(vw - 175, centerX));
+          const preferredY = rect.top > 125 ? rect.top - 52 : rect.bottom + 10;
+          const clampedY = Math.max(70, Math.min(vh - 76, preferredY));
+          nextCoords = { x: Math.round(clampedX), y: Math.round(clampedY) };
+        }
+      }
+    } catch (_e) {
+      nextCoords = null;
+    }
+    setSelectionCoords(nextCoords);
+    setSelectedPassageText(selectedText);
   };
 
   const addHighlight = (color) => {
     if (!selectedPassageText) return;
     setExamState(prev => ({
       ...prev,
-      highlights: [...prev.highlights, { id: Date.now(), text: selectedPassageText, color }]
+      highlights: [...prev.highlights, { id: Date.now() + Math.floor(Math.random() * 1000), text: selectedPassageText, color }]
     }));
-    setSelectedPassageText('');
+    dismissSelectionToolbar();
+  };
+
+  const removeHighlight = (highlightId) => {
+    if (!highlightId) return;
+    setExamState(prev => ({
+      ...prev,
+      highlights: (prev.highlights || []).filter(item => item.id !== highlightId)
+    }));
   };
 
   const addNote = (customNoteText = null) => {
@@ -3714,11 +3908,18 @@ export default function App() {
         notes: [...prev.notes, { id: Date.now(), text: selectedPassageText, note: noteContent }]
       }));
     }
-    setSelectedPassageText('');
+    dismissSelectionToolbar();
+  };
+
+  const handleCopyInternalExamText = async (rawText) => {
+    const clean = String(rawText || '').trim();
+    if (!clean) return;
+    await recordInternalCopy(clean);
+    showToast('Đã sao chép văn bản nội bộ (chỉ dán được vào phần bài làm trong bài thi)!', 'info');
   };
 
   // Exam Builder
-  const openExamBuilder = (testToEdit = null, initialTab = 'general') => {
+  const openExamBuilder = (testToEdit = null, initialTab = 'general', initialClassIds = []) => {
     setEditingTest(testToEdit || null);
     setBuilderListeningIdx(0);
     setBuilderReadingIdx(0);
@@ -3734,6 +3935,8 @@ export default function App() {
         sequentialMode: cfg.sequentialMode,
         allowEarlyNextSection: cfg.allowEarlyNextSection,
         antiCheatEnabled: cfg.antiCheatEnabled,
+        allowInternalCopyPaste: cfg.allowInternalCopyPaste,
+        assignedClassIds: cfg.assignedClassIds,
         sectionOrder: cfg.order,
         sectionDurations: cfg.durations,
         allowViewAnswers: cloned.allowViewAnswers ?? false,
@@ -3767,6 +3970,7 @@ export default function App() {
       setTestForm({
         ...createEmptyTestForm(),
         id: 'test-' + Date.now(),
+        assignedClassIds: Array.isArray(initialClassIds) ? Array.from(new Set(initialClassIds.filter(Boolean))) : [],
         title: 'Đề Thi Thử IELTS Academic Mới',
         description: 'Đề thi chuẩn cấu trúc 3 kỹ năng Listening, Reading, Writing.',
         createdAt: new Date().toISOString().split('T')[0],
@@ -3850,7 +4054,7 @@ export default function App() {
     setView('EXAM_BUILDER');
   };
 
-  const openSingleSkillBuilder = (skill = 'speaking', testToEdit = null) => {
+  const openSingleSkillBuilder = (skill = 'speaking', testToEdit = null, initialClassIds = []) => {
     if (testToEdit) {
       openExamBuilder(testToEdit, skill || 'general');
       return;
@@ -3858,7 +4062,11 @@ export default function App() {
     setEditingTest(null);
     setBuilderListeningIdx(0);
     setBuilderReadingIdx(0);
-    setTestForm(createEmptySingleSkillTestForm(skill));
+    const cleanClassIds = Array.isArray(initialClassIds) ? Array.from(new Set(initialClassIds.filter(Boolean))) : [];
+    setTestForm({
+      ...createEmptySingleSkillTestForm(skill),
+      assignedClassIds: cleanClassIds
+    });
     setBuilderTab(skill);
     setView('EXAM_BUILDER');
   };
@@ -4111,6 +4319,8 @@ export default function App() {
       sequentialMode: cfg.sequentialMode,
       allowEarlyNextSection: cfg.allowEarlyNextSection,
       antiCheatEnabled: cfg.antiCheatEnabled,
+      allowInternalCopyPaste: cfg.allowInternalCopyPaste,
+      assignedClassIds: cfg.assignedClassIds,
       scheduleMode: cfg.scheduleMode,
       openAt: cfg.openAt,
       dueAt: cfg.dueAt,
@@ -5467,6 +5677,7 @@ export default function App() {
       {view === 'HOME' && (
         <StudentHome
           attempts={attempts}
+          classesDb={classesDb}
           currentUser={currentUser}
           focusedTestId={focusedTestId}
           onClearFocusedTest={() => setFocusedTestId(null)}
@@ -5496,6 +5707,7 @@ export default function App() {
           activeTab={skillHubTab}
           aiConfigured={aiConfigured}
           attempts={attempts}
+          classesDb={classesDb}
           currentUser={currentUser}
           focusedTestId={focusedTestId}
           onChangeTab={nextTab => {
@@ -5683,13 +5895,17 @@ export default function App() {
           handlePassageTextSelect={handlePassageTextSelect}
           handlePlayListeningAudio={handlePlayListeningAudio}
           isPlayingAudio={isPlayingAudio}
+          onCopyInternalText={handleCopyInternalExamText}
+          onDismissSelectionToolbar={dismissSelectionToolbar}
           onExitExam={handleExitExamMode}
           onExitMissingTest={() => {
             setSelectedTestId(null);
             setView(currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME');
           }}
           playingAudioKey={playingAudioKey}
+          removeHighlight={removeHighlight}
           selectedPassageText={selectedPassageText}
+          selectionCoords={selectionCoords}
           selectedTestId={selectedTestId}
           setDarkMode={setDarkMode}
           setExamState={setExamState}
@@ -5727,6 +5943,7 @@ export default function App() {
       {view === 'TEACHER_DASHBOARD' && (
         <TeacherDashboard
           attempts={attempts}
+          classesDb={classesDb}
           copiedRoomPin={copiedRoomPin}
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
@@ -5747,6 +5964,12 @@ export default function App() {
           handleTeacherResetLobby={handleTeacherResetLobby}
           initGameCampaign={initGameCampaign}
           notifications={sentNotifications}
+          onAssignTestClasses={handleAssignTestClasses}
+          onCreateSkillForClass={(classId, skill = 'speaking') => openSingleSkillBuilder(skill, null, [classId])}
+          onCreateTestForClass={classId => openExamBuilder(null, 'general', [classId])}
+          onDeleteClass={handleDeleteClass}
+          onUpdateClassMembers={handleUpdateClassMembers}
+          onUpsertClass={handleUpsertClass}
           openExamBuilder={openExamBuilder}
           openMemberProfile={openMemberProfile}
           openSingleSkillBuilder={openSingleSkillBuilder}
@@ -5793,6 +6016,7 @@ export default function App() {
           builderListeningIdx={builderListeningIdx}
           builderReadingIdx={builderReadingIdx}
           builderTab={builderTab}
+          classesDb={classesDb}
           currentUser={currentUser}
           editingTest={editingTest}
           handleAudioFileUpload={handleAudioFileUpload}

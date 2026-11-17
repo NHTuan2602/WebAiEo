@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Send,
   Square,
+  Upload,
   Volume2
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
@@ -88,6 +89,7 @@ export default function SpeakingExamRoom({
   const prepTimerRef = useRef(null);
   const createdUrlsRef = useRef([]);
   const submitLockRef = useRef(false);
+  const promptAudioRef = useRef(null);
 
   useEffect(() => {
     examStartedAtRef.current = Date.now();
@@ -134,6 +136,12 @@ export default function SpeakingExamRoom({
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    if (promptAudioRef.current) {
+      try {
+        promptAudioRef.current.pause();
+      } catch (_err) {}
+      promptAudioRef.current = null;
+    }
   };
 
   useEffect(() => {
@@ -150,6 +158,7 @@ export default function SpeakingExamRoom({
 
   const currentItem = items[currentIdx] || items[0] || null;
   const currentPromptText = currentItem?.prompt || '';
+  const currentPromptAudioUrl = currentItem?.audioUrl || '';
 
   // Tick down Part 2 preparation timer cleanly without synchronous setState in effect
   useEffect(() => {
@@ -160,10 +169,34 @@ export default function SpeakingExamRoom({
     return () => clearInterval(t);
   }, [phase, prepRemainingSec]);
 
-  const speakPromptQuestion = (text) => {
+  const stopPromptPlayback = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_err) {}
+    }
+    if (promptAudioRef.current) {
+      try {
+        promptAudioRef.current.pause();
+      } catch (_err) {}
+      promptAudioRef.current = null;
+    }
+  };
+
+  const speakPromptQuestion = (text, audioUrl = '') => {
+    stopPromptPlayback();
+    if (audioUrl && typeof Audio !== 'undefined') {
+      try {
+        const audio = new Audio(audioUrl);
+        promptAudioRef.current = audio;
+        audio.play().catch(() => {
+          if (text) speakPromptQuestion(text, '');
+        });
+        return;
+      } catch (_err) {}
+    }
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
     try {
-      window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'en-GB';
       utter.rate = 0.95;
@@ -171,12 +204,13 @@ export default function SpeakingExamRoom({
     } catch (_err) {}
   };
 
-  // Auto-read Examiner prompt when advancing to a question in ACTIVE phase
+  // Auto-read Examiner prompt or play uploaded Examiner audio when advancing to a question in ACTIVE phase
   useEffect(() => {
-    if (phase === 'ACTIVE' && autoSpeakPrompt && currentPromptText) {
-      speakPromptQuestion(currentPromptText);
+    if (phase === 'ACTIVE' && autoSpeakPrompt && (currentPromptText || currentPromptAudioUrl)) {
+      speakPromptQuestion(currentPromptText, currentPromptAudioUrl);
     }
-  }, [phase, currentIdx, autoSpeakPrompt, currentPromptText]);
+    return () => stopPromptPlayback();
+  }, [phase, currentIdx, autoSpeakPrompt, currentPromptText, currentPromptAudioUrl]);
 
   const startMeterFromStream = (stream) => {
     try {
@@ -250,10 +284,48 @@ export default function SpeakingExamRoom({
 
   const handleStartExamSession = async () => {
     const stream = await ensureMicPermission();
-    if (!stream) return;
+    if (!stream && isRealExamLocked) return;
     setCurrentIdx(0);
     syncPrepForIndex(0);
     setPhase('ACTIVE');
+  };
+
+  const handleImportRecordedAudioFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !currentItem || isRecording) return;
+    if (file.size > 15 * 1024 * 1024) {
+      showToast?.('File ghi âm quá lớn (vui lòng chọn file dưới 15MB).', 'error');
+      return;
+    }
+    stopPromptPlayback();
+    const objUrl = URL.createObjectURL(file);
+    createdUrlsRef.current.push(objUrl);
+    let durationSec = 10;
+    try {
+      durationSec = await new Promise(resolve => {
+        const audio = new Audio();
+        audio.preload = 'metadata';
+        audio.onloadedmetadata = () => {
+          const d = Math.round(Number(audio.duration) || 0);
+          resolve(d > 0 && Number.isFinite(d) ? d : 10);
+        };
+        audio.onerror = () => resolve(10);
+        audio.src = objUrl;
+      });
+    } catch (_err) {}
+
+    setRecordingsByQid(prev => ({
+      ...prev,
+      [currentItem.id]: {
+        blob: file,
+        objectUrl: objUrl,
+        mimeType: cleanAudioMimeType(file.type || 'audio/mpeg'),
+        durationSec,
+        clientTranscript: ''
+      }
+    }));
+    showToast?.(`Đã nhập file ghi âm "${file.name}" (${durationSec}s) cho câu này!`);
   };
 
   const startSpeechRecognitionBackup = () => {
@@ -318,9 +390,7 @@ export default function SpeakingExamRoom({
         prepTimerRef.current = null;
       }
     }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    stopPromptPlayback();
 
     const stream = await ensureMicPermission();
     if (!stream) return;
@@ -476,8 +546,11 @@ export default function SpeakingExamRoom({
           ...r,
           transcript: ev?.transcript || r.clientTranscript || '',
           band: ev?.band ?? 0,
+          criteria: ev?.criteria || null,
+          fluencyMetrics: ev?.fluencyMetrics || null,
           feedback: ev?.feedback || '',
           grammarVocabularyFixes: ev?.grammarVocabularyFixes || [],
+          vocabularyUpgrades: ev?.vocabularyUpgrades || [],
           upgradedSample: ev?.upgradedSample || ''
         };
       });
@@ -752,10 +825,11 @@ export default function SpeakingExamRoom({
 
               <button
                 type="button"
-                onClick={() => speakPromptQuestion(currentItem.prompt)}
+                onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
                 className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] hover:border-[#570DF8] text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
               >
-                <Volume2 className="w-3.5 h-3.5 text-[#570DF8] dark:text-[#A78BFA]" /> Nghe Giám Khảo Đọc
+                <Volume2 className="w-3.5 h-3.5 text-[#570DF8] dark:text-[#A78BFA]" />
+                <span>{currentItem.audioUrl ? 'Nghe File Audio Giám Khảo' : 'Nghe Giám Khảo Đọc'}</span>
               </button>
             </div>
 
@@ -820,25 +894,39 @@ export default function SpeakingExamRoom({
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                   {!isRecording ? (
-                    <button
-                      type="button"
-                      onClick={handleBeginRecording}
-                      disabled={Boolean(currentRec && isRealExamLocked)}
-                      className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition shadow-md ${
-                        currentRec && isRealExamLocked
-                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                          : 'bg-[#570DF8] hover:bg-[#490AD2] text-white'
-                      }`}
-                    >
-                      {currentRec ? <RotateCcw className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                      <span>
-                        {currentRec
-                          ? isRealExamLocked
-                            ? 'Đã Ghi Âm (Thi thật 1 lượt)'
-                            : 'Ghi Âm Lại Câu Này'
-                          : 'Bắt Đầu Trả Lời & Ghi Âm'}
-                      </span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={handleBeginRecording}
+                        disabled={Boolean(currentRec && isRealExamLocked)}
+                        className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition shadow-md ${
+                          currentRec && isRealExamLocked
+                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                            : 'bg-[#570DF8] hover:bg-[#490AD2] text-white'
+                        }`}
+                      >
+                        {currentRec ? <RotateCcw className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                        <span>
+                          {currentRec
+                            ? isRealExamLocked
+                              ? 'Đã Ghi Âm (Thi thật 1 lượt)'
+                              : 'Ghi Âm Lại Câu Này'
+                            : 'Bắt Đầu Trả Lời & Ghi Âm'}
+                        </span>
+                      </button>
+                      {!isRealExamLocked && (
+                        <label className="cursor-pointer px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition">
+                          <Upload className="w-3.5 h-3.5 text-[#570DF8] dark:text-[#A78BFA]" />
+                          <span>Nhập File Ghi Âm</span>
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            onChange={handleImportRecordedAudioFile}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
                   ) : (
                     <button
                       type="button"

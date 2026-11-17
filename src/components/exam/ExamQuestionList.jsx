@@ -18,13 +18,16 @@ export default function ExamQuestionList({
   onAnswerChange,
   onSelectQuestion,
   onSwitchScope,
+  onTextSelect = null,
   onToggleBookmark,
   questionCardRefs,
   questions = [],
+  renderText = null,
   scopeLabelPrefix = '',
   scopeType = 'reading',
   showScopeBadge = false
 }) {
+  const formatText = (val) => (typeof renderText === 'function' ? renderText(val) : val);
   if (!Array.isArray(questions) || questions.length === 0) return null;
 
   const grouped = groupQuestionsForRendering(questions, baseOffset);
@@ -63,7 +66,7 @@ export default function ExamQuestionList({
   };
 
   return (
-    <div className="font-exam space-y-4">
+    <div onMouseUp={onTextSelect || undefined} data-exam-copy-source="true" className="font-exam space-y-4 select-text">
       {grouped.map(block => {
         if (block.kind === 'matrix') {
           const firstNum = block.items[0]?.displayNum;
@@ -129,7 +132,7 @@ export default function ExamQuestionList({
                                   {displayNum}
                                 </span>
                                 <span className={`${fontSizeClass} leading-snug text-[#1F2937] dark:text-[#E5E7EB] font-medium`}>
-                                  {cleanPrompt}
+                                  {formatText(cleanPrompt)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
@@ -221,7 +224,7 @@ export default function ExamQuestionList({
                   {displayNum}
                 </span>
                 <p className={`font-bold text-[#111827] dark:text-[#F3F4F6] ${fontSizeClass}`}>
-                  {cleanPrompt}
+                  {formatText(cleanPrompt)}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 ml-auto">
@@ -266,7 +269,7 @@ export default function ExamQuestionList({
                         className="mt-1.5 w-4 h-4 accent-[#2563EB] shrink-0"
                       />
                       <span className={`${fontSizeClass}`}>
-                        {opt}
+                        {formatText(opt)}
                       </span>
                     </label>
                   );

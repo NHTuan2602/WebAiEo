@@ -3,11 +3,9 @@ import {
   CheckCircle,
   ChevronLeft,
   Clock,
-  Download,
   Edit,
   Eye,
   EyeOff,
-  FileAudio,
   Headphones,
   Key,
   Loader2,
@@ -21,6 +19,7 @@ import {
 } from 'lucide-react';
 import { formatDurationVi } from '../constants/seedData';
 import { getWordCount, isObjectiveAnswerCorrect } from '../utils/examHelpers';
+import SpeakingQuestionLuyennoiCard from '../components/speaking/SpeakingQuestionLuyennoiCard';
 
 export default function ResultView({
   aiApiKey,
@@ -824,106 +823,21 @@ export default function ResultView({
             </div>
           )}
 
-          {/* Speaking Recordings, Transcript & AI Fixes Review */}
+          {/* Speaking Recordings, Transcript & Luyennoi-style AI Fixes Review */}
           {activeReviewTab === 'speaking' && (
             <div className="space-y-4">
               {(attempt.speakingRecordings || []).length === 0 ? (
                 <div className="p-8 rounded-2xl bg-slate-50 dark:bg-slate-800/50 text-center text-xs text-slate-500">
                   Không có bản ghi âm nào được lưu cho lượt thi này.
                 </div>
-              ) : (attempt.speakingRecordings || []).map((rec, idx) => (
-                <div
+              ) : (attempt.speakingRecordings || []).map((rec, idx, arr) => (
+                <SpeakingQuestionLuyennoiCard
                   key={rec.questionId || idx}
-                  className="bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3.5"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] text-[10px] font-black uppercase">
-                        Part {rec.part || 1} • Câu {idx + 1}
-                      </span>
-                      {rec.topic && (
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                          {rec.topic}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                        {rec.durationSec || 0}s
-                      </span>
-                      <span className="px-2.5 py-0.5 rounded-lg bg-white dark:bg-slate-900 border border-indigo-200 dark:border-slate-700 text-xs font-extrabold text-[#570DF8] dark:text-[#C4B5FD]">
-                        Band {rec.band ?? '-'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="font-bold text-slate-900 dark:text-white text-sm leading-snug">
-                    {rec.prompt}
-                  </p>
-
-                  {rec.audioUrl ? (
-                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center gap-3">
-                      <audio controls src={rec.audioUrl} className="w-full h-10" />
-                      <a
-                        href={rec.audioUrl}
-                        download={`speaking-part${rec.part || 1}-q${idx + 1}.webm`}
-                        className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Tải Ghi Âm
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                      <FileAudio className="w-4 h-4 shrink-0" />
-                      <span>{rec.durationSec > 0 ? 'File âm thanh chưa đồng bộ lên server.' : 'Thí sinh bỏ trống chưa thu âm câu này.'}</span>
-                    </div>
-                  )}
-
-                  {rec.transcript && (
-                    <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
-                        Transcript Bài Nói Của Thí Sinh:
-                      </span>
-                      <p className="text-xs text-slate-800 dark:text-slate-100 leading-relaxed whitespace-pre-line">
-                        {rec.transcript}
-                      </p>
-                    </div>
-                  )}
-
-                  {rec.feedback && (
-                    <div className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed bg-indigo-50/70 dark:bg-indigo-500/10 p-3.5 rounded-xl border border-indigo-200/70 dark:border-indigo-500/25">
-                      <strong className="text-[#570DF8] dark:text-[#C4B5FD]">Nhận xét AI: </strong>
-                      {rec.feedback}
-                    </div>
-                  )}
-
-                  {Array.isArray(rec.grammarVocabularyFixes) && rec.grammarVocabularyFixes.length > 0 && (
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-bold uppercase text-rose-600 dark:text-rose-400 block">
-                        Sửa Lỗi Ngữ Pháp &amp; Nâng Cấp Từ Vựng:
-                      </span>
-                      {rec.grammarVocabularyFixes.map((fix, fIdx) => (
-                        <div key={fIdx} className="text-xs bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-rose-200/70 dark:border-rose-500/25">
-                          <span className="line-through text-rose-600 dark:text-rose-400">{fix.original}</span>
-                          {' → '}
-                          <strong className="text-emerald-700 dark:text-emerald-400">{fix.corrected}</strong>
-                          {fix.reason && <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{fix.reason}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {rec.upgradedSample && (
-                    <div className="bg-emerald-50/80 dark:bg-emerald-500/10 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-500/30">
-                      <span className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300 block mb-1">
-                        Câu Trả Lời Mẫu Gợi Ý Nâng Band:
-                      </span>
-                      <p className="text-xs text-emerald-950 dark:text-emerald-100 leading-relaxed italic">
-                        {rec.upgradedSample}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                  rec={rec}
+                  idx={idx}
+                  totalCount={arr.length}
+                  attemptCriteria={attempt.scores?.speaking?.criteria || attempt.speakingAiDetails?.criteria || {}}
+                />
               ))}
             </div>
           )}

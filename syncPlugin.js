@@ -717,6 +717,7 @@ function createInitialStore(audioDir = '') {
     deletedTestIds: [],
     deletedUserIds: [],
     rooms: {},
+    classes: {},
     tests: [],
     attempts: [],
     teacherNotes: {},
@@ -829,6 +830,13 @@ function applyParsedStoreSnapshot(store, parsed) {
     store.rooms = {};
     Object.entries(parsed.rooms).forEach(([pin, r]) => {
       store.rooms[pin] = normalizeServerRoom(r, pin);
+    });
+  }
+  if (parsed.classes && typeof parsed.classes === 'object') {
+    store.classes = {};
+    Object.entries(parsed.classes).forEach(([cid, cls]) => {
+      const normalized = normalizeClassRecord(cls, cid);
+      if (normalized) store.classes[normalized.id] = normalized;
     });
   }
   if (Array.isArray(parsed.tests)) store.tests = parsed.tests;
@@ -1047,11 +1055,69 @@ function buildPublicAdminSnapshotFields(store, viewer) {
   return { supportAdminProfile, adminFeedbacks };
 }
 
+function normalizeClassIdList(rawIds) {
+  if (!Array.isArray(rawIds)) return [];
+  const clean = new Set();
+  rawIds.forEach(id => {
+    const s = String(id || '').trim().slice(0, 48);
+    if (s) clean.add(s);
+  });
+  return Array.from(clean).slice(0, 30);
+}
+
+function normalizeClassRecord(raw, fallbackId = '') {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || fallbackId || '').trim().slice(0, 48);
+  if (!id) return null;
+  const studentSet = new Set();
+  (Array.isArray(raw.studentUsernames) ? raw.studentUsernames : []).forEach(u => {
+    const cleanU = String(u || '').trim();
+    if (cleanU && cleanU !== SUPER_ADMIN_USERNAME) studentSet.add(cleanU);
+  });
+  const allowedColors = new Set(['teal', 'indigo', 'rose', 'amber', 'emerald', 'violet']);
+  return {
+    id,
+    name: String(raw.name || 'Lớp mới').trim().slice(0, 80) || 'Lớp mới',
+    description: String(raw.description || '').trim().slice(0, 240),
+    color: allowedColors.has(raw.color) ? raw.color : 'teal',
+    studentUsernames: Array.from(studentSet),
+    createdBy: String(raw.createdBy || 'teacher_ielts'),
+    createdAt: Number(raw.createdAt) || Date.now(),
+    updatedAt: Number(raw.updatedAt) || Date.now()
+  };
+}
+
+function getViewerClassIdSet(store, username = '') {
+  const uname = String(username || '').trim();
+  const unameLower = uname.toLowerCase();
+  const set = new Set();
+  if (!uname || !store?.classes) return set;
+  Object.entries(store.classes).forEach(([cid, cls]) => {
+    if (!cls || !Array.isArray(cls.studentUsernames)) return;
+    if (cls.studentUsernames.some(u => String(u || '').toLowerCase() === unameLower)) {
+      set.add(cls.id || cid);
+    }
+  });
+  return set;
+}
+
+function resolveClassNamesByIds(store, classIds = []) {
+  const cleanIds = normalizeClassIdList(classIds);
+  if (cleanIds.length === 0) return [];
+  return cleanIds
+    .map(cid => store?.classes?.[cid]?.name || '')
+    .filter(Boolean);
+}
+
 function appendStoreNotification(store, notif = {}, viewer = null) {
   const title = String(notif.title || '').trim().slice(0, 140);
   const message = String(notif.message || '').trim().slice(0, 500);
   if (!title || !message) return null;
   const type = ['exam', 'exercise', 'game', 'announcement'].includes(notif.type) ? notif.type : 'announcement';
+  const targetClassIds = normalizeClassIdList(notif.targetClassIds);
+  const targetClassNames = Array.isArray(notif.targetClassNames)
+    ? notif.targetClassNames.map(s => String(s || '').trim()).filter(Boolean).slice(0, 12)
+    : resolveClassNamesByIds(store, targetClassIds);
   const item = {
     id: notif.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     title,
@@ -1059,6 +1125,8 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
     type,
     testId: notif.testId ? String(notif.testId) : '',
     roomPin: notif.roomPin ? String(notif.roomPin) : '',
+    targetClassIds,
+    targetClassNames,
     createdBy: notif.createdBy || viewer?.username || 'teacher_ielts',
     createdByName: notif.createdByName || viewer?.name || 'Giáo viên',
     createdAt: notif.createdAt || new Date().toLocaleString('vi-VN'),
@@ -1079,6 +1147,8 @@ function serializeNotificationItem(n, uname = '') {
     type: n.type || 'announcement',
     testId: n.testId || '',
     roomPin: n.roomPin || '',
+    targetClassIds: normalizeClassIdList(n.targetClassIds),
+    targetClassNames: Array.isArray(n.targetClassNames) ? n.targetClassNames : [],
     createdBy: n.createdBy || '',
     createdByName: n.createdByName || '',
     createdAt: n.createdAt || '',
@@ -1094,13 +1164,24 @@ function serializeNotificationsForViewer(store, viewer) {
   }
   const list = Array.isArray(store.notifications) ? store.notifications : [];
   const uname = viewer.username || '';
+  const viewerClassSet = getViewerClassIdSet(store, uname);
   const testsById = new Map((Array.isArray(store.tests) ? store.tests : []).map(t => [t?.id, t]));
   return list
     .filter(n => {
       if (!n || (n.createdBy && n.createdBy === uname)) return false;
+      const nClasses = normalizeClassIdList(n.targetClassIds);
+      if (nClasses.length > 0 && !nClasses.some(cid => viewerClassSet.has(cid))) {
+        return false;
+      }
       if (n.testId) {
         const linked = testsById.get(n.testId);
-        if (linked && (linked.visibility || 'public') === 'private') return false;
+        if (linked) {
+          if ((linked.visibility || 'public') === 'private') return false;
+          const testClasses = normalizeClassIdList(linked.assignedClassIds);
+          if (testClasses.length > 0 && !testClasses.some(cid => viewerClassSet.has(cid))) {
+            return false;
+          }
+        }
       }
       return true;
     })
@@ -1130,6 +1211,7 @@ function getSnapshotForViewer(store, viewer = null) {
       ...basePayload,
       deletedUserIds: [],
       rooms: {},
+      classes: {},
       tests: [],
       attempts: [],
       teacherNotes: {},
@@ -1160,6 +1242,7 @@ function getSnapshotForViewer(store, viewer = null) {
       ...basePayload,
       deletedUserIds: (store.deletedUserIds || []).filter(id => id !== SUPER_ADMIN_USERNAME),
       rooms: sanitizedRooms,
+      classes: store.classes || {},
       tests: store.tests || [],
       attempts: store.attempts || [],
       teacherNotes: store.teacherNotes || {},
@@ -1171,14 +1254,33 @@ function getSnapshotForViewer(store, viewer = null) {
     };
   }
 
-  // Strict student view: hide private tests, strip keys before viewing answers allowed, redact peer details & room passwords
+  // Strict student view: hide private tests & tests assigned only to other classes, strip keys before viewing answers allowed, redact peer details & room passwords
+  const viewerClassSet = getViewerClassIdSet(store, viewer.username);
+  const studentClasses = {};
+  Object.entries(store.classes || {}).forEach(([cid, cls]) => {
+    if (cls && viewerClassSet.has(cls.id || cid)) {
+      studentClasses[cid] = {
+        id: cls.id || cid,
+        name: cls.name,
+        description: cls.description || '',
+        color: cls.color || 'teal',
+        studentUsernames: [viewer.username]
+      };
+    }
+  });
+
   const viewerAttempts = (store.attempts || []).filter(
     a => a.studentId === viewer.username || a.studentUsername === viewer.username
   );
   const submittedTestIds = new Set(viewerAttempts.map(a => a.testId).filter(Boolean));
 
   const studentTests = (store.tests || [])
-    .filter(t => (t?.visibility || 'public') !== 'private')
+    .filter(t => {
+      if ((t?.visibility || 'public') === 'private') return false;
+      const assigned = normalizeClassIdList(t?.assignedClassIds);
+      if (assigned.length > 0 && !assigned.some(cid => viewerClassSet.has(cid))) return false;
+      return true;
+    })
     .map(t => {
       const canSeeKeys = Boolean(t?.allowViewAnswers) && submittedTestIds.has(t.id);
       return canSeeKeys ? t : stripAnswerKeysFromTest(t);
@@ -1202,6 +1304,7 @@ function getSnapshotForViewer(store, viewer = null) {
     ...basePayload,
     deletedUserIds: [],
     rooms: studentRooms,
+    classes: studentClasses,
     tests: studentTests,
     attempts: studentAttempts,
     teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
@@ -1240,6 +1343,10 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'DELETE_TEST',
     'TOGGLE_TEST_ANSWERS',
     'TOGGLE_TEST_VISIBILITY',
+    'UPSERT_CLASS',
+    'DELETE_CLASS',
+    'UPDATE_CLASS_MEMBERS',
+    'ASSIGN_TEST_CLASSES',
     'DELETE_ATTEMPT',
     'PURGE_ORPHAN_ATTEMPTS',
     'UPSERT_NOTE',
@@ -1606,6 +1713,11 @@ function deleteSingleUserFromStore(store, uname, { purgeAttempts = false, viewer
     if (r?.lobbyPlayers?.[uname]) delete r.lobbyPlayers[uname];
     if (r?.liveMatch?.[uname]) delete r.liveMatch[uname];
   });
+  Object.values(store.classes || {}).forEach(cls => {
+    if (cls && Array.isArray(cls.studentUsernames)) {
+      cls.studentUsernames = cls.studentUsernames.filter(u => String(u || '').toLowerCase() !== uname.toLowerCase());
+    }
+  });
   let attemptsRemoved = false;
   if (purgeAttempts && Array.isArray(store.attempts)) {
     const prevLen = store.attempts.length;
@@ -1613,6 +1725,35 @@ function deleteSingleUserFromStore(store, uname, { purgeAttempts = false, viewer
     attemptsRemoved = store.attempts.length !== prevLen;
   }
   return existed || attemptsRemoved;
+}
+
+function notifyPublishedTest(store, testObj, viewer = null, explicitClassIds = null) {
+  if (!testObj) return;
+  const targetClassIds = explicitClassIds !== null
+    ? normalizeClassIdList(explicitClassIds)
+    : normalizeClassIdList(testObj.assignedClassIds);
+  const classNames = resolveClassNamesByIds(store, targetClassIds);
+  const classHint = classNames.length > 0 ? ` [Lớp: ${classNames.join(', ')}]` : '';
+  const isExercise = testObj.testMode === 'single_skill';
+  const dueAt = parseScheduleTimestampServer(testObj.dueAt);
+  const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(testObj.scheduleMode)
+    ? testObj.scheduleMode
+    : 'flexible';
+  const deadlineHint = scheduleMode !== 'flexible' && dueAt
+    ? ` (Hạn nộp: ${formatViDateTimeServer(dueAt)}${scheduleMode === 'deadline_lock' ? ' — khóa khi quá giờ' : ''})`
+    : '';
+  appendStoreNotification(
+    store,
+    {
+      type: isExercise ? 'exercise' : 'exam',
+      title: isExercise ? `Bài tập mới${classHint}!` : `Đề thi IELTS mới${classHint}!`,
+      message: `${viewer?.name || 'Giáo viên'} vừa giao ${isExercise ? 'bài tập' : 'đề thi'} "${testObj.title}"${classHint}${deadlineHint}. Nhấn vào thông báo để xem chi tiết!`,
+      testId: testObj.id,
+      targetClassIds,
+      targetClassNames: classNames
+    },
+    viewer
+  );
 }
 
 function applySyncAction(store, type, payload = {}, viewer = null) {
@@ -2029,8 +2170,10 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         : 'flexible';
       const openAt = parseScheduleTimestampServer(rawTest.openAt);
       const dueAt = parseScheduleTimestampServer(rawTest.dueAt);
+      const assignedClassIds = normalizeClassIdList(rawTest.assignedClassIds);
       const test = {
         ...rawTest,
+        assignedClassIds,
         scheduleMode,
         openAt,
         dueAt
@@ -2038,27 +2181,22 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const idx = store.tests.findIndex(t => t.id === test.id);
       const prevTest = idx >= 0 ? store.tests[idx] : null;
       const wasPublicBefore = prevTest ? (prevTest.visibility || 'public') !== 'private' : false;
+      const prevClassSet = new Set(normalizeClassIdList(prevTest?.assignedClassIds));
       const isPublicNow = (test.visibility || 'public') !== 'private';
       if (idx >= 0) {
         store.tests[idx] = test;
       } else {
         store.tests = [test, ...store.tests];
       }
-      if (isPublicNow && !wasPublicBefore) {
-        const isExercise = test.testMode === 'single_skill';
-        const deadlineHint = scheduleMode !== 'flexible' && dueAt
-          ? ` (Hạn nộp: ${formatViDateTimeServer(dueAt)}${scheduleMode === 'deadline_lock' ? ' — khóa khi quá giờ' : ''})`
-          : '';
-        appendStoreNotification(
-          store,
-          {
-            type: isExercise ? 'exercise' : 'exam',
-            title: isExercise ? 'Bài tập kỹ năng mới!' : 'Đề thi IELTS mới vừa mở!',
-            message: `${viewer?.name || 'Giáo viên'} vừa đăng ${isExercise ? 'bài tập' : 'đề thi'} "${test.title}"${deadlineHint}. Nhấn vào thông báo để xem chi tiết!`,
-            testId: test.id
-          },
-          viewer
-        );
+      if (isPublicNow) {
+        if (!wasPublicBefore) {
+          notifyPublishedTest(store, test, viewer);
+        } else if (assignedClassIds.length > 0 && prevClassSet.size > 0) {
+          const newlyAddedClasses = assignedClassIds.filter(cid => !prevClassSet.has(cid));
+          if (newlyAddedClasses.length > 0) {
+            notifyPublishedTest(store, test, viewer, newlyAddedClasses);
+          }
+        }
       }
       changed = true;
       break;
@@ -2095,23 +2233,96 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         return nextObj;
       });
       if (publishedTest) {
-        const isExercise = publishedTest.testMode === 'single_skill';
-        const pubDue = parseScheduleTimestampServer(publishedTest.dueAt);
-        const deadlineHint = publishedTest.scheduleMode !== 'flexible' && pubDue
-          ? ` (Hạn nộp: ${formatViDateTimeServer(pubDue)}${publishedTest.scheduleMode === 'deadline_lock' ? ' — khóa khi quá giờ' : ''})`
-          : '';
-        appendStoreNotification(
-          store,
-          {
-            type: isExercise ? 'exercise' : 'exam',
-            title: isExercise ? 'Bài tập mới vừa được công khai!' : 'Đề thi mới vừa được công khai!',
-            message: `${viewer?.name || 'Giáo viên'} vừa mở "${publishedTest.title}"${deadlineHint}. Nhấn vào thông báo để xem chi tiết bài này!`,
-            testId: publishedTest.id
-          },
-          viewer
-        );
+        notifyPublishedTest(store, publishedTest, viewer);
       }
       changed = true;
+      break;
+    }
+
+    case 'UPSERT_CLASS': {
+      const rawClass = payload.classObj || payload;
+      const cls = normalizeClassRecord(rawClass, rawClass?.id || `cls_${Date.now()}`);
+      if (!cls) break;
+      if (!store.classes || typeof store.classes !== 'object') store.classes = {};
+      const validUsers = store.users || {};
+      cls.studentUsernames = cls.studentUsernames.filter(u => Boolean(validUsers[u]));
+      cls.createdBy = store.classes[cls.id]?.createdBy || viewer?.username || cls.createdBy;
+      cls.createdAt = store.classes[cls.id]?.createdAt || cls.createdAt;
+      cls.updatedAt = Date.now();
+      store.classes[cls.id] = cls;
+      changed = true;
+      break;
+    }
+
+    case 'DELETE_CLASS': {
+      const cid = String(payload.classId || '').trim();
+      if (!cid || !store.classes?.[cid]) break;
+      delete store.classes[cid];
+      store.tests = (store.tests || []).map(t => {
+        const assigned = normalizeClassIdList(t?.assignedClassIds);
+        if (!assigned.includes(cid)) return t;
+        const remaining = assigned.filter(id => id !== cid);
+        return {
+          ...t,
+          assignedClassIds: remaining,
+          ...(remaining.length === 0 ? { visibility: 'private' } : {})
+        };
+      });
+      changed = true;
+      break;
+    }
+
+    case 'UPDATE_CLASS_MEMBERS': {
+      const cid = String(payload.classId || '').trim();
+      const targetCls = cid ? store.classes?.[cid] : null;
+      if (!targetCls) break;
+      const mode = ['add', 'remove', 'set'].includes(payload.mode) ? payload.mode : 'set';
+      const validUsers = store.users || {};
+      const incomingNames = Array.isArray(payload.usernames)
+        ? payload.usernames.map(u => String(u || '').trim()).filter(u => Boolean(validUsers[u]) && u !== SUPER_ADMIN_USERNAME)
+        : [];
+      const currentSet = new Set(Array.isArray(targetCls.studentUsernames) ? targetCls.studentUsernames : []);
+      if (mode === 'set') {
+        targetCls.studentUsernames = Array.from(new Set(incomingNames));
+      } else if (mode === 'add') {
+        incomingNames.forEach(u => currentSet.add(u));
+        targetCls.studentUsernames = Array.from(currentSet);
+      } else if (mode === 'remove') {
+        const removeLower = new Set(incomingNames.map(u => u.toLowerCase()));
+        targetCls.studentUsernames = Array.from(currentSet).filter(u => !removeLower.has(u.toLowerCase()));
+      }
+      targetCls.updatedAt = Date.now();
+      store.classes[cid] = targetCls;
+      changed = true;
+      break;
+    }
+
+    case 'ASSIGN_TEST_CLASSES': {
+      const testId = String(payload.testId || '').trim();
+      const nextAssigned = normalizeClassIdList(payload.assignedClassIds);
+      const notify = payload.notify !== false;
+      const makePrivateIfEmpty = Boolean(payload.makePrivateIfEmpty);
+      let targetTest = null;
+      let newlyAdded = [];
+      store.tests = (store.tests || []).map(t => {
+        if (t?.id !== testId) return t;
+        const prevSet = new Set(normalizeClassIdList(t.assignedClassIds));
+        newlyAdded = nextAssigned.filter(cid => !prevSet.has(cid));
+        const nextVis =
+          payload.publish === true
+            ? 'public'
+            : makePrivateIfEmpty && nextAssigned.length === 0
+            ? 'private'
+            : (t.visibility || 'public');
+        const nextObj = { ...t, assignedClassIds: nextAssigned, visibility: nextVis };
+        targetTest = nextObj;
+        return nextObj;
+      });
+      if (targetTest && notify && (targetTest.visibility || 'public') !== 'private') {
+        const notifyTarget = nextAssigned.length > 0 && newlyAdded.length > 0 ? newlyAdded : nextAssigned;
+        notifyPublishedTest(store, targetTest, viewer, notifyTarget);
+      }
+      if (targetTest) changed = true;
       break;
     }
 
@@ -2557,6 +2768,10 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'RESET_USER_PASSWORD',
   'DELETE_USER',
   'DELETE_USERS_BULK',
+  'UPSERT_CLASS',
+  'DELETE_CLASS',
+  'UPDATE_CLASS_MEMBERS',
+  'ASSIGN_TEST_CLASSES',
   'SEED_DEFAULTS'
 ]);
 

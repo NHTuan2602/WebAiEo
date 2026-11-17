@@ -8,6 +8,7 @@ import {
   Check,
   CheckCircle,
   Clock,
+  Copy,
   Eye,
   Headphones,
   Lock,
@@ -67,10 +68,14 @@ export default function ExamMode({
   handlePassageTextSelect,
   handlePlayListeningAudio,
   isPlayingAudio,
+  onCopyInternalText,
+  onDismissSelectionToolbar,
   onExitExam,
   onExitMissingTest,
   playingAudioKey,
+  removeHighlight,
   selectedPassageText,
+  selectionCoords = null,
   selectedTestId,
   setDarkMode,
   setExamState,
@@ -341,7 +346,11 @@ export default function ExamMode({
   const handleCancelInlineNote = () => {
     setInlineNoteDraft('');
     setShowInlineNoteForm(false);
-    addNote?.('');
+    if (onDismissSelectionToolbar) {
+      onDismissSelectionToolbar();
+    } else {
+      addNote?.('');
+    }
   };
 
   const renderHighlightRuns = (text) => {
@@ -350,8 +359,21 @@ export default function ExamMode({
       run.color ? (
         <mark
           key={idx}
+          onClick={
+            run.highlightId && typeof removeHighlight === 'function'
+              ? e => {
+                  e.stopPropagation();
+                  removeHighlight(run.highlightId);
+                }
+              : undefined
+          }
+          title={run.highlightId && typeof removeHighlight === 'function' ? 'Bấm để bỏ Highlight' : undefined}
           style={{ backgroundColor: run.color }}
-          className="text-[#111827] rounded-[3px] px-0.5 py-0.5 font-medium"
+          className={`text-[#111827] rounded-[3px] px-0.5 py-0.5 font-medium ${
+            run.highlightId && typeof removeHighlight === 'function'
+              ? 'cursor-pointer hover:opacity-80 transition-opacity'
+              : ''
+          }`}
         >
           {run.text}
         </mark>
@@ -380,8 +402,9 @@ export default function ExamMode({
 
   return (
     <div
+      translate="no"
       onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
-      className="min-h-screen bg-[#FDECF2] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam"
+      className="min-h-screen bg-[#FDECF2] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam notranslate"
     >
       {/* Top Computer-Delivered Header (matches Real IELTS bar) */}
       <header className="bg-[#FDF2F6] dark:bg-[#161616] text-[#111827] dark:text-white px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-pink-200 dark:border-[#2C2C2C] sticky top-0 z-50">
@@ -606,43 +629,66 @@ export default function ExamMode({
         })}
       </div>
 
-      {/* Text-Selection Floating Highlight & Inline Note Toolbar */}
+      {/* Text-Selection Floating Highlight, Copy & Inline Note Toolbar */}
       {selectedPassageText && (
-        <div className="bg-[#1F2937] dark:bg-[#262626] border-b border-[#374151] dark:border-[#404040] px-4 py-2 text-white">
-          <div className="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[11px] text-neutral-300 font-semibold shrink-0">Đoạn đã chọn:</span>
-              <span className="truncate max-w-md italic text-amber-300">“{selectedPassageText}”</span>
-            </div>
+        <div
+          style={
+            selectionCoords
+              ? { left: `${selectionCoords.x}px`, top: `${selectionCoords.y}px` }
+              : undefined
+          }
+          className={
+            selectionCoords
+              ? 'fixed z-[70] -translate-x-1/2 rounded-2xl bg-[#1F2937]/95 dark:bg-[#222222]/95 backdrop-blur-md border border-[#4B5563] dark:border-[#404040] px-3.5 py-2.5 text-white shadow-2xl max-w-[94vw]'
+              : 'fixed z-[70] top-[72px] left-1/2 -translate-x-1/2 rounded-2xl bg-[#1F2937]/95 dark:bg-[#222222]/95 backdrop-blur-md border border-[#4B5563] dark:border-[#404040] px-4 py-2 text-white shadow-2xl max-w-[94vw]'
+          }
+        >
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="truncate max-w-[180px] sm:max-w-[260px] italic text-amber-300 font-medium">
+              “{selectedPassageText}”
+            </span>
 
             {!showInlineNoteForm ? (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-neutral-300">Highlight:</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-neutral-300 font-semibold">Highlight:</span>
                 <button
                   type="button"
                   onClick={() => addHighlight('#fef08a')}
-                  className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition ring-1 ring-white/40"
+                  className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition ring-1 ring-white/50"
                   title="Highlight Vàng"
                 />
                 <button
                   type="button"
                   onClick={() => addHighlight('#bbf7d0')}
-                  className="w-4 h-4 rounded-full bg-emerald-300 hover:scale-110 transition ring-1 ring-white/40"
+                  className="w-4 h-4 rounded-full bg-emerald-300 hover:scale-110 transition ring-1 ring-white/50"
                   title="Highlight Xanh lá"
                 />
                 <button
                   type="button"
                   onClick={() => addHighlight('#bae6fd')}
-                  className="w-4 h-4 rounded-full bg-sky-300 hover:scale-110 transition ring-1 ring-white/40"
+                  className="w-4 h-4 rounded-full bg-sky-300 hover:scale-110 transition ring-1 ring-white/50"
                   title="Highlight Xanh dương"
                 />
                 <button
                   type="button"
                   onClick={() => setShowInlineNoteForm(true)}
-                  className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-[11px] font-bold transition"
+                  className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-[11px] font-bold transition"
                 >
-                  <MessageSquare className="w-3 h-3" /> Thêm Ghi Chú
+                  <MessageSquare className="w-3 h-3" /> Ghi Chú
                 </button>
+                {(!cfg.antiCheatEnabled || cfg.allowInternalCopyPaste) && typeof onCopyInternalText === 'function' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCopyInternalText(selectedPassageText);
+                      handleCancelInlineNote();
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition"
+                    title="Sao chép đoạn nội dung trong bài thi (chỉ dán được trong bài thi)"
+                  >
+                    <Copy className="w-3 h-3" /> Sao chép
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCancelInlineNote}
@@ -653,25 +699,25 @@ export default function ExamMode({
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmitInlineNote} className="flex items-center gap-2 flex-1 max-w-lg">
+              <form onSubmit={handleSubmitInlineNote} className="flex items-center gap-2 flex-1 min-w-[240px] max-w-md">
                 <input
                   type="text"
                   autoFocus
                   value={inlineNoteDraft}
                   onChange={e => setInlineNoteDraft(e.target.value)}
                   placeholder="Nhập ghi chú nhanh tại đây..."
-                  className="flex-1 h-7 px-2.5 rounded bg-[#111827] border border-neutral-600 text-xs text-white focus:border-amber-400 outline-none"
+                  className="flex-1 h-7 px-2.5 rounded-lg bg-[#111827] border border-neutral-600 text-xs text-white focus:border-amber-400 outline-none"
                 />
                 <button
                   type="submit"
-                  className="px-2.5 h-7 rounded bg-emerald-600 hover:bg-emerald-700 text-[11px] font-bold"
+                  className="px-2.5 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-[11px] font-bold"
                 >
                   Lưu
                 </button>
                 <button
                   type="button"
                   onClick={handleCancelInlineNote}
-                  className="px-2 h-7 rounded bg-neutral-700 hover:bg-neutral-600 text-[11px] font-semibold"
+                  className="px-2 h-7 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-[11px] font-semibold"
                 >
                   Hủy
                 </button>
@@ -798,6 +844,7 @@ export default function ExamMode({
 
                 <div
                   onMouseUp={handlePassageTextSelect}
+                  data-exam-copy-source="true"
                   className={`flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-4 select-text font-exam text-[#1F2937] dark:text-[#EDEDED] ${fontSizeClass}`}
                 >
                   {activePassage?.imageUrl && (
@@ -882,6 +929,7 @@ export default function ExamMode({
                       onPassageTextSelect={handlePassageTextSelect}
                       onToggleBookmark={toggleBookmarkQuestion}
                       questions={allReadingQs}
+                      renderText={renderHighlightRuns}
                       scopeField="passageIdx"
                       scopeIdx={safePassageIdx}
                     />
@@ -905,9 +953,11 @@ export default function ExamMode({
                         setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
                       }}
                       onSwitchScope={pIdx => switchPartIndex(pIdx, 'reading')}
+                      onTextSelect={handlePassageTextSelect}
                       onToggleBookmark={toggleBookmarkQuestion}
                       questionCardRefs={questionCardRefs}
                       questions={standaloneReadingQs}
+                      renderText={renderHighlightRuns}
                       scopeLabelPrefix="Passage"
                       scopeType="reading"
                       showScopeBadge={examState.showAllReadingQs && readingPassages.length > 1}
@@ -940,6 +990,7 @@ export default function ExamMode({
                   </div>
                   <div
                     onMouseUp={handlePassageTextSelect}
+                    data-exam-copy-source="true"
                     className={`flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-4 select-text text-[#1F2937] dark:text-[#EDEDED] whitespace-pre-line ${fontSizeClass}`}
                   >
                     {activeTrack?.imageUrl && (
@@ -987,6 +1038,7 @@ export default function ExamMode({
                         onPassageTextSelect={handlePassageTextSelect}
                         onToggleBookmark={toggleBookmarkQuestion}
                         questions={allListeningQs}
+                        renderText={renderHighlightRuns}
                         scopeField="trackIdx"
                         scopeIdx={safeTrackIdx}
                       />
@@ -1009,9 +1061,11 @@ export default function ExamMode({
                           setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
                         }}
                         onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
+                        onTextSelect={handlePassageTextSelect}
                         onToggleBookmark={toggleBookmarkQuestion}
                         questionCardRefs={questionCardRefs}
                         questions={standaloneListeningQs}
+                        renderText={renderHighlightRuns}
                         scopeLabelPrefix="Part"
                         scopeType="listening"
                         showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
@@ -1044,6 +1098,7 @@ export default function ExamMode({
                   onPassageTextSelect={handlePassageTextSelect}
                   onToggleBookmark={toggleBookmarkQuestion}
                   questions={allListeningQs}
+                  renderText={renderHighlightRuns}
                   scopeField="trackIdx"
                   scopeIdx={safeTrackIdx}
                 />
@@ -1066,9 +1121,11 @@ export default function ExamMode({
                     setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
                   }}
                   onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
+                  onTextSelect={handlePassageTextSelect}
                   onToggleBookmark={toggleBookmarkQuestion}
                   questionCardRefs={questionCardRefs}
                   questions={standaloneListeningQs}
+                  renderText={renderHighlightRuns}
                   scopeLabelPrefix="Part"
                   scopeType="listening"
                   showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
@@ -1090,7 +1147,11 @@ export default function ExamMode({
             onChangeSplit={setSplitPercent}
             left={
               <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-3.5">
+                <div
+                  onMouseUp={handlePassageTextSelect}
+                  data-exam-copy-source="true"
+                  className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-3.5 select-text"
+                >
                   <h3 className="text-base font-extrabold text-[#111827] dark:text-white">
                     Questions {activeWritingTask + 1}
                   </h3>
@@ -1105,7 +1166,7 @@ export default function ExamMode({
                       {activeWritingTask + 1}
                     </span>
                     <p className={`${fontSizeClass} font-semibold leading-relaxed whitespace-pre-line`}>
-                      {currentWritingCfg?.prompt || 'Chưa có đề bài cho phần Writing này.'}
+                      {renderHighlightRuns(currentWritingCfg?.prompt || 'Chưa có đề bài cho phần Writing này.')}
                     </p>
                   </div>
 
@@ -1150,6 +1211,8 @@ export default function ExamMode({
 
                 {/* High-contrast crisp white paper essay box matching Screenshots 4 & 5 */}
                 <textarea
+                  data-exam-copy-source="true"
+                  data-exam-answer-input="true"
                   value={examState.answers[currentWritingKey] || ''}
                   onChange={e =>
                     setExamState(prev => ({

@@ -64,12 +64,14 @@ ${attachedAudioOrder || '(None attached)'}
 
 INSTRUCTIONS:
 1. For EVERY question listed above (matching exact "questionId"):
-   - Write an accurate verbatim "transcript" of what the candidate actually said in the audio (include noticeable pauses like "[pause]" or hesitations like "uh/um" if audible; write "(Không có giọng nói rõ ràng)" if silent/empty).
-   - Score individual "band" (0.0 - 9.0, step 0.5).
+   - Write an accurate verbatim "transcript" of what the candidate actually said in the audio (include noticeable pauses like "[pause]" or fillers like "um/uh" if audible; write "(Không có giọng nói rõ ràng)" if silent/empty).
+   - Score individual "band" (0.0 - 9.0, step 0.5) AND per-question "criteria": { "fc": 7.0, "lr": 7.0, "gra": 7.0, "pr": 7.0 }.
    - Provide detailed helpful "feedback" in Vietnamese mentioning specific pronunciation/fluency/idea points.
-   - Provide up to 3 concrete "grammarVocabularyFixes": array of { "original": "...", "corrected": "...", "reason": "giải thích ngắn tiếng Việt" }.
-   - Provide "upgradedSample": a natural, high-scoring (Band 7.5-8.5) sample answer in English tailored to the candidate's own ideas!
-2. Compute criterion scores: "fc", "lr", "gra", "pr" (0.0 - 9.0 step 0.5).
+   - Provide "fluencyMetrics": { "fillerWords": ["um", "like"], "pauseCount": 1, "paceNote": "Tốc độ nói tự nhiên (~130 WPM)", "comment": "Nhận xét độ trôi chảy & ngập ngừng bằng tiếng Việt..." }.
+   - Provide up to 5 concrete "grammarVocabularyFixes": array of { "original": "exact substring copied verbatim from transcript", "corrected": "natural corrected English replacement", "reason": "giải thích ngắn tiếng Việt" }. IMPORTANT: "original" MUST match an exact phrase inside your "transcript" so the UI renders inline red strikethrough + green replacement right inside the text!
+   - Provide 2-4 "vocabularyUpgrades": array of { "basic": "simple word/phrase used", "upgraded": "Band 8.0+ academic/idiomatic collocation", "ipa": "/.../", "meaning": "nghĩa tiếng Việt" }.
+   - Provide "upgradedSample": a natural, high-scoring (Band 8.0-8.5) sample answer in English keeping and elevating the candidate's own ideas!
+2. Compute overall criterion scores: "fc", "lr", "gra", "pr" (0.0 - 9.0 step 0.5).
 3. Overall Speaking Band MUST equal average of the 4 criteria rounded to nearest 0.5 (or 0.0 if silent/no speech).
 4. Write "overallFeedback" in Vietnamese, plus 2-4 "strengths" and 2-4 "improvements" in Vietnamese.
 
@@ -90,18 +92,175 @@ Return ONLY strictly valid JSON matching this schema (no markdown fences):
       "questionId": "exact_question_id",
       "transcript": "Verbatim English spoken answer...",
       "band": 6.5,
+      "criteria": { "fc": 6.5, "lr": 6.5, "gra": 6.0, "pr": 6.5 },
       "feedback": "Nhận xét cụ thể bằng tiếng Việt cho câu này...",
+      "fluencyMetrics": {
+        "fillerWords": ["um", "like"],
+        "pauseCount": 1,
+        "paceNote": "Nhịp nói vừa phải, còn vài chỗ ngắt nhịp",
+        "comment": "Có 2 chỗ ngập ngừng nhẹ khi chuyển ý..."
+      },
       "grammarVocabularyFixes": [
         {
-          "original": "I very like...",
-          "corrected": "I really enjoy...",
-          "reason": "Trạng từ 'very' không đi trực tiếp trước động từ 'like'..."
+          "original": "offer",
+          "corrected": "prefer",
+          "reason": "Dùng sai động từ: 'prefer' (thích hơn) thay vì 'offer' (đề nghị)."
         }
       ],
-      "upgradedSample": "Natural Band 8.0 model response..."
+      "vocabularyUpgrades": [
+        {
+          "basic": "saves me time",
+          "upgraded": "streamlines my daily commute",
+          "ipa": "/ˈstriːmlaɪnz/",
+          "meaning": "giúp tối ưu hóa việc đi lại hằng ngày"
+        }
+      ],
+      "upgradedSample": "Natural Band 8.0+ model response..."
     }
   ]
 }`;
+}
+
+const FILLER_REGEX = /\b(um+|uh+|er+|ah+|you know|i mean|sort of|kind of|actually|basically|right)\b|\[pause[^\]]*\]/gi;
+
+export function analyzeTranscriptFluency(transcript = '', durationSec = 0) {
+  const clean = String(transcript || '').trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  const wordCount = words.length;
+  const dur = Math.max(0, Number(durationSec) || 0);
+  const wpm = dur > 0 && wordCount > 0 ? Math.round((wordCount / dur) * 60) : 0;
+  const pauseMatches = clean.match(/\[pause[^\]]*\]|\.{3}/gi) || [];
+  const fillerMatches = (clean.match(/\b(um+|uh+|er+|ah+|you know|i mean|sort of|kind of|actually|basically)\b/gi) || []).map(w => w.toLowerCase());
+  const fillerCounts = {};
+  fillerMatches.forEach(w => {
+    fillerCounts[w] = (fillerCounts[w] || 0) + 1;
+  });
+  const topFillers = Object.entries(fillerCounts).map(([word, count]) => (count > 1 ? `${word} (×${count})` : word));
+  const paceLabel =
+    wpm === 0
+      ? 'Chưa rõ nhịp nói'
+      : wpm < 95
+      ? 'Chậm — Cần tăng phản xạ nối ý'
+      : wpm <= 165
+      ? 'Nhịp độ lý tưởng IELTS'
+      : 'Khá nhanh — Giữ ngắt nhịp tự nhiên';
+  return {
+    wordCount,
+    wpm,
+    pauseCount: pauseMatches.length,
+    fillerCount: fillerMatches.length,
+    fillerWords: topFillers,
+    paceLabel
+  };
+}
+
+export function buildTranscriptCorrectionSegments(transcript = '', fixes = []) {
+  const text = String(transcript || '');
+  const fixList = Array.isArray(fixes)
+    ? fixes
+        .map((f, idx) => ({
+          idx,
+          original: String(f?.original || '').trim(),
+          corrected: String(f?.corrected || '').trim(),
+          reason: String(f?.reason || '').trim()
+        }))
+        .filter(f => f.original && f.corrected)
+    : [];
+
+  if (!text || fixList.length === 0) {
+    return {
+      segments: text ? [{ type: 'text', text }] : [],
+      unmatchedFixes: fixList
+    };
+  }
+
+  const lowerText = text.toLowerCase();
+  const candidates = [];
+  const matchedIndices = new Set();
+
+  fixList.forEach(fix => {
+    const needle = fix.original.toLowerCase();
+    let searchFrom = 0;
+    while (searchFrom < lowerText.length) {
+      const foundIdx = lowerText.indexOf(needle, searchFrom);
+      if (foundIdx === -1) break;
+      const beforeChar = foundIdx > 0 ? lowerText[foundIdx - 1] : ' ';
+      const afterPos = foundIdx + needle.length;
+      const afterChar = afterPos < lowerText.length ? lowerText[afterPos] : ' ';
+      const startsClean = !/[a-z0-9]/i.test(beforeChar) || !/[a-z0-9]/i.test(needle[0]);
+      const endsClean = !/[a-z0-9]/i.test(afterChar) || !/[a-z0-9]/i.test(needle[needle.length - 1]);
+      if (startsClean && endsClean) {
+        candidates.push({
+          start: foundIdx,
+          end: afterPos,
+          matchedText: text.slice(foundIdx, afterPos),
+          fix
+        });
+        break;
+      }
+      searchFrom = foundIdx + 1;
+    }
+  });
+
+  candidates.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+  const accepted = [];
+  let cursor = 0;
+  candidates.forEach(cand => {
+    if (cand.start >= cursor) {
+      accepted.push(cand);
+      matchedIndices.add(cand.fix.idx);
+      cursor = cand.end;
+    }
+  });
+
+  const segments = [];
+  let pos = 0;
+  accepted.forEach(cand => {
+    if (cand.start > pos) {
+      segments.push({ type: 'text', text: text.slice(pos, cand.start) });
+    }
+    segments.push({
+      type: 'correction',
+      matchedText: cand.matchedText,
+      original: cand.fix.original,
+      corrected: cand.fix.corrected,
+      reason: cand.fix.reason,
+      idx: cand.fix.idx
+    });
+    pos = cand.end;
+  });
+  if (pos < text.length) {
+    segments.push({ type: 'text', text: text.slice(pos) });
+  }
+
+  return {
+    segments,
+    unmatchedFixes: fixList.filter(f => !matchedIndices.has(f.idx))
+  };
+}
+
+export function buildFluencyHighlightSegments(transcript = '') {
+  const text = String(transcript || '');
+  if (!text) return [];
+  const regex = new RegExp(FILLER_REGEX.source, 'gi');
+  const segments = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', text: text.slice(lastIndex, match.index) });
+    }
+    const token = match[0];
+    segments.push({
+      type: token.startsWith('[') ? 'pause' : 'filler',
+      text: token
+    });
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ type: 'text', text: text.slice(lastIndex) });
+  }
+  return segments;
 }
 
 export function normalizeSpeakingEvaluation({ parsed, recordings = [], usedModel = 'gemini-audio', gradedMode = 'gemini_audio' }) {
@@ -128,24 +287,62 @@ export function normalizeSpeakingEvaluation({ parsed, recordings = [], usedModel
     const matched = parsedEvalMap.get(String(rec.questionId)) || parsed?.questionEvaluations?.[idx] || {};
     const hasSpokenInput = (Number(rec.durationSec) || 0) >= 1 && (rec.hasAudioBinary || String(rec.clientTranscript || '').trim().length >= 3);
     const qBand = hasSpokenInput ? roundSpeakingBand(matched.band ?? overallBand) : 0;
+    const rawQCrit = matched.criteria || {};
+    const qCriteria = hasSpokenInput
+      ? {
+          fc: roundSpeakingBand(rawQCrit.fc ?? qBand ?? fc),
+          lr: roundSpeakingBand(rawQCrit.lr ?? qBand ?? lr),
+          gra: roundSpeakingBand(rawQCrit.gra ?? qBand ?? gra),
+          pr: roundSpeakingBand(rawQCrit.pr ?? qBand ?? pr)
+        }
+      : { fc: 0, lr: 0, gra: 0, pr: 0 };
+
+    const transcriptText = String(matched.transcript || rec.clientTranscript || (hasSpokenInput ? '(Đã ghi âm giọng nói)' : '(Chưa thu âm / Không có lời nói)')).trim();
+    const computedFluency = analyzeTranscriptFluency(transcriptText, rec.durationSec);
+    const rawFm = matched.fluencyMetrics && typeof matched.fluencyMetrics === 'object' ? matched.fluencyMetrics : {};
+    const fluencyMetrics = {
+      wpm: Number(rawFm.wpm) || computedFluency.wpm,
+      fillerCount: Number(rawFm.fillerCount ?? computedFluency.fillerCount) || 0,
+      pauseCount: Number(rawFm.pauseCount ?? computedFluency.pauseCount) || 0,
+      fillerWords: Array.isArray(rawFm.fillerWords) && rawFm.fillerWords.length > 0
+        ? rawFm.fillerWords.map(w => String(w || '').trim()).filter(Boolean).slice(0, 8)
+        : computedFluency.fillerWords,
+      paceNote: String(rawFm.paceNote || rawFm.paceLabel || computedFluency.paceLabel).trim(),
+      comment: String(rawFm.comment || '').trim()
+    };
+
+    const vocabularyUpgrades = Array.isArray(matched.vocabularyUpgrades)
+      ? matched.vocabularyUpgrades
+          .filter(v => v && (v.basic || v.upgraded))
+          .slice(0, 5)
+          .map(v => ({
+            basic: String(v.basic || '').trim(),
+            upgraded: String(v.upgraded || '').trim(),
+            ipa: String(v.ipa || '').trim(),
+            meaning: String(v.meaning || '').trim()
+          }))
+      : [];
 
     return {
       questionId: rec.questionId,
       part: rec.part || 1,
       prompt: rec.prompt || '',
-      transcript: String(matched.transcript || rec.clientTranscript || (hasSpokenInput ? '(Đã ghi âm giọng nói)' : '(Chưa thu âm / Không có lời nói)')).trim(),
+      transcript: transcriptText,
       band: qBand,
+      criteria: qCriteria,
+      fluencyMetrics,
       feedback: String(matched.feedback || (hasSpokenInput ? 'Câu trả lời đã được ghi nhận và đánh giá.' : 'Thí sinh chưa thu âm câu này (0.0).')).trim(),
       grammarVocabularyFixes: Array.isArray(matched.grammarVocabularyFixes)
         ? matched.grammarVocabularyFixes
             .filter(f => f && (f.original || f.corrected))
-            .slice(0, 4)
+            .slice(0, 6)
             .map(f => ({
               original: String(f.original || '').trim(),
               corrected: String(f.corrected || '').trim(),
               reason: String(f.reason || '').trim()
             }))
         : [],
+      vocabularyUpgrades,
       upgradedSample: String(matched.upgradedSample || '').trim()
     };
   });
@@ -244,15 +441,47 @@ export function simulateAISpeakingGrading({ testTitle = '', partMode = 'full', r
     if (durationRatio >= 1 && words.length >= 45) qBand = Math.min(7.5, qBand + 0.5);
 
     const wpm = dur > 0 && words.length > 0 ? Math.round((words.length / dur) * 60) : null;
+    const rawTx = words.length > 0 ? String(rec.clientTranscript || '').trim() : '';
+    const heuristicFixes = [];
+    const heuristicRules = [
+      { pat: /\bvery\s+like\b/i, rep: 'really enjoy', why: "Không dùng 'very' đứng trước động từ 'like'; dùng 'really enjoy' hoặc 'be keen on'." },
+      { pat: /\ba\s+lot\s+of\b/i, rep: 'a wide variety of', why: "Nâng cấp cụm lặp phổ biến sang collocation học thuật tự nhiên hơn." },
+      { pat: /\bvery\s+good\b/i, rep: 'exceptionally beneficial', why: "Tránh lặp 'very good'; dùng tính từ mạnh chuẩn Band 7.5+." },
+      { pat: /\bmore\s+easy\b/i, rep: 'much easier', why: "Tính từ ngắn 'easy' dùng dạng so sánh hơn 'easier', không dùng 'more easy'." },
+      { pat: /\bmore\s+better\b/i, rep: 'far better', why: "Không ghép 'more' trước 'better'." }
+    ];
+    if (rawTx) {
+      heuristicRules.forEach(rule => {
+        const m = rawTx.match(rule.pat);
+        if (m) {
+          heuristicFixes.push({ original: m[0], corrected: rule.rep, reason: rule.why });
+        }
+      });
+    }
+    const qCrit = {
+      fc: roundSpeakingBand(qBand),
+      lr: roundSpeakingBand(Math.max(3.0, qBand + (uniqueLexicon.size >= 18 ? 0.5 : -0.5))),
+      gra: roundSpeakingBand(Math.max(3.0, qBand - (heuristicFixes.length > 0 ? 0.5 : 0))),
+      pr: roundSpeakingBand(qBand)
+    };
+    const fm = analyzeTranscriptFluency(rawTx, dur);
     return {
       questionId: rec.questionId,
-      transcript: words.length > 0 ? rec.clientTranscript : `(Đã lưu file ghi âm ${Math.round(dur)}s — chờ Gemini API Key để chép lời chính xác)`,
+      transcript: rawTx || `(Đã lưu file ghi âm ${Math.round(dur)}s — chờ Gemini API Key để chép lời chính xác)`,
       band: roundSpeakingBand(qBand),
+      criteria: qCrit,
+      fluencyMetrics: {
+        ...fm,
+        comment: rawTx
+          ? `Ghi nhận ~${fm.wpm || 0} từ/phút (${fm.paceLabel}).${fm.fillerCount > 0 ? ` Có ${fm.fillerCount} từ đệm/ngập ngừng (${fm.fillerWords.join(', ')}).` : ' Chưa phát hiện từ đệm thừa lớn trong bản nháp.'}`
+          : 'Nhập Google Gemini API Key để AI nghe trực tiếp nhịp điệu, phát âm & điểm ngừng thực tế trong file âm thanh.'
+      },
       feedback: words.length > 0
         ? `Ghi âm ${Math.round(dur)}s (${words.length} từ${wpm ? `, ~${wpm} từ/phút` : ''}). ${words.length >= 25 ? 'Ý trả lời rõ ràng; hãy thêm ví dụ cụ thể và từ nối tự nhiên để tăng điểm Fluency & Coherence.' : 'Câu trả lời hơi ngắn; nên mở rộng thêm 2–3 câu giải thích lý do hoặc ví dụ.'}`
         : `Đã lưu an toàn file ghi âm (${Math.round(dur)} giây). Điểm ước lượng sơ bộ dựa trên thời lượng nói; giáo viên có thể nghe lại file ghi âm trực tiếp hoặc cấu hình Google Gemini API Key để AI chép lời & chấm phát âm chi tiết từng âm tiết.`,
-      grammarVocabularyFixes: [],
-      upgradedSample: 'Cấu hình Google Gemini API Key trong Tài khoản Giáo viên để AI nghe trực tiếp file ghi âm, chép lời chính xác và gợi ý câu nâng Band cá nhân hóa.'
+      grammarVocabularyFixes: heuristicFixes,
+      vocabularyUpgrades: [],
+      upgradedSample: 'Cấu hình Google Gemini API Key trong Tài khoản Giáo viên để AI nghe trực tiếp file ghi âm, chép lời chính xác, sửa từng lỗi dùng từ và gợi ý câu trả lời nâng lên Band 8.0+.'
     };
   });
 
