@@ -53,6 +53,7 @@ import {
 import { speakWord } from '../utils/mediaHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
+import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
 
 export default function GameArena({
   activeQuestion,
@@ -820,6 +821,26 @@ export default function GameArena({
                       <Save className="w-3.5 h-3.5" /> Lưu Phòng
                     </button>
                   </div>
+                  <div className="sm:col-span-12 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-pink-100 dark:border-slate-800/80">
+                    <label className="inline-flex items-center gap-2 text-xs font-bold text-[#0F172B] dark:text-slate-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(hostRoomDraft.shufflePerPlayer)}
+                        onChange={e => setHostRoomDraft(prev => ({ ...prev, shufflePerPlayer: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-[#007A7A]"
+                      />
+                      <span>Đảo thứ tự từ riêng cho từng học sinh</span>
+                    </label>
+                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                      hostRoomDraft.shufflePerPlayer
+                        ? 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-200 border-purple-200 dark:border-purple-500/30'
+                        : 'bg-[#EDFFFD] dark:bg-cyan-500/15 text-[#007A7A] dark:text-cyan-200 border-[#B5F5F1] dark:border-cyan-500/30'
+                    }`}>
+                      {hostRoomDraft.shufflePerPlayer
+                        ? '🔀 BẬT: Mỗi học sinh gặp bộ câu xếp ngẫu nhiên riêng'
+                        : '⚡ TẮT: Cả lớp cùng câu hỏi — nhanh nhất cùng đáp án được điểm cao hơn'}
+                    </span>
+                  </div>
                 </form>
               </div>
             )}
@@ -831,7 +852,16 @@ export default function GameArena({
                   <Rocket className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="font-extrabold text-sm text-[#0F172B] dark:text-white">Khoang Chờ Tàu Vũ Trụ (Dropship Lobby)</h2>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-extrabold text-sm text-[#0F172B] dark:text-white">Khoang Chờ Tàu Vũ Trụ (Dropship Lobby)</h2>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                      room.shufflePerPlayer
+                        ? 'bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border-purple-200 dark:border-purple-500/30'
+                        : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+                    }`}>
+                      {room.shufflePerPlayer ? '🔀 Đảo từ riêng HS' : '⚡ Thi tốc độ • Nhanh nhất +điểm'}
+                    </span>
+                  </div>
                   <p className="text-[11px] text-[#62748E] dark:text-slate-400">
                     {isTeacher
                       ? 'Học sinh nhập Mã PIN & Mật khẩu để vào khoang. Nhấn Bắt Đầu Trận Đấu để tất cả cùng vào game.'
@@ -929,6 +959,15 @@ export default function GameArena({
                           }`} />
                           <span className="truncate max-w-[105px]">{player.name}</span>
                         </button>
+                        {(() => {
+                          const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb);
+                          if (!pTitle) return null;
+                          return (
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${pTitle.gameBadgeClass}`}>
+                              {pTitle.icon} {pTitle.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                     );
                   })
@@ -1059,6 +1098,15 @@ export default function GameArena({
                         }`}>
                           {isMemberTeacher ? 'Giáo viên' : 'Học viên'}
                         </span>
+                        {(() => {
+                          const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
+                          if (!mTitle || mTitle.isRoleBuiltIn) return null;
+                          return (
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${mTitle.gameBadgeClass}`}>
+                              {mTitle.icon} {mTitle.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <p className="text-[11px] font-mono text-[#62748E] dark:text-slate-400 mt-0.5">@{inspectedLobbyUsername}</p>
                     </div>
@@ -1298,7 +1346,16 @@ export default function GameArena({
                           onShip={true}
                         />
                         <p className="font-extrabold text-sm text-[#0F172B] dark:text-white mt-1.5 truncate max-w-full">{p.name}</p>
-                        <p className="font-mono text-lg font-black text-amber-600 dark:text-amber-300 tabular-nums">{p.score || 0}đ</p>
+                        {(() => {
+                          const podTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb);
+                          if (!podTitle) return null;
+                          return (
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border mt-0.5 ${podTitle.gameBadgeClass}`}>
+                              {podTitle.icon} {podTitle.label}
+                            </span>
+                          );
+                        })()}
+                        <p className="font-mono text-lg font-black text-amber-600 dark:text-amber-300 tabular-nums mt-0.5">{p.score || 0}đ</p>
                         <p className="text-[10px] text-[#62748E] dark:text-slate-400 truncate max-w-full mt-0.5">{p.progressText || 'Đang đua'}</p>
                       </div>
                     );
@@ -1386,6 +1443,20 @@ export default function GameArena({
                             <span className="font-extrabold text-sm text-[#0F172B] dark:text-white truncate max-w-[150px] sm:max-w-[210px]">
                               {p.name}
                             </span>
+                            {(() => {
+                              const rowTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb);
+                              if (!rowTitle) return null;
+                              return (
+                                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${rowTitle.gameBadgeClass}`}>
+                                  {rowTitle.icon} {rowTitle.label}
+                                </span>
+                              );
+                            })()}
+                            {(p.fastestWinsCount || 0) > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
+                                ⚡ {p.fastestWinsCount}x #1
+                              </span>
+                            )}
                             {p.finished ? (
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                 p.outcome === 'VICTORY'
@@ -1591,6 +1662,15 @@ export default function GameArena({
               <span className="text-rose-500 text-sm tracking-wide" title={`Còn ${gameLives} mạng`}>
                 {gameLives > 0 ? '❤️'.repeat(gameLives) : '💀'}
               </span>
+              {(() => {
+                const selfTitle = resolveVisibleTitleBadge(currentUser, attempts, roomsDb);
+                if (!selfTitle) return null;
+                return (
+                  <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${selfTitle.gameBadgeClass}`}>
+                    {selfTitle.icon} {selfTitle.label}
+                  </span>
+                );
+              })()}
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
@@ -1817,6 +1897,7 @@ export default function GameArena({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {topStandings.map((st, sIdx) => {
                         const isMe = st.username === currentUser?.username || st.name === currentUser?.name;
+                        const stTitle = st.username ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb) : null;
                         return (
                           <div
                             key={st.username || st.name || sIdx}
@@ -1826,8 +1907,16 @@ export default function GameArena({
                                 : 'bg-[#FFF5F8] dark:bg-slate-950/70 border-pink-200/80 dark:border-slate-800 text-[#0F172B] dark:text-slate-200'
                             }`}
                           >
-                            <span className="truncate font-semibold">
-                              #{sIdx + 1} {st.name || st.username} {isMe ? '(Bạn)' : ''}
+                            <span className="truncate font-semibold flex items-center gap-1.5 min-w-0">
+                              <span className="truncate">#{sIdx + 1} {st.name || st.username} {isMe ? '(Bạn)' : ''}</span>
+                              {stTitle && (
+                                <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border shrink-0 ${stTitle.gameBadgeClass}`}>
+                                  {stTitle.icon} {stTitle.label}
+                                </span>
+                              )}
+                              {(st.fastestWinsCount || 0) > 0 && (
+                                <span className="text-[9px] font-black text-amber-600 dark:text-amber-300 shrink-0">⚡{st.fastestWinsCount}</span>
+                              )}
                             </span>
                             <span className="font-mono font-extrabold text-amber-600 dark:text-amber-300 ml-2 shrink-0">{st.score || 0}đ</span>
                           </div>

@@ -462,6 +462,23 @@ export default function GlobalModals({
               </div>
             </div>
 
+            <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(newRoomForm.shufflePerPlayer)}
+                onChange={e => setNewRoomForm(prev => ({ ...prev, shufflePerPlayer: e.target.checked }))}
+                className="mt-0.5 w-4 h-4 rounded accent-emerald-600"
+              />
+              <div>
+                <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">Đảo thứ tự từ riêng cho từng học sinh</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {newRoomForm.shufflePerPlayer
+                    ? 'Đang BẬT: Mỗi học sinh gặp thứ tự câu khác nhau (hạn chế nhìn bài nhau).'
+                    : 'Đang TẮT: Tất cả cùng làm chung một bộ câu hỏi — ai trả lời nhanh nhất được điểm cao hơn.'}
+                </p>
+              </div>
+            </label>
+
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"

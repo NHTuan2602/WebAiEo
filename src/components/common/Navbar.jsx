@@ -1,14 +1,20 @@
+import { useState, useEffect, useRef } from 'react';
 import {
+  Bell,
   BookOpen,
   Camera,
+  CheckCheck,
   Gamepad2,
   Key,
   LogOut,
+  Megaphone,
   Mic,
   Moon,
   Phone,
   ShieldAlert,
+  Sparkles,
   Sun,
+  Trash2,
   UserCheck,
   Users
 } from 'lucide-react';
@@ -20,6 +26,10 @@ export default function Navbar({
   currentUser,
   darkMode,
   handleLogout,
+  notifications = [],
+  onDeleteNotification,
+  onMarkNotificationsRead,
+  onOpenNotificationTarget,
   openMemberProfile,
   openStudentGamePortal,
   setApiTestState,
@@ -32,8 +42,24 @@ export default function Navbar({
   teacherHubTab,
   view
 }) {
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const notifBoxRef = useRef(null);
+
+  useEffect(() => {
+    if (!showNotifMenu) return undefined;
+    const handleClickOutside = (e) => {
+      if (notifBoxRef.current && !notifBoxRef.current.contains(e.target)) {
+        setShowNotifMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifMenu]);
+
   if (view === 'AUTH') return null;
   const isTeacher = currentUser?.role === 'teacher';
+  const notifList = Array.isArray(notifications) ? notifications : [];
+  const unreadNotifCount = notifList.filter(n => !n?.isRead).length;
   const goToOwnProfile = () => {
     if (openMemberProfile) {
       openMemberProfile(currentUser?.username);
@@ -214,6 +240,150 @@ export default function Navbar({
             >
               <Camera className="w-4 h-4" />
             </button>
+          </div>
+
+          <div className="relative shrink-0" ref={notifBoxRef}>
+            <button
+              type="button"
+              onClick={() => setShowNotifMenu(v => !v)}
+              className={`relative p-2 rounded-xl transition border shrink-0 ${
+                showNotifMenu || unreadNotifCount > 0
+                  ? 'bg-pink-50 dark:bg-slate-800 text-[#007A7A] dark:text-[#1EE1D6] border-pink-200 dark:border-slate-700'
+                  : 'text-[#62748E] dark:text-slate-400 hover:bg-pink-50 dark:hover:bg-slate-800 border-transparent'
+              }`}
+              title="Thông báo bài tập & đề thi"
+              aria-label="Thông báo"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center shadow-sm">
+                  {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifMenu && (
+              <div className="fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-pink-200 dark:border-slate-700 z-50 overflow-hidden">
+                <div className="px-4 py-3 bg-[#FDF2F6] dark:bg-slate-800/80 border-b border-pink-200/80 dark:border-slate-700 flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Bell className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                      Thông Báo Lớp Học ({notifList.length})
+                    </h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {unreadNotifCount > 0 ? `${unreadNotifCount} thông báo chưa đọc` : 'Đã xem hết tất cả thông báo'}
+                    </p>
+                  </div>
+                  {unreadNotifCount > 0 && onMarkNotificationsRead && (
+                    <button
+                      type="button"
+                      onClick={() => onMarkNotificationsRead('all')}
+                      className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline flex items-center gap-1 shrink-0"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" /> Đọc tất cả
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-96 overflow-y-auto divide-y divide-pink-100/80 dark:divide-slate-800">
+                  {notifList.length === 0 ? (
+                    <div className="py-10 px-4 text-center space-y-1.5">
+                      <Bell className="w-7 h-7 text-slate-300 dark:text-slate-700 mx-auto" />
+                      <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Chưa có thông báo nào.</p>
+                      <p className="text-[11px] text-slate-400">Khi giáo viên đăng đề thi mới hoặc gửi lời nhắn, thông báo sẽ hiển thị tại đây.</p>
+                    </div>
+                  ) : (
+                    notifList.map(notif => {
+                      const NIcon =
+                        notif.type === 'exam'
+                          ? BookOpen
+                          : notif.type === 'exercise'
+                          ? Sparkles
+                          : notif.type === 'game'
+                          ? Gamepad2
+                          : Megaphone;
+                      const iconCls =
+                        notif.type === 'exam'
+                          ? 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-teal-300'
+                          : notif.type === 'exercise'
+                          ? 'bg-violet-50 dark:bg-violet-500/15 text-[#570DF8] dark:text-violet-300'
+                          : notif.type === 'game'
+                          ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300'
+                          : 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300';
+
+                      return (
+                        <div
+                          key={notif.id}
+                          className={`p-3.5 transition ${
+                            notif.isRead
+                              ? 'bg-white dark:bg-slate-900'
+                              : 'bg-[#EDFFFD]/55 dark:bg-teal-950/20'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${iconCls}`}>
+                              <NIcon className="w-4 h-4" />
+                            </span>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug">
+                                  {!notif.isRead && (
+                                    <span className="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1.5 align-middle" />
+                                  )}
+                                  {notif.title}
+                                </p>
+                                {isTeacher && onDeleteNotification && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteNotification(notif.id)}
+                                    className="text-slate-400 hover:text-rose-600 p-0.5 shrink-0"
+                                    title="Xóa thông báo"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                                {notif.message}
+                              </p>
+                              <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                                <span className="text-[10px] text-slate-400">
+                                  {notif.createdByName || 'Giáo viên'} • {notif.createdAt}
+                                  {isTeacher && typeof notif.readCount === 'number' ? ` • ${notif.readCount} đã xem` : ''}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  {!notif.isRead && onMarkNotificationsRead && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onMarkNotificationsRead(notif.id)}
+                                      className="text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                                    >
+                                      Đã đọc
+                                    </button>
+                                  )}
+                                  {(notif.testId || notif.roomPin) && onOpenNotificationTarget && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowNotifMenu(false);
+                                        onOpenNotificationTarget(notif);
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[10px] font-extrabold transition"
+                                    >
+                                      {notif.roomPin ? `Vào Phòng #${notif.roomPin} →` : 'Làm bài ngay →'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <button

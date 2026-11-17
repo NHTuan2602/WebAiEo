@@ -300,7 +300,12 @@ function sanitizeUserForViewer(user, viewer) {
     targetBand: user.targetBand ?? (user.role === 'teacher' ? 9.0 : 7.5),
     studyGoal: user.studyGoal || '',
     joinedDate: user.joinedDate || '',
-    avatarUrl: user.avatarUrl || ''
+    avatarUrl: user.avatarUrl || '',
+    profileBannerId: typeof user.profileBannerId === 'string' && user.profileBannerId ? user.profileBannerId : 'ocean',
+    profileCoverUrl: typeof user.profileCoverUrl === 'string' ? user.profileCoverUrl : '',
+    avatarFrameId: typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
+    equippedTitleId: typeof user.equippedTitleId === 'string' && user.equippedTitleId ? user.equippedTitleId : 'newbie',
+    showTitleBadge: user.showTitleBadge !== false
   };
   if (viewer?.isSuperAdmin && user.isSuperAdmin) {
     safe.isSuperAdmin = true;
@@ -508,9 +513,11 @@ export function normalizeServerRoom(raw = {}, pinKey = '', now = Date.now()) {
     maxPlayers: Number(raw?.maxPlayers) || 30,
     roundSize: Number.isFinite(rawRoundSize) && rawRoundSize >= 2 ? Math.min(8, Math.round(rawRoundSize)) : 4,
     speedMode: ['relaxed', 'normal', 'turbo'].includes(raw?.speedMode) ? raw.speedMode : 'normal',
+    shufflePerPlayer: Boolean(raw?.shufflePerPlayer),
     startedAt: raw?.startedAt || null,
     lobbyPlayers: prunedChat.lobbyPlayers,
     liveMatch: raw?.liveMatch && typeof raw.liveMatch === 'object' ? { ...raw.liveMatch } : {},
+    questionSolves: raw?.questionSolves && typeof raw.questionSolves === 'object' ? { ...raw.questionSolves } : {},
     chatMessages: prunedChat.chatMessages,
     chatCycleStartedAt: prunedChat.chatCycleStartedAt,
     rawVocab: typeof raw?.rawVocab === 'string' ? raw.rawVocab : '',
@@ -551,6 +558,7 @@ function createInitialStore(audioDir = '') {
     users: {},
     customVocabTopics: [],
     adminFeedbacks: [],
+    notifications: [],
     aiConfig: { geminiApiKey: '' },
     _authSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
     _rateLimits: new Map(),
@@ -672,6 +680,9 @@ export function createPersistentSyncStore(persistFile = '') {
           if (Array.isArray(parsed.adminFeedbacks)) {
             store.adminFeedbacks = parsed.adminFeedbacks.filter(f => f?.id && f?.content);
           }
+          if (Array.isArray(parsed.notifications)) {
+            store.notifications = parsed.notifications.filter(n => n?.id && n?.title).slice(0, 80);
+          }
           if (parsed.aiConfig && typeof parsed.aiConfig === 'object') {
             store.aiConfig = {
               geminiApiKey: String(parsed.aiConfig.geminiApiKey || '').trim()
@@ -758,6 +769,51 @@ function buildPublicAdminSnapshotFields(store, viewer) {
   return { supportAdminProfile, adminFeedbacks };
 }
 
+function appendStoreNotification(store, notif = {}, viewer = null) {
+  const title = String(notif.title || '').trim().slice(0, 140);
+  const message = String(notif.message || '').trim().slice(0, 500);
+  if (!title || !message) return null;
+  const type = ['exam', 'exercise', 'game', 'announcement'].includes(notif.type) ? notif.type : 'announcement';
+  const item = {
+    id: notif.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    title,
+    message,
+    type,
+    testId: notif.testId ? String(notif.testId) : '',
+    roomPin: notif.roomPin ? String(notif.roomPin) : '',
+    createdBy: notif.createdBy || viewer?.username || 'teacher_ielts',
+    createdByName: notif.createdByName || viewer?.name || 'Giáo viên',
+    createdAt: notif.createdAt || new Date().toLocaleString('vi-VN'),
+    timestamp: Number(notif.timestamp) || Date.now(),
+    readBy: Array.isArray(notif.readBy) ? [...new Set(notif.readBy)] : []
+  };
+  const prevList = Array.isArray(store.notifications) ? store.notifications : [];
+  store.notifications = [item, ...prevList].slice(0, 80);
+  return item;
+}
+
+function serializeNotificationsForViewer(store, viewer) {
+  const list = Array.isArray(store.notifications) ? store.notifications : [];
+  const uname = viewer?.username || '';
+  return list.map(n => {
+    const readArr = Array.isArray(n.readBy) ? n.readBy : [];
+    return {
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      type: n.type || 'announcement',
+      testId: n.testId || '',
+      roomPin: n.roomPin || '',
+      createdBy: n.createdBy || '',
+      createdByName: n.createdByName || '',
+      createdAt: n.createdAt || '',
+      timestamp: Number(n.timestamp) || 0,
+      isRead: Boolean(uname && readArr.includes(uname)),
+      readCount: readArr.length
+    };
+  });
+}
+
 function getSnapshotForViewer(store, viewer = null) {
   pruneExpiredStoreChats(store, Date.now());
   const basePayload = {
@@ -779,7 +835,8 @@ function getSnapshotForViewer(store, viewer = null) {
       users: {},
       customVocabTopics: [],
       supportAdminProfile: null,
-      adminFeedbacks: []
+      adminFeedbacks: [],
+      notifications: []
     };
   }
 
@@ -789,6 +846,7 @@ function getSnapshotForViewer(store, viewer = null) {
     if (clean) sanitizedUsers[uname] = clean;
   });
   const adminFields = buildPublicAdminSnapshotFields(store, viewer);
+  const notifications = serializeNotificationsForViewer(store, viewer);
 
   if (viewer.role === 'teacher') {
     const sanitizedRooms = {};
@@ -804,7 +862,8 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: store.teacherNotes || {},
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
-      ...adminFields
+      ...adminFields,
+      notifications
     };
   }
 
@@ -844,7 +903,8 @@ function getSnapshotForViewer(store, viewer = null) {
     teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
-    ...adminFields
+    ...adminFields,
+    notifications
   };
 }
 
@@ -880,7 +940,9 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'UPSERT_NOTE',
     'UPSERT_VOCAB_TOPIC',
     'DELETE_VOCAB_TOPIC',
-    'SET_AI_CONFIG'
+    'SET_AI_CONFIG',
+    'CREATE_NOTIFICATION',
+    'DELETE_NOTIFICATION'
   ]);
 
   if (teacherOnlyActions.has(type)) {
@@ -1097,6 +1159,10 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: true };
     }
 
+    case 'MARK_NOTIFICATIONS_READ': {
+      return { allowed: true };
+    }
+
     default:
       return { allowed: false, status: 400, error: 'Yêu cầu đồng bộ không hợp lệ.' };
   }
@@ -1111,6 +1177,16 @@ function upsertSingleUserInStore(store, uname, rawUser, viewer) {
     return false;
   }
 
+  const sanitizeCoverUrl = (val, prevVal = '') => {
+    if (val === undefined) return prevVal || '';
+    const str = String(val || '').trim();
+    if (!str) return '';
+    if ((str.startsWith('data:image/') || str.startsWith('https://')) && str.length <= 500_000) {
+      return str;
+    }
+    return prevVal || '';
+  };
+
   if (!isTeacher && prevUser) {
     // Student may only update non-privilege profile fields on own account
     const cleanSelf = {
@@ -1118,11 +1194,29 @@ function upsertSingleUserInStore(store, uname, rawUser, viewer) {
       name: typeof rawUser.name === 'string' && rawUser.name.trim() ? rawUser.name.trim() : prevUser.name,
       avatarUrl: rawUser.avatarUrl ?? prevUser.avatarUrl,
       targetBand: rawUser.targetBand ?? prevUser.targetBand,
-      studyGoal: rawUser.studyGoal ?? prevUser.studyGoal
+      studyGoal: rawUser.studyGoal ?? prevUser.studyGoal,
+      profileBannerId: typeof rawUser.profileBannerId === 'string' && rawUser.profileBannerId ? rawUser.profileBannerId.slice(0, 40) : (prevUser.profileBannerId || 'ocean'),
+      profileCoverUrl: sanitizeCoverUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl),
+      avatarFrameId: typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none'),
+      equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
+      showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false)
     };
     store.users[uname] = cleanSelf;
   } else {
     const incoming = { ...rawUser, username: uname };
+    incoming.profileBannerId = typeof incoming.profileBannerId === 'string' && incoming.profileBannerId
+      ? incoming.profileBannerId.slice(0, 40)
+      : (prevUser?.profileBannerId || 'ocean');
+    incoming.profileCoverUrl = sanitizeCoverUrl(incoming.profileCoverUrl, prevUser?.profileCoverUrl || '');
+    incoming.avatarFrameId = typeof incoming.avatarFrameId === 'string' && incoming.avatarFrameId
+      ? incoming.avatarFrameId.slice(0, 40)
+      : (prevUser?.avatarFrameId || 'none');
+    incoming.equippedTitleId = typeof incoming.equippedTitleId === 'string' && incoming.equippedTitleId
+      ? incoming.equippedTitleId.slice(0, 40)
+      : (prevUser?.equippedTitleId || 'newbie');
+    incoming.showTitleBadge = incoming.showTitleBadge !== undefined
+      ? Boolean(incoming.showTitleBadge)
+      : (prevUser?.showTitleBadge !== false);
     if (incoming.pass && String(incoming.pass).trim()) {
       incoming.passwordHash = hashPassword(String(incoming.pass).trim());
     } else if (prevUser?.passwordHash) {
@@ -1415,6 +1509,10 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin);
       base.status = 'PLAYING';
       base.startedAt = payload.startedAt || Date.now();
+      base.questionSolves = {};
+      if (payload.shufflePerPlayer !== undefined) {
+        base.shufflePerPlayer = Boolean(payload.shufflePerPlayer);
+      }
       const freshLive = {};
       Object.values(base.lobbyPlayers || {}).forEach(lp => {
         if (lp && lp.role !== 'teacher') {
@@ -1490,6 +1588,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       base.status = 'LOBBY';
       base.startedAt = null;
       base.liveMatch = {};
+      base.questionSolves = {};
       store.rooms[cleanPin] = base;
       changed = true;
       break;
@@ -1502,16 +1601,59 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       if (!cleanPin || !username || !entry) break;
       const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin);
       const prevEntry = base.liveMatch[username] || {};
+      let serverFirstBonusTotal = Number(prevEntry.serverFirstBonusTotal) || 0;
+      let lastFastestRank = prevEntry.lastFastestRank || null;
+      let lastFastestBonus = prevEntry.lastFastestBonus || 0;
+      let lastFastestWord = prevEntry.lastFastestWord || '';
+      let fastestWinsCount = Number(prevEntry.fastestWinsCount) || 0;
+
+      const solveEv = payload.solveEvent;
+      if (solveEv?.questionKey && typeof solveEv.questionKey === 'string') {
+        const qKey = solveEv.questionKey.slice(0, 80);
+        const solves = Array.isArray(base.questionSolves[qKey]) ? [...base.questionSolves[qKey]] : [];
+        if (!solves.some(s => s?.username === username)) {
+          const rank = solves.length + 1;
+          const firstBonus = rank === 1 ? 60 : rank === 2 ? 35 : rank === 3 ? 15 : 0;
+          solves.push({
+            username,
+            name: entry.name || prevEntry.name || username,
+            reactionMs: Math.max(0, Number(solveEv.reactionMs) || 0),
+            rank,
+            bonus: firstBonus,
+            solvedAt: Date.now()
+          });
+          base.questionSolves[qKey] = solves;
+          serverFirstBonusTotal += firstBonus;
+          lastFastestRank = rank;
+          lastFastestBonus = firstBonus;
+          lastFastestWord = String(solveEv.word || qKey.split(':').slice(1).join(':') || '');
+          if (rank === 1) fastestWinsCount += 1;
+        }
+      }
+
+      const clientBaseScore = entry.clientBaseScore !== undefined
+        ? Math.max(0, Number(entry.clientBaseScore) || 0)
+        : Math.max(0, Number(entry.score) || 0);
+      const effectiveScore = entry.clientBaseScore !== undefined
+        ? clientBaseScore + serverFirstBonusTotal
+        : Math.max(Number(entry.score) || 0, clientBaseScore + serverFirstBonusTotal);
+
       base.liveMatch[username] = {
         ...prevEntry,
         ...entry,
         username,
+        clientBaseScore,
+        serverFirstBonusTotal,
+        lastFastestRank,
+        lastFastestBonus,
+        lastFastestWord,
+        fastestWinsCount,
+        score: effectiveScore,
         updatedAt: Date.now()
       };
-      const scoreVal = Number(entry.score) || 0;
-      if (scoreVal > 0 || entry.finished) {
+      if (effectiveScore > 0 || entry.finished) {
         const prevRec = base.players[username];
-        const bestScore = prevRec ? Math.max(Number(prevRec.score) || 0, scoreVal) : scoreVal;
+        const bestScore = prevRec ? Math.max(Number(prevRec.score) || 0, effectiveScore) : effectiveScore;
         base.players[username] = {
           name: entry.name || prevEntry.name || username,
           score: bestScore,
@@ -1533,7 +1675,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       if (!cleanPin || !username || !record) break;
       const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin);
       const prevRec = base.players[username];
-      const bestScore = prevRec ? Math.max(Number(prevRec.score) || 0, Number(record.score) || 0) : (Number(record.score) || 0);
+      const liveBest = Number(base.liveMatch?.[username]?.score) || 0;
+      const bestScore = Math.max(Number(prevRec?.score) || 0, Number(record.score) || 0, liveBest);
       base.players[username] = {
         ...record,
         score: bestScore
@@ -1547,10 +1690,26 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const test = payload.test;
       if (!test?.id) break;
       const idx = store.tests.findIndex(t => t.id === test.id);
+      const prevTest = idx >= 0 ? store.tests[idx] : null;
+      const wasPublicBefore = prevTest ? (prevTest.visibility || 'public') !== 'private' : false;
+      const isPublicNow = (test.visibility || 'public') !== 'private';
       if (idx >= 0) {
         store.tests[idx] = test;
       } else {
         store.tests = [test, ...store.tests];
+      }
+      if (isPublicNow && !wasPublicBefore) {
+        const isExercise = test.testMode === 'single_skill';
+        appendStoreNotification(
+          store,
+          {
+            type: isExercise ? 'exercise' : 'exam',
+            title: isExercise ? 'Bài tập kỹ năng mới!' : 'Đề thi IELTS mới vừa mở!',
+            message: `${viewer?.name || 'Giáo viên'} vừa đăng ${isExercise ? 'bài tập' : 'đề thi'} "${test.title}". Nhấn để làm bài ngay!`,
+            testId: test.id
+          },
+          viewer
+        );
       }
       changed = true;
       break;
@@ -1578,12 +1737,63 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     case 'TOGGLE_TEST_VISIBILITY': {
       const testId = payload.testId;
       if (!testId) break;
-      store.tests = store.tests.map(t =>
-        t.id === testId
-          ? { ...t, visibility: (t.visibility || 'public') === 'private' ? 'public' : 'private' }
-          : t
-      );
+      let publishedTest = null;
+      store.tests = store.tests.map(t => {
+        if (t.id !== testId) return t;
+        const nextVis = (t.visibility || 'public') === 'private' ? 'public' : 'private';
+        const nextObj = { ...t, visibility: nextVis };
+        if (nextVis === 'public') publishedTest = nextObj;
+        return nextObj;
+      });
+      if (publishedTest) {
+        const isExercise = publishedTest.testMode === 'single_skill';
+        appendStoreNotification(
+          store,
+          {
+            type: isExercise ? 'exercise' : 'exam',
+            title: isExercise ? 'Bài tập mới vừa được công khai!' : 'Đề thi mới vừa được công khai!',
+            message: `${viewer?.name || 'Giáo viên'} vừa mở "${publishedTest.title}". Học viên có thể vào làm bài ngay!`,
+            testId: publishedTest.id
+          },
+          viewer
+        );
+      }
       changed = true;
+      break;
+    }
+
+    case 'CREATE_NOTIFICATION': {
+      const item = appendStoreNotification(store, payload, viewer);
+      if (item) changed = true;
+      break;
+    }
+
+    case 'MARK_NOTIFICATIONS_READ': {
+      const uname = viewer?.username;
+      if (!uname) break;
+      const targetId = String(payload?.notificationId || 'all').trim();
+      const list = Array.isArray(store.notifications) ? store.notifications : [];
+      let touched = false;
+      store.notifications = list.map(n => {
+        if (targetId !== 'all' && n.id !== targetId) return n;
+        const readArr = Array.isArray(n.readBy) ? n.readBy : [];
+        if (readArr.includes(uname)) return n;
+        touched = true;
+        return { ...n, readBy: [...readArr, uname] };
+      });
+      if (touched) changed = true;
+      break;
+    }
+
+    case 'DELETE_NOTIFICATION': {
+      const nid = String(payload?.notificationId || '').trim();
+      if (!nid) break;
+      const list = Array.isArray(store.notifications) ? store.notifications : [];
+      const next = list.filter(n => n.id !== nid);
+      if (next.length !== list.length) {
+        store.notifications = next;
+        changed = true;
+      }
       break;
     }
 

@@ -125,7 +125,11 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
   });
 
   server.listen(port, host, () => {
+    const storagePath = process.env.RAILWAY_VOLUME_MOUNT_PATH
+      ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'lexiprep-sync-state.json')
+      : path.join(process.cwd(), '.data', 'dev-sync-state.json');
     console.log(`[Luyện Thi IELTS Nha Trang] Production server listening at http://${host}:${port}`);
+    console.log(`[Luyện Thi IELTS Nha Trang] Persistent storage: ${storagePath}`);
   });
 
   return server;

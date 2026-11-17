@@ -25,6 +25,7 @@ import { loadExamDraft } from '../utils/sessionPersistence';
 import BrandContactFooter from '../components/common/BrandContactFooter';
 import { Users as ClassMembersIcon } from 'lucide-react';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
+import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
 
 export default function StudentHome({
   attempts,
@@ -32,6 +33,7 @@ export default function StudentHome({
   openMemberProfile,
   openSkillPracticeHub,
   openStudentGamePortal,
+  roomsDb = {},
   setEditingTargetUser,
   setPreviousView,
   setSelectedAttemptId,
@@ -622,7 +624,7 @@ export default function StudentHome({
                         >
                           <UserAvatarBadge user={{ ...u, username: uname }} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-sm font-extrabold text-[#0F172B] dark:text-white truncate group-hover:text-teal-700 dark:group-hover:text-teal-300">
                                 {u?.name || uname}
                               </span>
@@ -630,16 +632,36 @@ export default function StudentHome({
                                 <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-rose-200/70 dark:bg-slate-700 text-rose-900 dark:text-slate-200 shrink-0">Bạn</span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                                memberIsAdmin
-                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200'
-                                  : memberIsTeacher
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                                  : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300'
-                              }`}>
-                                {memberIsAdmin ? 'Quản trị hệ thống' : memberIsTeacher ? 'Giáo viên' : 'Học viên'}
-                              </span>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {(() => {
+                                const mTitle = resolveVisibleTitleBadge({ ...u, username: uname }, attempts, roomsDb);
+                                if (memberIsAdmin) {
+                                  return (
+                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
+                                      🛡️ Quản trị hệ thống
+                                    </span>
+                                  );
+                                }
+                                if (memberIsTeacher) {
+                                  return (
+                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                      👩‍🏫 Giáo viên IELTS
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                                      Học viên
+                                    </span>
+                                    {mTitle && (
+                                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${mTitle.badgeClass}`}>
+                                        {mTitle.icon} {mTitle.label}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
                               <span className="text-xs text-slate-600 dark:text-slate-400 truncate">
                                 {memberIsAdmin ? 'Góp ý tính năng' : memberIsTeacher ? 'Hồ sơ giảng viên' : `${memberAttCount} bài thi`}
                               </span>

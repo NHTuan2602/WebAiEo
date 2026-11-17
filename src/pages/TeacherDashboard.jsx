@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  Bell,
   BookOpen,
   Check,
   CheckCircle2,
@@ -21,6 +22,7 @@ import {
   Headphones,
   Key,
   Lock,
+  Megaphone,
   Mic,
   PenTool,
   Play,
@@ -28,6 +30,7 @@ import {
   RefreshCw,
   Rocket,
   Search,
+  Send,
   Share2,
   ShieldAlert,
   ShieldCheck,
@@ -62,8 +65,10 @@ export default function TeacherDashboard({
   gradingFilters,
   handleBulkDeleteAccounts,
   handleCopyInviteLink,
+  handleCreateNotification,
   handleDeleteAccount,
   handleDeleteAttempt,
+  handleDeleteNotification,
   handleDeleteRoom,
   handleDeleteTest,
   handleDuplicateTest,
@@ -72,6 +77,7 @@ export default function TeacherDashboard({
   handleTeacherOpenLobby,
   handleTeacherResetLobby,
   initGameCampaign,
+  notifications = [],
   openExamBuilder,
   openMemberProfile,
   openSingleSkillBuilder,
@@ -117,6 +123,15 @@ export default function TeacherDashboard({
   const [renamingTestId, setRenamingTestId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [selectedUsernames, setSelectedUsernames] = useState([]);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [notifyForm, setNotifyForm] = useState({
+    title: '',
+    message: '',
+    type: 'announcement',
+    testId: '',
+    roomPin: ''
+  });
+  const [notifySending, setNotifySending] = useState(false);
 
   const validSelectedUsernames = selectedUsernames.filter(uname => {
     const acc = usersDb?.[uname];
@@ -832,6 +847,18 @@ export default function TeacherDashboard({
             className="bg-[#570DF8]/10 hover:bg-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD] hover:text-white border border-[#570DF8]/25 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-2xl transition flex items-center gap-2"
           >
             <Sparkles className="w-4 h-4" /> Tạo Bài Tập 4 Kỹ Năng
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowNotifyModal(true)}
+            className="bg-amber-50 hover:bg-amber-500 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500 hover:text-white border border-amber-300 dark:border-amber-500/40 text-xs sm:text-sm font-extrabold px-4 py-3 rounded-2xl transition flex items-center gap-2"
+          >
+            <Bell className="w-4 h-4" /> Gửi Thông Báo
+            {notifications.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-600/15 dark:bg-white/15 text-[10px] font-black tabular-nums">
+                {notifications.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -2282,6 +2309,181 @@ export default function TeacherDashboard({
           </div>
         );
       })()}
+
+      {/* Teacher Notification Broadcast Modal */}
+      {showNotifyModal && (
+        <div
+          className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowNotifyModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-pink-200 dark:border-slate-700 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-[#FDF2F6] dark:bg-slate-800/80 border-b border-pink-200/80 dark:border-slate-700 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Megaphone className="w-4 h-4 text-amber-500" /> Gửi Thông Báo Học Tập Tới Lớp
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Mọi thông báo được đồng bộ real-time lên thanh chuông của toàn bộ học viên. (Khi bạn tạo hoặc mở công khai đề thi mới, hệ thống cũng tự động thông báo!)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotifyModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-pink-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-5">
+              <form
+                onSubmit={async e => {
+                  e.preventDefault();
+                  if (!handleCreateNotification || notifySending) return;
+                  setNotifySending(true);
+                  const ok = await handleCreateNotification(notifyForm);
+                  setNotifySending(false);
+                  if (ok !== false) {
+                    setNotifyForm({ title: '', message: '', type: 'announcement', testId: '', roomPin: '' });
+                  }
+                }}
+                className="space-y-3.5 bg-slate-50/90 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Loại thông báo</label>
+                    <select
+                      value={notifyForm.type}
+                      onChange={e => setNotifyForm(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100"
+                    >
+                      <option value="announcement">📢 Thông báo chung</option>
+                      <option value="exam">📝 Giao Đề Thi IELTS</option>
+                      <option value="exercise">✨ Giao Bài Tập 4 Kỹ Năng</option>
+                      <option value="game">🚀 Mời Đua Top Game Từ Vựng</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Đính kèm Đề / Bài tập (tùy chọn)
+                    </label>
+                    <select
+                      value={notifyForm.testId}
+                      onChange={e => {
+                        const tid = e.target.value;
+                        const matched = tests.find(t => t.id === tid);
+                        setNotifyForm(prev => ({
+                          ...prev,
+                          testId: tid,
+                          roomPin: tid ? '' : prev.roomPin,
+                          type: matched ? (matched.testMode === 'single_skill' ? 'exercise' : 'exam') : prev.type,
+                          title: !prev.title && matched ? `Nhắc làm bài: ${matched.title}` : prev.title
+                        }));
+                      }}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100"
+                    >
+                      <option value="">-- Không đính kèm đề thi --</option>
+                      {tests
+                        .filter(t => (t?.visibility || 'public') !== 'private')
+                        .map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.testMode === 'single_skill' ? '[Bài Tập] ' : '[Đề Thi] '}
+                            {t.title}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tiêu đề thông báo *</label>
+                    <input
+                      type="text"
+                      required
+                      value={notifyForm.title}
+                      onChange={e => setNotifyForm(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="VD: Hoàn thành Mock Test 02 trước 21h tối nay!"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Hoặc PIN Game (nếu mời)</label>
+                    <input
+                      type="text"
+                      value={notifyForm.roomPin}
+                      onChange={e => setNotifyForm(prev => ({ ...prev, roomPin: e.target.value, testId: e.target.value ? '' : prev.testId }))}
+                      placeholder={`VD: ${currentRoomPin}`}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Nội dung chi tiết *</label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={notifyForm.message}
+                    onChange={e => setNotifyForm(prev => ({ ...prev, message: e.target.value }))}
+                    placeholder="Nhập dặn dò, hạn nộp bài hoặc phần thưởng danh hiệu cho học viên..."
+                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={notifySending}
+                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-extrabold transition shadow flex items-center gap-1.5"
+                  >
+                    <Send className="w-3.5 h-3.5" /> {notifySending ? 'Đang gửi...' : 'Phát Thông Báo Tới Toàn Lớp'}
+                  </button>
+                </div>
+              </form>
+
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Lịch Sử Thông Báo Đã Gửi ({notifications.length})
+                </h4>
+                {notifications.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-4 text-center">Chưa có thông báo nào được gửi.</p>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {notifications.map(n => (
+                      <div
+                        key={n.id}
+                        className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-start justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-extrabold text-slate-900 dark:text-white">{n.title}</p>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">{n.message}</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {n.createdAt} • {n.readCount || 0} học viên đã xem
+                          </p>
+                        </div>
+                        {handleDeleteNotification && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNotification(n.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/15 shrink-0"
+                            title="Xóa thông báo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

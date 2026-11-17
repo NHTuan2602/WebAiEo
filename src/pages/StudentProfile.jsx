@@ -5,12 +5,15 @@ import {
   BookOpen,
   Calendar,
   Camera,
+  Check,
   CheckCircle,
   CheckCircle2,
   ChevronLeft,
   Clock,
   Edit,
   ExternalLink,
+  Eye,
+  EyeOff,
   FileText,
   Gamepad2,
   Globe,
@@ -20,6 +23,7 @@ import {
   Lock,
   MapPin,
   MessageSquare,
+  Palette,
   PenTool,
   Phone,
   Play,
@@ -32,12 +36,22 @@ import {
   Target,
   Trash2,
   TrendingUp,
+  Trophy,
+  Upload,
   UserCheck,
-  Users
+  Users,
+  X
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
 import { normalizeExamConfig } from '../constants/seedData';
-import { countExtensionCheatSignals, getRiskAssessment } from '../utils/examHelpers';
+import { countExtensionCheatSignals, getRiskAssessment, compressBannerImageFile } from '../utils/examHelpers';
+import {
+  AVATAR_FRAMES,
+  PROFILE_BANNERS,
+  getProfileBannerById,
+  resolveStudentTitleSummary,
+  resolveVisibleTitleBadge
+} from '../constants/profileCustomization';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 
 export default function StudentProfile({
@@ -47,6 +61,7 @@ export default function StudentProfile({
   currentUser,
   dispatchSyncAction,
   handleTeacherOpenLobby,
+  handleUpdateUserProfileFields,
   openStudentGamePortal,
   previousView,
   roomsDb = {},
@@ -75,6 +90,17 @@ export default function StudentProfile({
   const [fbStatusFilter, setFbStatusFilter] = useState('all');
   const [replyDrafts, setReplyDrafts] = useState({});
   const [statusDrafts, setStatusDrafts] = useState({});
+  const [showTitlesModal, setShowTitlesModal] = useState(false);
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
+  const [customDraft, setCustomDraft] = useState({
+    profileBannerId: 'ocean',
+    profileCoverUrl: '',
+    avatarFrameId: 'none',
+    studyGoal: '',
+    equippedTitleId: 'newbie',
+    showTitleBadge: true
+  });
 
   const isTeacherViewer = currentUser?.role === 'teacher';
   const fallbackUsername = currentUser?.username || Object.keys(usersDb)[0] || supportAdminProfile?.username || 'teacher_ielts';
@@ -105,6 +131,25 @@ export default function StudentProfile({
     : (isSelf || isTeacherViewer);
   const canInspectAttemptDetails = isTeacherViewer || isSelf;
   const canSeeTeacherNotes = isTeacherViewer || isSelf;
+  const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb);
+  const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb);
+  const heroBanner = getProfileBannerById(student.profileBannerId);
+  const hasCustomCover = Boolean(
+    student.profileCoverUrl &&
+    (student.profileCoverUrl.startsWith('data:image/') || student.profileCoverUrl.startsWith('https://'))
+  );
+
+  const openCustomizeModal = () => {
+    setCustomDraft({
+      profileBannerId: student.profileBannerId || 'ocean',
+      profileCoverUrl: student.profileCoverUrl || '',
+      avatarFrameId: student.avatarFrameId || 'none',
+      studyGoal: student.studyGoal || '',
+      equippedTitleId: student.equippedTitleId || titleSummary?.title?.id || 'newbie',
+      showTitleBadge: student.showTitleBadge !== false
+    });
+    setShowCustomizeModal(true);
+  };
 
   const baseMembers = Object.values(usersDb).filter(u => {
     if (!u) return false;
@@ -379,9 +424,22 @@ export default function StudentProfile({
                       ) : isMemberTeacher ? (
                         <span className="text-amber-600 dark:text-amber-300 font-bold">Giáo viên</span>
                       ) : (
-                        <span>
-                          Target {member.targetBand || '7.5'}
-                          {mBest !== null ? ` • Best ${mBest}` : ''}
+                        <span className="inline-flex items-center gap-1 flex-wrap">
+                          {(() => {
+                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb);
+                            if (mTitle && !mTitle.isRoleBuiltIn) {
+                              return (
+                                <span className={`px-1.5 py-0.2 rounded-full border font-extrabold text-[9px] ${mTitle.badgeClass}`}>
+                                  {mTitle.icon} {mTitle.label}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                          <span>
+                            Target {member.targetBand || '7.5'}
+                            {mBest !== null ? ` • Best ${mBest}` : ''}
+                          </span>
                         </span>
                       )}
                     </p>
@@ -394,7 +452,21 @@ export default function StudentProfile({
       </div>
 
       {/* Profile Hero Card */}
-      <div className="bg-gradient-to-r from-[#0F172B] via-[#003538] to-[#065B5B] rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl mb-8 relative overflow-hidden">
+      <div
+        className={`${hasCustomCover ? 'bg-slate-900' : heroBanner.heroClass} rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl mb-8 relative overflow-hidden`}
+        style={
+          hasCustomCover
+            ? {
+                backgroundImage: `url("${student.profileCoverUrl}")`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }
+            : undefined
+        }
+      >
+        {hasCustomCover && (
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/85 via-slate-900/72 to-slate-950/80 pointer-events-none" />
+        )}
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex items-center gap-5">
             <div className="shrink-0 flex flex-col items-center">
@@ -437,12 +509,34 @@ export default function StudentProfile({
                     <ShieldCheck className="w-3 h-3" /> Giáo Viên IELTS
                   </span>
                 ) : (
-                  <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" /> Học Viên Chính Thức
-                  </span>
+                  <>
+                    <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Học Viên Chính Thức
+                    </span>
+                    {visibleTitle && !visibleTitle.isRoleBuiltIn && (
+                      <button
+                        type="button"
+                        onClick={() => setShowTitlesModal(true)}
+                        title="Bấm để xem bảng danh hiệu và cách đạt được"
+                        className={`text-xs px-2.5 py-0.5 rounded-full font-extrabold border flex items-center gap-1 hover:scale-105 transition cursor-pointer ${visibleTitle.heroBadgeClass}`}
+                      >
+                        <span>{visibleTitle.icon}</span>
+                        <span>{visibleTitle.label}</span>
+                      </button>
+                    )}
+                    {isSelf && student.showTitleBadge === false && (
+                      <button
+                        type="button"
+                        onClick={() => setShowTitlesModal(true)}
+                        className="text-[11px] bg-white/10 hover:bg-white/20 text-slate-200 border border-white/25 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 transition"
+                      >
+                        <EyeOff className="w-3 h-3" /> Đang tắt danh hiệu
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
-              <div className="flex items-center gap-4 text-xs text-slate-300 flex-wrap">
+              <div className="flex items-center gap-2.5 text-xs text-slate-300 flex-wrap">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-slate-400" /> Gia nhập: <b>{student.joinedDate || '01/02/2026'}</b>
                 </span>
@@ -452,21 +546,39 @@ export default function StudentProfile({
                   </span>
                 )}
                 {canEditTargetInfo && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditingTargetUser({
+                          username: student.username,
+                          name: student.name || '',
+                          role: student.role || 'student',
+                          targetBand: student.targetBand || 7.5,
+                          studyGoal: student.studyGoal || '',
+                          avatarUrl: student.avatarUrl || ''
+                        })
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 border border-amber-300/40 text-amber-200 text-[11px] font-bold transition"
+                    >
+                      <Edit className="w-3 h-3" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openCustomizeModal}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-pink-500/25 hover:bg-pink-500/40 border border-pink-300/45 text-pink-100 text-[11px] font-bold transition"
+                    >
+                      <Palette className="w-3 h-3" /> Tùy Chỉnh Hình Nền & Khung
+                    </button>
+                  </>
+                )}
+                {!isTargetTeacher && !isTargetSystemAdmin && (
                   <button
                     type="button"
-                    onClick={() =>
-                      setEditingTargetUser({
-                        username: student.username,
-                        name: student.name || '',
-                        role: student.role || 'student',
-                        targetBand: student.targetBand || 7.5,
-                        studyGoal: student.studyGoal || '',
-                        avatarUrl: student.avatarUrl || ''
-                      })
-                    }
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/35 border border-amber-300/40 text-amber-200 text-[11px] font-bold transition"
+                    onClick={() => setShowTitlesModal(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-400/20 hover:bg-teal-400/35 border border-teal-300/45 text-teal-100 text-[11px] font-bold transition"
                   >
-                    <Edit className="w-3 h-3" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
+                    <Trophy className="w-3 h-3" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 9})
                   </button>
                 )}
                 {(student.studyGoal || isTargetTeacher || isTargetSystemAdmin) && (
@@ -1423,6 +1535,383 @@ export default function StudentProfile({
           </div>
         </div>
       </div>
+
+      {/* Modal: Bảng Danh Hiệu Học Viên & Cách Đạt Được */}
+      {showTitlesModal && !isTargetTeacher && !isTargetSystemAdmin && titleSummary && (
+        <div
+          className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowTitlesModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-pink-200 dark:border-slate-700 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-gradient-to-r from-[#0F172B] via-[#003538] to-[#065B5B] text-white flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-300" /> Bảng Danh Hiệu Học Viên — {student.name}
+                </h3>
+                <p className="text-xs text-teal-100/90 mt-0.5">
+                  Dành riêng cho Học viên (Giảng viên &amp; Quản trị có huy hiệu chức vụ cố định). Hoàn thành bài thi &amp; chơi Game để mở khóa toàn bộ!
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTitlesModal(false)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
+              {/* Student Metrics Summary + Visibility Switch */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#FDF2F6] dark:bg-slate-800/70 border border-pink-200/80 dark:border-slate-700">
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  <span>📝 Số bài đã làm: <b className="text-slate-900 dark:text-white">{titleSummary.stats?.examCount || 0} bài</b></span>
+                  <span>🎯 Band cao nhất: <b className="text-[#007A7A] dark:text-[#1EE1D6]">{titleSummary.stats?.highestBand ? titleSummary.stats.highestBand.toFixed(1) : '0.0'}</b></span>
+                  <span>🎮 Game kỷ lục: <b className="text-purple-700 dark:text-purple-300">{titleSummary.stats?.bestGameScore || 0}đ</b></span>
+                </div>
+
+                {isSelf && handleUpdateUserProfileFields && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleUpdateUserProfileFields(student.username, {
+                        showTitleBadge: !(student.showTitleBadge !== false),
+                        customToast: student.showTitleBadge === false
+                          ? 'Đã BẬT hiển thị danh hiệu trên Profile & Game!'
+                          : 'Đã TẮT hiển thị danh hiệu trên Profile & Game.'
+                      })
+                    }
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border flex items-center gap-1.5 transition ${
+                      student.showTitleBadge !== false
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600'
+                    }`}
+                  >
+                    {student.showTitleBadge !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    {student.showTitleBadge !== false ? 'Đang HIỆN danh hiệu (Bấm để tắt)' : 'Đang ẨN danh hiệu (Bấm để bật)'}
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {titleSummary.itemsWithProgress.map(item => {
+                  const isEquipped = titleSummary.title?.id === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-4 rounded-2xl border transition flex flex-col justify-between gap-3 ${
+                        item.unlocked
+                          ? isEquipped
+                            ? 'bg-[#EDFFFD]/90 dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/15'
+                            : 'bg-white dark:bg-slate-800/80 border-emerald-200 dark:border-emerald-500/30 shadow-xs'
+                          : 'bg-slate-50/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-90'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-10 h-10 rounded-xl bg-white dark:bg-slate-950 border border-pink-200/80 dark:border-slate-700 flex items-center justify-center text-xl shrink-0 shadow-2xs">
+                              {item.icon}
+                            </span>
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                                {item.tier}
+                              </span>
+                              <h4 className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                                {item.label}
+                              </h4>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border shrink-0 ${
+                            item.unlocked
+                              ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/40'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                          }`}>
+                            {item.unlocked ? 'Đã đạt' : 'Chưa mở'}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                          <b>Cách đạt được:</b> {item.conditionText}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                            <span>Tiến độ</span>
+                            <span className={item.unlocked ? 'text-emerald-600 dark:text-emerald-400' : ''}>{item.progressText}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                item.unlocked ? 'bg-emerald-500' : 'bg-[#007A7A] dark:bg-cyan-400'
+                              }`}
+                              style={{ width: `${item.progressPct}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {isSelf && item.unlocked && handleUpdateUserProfileFields && (
+                          <button
+                            type="button"
+                            disabled={isEquipped && student.showTitleBadge !== false}
+                            onClick={() =>
+                              handleUpdateUserProfileFields(student.username, {
+                                equippedTitleId: item.id,
+                                showTitleBadge: true,
+                                customToast: `Đã trang bị danh hiệu ${item.icon} ${item.label}!`
+                              })
+                            }
+                            className={`w-full py-2 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 ${
+                              isEquipped && student.showTitleBadge !== false
+                                ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 cursor-default'
+                                : 'bg-[#007A7A] hover:bg-[#065B5B] text-white shadow-xs'
+                            }`}
+                          >
+                            {isEquipped && student.showTitleBadge !== false ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" /> Đang Trang Bị
+                              </>
+                            ) : (
+                              'Trang Bị Danh Hiệu Này'
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Tùy Chỉnh Giao Diện Profile (Hình nền + Khung Avatar + Khẩu hiệu) */}
+      {showCustomizeModal && canEditTargetInfo && (
+        <div
+          className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowCustomizeModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-pink-200 dark:border-slate-700 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-[#FDF2F6] dark:bg-slate-800/80 border-b border-pink-200/80 dark:border-slate-700 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-pink-500" /> Tùy Chỉnh Hồ Sơ Cá Nhân (@{student.username})
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Cá nhân hóa hình nền Profile, khung viền Avatar và danh hiệu để mọi người trong lớp nhìn thấy phong cách riêng của bạn!
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCustomizeModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-pink-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-5">
+              {/* Live Mini Preview */}
+              {(() => {
+                const previewBanner = getProfileBannerById(customDraft.profileBannerId);
+                const previewCoverOk = Boolean(
+                  customDraft.profileCoverUrl &&
+                  (customDraft.profileCoverUrl.startsWith('data:image/') || customDraft.profileCoverUrl.startsWith('https://'))
+                );
+                const previewUser = {
+                  ...student,
+                  avatarFrameId: customDraft.avatarFrameId
+                };
+                return (
+                  <div
+                    className={`${previewCoverOk ? 'bg-slate-900' : previewBanner.heroClass} rounded-2xl p-4 text-white relative overflow-hidden border border-slate-800`}
+                    style={
+                      previewCoverOk
+                        ? { backgroundImage: `url("${customDraft.profileCoverUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                        : undefined
+                    }
+                  >
+                    {previewCoverOk && <div className="absolute inset-0 bg-slate-950/65 pointer-events-none" />}
+                    <div className="relative z-10 flex items-center gap-3.5">
+                      <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-2xl" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider text-teal-200 font-bold">Xem trước trực tiếp</p>
+                        <p className="text-base font-extrabold truncate">{student.name}</p>
+                        <p className="text-xs text-slate-200 truncate">{customDraft.studyGoal || 'Mục tiêu chinh phục IELTS!'}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Preset Wallpaper Grid */}
+              <div className="space-y-2.5">
+                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  1. Chọn Hình Nền Gradient Có Sẵn
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {PROFILE_BANNERS.map(b => {
+                    const active = customDraft.profileBannerId === b.id && !customDraft.profileCoverUrl;
+                    return (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => setCustomDraft(prev => ({ ...prev, profileBannerId: b.id, profileCoverUrl: '' }))}
+                        className={`p-2.5 rounded-2xl border text-left transition ${
+                          active
+                            ? 'border-[#007A7A] ring-2 ring-[#007A7A]/30 bg-[#EDFFFD]/50 dark:bg-teal-950/30'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                        }`}
+                      >
+                        <div className={`h-9 rounded-xl ${b.previewClass} mb-2`} />
+                        <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{b.name}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{b.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Custom Wallpaper Image Upload or URL */}
+              <div className="space-y-2">
+                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Hoặc Tải Ảnh Hình Nền Riêng Từ Máy
+                </label>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold cursor-pointer hover:opacity-90 transition">
+                    <Upload className="w-3.5 h-3.5" /> Chọn Ảnh Hình Nền
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        try {
+                          const compressed = await compressBannerImageFile(file);
+                          setCustomDraft(prev => ({ ...prev, profileCoverUrl: compressed }));
+                        } catch (err) {
+                          showToast?.(err?.message || 'Không thể tải ảnh hình nền.', 'error');
+                        }
+                      }}
+                    />
+                  </label>
+                  {customDraft.profileCoverUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomDraft(prev => ({ ...prev, profileCoverUrl: '' }))}
+                      className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-500/30"
+                    >
+                      Xóa ảnh nền riêng
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="url"
+                  value={customDraft.profileCoverUrl?.startsWith('https://') ? customDraft.profileCoverUrl : ''}
+                  onChange={e => setCustomDraft(prev => ({ ...prev, profileCoverUrl: e.target.value.trim() }))}
+                  placeholder="Hoặc dán URL ảnh https://... (tùy chọn)"
+                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100"
+                />
+              </div>
+
+              {/* Avatar Frame Picker */}
+              <div className="space-y-2.5">
+                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  2. Khung Viền Avatar Nổi Bật
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {AVATAR_FRAMES.map(frame => {
+                    const active = (customDraft.avatarFrameId || 'none') === frame.id;
+                    return (
+                      <button
+                        key={frame.id}
+                        type="button"
+                        onClick={() => setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }))}
+                        className={`p-2 rounded-2xl border flex flex-col items-center gap-1.5 transition ${
+                          active
+                            ? 'border-[#007A7A] bg-[#EDFFFD] dark:bg-teal-950/35 ring-2 ring-[#007A7A]/25'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                        }`}
+                      >
+                        <span className={`w-7 h-7 rounded-full ${frame.previewBg} ${frame.id !== 'none' ? frame.ringClass : ''}`} />
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate max-w-full">{frame.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Study Goal / Bio + Student Title Toggle */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    3. Khẩu Hiệu / Giới Thiệu Bản Thân
+                  </label>
+                  <input
+                    type="text"
+                    value={customDraft.studyGoal}
+                    onChange={e => setCustomDraft(prev => ({ ...prev, studyGoal: e.target.value }))}
+                    placeholder="VD: Quyết tâm Band 7.5 trước tháng 12!"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                {!isTargetTeacher && !isTargetSystemAdmin && (
+                  <label className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                    <div>
+                      <p className="text-xs font-extrabold text-slate-900 dark:text-white">Hiển thị Danh Hiệu trước tên</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Bật để bạn bè thấy Danh Hiệu ({titleSummary?.title?.icon} {titleSummary?.title?.label}) trong Game &amp; Hồ sơ.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(customDraft.showTitleBadge)}
+                      onChange={e => setCustomDraft(prev => ({ ...prev, showTitleBadge: e.target.checked }))}
+                      className="w-4 h-4 accent-[#007A7A]"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/70 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCustomizeModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700 rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isSavingProfileTheme}
+                onClick={async () => {
+                  if (!handleUpdateUserProfileFields || isSavingProfileTheme) return;
+                  setIsSavingProfileTheme(true);
+                  await handleUpdateUserProfileFields(student.username, customDraft);
+                  setIsSavingProfileTheme(false);
+                  setShowCustomizeModal(false);
+                }}
+                className="px-5 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" /> {isSavingProfileTheme ? 'Đang lưu...' : 'Lưu Tùy Chỉnh Profile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -181,7 +181,34 @@ export function parseBulkStudentsText(rawText) {
   }).filter(u => u.username && u.pass);
 }
 
-export function parseRawVocabText(rawText) {
+function hashStringSeed(seedStr) {
+  let h = 2166136261 >>> 0;
+  const str = String(seedStr || 'ielts-seed');
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+export function shuffleArrayWithSeed(items, seedStr) {
+  const arr = Array.isArray(items) ? [...items] : [];
+  if (arr.length <= 1) return arr;
+  let state = hashStringSeed(seedStr) || 1;
+  const nextRand = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(nextRand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+export function parseRawVocabText(rawText, seedStr = null) {
   const lines = String(rawText || '').split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
   const parsedItems = [];
   const seenWords = new Set();
@@ -218,7 +245,10 @@ export function parseRawVocabText(rawText) {
       if (pool.length >= 8) break;
       if (fb !== item.word && !pool.includes(fb)) pool.push(fb);
     }
-    item.distractors = pool.sort(() => Math.random() - 0.5).slice(0, 4);
+    const orderedPool = seedStr
+      ? shuffleArrayWithSeed(pool, `${seedStr}:dist:${item.word}`)
+      : [...pool].sort(() => Math.random() - 0.5);
+    item.distractors = orderedPool.slice(0, 4);
   });
 
   return parsedItems;
@@ -245,6 +275,44 @@ export function compressAvatarImageFile(file, targetSize = 160) {
         const sy = (img.height - minSide) / 2;
         ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
         resolve(canvas.toDataURL('image/jpeg', 0.84));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+export function compressBannerImageFile(file, targetWidth = 960, targetHeight = 320) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type?.startsWith('image/')) {
+      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP).'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error('Không thể xử lý định dạng ảnh này.'));
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        const targetRatio = targetWidth / targetHeight;
+        const srcRatio = img.width / Math.max(1, img.height);
+        let sx = 0;
+        let sy = 0;
+        let sw = img.width;
+        let sh = img.height;
+        if (srcRatio > targetRatio) {
+          sw = img.height * targetRatio;
+          sx = (img.width - sw) / 2;
+        } else {
+          sh = img.width / targetRatio;
+          sy = (img.height - sh) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+        resolve(canvas.toDataURL('image/jpeg', 0.78));
       };
       img.src = reader.result;
     };
@@ -327,12 +395,32 @@ export function normalizeRoomObject(room, pinKey, now = Date.now()) {
     maxPlayers: room?.maxPlayers || 30,
     roundSize: Math.max(2, Math.min(8, Number(room?.roundSize) || 4)),
     speedMode: ['relaxed', 'normal', 'turbo'].includes(room?.speedMode) ? room.speedMode : 'normal',
+    shufflePerPlayer: Boolean(room?.shufflePerPlayer),
     startedAt: room?.startedAt || null,
     lobbyPlayers: prunedChat.lobbyPlayers,
     liveMatch: room?.liveMatch || {},
+    questionSolves: room?.questionSolves && typeof room.questionSolves === 'object' ? { ...room.questionSolves } : {},
     chatMessages: prunedChat.chatMessages,
     chatCycleStartedAt: prunedChat.chatCycleStartedAt,
     rawVocab: room?.rawVocab || DEFAULT_VOCAB_TEXT,
     players: room?.players || {}
+  };
+}
+
+export function buildSeededRoundQueues(roomInput, pinKey = '', username = '', fallbackVocab = DEFAULT_VOCAB_TEXT) {
+  const room = normalizeRoomObject(roomInput || { rawVocab: fallbackVocab }, pinKey);
+  const baseSeed = room.startedAt ? `${room.pin || pinKey}:${room.startedAt}` : `${room.pin || pinKey}:preview`;
+  const seed = room.shufflePerPlayer
+    ? `${baseSeed}:player:${String(username || 'guest')}`
+    : `${baseSeed}:shared`;
+  const vocabList = parseRawVocabText(room.rawVocab || fallbackVocab, seed);
+  const ordered = shuffleArrayWithSeed(vocabList, `${seed}:words`);
+  const total = ordered.length;
+  const desiredPerRound = Math.max(2, Math.min(8, Number(room.roundSize) || 4));
+  const perRound = Math.max(1, Math.min(desiredPerRound, Math.floor(total / 3) || 1));
+  return {
+    1: ordered.slice(0, perRound),
+    2: ordered.slice(perRound, perRound * 2),
+    3: ordered.slice(perRound * 2, perRound * 3)
   };
 }

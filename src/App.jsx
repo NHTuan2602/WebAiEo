@@ -32,7 +32,8 @@ import {
   parseBulkStudentsText,
   parseRawVocabText,
   normalizeRoomObject,
-  pruneExpiredRoomChat
+  pruneExpiredRoomChat,
+  buildSeededRoundQueues
 } from './utils/examHelpers';
 import {
   testGeminiApiConnection,
@@ -223,8 +224,11 @@ export default function App() {
   const avatarImageRef = useRef(null);
   const [lobbyCountdown, setLobbyCountdown] = useState(null);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
-  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal' });
-  const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal' });
+  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
+  const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
+  const [notifications, setNotifications] = useState([]);
+  const seenNotifIdsRef = useRef(null);
+  const serverBonusTotalRef = useRef(0);
   const [lobbyChatInput, setLobbyChatInput] = useState('');
   const [lobbyNowTick, setLobbyNowTick] = useState(() => Date.now());
   const [serverSyncConnected, setServerSyncConnected] = useState(false);
@@ -416,7 +420,12 @@ export default function App() {
       ...(patch.name !== undefined ? { name: patch.name.trim() || targetUser.name } : {}),
       ...(nextRole === 'teacher' || patch.targetBand !== undefined ? { targetBand: cleanBand } : {}),
       ...(patch.studyGoal !== undefined ? { studyGoal: patch.studyGoal.trim() } : {}),
-      ...(patch.avatarUrl !== undefined ? { avatarUrl: nextAvatar } : {})
+      ...(patch.avatarUrl !== undefined ? { avatarUrl: nextAvatar } : {}),
+      ...(patch.profileBannerId !== undefined ? { profileBannerId: patch.profileBannerId || 'ocean' } : {}),
+      ...(patch.profileCoverUrl !== undefined ? { profileCoverUrl: patch.profileCoverUrl || '' } : {}),
+      ...(patch.avatarFrameId !== undefined ? { avatarFrameId: patch.avatarFrameId || 'none' } : {}),
+      ...(patch.equippedTitleId !== undefined ? { equippedTitleId: patch.equippedTitleId || 'newbie' } : {}),
+      ...(patch.showTitleBadge !== undefined ? { showTitleBadge: Boolean(patch.showTitleBadge) } : {})
     };
     setUsersDb(prev => ({ ...prev, [username]: updatedUser }));
     if (currentUser?.username === username) {
@@ -427,8 +436,18 @@ export default function App() {
       }
     }
     await dispatchSyncAction('UPSERT_USER', { username, user: updatedUser });
+    const isStylingOnly =
+      patch.profileBannerId !== undefined ||
+      patch.profileCoverUrl !== undefined ||
+      patch.avatarFrameId !== undefined ||
+      patch.equippedTitleId !== undefined ||
+      patch.showTitleBadge !== undefined;
     showToast(
-      updatedUser.role === 'teacher'
+      patch.customToast
+        ? patch.customToast
+        : isStylingOnly
+        ? `Đã cập nhật giao diện hồ sơ & danh hiệu cho ${updatedUser.name}!`
+        : updatedUser.role === 'teacher'
         ? `Đã cập nhật tài khoản ${updatedUser.isSuperAdmin ? 'Quản trị' : 'Giáo viên'} ${updatedUser.name}!`
         : `Đã cập nhật tài khoản ${updatedUser.name} (Target Band ${updatedUser.targetBand})!`
     );
@@ -999,6 +1018,8 @@ export default function App() {
         authEpochRef.current += 1;
         currentUserRef.current = null;
         setCurrentUser(null);
+        seenNotifIdsRef.current = null;
+        setNotifications([]);
         setJoinedRoomPin(null);
         setGameSubState('JOIN');
         setView('AUTH');
@@ -1060,6 +1081,19 @@ export default function App() {
     }
     if (Array.isArray(snap.adminFeedbacks)) {
       setAdminFeedbacks(prev => (JSON.stringify(prev) === JSON.stringify(snap.adminFeedbacks) ? prev : snap.adminFeedbacks));
+    }
+    if (Array.isArray(snap.notifications)) {
+      const nextNotifs = snap.notifications;
+      if (seenNotifIdsRef.current !== null && currentUserRef.current?.username) {
+        const freshlyArrived = nextNotifs.find(
+          n => n && !n.isRead && !seenNotifIdsRef.current.has(n.id) && n.createdBy !== currentUserRef.current?.username
+        );
+        if (freshlyArrived) {
+          showToast(`🔔 ${freshlyArrived.title}: ${freshlyArrived.message}`, 'info');
+        }
+      }
+      seenNotifIdsRef.current = new Set(nextNotifs.map(n => n?.id).filter(Boolean));
+      setNotifications(prev => (JSON.stringify(prev) === JSON.stringify(nextNotifs) ? prev : nextNotifs));
     }
   };
 
@@ -1336,7 +1370,8 @@ export default function App() {
         name: r.name || `Phòng Từ Vựng #${currentRoomPin}`,
         pass: r.pass ?? 'ielts',
         roundSize: Math.max(2, Math.min(8, Number(r.roundSize) || 4)),
-        speedMode: ['relaxed', 'normal', 'turbo'].includes(r.speedMode) ? r.speedMode : 'normal'
+        speedMode: ['relaxed', 'normal', 'turbo'].includes(r.speedMode) ? r.speedMode : 'normal',
+        shufflePerPlayer: Boolean(r.shufflePerPlayer)
       });
     }
   }, [currentRoomPin]);
@@ -1555,6 +1590,69 @@ export default function App() {
     }, 3000);
   };
 
+  // Notification Handlers (Announcements & Auto-Exam Alerts)
+  const handleCreateNotification = async ({ title, message, type = 'announcement', testId = '', roomPin = '' }) => {
+    if (currentUser?.role !== 'teacher') return;
+    const cleanTitle = String(title || '').trim();
+    const cleanMessage = String(message || '').trim();
+    if (!cleanTitle || !cleanMessage) {
+      showToast('Vui lòng nhập đầy đủ Tiêu đề và Nội dung thông báo!', 'error');
+      return false;
+    }
+    await dispatchSyncAction('CREATE_NOTIFICATION', {
+      title: cleanTitle,
+      message: cleanMessage,
+      type,
+      testId: testId || '',
+      roomPin: roomPin || ''
+    });
+    showToast('Đã phát thông báo tới toàn bộ học viên!');
+    return true;
+  };
+
+  const handleMarkNotificationsRead = (notificationId = 'all') => {
+    setNotifications(prev =>
+      prev.map(n => (notificationId === 'all' || n.id === notificationId ? { ...n, isRead: true } : n))
+    );
+    dispatchSyncAction('MARK_NOTIFICATIONS_READ', { notificationId });
+  };
+
+  const handleDeleteNotification = (notificationId) => {
+    if (currentUser?.role !== 'teacher' || !notificationId) return;
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    dispatchSyncAction('DELETE_NOTIFICATION', { notificationId });
+    showToast('Đã xóa thông báo.');
+  };
+
+  const handleOpenNotificationTarget = (notif) => {
+    if (!notif) return;
+    if (!notif.isRead) {
+      handleMarkNotificationsRead(notif.id);
+    }
+    if (notif.roomPin) {
+      setJoinedRoomPin(notif.roomPin);
+      setRoomJoinForm(prev => ({ ...prev, pin: notif.roomPin }));
+      setGameSubState('JOIN');
+      setView('GAME_ARENA');
+      return;
+    }
+    if (notif.testId) {
+      const targetTest = tests.find(t => t.id === notif.testId);
+      if (targetTest) {
+        if (currentUser?.role === 'teacher') {
+          setPreviousView('TEACHER_DASHBOARD');
+          setTeacherHubTab(targetTest.testMode === 'single_skill' ? 'skill_exercises' : 'tests');
+          setExpandedTeacherTestId(targetTest.id);
+          setView('TEACHER_DASHBOARD');
+        } else {
+          startExam(targetTest.id);
+        }
+      } else {
+        showToast('Đề thi liên kết với thông báo này hiện không còn khả dụng hoặc đang ẩn.', 'info');
+      }
+    }
+  };
+
   // Sync Student Game Score & Real-time Race Progress to Leaderboard
   const syncLiveMatchProgress = ({
     scoreVal = 0,
@@ -1564,12 +1662,14 @@ export default function App() {
     progressText = 'Đang chơi',
     finished = false,
     outcome = null,
-    missedWords = []
+    missedWords = [],
+    solveEvent = null
   }) => {
     if (!currentUser || currentUser.role === 'teacher' || gameRuntimeRef.current.isSandbox) return;
     const targetPin = joinedRoomPin || currentRoomPin;
     const roomObj = roomsDb[targetPin];
     const lobbyInfo = roomObj?.lobbyPlayers?.[currentUser.username];
+    const clientBaseScore = Math.max(0, Number(scoreVal) - serverBonusTotalRef.current);
     const liveEntry = {
       username: currentUser.username,
       name: currentUser.name || currentUser.username,
@@ -1579,6 +1679,7 @@ export default function App() {
       accessoryId: lobbyInfo?.accessoryId || myAccessoryId,
       avatarUrl: currentUser.avatarUrl || '',
       score: scoreVal,
+      clientBaseScore,
       streak: streakVal,
       lives: livesVal,
       round: roundNum,
@@ -1614,7 +1715,8 @@ export default function App() {
     dispatchSyncAction('UPDATE_LIVE_SCORE', {
       pin: targetPin,
       username: currentUser.username,
-      entry: liveEntry
+      entry: liveEntry,
+      ...(solveEvent ? { solveEvent } : {})
     });
   };
 
@@ -1895,6 +1997,7 @@ export default function App() {
     const newPass = (hostRoomDraft.pass || '').trim() || 'ielts';
     const cleanRoundSize = Math.max(2, Math.min(8, Number(hostRoomDraft.roundSize) || 4));
     const cleanSpeedMode = ['relaxed', 'normal', 'turbo'].includes(hostRoomDraft.speedMode) ? hostRoomDraft.speedMode : 'normal';
+    const cleanShufflePerPlayer = Boolean(hostRoomDraft.shufflePerPlayer);
 
     if (newPin !== oldPin && roomsDb[newPin]) {
       showToast(`Mã phòng "${newPin}" đã tồn tại — hãy chọn mã PIN khác hoặc bấm chọn phòng đó!`, 'error');
@@ -1910,7 +2013,8 @@ export default function App() {
           name: newName,
           pass: newPass,
           roundSize: cleanRoundSize,
-          speedMode: cleanSpeedMode
+          speedMode: cleanSpeedMode,
+          shufflePerPlayer: cleanShufflePerPlayer
         },
         newPin
       );
@@ -1923,14 +2027,27 @@ export default function App() {
 
     setCurrentRoomPin(newPin);
     setJoinedRoomPin(newPin);
-    setHostRoomDraft({ pin: newPin, name: newName, pass: newPass, roundSize: cleanRoundSize, speedMode: cleanSpeedMode });
+    setHostRoomDraft({
+      pin: newPin,
+      name: newName,
+      pass: newPass,
+      roundSize: cleanRoundSize,
+      speedMode: cleanSpeedMode,
+      shufflePerPlayer: cleanShufflePerPlayer
+    });
 
     dispatchSyncAction('UPSERT_ROOM', {
       pin: newPin,
       oldPin: oldPin !== newPin ? oldPin : undefined,
-      updates: { name: newName, pass: newPass, roundSize: cleanRoundSize, speedMode: cleanSpeedMode }
+      updates: {
+        name: newName,
+        pass: newPass,
+        roundSize: cleanRoundSize,
+        speedMode: cleanSpeedMode,
+        shufflePerPlayer: cleanShufflePerPlayer
+      }
     });
-    showToast(`Đã cập nhật phòng "${newName}" (PIN: ${newPin} • ${cleanRoundSize} từ/vòng • ${cleanSpeedMode})!`);
+    showToast(`Đã cập nhật phòng "${newName}" (${cleanShufflePerPlayer ? 'Đảo từ riêng' : 'Chung câu hỏi'} • ${cleanRoundSize} từ/vòng)!`);
   };
 
   const handleTeacherResetLobby = (pin = currentRoomPin) => {
@@ -1998,11 +2115,16 @@ export default function App() {
           ...r,
           status: 'PLAYING',
           startedAt: launchTs,
+          questionSolves: {},
           liveMatch: freshLive
         }
       };
     });
-    dispatchSyncAction('START_GAME', { pin: targetPin, startedAt: launchTs });
+    dispatchSyncAction('START_GAME', {
+      pin: targetPin,
+      startedAt: launchTs,
+      shufflePerPlayer: Boolean(targetRoom.shufflePerPlayer)
+    });
   };
 
   const handleLeaveGameLobby = () => {
@@ -2259,8 +2381,10 @@ export default function App() {
       maxPlayers: 30,
       roundSize: Math.max(2, Math.min(8, Number(newRoomForm.roundSize) || 4)),
       speedMode: ['relaxed', 'normal', 'turbo'].includes(newRoomForm.speedMode) ? newRoomForm.speedMode : 'normal',
+      shufflePerPlayer: Boolean(newRoomForm.shufflePerPlayer),
       startedAt: null,
       lobbyPlayers: teacherEntry ? { [currentUser.username]: teacherEntry } : {},
+      questionSolves: {},
       chatMessages: [],
       rawVocab: DEFAULT_VOCAB_TEXT,
       players: {}
@@ -2277,10 +2401,11 @@ export default function App() {
       name: cleanName,
       pass: cleanPass,
       roundSize: newRoomObj.roundSize,
-      speedMode: newRoomObj.speedMode
+      speedMode: newRoomObj.speedMode,
+      shufflePerPlayer: newRoomObj.shufflePerPlayer
     });
     setShowCreateRoomModal(false);
-    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal' });
+    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
 
     dispatchSyncAction('UPSERT_ROOM', { pin: generatedPin, updates: newRoomObj });
     showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} • Pass: ${cleanPass})!`);
@@ -2426,6 +2551,9 @@ export default function App() {
     setGameSubState('JOIN');
     setSupportAdminProfile(null);
     setAdminFeedbacks([]);
+    seenNotifIdsRef.current = null;
+    setNotifications([]);
+    serverBonusTotalRef.current = 0;
     currentUserRef.current = null;
     setCurrentUser(null);
     setView('AUTH');
@@ -3696,27 +3824,40 @@ export default function App() {
     });
   };
 
-  const buildRoundQueuesFromRoom = (pin) => {
+  const buildRoundQueuesFromRoom = (pin, userObj = currentUser) => {
     const room = normalizeRoomObject(roomsDb[pin] || { rawVocab: DEFAULT_VOCAB_TEXT }, pin);
-    const vocabList = parseRawVocabText(room.rawVocab || DEFAULT_VOCAB_TEXT);
-    const shuffled = [...vocabList].sort(() => Math.random() - 0.5);
-    const total = shuffled.length;
-    const desiredPerRound = Math.max(2, Math.min(8, Number(room.roundSize) || 4));
-    const perRound = Math.max(1, Math.min(desiredPerRound, Math.floor(total / 3) || 1));
-    return {
-      1: shuffled.slice(0, perRound),
-      2: shuffled.slice(perRound, perRound * 2),
-      3: shuffled.slice(perRound * 2, perRound * 3)
-    };
+    return buildSeededRoundQueues(room, pin, userObj?.username || '', DEFAULT_VOCAB_TEXT);
   };
+
+  // Sync authoritative server-side fastest-responder bonuses into live Game HUD
+  useEffect(() => {
+    if (view !== 'GAME_ARENA' || !currentUser || currentUser.role === 'teacher') return;
+    if (gameRuntimeRef.current?.subState !== 'PLAYING' || gameRuntimeRef.current?.isSandbox) return;
+    const activePin = joinedRoomPin || currentRoomPin;
+    const myLiveEntry = roomsDb[activePin]?.liveMatch?.[currentUser.username];
+    const remoteBonus = Number(myLiveEntry?.serverFirstBonusTotal) || 0;
+    if (remoteBonus > serverBonusTotalRef.current) {
+      const delta = remoteBonus - serverBonusTotalRef.current;
+      serverBonusTotalRef.current = remoteBonus;
+      gameRuntimeRef.current.score += delta;
+      setGameScore(gameRuntimeRef.current.score);
+      if (myLiveEntry?.lastFastestRank === 1 && myLiveEntry?.lastFastestWord) {
+        triggerGameToast(
+          `⚡ Nhanh nhất từ "${myLiveEntry.lastFastestWord}"! +${myLiveEntry.lastFastestBonus || delta}đ Hạng #1`,
+          true
+        );
+      }
+    }
+  }, [roomsDb, view, joinedRoomPin, currentRoomPin, currentUser]);
 
   const initGameCampaign = (pin = joinedRoomPin || currentRoomPin, _userObj = currentUser) => {
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
+    serverBonusTotalRef.current = 0;
 
     const roomObj = normalizeRoomObject(roomsDb[pin] || {}, pin);
     const speedMode = roomObj.speedMode || 'normal';
-    const queues = buildRoundQueuesFromRoom(pin);
+    const queues = buildRoundQueuesFromRoom(pin, _userObj);
     const firstQ = queues[1][0] || null;
     const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
 
@@ -3787,7 +3928,7 @@ export default function App() {
 
     let queues = gameRuntimeRef.current.queues;
     if (!queues?.[roundNum]?.length) {
-      queues = buildRoundQueuesFromRoom(activePin);
+      queues = buildRoundQueuesFromRoom(activePin, currentUser);
       setGameQueues(queues);
     }
     const speedMode = activeRoom.speedMode || 'normal';
@@ -3873,7 +4014,7 @@ export default function App() {
   };
 
   // Handle word progression in game
-  const handleWordCleared = (isCorrect, latestScoreOverride = null, latestComboOverride = null) => {
+  const handleWordCleared = (isCorrect, latestScoreOverride = null, latestComboOverride = null, solveEvent = null) => {
     const rt = gameRuntimeRef.current;
     const q = rt.activeQuestion;
     if (!q || rt.subState !== 'PLAYING') return;
@@ -3908,7 +4049,8 @@ export default function App() {
         livesVal: rt.lives,
         roundNum: currentRoundNum,
         progressText: `Vòng ${currentRoundNum}/3 • Câu ${nextIdx + 1}/${Math.max(1, currentQueue.length)}`,
-        missedWords: [...missedWordsMatchRef.current]
+        missedWords: [...missedWordsMatchRef.current],
+        ...(isCorrect && solveEvent ? { solveEvent } : {})
       });
 
       if (currentRoundNum === 3) {
@@ -3927,7 +4069,8 @@ export default function App() {
           livesVal: rt.lives,
           roundNum: currentRoundNum,
           progressText: `Xong Vòng ${currentRoundNum}/3`,
-          missedWords: [...missedWordsMatchRef.current]
+          missedWords: [...missedWordsMatchRef.current],
+          ...(isCorrect && solveEvent ? { solveEvent } : {})
         });
         let countdown = 3;
         clearTimeout(autoNextTimerRef.current);
@@ -3956,7 +4099,8 @@ export default function App() {
           progressText: 'Hoàn thành 3 Vòng',
           finished: true,
           outcome: 'VICTORY',
-          missedWords: allMissed
+          missedWords: allMissed,
+          ...(isCorrect && solveEvent ? { solveEvent } : {})
         });
         syncScoreToLeaderboard(
           finalScore,
@@ -4060,10 +4204,14 @@ export default function App() {
 
       if (nextProgress >= target.length) {
         rt.questionResolved = true;
+        const limitSec = Math.max(1, rt.timeLimit || (rt.round === 2 ? 22 : 24));
+        const remainRatioR23 = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
+        const reactionMsR23 = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
+        const speedBonusR23 = Math.round(remainRatioR23 * (rt.round === 2 ? 100 : 120));
         const feverMult = rt.combo >= 3 ? 2 : 1;
         const bonus = rt.round === 2 ? 150 : 250;
         const streakBonus = rt.combo * 25;
-        const totalGain = (bonus + streakBonus) * feverMult;
+        const totalGain = (bonus + streakBonus + speedBonusR23) * feverMult;
         const nextScore = rt.score + totalGain;
         const nextCombo = rt.combo + 1;
 
@@ -4076,10 +4224,14 @@ export default function App() {
         playSound('word_clear');
         speakWord(q.word);
         triggerGameToast(
-          `🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+          `🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ${speedBonusR23 > 0 ? ` (⚡+${speedBonusR23})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
           true
         );
-        handleWordCleared(true, nextScore, nextCombo);
+        handleWordCleared(true, nextScore, nextCombo, {
+          questionKey: `${rt.round}:${q.word}`,
+          word: q.word,
+          reactionMs: reactionMsR23
+        });
       }
     } else {
       playSound('wrong');
@@ -4447,8 +4599,12 @@ export default function App() {
 
               if (c.isCorrect) {
                 rt.questionResolved = true;
+                const limitSec = Math.max(1, rt.timeLimit || 25);
+                const remainRatioR1 = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
+                const reactionMsR1 = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
+                const speedBonusR1 = Math.round(remainRatioR1 * 80);
                 const feverMult = rt.combo >= 3 ? 2 : 1;
-                const gain = (120 + rt.combo * 20) * feverMult;
+                const gain = (120 + rt.combo * 20 + speedBonusR1) * feverMult;
                 const nextCombo = rt.combo + 1;
                 const nextScore = rt.score + gain;
                 rt.score = nextScore;
@@ -4460,10 +4616,14 @@ export default function App() {
                 playSound('word_clear');
                 speakWord(rt.activeQuestion.word);
                 triggerGameToast(
-                  `✅ Xuất sắc! ${rt.activeQuestion.word} (${rt.activeQuestion.ipa}) +${gain}đ${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+                  `✅ Xuất sắc! ${rt.activeQuestion.word} (${rt.activeQuestion.ipa}) +${gain}đ${speedBonusR1 > 0 ? ` (⚡+${speedBonusR1})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
                   true
                 );
-                handleWordCleared(true, nextScore, nextCombo);
+                handleWordCleared(true, nextScore, nextCombo, {
+                  questionKey: `1:${rt.activeQuestion.word}`,
+                  word: rt.activeQuestion.word,
+                  reactionMs: reactionMsR1
+                });
               } else {
                 pushGameParticles(c.x, c.y, '#fb7185', 16);
                 chickens.splice(j, 1);
@@ -4749,6 +4909,10 @@ export default function App() {
           currentUser={currentUser}
           darkMode={darkMode}
           handleLogout={handleLogout}
+          notifications={notifications}
+          onDeleteNotification={handleDeleteNotification}
+          onMarkNotificationsRead={handleMarkNotificationsRead}
+          onOpenNotificationTarget={handleOpenNotificationTarget}
           openMemberProfile={openMemberProfile}
           openStudentGamePortal={openStudentGamePortal}
           setApiTestState={setApiTestState}
@@ -4788,6 +4952,7 @@ export default function App() {
             setView('SKILL_HUB');
           }}
           openStudentGamePortal={openStudentGamePortal}
+          roomsDb={roomsDb}
           setEditingTargetUser={setEditingTargetUser}
           setPreviousView={setPreviousView}
           setSelectedAttemptId={setSelectedAttemptId}
@@ -4856,6 +5021,7 @@ export default function App() {
           previousView={previousView}
           roomsDb={roomsDb}
           selectedProfileStudent={selectedProfileStudent}
+          handleUpdateUserProfileFields={handleUpdateUserProfileFields}
           setEditingTargetUser={setEditingTargetUser}
           setPreviousView={setPreviousView}
           setSelectedAttemptId={setSelectedAttemptId}
@@ -5032,8 +5198,10 @@ export default function App() {
           gradingFilters={gradingFilters}
           handleBulkDeleteAccounts={handleBulkDeleteAccounts}
           handleCopyInviteLink={handleCopyInviteLink}
+          handleCreateNotification={handleCreateNotification}
           handleDeleteAccount={handleDeleteAccount}
           handleDeleteAttempt={handleDeleteAttempt}
+          handleDeleteNotification={handleDeleteNotification}
           handleDeleteRoom={handleDeleteRoom}
           handleDeleteTest={handleDeleteTest}
           handleDuplicateTest={handleDuplicateTest}
@@ -5042,6 +5210,7 @@ export default function App() {
           handleTeacherOpenLobby={handleTeacherOpenLobby}
           handleTeacherResetLobby={handleTeacherResetLobby}
           initGameCampaign={initGameCampaign}
+          notifications={notifications}
           openExamBuilder={openExamBuilder}
           openMemberProfile={openMemberProfile}
           openSingleSkillBuilder={openSingleSkillBuilder}
