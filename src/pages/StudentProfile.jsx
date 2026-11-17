@@ -61,7 +61,7 @@ import {
   resolveStudentTitleSummary,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
-import CoverUnlockQrCard from '../components/common/CoverUnlockQrCard';
+import CoverCheckoutModal from '../components/modals/CoverCheckoutModal';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 
 export default function StudentProfile({
@@ -77,6 +77,7 @@ export default function StudentProfile({
   onGrantUserTitles,
   onOpenAccountSecurity,
   onOpenAdminTitleManager,
+  onPullSync = null,
   onRequestCoverUnlock = null,
   onToggleUserCoverUnlock = null,
   openStudentGamePortal,
@@ -111,8 +112,8 @@ export default function StudentProfile({
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [titleFilter, setTitleFilter] = useState('all');
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [showCoverCheckoutModal, setShowCoverCheckoutModal] = useState(false);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
-  const [isRequestingCoverUnlock, setIsRequestingCoverUnlock] = useState(false);
   const [isTogglingCoverUnlock, setIsTogglingCoverUnlock] = useState(false);
   const [coverCropSource, setCoverCropSource] = useState('');
   const [customDraft, setCustomDraft] = useState({
@@ -372,14 +373,26 @@ export default function StudentProfile({
           )}
 
           {canEditTargetInfo && (
-            <button
-              type="button"
-              onClick={openCustomizeModal}
-              className="absolute bottom-3.5 right-3.5 sm:bottom-4 sm:right-5 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-900 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-white border border-slate-200/90 dark:border-slate-700 text-xs font-extrabold shadow-md backdrop-blur-xs transition"
-            >
-              <Camera className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
-              <span>Đổi Ảnh Bìa</span>
-            </button>
+            <div className="absolute bottom-3.5 right-3.5 sm:bottom-4 sm:right-5 flex flex-wrap items-center justify-end gap-2">
+              {isSelf && !studentHasCoverPermission && (
+                <button
+                  type="button"
+                  onClick={() => setShowCoverCheckoutModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold shadow-md transition"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Mở Ảnh Nền ({unlockPriceLabel})</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openCustomizeModal}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-900 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-white border border-slate-200/90 dark:border-slate-700 text-xs font-extrabold shadow-md backdrop-blur-xs transition"
+              >
+                <Camera className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                <span>Đổi Ảnh Bìa</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -2111,18 +2124,26 @@ export default function StudentProfile({
                     />
                   </>
                 ) : (
-                  <CoverUnlockQrCard
-                    username={student.username}
-                    paymentConfig={paymentConfig}
-                    requestedAt={student.coverUnlockRequestedAt}
-                    requesting={isRequestingCoverUnlock}
-                    onRequestUnlock={onRequestCoverUnlock ? async () => {
-                      setIsRequestingCoverUnlock(true);
-                      await onRequestCoverUnlock();
-                      setIsRequestingCoverUnlock(false);
-                    } : null}
-                    showToast={showToast}
-                  />
+                  <div className="p-4 rounded-2xl border border-amber-300 dark:border-amber-500/40 bg-gradient-to-br from-amber-50/90 via-white to-teal-50/70 dark:from-amber-950/25 dark:via-slate-900 dark:to-teal-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Mở khóa tải &amp; cắt ảnh nền riêng ({unlockPriceLabel})</span>
+                      </p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {paymentConfig?.autoVerifyEnabled
+                          ? 'Bấm nút bên cạnh để hiện mã VietQR — chuyển khoản xong hệ thống tự động mở khóa sau vài giây.'
+                          : 'Bấm nút bên cạnh để mở mã VietQR chuyển khoản nhanh (6 nền Gradient phía trên vẫn miễn phí).'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCoverCheckoutModal(true)}
+                      className="shrink-0 px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow-sm inline-flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Mở QR Thanh Toán ({unlockPriceLabel})
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -2229,6 +2250,19 @@ export default function StudentProfile({
           setCoverCropSource('');
         }}
       />
+
+      {showCoverCheckoutModal && isSelf && (
+        <CoverCheckoutModal
+          isOpen={true}
+          currentUser={student}
+          paymentConfig={paymentConfig}
+          onClose={() => setShowCoverCheckoutModal(false)}
+          onUnlockedReady={() => openCustomizeModal()}
+          onRequestUnlock={onRequestCoverUnlock}
+          onPullSync={onPullSync}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }

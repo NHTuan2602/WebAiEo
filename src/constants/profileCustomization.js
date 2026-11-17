@@ -793,7 +793,13 @@ export function formatVndCurrency(amount = CUSTOM_COVER_UNLOCK_PRICE_VND) {
   return `${safe.toLocaleString('vi-VN')}đ`;
 }
 
-export function buildCoverUnlockTransferNote(username = '') {
+export function buildCoverUnlockTransferNote(username = '', orderCode = '') {
+  const cleanOrder = String(orderCode || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+    .slice(0, 20);
+  if (cleanOrder) return cleanOrder;
   const cleaned = String(username || '')
     .trim()
     .replace(/[^a-zA-Z0-9]/g, '')

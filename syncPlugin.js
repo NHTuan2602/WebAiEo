@@ -44,6 +44,63 @@ function timingSafeHexMatch(hexA, hexB) {
   }
 }
 
+function timingSafeStringMatch(strA, strB) {
+  try {
+    const a = crypto.createHash('sha256').update(String(strA || '')).digest();
+    const b = crypto.createHash('sha256').update(String(strB || '')).digest();
+    return Boolean(strA) && Boolean(strB) && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+function sortObjDataByKey(object) {
+  if (object === null || typeof object !== 'object') return object;
+  if (Array.isArray(object)) return object.map(sortObjDataByKey);
+  return Object.keys(object)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = sortObjDataByKey(object[k]);
+      return acc;
+    }, {});
+}
+
+function verifyPayosWebhookSignature(dataObj, signatureHex, checksumKey) {
+  if (!dataObj || typeof dataObj !== 'object' || !signatureHex || !checksumKey) return false;
+  const sorted = sortObjDataByKey(dataObj);
+  const queryStr = Object.keys(sorted)
+    .filter(k => sorted[k] !== undefined)
+    .map(k => {
+      let val = sorted[k];
+      if (val === null || val === undefined) val = '';
+      else if (typeof val === 'object') val = JSON.stringify(val);
+      return `${k}=${val}`;
+    })
+    .join('&');
+  const expected = crypto.createHmac('sha256', String(checksumKey)).update(queryStr).digest('hex');
+  return timingSafeHexMatch(expected, String(signatureHex).trim().toLowerCase());
+}
+
+function getEffectivePaymentSecrets(store) {
+  const sec = store?.paymentSecrets && typeof store.paymentSecrets === 'object' ? store.paymentSecrets : {};
+  return {
+    sepayApiKey: String(sec.sepayApiKey || process.env.SEPAY_API_KEY || '').trim(),
+    payosChecksumKey: String(sec.payosChecksumKey || process.env.PAYOS_CHECKSUM_KEY || '').trim()
+  };
+}
+
+function getPublicPaymentConfigSummary(store) {
+  const cfg = normalizePaymentConfig(store?.paymentConfig || {});
+  const secrets = getEffectivePaymentSecrets(store);
+  return {
+    ...cfg,
+    qrReady: Boolean(cfg.customQrUrl || (cfg.bankCode && cfg.accountNumber)),
+    hasSepayApiKey: Boolean(secrets.sepayApiKey),
+    hasPayosChecksumKey: Boolean(secrets.payosChecksumKey),
+    autoVerifyEnabled: Boolean(secrets.sepayApiKey || secrets.payosChecksumKey)
+  };
+}
+
 function getOtpMap(store) {
   if (!store._otpChallenges || !(store._otpChallenges instanceof Map)) {
     store._otpChallenges = new Map();
@@ -748,6 +805,9 @@ function createInitialStore(audioDir = '') {
     notifications: [],
     aiConfig: { geminiApiKey: '' },
     paymentConfig: normalizePaymentConfig({}),
+    paymentSecrets: { sepayApiKey: '', payosChecksumKey: '' },
+    paymentOrders: [],
+    processedWebhookTxIds: [],
     mailConfig: {
       provider: 'none',
       resendApiKey: '',
@@ -896,6 +956,18 @@ function applyParsedStoreSnapshot(store, parsed) {
   }
   if (parsed.paymentConfig && typeof parsed.paymentConfig === 'object') {
     store.paymentConfig = normalizePaymentConfig(parsed.paymentConfig);
+  }
+  if (parsed.paymentSecrets && typeof parsed.paymentSecrets === 'object') {
+    store.paymentSecrets = {
+      sepayApiKey: String(parsed.paymentSecrets.sepayApiKey || '').trim(),
+      payosChecksumKey: String(parsed.paymentSecrets.payosChecksumKey || '').trim()
+    };
+  }
+  if (Array.isArray(parsed.paymentOrders)) {
+    store.paymentOrders = parsed.paymentOrders.filter(o => o && o.orderCode && o.username).slice(0, 500);
+  }
+  if (Array.isArray(parsed.processedWebhookTxIds)) {
+    store.processedWebhookTxIds = parsed.processedWebhookTxIds.map(String).filter(Boolean).slice(0, 500);
   }
   if (parsed.mailConfig && typeof parsed.mailConfig === 'object') {
     store.mailConfig = {
@@ -1324,7 +1396,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
-      paymentConfig: normalizePaymentConfig(store.paymentConfig),
+      paymentConfig: getPublicPaymentConfigSummary(store),
       ...adminFields,
       notifications,
       sentNotifications
@@ -1409,7 +1481,7 @@ function getSnapshotForViewer(store, viewer = null) {
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
     customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
-    paymentConfig: normalizePaymentConfig(store.paymentConfig),
+    paymentConfig: getPublicPaymentConfigSummary(store),
     ...adminFields,
     notifications,
     sentNotifications: []
@@ -3782,6 +3854,253 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       } catch (err) {
         const status = err?.code === 'MAIL_NOT_CONFIGURED' ? 503 : 502;
         sendJsonResponse(res, status, { ok: false, error: formatMailTransportError(err, 'Gửi email thử nghiệm thất bại.') });
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl === '/payment/config') {
+      if (!viewer || viewer.role !== 'teacher') {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên mới xem được cấu hình thanh toán.' });
+        return;
+      }
+      sendJsonResponse(res, 200, { ok: true, config: getPublicPaymentConfigSummary(store) });
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/payment/config') {
+      if (!viewer || viewer.role !== 'teacher') {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên mới được cấu hình tài khoản nhận tiền.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const rawCfg = body?.paymentConfig || body || {};
+        store.paymentConfig = normalizePaymentConfig(rawCfg);
+        const prevSec = store.paymentSecrets && typeof store.paymentSecrets === 'object'
+          ? store.paymentSecrets
+          : { sepayApiKey: '', payosChecksumKey: '' };
+        store.paymentSecrets = {
+          sepayApiKey: body?.clearSepayApiKey
+            ? ''
+            : (String(body?.sepayApiKey || '').trim() || prevSec.sepayApiKey || ''),
+          payosChecksumKey: body?.clearPayosChecksumKey
+            ? ''
+            : (String(body?.payosChecksumKey || '').trim() || prevSec.payosChecksumKey || '')
+        };
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(50);
+        sendJsonResponse(res, 200, { ok: true, config: getPublicPaymentConfigSummary(store) });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Lưu cấu hình QR thanh toán thất bại.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/payment/create-order') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để tạo mã thanh toán.' });
+        return;
+      }
+      const viewerUser = store.users?.[viewer.username] || viewer;
+      if (hasCustomCoverPermission(viewerUser)) {
+        sendJsonResponse(res, 200, {
+          ok: true,
+          alreadyUnlocked: true,
+          paymentConfig: getPublicPaymentConfigSummary(store)
+        });
+        return;
+      }
+      if (!Array.isArray(store.paymentOrders)) store.paymentOrders = [];
+      const cfg = getPublicPaymentConfigSummary(store);
+      const amount = cfg.coverUnlockPrice;
+      const now = Date.now();
+      let activeOrder = store.paymentOrders.find(
+        o => o && o.username === viewer.username && o.status === 'pending' && Number(o.amount) === amount && o.expiresAt > now + 5 * 60 * 1000
+      );
+      if (!activeOrder) {
+        const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+        activeOrder = {
+          id: `ord_${now}_${suffix}`,
+          orderCode: `MKN${suffix}`,
+          numericOrderCode: crypto.randomInt(10_000_000, 999_999_999),
+          username: viewer.username,
+          amount,
+          status: 'pending',
+          createdAt: now,
+          expiresAt: now + 30 * 60 * 1000,
+          paidAt: 0,
+          paidAmount: 0,
+          txId: '',
+          gateway: ''
+        };
+        store.paymentOrders = [activeOrder, ...store.paymentOrders].slice(0, 500);
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+      }
+      sendJsonResponse(res, 200, {
+        ok: true,
+        alreadyUnlocked: false,
+        order: activeOrder,
+        paymentConfig: cfg
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl === '/payment/order') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập.' });
+        return;
+      }
+      const parsedUrl = new URL(req.url || '/', 'http://localhost');
+      const code = String(parsedUrl.searchParams.get('code') || '').trim().toUpperCase();
+      const viewerUser = store.users?.[viewer.username] || viewer;
+      const matched = (store.paymentOrders || []).find(
+        o => o && o.orderCode === code && (o.username === viewer.username || viewer.role === 'teacher')
+      );
+      sendJsonResponse(res, 200, {
+        ok: true,
+        unlocked: hasCustomCoverPermission(viewerUser),
+        order: matched || null
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/payment/webhook') {
+      try {
+        const body = await readJsonBody(req);
+        const secrets = getEffectivePaymentSecrets(store);
+        const isPayosPayload = Boolean(body && typeof body.data === 'object' && body.data !== null && body.signature);
+        let gateway = 'sepay';
+        let txKey = '';
+        let amount = 0;
+        let descriptionUpper = '';
+        let numericOrderCode = null;
+
+        if (isPayosPayload) {
+          gateway = 'payos';
+          if (!secrets.payosChecksumKey || !verifyPayosWebhookSignature(body.data, body.signature, secrets.payosChecksumKey)) {
+            sendJsonResponse(res, 401, { error: -1, success: false, message: 'Invalid PayOS signature' });
+            return;
+          }
+          if (body.code !== '00' || body.success === false || (body.data.code && body.data.code !== '00')) {
+            sendJsonResponse(res, 200, { error: 0, success: true, ignored: 'non_success_status' });
+            return;
+          }
+          const ref = String(body.data.reference || body.data.paymentLinkId || body.data.orderCode || '').trim();
+          txKey = ref ? `payos:${ref}` : '';
+          amount = Number(body.data.amount) || 0;
+          numericOrderCode = Number(body.data.orderCode) || null;
+          descriptionUpper = `${body.data.description || ''}`.toUpperCase();
+        } else {
+          const authHeader = String(req.headers?.authorization || '');
+          const authMatch = /^Apikey\s+(.+)$/i.exec(authHeader.trim());
+          const token = authMatch ? authMatch[1].trim() : '';
+          if (!secrets.sepayApiKey || !timingSafeStringMatch(token, secrets.sepayApiKey)) {
+            sendJsonResponse(res, 401, { success: false, message: 'Unauthorized' });
+            return;
+          }
+          if (body?.transferType && String(body.transferType).toLowerCase() !== 'in') {
+            sendJsonResponse(res, 200, { success: true, ignored: 'not_incoming' });
+            return;
+          }
+          const ref = String(body?.id || body?.referenceCode || '').trim();
+          txKey = ref ? `sepay:${ref}` : '';
+          amount = Number(body?.transferAmount ?? body?.amount) || 0;
+          descriptionUpper = `${body?.code || ''} ${body?.content || ''} ${body?.description || ''}`.toUpperCase();
+        }
+
+        if (!Array.isArray(store.processedWebhookTxIds)) store.processedWebhookTxIds = [];
+        if (txKey && store.processedWebhookTxIds.includes(txKey)) {
+          sendJsonResponse(res, 200, { error: 0, success: true, duplicate: true });
+          return;
+        }
+
+        if (!Array.isArray(store.paymentOrders)) store.paymentOrders = [];
+        const codeMatches = descriptionUpper.match(/\bMKN[A-Z0-9]{6}\b/g) || [];
+        let matchedOrder = store.paymentOrders.find(o => {
+          if (!o || o.status !== 'pending') return false;
+          if (numericOrderCode && o.numericOrderCode === numericOrderCode) return true;
+          if (codeMatches.includes(o.orderCode)) return true;
+          return descriptionUpper.includes(o.orderCode);
+        });
+
+        // Fallback match by MOKHOANEN <USERNAME> if user made manual transfer while keeping pending order
+        if (!matchedOrder && descriptionUpper.includes('MOKHOANEN')) {
+          matchedOrder = store.paymentOrders.find(o => {
+            if (!o || o.status !== 'pending') return false;
+            const cleanU = String(o.username || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            return cleanU && descriptionUpper.includes(cleanU);
+          });
+        }
+
+        if (!matchedOrder) {
+          sendJsonResponse(res, 200, { error: 0, success: true, matched: false });
+          return;
+        }
+
+        if (amount < Number(matchedOrder.amount || 0)) {
+          sendJsonResponse(res, 200, {
+            error: 0,
+            success: true,
+            matched: true,
+            unlocked: false,
+            reason: 'insufficient_amount'
+          });
+          return;
+        }
+
+        const targetKey = findUserKeyInStore(store, matchedOrder.username);
+        const targetUser = targetKey ? store.users?.[targetKey] : null;
+        if (txKey) {
+          store.processedWebhookTxIds = [txKey, ...store.processedWebhookTxIds].slice(0, 500);
+        }
+        matchedOrder.status = 'paid';
+        matchedOrder.paidAt = Date.now();
+        matchedOrder.paidAmount = amount;
+        matchedOrder.txId = txKey;
+        matchedOrder.gateway = gateway;
+
+        if (targetKey && targetUser) {
+          store.users[targetKey] = {
+            ...targetUser,
+            customCoverUnlocked: true,
+            customCoverUnlockedAt: Date.now(),
+            customCoverUnlockedBy: `auto_${gateway}`,
+            coverUnlockRequestedAt: 0
+          };
+          appendStoreNotification(
+            store,
+            {
+              title: '🎉 Đã mở khóa Ảnh Nền Riêng tự động!',
+              message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ ngay bây giờ!`,
+              type: 'announcement',
+              targetUsernames: [targetKey],
+              createdBy: 'teacher_ielts',
+              createdByName: 'Hệ Thống Thanh Toán Tự Động'
+            },
+            null
+          );
+        }
+
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(10);
+        sendJsonResponse(res, 200, {
+          error: 0,
+          success: true,
+          unlocked: true,
+          orderCode: matchedOrder.orderCode,
+          username: matchedOrder.username
+        });
+      } catch (err) {
+        sendJsonResponse(res, 400, { error: -1, success: false, message: err?.message || 'Webhook failed' });
       }
       return;
     }

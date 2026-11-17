@@ -610,15 +610,6 @@ export default function App() {
     return true;
   };
 
-  const handleUpdatePaymentConfig = async (nextConfig) => {
-    if (currentUser?.role !== 'teacher') return false;
-    const snap = await dispatchSyncAction('UPDATE_PAYMENT_CONFIG', { paymentConfig: nextConfig });
-    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
-    if (nextConfig) setPaymentConfig(nextConfig);
-    showToast('Đã lưu cấu hình QR chuyển khoản mở khóa Ảnh Nền!');
-    return true;
-  };
-
   const handleSpeakingRoomUnlocked = (testId, unlockToken) => {
     if (!testId || !unlockToken) return;
     setSpeakingUnlockTokens(prev => ({ ...prev, [testId]: unlockToken }));
@@ -5954,6 +5945,7 @@ export default function App() {
           onGrantUserTitles={handleGrantUserTitles}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           onOpenAdminTitleManager={targetUsername => setAdminTitleModalState({ isOpen: true, targetUsername: targetUsername || null })}
+          onPullSync={() => pullServerSyncState(true)}
           onRequestCoverUnlock={handleRequestCoverUnlock}
           onToggleUserCoverUnlock={handleToggleUserCoverUnlock}
           openStudentGamePortal={openStudentGamePortal}
@@ -6341,7 +6333,7 @@ export default function App() {
           isOpen={true}
           paymentConfig={paymentConfig}
           onClose={() => setShowPaymentConfigModal(false)}
-          onSave={handleUpdatePaymentConfig}
+          onSaved={cfg => cfg && setPaymentConfig(cfg)}
           showToast={showToast}
         />
       )}
