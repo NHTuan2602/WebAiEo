@@ -60,6 +60,7 @@ export default function TeacherDashboard({
   currentUser,
   expandedTeacherTestId,
   gradingFilters,
+  handleBulkDeleteAccounts,
   handleCopyInviteLink,
   handleDeleteAccount,
   handleDeleteAttempt,
@@ -67,6 +68,7 @@ export default function TeacherDashboard({
   handleDeleteTest,
   handleDuplicateTest,
   handleKickLobbyPlayer,
+  handlePurgeOrphanAttempts,
   handleTeacherOpenLobby,
   handleTeacherResetLobby,
   initGameCampaign,
@@ -114,6 +116,18 @@ export default function TeacherDashboard({
   const [completionSearch, setCompletionSearch] = useState('');
   const [renamingTestId, setRenamingTestId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
+  const [selectedUsernames, setSelectedUsernames] = useState([]);
+
+  const validSelectedUsernames = selectedUsernames.filter(uname => {
+    const acc = usersDb?.[uname];
+    if (!acc) return false;
+    if (acc.isSuperAdmin || uname === 'tuanpro123s' || uname === currentUser?.username) return false;
+    return true;
+  });
+
+  const orphanAttemptsCount = (attempts || []).filter(
+    att => att?.studentId && !usersDb?.[att.studentId]
+  ).length;
 
   const handleCommitInlineRename = (testId) => {
     const ok = updateTestQuickTitle?.(testId, renameDraft);
@@ -1191,16 +1205,28 @@ export default function TeacherDashboard({
                 className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 w-44 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                exportAttemptsToCsv(filteredAttempts);
-                showToast(`Đã xuất file CSV bảng điểm (${filteredAttempts.length} dòng)!`);
-              }}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
-            >
-              <Download className="w-3.5 h-3.5" /> Xuất CSV Excel ({filteredAttempts.length})
-            </button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {orphanAttemptsCount > 0 && handlePurgeOrphanAttempts && (
+                <button
+                  type="button"
+                  onClick={handlePurgeOrphanAttempts}
+                  title="Dọn sạch các bài làm thuộc những tài khoản đã bị xóa"
+                  className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Dọn {orphanAttemptsCount} bài TK đã xóa
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  exportAttemptsToCsv(filteredAttempts);
+                  showToast(`Đã xuất file CSV bảng điểm (${filteredAttempts.length} dòng)!`);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
+              >
+                <Download className="w-3.5 h-3.5" /> Xuất CSV Excel ({filteredAttempts.length})
+              </button>
+            </div>
           </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -1716,15 +1742,68 @@ export default function TeacherDashboard({
                 className="w-full sm:w-72 px-4 py-2 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none font-medium"
               />
             </div>
+
+            {validSelectedUsernames.length > 0 && handleBulkDeleteAccounts && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30">
+                <span className="text-xs font-extrabold text-rose-700 dark:text-rose-300">
+                  Đã chọn {validSelectedUsernames.length} tài khoản (bao gồm xóa gọn bài nộp liên quan nếu có)
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUsernames([])}
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition"
+                  >
+                    Bỏ chọn
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ok = handleBulkDeleteAccounts(validSelectedUsernames);
+                      if (ok) setSelectedUsernames([]);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Xóa {validSelectedUsernames.length} tài khoản đã chọn
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Accounts Management Table */}
+          {(() => {
+            const selectableFilteredNames = filteredAccounts
+              .filter(acc => acc.username !== currentUser?.username && !acc.isSuperAdmin && acc.username !== 'tuanpro123s')
+              .map(acc => acc.username);
+            const allSelectableChecked =
+              selectableFilteredNames.length > 0 &&
+              selectableFilteredNames.every(uname => validSelectedUsernames.includes(uname));
+
+            return (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
                 <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
                   <tr>
-                    <th className="px-6 py-4">Tài Khoản</th>
+                    <th className="pl-5 pr-2 py-4 w-10">
+                      <input
+                        type="checkbox"
+                        aria-label="Chọn tất cả tài khoản đang hiển thị"
+                        checked={allSelectableChecked}
+                        disabled={selectableFilteredNames.length === 0}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedUsernames(prev => Array.from(new Set([...prev, ...selectableFilteredNames])));
+                          } else {
+                            const dropSet = new Set(selectableFilteredNames);
+                            setSelectedUsernames(prev => prev.filter(u => !dropSet.has(u)));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:opacity-40"
+                      />
+                    </th>
+                    <th className="px-4 py-4">Tài Khoản</th>
                     <th className="px-6 py-4 text-center">Vai Trò</th>
                     <th className="px-6 py-4 text-center">Mục Tiêu / Ghi Chú</th>
                     <th className="px-6 py-4 text-center">Hoạt Động</th>
@@ -1735,7 +1814,7 @@ export default function TeacherDashboard({
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-10 text-center text-xs text-slate-400">
+                      <td colSpan={7} className="px-6 py-10 text-center text-xs text-slate-400">
                         Không tìm thấy tài khoản nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
@@ -1746,6 +1825,7 @@ export default function TeacherDashboard({
                       const isSelfAccount = account.username === currentUser?.username;
                       const canResetAccountPass = isViewerSuperAdmin || !isTeacherAccount || isSelfAccount;
                       const disableDelete = isSelfAccount || isSuperAdminAccount;
+                      const isChecked = validSelectedUsernames.includes(account.username);
                       const studentAttempts = attempts.filter(a => a.studentId === account.username);
                       const gradedStudentBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
                       const bestBand = gradedStudentBands.length > 0
@@ -1754,7 +1834,25 @@ export default function TeacherDashboard({
 
                       return (
                         <tr key={account.username} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                          <td className="px-6 py-4">
+                          <td className="pl-5 pr-2 py-4 w-10">
+                            <input
+                              type="checkbox"
+                              aria-label={`Chọn tài khoản ${account.username}`}
+                              checked={isChecked}
+                              disabled={disableDelete}
+                              onChange={e => {
+                                if (disableDelete) return;
+                                const checked = e.target.checked;
+                                setSelectedUsernames(prev =>
+                                  checked
+                                    ? Array.from(new Set([...prev, account.username]))
+                                    : prev.filter(u => u !== account.username)
+                                );
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            />
+                          </td>
+                          <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
                               <UserAvatarBadge user={account} sizeClass="w-10 h-10" textClass="text-sm" rounded="rounded-2xl" />
                               <div>
@@ -1931,6 +2029,8 @@ export default function TeacherDashboard({
               </table>
             </div>
           </div>
+            );
+          })()}
         </div>
       )}
 

@@ -43,6 +43,17 @@ export function roundIeltsBand(score) {
   return Math.min(9.0, Math.round((num + 1e-9) * 2) / 2);
 }
 
+/** Generate a collision-free attempt ID across concurrent multi-student submissions. */
+export function createUniqueAttemptId(prefix = 'att', username = 'std') {
+  const cleanPrefix = String(prefix || 'att').replace(/[^a-zA-Z0-9_-]/g, '') || 'att';
+  const cleanUser = String(username || 'std').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) || 'std';
+  const rand =
+    typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID
+      ? globalThis.crypto.randomUUID().slice(0, 8)
+      : Math.random().toString(36).slice(2, 10);
+  return `${cleanPrefix}-${cleanUser}-${Date.now()}-${rand}`;
+}
+
 /** Compute official IELTS Writing band (Task 2 weighted 2x Task 1, rounded to 0.5). */
 export function calculateWritingBand(task1Band, task2Band) {
   const t1 = Math.min(9.0, Math.max(0, Number(task1Band) || 0));

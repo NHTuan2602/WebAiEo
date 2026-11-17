@@ -25,6 +25,7 @@ import {
   calculateWritingBand,
   getWordCount,
   roundIeltsBand,
+  createUniqueAttemptId,
   getSpeedAdjustedTimeLimit,
   isObjectiveAnswerCorrect,
   buildRoomInviteLink,
@@ -531,9 +532,7 @@ export default function App() {
       return;
     }
     setUsersDb(prev => ({ ...prev, ...createdUsers }));
-    addedEntries.forEach(([username, user]) => {
-      dispatchSyncAction('UPSERT_USER', { username, user });
-    });
+    dispatchSyncAction('UPSERT_USERS_BULK', { users: addedEntries.map(([, user]) => user) });
     setShowAddStudentModal(false);
     showToast(`Đã thêm ${addedEntries.length} học viên${skipped > 0 ? ` (bỏ qua ${skipped} tài khoản trùng)` : ''}!`);
   };
@@ -568,7 +567,7 @@ export default function App() {
     showToast(`Đã đặt lại mật khẩu mới cho tài khoản ${baseUser.name || uname}!`);
   };
 
-  // Teacher Action: Delete Managed Account
+  // Teacher Action: Delete Managed Account (also cleans associated student attempts)
   const handleDeleteAccount = (userObj) => {
     if (currentUser?.role !== 'teacher' || !userObj?.username) return;
     const uname = userObj.username;
@@ -587,7 +586,14 @@ export default function App() {
       showToast('Cần giữ lại ít nhất 1 tài khoản Giáo viên trong hệ thống!', 'error');
       return;
     }
-    if (!window.confirm(`Bạn có chắc muốn xóa tài khoản "${userObj.name}" (@${uname})?`)) {
+    const relatedAttemptCount = attempts.filter(a => a.studentId === uname || a.studentUsername === uname).length;
+    if (
+      !window.confirm(
+        `Bạn có chắc muốn xóa tài khoản "${userObj.name}" (@${uname})${
+          relatedAttemptCount > 0 ? ` và ${relatedAttemptCount} bài làm liên quan` : ''
+        }?`
+      )
+    ) {
       return;
     }
     setUsersDb(prev => {
@@ -601,8 +607,88 @@ export default function App() {
       delete next[uname];
       return next;
     });
-    dispatchSyncAction('DELETE_USER', { username: uname });
+    if (relatedAttemptCount > 0) {
+      setAttempts(prev => prev.filter(a => a.studentId !== uname && a.studentUsername !== uname));
+    }
+    dispatchSyncAction('DELETE_USER', { username: uname, purgeAttempts: true });
     showToast(`Đã xóa tài khoản "${userObj.name}" (@${uname}).`, 'info');
+  };
+
+  // Teacher Action: Bulk Delete Selected Accounts (atomic server batch + attempt cleanup)
+  const handleBulkDeleteAccounts = (rawUsernames = []) => {
+    if (currentUser?.role !== 'teacher') return false;
+    const cleanSet = new Set(
+      (Array.isArray(rawUsernames) ? rawUsernames : [])
+        .map(u => String(u || '').trim())
+        .filter(uname => {
+          if (!uname || uname === 'tuanpro123s' || uname === currentUser.username) return false;
+          const target = usersDb[uname];
+          if (target?.isSuperAdmin) return false;
+          return Boolean(target);
+        })
+    );
+    const cleanNames = Array.from(cleanSet);
+    if (cleanNames.length === 0) {
+      showToast('Chưa chọn tài khoản hợp lệ nào để xóa.', 'error');
+      return false;
+    }
+    const remainingTeachers = Object.values(usersDb).filter(
+      u => u?.role === 'teacher' && !u?.isSuperAdmin && u?.username !== 'tuanpro123s' && !cleanSet.has(u.username)
+    ).length;
+    if (remainingTeachers < 1) {
+      showToast('Cần giữ lại ít nhất 1 tài khoản Giáo viên trong hệ thống!', 'error');
+      return false;
+    }
+    const relatedAttempts = attempts.filter(
+      a => cleanSet.has(a.studentId) || cleanSet.has(a.studentUsername)
+    ).length;
+    if (
+      !window.confirm(
+        `Xác nhận xóa ${cleanNames.length} tài khoản đã chọn${
+          relatedAttempts > 0 ? ` cùng ${relatedAttempts} bài nộp liên quan` : ''
+        }? Thao tác này không thể hoàn tác.`
+      )
+    ) {
+      return false;
+    }
+    setUsersDb(prev => {
+      const next = { ...prev };
+      cleanNames.forEach(uname => delete next[uname]);
+      return next;
+    });
+    setTeacherNotes(prev => {
+      const next = { ...prev };
+      let removed = false;
+      cleanNames.forEach(uname => {
+        if (next[uname]) {
+          delete next[uname];
+          removed = true;
+        }
+      });
+      return removed ? next : prev;
+    });
+    if (relatedAttempts > 0) {
+      setAttempts(prev => prev.filter(a => !cleanSet.has(a.studentId) && !cleanSet.has(a.studentUsername)));
+    }
+    dispatchSyncAction('DELETE_USERS_BULK', { usernames: cleanNames, purgeAttempts: true });
+    showToast(`Đã xóa gọn ${cleanNames.length} tài khoản${relatedAttempts > 0 ? ` & ${relatedAttempts} bài làm` : ''}!`, 'info');
+    return true;
+  };
+
+  // Teacher Action: Purge Orphaned Attempts Whose Accounts Were Deleted
+  const handlePurgeOrphanAttempts = () => {
+    if (currentUser?.role !== 'teacher') return;
+    const orphanCount = attempts.filter(a => a.studentId && !usersDb[a.studentId]).length;
+    if (orphanCount === 0) {
+      showToast('Không có bài nộp mồ côi nào cần dọn dẹp.', 'info');
+      return;
+    }
+    if (!window.confirm(`Dọn sạch ${orphanCount} bài làm thuộc các tài khoản đã xóa khỏi bảng điểm?`)) {
+      return;
+    }
+    setAttempts(prev => prev.filter(a => !a.studentId || Boolean(usersDb[a.studentId])));
+    dispatchSyncAction('PURGE_ORPHAN_ATTEMPTS', {});
+    showToast(`Đã dọn sạch ${orphanCount} bài làm của tài khoản đã xóa!`, 'info');
   };
 
   // Teacher Action: Copy Room Invite Link (?pin=...)
@@ -2180,6 +2266,7 @@ export default function App() {
 
   const examAutoAdvanceHandledRef = useRef(null);
   const autoAdvanceFnRef = useRef(null);
+  const examSubmitLockRef = useRef(false);
 
   // Exam Countdown Timer (only decrements safely; timeout triggers separate effect below)
   useEffect(() => {
@@ -2336,6 +2423,7 @@ export default function App() {
     }
 
     examAutoAdvanceHandledRef.current = null;
+    examSubmitLockRef.current = false;
     stopExamAudio();
     setShowSubmitConfirmModal(false);
     setSelectedTestId(testId);
@@ -2460,10 +2548,12 @@ export default function App() {
   };
 
   const handleFinalExamSubmit = () => {
+    if (examSubmitLockRef.current) return;
     stopExamAudio();
     setShowSubmitConfirmModal(false);
     const activeTest = tests.find(t => t.id === selectedTestId);
     if (!activeTest) return;
+    examSubmitLockRef.current = true;
     const cfg = normalizeExamConfig(activeTest);
 
     let listeningRaw = 0;
@@ -2488,7 +2578,7 @@ export default function App() {
       cfg.focusSkill === 'listening' ? lBand : cfg.focusSkill === 'reading' ? rBand : null;
 
     const newAttempt = {
-      id: 'att-' + Date.now(),
+      id: createUniqueAttemptId('att', currentUser?.username),
       testId: activeTest.id,
       testTitle: activeTest.title,
       testMode: cfg.testMode,
@@ -2518,7 +2608,7 @@ export default function App() {
       teacherFeedback: ''
     };
 
-    setAttempts([newAttempt, ...attempts]);
+    setAttempts(prev => [newAttempt, ...prev]);
     dispatchSyncAction('UPSERT_ATTEMPT', { attempt: newAttempt });
     setSelectedAttemptId(newAttempt.id);
     if (cfg.testMode === 'single_skill' && cfg.focusSkill) {
@@ -4890,6 +4980,7 @@ export default function App() {
           currentUser={currentUser}
           expandedTeacherTestId={expandedTeacherTestId}
           gradingFilters={gradingFilters}
+          handleBulkDeleteAccounts={handleBulkDeleteAccounts}
           handleCopyInviteLink={handleCopyInviteLink}
           handleDeleteAccount={handleDeleteAccount}
           handleDeleteAttempt={handleDeleteAttempt}
@@ -4897,6 +4988,7 @@ export default function App() {
           handleDeleteTest={handleDeleteTest}
           handleDuplicateTest={handleDuplicateTest}
           handleKickLobbyPlayer={handleKickLobbyPlayer}
+          handlePurgeOrphanAttempts={handlePurgeOrphanAttempts}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
           handleTeacherResetLobby={handleTeacherResetLobby}
           initGameCampaign={initGameCampaign}

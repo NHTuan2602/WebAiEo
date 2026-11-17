@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
 import { getSpeakingQuestionItems, normalizeExamConfig } from '../constants/seedData';
+import { createUniqueAttemptId } from '../utils/examHelpers';
 import { cleanAudioMimeType, roundSpeakingBand } from '../utils/speakingAiEngine';
 import { pickSupportedAudioMimeType, requestAiSpeakingGrading, uploadSpeakingRecording } from '../utils/speakingApi';
 import AudioLevelMeter from '../components/speaking/AudioLevelMeter';
@@ -85,6 +86,7 @@ export default function SpeakingExamRoom({
   const recordTimerRef = useRef(null);
   const prepTimerRef = useRef(null);
   const createdUrlsRef = useRef([]);
+  const submitLockRef = useRef(false);
 
   const stopMeterLoop = () => {
     if (meterRafRef.current) {
@@ -385,6 +387,8 @@ export default function SpeakingExamRoom({
   };
 
   const handleFinalSubmitSpeaking = async () => {
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setShowSubmitConfirm(false);
     if (isRecording) {
       await stopCurrentRecording();
@@ -392,7 +396,7 @@ export default function SpeakingExamRoom({
     cleanupMediaResources();
     setPhase('GRADING');
 
-    const attemptId = 'att-spk-' + Date.now();
+    const attemptId = createUniqueAttemptId('att-spk', currentUser?.username);
     const savedRecordings = [];
 
     try {
@@ -516,6 +520,7 @@ export default function SpeakingExamRoom({
       setSubmittedAttempt(newAttempt);
       setPhase('CELEBRATION');
     } catch (err) {
+      submitLockRef.current = false;
       showToast?.(err?.message || 'Có lỗi khi lưu & chấm bài Speaking.', 'error');
       setPhase('ACTIVE');
     }

@@ -71,6 +71,32 @@ function verifyPassword(rawPassword, userRecord) {
   return false;
 }
 
+function verifyPasswordAsync(rawPassword, userRecord) {
+  if (!userRecord || typeof userRecord !== 'object') return Promise.resolve(false);
+  const candidate = String(rawPassword ?? '');
+  if (typeof userRecord.passwordHash === 'string' && userRecord.passwordHash.startsWith('scrypt$')) {
+    const parts = userRecord.passwordHash.split('$');
+    if (parts.length !== 3) return Promise.resolve(false);
+    return new Promise(resolve => {
+      try {
+        const salt = parts[1];
+        const expectedBuf = Buffer.from(parts[2], 'hex');
+        crypto.scrypt(candidate, salt, 64, (err, actualBuf) => {
+          if (err || !actualBuf) return resolve(false);
+          try {
+            resolve(expectedBuf.length === actualBuf.length && crypto.timingSafeEqual(expectedBuf, actualBuf));
+          } catch {
+            resolve(false);
+          }
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+  }
+  return Promise.resolve(verifyPassword(candidate, userRecord));
+}
+
 function signToken(payloadObj, secret) {
   const encoded = Buffer.from(JSON.stringify(payloadObj), 'utf8').toString('base64url');
   const sig = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
@@ -794,6 +820,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'TOGGLE_TEST_ANSWERS',
     'TOGGLE_TEST_VISIBILITY',
     'DELETE_ATTEMPT',
+    'PURGE_ORPHAN_ATTEMPTS',
     'UPSERT_NOTE',
     'UPSERT_VOCAB_TOPIC',
     'DELETE_VOCAB_TOPIC',
@@ -837,6 +864,65 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       }
       if (targetUsername === viewer.username) {
         return { allowed: false, status: 403, error: 'Không thể tự xóa tài khoản đang đăng nhập.' };
+      }
+      if (targetUser?.role === 'teacher') {
+        const remainingTeachers = Object.values(store.users || {}).filter(
+          u => u && u.role === 'teacher' && !u.isSuperAdmin && u.username !== SUPER_ADMIN_USERNAME && u.username !== targetUsername
+        ).length;
+        if (remainingTeachers < 1) {
+          return { allowed: false, status: 403, error: 'Cần giữ lại ít nhất 1 tài khoản Giáo viên trong hệ thống.' };
+        }
+      }
+      return { allowed: true };
+    }
+
+    case 'DELETE_USERS_BULK': {
+      if (!isTeacher) {
+        return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới được xóa tài khoản.' };
+      }
+      const rawNames = Array.isArray(payload?.usernames)
+        ? [...new Set(payload.usernames.map(u => String(u || '').trim()).filter(Boolean))]
+        : [];
+      if (rawNames.length === 0) {
+        return { allowed: false, status: 400, error: 'Chưa chọn tài khoản nào để xóa.' };
+      }
+      const deletableNames = rawNames.filter(uname => {
+        const target = store.users?.[uname];
+        return uname !== SUPER_ADMIN_USERNAME && !target?.isSuperAdmin && uname !== viewer.username;
+      });
+      if (deletableNames.length === 0) {
+        return { allowed: false, status: 403, error: 'Không có tài khoản hợp lệ nào có thể xóa.' };
+      }
+      const deleteSet = new Set(deletableNames);
+      const remainingTeachers = Object.values(store.users || {}).filter(
+        u => u && u.role === 'teacher' && !u.isSuperAdmin && u.username !== SUPER_ADMIN_USERNAME && !deleteSet.has(u.username)
+      ).length;
+      if (remainingTeachers < 1) {
+        return { allowed: false, status: 403, error: 'Cần giữ lại ít nhất 1 tài khoản Giáo viên trong hệ thống.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'UPSERT_USERS_BULK': {
+      if (!isTeacher) {
+        return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới được tạo tài khoản hàng loạt.' };
+      }
+      const rawUsers = Array.isArray(payload?.users) ? payload.users : [];
+      if (rawUsers.length === 0) {
+        return { allowed: false, status: 400, error: 'Danh sách tài khoản trống.' };
+      }
+      if (rawUsers.length > 500) {
+        return { allowed: false, status: 400, error: 'Tối đa 500 tài khoản mỗi lần nhập.' };
+      }
+      for (const item of rawUsers) {
+        const uname = String(item?.username || '').trim();
+        if (!uname) {
+          return { allowed: false, status: 400, error: 'Có dòng tài khoản thiếu tên đăng nhập.' };
+        }
+        const targetExisting = store.users?.[uname];
+        if ((targetExisting?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
+          return { allowed: false, status: 403, error: 'Không thể chỉnh sửa tài khoản Quản trị hệ thống.' };
+        }
       }
       return { allowed: true };
     }
@@ -926,6 +1012,90 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     default:
       return { allowed: false, status: 400, error: 'Yêu cầu đồng bộ không hợp lệ.' };
   }
+}
+
+function upsertSingleUserInStore(store, uname, rawUser, viewer) {
+  if (!uname || !rawUser) return false;
+  const prevUser = store.users?.[uname];
+  const isTeacher = viewer?.role === 'teacher';
+  const isSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+  if ((prevUser?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
+    return false;
+  }
+
+  if (!isTeacher && prevUser) {
+    // Student may only update non-privilege profile fields on own account
+    const cleanSelf = {
+      ...prevUser,
+      name: typeof rawUser.name === 'string' && rawUser.name.trim() ? rawUser.name.trim() : prevUser.name,
+      avatarUrl: rawUser.avatarUrl ?? prevUser.avatarUrl,
+      targetBand: rawUser.targetBand ?? prevUser.targetBand,
+      studyGoal: rawUser.studyGoal ?? prevUser.studyGoal
+    };
+    store.users[uname] = cleanSelf;
+  } else {
+    const incoming = { ...rawUser, username: uname };
+    if (incoming.pass && String(incoming.pass).trim()) {
+      incoming.passwordHash = hashPassword(String(incoming.pass).trim());
+    } else if (prevUser?.passwordHash) {
+      incoming.passwordHash = prevUser.passwordHash;
+    }
+    delete incoming.pass;
+    incoming.tokenVersion = prevUser?.tokenVersion || 1;
+    if (uname === SUPER_ADMIN_USERNAME && isSuperAdmin) {
+      incoming.isSuperAdmin = true;
+      incoming.hiddenFromTeacher = true;
+      incoming.role = 'teacher';
+    } else {
+      delete incoming.isSuperAdmin;
+      delete incoming.hiddenFromTeacher;
+      incoming.role = incoming.role === 'teacher' ? 'teacher' : 'student';
+    }
+    store.deletedUserIds = store.deletedUserIds.filter(id => id !== uname);
+    store.users[uname] = incoming;
+  }
+
+  const savedUser = store.users[uname];
+  // Propagate updated avatarUrl & display name into any active room lobbies / live races
+  Object.entries(store.rooms).forEach(([_pin, r]) => {
+    if (r?.lobbyPlayers?.[uname]) {
+      r.lobbyPlayers[uname] = {
+        ...r.lobbyPlayers[uname],
+        name: savedUser.name || r.lobbyPlayers[uname].name,
+        avatarUrl: savedUser.avatarUrl ?? r.lobbyPlayers[uname].avatarUrl
+      };
+    }
+    if (r?.liveMatch?.[uname]) {
+      r.liveMatch[uname] = {
+        ...r.liveMatch[uname],
+        name: savedUser.name || r.liveMatch[uname].name,
+        avatarUrl: savedUser.avatarUrl ?? r.liveMatch[uname].avatarUrl
+      };
+    }
+  });
+  return true;
+}
+
+function deleteSingleUserFromStore(store, uname, { purgeAttempts = false, viewerUsername = '' } = {}) {
+  if (!uname || uname === SUPER_ADMIN_USERNAME || store.users?.[uname]?.isSuperAdmin) return false;
+  if (viewerUsername && uname === viewerUsername) return false;
+  if (!store.deletedUserIds.includes(uname)) {
+    store.deletedUserIds.push(uname);
+  }
+  const existed = Boolean(store.users[uname]);
+  delete store.users[uname];
+  delete store.teacherNotes[uname];
+  Object.values(store.rooms).forEach(r => {
+    if (r?.lobbyPlayers?.[uname]) delete r.lobbyPlayers[uname];
+    if (r?.liveMatch?.[uname]) delete r.liveMatch[uname];
+  });
+  let attemptsRemoved = false;
+  if (purgeAttempts && Array.isArray(store.attempts)) {
+    const prevLen = store.attempts.length;
+    store.attempts = store.attempts.filter(a => a?.studentId !== uname && a?.studentUsername !== uname);
+    attemptsRemoved = store.attempts.length !== prevLen;
+  }
+  return existed || attemptsRemoved;
 }
 
 function applySyncAction(store, type, payload = {}, viewer = null) {
@@ -1429,79 +1599,51 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
 
     case 'UPSERT_USER': {
       const uname = String(payload.username || payload.user?.username || '').trim();
-      if (!uname || !payload.user) break;
-      const prevUser = store.users?.[uname];
-      const isTeacher = viewer?.role === 'teacher';
-      const isSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
-
-      if (!isTeacher && prevUser) {
-        // Student may only update non-privilege profile fields on own account
-        const cleanSelf = {
-          ...prevUser,
-          name: typeof payload.user.name === 'string' && payload.user.name.trim() ? payload.user.name.trim() : prevUser.name,
-          avatarUrl: payload.user.avatarUrl ?? prevUser.avatarUrl,
-          targetBand: payload.user.targetBand ?? prevUser.targetBand,
-          studyGoal: payload.user.studyGoal ?? prevUser.studyGoal
-        };
-        store.users[uname] = cleanSelf;
-      } else {
-        const incoming = { ...payload.user, username: uname };
-        if (incoming.pass && String(incoming.pass).trim()) {
-          incoming.passwordHash = hashPassword(String(incoming.pass).trim());
-        } else if (prevUser?.passwordHash) {
-          incoming.passwordHash = prevUser.passwordHash;
-        }
-        delete incoming.pass;
-        incoming.tokenVersion = prevUser?.tokenVersion || 1;
-        if (uname === SUPER_ADMIN_USERNAME && isSuperAdmin) {
-          incoming.isSuperAdmin = true;
-          incoming.hiddenFromTeacher = true;
-          incoming.role = 'teacher';
-        } else {
-          delete incoming.isSuperAdmin;
-          delete incoming.hiddenFromTeacher;
-          incoming.role = incoming.role === 'teacher' ? 'teacher' : 'student';
-        }
-        store.deletedUserIds = store.deletedUserIds.filter(id => id !== uname);
-        store.users[uname] = incoming;
+      if (upsertSingleUserInStore(store, uname, payload.user, viewer)) {
+        changed = true;
       }
+      break;
+    }
 
-      const savedUser = store.users[uname];
-      // Propagate updated avatarUrl & display name into any active room lobbies / live races
-      Object.entries(store.rooms).forEach(([_pin, r]) => {
-        if (r?.lobbyPlayers?.[uname]) {
-          r.lobbyPlayers[uname] = {
-            ...r.lobbyPlayers[uname],
-            name: savedUser.name || r.lobbyPlayers[uname].name,
-            avatarUrl: savedUser.avatarUrl ?? r.lobbyPlayers[uname].avatarUrl
-          };
+    case 'UPSERT_USERS_BULK': {
+      const rawUsers = Array.isArray(payload.users) ? payload.users : [];
+      for (const item of rawUsers) {
+        const uname = String(item?.username || '').trim();
+        if (upsertSingleUserInStore(store, uname, item, viewer)) {
+          changed = true;
         }
-        if (r?.liveMatch?.[uname]) {
-          r.liveMatch[uname] = {
-            ...r.liveMatch[uname],
-            name: savedUser.name || r.liveMatch[uname].name,
-            avatarUrl: savedUser.avatarUrl ?? r.liveMatch[uname].avatarUrl
-          };
-        }
-      });
-      changed = true;
+      }
       break;
     }
 
     case 'DELETE_USER': {
-      const uname = payload.username;
-      if (!uname || uname === SUPER_ADMIN_USERNAME || store.users?.[uname]?.isSuperAdmin) break;
-      if (!store.deletedUserIds.includes(uname)) {
-        store.deletedUserIds.push(uname);
+      const uname = String(payload.username || '').trim();
+      if (deleteSingleUserFromStore(store, uname, { purgeAttempts: Boolean(payload.purgeAttempts), viewerUsername: viewer?.username || '' })) {
+        changed = true;
       }
-      const existed = Boolean(store.users[uname]);
-      delete store.users[uname];
-      delete store.teacherNotes[uname];
-      Object.values(store.rooms).forEach(r => {
-        if (r?.lobbyPlayers?.[uname]) delete r.lobbyPlayers[uname];
-        if (r?.liveMatch?.[uname]) delete r.liveMatch[uname];
+      break;
+    }
+
+    case 'DELETE_USERS_BULK': {
+      const rawNames = Array.isArray(payload.usernames) ? payload.usernames : [];
+      const purgeAttempts = payload.purgeAttempts !== false;
+      for (const rawName of rawNames) {
+        const uname = String(rawName || '').trim();
+        if (deleteSingleUserFromStore(store, uname, { purgeAttempts, viewerUsername: viewer?.username || '' })) {
+          changed = true;
+        }
+      }
+      break;
+    }
+
+    case 'PURGE_ORPHAN_ATTEMPTS': {
+      const validUsers = store.users || {};
+      const prevLen = Array.isArray(store.attempts) ? store.attempts.length : 0;
+      store.attempts = (store.attempts || []).filter(att => {
+        const sid = String(att?.studentId || '').trim();
+        return !sid || Boolean(validUsers[sid]);
       });
-      if (existed) {
+      if (store.attempts.length !== prevLen) {
         changed = true;
       }
       break;
@@ -1672,8 +1814,14 @@ async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMod
 
 export function attachSyncMiddleware(middlewares, store, sseClients, onChanged = null) {
   const sseClientUsers = new WeakMap();
+  let broadcastTimer = null;
+
   const broadcast = () => {
     for (const res of sseClients) {
+      if (res.destroyed || res.writableEnded) {
+        sseClients.delete(res);
+        continue;
+      }
       try {
         const uname = sseClientUsers.get(res);
         const viewer = uname ? store.users?.[uname] || null : null;
@@ -1685,11 +1833,21 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
   };
 
+  // Coalesce burst mutations (e.g., 40 simultaneous exam submissions) into one SSE fan-out pass
+  const scheduleBroadcast = (delayMs = 50) => {
+    if (broadcastTimer) return;
+    broadcastTimer = setTimeout(() => {
+      broadcastTimer = null;
+      broadcast();
+    }, delayMs);
+    broadcastTimer.unref?.();
+  };
+
   // Sweep expired 10-minute room chats automatically and broadcast updates
   const chatSweepTimer = setInterval(() => {
     if (pruneExpiredStoreChats(store, Date.now())) {
       onChanged?.(store);
-      broadcast();
+      scheduleBroadcast(25);
     }
   }, 10000);
   chatSweepTimer.unref?.();
@@ -1713,7 +1871,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         }
 
         const user = username ? store.users?.[username] : null;
-        if (!user || !verifyPassword(password, user)) {
+        if (!user || !(await verifyPasswordAsync(password, user))) {
           res.statusCode = 401;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ ok: false, error: 'Sai tên đăng nhập hoặc mật khẩu!' }));
@@ -1838,7 +1996,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         store.rooms[cleanPin] = normRoom;
         store.version += 1;
         onChanged?.(store);
-        broadcast();
+        scheduleBroadcast(25);
 
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -2067,7 +2225,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const changed = applySyncAction(store, body.type, body.payload, viewer);
         if (changed) {
           onChanged?.(store);
-          broadcast();
+          scheduleBroadcast(50);
         }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
