@@ -912,6 +912,31 @@ function pruneExpiredStoreChats(store, now = Date.now()) {
   return prunedAny;
 }
 
+function removeUserFromGameRooms(store, username = '') {
+  const uname = String(username || '').trim();
+  if (!uname || !store?.rooms || typeof store.rooms !== 'object') return false;
+  let changed = false;
+  Object.entries(store.rooms).forEach(([pin, r]) => {
+    if (!r || typeof r !== 'object') return;
+    let roomChanged = false;
+    const nextLobby = r.lobbyPlayers && typeof r.lobbyPlayers === 'object' ? { ...r.lobbyPlayers } : {};
+    if (Object.prototype.hasOwnProperty.call(nextLobby, uname)) {
+      delete nextLobby[uname];
+      roomChanged = true;
+    }
+    const nextLiveMatch = r.liveMatch && typeof r.liveMatch === 'object' ? { ...r.liveMatch } : {};
+    if (r.status === 'LOBBY' && Object.prototype.hasOwnProperty.call(nextLiveMatch, uname)) {
+      delete nextLiveMatch[uname];
+      roomChanged = true;
+    }
+    if (roomChanged) {
+      store.rooms[pin] = normalizeServerRoom({ ...r, lobbyPlayers: nextLobby, liveMatch: nextLiveMatch }, pin);
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function createInitialStore(audioDir = '') {
   const store = {
     version: 0,
@@ -3541,6 +3566,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'POST' && reqUrl === '/auth/logout') {
+      if (viewer?.username && removeUserFromGameRooms(store, viewer.username)) {
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(20);
+      }
       res.setHeader('Set-Cookie', buildSessionCookieHeader(req, '', 0));
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');

@@ -7,7 +7,6 @@ import {
   Gamepad2,
   Key,
   LogOut,
-  Mail,
   Megaphone,
   Mic,
   Moon,
@@ -15,35 +14,27 @@ import {
   ShieldAlert,
   Sparkles,
   Sun,
-  UserCheck,
-  Users
+  UserCheck
 } from 'lucide-react';
 import { BRAND_INFO } from '../../constants/brandInfo';
 import UserAvatarBadge from './UserAvatarBadge';
 
 export default function Navbar({
-  aiApiKey,
   currentUser,
   dailySpeakingPendingCount = 0,
   darkMode,
   handleLogout,
-  mailConfigured = false,
   notifications = [],
   onMarkNotificationsRead,
   onOpenAccountSecurity,
-  onOpenMailConfig = null,
   onOpenNotificationTarget,
   onOpenSpeakingDaily,
   openMemberProfile,
   openStudentGamePortal,
-  setApiTestState,
   setDarkMode,
   setSelectedProfileStudent,
-  setShowApiKeyModal,
   setShowAvatarModal,
-  setTeacherHubTab,
   setView,
-  teacherHubTab,
   view
 }) {
   const [showNotifMenu, setShowNotifMenu] = useState(false);
@@ -161,38 +152,19 @@ export default function Navbar({
             <span>Hồ Sơ Lớp</span>
           </button>
           {isTeacher && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setTeacherHubTab(prev => (prev === 'accounts' ? 'tests' : prev));
-                  setView('TEACHER_DASHBOARD');
-                }}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
-                  (view === 'TEACHER_DASHBOARD' && teacherHubTab !== 'accounts') || view === 'EXAM_BUILDER'
-                    ? 'bg-[#F25220] text-white shadow-sm'
-                    : 'text-[#E17100] dark:text-amber-300 hover:bg-amber-500/10'
-                }`}
-              >
-                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                <span>Quản Trị GV</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTeacherHubTab('accounts');
-                  setView('TEACHER_DASHBOARD');
-                }}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
-                  view === 'TEACHER_DASHBOARD' && teacherHubTab === 'accounts'
-                    ? 'bg-white dark:bg-[#0F172B] text-[#007A7A] dark:text-[#1EE1D6] shadow-sm border border-[#B5F5F1] dark:border-teal-500/30'
-                    : 'text-[#314158] dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-white'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5 shrink-0" />
-                <span>Tài Khoản</span>
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setView('TEACHER_DASHBOARD')}
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
+                view === 'TEACHER_DASHBOARD' || view === 'EXAM_BUILDER'
+                  ? 'bg-[#F25220] text-white shadow-sm'
+                  : 'text-[#E17100] dark:text-amber-300 hover:bg-amber-500/10'
+              }`}
+              title="Trung tâm Quản trị Giáo viên & Tài khoản lớp"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+              <span>Quản Trị GV</span>
+            </button>
           )}
         </nav>
 
@@ -215,37 +187,6 @@ export default function Navbar({
           >
             {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#007A7A]" />}
           </button>
-
-          {/* AI Key & Email OTP config shortcuts strictly for Teacher/Admin */}
-          {isTeacher && (
-            <>
-              {onOpenMailConfig && (
-                <button
-                  type="button"
-                  onClick={onOpenMailConfig}
-                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-rose-50/80 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-[#EDFFFD] dark:hover:bg-slate-700 transition border border-rose-200/80 dark:border-slate-700 shrink-0 whitespace-nowrap"
-                  title={mailConfigured ? 'Email OTP đang bật — Bấm để xem hoặc chỉnh sửa' : 'Chưa cấu hình Email OTP — Bấm để cài Gmail SMTP / Resend'}
-                >
-                  <Mail className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
-                  <span className="hidden xl:inline">Email OTP</span>
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${mailConfigured ? 'bg-[#059271]' : 'bg-amber-500'}`} />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setApiTestState({ testing: false, ok: null, message: '', model: '' });
-                  setShowApiKeyModal(true);
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-rose-50/80 dark:bg-slate-800 text-[#314158] dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-slate-700 transition border border-rose-200/80 dark:border-slate-700 shrink-0 whitespace-nowrap"
-                title="Cấu hình Google Gemini API Key"
-              >
-                <Key className="w-3.5 h-3.5 text-[#E17100] shrink-0" />
-                <span className="hidden xl:inline">Gemini Key</span>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${aiApiKey?.trim() ? 'bg-[#059271]' : 'bg-slate-400'}`} />
-              </button>
-            </>
-          )}
 
           <div className="flex items-center gap-1 shrink-0">
             <button
@@ -488,36 +429,17 @@ export default function Navbar({
           <UserCheck className="w-3.5 h-3.5" /> Hồ Sơ Lớp
         </button>
         {isTeacher && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setTeacherHubTab(prev => (prev === 'accounts' ? 'tests' : prev));
-                setView('TEACHER_DASHBOARD');
-              }}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
-                (view === 'TEACHER_DASHBOARD' && teacherHubTab !== 'accounts') || view === 'EXAM_BUILDER'
-                  ? 'bg-[#F25220] text-white'
-                  : 'bg-amber-50 dark:bg-amber-500/15 text-[#E17100] dark:text-amber-300'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" /> Quản Trị GV
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTeacherHubTab('accounts');
-                setView('TEACHER_DASHBOARD');
-              }}
-              className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
-                view === 'TEACHER_DASHBOARD' && teacherHubTab === 'accounts'
-                  ? 'bg-[#007A7A] text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-[#314158] dark:text-slate-300'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> Tài Khoản
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setView('TEACHER_DASHBOARD')}
+            className={`px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 ${
+              view === 'TEACHER_DASHBOARD' || view === 'EXAM_BUILDER'
+                ? 'bg-[#F25220] text-white'
+                : 'bg-amber-50 dark:bg-amber-500/15 text-[#E17100] dark:text-amber-300'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" /> Quản Trị GV
+          </button>
         )}
       </div>
     </header>

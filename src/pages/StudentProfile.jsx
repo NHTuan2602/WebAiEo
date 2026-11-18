@@ -442,9 +442,6 @@ export default function StudentProfile({
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0F172B] dark:text-white leading-tight">
                     {student.name}
                   </h1>
-                  <span className="text-xs font-mono bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/35 px-2.5 py-0.5 rounded-full font-bold">
-                    @{student.username}
-                  </span>
                   {isTargetSystemAdmin ? (
                     <span className="text-xs bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                       <ShieldAlert className="w-3 h-3" /> Quản Trị Hệ Thống &bull; Góp Ý Tính Năng
@@ -1993,7 +1990,7 @@ export default function StudentProfile({
             <div className="px-6 py-4 bg-[#FDF2F6] dark:bg-slate-800/80 border-b border-pink-200/80 dark:border-slate-700 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-pink-500" /> Tùy Chỉnh Hồ Sơ Cá Nhân (@{student.username})
+                  <Palette className="w-4 h-4 text-pink-500" /> Tùy Chỉnh Hồ Sơ Cá Nhân
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Cá nhân hóa hình nền Profile, khung viền Avatar và danh hiệu để mọi người trong lớp nhìn thấy phong cách riêng của bạn!

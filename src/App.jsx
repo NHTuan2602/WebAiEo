@@ -1237,6 +1237,54 @@ export default function App() {
     }
   }, [currentUser]);
 
+  // Reset client-side game room state cleanly on logout, auth reset, or session expiry
+  const resetActiveGameSession = (usernameToRemove = '') => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+    clearInterval(lobbyCountdownTimerRef.current);
+    setLobbyCountdown(null);
+    setJoinedRoomPin(null);
+    setGameSubState('JOIN');
+    setRoomJoinForm({ pin: '', pass: '' });
+    setRoomJoinError('');
+    gameRuntimeRef.current = {
+      ...gameRuntimeRef.current,
+      subState: 'JOIN',
+      paused: false,
+      activeQuestion: null,
+      timeLimit: 18
+    };
+    const cleanUname = String(usernameToRemove || '').trim();
+    if (cleanUname) {
+      skipNextRoomBroadcastRef.current = true;
+      setRoomsDb(prev => {
+        let touched = false;
+        const nextRooms = { ...prev };
+        Object.entries(nextRooms).forEach(([pin, r]) => {
+          if (!r || typeof r !== 'object') return;
+          const nextLobby = r.lobbyPlayers && typeof r.lobbyPlayers === 'object' ? { ...r.lobbyPlayers } : {};
+          const nextLive = r.liveMatch && typeof r.liveMatch === 'object' ? { ...r.liveMatch } : {};
+          let roomTouched = false;
+          if (Object.prototype.hasOwnProperty.call(nextLobby, cleanUname)) {
+            delete nextLobby[cleanUname];
+            roomTouched = true;
+          }
+          if (r.status === 'LOBBY' && Object.prototype.hasOwnProperty.call(nextLive, cleanUname)) {
+            delete nextLive[cleanUname];
+            roomTouched = true;
+          }
+          if (roomTouched) {
+            nextRooms[pin] = { ...r, lobbyPlayers: nextLobby, liveMatch: nextLive };
+            touched = true;
+          }
+        });
+        return touched ? nextRooms : prev;
+      });
+    }
+  };
+  const resetActiveGameSessionRef = useRef(resetActiveGameSession);
+  resetActiveGameSessionRef.current = resetActiveGameSession;
+
   // Shared Cross-Browser Sync Dispatch Helpers (/api/sync via Vite Middleware + BroadcastChannel fallback)
   const applyRemoteSnapshotData = useRef(null);
   applyRemoteSnapshotData.current = (snap) => {
@@ -1258,7 +1306,9 @@ export default function App() {
         setMailConfigured(snap.mailConfigured);
       }
       if (bootSessionCheckedRef.current && currentUserRef.current) {
+        const expiredUsername = currentUserRef.current?.username || '';
         authEpochRef.current += 1;
+        clearNavSession();
         currentUserRef.current = null;
         setCurrentUser(null);
         seenNotifIdsRef.current = null;
@@ -1269,8 +1319,7 @@ export default function App() {
         setSpeakingUnlockTokens({});
         setAdminTitleModalState({ isOpen: false, targetUsername: null });
         setFocusedTestId(null);
-        setJoinedRoomPin(null);
-        setGameSubState('JOIN');
+        resetActiveGameSession(expiredUsername);
         setView('AUTH');
         showToast('Phiên đăng nhập đã hết hạn hoặc mật khẩu vừa được thay đổi. Vui lòng đăng nhập lại.', 'info');
       }
@@ -1423,12 +1472,13 @@ export default function App() {
         const errData = await res.json().catch(() => ({}));
         const errMsg = errData?.error || `Thao tác bị từ chối (${res.status}).`;
         if (res.status === 401) {
+          const expiredUsername = currentUserRef.current?.username || '';
           authEpochRef.current += 1;
           lastSyncVersionRef.current = -1;
+          clearNavSession();
           currentUserRef.current = null;
           setCurrentUser(null);
-          setJoinedRoomPin(null);
-          setGameSubState('JOIN');
+          resetActiveGameSession(expiredUsername);
           setView('AUTH');
         }
         showToast(errMsg, 'error');
@@ -1480,6 +1530,16 @@ export default function App() {
       const ch = new BroadcastChannel('lexiprep_sync_v1');
       syncChannelRef.current = ch;
       ch.onmessage = (e) => {
+        if (e.data?.type === 'AUTH_LOGOUT') {
+          authEpochRef.current += 1;
+          lastSyncVersionRef.current = -1;
+          clearNavSession();
+          currentUserRef.current = null;
+          setCurrentUser(null);
+          resetActiveGameSessionRef.current?.(e.data.username || '');
+          setView('AUTH');
+          return;
+        }
         if (e.data?.key) applyRemoteUpdate(e.data.key, e.data.payload);
       };
     }
@@ -3145,6 +3205,7 @@ export default function App() {
     setSelectedTestId(null);
     setSelectedAttemptId(null);
     setSelectedProfileStudent(null);
+    resetActiveGameSession();
     currentUserRef.current = loggedInUser;
     const localSeen = loadLocalSeenTitles(loggedInUser.username);
     if (localSeen.hasBaseline) {
@@ -3170,11 +3231,10 @@ export default function App() {
     authEpochRef.current += 1;
     lastSyncVersionRef.current = -1;
     lastBootIdRef.current = '';
-    fetch('/api/sync/auth/logout', { method: 'POST' }).catch(() => {});
-    clearTimeout(autoNextTimerRef.current);
-    clearInterval(wordTimerRef.current);
-    clearInterval(lobbyCountdownTimerRef.current);
-    setLobbyCountdown(null);
+    fetch('/api/sync/auth/logout', { method: 'POST', keepalive: true }).catch(() => {});
+    try {
+      syncChannelRef.current?.postMessage({ type: 'AUTH_LOGOUT', username: prevUsername });
+    } catch (_err) {}
     if (examAudioRef.current) {
       examAudioRef.current.pause();
       examAudioRef.current = null;
@@ -3187,8 +3247,7 @@ export default function App() {
     setSelectedTestId(null);
     setSelectedAttemptId(null);
     setSelectedProfileStudent(null);
-    setJoinedRoomPin(null);
-    setGameSubState('JOIN');
+    resetActiveGameSession(prevUsername);
     setSupportAdminProfile(null);
     setAdminFeedbacks([]);
     seenNotifIdsRef.current = null;
@@ -5795,29 +5854,22 @@ export default function App() {
       {/* Navbar rendered when not on Auth, Full Exam, Speaking Room, or Game Arena */}
       {view !== 'AUTH' && view !== 'EXAM_MODE' && view !== 'SPEAKING_MODE' && view !== 'GAME_ARENA' && (
         <Navbar
-          aiApiKey={aiApiKey}
           currentUser={currentUser}
           dailySpeakingPendingCount={dailySpeakingPendingCount}
           darkMode={darkMode}
           handleLogout={handleLogout}
-          mailConfigured={mailConfigured}
           notifications={notifications}
           onDeleteNotification={handleDeleteNotification}
           onMarkNotificationsRead={handleMarkNotificationsRead}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
-          onOpenMailConfig={() => setShowMailConfigModal(true)}
           onOpenNotificationTarget={handleOpenNotificationTarget}
           onOpenSpeakingDaily={openSpeakingDaily}
           openMemberProfile={openMemberProfile}
           openStudentGamePortal={openStudentGamePortal}
-          setApiTestState={setApiTestState}
           setDarkMode={setDarkMode}
           setSelectedProfileStudent={setSelectedProfileStudent}
-          setShowApiKeyModal={setShowApiKeyModal}
           setShowAvatarModal={setShowAvatarModal}
-          setTeacherHubTab={setTeacherHubTab}
           setView={setView}
-          teacherHubTab={teacherHubTab}
           view={view}
         />
       )}
