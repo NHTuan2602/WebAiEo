@@ -26,8 +26,8 @@
 }
 
 html.dark ::selection {
-  background: rgba(30, 225, 214, 0.24);
-  color: #f8fafc;
+  background: rgba(161, 161, 170, 0.28);
+  color: #f4f4f5;
 }
 
 :focus-visible {
@@ -36,7 +36,7 @@ html.dark ::selection {
 }
 
 html.dark :focus-visible {
-  outline-color: #1EE1D6;
+  outline-color: #d4d4d8;
 }
 
 .lexi-underlined {
@@ -66,20 +66,19 @@ html.dark .lexi-underlined::after {
 }
 
 html.dark .lexi-hero-surface {
-  background-color: #020618;
+  background-color: #121214;
 }
 
 .lexi-card {
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .lexi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 26px -10px rgba(0, 122, 122, 0.14);
+  box-shadow: none;
 }
 
 html.dark .lexi-card:hover {
-  box-shadow: 0 12px 26px -10px rgba(0, 178, 173, 0.22);
+  box-shadow: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -106,11 +105,6 @@ html.dark .lexi-card:hover {
   animation: crewmateBob 2.2s ease-in-out infinite;
 }
 
-@keyframes vipAuraPulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55), 0 0 14px rgba(239, 68, 68, 0.28); }
-  50% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9), 0 0 22px rgba(239, 68, 68, 0.45); }
-}
-
 .vip-shimmer-badge {
   position: relative;
   overflow: hidden;
@@ -118,7 +112,8 @@ html.dark .lexi-card:hover {
 }
 
 .vip-avatar-aura {
-  animation: vipAuraPulse 2.8s ease-in-out infinite;
+  animation: none !important;
+  box-shadow: none !important;
 }
 
 .vip-red-name-text,
@@ -156,33 +151,14 @@ html.dark .vip-color-violet { color: #c084fc !important; }
 .vip-color-pink { color: #be185d !important; }
 html.dark .vip-color-pink { color: #f472b6 !important; }
 
-@keyframes vipNeonShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-@keyframes vipLedAuroraPulse {
-  0%, 100% {
-    box-shadow: inset 0 0 26px rgba(0, 245, 212, 0.52), inset 0 3px 12px rgba(236, 72, 153, 0.42);
-  }
-  33% {
-    box-shadow: inset 0 0 28px rgba(236, 72, 153, 0.56), inset 0 3px 12px rgba(168, 85, 247, 0.45);
-  }
-  66% {
-    box-shadow: inset 0 0 26px rgba(251, 191, 36, 0.5), inset 0 3px 12px rgba(16, 185, 129, 0.45);
-  }
-}
-
 .vip-neon-aurora-frame,
 .vip-neon-aurora-seam {
-  background-image: linear-gradient(90deg, #ff2e93, #fbbf24, #10b981, #00f5d4, #38bdf8, #a855f7, #ff2e93);
-  background-size: 280% 280%;
-  animation: vipNeonShift 5s linear infinite;
+  box-shadow: none !important;
 }
 
 .vip-cover-led-aurora {
-  animation: vipLedAuroraPulse 4.5s ease-in-out infinite;
+  box-shadow: none !important;
+  animation: none !important;
 }
 
 html.dark {
@@ -205,8 +181,8 @@ body {
 }
 
 html.dark body {
-  background-color: #020617;
-  color: #f1f5f9;
+  background-color: #121214;
+  color: #f4f4f5;
 }
 
 html.dark input,
@@ -252,16 +228,16 @@ html.dark .cd-exam-scroll::-webkit-scrollbar-thumb:hover {
 }
 
 html.dark ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #18181b;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #3f3f46;
   border-radius: 9999px;
 }
 
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #52525b;
 }
 
 #root {

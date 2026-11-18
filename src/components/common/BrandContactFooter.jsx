@@ -22,8 +22,8 @@ export default function BrandContactFooter({ variant = 'full' }) {
               className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-zinc-700 bg-white shrink-0"
             />
             <div>
-              <p className="font-extrabold text-base sm:text-lg text-[#0F172A] dark:text-white leading-tight">{BRAND_INFO.siteName}</p>
-              <p className="text-xs sm:text-sm font-semibold text-[#0F766E] dark:text-teal-400">{BRAND_INFO.englishSubName}</p>
+              <p className="font-extrabold text-base sm:text-lg text-[#0F172A] dark:text-[#F4F4F5] leading-tight">{BRAND_INFO.siteName}</p>
+              <p className="text-xs sm:text-sm font-semibold text-[#475569] dark:text-zinc-400">{BRAND_INFO.englishSubName}</p>
             </div>
           </div>
           <p className="text-sm text-[#475569] dark:text-zinc-300 leading-relaxed max-w-sm">
@@ -42,13 +42,13 @@ export default function BrandContactFooter({ variant = 'full' }) {
           <div className="space-y-2 text-sm text-[#475569] dark:text-zinc-300">
             <a
               href={BRAND_INFO.phoneHref}
-              className="flex items-center gap-2.5 text-[#0F172A] dark:text-zinc-100 hover:text-[#0F766E] dark:hover:text-teal-400 transition font-semibold"
+              className="flex items-center gap-2.5 text-[#0F172A] dark:text-zinc-100 hover:text-[#0F766E] dark:hover:text-white transition font-semibold"
             >
-              <Phone className="w-4 h-4 text-[#0F766E] dark:text-teal-400 shrink-0" />
+              <Phone className="w-4 h-4 text-slate-600 dark:text-zinc-300 shrink-0" />
               <span>Điện thoại / Zalo: <strong>{BRAND_INFO.phoneDisplay}</strong> ({BRAND_INFO.teacherName})</span>
             </a>
             <div className="flex items-start gap-2.5 text-[#475569] dark:text-zinc-300 leading-relaxed">
-              <MapPin className="w-4 h-4 text-[#334155] dark:text-zinc-400 shrink-0 mt-0.5" />
+              <MapPin className="w-4 h-4 text-slate-600 dark:text-zinc-400 shrink-0 mt-0.5" />
               <span>Địa chỉ: {BRAND_INFO.address}</span>
             </div>
           </div>
@@ -64,9 +64,9 @@ export default function BrandContactFooter({ variant = 'full' }) {
               href={BRAND_INFO.facebookUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2.5 text-[#0F172A] dark:text-zinc-100 hover:text-[#0F766E] dark:hover:text-teal-400 transition font-semibold"
+              className="inline-flex items-center gap-2.5 text-[#0F172A] dark:text-zinc-100 hover:text-[#0F766E] dark:hover:text-white transition font-semibold"
             >
-              <MessageCircle className="w-4 h-4 text-[#0F766E] dark:text-teal-400 shrink-0" />
+              <MessageCircle className="w-4 h-4 text-slate-600 dark:text-zinc-300 shrink-0" />
               <span>Facebook: {BRAND_INFO.facebookHandle}</span>
               <ExternalLink className="w-3.5 h-3.5 opacity-75 shrink-0" />
             </a>
@@ -74,9 +74,9 @@ export default function BrandContactFooter({ variant = 'full' }) {
               href={BRAND_INFO.blogUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2.5 text-[#0F172A] dark:text-zinc-100 hover:text-[#0F766E] dark:hover:text-teal-400 transition font-semibold"
+              className="inline-flex items-center gap-2.5 text-[#0F172A] dark:text-zinc-100 hover:text-[#0F766E] dark:hover:text-white transition font-semibold"
             >
-              <Globe className="w-4 h-4 text-[#334155] dark:text-zinc-400 shrink-0" />
+              <Globe className="w-4 h-4 text-slate-600 dark:text-zinc-400 shrink-0" />
               <span>Blog: {BRAND_INFO.blogHost}</span>
               <ExternalLink className="w-3.5 h-3.5 opacity-75 shrink-0" />
             </a>

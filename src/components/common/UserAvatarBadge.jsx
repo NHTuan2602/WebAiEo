@@ -13,23 +13,24 @@ export default function UserAvatarBadge({
   const frameAllowed = showFrame && hasUnlockedAvatarFrame(user, user?.avatarFrameId);
   const frameClass = frameAllowed ? (getAvatarFrameById(user?.avatarFrameId)?.ringClass || '') : '';
   const hasVipAura = showFrame && hasPaidTitleVisualPerk(user);
-  const auraCls = hasVipAura ? 'vip-avatar-aura ring-2 ring-amber-400 dark:ring-amber-300' : '';
+  const auraCls = !frameClass && hasVipAura ? 'border-2 border-amber-500 dark:border-amber-400' : '';
+  const defaultBorderCls = !frameClass && !auraCls ? 'border border-[#E2E8F0] dark:border-zinc-700' : '';
   if (user?.avatarUrl) {
     return (
       <img
         src={user.avatarUrl}
         alt={user?.name || 'Avatar'}
-        className={`${sizeClass} aspect-square ${rounded} block object-cover object-center bg-white border border-[#E2E8F0] dark:border-slate-700 shadow-sm shrink-0 overflow-hidden ${frameClass} ${auraCls} ${className}`}
+        className={`${sizeClass} aspect-square ${rounded} block object-cover object-center bg-white ${defaultBorderCls} shrink-0 overflow-hidden shadow-none ${frameClass} ${auraCls} ${className}`}
       />
     );
   }
   const fallbackGradient = user?.isSuperAdmin
-    ? 'bg-[#334155]'
+    ? 'bg-zinc-700 dark:bg-[#27272A]'
     : user?.role === 'teacher'
     ? 'bg-[#B45309]'
     : 'bg-[#047857]';
   return (
-    <div className={`${sizeClass} ${rounded} ${fallbackGradient} flex items-center justify-center font-black ${textClass} text-white uppercase shadow-sm shrink-0 ${frameClass} ${auraCls} ${className}`}>
+    <div className={`${sizeClass} ${rounded} ${fallbackGradient} ${defaultBorderCls} flex items-center justify-center font-black ${textClass} text-white uppercase shrink-0 shadow-none ${frameClass} ${auraCls} ${className}`}>
       {initial}
     </div>
   );
