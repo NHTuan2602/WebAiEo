@@ -58,52 +58,52 @@ export const AVATAR_FRAMES = [
   {
     id: 'teal_glow',
     name: 'Ngọc Bích',
-    ringClass: '!border-2 !border-[#14B8A6] shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-[#1EE1D6] shadow-[0_0_20px_rgba(30,225,214,0.45)]',
     previewBg: 'bg-[#1EE1D6]'
   },
   {
     id: 'gold_crown',
     name: 'Hoàng Kim',
-    ringClass: '!border-2 !border-amber-500 shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-amber-400 shadow-[0_0_22px_rgba(251,191,36,0.55)]',
     previewBg: 'bg-amber-400'
   },
   {
     id: 'sakura_pink',
     name: 'Anh Đào',
-    ringClass: '!border-2 !border-pink-500 shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-pink-400 shadow-[0_0_20px_rgba(244,114,182,0.5)]',
     previewBg: 'bg-pink-400'
   },
   {
     id: 'nebula_violet',
     name: 'Tím Vũ Trụ',
-    ringClass: '!border-2 !border-violet-500 shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-violet-400 shadow-[0_0_22px_rgba(167,139,250,0.5)]',
     previewBg: 'bg-violet-400'
   },
   {
     id: 'flame_emerald',
     name: 'Lục Bảo',
-    ringClass: '!border-2 !border-emerald-500 shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]',
     previewBg: 'bg-emerald-400'
   },
   {
     id: 'vip_neon_cyan',
     name: 'Neon Cyan VIP',
     vipOnly: true,
-    ringClass: '!border-2 !border-[#06B6D4] shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-cyan-300 shadow-[0_0_24px_rgba(34,211,238,0.65)]',
     previewBg: 'bg-gradient-to-tr from-cyan-400 to-teal-300'
   },
   {
     id: 'vip_neon_pink',
     name: 'Cyber Hồng VIP',
     vipOnly: true,
-    ringClass: '!border-2 !border-[#DB2777] shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-fuchsia-400 shadow-[0_0_24px_rgba(232,121,249,0.65)]',
     previewBg: 'bg-gradient-to-tr from-pink-500 to-purple-500'
   },
   {
     id: 'vip_neon_gold',
     name: 'Hoàng Kim Neon VIP',
     vipOnly: true,
-    ringClass: '!border-2 !border-[#D97706] shadow-none',
+    ringClass: 'vip-avatar-frame ring-4 ring-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.7)]',
     previewBg: 'bg-gradient-to-tr from-amber-400 to-rose-500'
   }
 ];
@@ -854,7 +854,7 @@ export const STUDENT_TITLES = [
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 10000,
-    vipHaloClass: 'border-2 border-emerald-500 shadow-none',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-emerald-400',
     conditionText: 'Danh hiệu Phú Quý (1 tháng): Sở hữu vòng hào quang Lục Bảo & nổi bật trên Hồ sơ + BXH suốt 30 ngày.',
     badgeClass: 'bg-emerald-100 text-[#09090B] border-emerald-500 font-semibold dark:bg-[#064E3B] dark:text-[#F4F4F5] dark:border-emerald-600',
     heroBadgeClass: 'bg-[#064E3B] text-[#F4F4F5] border-emerald-600 font-semibold',
@@ -873,7 +873,7 @@ export const STUDENT_TITLES = [
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 15000,
-    vipHaloClass: 'border-2 border-rose-500 shadow-none',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-rose-400',
     conditionText: 'Danh hiệu Phú Quý (1 tháng): Hiệu ứng ánh kim Hồng Ngọc + hào quang Avatar khi đồng hành duy trì server.',
     badgeClass: 'bg-rose-100 text-[#09090B] border-rose-500 font-semibold dark:bg-[#881337] dark:text-[#F4F4F5] dark:border-rose-600',
     heroBadgeClass: 'bg-[#881337] text-[#F4F4F5] border-rose-600 font-semibold',
@@ -892,7 +892,7 @@ export const STUDENT_TITLES = [
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 20000,
-    vipHaloClass: 'border-2 border-amber-500 shadow-none',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-amber-400',
     conditionText: 'Danh hiệu Phú Quý (1 tháng): Ánh vàng Hoàng Kim rực sáng kèm hào quang Avatar & huy hiệu ưu tiên trên BXH 30 ngày.',
     badgeClass: 'bg-[#FBBF24] text-[#09090B] border-[#D97706] font-semibold',
     heroBadgeClass: 'bg-[#FBBF24] text-[#09090B] border-[#D97706] font-semibold',
@@ -911,7 +911,7 @@ export const STUDENT_TITLES = [
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 50000,
-    vipHaloClass: 'border-2 border-amber-500 shadow-none',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-amber-300',
     conditionText: 'Danh hiệu Phú Quý Đỉnh Cao (1 tháng): Ánh kim Vàng Đỏ phát sáng độc tôn + hào quang Avatar & vinh danh VIP trên BXH.',
     badgeClass: 'bg-[#F59E0B] text-[#09090B] border-[#B45309] font-semibold',
     heroBadgeClass: 'bg-[#F59E0B] text-[#09090B] border-[#B45309] font-semibold',
@@ -930,7 +930,7 @@ export const STUDENT_TITLES = [
     difficulty: 'VIP Độc Quyền',
     isVipBundleTitle: true,
     defaultPriceVnd: 80000,
-    vipHaloClass: 'border-2 border-red-500 shadow-none',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-red-500',
     conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu Ai eo VIP.',
     badgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
     heroBadgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
@@ -1332,68 +1332,68 @@ export const VIP_NEON_COVER_THEMES = [
   {
     id: 'aurora_rgb',
     name: 'LED 7 Sắc Nhiều Màu',
-    desc: 'Viền đèn LED đa sắc sắc nét',
+    desc: 'Viền đèn LED đa sắc chuyển động nổi bật',
     swatchClass: 'bg-gradient-to-r from-rose-500 via-amber-400 to-cyan-400',
-    frameWrapClass: 'border-2 border-fuchsia-500 shadow-none',
-    cardRimWrapClass: 'border-2 border-fuchsia-500 shadow-none',
-    coverLedInnerClass: '',
-    seamBarClass: 'bg-fuchsia-500',
-    cardAccentClass: 'border-2 border-fuchsia-500 shadow-none'
+    frameWrapClass: 'vip-neon-frame vip-neon-aurora-frame shadow-[0_14px_36px_-6px_rgba(236,72,153,0.55),0_10px_28px_-6px_rgba(34,211,238,0.55)]',
+    cardRimWrapClass: 'vip-neon-frame vip-neon-aurora-frame shadow-[0_8px_22px_-6px_rgba(168,85,247,0.5),0_6px_18px_-6px_rgba(34,211,238,0.45)]',
+    coverLedInnerClass: 'vip-cover-led-aurora',
+    seamBarClass: 'vip-neon-aurora-seam',
+    cardAccentClass: 'vip-neon-frame ring-2 ring-fuchsia-400/85 border-cyan-400 shadow-[0_10px_24px_-8px_rgba(168,85,247,0.48)]'
   },
   {
     id: 'neon_pink',
     name: 'LED Hồng Cyber',
     desc: 'Viền LED hồng tím neon nổi bật',
     swatchClass: 'bg-gradient-to-r from-pink-500 via-fuchsia-500 to-cyan-400',
-    frameWrapClass: 'border-2 border-pink-500 shadow-none',
-    cardRimWrapClass: 'border-2 border-pink-500 shadow-none',
-    coverLedInnerClass: '',
-    seamBarClass: 'bg-pink-500',
-    cardAccentClass: 'border-2 border-pink-500 shadow-none'
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#FF2E93] via-[#E879F9] to-[#22D3EE] shadow-[0_14px_34px_-6px_rgba(236,72,153,0.68)]',
+    cardRimWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#FF2E93] via-[#C084FC] to-[#22D3EE] shadow-[0_8px_22px_-6px_rgba(236,72,153,0.52)]',
+    coverLedInnerClass: 'vip-cover-led shadow-[inset_0_0_26px_rgba(255,46,147,0.62),inset_0_3px_12px_rgba(34,211,238,0.45)]',
+    seamBarClass: 'vip-neon-seam bg-gradient-to-r from-[#FF2E93] via-[#E879F9] to-[#22D3EE]',
+    cardAccentClass: 'vip-neon-frame ring-2 ring-pink-500/80 border-pink-400 shadow-[0_10px_24px_-8px_rgba(236,72,153,0.45)]'
   },
   {
     id: 'cyber_cyan',
     name: 'LED Cyan Băng',
     desc: 'Viền đèn LED xanh điện lạnh sắc nét',
     swatchClass: 'bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400',
-    frameWrapClass: 'border-2 border-cyan-500 shadow-none',
-    cardRimWrapClass: 'border-2 border-cyan-500 shadow-none',
-    coverLedInnerClass: '',
-    seamBarClass: 'bg-cyan-500',
-    cardAccentClass: 'border-2 border-cyan-500 shadow-none'
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#6366F1] shadow-[0_14px_34px_-6px_rgba(6,182,212,0.7)]',
+    cardRimWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#6366F1] shadow-[0_8px_22px_-6px_rgba(6,182,212,0.52)]',
+    coverLedInnerClass: 'vip-cover-led shadow-[inset_0_0_26px_rgba(34,211,238,0.65),inset_0_3px_12px_rgba(0,245,212,0.45)]',
+    seamBarClass: 'vip-neon-seam bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#6366F1]',
+    cardAccentClass: 'vip-neon-frame ring-2 ring-cyan-400/80 border-cyan-400 shadow-[0_10px_24px_-8px_rgba(6,182,212,0.45)]'
   },
   {
     id: 'emerald_volt',
     name: 'LED Lục Điện',
     desc: 'Viền LED xanh ngọc sắc nét nổi bật',
     swatchClass: 'bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400',
-    frameWrapClass: 'border-2 border-emerald-500 shadow-none',
-    cardRimWrapClass: 'border-2 border-emerald-500 shadow-none',
-    coverLedInnerClass: '',
-    seamBarClass: 'bg-emerald-500',
-    cardAccentClass: 'border-2 border-emerald-500 shadow-none'
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#38BDF8] shadow-[0_14px_34px_-6px_rgba(16,185,129,0.68)]',
+    cardRimWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#38BDF8] shadow-[0_8px_22px_-6px_rgba(16,185,129,0.52)]',
+    coverLedInnerClass: 'vip-cover-led shadow-[inset_0_0_26px_rgba(30,225,214,0.62),inset_0_3px_12px_rgba(16,185,129,0.45)]',
+    seamBarClass: 'vip-neon-seam bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#38BDF8]',
+    cardAccentClass: 'vip-neon-frame ring-2 ring-emerald-400/85 border-emerald-400 shadow-[0_10px_24px_-8px_rgba(16,185,129,0.45)]'
   },
   {
     id: 'ruby_fire',
     name: 'LED Đỏ Hổ Phách',
     desc: 'Viền LED đỏ cam năng lượng VIP',
     swatchClass: 'bg-gradient-to-r from-red-500 via-rose-500 to-amber-400',
-    frameWrapClass: 'border-2 border-rose-500 shadow-none',
-    cardRimWrapClass: 'border-2 border-rose-500 shadow-none',
-    coverLedInnerClass: '',
-    seamBarClass: 'bg-rose-500',
-    cardAccentClass: 'border-2 border-rose-500 shadow-none'
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#FBBF24] shadow-[0_14px_34px_-6px_rgba(239,68,68,0.68)]',
+    cardRimWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#FBBF24] shadow-[0_8px_22px_-6px_rgba(239,68,68,0.52)]',
+    coverLedInnerClass: 'vip-cover-led shadow-[inset_0_0_26px_rgba(239,68,68,0.62),inset_0_3px_12px_rgba(251,191,36,0.45)]',
+    seamBarClass: 'vip-neon-seam bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#FBBF24]',
+    cardAccentClass: 'vip-neon-frame ring-2 ring-rose-500/80 border-rose-400 shadow-[0_10px_24px_-8px_rgba(239,68,68,0.45)]'
   },
   {
     id: 'solar_gold',
     name: 'LED Hoàng Kim',
     desc: 'Viền LED vàng kim ánh sáng hoàng gia',
     swatchClass: 'bg-gradient-to-r from-amber-400 via-yellow-300 to-rose-400',
-    frameWrapClass: 'border-2 border-amber-500 shadow-none',
-    cardRimWrapClass: 'border-2 border-amber-500 shadow-none',
-    coverLedInnerClass: '',
-    seamBarClass: 'bg-amber-500',
-    cardAccentClass: 'border-2 border-amber-500 shadow-none'
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB7185] shadow-[0_14px_34px_-6px_rgba(245,158,11,0.7)]',
+    cardRimWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB7185] shadow-[0_8px_22px_-6px_rgba(245,158,11,0.52)]',
+    coverLedInnerClass: 'vip-cover-led shadow-[inset_0_0_26px_rgba(251,191,36,0.65),inset_0_3px_12px_rgba(251,113,133,0.42)]',
+    seamBarClass: 'vip-neon-seam bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB7185]',
+    cardAccentClass: 'vip-neon-frame ring-2 ring-amber-400/85 border-amber-400 shadow-[0_10px_24px_-8px_rgba(245,158,11,0.45)]'
   }
 ];
 

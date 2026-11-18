@@ -26,14 +26,16 @@ import VipMemberName from '../components/common/VipMemberName';
 import {
   formatVndCurrency,
   getTestPurchasePriceVnd,
-  hasTestPurchaseAccess
+  hasTestPurchaseAccess,
+  resolveUserVipNameVisual,
+  resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 
 export default function StudentHome({
   attempts,
   classesDb = {},
   currentUser,
-  customTitles: _customTitles = [],
+  customTitles = [],
   examUnlockTokens = {},
   focusedTestId = null,
   onClearFocusedTest,
@@ -776,9 +778,11 @@ export default function StudentHome({
                       const memberIsAdmin = Boolean(u?.isSystemAdmin);
                       const memberIsTeacher = !memberIsAdmin && u?.role === 'teacher';
                       const memberAttCount = (attempts || []).filter(att => att.studentId === uname).length;
-                      return (
+                      const memberVip = resolveUserVipNameVisual(memberObj);
+                      const mTitle = resolveVisibleTitleBadge(memberObj, attempts, roomsDb, customTitles, paymentConfig);
+                      const cardBtn = (
                         <button
-                          key={uname}
+                          key={memberVip.showNeonCover ? undefined : uname}
                           type="button"
                           onClick={() => {
                             if (openMemberProfile) {
@@ -789,19 +793,23 @@ export default function StudentHome({
                               setView('STUDENT_PROFILE');
                             }
                           }}
-                          className="w-full h-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-lg border border-slate-200 dark:border-zinc-800 bg-[#F8FAFC] dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-600 transition text-left group"
+                          className={`w-full h-full flex items-center gap-3.5 p-3.5 sm:p-4 transition text-left group ${
+                            memberVip.showNeonCover
+                              ? 'rounded-[10px] bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-900'
+                              : 'rounded-xl border border-slate-200 dark:border-zinc-800 bg-[#F8FAFC] dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-600'
+                          }`}
                         >
-                          <UserAvatarBadge user={memberObj} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-lg" showFrame={false} />
+                          <UserAvatarBadge user={memberObj} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-sm font-bold text-[#0F172B] dark:text-[#F4F4F5] truncate group-hover:text-[#0F766E] dark:group-hover:text-white">
-                                {u?.name || uname}
+                                <VipMemberName user={memberObj} fallbackName={u?.name || uname} badgeSize="xs" />
                               </span>
                               {isSelf && (
                                 <span className="text-xs font-medium text-[#475569] dark:text-zinc-400 shrink-0">(Bạn)</span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                               {memberIsAdmin ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700">
                                   Quản trị viên
@@ -815,6 +823,12 @@ export default function StudentHome({
                                   Học viên
                                 </span>
                               )}
+                              {mTitle && !mTitle.isRoleBuiltIn && (
+                                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${mTitle.badgeClass}`}>
+                                  <span>{mTitle.icon}</span>
+                                  <span className="truncate max-w-[140px]">{mTitle.label}</span>
+                                </span>
+                              )}
                               <span className="text-xs text-[#475569] dark:text-zinc-400 truncate">
                                 {memberIsAdmin ? 'Góp ý tính năng' : memberIsTeacher ? 'Hồ sơ giảng viên' : `${memberAttCount} bài thi`}
                               </span>
@@ -822,6 +836,14 @@ export default function StudentHome({
                           </div>
                         </button>
                       );
+                      return memberVip.showNeonCover ? (
+                        <div
+                          key={uname}
+                          className={`vip-card-rim rounded-xl p-[2px] transition-all ${memberVip.neonCoverMeta.cardRimWrapClass}`}
+                        >
+                          {cardBtn}
+                        </div>
+                      ) : cardBtn;
                     });
                 })()}
               </div>

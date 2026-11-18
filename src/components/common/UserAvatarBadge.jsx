@@ -13,14 +13,17 @@ export default function UserAvatarBadge({
   const frameAllowed = showFrame && hasUnlockedAvatarFrame(user, user?.avatarFrameId);
   const frameClass = frameAllowed ? (getAvatarFrameById(user?.avatarFrameId)?.ringClass || '') : '';
   const hasVipAura = showFrame && hasPaidTitleVisualPerk(user);
-  const auraCls = !frameClass && hasVipAura ? 'border-2 border-amber-500 dark:border-amber-400' : '';
-  const defaultBorderCls = !frameClass && !auraCls ? 'border border-[#E2E8F0] dark:border-zinc-700' : '';
+  const auraCls = hasVipAura
+    ? (frameClass ? 'vip-avatar-aura' : 'vip-avatar-aura ring-2 ring-amber-400 dark:ring-amber-300')
+    : '';
+  const defaultBorderCls = !frameClass && !auraCls ? 'border border-[#E2E8F0] dark:border-zinc-700 shadow-none' : '';
   if (user?.avatarUrl) {
     return (
       <img
         src={user.avatarUrl}
         alt={user?.name || 'Avatar'}
-        className={`${sizeClass} aspect-square ${rounded} block object-cover object-center bg-white ${defaultBorderCls} shrink-0 overflow-hidden shadow-none ${frameClass} ${auraCls} ${className}`}
+        data-avatar-badge="true"
+        className={`vip-avatar-badge ${sizeClass} aspect-square ${rounded} block object-cover object-center bg-white ${defaultBorderCls} shrink-0 overflow-hidden ${frameClass} ${auraCls} ${className}`}
       />
     );
   }
@@ -30,7 +33,10 @@ export default function UserAvatarBadge({
     ? 'bg-[#B45309]'
     : 'bg-[#047857]';
   return (
-    <div className={`${sizeClass} ${rounded} ${fallbackGradient} ${defaultBorderCls} flex items-center justify-center font-black ${textClass} text-white uppercase shrink-0 shadow-none ${frameClass} ${auraCls} ${className}`}>
+    <div
+      data-avatar-badge="true"
+      className={`vip-avatar-badge ${sizeClass} aspect-square ${rounded} ${fallbackGradient} ${defaultBorderCls} flex items-center justify-center font-black ${textClass} text-white uppercase shrink-0 ${frameClass} ${auraCls} ${className}`}
+    >
       {initial}
     </div>
   );

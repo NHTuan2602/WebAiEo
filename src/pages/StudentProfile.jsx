@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Award,
   BarChart2,
@@ -8,6 +8,7 @@ import {
   Check,
   CheckCircle,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   Clock,
   Copy,
@@ -27,6 +28,7 @@ import {
   Lock,
   Mail,
   MapPin,
+  MessageCircle,
   MessageSquare,
   Palette,
   PenTool,
@@ -117,6 +119,26 @@ export default function StudentProfile({
 }) {
   const [memberSearch, setMemberSearch] = useState('');
   const [memberRoleFilter, setMemberRoleFilter] = useState('all');
+  const [showMemberDirectoryPopup, setShowMemberDirectoryPopup] = useState(false);
+  const memberDirectoryRef = useRef(null);
+
+  useEffect(() => {
+    if (!showMemberDirectoryPopup) return undefined;
+    const handleOutside = (e) => {
+      if (memberDirectoryRef.current && !memberDirectoryRef.current.contains(e.target)) {
+        setShowMemberDirectoryPopup(false);
+      }
+    };
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setShowMemberDirectoryPopup(false);
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [showMemberDirectoryPopup]);
   const [fbCategory, setFbCategory] = useState('feature');
   const [fbContent, setFbContent] = useState('');
   const [fbPrivate, setFbPrivate] = useState(false);
@@ -602,33 +624,260 @@ export default function StudentProfile({
           {isTeacherViewer ? 'Quay Lại Quản Trị Giáo Viên' : 'Quay Lại Phòng Luyện Đề'}
         </button>
 
-        {!isSelf && currentUser?.username && (
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedProfileStudent(currentUser.username);
-              setTempNoteText('');
-            }}
-            className={profileActionBtnCls}
-          >
-            <UserCheck className="w-4 h-4 text-slate-600 dark:text-zinc-300" /> Quay về Hồ Sơ Của Tôi ({currentUser.name})
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {!isSelf && currentUser?.username && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedProfileStudent(currentUser.username);
+                setTempNoteText('');
+              }}
+              className={profileActionBtnCls}
+            >
+              <UserCheck className="w-4 h-4 text-slate-600 dark:text-zinc-300" /> Quay về Hồ Sơ Của Tôi ({currentUser.name})
+            </button>
+          )}
+
+          {/* Messenger-Style Dropdown Directory Popup Trigger */}
+          <div className="relative" ref={memberDirectoryRef}>
+            <button
+              type="button"
+              onClick={() => setShowMemberDirectoryPopup(v => !v)}
+              aria-expanded={showMemberDirectoryPopup}
+              aria-label="Mở danh bạ hồ sơ thành viên"
+              className={`relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition ${
+                showMemberDirectoryPopup
+                  ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                  : 'bg-white hover:bg-slate-50 dark:bg-[#18181B] dark:hover:bg-zinc-800 border-[#E2E8F0] dark:border-zinc-700 text-[#0F172B] dark:text-zinc-100 shadow-sm'
+              }`}
+            >
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                  showMemberDirectoryPopup
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[#0F766E] text-white'
+                }`}
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+              </span>
+              <span>Danh Bạ</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-xs font-extrabold tabular-nums ${
+                  showMemberDirectoryPopup
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200'
+                }`}
+              >
+                {allMembers.length}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                  showMemberDirectoryPopup ? 'rotate-180' : ''
+                }`}
+              />
+              {newFeedbacksCount > 0 && isViewerSuperAdmin && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-xs font-bold flex items-center justify-center"
+                  title={`${newFeedbacksCount} góp ý chờ đọc`}
+                >
+                  {newFeedbacksCount > 9 ? '9+' : newFeedbacksCount}
+                </span>
+              )}
+            </button>
+
+            {showMemberDirectoryPopup && (
+              <div className="fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-[410px] max-h-[75vh] flex flex-col bg-white dark:bg-[#18181B] rounded-2xl shadow-2xl border border-[#E2E8F0] dark:border-zinc-700 z-50 overflow-hidden">
+                <div className="px-4 py-3 bg-[#F8FAFC] dark:bg-zinc-900 border-b border-[#E2E8F0] dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0">
+                  <div>
+                    <h2 className="text-sm font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
+                      <Users className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
+                      Danh Bạ Hồ Sơ Thành Viên ({filteredMembers.length}/{allMembers.length})
+                    </h2>
+                    <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                      Chọn thành viên để xem nhanh hồ sơ, tiến trình &amp; góp ý.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMemberDirectoryPopup(false)}
+                    aria-label="Đóng danh bạ thành viên"
+                    className="p-1.5 rounded-full text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-zinc-800 transition shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-3.5 border-b border-[#E2E8F0] dark:border-zinc-800 space-y-2.5 shrink-0 bg-white dark:bg-[#18181B]">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={memberSearch}
+                      onChange={e => setMemberSearch(e.target.value)}
+                      placeholder="Tìm tên hoặc @username..."
+                      aria-label="Tìm thành viên theo tên hoặc username"
+                      className="w-full pl-8 pr-3 py-2 text-xs bg-[#F8FAFC] dark:bg-zinc-900 text-[#0F172B] dark:text-zinc-100 border border-[#CBD5E1] dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-zinc-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                    {[
+                      { id: 'all', label: `Tất cả (${allMembers.length})` },
+                      ...(adminCardMember ? [{ id: 'admin', label: 'Quản trị (1)' }] : []),
+                      { id: 'teacher', label: `Giáo viên (${allMembers.filter(m => !m.isSystemAdmin && m.role === 'teacher').length})` },
+                      { id: 'student', label: `Học viên (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher').length})` }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setMemberRoleFilter(f.id)}
+                        className={`px-2.5 py-1 rounded-[6px] border transition ${
+                          memberRoleFilter === f.id
+                            ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                            : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700 hover:bg-slate-200/70 dark:hover:bg-zinc-700'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {filteredMembers.length === 0 ? (
+                    <p className="text-xs text-[#475569] dark:text-zinc-400 py-6 text-center">
+                      Không tìm thấy thành viên nào khớp &quot;{memberSearch}&quot;.
+                    </p>
+                  ) : (
+                    filteredMembers.map(member => {
+                      const isSelected = activeUsername === member.username;
+                      const isMemberAdmin = Boolean(member.isSystemAdmin);
+                      const isMemberTeacher = !isMemberAdmin && member.role === 'teacher';
+                      const isMeChip = member.username === currentUser?.username;
+                      const mBest = bestBandByStudent.get(member.username) ?? null;
+                      const memberVipVisual = resolveUserVipNameVisual(member);
+
+                      const memberCardBtn = (
+                        <button
+                          key={memberVipVisual.showNeonCover ? undefined : member.username}
+                          type="button"
+                          onClick={() => {
+                            setSelectedProfileStudent(member.username);
+                            setTempNoteText('');
+                            setShowMemberDirectoryPopup(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition ${
+                            memberVipVisual.showNeonCover
+                              ? isSelected
+                                ? 'rounded-[10px] bg-slate-50 dark:bg-zinc-800/95'
+                                : 'rounded-[10px] bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-900'
+                              : isSelected
+                              ? 'rounded-xl border bg-slate-100 dark:bg-zinc-800 border-slate-400 dark:border-zinc-500'
+                              : 'rounded-xl border bg-[#F8FAFC] dark:bg-zinc-900 border-[#E2E8F0] dark:border-zinc-800 hover:border-slate-300 hover:bg-white dark:hover:bg-zinc-800'
+                          }`}
+                        >
+                          <UserAvatarBadge user={member} sizeClass="w-10 h-10" textClass="text-xs" rounded="rounded-xl" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <VipMemberName
+                                user={member}
+                                fallbackName={member.name || member.username}
+                                className="text-xs font-bold text-[#0F172B] dark:text-[#F4F4F5] truncate"
+                                badgeSize="xs"
+                              />
+                              {isMeChip && (
+                                <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-zinc-700 text-[#334155] dark:text-zinc-200 shrink-0">
+                                  Bạn
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-[#475569] dark:text-zinc-400 flex items-center gap-1 flex-wrap mt-0.5">
+                              {(() => {
+                                const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles, paymentConfig);
+                                if (isMemberAdmin) {
+                                  return (
+                                    <>
+                                      <span className="text-slate-700 dark:text-zinc-200 font-bold inline-flex items-center gap-1">
+                                        ADMIN &bull; Góp ý
+                                        {newFeedbacksCount > 0 && (
+                                          <span className="px-1.5 py-0.2 rounded-full bg-[#0F766E] text-white text-xs font-bold">
+                                            {newFeedbacksCount} mới
+                                          </span>
+                                        )}
+                                      </span>
+                                      {mTitle && !mTitle.isRoleBuiltIn && (
+                                        <span className={`px-1.5 py-0.2 rounded-full border font-semibold text-xs ${mTitle.badgeClass}`}>
+                                          {mTitle.icon} {mTitle.label}
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                }
+                                if (isMemberTeacher) {
+                                  return (
+                                    <>
+                                      <span className="text-[#334155] dark:text-zinc-200 font-bold">Giáo viên</span>
+                                      {mTitle && !mTitle.isRoleBuiltIn && (
+                                        <span className={`px-1.5 py-0.2 rounded-full border font-semibold text-xs ${mTitle.badgeClass}`}>
+                                          {mTitle.icon} {mTitle.label}
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                }
+                                return (
+                                  <span className="inline-flex items-center gap-1 flex-wrap">
+                                    {mTitle && !mTitle.isRoleBuiltIn && (
+                                      <span className={`px-1.5 py-0.2 rounded-full border font-semibold text-xs ${mTitle.badgeClass}`}>
+                                        {mTitle.icon} {mTitle.label}
+                                      </span>
+                                    )}
+                                    <span>
+                                      Target {member.targetBand || '7.5'}
+                                      {mBest !== null ? ` • Best ${mBest}` : ''}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </button>
+                      );
+
+                      return memberVipVisual.showNeonCover ? (
+                        <div
+                          key={member.username}
+                          className={`vip-card-rim rounded-xl p-[2px] transition-all ${memberVipVisual.neonCoverMeta.cardRimWrapClass}`}
+                        >
+                          {memberCardBtn}
+                        </div>
+                      ) : memberCardBtn;
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Clean SaaS Profile Header: Compact 160-180px Cover Banner + Flat VIP Border (Zero glow, zero nested card frames) */}
+      {/* Clean SaaS Profile Header + VIP Neon LED Frame when enabled */}
       <div
-        className={`bg-white dark:bg-[#18181B] rounded-2xl overflow-hidden mb-7 ${
+        className={
           vipVisual.showNeonCover
-            ? vipVisual.neonCoverMeta.frameWrapClass
-            : 'border border-[#E2E8F0] dark:border-zinc-800'
-        }`}
-        style={{ boxShadow: 'none' }}
+            ? `vip-neon-frame rounded-2xl p-[3px] mb-7 transition-all ${vipVisual.neonCoverMeta.frameWrapClass}`
+            : 'bg-white dark:bg-[#18181B] rounded-2xl border border-[#E2E8F0] dark:border-zinc-800 overflow-hidden mb-7'
+        }
+        style={vipVisual.showNeonCover ? undefined : { boxShadow: 'none' }}
       >
         {/* 1. Compact Cover Photo / Banner Stage */}
         <div
           className={`relative w-full h-[160px] sm:h-[180px] overflow-hidden ${
-            hasCustomCover ? '' : heroBanner.heroClass
+            vipVisual.showNeonCover
+              ? 'rounded-t-[13px]'
+              : 'border-b border-[#E2E8F0] dark:border-zinc-800'
+          } ${
+            hasCustomCover ? 'bg-slate-100 dark:bg-zinc-900' : heroBanner.heroClass
           }`}
         >
           {hasCustomCover && (
@@ -636,6 +885,13 @@ export default function StudentProfile({
               src={student.profileCoverUrl}
               alt={`Ảnh bìa của ${student.name || student.username}`}
               className="w-full h-full object-cover object-center select-none"
+            />
+          )}
+
+          {vipVisual.showNeonCover && (
+            <div
+              aria-hidden="true"
+              className={`vip-cover-led absolute inset-0 rounded-t-[13px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
             />
           )}
 
@@ -672,21 +928,25 @@ export default function StudentProfile({
               </button>
             </div>
           )}
+          {vipVisual.showNeonCover && (
+            <div className={`vip-neon-seam absolute bottom-0 inset-x-0 h-[3px] z-10 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
+          )}
         </div>
 
         {/* 2. Profile Info & Controls Section Below Cover */}
-        <div className="px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-[#18181B]">
+        <div className={`vip-profile-inner px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-[#18181B] ${vipVisual.showNeonCover ? 'rounded-b-[13px]' : ''}`}>
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 min-w-0">
-              {/* Proportional Overlapping Avatar (flat border directly on avatar, zero nested wrapper card/glow) */}
+              {/* Proportional Overlapping Avatar inside clean collar so VIP frame ring & glow sit symmetrically */}
               <div className="-mt-12 sm:-mt-14 relative z-20 shrink-0 w-fit">
-                <UserAvatarBadge
-                  user={student}
-                  sizeClass="w-24 h-24 sm:w-28 sm:h-28"
-                  textClass="text-3xl sm:text-4xl"
-                  rounded="rounded-full"
-                  className="border-4 border-white dark:border-[#18181B]"
-                />
+                <div className="vip-avatar-collar p-1 rounded-full bg-white dark:bg-[#18181B] flex items-center justify-center">
+                  <UserAvatarBadge
+                    user={student}
+                    sizeClass="w-24 h-24 sm:w-28 sm:h-28"
+                    textClass="text-3xl sm:text-4xl"
+                    rounded="rounded-full"
+                  />
+                </div>
                 {canEditTargetInfo && (
                   <button
                     type="button"
@@ -953,9 +1213,8 @@ export default function StudentProfile({
         </div>
       </div>
 
-      {/* Main 2-Column Workspace: Left Profile Content + Right Sticky Member Directory */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-8 space-y-6 min-w-0">
+      {/* Full-Width Profile Content Workspace */}
+      <div className="space-y-6 min-w-0">
 
       {/* SYSTEM ADMIN PROFILE: DEDICATED DONATE QR + FEEDBACK & FEATURE REQUEST INBOX */}
       {isTargetSystemAdmin ? (() => {
@@ -2149,154 +2408,6 @@ export default function StudentProfile({
           </div>
         </div>
       </div>
-        </div>
-
-        {/* Right Sticky Sidebar: Member Directory */}
-        <aside className="lg:col-span-4 lg:sticky lg:top-20 space-y-4">
-          <div className={`${profileCardCls} p-4 sm:p-5 space-y-3.5`}>
-            <div>
-              <h2 className="text-sm font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
-                Danh Bạ Hồ Sơ Thành Viên ({filteredMembers.length}/{allMembers.length})
-              </h2>
-              <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
-                Chọn thành viên để xem nhanh hồ sơ, tiến trình &amp; góp ý.
-              </p>
-            </div>
-
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={memberSearch}
-                onChange={e => setMemberSearch(e.target.value)}
-                placeholder="Tìm tên hoặc @username..."
-                aria-label="Tìm thành viên theo tên hoặc username"
-                className="w-full pl-8 pr-3 py-2 text-xs bg-[#F8FAFC] dark:bg-zinc-900 text-[#0F172B] dark:text-zinc-100 border border-[#CBD5E1] dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-zinc-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-              {[
-                { id: 'all', label: `Tất cả (${allMembers.length})` },
-                ...(adminCardMember ? [{ id: 'admin', label: 'Quản trị (1)' }] : []),
-                { id: 'teacher', label: `Giáo viên (${allMembers.filter(m => !m.isSystemAdmin && m.role === 'teacher').length})` },
-                { id: 'student', label: `Học viên (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher').length})` }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setMemberRoleFilter(f.id)}
-                  className={`px-2.5 py-1 rounded-[6px] border transition ${
-                    memberRoleFilter === f.id
-                      ? 'bg-[#0F766E] text-white border-[#0F766E]'
-                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700 hover:bg-slate-200/70 dark:hover:bg-zinc-700'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="max-h-[480px] overflow-y-auto space-y-2 pr-1">
-              {filteredMembers.length === 0 ? (
-                <p className="text-xs text-[#475569] dark:text-zinc-400 py-4 text-center">
-                  Không tìm thấy thành viên nào khớp "{memberSearch}".
-                </p>
-              ) : (
-                filteredMembers.map(member => {
-                  const isSelected = activeUsername === member.username;
-                  const isMemberAdmin = Boolean(member.isSystemAdmin);
-                  const isMemberTeacher = !isMemberAdmin && member.role === 'teacher';
-                  const isMeChip = member.username === currentUser?.username;
-                  const mBest = bestBandByStudent.get(member.username) ?? null;
-
-                  return (
-                    <button
-                      key={member.username}
-                      type="button"
-                      onClick={() => {
-                        setSelectedProfileStudent(member.username);
-                        setTempNoteText('');
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-xl border transition ${
-                        isSelected
-                          ? 'bg-slate-100 dark:bg-zinc-800 border-slate-400 dark:border-zinc-500'
-                          : 'bg-[#F8FAFC] dark:bg-zinc-900 border-[#E2E8F0] dark:border-zinc-800 hover:border-slate-300 hover:bg-white dark:hover:bg-zinc-800'
-                      }`}
-                    >
-                      <UserAvatarBadge user={member} sizeClass="w-10 h-10" textClass="text-xs" rounded="rounded-xl" showFrame={false} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <VipMemberName
-                            user={member}
-                            fallbackName={member.name || member.username}
-                            className="text-xs font-bold text-[#0F172B] dark:text-[#F4F4F5] truncate"
-                            badgeSize="xs"
-                          />
-                          {isMeChip && (
-                            <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-zinc-700 text-[#334155] dark:text-zinc-200 shrink-0">
-                              Bạn
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-[#475569] dark:text-zinc-400 flex items-center gap-1 flex-wrap mt-0.5">
-                          {(() => {
-                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles, paymentConfig);
-                            if (isMemberAdmin) {
-                              return (
-                                <>
-                                  <span className="text-slate-700 dark:text-zinc-200 font-bold inline-flex items-center gap-1">
-                                    ADMIN &bull; Góp ý
-                                    {newFeedbacksCount > 0 && (
-                                      <span className="px-1.5 py-0.2 rounded-full bg-[#0F766E] text-white text-xs font-bold">
-                                        {newFeedbacksCount} mới
-                                      </span>
-                                    )}
-                                  </span>
-                                  {mTitle && !mTitle.isRoleBuiltIn && (
-                                    <span className={`px-1.5 py-0.2 rounded-full border font-semibold text-xs ${mTitle.badgeClass}`}>
-                                      {mTitle.icon} {mTitle.label}
-                                    </span>
-                                  )}
-                                </>
-                              );
-                            }
-                            if (isMemberTeacher) {
-                              return (
-                                <>
-                                  <span className="text-[#334155] dark:text-zinc-200 font-bold">Giáo viên</span>
-                                  {mTitle && !mTitle.isRoleBuiltIn && (
-                                    <span className={`px-1.5 py-0.2 rounded-full border font-semibold text-xs ${mTitle.badgeClass}`}>
-                                      {mTitle.icon} {mTitle.label}
-                                    </span>
-                                  )}
-                                </>
-                              );
-                            }
-                            return (
-                              <span className="inline-flex items-center gap-1 flex-wrap">
-                                {mTitle && !mTitle.isRoleBuiltIn && (
-                                  <span className={`px-1.5 py-0.2 rounded-full border font-semibold text-xs ${mTitle.badgeClass}`}>
-                                    {mTitle.icon} {mTitle.label}
-                                  </span>
-                                )}
-                                <span>
-                                  Target {member.targetBand || '7.5'}
-                                  {mBest !== null ? ` • Best ${mBest}` : ''}
-                                </span>
-                              </span>
-                            );
-                          })()}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </aside>
       </div>
 
       {/* Modal: Bảng Danh Hiệu & Cách Đạt Được (Học viên, Giáo viên & Quản trị) */}
@@ -2656,10 +2767,20 @@ export default function StudentProfile({
                   avatarFrameId: customDraft.avatarFrameId
                 };
                 return (
-                  <div className="rounded-xl overflow-hidden border border-[#E2E8F0] dark:border-zinc-800 bg-white dark:bg-[#18181B]">
+                  <div
+                    className={
+                      vipVisual.showNeonCover
+                        ? `vip-neon-frame rounded-2xl p-[3px] ${vipVisual.neonCoverMeta.frameWrapClass}`
+                        : 'rounded-xl overflow-hidden border border-[#E2E8F0] dark:border-zinc-800 bg-white dark:bg-[#18181B]'
+                    }
+                  >
                     <div
-                      className={`relative h-24 w-full overflow-hidden border-b border-[#E2E8F0] dark:border-zinc-800 ${
-                        previewCoverOk ? '' : previewBanner.heroClass
+                      className={`relative h-24 w-full overflow-hidden ${
+                        vipVisual.showNeonCover
+                          ? 'rounded-t-[13px]'
+                          : 'border-b border-[#E2E8F0] dark:border-zinc-800'
+                      } ${
+                        previewCoverOk ? 'bg-slate-100 dark:bg-zinc-900' : previewBanner.heroClass
                       }`}
                     >
                       {previewCoverOk && (
@@ -2669,10 +2790,21 @@ export default function StudentProfile({
                           className="w-full h-full object-cover object-center"
                         />
                       )}
+                      {vipVisual.showNeonCover && (
+                        <>
+                          <div
+                            aria-hidden="true"
+                            className={`vip-cover-led absolute inset-0 rounded-t-[13px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
+                          />
+                          <div className={`vip-neon-seam absolute bottom-0 inset-x-0 h-[3px] z-10 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
+                        </>
+                      )}
                     </div>
-                    <div className="px-4 pb-3.5 pt-2 flex items-end gap-3 bg-white dark:bg-[#18181B]">
+                    <div className={`vip-profile-inner px-4 pb-3.5 pt-2 flex items-end gap-3 bg-white dark:bg-[#18181B] ${vipVisual.showNeonCover ? 'rounded-b-[13px]' : ''}`}>
                       <div className="-mt-8 relative z-20 shrink-0">
-                        <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-full" className="border-2 border-white dark:border-[#18181B]" />
+                        <div className="vip-avatar-collar p-1 rounded-full bg-white dark:bg-[#18181B] flex items-center justify-center">
+                          <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-full" />
+                        </div>
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wider text-[#475569] dark:text-zinc-400 font-bold">Xem trước trực tiếp</p>

@@ -66,9 +66,9 @@ img:hover {
   text-shadow: none !important;
 }
 
-[class*="shadow-"]:not(.shadow-none),
-[style*="box-shadow"]:not(.shadow-none) {
-  /* Chỉ cho phép bóng đổ đen cực nhẹ dưới đáy, cấm bóng phát sáng màu cyan/amber/pink */
+[class*="shadow-"]:not(.shadow-none):not([class*="vip-"]),
+[style*="box-shadow"]:not(.shadow-none):not([class*="vip-"]) {
+  /* Chỉ cho phép bóng đổ đen cực nhẹ dưới đáy cho UI thường, giữ nguyên viền LED & khung VIP */
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
@@ -96,8 +96,8 @@ p.text-center {
   margin-inline: auto;
 }
 
-/* 7. Tự động triệt tiêu lỗi NESTED CARDS (Thẻ có viền/nền nằm bên trong một thẻ khác) */
-[class*="rounded-"][class*="border"] [class*="rounded-"][class*="border"]:not(button):not(input):not(select):not(textarea):not(span):not(a) {
+/* 7. Tự động triệt tiêu lỗi NESTED CARDS (Thẻ có viền/nền nằm bên trong một thẻ khác) - loại trừ Avatar Badge & Khung Viền VIP */
+[class*="rounded-"][class*="border"]:not([class*="vip-"]) [class*="rounded-"][class*="border"]:not(button):not(input):not(select):not(textarea):not(span):not(a):not([data-avatar-badge]):not([class*="vip-"]) {
   background-color: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;
