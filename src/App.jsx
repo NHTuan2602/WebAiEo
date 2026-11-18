@@ -7383,16 +7383,29 @@ export default function App() {
         </div>
       )}
 
-      {Boolean(showVipPromoModal && currentUser && currentUser.role !== 'teacher' && !hasActiveAieoVip(currentUser) && view !== 'AUTH') && (
-        <VipPromoPopupModal
-          isOpen={true}
-          currentUser={currentUser}
-          paymentConfig={paymentConfig}
-          onClose={() => setShowVipPromoModal(false)}
-          onOpenVipCheckout={() => openGlobalCheckoutModal({ itemType: 'aieo_vip' })}
-          onOpenRoomTicketCheckout={() => openGlobalCheckoutModal({ itemType: 'room_ticket' })}
-        />
-      )}
+      {(() => {
+        const canShowVipPromoSurface = Boolean(
+          currentUser &&
+          currentUser.role !== 'teacher' &&
+          !hasActiveAieoVip(currentUser) &&
+          !globalCheckoutState &&
+          ['HOME', 'SKILL_HUB', 'STUDENT_PROFILE', 'RESULT_VIEW', 'GAME_ARENA'].includes(view) &&
+          !(view === 'GAME_ARENA' && ['PLAYING', 'COUNTDOWN', 'TRANSITION'].includes(gameSubState))
+        );
+        if (!canShowVipPromoSurface) return null;
+        return (
+          <VipPromoPopupModal
+            isOpen={Boolean(showVipPromoModal)}
+            showFloatingTrigger={true}
+            hasNavbar={view !== 'GAME_ARENA'}
+            currentUser={currentUser}
+            paymentConfig={paymentConfig}
+            onOpen={() => setShowVipPromoModal(true)}
+            onClose={() => setShowVipPromoModal(false)}
+            onOpenVipCheckout={() => openGlobalCheckoutModal({ itemType: 'aieo_vip' })}
+          />
+        );
+      })()}
 
       {Boolean(globalCheckoutState && currentUser) && (
         <CoverCheckoutModal

@@ -1197,7 +1197,7 @@ export default function GlobalModals({
                   <span>Avatar Động (.GIF / .WebP động) - Đặc quyền Ai eo VIP</span>
                 </p>
                 <p className="text-xs text-[#475569] dark:text-slate-400">
-                  Mở Gói Ai eo VIP ({vipPriceLabel}/1T) để đặt ảnh đại diện chuyển động &amp; LED Neon nhiều màu.
+                  Mở Gói Ai eo VIP ({vipPriceLabel}/1 tháng) để đặt ảnh đại diện chuyển động &amp; LED Neon nhiều màu.
                 </p>
               </div>
               {onOpenVipCheckout && (
@@ -1233,7 +1233,7 @@ export default function GlobalModals({
                     const rawDataUrl = await readImageFileAsDataUrl(file);
                     if (animated) {
                       if (!canUseSelfAnimatedAvatar) {
-                        showToast(`Ảnh Avatar Động (.GIF/.WebP) chỉ dành cho Gói Ai eo VIP (${vipPriceLabel}/1T) - ảnh sẽ được cắt thành ảnh tĩnh.`, 'info');
+                        showToast(`Ảnh Avatar Động (.GIF/.WebP) chỉ dành cho Gói Ai eo VIP (${vipPriceLabel}/1 tháng) - ảnh sẽ được cắt thành ảnh tĩnh.`, 'info');
                         setAvatarCropState({ sourceUrl: rawDataUrl, target: 'self_avatar' });
                         return;
                       }

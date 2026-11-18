@@ -794,7 +794,7 @@ export default function GameArena({
                       ? 'Tài khoản của bạn đã mở quyền tạo phòng không giới hạn - tự chọn số người, chia Team và đua cùng bạn bè ngay!'
                       : roomTicketCredits > 0
                       ? `Bạn đang có ${roomTicketCredits} vé tạo phòng lẻ (${roomTicketPriceLabel}/lần). Bấm Tạo Phòng Bạn Bè để mở phòng riêng ngay!`
-                      : `Chọn mua vé lẻ ${roomTicketPriceLabel}/lần tạo phòng hoặc nâng cấp Gói Ai eo VIP (${aieoVipPriceLabel}/1T) để tạo vô hạn, Đổi Màu Chữ & Viền Bìa Neon! Bạn bè vào phòng miễn phí - bạn vẫn có thể Tập luyện 1 mình miễn phí!`}
+                      : `Chọn mua vé lẻ ${roomTicketPriceLabel}/lần tạo phòng hoặc nâng cấp Gói Ai eo VIP (${aieoVipPriceLabel}/1 tháng) để tạo vô hạn, Đổi Màu Chữ & Viền Bìa Neon! Bạn bè vào phòng miễn phí - bạn vẫn có thể Tập luyện 1 mình miễn phí!`}
                   </p>
                 </div>
                 {canCreateFriendVipRoom && (
@@ -859,7 +859,7 @@ export default function GameArena({
                     }
                     className="px-4 py-2.5 rounded-xl bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                   >
-                    <Crown className="w-4 h-4 text-amber-200" /> Mở Ai eo VIP ({aieoVipPriceLabel}/1T - Vô hạn)
+                    <Crown className="w-4 h-4 text-amber-200" /> Mở Ai eo VIP ({aieoVipPriceLabel}/1 tháng - Vô hạn)
                   </button>
                 </div>
               )}

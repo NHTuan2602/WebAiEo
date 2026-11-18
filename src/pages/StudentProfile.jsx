@@ -904,7 +904,7 @@ export default function StudentProfile({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-slate-100/95 hover:bg-white dark:bg-zinc-800/95 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold transition"
                 >
                   <Lock className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
-                  <span>Mở Ảnh Nền ({unlockPriceLabel}/1T)</span>
+                  <span>Mở Ảnh Nền ({unlockPriceLabel}/1 tháng)</span>
                 </button>
               )}
               {isSelf && studentHasCoverPermission && !isTargetTeacher && !isTargetSystemAdmin && student.customCoverExpiresAt > 0 && (
@@ -1885,8 +1885,8 @@ export default function StudentProfile({
                   <span className="text-xs font-black text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
                     <Crown className="w-4 h-4 text-amber-500" /> Gói Ai eo VIP
                   </span>
-                  <span className="text-xs font-semibold text-[#09090B] bg-[#F59E0B] px-2 py-0.5 rounded-full">
-                    {aieoVipPriceLabel}/1T
+                  <span className="text-xs font-semibold text-[#09090B] bg-[#F59E0B] px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                    {aieoVipPriceLabel}/1 tháng
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
@@ -1926,8 +1926,8 @@ export default function StudentProfile({
                   <span className="text-xs font-extrabold text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
                     <Camera className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Ảnh Nền Cá Nhân
                   </span>
-                  <span className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7] bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 px-2 py-0.5 rounded-full">
-                    {unlockPriceLabel}/1T
+                  <span className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7] bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                    {unlockPriceLabel}/1 tháng
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
@@ -2693,7 +2693,7 @@ export default function StudentProfile({
                             }}
                             className="w-full py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-[#991B1B] hover:bg-[#B91C1C] text-[#F4F4F5]"
                           >
-                            <Crown className="w-3.5 h-3.5" /> Đăng Ký Gói Ai eo VIP ({aieoVipPriceLabel}/1T)
+                            <Crown className="w-3.5 h-3.5" /> Đăng Ký Gói Ai eo VIP ({aieoVipPriceLabel}/1 tháng)
                           </button>
                         )}
                         {isViewerSuperAdmin && !isTargetSystemAdmin && onGrantUserTitles && !item.isRoleBuiltIn && item.id !== 'newbie' && (() => {
@@ -2952,7 +2952,7 @@ export default function StudentProfile({
                         type="button"
                         onClick={() => {
                           if (!frameAllowed) {
-                            showToast?.('Khung Avatar Neon thuộc đặc quyền Gói Ai eo VIP (80k/1T)!', 'info');
+                            showToast?.('Khung Avatar Neon thuộc đặc quyền Gói Ai eo VIP (80.000đ/1 tháng)!', 'info');
                             return;
                           }
                           setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }));
