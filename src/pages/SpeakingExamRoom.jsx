@@ -607,7 +607,7 @@ export default function SpeakingExamRoom({
       setRecordElapsedSec(elapsed);
       if (elapsed >= maxSec) {
         stopCurrentRecording();
-        showToast?.(`Đã hết thời gian câu ${currentIdx + 1} (${maxSec}s) — tự động lưu ghi âm!`, 'info');
+        showToast?.(`Đã hết thời gian câu ${currentIdx + 1} (${maxSec}s) - tự động lưu ghi âm!`, 'info');
       }
     }, 250);
   };
@@ -788,12 +788,12 @@ export default function SpeakingExamRoom({
 
   if (!activeTest || items.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FDECF2] dark:bg-[#141318] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 text-center space-y-4 shadow-xl">
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#020618] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 text-center space-y-4 shadow-xl">
           <img
             src={BRAND_INFO.avatarUrl}
             alt={BRAND_INFO.shortName}
-            className="w-16 h-16 mx-auto rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-sm"
+            className="w-16 h-16 mx-auto rounded-full object-cover border-2 border-slate-200 dark:border-slate-700 bg-white shadow-sm"
           />
           <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
             Đề Speaking không có câu hỏi khả dụng
@@ -801,7 +801,7 @@ export default function SpeakingExamRoom({
           <button
             type="button"
             onClick={() => onExitSpeaking?.()}
-            className="w-full py-2.5 px-4 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold"
           >
             Quay Về Luyện Speaking
           </button>
@@ -820,9 +820,9 @@ export default function SpeakingExamRoom({
   const remainingSpeakSec = Math.max(0, maxAllowedSec - recordElapsedSec);
 
   return (
-    <div className="min-h-screen bg-[#FDECF2] dark:bg-[#141318] text-slate-900 dark:text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#020618] text-slate-900 dark:text-slate-100 flex flex-col">
       {/* Top Room Header */}
-      <header className="bg-[#FDF2F6] dark:bg-[#191820] border-b border-pink-200 dark:border-[#2C2A35] px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sticky top-0 z-40">
+      <header className="bg-white dark:bg-[#0F172B] border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sticky top-0 z-40">
         <div className="flex items-center gap-3 min-w-0">
           <img
             src={BRAND_INFO.avatarUrl}
@@ -830,21 +830,21 @@ export default function SpeakingExamRoom({
             className={`w-9 h-9 rounded-full object-cover bg-white shrink-0 border-2 transition ${
               isRecording
                 ? 'border-rose-500 ring-2 ring-rose-400/40 animate-pulse'
-                : 'border-pink-200 dark:border-[#34323F]'
+                : 'border-slate-200 dark:border-slate-700'
             }`}
           />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#570DF8] text-white shrink-0">
+              <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#007A7A] text-white shrink-0">
                 {partMode === 'full' ? 'FULL TEST' : partMode.toUpperCase()}
               </span>
               {isDailyMode && (
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-600 text-white shrink-0">
+                <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-600 text-white shrink-0">
                   Speaking Daily
                 </span>
               )}
               {isExamRoomMode && (
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-600 text-white shrink-0">
+                <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-600 text-white shrink-0">
                   Phòng Thi Thực Chiến
                 </span>
               )}
@@ -852,7 +852,7 @@ export default function SpeakingExamRoom({
                 {activeTest.title}
               </h1>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-[#475569] dark:text-slate-400">
               Đã thu {recordedCount}/{items.length} câu · Tự động lưu file &amp; AI chấm
             </p>
           </div>
@@ -876,12 +876,12 @@ export default function SpeakingExamRoom({
                 cleanupMediaResources();
                 onExitSpeaking?.();
               }}
-              className="px-3 py-2 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1"
+              className="px-3 py-2 rounded-xl bg-white dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-1"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Thoát
             </button>
           ) : (
-            <span className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[11px] font-bold flex items-center gap-1">
+            <span className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-1">
               <Lock className="w-3 h-3" /> Thi Thật
             </span>
           )}
@@ -893,19 +893,19 @@ export default function SpeakingExamRoom({
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
           <form
             onSubmit={handleVerifyRoomPassword}
-            className="max-w-md w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 sm:p-8 shadow-xl space-y-5 text-center"
+            className="max-w-md w-full bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5 text-center"
           >
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center border border-[#570DF8]/30">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] flex items-center justify-center border border-[#007A7A]/30">
               <Lock className="w-7 h-7" />
             </div>
             <div className="space-y-1.5">
-              <span className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+              <span className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
                 Phòng Thi Thực Chiến • Team Sắp Thi
               </span>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
                 Nhập Mật Khẩu Vào Phòng Thi
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              <p className="text-xs text-[#475569] dark:text-slate-400 leading-relaxed">
                 Phòng thi <strong>{activeTest.title}</strong> được bảo vệ bằng mật khẩu dành riêng cho nhóm học viên chuẩn bị thi thật.
               </p>
             </div>
@@ -918,7 +918,7 @@ export default function SpeakingExamRoom({
                 value={roomPassInput}
                 onChange={e => setRoomPassInput(e.target.value)}
                 placeholder="Nhập mật khẩu phòng thi do giáo viên cấp..."
-                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#570DF8]"
+                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007A7A]"
               />
               {roomPassError && (
                 <p className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
@@ -930,7 +930,7 @@ export default function SpeakingExamRoom({
             <button
               type="submit"
               disabled={verifyingRoomPass}
-              className="w-full py-3 rounded-2xl bg-[#570DF8] hover:bg-[#490AD2] disabled:opacity-60 text-white text-sm font-extrabold shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 transition"
+              className="w-full py-3 rounded-2xl bg-[#007A7A] hover:bg-[#065B5B] disabled:opacity-60 text-white text-sm font-extrabold shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 transition"
             >
               <Lock className="w-4 h-4" />
               <span>{verifyingRoomPass ? 'Đang kiểm tra mật khẩu...' : 'Mở Khóa Phòng Thi Thực Chiến'}</span>
@@ -942,25 +942,25 @@ export default function SpeakingExamRoom({
       {/* PHASE 1: MIC CHECK */}
       {!requiresRoomPassword && phase === 'MIC_CHECK' && (
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
-          <div className="max-w-lg w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 text-center">
+          <div className="max-w-lg w-full bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 text-center">
             <img
               src={BRAND_INFO.avatarUrl}
               alt={BRAND_INFO.shortName}
-              className="w-20 h-20 mx-auto rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-md"
+              className="w-20 h-20 mx-auto rounded-full object-cover border-2 border-slate-200 dark:border-slate-700 bg-white shadow-md"
             />
             <div className="space-y-1.5">
-              <span className="text-[11px] font-black uppercase tracking-wider text-[#570DF8] dark:text-[#A78BFA]">
+              <span className="text-xs font-black uppercase tracking-wider text-[#0F766E] dark:text-[#1EE1D6]">
                 Chuẩn bị phòng thi Speaking AI
               </span>
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
                 Kiểm Tra Micro Trước Khi Nói
               </h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-400">
                 Gồm <strong>{items.length} câu hỏi</strong> ({partMode === 'full' ? 'Part 1 + Part 2 Cue Card + Part 3' : `Thi tập trung ${partMode.toUpperCase()}`}). Hệ thống sẽ lưu file ghi âm và chấm điểm tự động ngay sau khi hoàn thành.
               </p>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white/80 dark:bg-[#23222D] border border-pink-200/80 dark:border-[#34323F] space-y-3">
+            <div className="p-4 rounded-2xl bg-white/80 dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 space-y-3">
               <AudioLevelMeter level={audioLevel} active={micReady} />
               <div className="flex items-center justify-center gap-2">
                 <button
@@ -998,7 +998,7 @@ export default function SpeakingExamRoom({
               <div className="px-3.5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-700 dark:text-emerald-300">
                 {allHaveTeacherAudio
                   ? `🎧 Tất cả ${teacherAudioCount}/${items.length} câu dùng file ghi âm chuẩn của Giáo viên.`
-                  : `🎧 Đề có ${teacherAudioCount}/${items.length} câu dùng file ghi âm của Giáo viên — các câu còn lại dùng giọng Giám khảo AI đọc chuẩn IELTS.`}
+                  : `🎧 Đề có ${teacherAudioCount}/${items.length} câu dùng file ghi âm của Giáo viên - các câu còn lại dùng giọng Giám khảo AI đọc chuẩn IELTS.`}
               </div>
             )}
 
@@ -1008,7 +1008,7 @@ export default function SpeakingExamRoom({
                   type="checkbox"
                   checked={autoSpeakPrompt}
                   onChange={e => setAutoSpeakPrompt(e.target.checked)}
-                  className="w-4 h-4 accent-[#570DF8]"
+                  className="w-4 h-4 accent-[#007A7A]"
                 />
                 <span>
                   {allHaveTeacherAudio
@@ -1023,7 +1023,7 @@ export default function SpeakingExamRoom({
             <button
               type="button"
               onClick={handleStartExamSession}
-              className="w-full py-3.5 px-6 rounded-2xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-sm font-extrabold shadow-lg shadow-indigo-900/25 flex items-center justify-center gap-2 transition"
+              className="w-full py-3.5 px-6 rounded-2xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-sm font-extrabold shadow-lg shadow-indigo-900/25 flex items-center justify-center gap-2 transition"
             >
               <Mic className="w-4 h-4" />
               <span>Bắt Đầu Thi Speaking Ngay</span>
@@ -1048,10 +1048,10 @@ export default function SpeakingExamRoom({
                     onClick={() => handleGoQuestion(idx)}
                     className={`h-8 min-w-[36px] px-2.5 rounded-full text-xs font-extrabold border transition flex items-center justify-center gap-1 ${
                       active
-                        ? 'bg-[#570DF8] text-white border-[#570DF8] shadow-sm'
+                        ? 'bg-[#007A7A] text-white border-[#007A7A] shadow-sm'
                         : done
                         ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40'
-                        : 'bg-[#FFF5F8] dark:bg-[#191820] text-slate-600 dark:text-slate-300 border-pink-200 dark:border-[#34323F]'
+                        : 'bg-white dark:bg-[#0F172B] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                     }`}
                   >
                     <span>P{it.part}.{idx + 1}</span>
@@ -1060,19 +1060,19 @@ export default function SpeakingExamRoom({
                 );
               })}
             </div>
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-bold text-[#475569] dark:text-slate-400">
               Câu {currentIdx + 1} / {items.length}
             </span>
           </div>
 
           {/* Question Card */}
-          <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] text-xs font-black uppercase">
+                <span className="px-3 py-1 rounded-full bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] text-xs font-black uppercase">
                   {currentItem.partLabel}
                 </span>
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                <span className="text-xs font-bold text-[#475569] dark:text-slate-400">
                   {currentItem.topic}
                 </span>
               </div>
@@ -1084,11 +1084,11 @@ export default function SpeakingExamRoom({
                   currentItem.audioUrl
                     ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-200'
                     : isSpeakingPrompt
-                    ? 'bg-[#570DF8] text-white border-[#570DF8] animate-pulse'
-                    : 'bg-white dark:bg-[#23222D] border-pink-200 dark:border-[#34323F] hover:border-[#570DF8] text-slate-700 dark:text-slate-200'
+                    ? 'bg-[#007A7A] text-white border-[#007A7A] animate-pulse'
+                    : 'bg-white dark:bg-[#23222D] border-slate-200 dark:border-slate-700 hover:border-[#007A7A] text-slate-700 dark:text-slate-200'
                 }`}
               >
-                <Volume2 className={`w-3.5 h-3.5 ${currentItem.audioUrl ? 'text-emerald-600 dark:text-emerald-300' : isSpeakingPrompt ? 'text-white' : 'text-[#570DF8] dark:text-[#A78BFA]'}`} />
+                <Volume2 className={`w-3.5 h-3.5 ${currentItem.audioUrl ? 'text-emerald-600 dark:text-emerald-300' : isSpeakingPrompt ? 'text-white' : 'text-[#0F766E] dark:text-[#1EE1D6]'}`} />
                 <span>
                   {currentItem.audioUrl
                     ? 'Nghe Lại File Ghi Âm Giáo Viên'
@@ -1127,7 +1127,7 @@ export default function SpeakingExamRoom({
                     <button
                       type="button"
                       onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold animate-pulse"
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold animate-pulse"
                     >
                       ▶ Bấm Phát Ngay
                     </button>
@@ -1153,8 +1153,8 @@ export default function SpeakingExamRoom({
               </h2>
 
               {Array.isArray(currentItem.bullets) && currentItem.bullets.length > 0 && (
-                <div className="p-4 sm:p-5 rounded-2xl bg-white/80 dark:bg-[#23222D] border border-pink-200/80 dark:border-[#34323F] space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <div className="p-4 sm:p-5 rounded-2xl bg-white/80 dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#475569] dark:text-slate-400">
                     You should say:
                   </p>
                   <ul className="list-disc pl-5 space-y-1.5 text-sm sm:text-base text-slate-800 dark:text-slate-100 font-medium">
@@ -1175,21 +1175,21 @@ export default function SpeakingExamRoom({
 
             {/* Part 2 1-Minute Preparation Note Pad */}
             {currentItem.part === 2 && !isRecording && !currentRec && (
-              <div className="p-4 rounded-2xl bg-indigo-50/75 dark:bg-[#211F2D] border border-indigo-200 dark:border-[#570DF8]/35 space-y-3">
+              <div className="p-4 rounded-2xl bg-indigo-50/75 dark:bg-[#211F2D] border border-indigo-200 dark:border-[#007A7A]/35 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-[#570DF8] dark:text-[#C4B5FD] flex items-center gap-1.5">
+                  <span className="text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6] flex items-center gap-1.5">
                     <Clock className="w-4 h-4" />
                     {prepRemainingSec > 0
                       ? `Thời gian chuẩn bị Cue Card còn lại: ${formatSecs(prepRemainingSec)}`
-                      : 'Hết thời gian chuẩn bị — hãy bấm Ghi Âm bài nói Part 2'}
+                      : 'Hết thời gian chuẩn bị - hãy bấm Ghi Âm bài nói Part 2'}
                   </span>
                   {prepRemainingSec > 0 && (
                     <button
                       type="button"
                       onClick={handleBeginRecording}
-                      className="text-xs font-extrabold text-[#570DF8] dark:text-[#A78BFA] hover:underline"
+                      className="text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6] hover:underline"
                     >
-                      Tôi đã sẵn sàng — Bắt đầu nói luôn →
+                      Tôi đã sẵn sàng - Bắt đầu nói luôn →
                     </button>
                   )}
                 </div>
@@ -1204,13 +1204,13 @@ export default function SpeakingExamRoom({
                   value={part2Notes}
                   onChange={e => setPart2Notes(e.target.value)}
                   placeholder="Ghi chú nhanh dàn ý gạch đầu dòng (Bullet points) cho Cue Card Part 2 trong 1 phút chuẩn bị..."
-                  className="w-full p-3 rounded-xl bg-white dark:bg-[#16151C] border border-indigo-200 dark:border-[#34323F] text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#570DF8]"
+                  className="w-full p-3 rounded-xl bg-white dark:bg-[#16151C] border border-indigo-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007A7A]"
                 />
               </div>
             )}
 
             {/* Recording Bar */}
-            <div className="p-5 rounded-2xl bg-white/85 dark:bg-[#23222D] border border-pink-200/80 dark:border-[#34323F] space-y-4">
+            <div className="p-5 rounded-2xl bg-white/85 dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 space-y-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                   {!isRecording ? (
@@ -1222,7 +1222,7 @@ export default function SpeakingExamRoom({
                         className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition shadow-md ${
                           currentRec && isRealExamLocked
                             ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                            : 'bg-[#570DF8] hover:bg-[#490AD2] text-white'
+                            : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                         }`}
                       >
                         {currentRec ? <RotateCcw className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -1248,7 +1248,7 @@ export default function SpeakingExamRoom({
                 </div>
 
                 <div className="flex items-center gap-3 text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
-                  <Clock className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA]" />
+                  <Clock className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" />
                   <span>
                     {isRecording
                       ? `Đang nói: ${formatSecs(recordElapsedSec)} (còn ${formatSecs(remainingSpeakSec)})`
@@ -1260,20 +1260,20 @@ export default function SpeakingExamRoom({
               <AudioLevelMeter level={audioLevel} active={isRecording} barCount={24} />
 
               {isRecording && liveTranscript && (
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#191820] border border-slate-200 dark:border-[#34323F] text-xs text-slate-600 dark:text-slate-300 italic">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0F172B] border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 italic">
                   <strong>Bản nháp nhận diện giọng nói:</strong> {liveTranscript}
                 </div>
               )}
 
               {currentRec && !isRecording && (
-                <div className="pt-2 border-t border-pink-200/70 dark:border-[#34323F] space-y-2">
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                     <span className="flex items-center gap-1.5">
                       <FileAudio className="w-4 h-4" />
                       Đã thu âm câu này ({currentRec.durationSec} giây)
                     </span>
                     {currentRec.clientTranscript && (
-                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-md">
+                      <span className="text-xs font-medium text-[#475569] dark:text-slate-400 truncate max-w-md">
                         &quot;{currentRec.clientTranscript}&quot;
                       </span>
                     )}
@@ -1289,7 +1289,7 @@ export default function SpeakingExamRoom({
                 type="button"
                 disabled={currentIdx === 0}
                 onClick={() => handleGoQuestion(currentIdx - 1)}
-                className="px-4 py-2.5 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] disabled:opacity-40 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-xl bg-white dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 disabled:opacity-40 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Câu Trước
               </button>
@@ -1298,7 +1298,7 @@ export default function SpeakingExamRoom({
                 <button
                   type="button"
                   onClick={() => handleGoQuestion(currentIdx + 1)}
-                  className="px-5 py-2.5 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
                 >
                   <span>Câu Tiếp Theo</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -1324,13 +1324,13 @@ export default function SpeakingExamRoom({
           <img
             src={BRAND_INFO.avatarUrl}
             alt={BRAND_INFO.shortName}
-            className="w-28 h-28 rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-lg animate-pulse"
+            className="w-28 h-28 rounded-full object-cover border-2 border-slate-200 dark:border-slate-700 bg-white shadow-lg animate-pulse"
           />
           <div className="space-y-2 max-w-md">
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
               {gradingProgressText || 'Uốn lưỡi bảy lần trước khi chấm bài...'}
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-400">
               Hệ thống đang lưu an toàn các file ghi âm lên máy chủ và AI Examiner đang chấm Band điểm 4 tiêu chí IELTS Speaking (FC, LR, GRA, PR).
             </p>
           </div>
@@ -1350,7 +1350,7 @@ export default function SpeakingExamRoom({
       {/* SUBMIT CONFIRM MODAL */}
       {showSubmitConfirm && (
         <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] rounded-3xl p-6 space-y-4 shadow-2xl">
+          <div className="max-w-md w-full bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl">
             <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
               Xác nhận nộp bài Speaking cho AI chấm?
             </h3>
@@ -1359,21 +1359,21 @@ export default function SpeakingExamRoom({
             </p>
             {recordedCount < items.length && (
               <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-300">
-                Còn {items.length - recordedCount} câu chưa ghi âm — AI sẽ chấm 0.0 cho các câu bỏ trống.
+                Còn {items.length - recordedCount} câu chưa ghi âm - AI sẽ chấm 0.0 cho các câu bỏ trống.
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowSubmitConfirm(false)}
-                className="px-4 py-2 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-700 dark:text-slate-200"
+                className="px-4 py-2 rounded-xl bg-white dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
               >
                 Tiếp Tục Nói
               </button>
               <button
                 type="button"
                 onClick={handleFinalSubmitSpeaking}
-                className="px-5 py-2 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold shadow-sm"
+                className="px-5 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold shadow-sm"
               >
                 Nộp &amp; Chấm Ngay
               </button>

@@ -475,7 +475,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               return isEx ? 'Tạo & Biên Soạn Bài Tập Kỹ Năng Mới' : 'Tạo & Biên Soạn Đề Thi IELTS Mới';
             })()}
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
             {normalizeExamConfig(testForm).testMode === 'single_skill'
               ? 'Biên soạn nội dung, câu hỏi, audio / hình ảnh hoặc đề Speaking AI riêng cho bài tập kỹ năng này.'
               : 'Tùy chỉnh câu hỏi Listening (kèm file ghi âm MP3/WAV), Reading (kèm hình ảnh minh họa), Writing và quyền xem đáp án.'}
@@ -530,7 +530,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           listening: { label: `2. Nội Dung & Câu Hỏi Listening (${testForm.listening?.questions?.length || 0} câu)`, icon: Headphones, activeCls: 'bg-blue-600 text-white shadow-sm' },
           reading: { label: `2. Nội Dung & Câu Hỏi Reading (${testForm.reading?.questions?.length || 0} câu)`, icon: BookOpen, activeCls: 'bg-indigo-600 text-white shadow-sm' },
           writing: { label: '2. Nội Dung Đề Writing & Bài Mẫu', icon: PenTool, activeCls: 'bg-emerald-600 text-white shadow-sm' },
-          speaking: { label: `2. Câu Hỏi Speaking AI (${getSpeakingQuestionItems(testForm.speaking, 'all').length} câu)`, icon: Mic, activeCls: 'bg-[#570DF8] text-white shadow-sm' }
+          speaking: { label: `2. Câu Hỏi Speaking AI (${getSpeakingQuestionItems(testForm.speaking, 'all').length} câu)`, icon: Mic, activeCls: 'bg-[#007A7A] text-white shadow-sm' }
         };
 
         return (
@@ -599,7 +599,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             </div>
 
             {isSingleSkill && (
-              <span className="px-3 py-1 rounded-xl bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] text-[11px] font-extrabold mr-1">
+              <span className="px-3 py-1 rounded-xl bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] text-xs font-extrabold mr-1">
                 Chế độ: Bài Tập {currentCfg.focusSkill === 'speaking' ? 'Speaking AI' : currentCfg.focusSkill.toUpperCase()}
               </span>
             )}
@@ -614,7 +614,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           listening: { name: 'Listening', icon: Headphones, color: 'text-blue-600 dark:text-blue-400' },
           reading: { name: 'Reading', icon: BookOpen, color: 'text-indigo-600 dark:text-indigo-400' },
           writing: { name: 'Writing', icon: PenTool, color: 'text-purple-600 dark:text-purple-400' },
-          speaking: { name: 'Speaking AI', icon: Mic, color: 'text-[#570DF8] dark:text-[#C4B5FD]' }
+          speaking: { name: 'Speaking AI', icon: Mic, color: 'text-[#0F766E] dark:text-[#1EE1D6]' }
         };
         const moveSectionOrder = (idx, dir) => {
           const nextIdx = idx + dir;
@@ -627,13 +627,13 @@ Write ONE WORD AND/OR A NUMBER for each answer.
         return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
           {/* Exam Structure Mode Switcher: Full Mock Exam vs Single Skill Exercise */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#570DF8]/5 dark:bg-indigo-950/25 border border-[#570DF8]/25 space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#EDFFFD] dark:bg-indigo-950/25 border border-[#007A7A]/25 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-xs sm:text-sm font-extrabold text-[#570DF8] dark:text-[#C4B5FD]">
+                <h3 className="text-xs sm:text-sm font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
                   Loại Nội Dung: Đề Thi IELTS (L·R·W) vs Bài Tập Từng Kỹ Năng Riêng
                 </h3>
-                <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                   Chọn <b>Đề Thi IELTS</b> để thi đủ Listening → Reading → Writing liên hoàn, hoặc chọn <b>Bài Tập Kỹ Năng</b> (Speaking AI / Listening / Reading / Writing) để xếp riêng vào Kho Bài Tập 4 Kỹ Năng.
                 </p>
               </div>
@@ -681,8 +681,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     }
                     className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition ${
                       isActiveSk
-                        ? 'bg-[#570DF8] text-white border-[#570DF8] shadow-xs'
-                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#570DF8]'
+                        ? 'bg-[#007A7A] text-white border-[#007A7A] shadow-xs'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
                     }`}
                   >
                     {skLabel}
@@ -696,9 +696,9 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-xs sm:text-sm font-extrabold text-[#007A7A] dark:text-[#1EE1D6] flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4" /> Chia Sẵn Chế Độ Đề Thi (1 Chạm — Đỡ Rối Khi Tạo)
+                  <Sparkles className="w-4 h-4" /> Chia Sẵn Chế Độ Đề Thi (1 Chạm - Đỡ Rối Khi Tạo)
                 </h3>
-                <p className="text-[11px] text-[#314158] dark:text-slate-300 mt-0.5">
+                <p className="text-xs text-[#314158] dark:text-slate-300 mt-0.5">
                   {cfg.testMode === 'single_skill'
                     ? 'Bài tập 4 Kỹ Năng luôn miễn phí cho học viên. Bấm Công Khai hoặc Lưu Nháp bên dưới:'
                     : 'Chỉ cần nhấn 1 nút phù hợp: Thi Thực Chiến (có pass lớp, không quay lại kỹ năng cũ) hoặc Đề Đăng Bán (làm nhiều lần):'}
@@ -718,7 +718,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   }`}
                 >
                   <div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">🌐 Mở Công Khai (Miễn Phí)</div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                     Học viên vào Kho Bài Tập 4 Kỹ Năng làm miễn phí không giới hạn
                   </p>
                 </button>
@@ -732,7 +732,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   }`}
                 >
                   <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400">🔒 Lưu Nháp Soạn Dở</div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                     Chỉ mình giáo viên thấy • Học sinh chưa nhìn thấy bài tập này
                   </p>
                 </button>
@@ -761,7 +761,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       }`}
                     >
                       <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">🏛️ Thi Thực Chiến (Thi Thật)</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                      <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
                         Tạo mật khẩu gửi lớp · 1 lượt · Tuần tự &amp; không quay lại kỹ năng cũ
                       </p>
                     </button>
@@ -778,7 +778,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                         <ShoppingBag className="w-3.5 h-3.5" /> Đề Đăng Bán ({formatVndCurrency(suggestedSalePrice)})
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                      <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
                         Mở bán đề 3 kỹ năng · Học sinh mua xong được làm lại nhiều lần
                       </p>
                     </button>
@@ -793,7 +793,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       }`}
                     >
                       <div className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">📖 Luyện Tập Miễn Phí</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                      <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
                         Công khai 0đ · Làm nhiều lần · Tự do đổi phần &amp; xem đáp án
                       </p>
                     </button>
@@ -808,7 +808,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       }`}
                     >
                       <div className="text-xs font-extrabold text-slate-600 dark:text-slate-300">🔒 Lưu Nháp Soạn Dở</div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                      <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
                         Chỉ mình tôi thấy · Chưa hiển thị cho học sinh
                       </p>
                     </button>
@@ -828,7 +828,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           <button
                             type="button"
                             onClick={() => setTestForm(prev => ({ ...prev, examPassword: '', hasExamPassword: false }))}
-                            className="text-[11px] font-bold text-slate-500 hover:text-rose-600 underline"
+                            className="text-xs font-bold text-slate-500 hover:text-rose-600 underline"
                           >
                             Bỏ mật khẩu
                           </button>
@@ -841,7 +841,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           onChange={e => setTestForm(prev => ({ ...prev, examPassword: e.target.value.trimStart() }))}
                           placeholder={
                             testForm.hasExamPassword && !testForm.examPassword
-                              ? 'Đang có mật khẩu cũ — nhập mã mới nếu muốn đổi'
+                              ? 'Đang có mật khẩu cũ - nhập mã mới nếu muốn đổi'
                               : 'VD: THI2026 hoặc IELTS80'
                           }
                           className="flex-1 min-w-[200px] px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-xs font-extrabold tracking-wider text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -872,7 +872,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           </button>
                         )}
                       </div>
-                      <p className="text-[11px] text-indigo-800/80 dark:text-indigo-300/80">
+                      <p className="text-xs text-indigo-800/80 dark:text-indigo-300/80">
                         Học sinh phải nhập đúng mật khẩu này mới vào phòng thi thật; khi thi tuần tự đã kích hoạt, chuyển sang kỹ năng mới (kể cả chuyển sớm) sẽ không quay lại kỹ năng cũ được.
                       </p>
                     </div>
@@ -887,7 +887,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                             Giá Bán Đề Thi Luyện 3 Kỹ Năng (Học viên mua xong làm nhiều lần)
                           </span>
                         </div>
-                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                        <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
                           {Number(testForm.priceVnd || 0) > 0 ? formatVndCurrency(Number(testForm.priceVnd)) : 'Miễn phí (0đ)'}
                         </span>
                       </div>
@@ -917,7 +917,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           );
                         })}
                         <div className="flex items-center gap-1.5 ml-auto">
-                          <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Khác:</span>
+                          <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Khác:</span>
                           <input
                             type="number"
                             min={0}
@@ -946,7 +946,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <div className="md:col-span-2">
               <label className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                 <span>Tên Đề Thi IELTS</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 font-extrabold normal-case">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 font-extrabold normal-case">
                   Bắt buộc
                 </span>
               </label>
@@ -963,7 +963,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <div>
               <label className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                 <span>Số Lần Nghe Audio</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold normal-case">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[#475569] dark:text-slate-400 font-bold normal-case">
                   Mặc định 1
                 </span>
               </label>
@@ -981,7 +981,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           <div>
             <label className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
               <span>Mô Tả Ngắn Về Đề Thi</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold normal-case">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[#475569] dark:text-slate-400 font-bold normal-case">
                 Tùy chọn (bỏ trống cũng được)
               </span>
             </label>
@@ -1003,7 +1003,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   {cfg.visibility === 'private' ? <EyeOff className="w-4 h-4 text-amber-500" /> : <Globe className="w-4 h-4 text-emerald-500" />}
                   Chế Độ Hiển Thị Đề Thi
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
                   Chọn <b>Chỉ mình tôi</b> khi đang soạn thảo để học viên không nhìn thấy hoặc bấm nhầm.
                 </p>
               </div>
@@ -1039,7 +1039,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-indigo-500" /> Số Lần Học Viên Được Làm Bài
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
                   Đặt <b>0</b> để ôn tập tự do không giới hạn, hoặc <b>1</b> nếu dùng để kiểm tra / thi thật.
                 </p>
               </div>
@@ -1067,7 +1067,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   🔒 Thi Thật (1 lần)
                 </button>
                 <div className="flex items-center gap-1.5 ml-auto">
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Tùy chỉnh:</span>
+                  <span className="text-xs text-[#475569] dark:text-slate-400 font-semibold">Tùy chỉnh:</span>
                   <input
                     type="number"
                     min={0}
@@ -1101,7 +1101,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       <Layers className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                       Giao Đề / Bài Tập Theo Lớp Học
                     </h3>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                       Chọn <strong>Tất cả học viên</strong> hoặc chỉ định riêng một vài lớp (chỉ học viên trong lớp được chọn mới nhìn thấy bài và nhận thông báo).
                     </p>
                   </div>
@@ -1120,7 +1120,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 </div>
 
                 {classList.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                  <p className="text-xs text-[#475569] dark:text-slate-400 italic">
                     Chưa có lớp học nào. Giáo viên có thể tạo lớp tại tab <strong>6. Quản Lý Lớp Học</strong> trên Bảng Điều Khiển.
                   </p>
                 ) : (
@@ -1140,7 +1140,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         >
                           <Users className="w-3.5 h-3.5" />
                           <span>{cls.name}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${active ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-md ${active ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-[#475569] dark:text-slate-400'}`}>
                             {cls.studentUsernames?.length || 0} HS
                           </span>
                         </button>
@@ -1159,12 +1159,12 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <Clock className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Hẹn Giờ Mở Đề &amp; Hạn Chót Nộp Bài
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
                   Chọn khóa hẳn bài khi quá giờ, hoặc cho làm bất kỳ lúc nào (hệ thống luôn ghi nhận ngày giờ bắt đầu, lúc nộp &amp; tổng thời gian làm của từng học viên).
                 </p>
               </div>
               {cfg.scheduleMode !== 'flexible' && cfg.dueAt && (
-                <span className="text-[11px] font-extrabold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 shrink-0">
+                <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 shrink-0">
                   Hạn: {formatViDateTime(cfg.dueAt)}
                 </span>
               )}
@@ -1179,12 +1179,12 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 },
                 {
                   id: 'deadline_lock',
-                  title: '🔒 Hẹn giờ — Khóa khi quá giờ',
+                  title: '🔒 Hẹn giờ - Khóa khi quá giờ',
                   desc: 'Hết giờ quy định hệ thống tự khóa, học viên không vào làm hoặc nộp được nữa.'
                 },
                 {
                   id: 'deadline_track',
-                  title: '⏱️ Hẹn giờ — Quá giờ vẫn cho làm',
+                  title: '⏱️ Hẹn giờ - Quá giờ vẫn cho làm',
                   desc: 'Vượt hạn vẫn cho nộp, nhưng bảng điểm tự đánh dấu nộp muộn (trễ bao nhiêu phút).'
                 }
               ].map(opt => {
@@ -1210,7 +1210,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     }`}
                   >
                     <p className="text-xs font-extrabold text-slate-900 dark:text-white">{opt.title}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{opt.desc}</p>
+                    <p className="text-xs text-[#475569] dark:text-slate-400 mt-1 leading-relaxed">{opt.desc}</p>
                   </button>
                 );
               })}
@@ -1219,7 +1219,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             {cfg.scheduleMode !== 'flexible' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                     Hạn Chót Nộp Bài (Ngày &amp; Giờ) *
                   </label>
                   <input
@@ -1244,7 +1244,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         key={preset.label}
                         type="button"
                         onClick={() => setTestForm(prev => ({ ...prev, dueAt: Date.now() + preset.ms }))}
-                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-[#007A7A] text-[10px] font-bold text-slate-700 dark:text-slate-200 transition"
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-[#007A7A] text-xs font-bold text-slate-700 dark:text-slate-200 transition"
                       >
                         {preset.label}
                       </button>
@@ -1254,14 +1254,14 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                       Giờ Bắt Đầu Mở Đề (Tùy chọn)
                     </label>
                     {cfg.openAt && (
                       <button
                         type="button"
                         onClick={() => setTestForm(prev => ({ ...prev, openAt: null }))}
-                        className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                        className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
                       >
                         Mở ngay lập tức
                       </button>
@@ -1278,7 +1278,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     }
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                   />
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     {cfg.openAt ? `Học viên sẽ vào làm được từ ${formatViDateTime(cfg.openAt)}.` : 'Bỏ trống để học viên làm được ngay sau khi công khai.'}
                   </p>
                 </div>
@@ -1293,7 +1293,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Thời Gian Từng Kỹ Năng & Thứ Tự Thi Luân Phiên
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                   Đặt số phút riêng cho mỗi kỹ năng (VD: Reading 30p, Listening 15p) và sắp xếp thứ tự làm bài từ trên xuống dưới.
                 </p>
               </div>
@@ -1335,7 +1335,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           }}
                           className="w-16 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-extrabold text-center"
                         />
-                        <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">phút</span>
+                        <span className="text-xs text-[#475569] dark:text-slate-400 font-semibold">phút</span>
                       </div>
 
                       <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-3">
@@ -1372,7 +1372,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   onChange={e => setTestForm(prev => ({ ...prev, sequentialMode: e.target.checked }))}
                   className="w-4 h-4 rounded text-indigo-600"
                 />
-                <span>Khóa tuần tự theo từng phần (Làm xong kỹ năng này sang kỹ năng khác — không thể quay lại kỹ năng cũ)</span>
+                <span>Khóa tuần tự theo từng phần (Làm xong kỹ năng này sang kỹ năng khác - không thể quay lại kỹ năng cũ)</span>
               </label>
 
               {cfg.sequentialMode && (
@@ -1436,7 +1436,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
                     Chế Độ Chống Gian Lận &amp; Kiểm Tra Extension
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 dark:bg-slate-800 border border-slate-700">
+                    <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 dark:bg-slate-800 border border-slate-700">
                       Ẩn với học sinh
                     </span>
                   </h3>
@@ -1477,7 +1477,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     className="mt-0.5 w-4 h-4 accent-indigo-600 rounded"
                   />
                   <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
-                    <strong>Cho phép Copy/Paste NỘI BỘ trong bài thi</strong> — Học viên có thể Ctrl+C / Ctrl+V văn bản từ chính Đề đọc, Ngữ cảnh, Câu hỏi sang ô trả lời Writing/Fill-blank, nhưng vẫn <strong>CẤM 100%</strong> mọi thao tác dán văn bản copy từ web/app bên ngoài.
+                    <strong>Cho phép Copy/Paste NỘI BỘ trong bài thi</strong> - Học viên có thể Ctrl+C / Ctrl+V văn bản từ chính Đề đọc, Ngữ cảnh, Câu hỏi sang ô trả lời Writing/Fill-blank, nhưng vẫn <strong>CẤM 100%</strong> mọi thao tác dán văn bản copy từ web/app bên ngoài.
                   </span>
                 </label>
               </div>
@@ -1550,7 +1550,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Nội Dung Bài Nghe Listening ({tracks.length} Chủ Đề / Bài)
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
                   Mặc định có 1 chủ đề. Bấm &quot;Thêm Chủ Đề&quot; nếu cần chia nhiều chủ đề / file ghi âm đánh số 1, 2, 3... kèm ảnh sơ đồ/đề chụp hoặc đoạn đề dẫn giống phần Reading.
                 </p>
               </div>
@@ -1577,7 +1577,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-500/15'
                     }`}
                   >
-                    <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
+                    <span className={`w-5 h-5 rounded-full text-xs font-black flex items-center justify-center ${
                       trIdx === activeIdx ? 'bg-white text-blue-600' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
                     }`}>
                       {trIdx + 1}
@@ -1621,7 +1621,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   <span className="text-xs font-extrabold text-blue-900 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5 mb-2">
                     <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Tải File Ghi Âm Chủ Đề #{activeIdx + 1} Từ Máy Tính
                   </span>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4">
+                  <p className="text-xs text-[#475569] dark:text-slate-400 mb-4">
                     Hỗ trợ MP3, WAV, OGG, M4A (Tối đa 15MB/file; nếu có nhiều file dung lượng lớn nên dùng Link URL ngoài để tránh đầy bộ nhớ trình duyệt).
                   </p>
                 </div>
@@ -1678,7 +1678,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 
                 {activeTrack?.audioUrl && (
                   <div className="bg-slate-50 dark:bg-slate-800/70 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-2">
+                    <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">
                       Nghe thử file ghi âm Chủ đề #{activeIdx + 1}:
                     </p>
                     <audio key={`preview-${activeIdx}-${activeTrack.audioUrl.slice(0, 32)}`} controls src={activeTrack.audioUrl} className="w-full h-9" />
@@ -1701,7 +1701,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     <div className="flex items-center gap-2 text-xs font-extrabold text-slate-700 dark:text-slate-200">
                       <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span>Tùy chọn phụ: Ảnh Sơ Đồ / Bản Đồ &amp; Đề Dẫn Riêng Cho Chủ Đề #{activeIdx + 1}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold">
                         {hasListeningExtras ? 'Đang có dữ liệu' : 'Bỏ qua nếu không có'}
                       </span>
                     </div>
@@ -1715,7 +1715,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           <span className="text-xs font-extrabold text-blue-950 dark:text-blue-200 uppercase flex items-center gap-1.5">
                             <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Ảnh Sơ Đồ / Map Chủ Đề #{activeIdx + 1}
                           </span>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <p className="text-xs text-[#475569] dark:text-slate-400">
                             Chỉ cần tải lên khi bài nghe có hình bản đồ (Map), sơ đồ máy móc (Diagram)...
                           </p>
 
@@ -1744,7 +1744,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                               Hoặc dán Link URL hình ảnh:
                             </label>
                             <input
@@ -1796,7 +1796,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <div>
               <label className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                 <span>Lời Thoại Audio / Transcript Chủ Đề #{activeIdx + 1}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold">
                   Không có file MP3? Chỉ cần dán đoạn văn vào đây máy tự đọc!
                 </span>
               </label>
@@ -1900,7 +1900,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <BookOpen className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" /> Nội Dung Bài Đọc Reading ({passages.length} Chủ Đề / Bài)
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
                   Tạo nhiều bài đọc / chủ đề đánh số 1, 2, 3... để học sinh chuyển qua lại dễ dàng khi có nhiều ảnh hoặc nhiều đoạn đọc.
                 </p>
               </div>
@@ -1927,7 +1927,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#EDFFFD] dark:hover:bg-teal-500/15'
                     }`}
                   >
-                    <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
+                    <span className={`w-5 h-5 rounded-full text-xs font-black flex items-center justify-center ${
                       pIdx === activeIdx ? 'bg-white text-[#007A7A]' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
                     }`}>
                       {pIdx + 1}
@@ -1975,7 +1975,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     <div className="flex items-center gap-2 text-xs font-extrabold text-indigo-950 dark:text-indigo-200">
                       <Image className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                       <span>Tùy chọn phụ: Ảnh Minh Họa / Đề Chụp Kèm Bài Đọc #{activeIdx + 1}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
                         {hasReadingImg ? 'Đang có ảnh' : 'Bỏ qua nếu bạn nhập chữ'}
                       </span>
                     </div>
@@ -1988,7 +1988,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         <span className="text-xs font-extrabold text-indigo-950 dark:text-indigo-200 uppercase flex items-center gap-1.5">
                           <Image className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Tải Ảnh Kèm Bài #{activeIdx + 1}
                         </span>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-[#475569] dark:text-slate-400">
                           Chỉ dùng khi muốn học sinh nhìn ảnh gốc thay cho đoạn chữ. (Nếu muốn AI chép chữ từ ảnh, hãy dùng khung <strong>Tạo Đề Tự Động Từ Ảnh</strong> ngay bên dưới!).
                         </p>
 
@@ -2016,7 +2016,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                             Hoặc dán Link URL hình ảnh:
                           </label>
                           <input
@@ -2054,7 +2054,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <div>
               <label className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                 <span>Nội Dung Văn Bản Bài Đọc #{activeIdx + 1}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold">
                   Copy/Dán bài đọc từ Word/PDF hoặc dùng tab Tạo Tự Động (AI Ảnh) bên dưới
                 </span>
               </label>

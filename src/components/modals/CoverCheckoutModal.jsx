@@ -197,11 +197,11 @@ export default function CoverCheckoutModal({
                     ? 'Đăng Ký Gói Ai eo VIP (1 Tháng)'
                     : 'Mở Khóa Ảnh Nền Riêng (1 Tháng)'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-black tabular-nums">
+                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-black tabular-nums">
                   {priceLabel}
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-300">
+              <p className="text-xs text-slate-300">
                 {order?.orderCode
                   ? `Mã đơn thanh toán: #${order.orderCode}`
                   : isRoomTicketOrder
@@ -228,20 +228,20 @@ export default function CoverCheckoutModal({
               </div>
               <h4 className="text-base font-extrabold text-emerald-900 dark:text-emerald-200">
                 {isTitleOrder
-                  ? `Thanh toán thành công — Đã sở hữu ${itemLabel || 'Danh Hiệu VIP'}!`
+                  ? `Thanh toán thành công - Đã sở hữu ${itemLabel || 'Danh Hiệu VIP'}!`
                   : isTestOrder
-                  ? `Thanh toán thành công — Đã mở khóa Đề Thi!`
+                  ? `Thanh toán thành công - Đã mở khóa Đề Thi!`
                   : isRoomTicketOrder
-                  ? 'Thanh toán thành công — Đã cộng +1 Lượt Tạo Phòng!'
+                  ? 'Thanh toán thành công - Đã cộng +1 Lượt Tạo Phòng!'
                   : isAieoVipOrder
-                  ? 'Thanh toán thành công — Chào mừng thành viên Ai eo VIP!'
-                  : 'Thanh toán thành công — Đã mở khóa Ảnh Nền Riêng!'}
+                  ? 'Thanh toán thành công - Chào mừng thành viên Ai eo VIP!'
+                  : 'Thanh toán thành công - Đã mở khóa Ảnh Nền Riêng!'}
               </h4>
               <p className="text-xs text-emerald-800/90 dark:text-emerald-300 leading-relaxed">
                 {isTitleOrder
                   ? `Tài khoản @${currentUser?.username} đã mở khóa danh hiệu ${itemLabel} (thời hạn 1 tháng${expiryPreview ? ` • ${expiryPreview}` : ''}).`
                   : isTestOrder
-                  ? `Tài khoản @${currentUser?.username} đã mở khóa đề thi "${itemLabel}" — được làm lại nhiều lần không giới hạn!`
+                  ? `Tài khoản @${currentUser?.username} đã mở khóa đề thi "${itemLabel}" - được làm lại nhiều lần không giới hạn!`
                   : isRoomTicketOrder
                   ? `Tài khoản @${currentUser?.username} đã nhận +1 lượt tạo Phòng Đấu Trường Bạn Bè (hiện có ${Math.max(1, Number(currentUser?.roomCreateCredits) || 1)} lượt).`
                   : isAieoVipOrder
@@ -295,7 +295,7 @@ export default function CoverCheckoutModal({
               </div>
             </div>
           ) : creating && !order ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-[#475569] dark:text-slate-400">
               <Loader2 className="w-6 h-6 animate-spin text-[#007A7A]" />
               <span>Đang tạo mã đơn &amp; mã VietQR {priceLabel}...</span>
             </div>
@@ -325,7 +325,7 @@ export default function CoverCheckoutModal({
               />
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <span className="text-xs text-[#475569] dark:text-slate-400 flex items-center gap-1">
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Tự động cập nhật ngay khi nhận tiền
                 </span>
                 <div className="flex items-center gap-2">

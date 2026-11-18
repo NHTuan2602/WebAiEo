@@ -140,10 +140,10 @@ export function BuilderGuideModal({ isOpen, onClose, onJumpToTab }) {
             </h3>
             <ol className="list-decimal pl-5 space-y-1.5 text-xs leading-relaxed">
               <li>
-                Mở file PDF/Word hoặc sách đề thi trên màn hình. Dùng phím <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-[11px] font-bold">Windows + Shift + S</kbd> (trên Windows) để chụp vùng câu hỏi cần tạo.
+                Mở file PDF/Word hoặc sách đề thi trên màn hình. Dùng phím <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-xs font-bold">Windows + Shift + S</kbd> (trên Windows) để chụp vùng câu hỏi cần tạo.
               </li>
               <li>
-                Mở tab <strong>Tạo Tự Động (AI Ảnh)</strong>, bấm chuột vào ô khung viền nét đứt rồi nhấn <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-[11px] font-bold">Ctrl + V</kbd> (hoặc bấm nút Chọn Ảnh từ máy).
+                Mở tab <strong>Tạo Tự Động (AI Ảnh)</strong>, bấm chuột vào ô khung viền nét đứt rồi nhấn <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-xs font-bold">Ctrl + V</kbd> (hoặc bấm nút Chọn Ảnh từ máy).
               </li>
               <li>
                 Nếu có bảng đáp án ngắn dạng chữ (VD: <code>1. garden</code>, <code>2. 115</code>), dán vào ô <em>Bảng Đáp Án</em> rồi bấm <strong>AI Đọc Ảnh &amp; Tạo Đề Ngay</strong>. Các câu sinh ra sẽ được gắn nhãn <strong>Tự động (AI Ảnh)</strong> rõ ràng.
@@ -161,11 +161,11 @@ export function BuilderGuideModal({ isOpen, onClose, onJumpToTab }) {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono">
-                <div className="text-[10px] font-sans font-bold uppercase text-slate-400 mb-1">1. Bạn gõ vào ô Đục lỗ:</div>
+                <div className="text-xs font-sans font-bold uppercase text-slate-400 mb-1">1. Bạn gõ vào ô Đục lỗ:</div>
                 <code>• the {'{{1}}'} Room – seats 100</code>
               </div>
               <div className="p-3 rounded-xl bg-[#EDFFFD] dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-500/30">
-                <div className="text-[10px] font-bold uppercase text-[#007A7A] dark:text-[#1EE1D6] mb-1">2. Học sinh sẽ nhìn thấy:</div>
+                <div className="text-xs font-bold uppercase text-[#007A7A] dark:text-[#1EE1D6] mb-1">2. Học sinh sẽ nhìn thấy:</div>
                 <span>• the </span>
                 <span className="inline-block px-4 py-0.5 rounded-full border border-[#007A7A] bg-white dark:bg-slate-900 text-[#007A7A] font-bold">
                   1
@@ -295,8 +295,8 @@ export default function BuilderGuideBanner({
             <h2 className="text-xs sm:text-sm font-extrabold text-[#0F172B] dark:text-white">
               Trợ Lý Hướng Dẫn Tạo Đề (Làm theo 4 bước bên dưới)
             </h2>
-            <p className="text-[11px] text-[#62748E] dark:text-slate-400">
-              Không cần điền tất cả mọi ô — chỉ điền những phần bạn có, xong bấm Lưu ở góc trên.
+            <p className="text-xs text-[#475569] dark:text-slate-400">
+              Không cần điền tất cả mọi ô - chỉ điền những phần bạn có, xong bấm Lưu ở góc trên.
             </p>
           </div>
         </div>
@@ -359,8 +359,8 @@ export default function BuilderGuideBanner({
                       <span className="truncate">{st.num}. {st.label}</span>
                     </div>
                     <div
-                      className={`text-[10px] font-semibold truncate ${
-                        st.done ? 'text-[#059271] dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                      className={`text-xs font-semibold truncate ${
+                        st.done ? 'text-[#059271] dark:text-emerald-400' : 'text-[#475569] dark:text-slate-400'
                       }`}
                     >
                       {st.detail}
@@ -372,7 +372,7 @@ export default function BuilderGuideBanner({
           </div>
 
           <div className="px-3.5 py-2.5 rounded-2xl bg-white/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700 text-xs flex items-start gap-2.5">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 shrink-0 mt-0.5">
+            <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 shrink-0 mt-0.5">
               Mẹo Bước Này
             </span>
             <p className="text-[#314158] dark:text-slate-300 leading-relaxed">

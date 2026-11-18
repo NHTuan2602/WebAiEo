@@ -46,10 +46,10 @@ ${hintLine}`;
 
   return `You are an official IELTS Speaking Senior Examiner (certified by IDP and British Council).
 Evaluate the candidate's IELTS Speaking performance strictly according to the official 4 IELTS Speaking Band Descriptors:
-1. fc — Fluency and Coherence (độ trôi chảy, mạch lạc, tốc độ nói tự nhiên, phát triển ý, từ nối)
-2. lr — Lexical Resource (vốn từ vựng học thuật/idiomatic, collocation, paraphrase)
-3. gra — Grammatical Range and Accuracy (cấu trúc câu đơn/ghép/phức, thì, độ chính xác ngữ pháp)
-4. pr — Pronunciation (phát âm âm vị rõ ràng, trọng âm từ, ngữ điệu câu, độ dễ nghe)
+1. fc - Fluency and Coherence (độ trôi chảy, mạch lạc, tốc độ nói tự nhiên, phát triển ý, từ nối)
+2. lr - Lexical Resource (vốn từ vựng học thuật/idiomatic, collocation, paraphrase)
+3. gra - Grammatical Range and Accuracy (cấu trúc câu đơn/ghép/phức, thì, độ chính xác ngữ pháp)
+4. pr - Pronunciation (phát âm âm vị rõ ràng, trọng âm từ, ngữ điệu câu, độ dễ nghe)
 
 STRICT CRITICAL SCORING RULES:
 - MANDATORY INTEGER SCORING: Every IELTS Speaking criterion score (fc, lr, gra, pr) and overallBand MUST BE A WHOLE INTEGER from 1 to 9 (no .5 decimals like 6.5! Allowed scores: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9). Do NOT output half-bands.
@@ -142,10 +142,10 @@ export function analyzeTranscriptFluency(transcript = '', durationSec = 0) {
     wpm === 0
       ? 'Chưa rõ nhịp nói'
       : wpm < 95
-      ? 'Chậm — Cần tăng phản xạ nối ý'
+      ? 'Chậm - Cần tăng phản xạ nối ý'
       : wpm <= 165
       ? 'Nhịp độ lý tưởng IELTS'
-      : 'Khá nhanh — Giữ ngắt nhịp tự nhiên';
+      : 'Khá nhanh - Giữ ngắt nhịp tự nhiên';
   return {
     wordCount,
     wpm,
@@ -469,7 +469,7 @@ export function simulateAISpeakingGrading({ testTitle = '', partMode = 'full', r
     const fm = analyzeTranscriptFluency(rawTx, dur);
     return {
       questionId: rec.questionId,
-      transcript: rawTx || `(Đã lưu file ghi âm ${Math.round(dur)}s — chờ Gemini API Key để chép lời chính xác)`,
+      transcript: rawTx || `(Đã lưu file ghi âm ${Math.round(dur)}s - chờ Gemini API Key để chép lời chính xác)`,
       band: roundSpeakingBand(qBand),
       criteria: qCrit,
       fluencyMetrics: {
@@ -503,7 +503,7 @@ export function simulateAISpeakingGrading({ testTitle = '', partMode = 'full', r
     parsed: {
       overallBand: overall,
       criteria: { fc, lr, gra, pr },
-      overallFeedback: `[Đánh Giá Speaking Tự Động — Bộ Chấm Cơ Bản]: Đã lưu ${validRecs.length}/${recList.length} file ghi âm (tổng ${Math.round(totalSec)} giây${totalWords > 0 ? `, ~${totalWords} từ` : ''}) cho bài "${testTitle || 'IELTS Speaking'}" (${partMode}). ${totalSec < 20 ? 'Thời lượng nói còn khá ngắn, cần mở rộng câu trả lời dài và tự nhiên hơn.' : 'Thời lượng nói ổn định. Để AI nghe trực tiếp file thu âm và chấm chính xác Phát âm (Pronunciation) & chép lời chi tiết, giáo viên hãy nhập Google Gemini API Key.'}`,
+      overallFeedback: `[Đánh Giá Speaking Tự Động - Bộ Chấm Cơ Bản]: Đã lưu ${validRecs.length}/${recList.length} file ghi âm (tổng ${Math.round(totalSec)} giây${totalWords > 0 ? `, ~${totalWords} từ` : ''}) cho bài "${testTitle || 'IELTS Speaking'}" (${partMode}). ${totalSec < 20 ? 'Thời lượng nói còn khá ngắn, cần mở rộng câu trả lời dài và tự nhiên hơn.' : 'Thời lượng nói ổn định. Để AI nghe trực tiếp file thu âm và chấm chính xác Phát âm (Pronunciation) & chép lời chi tiết, giáo viên hãy nhập Google Gemini API Key.'}`,
       strengths: [
         `Đã hoàn thành và lưu an toàn ${validRecs.length}/${recList.length} file ghi âm trên hệ thống (${Math.round(totalSec)}s).`,
         totalWords >= 40 ? `Tốc độ phản hồi và lượng từ vựng bước đầu tốt (${uniqueLexicon.size} từ khác nhau).` : 'Chủ động ghi âm phản xạ trực tiếp bằng Micro.'

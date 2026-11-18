@@ -23,7 +23,7 @@ export default function AudioLevelMeter({ level = 0, active = false, barCount = 
             className={`w-1.5 rounded-full transition-all duration-100 ${
               active
                 ? safeLevel > 12
-                  ? 'bg-[#570DF8] dark:bg-[#8B5CF6]'
+                  ? 'bg-[#007A7A] dark:bg-[#8B5CF6]'
                   : 'bg-emerald-500/70'
                 : 'bg-slate-300 dark:bg-slate-700'
             }`}

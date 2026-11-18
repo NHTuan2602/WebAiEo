@@ -134,9 +134,9 @@ export default function GlobalModals({
                 Google Gemini API Key (Dùng chung toàn hệ thống cho Giáo viên / Admin)
               </label>
               {aiConfigured && !aiApiKey?.trim() && (
-                <div className="mb-2.5 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-[11px] font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                <div className="mb-2.5 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Máy chủ đã đồng bộ sẵn Gemini Key — máy này có thể bấm Kiểm Tra Key hoặc dùng AI ngay mà không cần nhập lại!</span>
+                  <span>Máy chủ đã đồng bộ sẵn Gemini Key - máy này có thể bấm Kiểm Tra Key hoặc dùng AI ngay mà không cần nhập lại!</span>
                 </div>
               )}
               <div className="flex gap-2">
@@ -163,7 +163,7 @@ export default function GlobalModals({
                   )}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+              <p className="text-xs text-[#475569] dark:text-slate-400 mt-2 leading-relaxed">
                 Tạo Key miễn phí tại <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline font-semibold">Google AI Studio</a>. Hệ thống tự động thử lại nếu gặp lỗi 503 &amp; tự chuyển model dự phòng qua máy chủ.
               </p>
             </div>
@@ -181,7 +181,7 @@ export default function GlobalModals({
                 )}
                 <div>
                   <p className="font-bold">{apiTestState.ok ? 'Key hoạt động bình thường!' : 'Không thể xác thực API Key'}</p>
-                  <p className="mt-0.5 text-[11px] opacity-90">{apiTestState.message}</p>
+                  <p className="mt-0.5 text-xs opacity-90">{apiTestState.message}</p>
                 </div>
               </div>
             )}
@@ -245,9 +245,9 @@ export default function GlobalModals({
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700">
               <UserAvatarBadge user={editingTargetUser} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-2xl" />
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Ảnh Đại Diện (@{editingTargetUser.username})</p>
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Ảnh Đại Diện (@{editingTargetUser.username})</p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <label className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold cursor-pointer transition inline-flex items-center gap-1">
+                  <label className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer transition inline-flex items-center gap-1">
                     <Upload className="w-3 h-3" /> {editingTargetUser.avatarUrl ? 'Đổi ảnh' : 'Tải ảnh'}
                     <input
                       type="file"
@@ -262,7 +262,7 @@ export default function GlobalModals({
                           const rawDataUrl = await readImageFileAsDataUrl(file);
                           if (animated) {
                             if (!canUseTargetAnimatedAvatar) {
-                              showToast('Ảnh Avatar Động (.GIF/.WebP) thuộc gói Ai eo VIP — ảnh sẽ được cắt tĩnh.', 'info');
+                              showToast('Ảnh Avatar Động (.GIF/.WebP) thuộc gói Ai eo VIP - ảnh sẽ được cắt tĩnh.', 'info');
                               setAvatarCropState({ sourceUrl: rawDataUrl, target: 'editing_avatar' });
                               return;
                             }
@@ -271,7 +271,7 @@ export default function GlobalModals({
                               return;
                             }
                             setEditingTargetUser(prev => (prev ? { ...prev, avatarUrl: rawDataUrl } : prev));
-                            showToast('Đã chọn Ảnh Avatar Động VIP — bấm Lưu để hoàn tất!');
+                            showToast('Đã chọn Ảnh Avatar Động VIP - bấm Lưu để hoàn tất!');
                             return;
                           }
                           setAvatarCropState({ sourceUrl: rawDataUrl, target: 'editing_avatar' });
@@ -285,7 +285,7 @@ export default function GlobalModals({
                     <button
                       type="button"
                       onClick={() => setAvatarCropState({ sourceUrl: editingTargetUser.avatarUrl, target: 'editing_avatar' })}
-                      className="px-2 py-1 rounded-lg bg-[#EDFFFD] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-teal-200 dark:border-teal-800 text-[11px] font-bold hover:bg-teal-100/70 transition inline-flex items-center gap-1"
+                      className="px-2 py-1 rounded-lg bg-[#EDFFFD] dark:bg-teal-950/50 text-[#007A7A] dark:text-[#1EE1D6] border border-teal-200 dark:border-teal-800 text-xs font-bold hover:bg-teal-100/70 transition inline-flex items-center gap-1"
                     >
                       <Crop className="w-3 h-3" /> Cắt ảnh
                     </button>
@@ -294,7 +294,7 @@ export default function GlobalModals({
                     <button
                       type="button"
                       onClick={() => setEditingTargetUser(prev => (prev ? { ...prev, avatarUrl: '' } : prev))}
-                      className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-[11px] font-bold hover:bg-rose-100 transition"
+                      className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-bold hover:bg-rose-100 transition"
                     >
                       Gỡ ảnh
                     </button>
@@ -461,7 +461,7 @@ export default function GlobalModals({
           </div>
 
           {currentUser?.role !== 'teacher' && !hasVipFriendRoomAccess(currentUser) && (
-            <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-200 dark:border-amber-500/35 text-[11px] font-bold text-amber-800 dark:text-amber-200">
+            <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-200 dark:border-amber-500/35 text-xs font-bold text-amber-800 dark:text-amber-200">
               🎫 Bấm Tạo Phòng sẽ dùng 1 vé tạo phòng 5.000đ (bạn hiện còn {getFriendRoomTicketCredits(currentUser)} vé).
             </div>
           )}
@@ -577,9 +577,9 @@ export default function GlobalModals({
                       </select>
                     </div>
                   </div>
-                  <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
                     {chosenTeams >= 2
-                      ? `⚡ Dự kiến: ${chosenMax} người · ${chosenTeams} Team (~${perTeamAvg} người/team) — tự động chia cân bằng khi vào phòng.`
+                      ? `⚡ Dự kiến: ${chosenMax} người · ${chosenTeams} Team (~${perTeamAvg} người/team) - tự động chia cân bằng khi vào phòng.`
                       : `⚡ Đấu Đơn: Tối đa ${chosenMax} người chơi tranh hạng trực tiếp.`}
                   </p>
                 </div>
@@ -612,10 +612,10 @@ export default function GlobalModals({
               />
               <div>
                 <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">Đảo thứ tự từ riêng cho từng học sinh</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-[#475569] dark:text-slate-400">
                   {newRoomForm.shufflePerPlayer
                     ? 'Đang BẬT: Mỗi học sinh gặp thứ tự câu khác nhau (hạn chế nhìn bài nhau).'
-                    : 'Đang TẮT: Tất cả cùng làm chung một bộ câu hỏi — ai trả lời nhanh nhất được điểm cao hơn.'}
+                    : 'Đang TẮT: Tất cả cùng làm chung một bộ câu hỏi - ai trả lời nhanh nhất được điểm cao hơn.'}
                 </p>
               </div>
             </label>
@@ -664,7 +664,7 @@ export default function GlobalModals({
 
           {/* Quick-Load IELTS Topic Presets + Teacher Custom Topics + Add "+" Button */}
           <div className="mb-3">
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">
+            <p className="text-xs font-bold text-[#475569] dark:text-slate-400 mb-1.5">
               Nạp nhanh bộ từ vựng mẫu theo chủ đề IELTS:
             </p>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -676,7 +676,7 @@ export default function GlobalModals({
                     setCustomVocabInput(preset.text);
                     showToast(`Đã nạp bộ từ vựng "${preset.label}"! Bấm Lưu để áp dụng.`);
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-500/15 hover:bg-purple-100 dark:hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 text-[11px] font-bold transition"
+                  className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-500/15 hover:bg-purple-100 dark:hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 text-xs font-bold transition"
                 >
                   + {preset.label}
                 </button>
@@ -692,7 +692,7 @@ export default function GlobalModals({
                       setCustomVocabInput(topic.text);
                       showToast(`Đã nạp chủ đề "${topic.label}"! Bấm Lưu để áp dụng.`);
                     }}
-                    className="px-2.5 py-1 hover:bg-teal-100 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] text-[11px] font-bold transition"
+                    className="px-2.5 py-1 hover:bg-teal-100 dark:hover:bg-teal-500/25 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold transition"
                   >
                     + {topic.label}
                   </button>
@@ -742,7 +742,7 @@ export default function GlobalModals({
                     return next;
                   });
                 }}
-                className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline px-1"
+                className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline px-1"
               >
                 {showNewTopicForm ? 'Đóng form thêm' : 'Thêm chủ đề'}
               </button>
@@ -756,7 +756,7 @@ export default function GlobalModals({
                 <p className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5" /> Tạo Chủ Đề Từ Vựng Mới (Lưu Dùng Lâu Dài)
                 </p>
-                <div className="flex items-center gap-2 text-[11px]">
+                <div className="flex items-center gap-2 text-xs">
                   <button
                     type="button"
                     onClick={() => setNewTopicText(customVocabInput || '')}
@@ -767,7 +767,7 @@ export default function GlobalModals({
                   <button
                     type="button"
                     onClick={() => setNewTopicText('')}
-                    className="font-semibold text-slate-500 dark:text-slate-400 hover:underline"
+                    className="font-semibold text-[#475569] dark:text-slate-400 hover:underline"
                   >
                     Xóa trắng
                   </button>
@@ -788,7 +788,7 @@ export default function GlobalModals({
                 className="w-full p-2.5 font-mono text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-emerald-300 dark:border-emerald-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
                   Nhận diện hợp lệ: {newTopicParsedCount} từ
                 </span>
                 <div className="flex items-center gap-2">
@@ -829,7 +829,7 @@ export default function GlobalModals({
           )}
 
           {/* Live Format Validation Status */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-2">
             <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
               <CheckCircle className="w-3.5 h-3.5" /> Hợp lệ: {parsedPreview.length} từ
             </span>
@@ -853,7 +853,7 @@ export default function GlobalModals({
           <div className="flex justify-between items-center flex-wrap gap-2">
             <button
               onClick={() => setCustomVocabInput(DEFAULT_VOCAB_TEXT)}
-              className="text-xs text-slate-500 dark:text-slate-400 hover:underline"
+              className="text-xs text-[#475569] dark:text-slate-400 hover:underline"
             >
               Khôi phục 12 từ mặc định
             </button>
@@ -1012,7 +1012,7 @@ export default function GlobalModals({
               </div>
 
               {isCreatingTeacher && (
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
                   <span>Tài khoản Giáo viên có toàn quyền tạo đề thi, chấm bài và tạo/quản lý các tài khoản khác.</span>
                 </div>
@@ -1020,7 +1020,7 @@ export default function GlobalModals({
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-[#475569] dark:text-slate-400">
                 Mỗi dòng 1 học viên theo định dạng: <code className="font-bold text-indigo-600 dark:text-indigo-300">username | Họ tên | mật khẩu | TargetBand</code>
               </p>
               <textarea
@@ -1029,7 +1029,7 @@ export default function GlobalModals({
                 onChange={e => setBulkStudentsText(e.target.value)}
                 className="w-full p-3 font-mono text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
-              <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                 Nhận diện hợp lệ: {bulkParsedCount} tài khoản học viên
               </p>
             </div>
@@ -1067,11 +1067,11 @@ export default function GlobalModals({
               <X className="w-5 h-5" />
             </button>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          <p className="text-xs text-[#475569] dark:text-slate-400 mb-3">
             Tài khoản: <b className="text-slate-900 dark:text-white">{editingStudentAccount.name}</b> (<code className="font-mono">@{editingStudentAccount.username}</code>)
           </p>
           {currentUser?.isSuperAdmin && (
-            <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-[11px] font-semibold text-amber-800 dark:text-amber-200">
+            <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-xs font-semibold text-amber-800 dark:text-amber-200">
               Quyền Quản Trị Hệ Thống: Có thể đặt lại mật khẩu mới cho mọi Giáo viên &amp; Học viên (tự động đăng xuất phiên cũ).
             </div>
           )}
@@ -1081,7 +1081,7 @@ export default function GlobalModals({
               <button
                 type="button"
                 onClick={() => setStudentPasswordDraft('123456')}
-                className="text-[11px] font-extrabold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
+                className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6] hover:underline"
               >
                 Đặt MK mặc định (123456)
               </button>
@@ -1132,16 +1132,16 @@ export default function GlobalModals({
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center text-center">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2">Avatar Tài Khoản</p>
+              <p className="text-xs font-bold text-[#475569] dark:text-slate-400 mb-2">Avatar Tài Khoản</p>
               <UserAvatarBadge user={currentUser} sizeClass="w-20 h-20" textClass="text-2xl" rounded="rounded-2xl" />
               {isAnimatedDataUrl(currentUser.avatarUrl) && (
-                <span className="mt-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-white text-[9px] font-black uppercase">
+                <span className="mt-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-white text-xs font-black uppercase">
                   ✨ Avatar Động VIP
                 </span>
               )}
             </div>
             <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 flex flex-col items-center text-center">
-              <p className="text-[11px] font-bold text-cyan-300 mb-2">Phi Thuyền Thú Cưng</p>
+              <p className="text-xs font-bold text-cyan-300 mb-2">Phi Thuyền Thú Cưng</p>
               <AnimalPilotAvatar
                 animalId={myAnimalId}
                 accessoryId={myAccessoryId}
@@ -1160,7 +1160,7 @@ export default function GlobalModals({
 
           {canUseSelfAnimatedAvatar ? (
             <div className="mb-3.5 p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 dark:from-amber-950/30 dark:to-rose-950/25 border border-amber-300 dark:border-amber-500/40 space-y-2">
-              <p className="text-[11px] font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+              <p className="text-xs font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                 <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 <span>Đặc quyền Avatar Động VIP đang mở (.GIF / .WebP động ≤ 1.1 MB)</span>
               </p>
@@ -1170,7 +1170,7 @@ export default function GlobalModals({
                   value={gifAvatarLinkInput}
                   onChange={e => setGifAvatarLinkInput(e.target.value)}
                   placeholder="Hoặc dán link ảnh động https://...gif"
-                  className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white"
+                  className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
                 />
                 <button
                   type="button"
@@ -1183,7 +1183,7 @@ export default function GlobalModals({
                     const ok = await handleUpdateUserAvatar(cleanUrl);
                     if (ok) setGifAvatarLinkInput('');
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-extrabold shrink-0 transition"
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold shrink-0 transition"
                 >
                   Lưu Link
                 </button>
@@ -1192,11 +1192,11 @@ export default function GlobalModals({
           ) : (
             <div className="mb-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/75 border border-rose-200 dark:border-rose-500/35 flex flex-wrap items-center justify-between gap-2.5">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                  <span>Avatar Động (.GIF / .WebP động) — Đặc quyền Ai eo VIP</span>
+                  <span>Avatar Động (.GIF / .WebP động) - Đặc quyền Ai eo VIP</span>
                 </p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-[#475569] dark:text-slate-400">
                   Mở Gói Ai eo VIP ({vipPriceLabel}/1T) để đặt ảnh đại diện chuyển động &amp; LED Neon nhiều màu.
                 </p>
               </div>
@@ -1204,7 +1204,7 @@ export default function GlobalModals({
                 <button
                   type="button"
                   onClick={onOpenVipCheckout}
-                  className="vip-shimmer-badge px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white text-[11px] font-black shrink-0 shadow-xs"
+                  className="vip-shimmer-badge px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white text-xs font-black shrink-0 shadow-xs"
                 >
                   Mở VIP ({vipPriceLabel})
                 </button>
@@ -1233,7 +1233,7 @@ export default function GlobalModals({
                     const rawDataUrl = await readImageFileAsDataUrl(file);
                     if (animated) {
                       if (!canUseSelfAnimatedAvatar) {
-                        showToast(`Ảnh Avatar Động (.GIF/.WebP) chỉ dành cho Gói Ai eo VIP (${vipPriceLabel}/1T) — ảnh sẽ được cắt thành ảnh tĩnh.`, 'info');
+                        showToast(`Ảnh Avatar Động (.GIF/.WebP) chỉ dành cho Gói Ai eo VIP (${vipPriceLabel}/1T) - ảnh sẽ được cắt thành ảnh tĩnh.`, 'info');
                         setAvatarCropState({ sourceUrl: rawDataUrl, target: 'self_avatar' });
                         return;
                       }

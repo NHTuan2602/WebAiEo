@@ -240,7 +240,7 @@ function ImageCropperDialog({
               <h3 id="image-cropper-title" className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
                 {title || preset.defaultTitle}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                 {subtitle || preset.defaultSubtitle}
               </p>
             </div>
@@ -313,7 +313,7 @@ function ImageCropperDialog({
             )}
           </div>
 
-          <p className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          <p className="mt-2.5 flex items-center justify-center gap-1.5 text-xs font-medium text-[#475569] dark:text-slate-400">
             <Move className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
             Kéo trực tiếp để dịch vùng ảnh • Lăn chuột hoặc trượt thanh để thu phóng
           </p>
@@ -379,7 +379,7 @@ function ImageCropperDialog({
                 <RotateCcw className="w-3.5 h-3.5" /> Đặt lại
               </button>
             </div>
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-semibold text-[#475569] dark:text-slate-400">
               Xuất {preset.targetWidth} × {preset.targetHeight}px
             </span>
           </div>

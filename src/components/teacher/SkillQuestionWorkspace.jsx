@@ -86,13 +86,13 @@ function QuestionOriginBadge({ question }) {
   return (
     <div className="inline-flex flex-wrap items-center gap-1.5">
       <span
-        className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${style.badgeClass}`}
+        className={`inline-flex items-center gap-1 text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${style.badgeClass}`}
       >
         <BadgeIcon className="w-3 h-3" />
         <span>{style.label}</span>
       </span>
       {hasBlank && (
-        <span className="inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+        <span className="inline-flex items-center text-xs font-extrabold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
           Ô đục lỗ #{question.blankNum}
         </span>
       )}
@@ -214,7 +214,7 @@ function QuestionCardItem({
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
         <div className="md:col-span-8">
-          <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+          <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
             Nội dung câu hỏi
           </label>
           <input
@@ -226,7 +226,7 @@ function QuestionCardItem({
           />
         </div>
         <div className="md:col-span-4">
-          <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+          <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
             Giới hạn từ / Nhãn hướng dẫn (tùy chọn)
           </label>
           <input
@@ -242,7 +242,7 @@ function QuestionCardItem({
       {supportsOptions && (
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase">
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">
               Các phương án / Đáp án lựa chọn ({optionList.length})
             </label>
             <div className="flex items-center gap-1.5">
@@ -255,7 +255,7 @@ function QuestionCardItem({
                     onUpdateQuestion(q.id, 'options', nextOpts);
                     onUpdateQuestion(q.id, 'correctAnswer', nextOpts[0]);
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-700 text-[10px] font-extrabold text-slate-700 dark:text-slate-200 hover:opacity-90"
+                  className="px-2.5 py-1 rounded-lg bg-slate-200/80 dark:bg-slate-700 text-xs font-extrabold text-slate-700 dark:text-slate-200 hover:opacity-90"
                 >
                   Đổi T/F/NG ⇄ Y/N/NG
                 </button>
@@ -264,7 +264,7 @@ function QuestionCardItem({
                 <button
                   type="button"
                   onClick={() => onUpdateQuestion(q.id, 'options', [])}
-                  className="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-[10px] font-extrabold text-amber-800 dark:text-amber-300"
+                  className="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-xs font-extrabold text-amber-800 dark:text-amber-300"
                 >
                   Chuyển sang Tự Điền Chữ (Bỏ Hộp)
                 </button>
@@ -277,7 +277,7 @@ function QuestionCardItem({
                     onUpdateQuestion(q.id, 'options', fallbackOpts);
                     if (!q.correctAnswer) onUpdateQuestion(q.id, 'correctAnswer', fallbackOpts[0]);
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-[10px] font-extrabold text-indigo-800 dark:text-indigo-300"
+                  className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-xs font-extrabold text-indigo-800 dark:text-indigo-300"
                 >
                   + Dùng Hộp Lựa Chọn (A–F)
                 </button>
@@ -289,7 +289,7 @@ function QuestionCardItem({
                     const nextCode = String.fromCharCode(65 + optionList.length);
                     onUpdateQuestion(q.id, 'options', [...optionList, nextCode]);
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[10px] font-extrabold text-slate-700 dark:text-slate-200"
+                  className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-extrabold text-slate-700 dark:text-slate-200"
                 >
                   + Thêm lựa chọn
                 </button>
@@ -298,7 +298,7 @@ function QuestionCardItem({
                 <button
                   type="button"
                   onClick={() => onUpdateQuestion(q.id, 'options', optionList.slice(0, -1))}
-                  className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-[10px] font-extrabold text-rose-700 dark:text-rose-300"
+                  className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-xs font-extrabold text-rose-700 dark:text-rose-300"
                 >
                   − Bớt 1
                 </button>
@@ -324,7 +324,7 @@ function QuestionCardItem({
       )}
 
       <div className="bg-emerald-50/80 dark:bg-emerald-500/15 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-500/30">
-        <label className="block text-[11px] font-extrabold text-emerald-800 dark:text-emerald-300 uppercase mb-1">
+        <label className="block text-xs font-extrabold text-emerald-800 dark:text-emerald-300 uppercase mb-1">
           ✅ Đáp án đúng của câu hỏi này (Dùng để chấm điểm tự động)
         </label>
         {optionList.length > 0 ? (
@@ -348,7 +348,7 @@ function QuestionCardItem({
               className="w-full sm:w-96 px-3.5 py-2 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-xs font-extrabold text-emerald-900 dark:text-emerald-200"
               placeholder="VD: 15 | fifteen hoặc color / colour"
             />
-            <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-1">
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-1">
               Mẹo: Dùng dấu <code className="font-bold">|</code> hoặc <code className="font-bold">/</code> nếu chấp nhận nhiều đáp án tương đương.
             </p>
           </div>
@@ -477,7 +477,7 @@ export default function SkillQuestionWorkspace({
               {questions.length} câu tổng
             </span>
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
             Chọn đúng tab bên dưới theo cách bạn muốn soạn: <strong>AI đọc ảnh / Đục lỗ tự động</strong> hoặc <strong>Tạo bằng tay từng câu</strong>.
           </p>
         </div>
@@ -519,7 +519,7 @@ export default function SkillQuestionWorkspace({
                 <span className="truncate">{tab.label}</span>
               </span>
               <span
-                className={`px-2 py-0.5 rounded-full text-[11px] font-black shrink-0 ${
+                className={`px-2 py-0.5 rounded-full text-xs font-black shrink-0 ${
                   isCurrent
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
@@ -537,7 +537,7 @@ export default function SkillQuestionWorkspace({
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mr-1">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-[#475569] dark:text-slate-400 mr-1">
                 Lọc nguồn câu hỏi:
               </span>
               {[
@@ -590,7 +590,7 @@ export default function SkillQuestionWorkspace({
 
           {allTabFilteredEntries.length === 0 ? (
             groups.length > 1 && filterByGroup && questions.length > 0 && scopedEntries.length === 0 ? (
-              <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400 space-y-3">
+              <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-[#475569] dark:text-slate-400 space-y-3">
                 <p className="font-semibold">
                   {scopeLabel} chưa có câu hỏi nào riêng.
                 </p>
@@ -619,7 +619,7 @@ export default function SkillQuestionWorkspace({
                 </div>
               </div>
             ) : scopedEntries.length > 0 ? (
-              <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400 space-y-3">
+              <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-[#475569] dark:text-slate-400 space-y-3">
                 <p className="font-semibold">
                   {sourceFilter === 'auto'
                     ? `Chưa có câu hỏi nào được tạo tự động (AI hoặc Đục lỗ) trong ${scopeLabel}.`
@@ -675,7 +675,7 @@ export default function SkillQuestionWorkspace({
                     <Bot className="w-4 h-4" /> Cách 1: Tự Động Từ Ảnh (AI)
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Dán hoặc tải ảnh chụp trang đề thi — AI sẽ tự tạo câu hỏi &amp; đáp án cho bạn.
+                    Dán hoặc tải ảnh chụp trang đề thi - AI sẽ tự tạo câu hỏi &amp; đáp án cho bạn.
                   </p>
                 </button>
 
@@ -764,7 +764,7 @@ export default function SkillQuestionWorkspace({
             </div>
 
             {aiEntries.length === 0 ? (
-              <div className="p-6 rounded-2xl border border-dashed border-[#B5F5F1] dark:border-teal-500/30 text-center text-xs text-slate-500 dark:text-slate-400">
+              <div className="p-6 rounded-2xl border border-dashed border-[#B5F5F1] dark:border-teal-500/30 text-center text-xs text-[#475569] dark:text-slate-400">
                 Chưa có câu hỏi AI nào trong {scopeLabel}. Hãy dán hoặc chọn ảnh ở khung phía trên rồi bấm <strong>AI Đọc Ảnh &amp; Tạo Đề Ngay</strong>.
               </div>
             ) : (
@@ -794,7 +794,7 @@ export default function SkillQuestionWorkspace({
             </h4>
 
             {clozeEntries.length === 0 ? (
-              <div className="p-6 rounded-2xl border border-dashed border-sky-200 dark:border-sky-500/30 text-center text-xs text-slate-500 dark:text-slate-400">
+              <div className="p-6 rounded-2xl border border-dashed border-sky-200 dark:border-sky-500/30 text-center text-xs text-[#475569] dark:text-slate-400">
                 Chưa có ô đục lỗ nào được đồng bộ trong {scopeLabel}. Hãy chèn <code>{'{{1}}'}</code>, <code>{'{{2}}'}</code> vào khung trên rồi bấm <strong>Đồng Bộ Câu Hỏi</strong>.
               </div>
             ) : (
@@ -812,10 +812,10 @@ export default function SkillQuestionWorkspace({
               <div>
                 <h4 className="text-sm font-extrabold text-amber-950 dark:text-amber-200 flex items-center gap-2">
                   <PenTool className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>Soạn Câu Hỏi Thủ Công ({scopeLabel}) — Đủ {getQuestionTypesForSkill(skill).length} Dạng IELTS</span>
+                  <span>Soạn Câu Hỏi Thủ Công ({scopeLabel}) - Đủ {getQuestionTypesForSkill(skill).length} Dạng IELTS</span>
                 </h4>
                 <p className="text-xs text-amber-900/80 dark:text-amber-200/80 mt-0.5">
-                  Chọn đúng dạng câu hỏi để thêm nhanh — mọi câu tạo ở đây đều hỗ trợ chấm điểm &amp; hiển thị chuẩn thi IELTS.
+                  Chọn đúng dạng câu hỏi để thêm nhanh - mọi câu tạo ở đây đều hỗ trợ chấm điểm &amp; hiển thị chuẩn thi IELTS.
                 </p>
               </div>
             </div>
@@ -846,7 +846,7 @@ export default function SkillQuestionWorkspace({
           />
 
           {manualEntries.length === 0 ? (
-            <div className="p-8 rounded-2xl border border-dashed border-amber-300/70 dark:border-amber-500/30 text-center text-xs text-slate-500 dark:text-slate-400 space-y-2.5">
+            <div className="p-8 rounded-2xl border border-dashed border-amber-300/70 dark:border-amber-500/30 text-center text-xs text-[#475569] dark:text-slate-400 space-y-2.5">
               <p className="font-semibold">
                 Chưa có câu hỏi thủ công nào trong {scopeLabel}.
               </p>

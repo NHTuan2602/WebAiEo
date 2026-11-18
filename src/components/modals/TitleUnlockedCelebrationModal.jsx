@@ -57,7 +57,7 @@ export default function TitleUnlockedCelebrationModal({
       aria-modal="true"
       aria-labelledby="title-unlock-celebration-heading"
     >
-      <div className="w-full max-w-md bg-white dark:bg-[#161722] border border-pink-200/80 dark:border-slate-700/80 rounded-3xl overflow-hidden shadow-2xl relative animate-[fadeIn_0.25s_ease-out]">
+      <div className="w-full max-w-md bg-white dark:bg-[#161722] border border-slate-200 dark:border-slate-700/80 rounded-3xl overflow-hidden shadow-2xl relative animate-[fadeIn_0.25s_ease-out]">
         <div className={`h-2 w-full bg-gradient-to-r ${accent.topBar}`} />
 
         <button
@@ -70,7 +70,7 @@ export default function TitleUnlockedCelebrationModal({
         </button>
 
         <div className="p-6 sm:p-7 text-center space-y-5">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 dark:bg-[#007A7A]/20 border border-teal-200 dark:border-[#1EE1D6]/40 text-[#007A7A] dark:text-[#1EE1D6] text-[11px] font-extrabold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 dark:bg-[#007A7A]/20 border border-teal-200 dark:border-[#1EE1D6]/40 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-extrabold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             <span>
               {multiCount > 1
@@ -96,7 +96,7 @@ export default function TitleUnlockedCelebrationModal({
 
           <div className="space-y-2">
             <div className="flex items-center justify-center gap-2 flex-wrap">
-              <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${accent.pill}`}>
+              <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${accent.pill}`}>
                 {activeTitle.difficulty} · {activeTitle.tier}
               </span>
             </div>
@@ -122,7 +122,7 @@ export default function TitleUnlockedCelebrationModal({
 
           {multiCount > 1 && (
             <div className="space-y-2 text-left">
-              <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <p className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
                 <span>Chọn danh hiệu bạn muốn trang bị ngay ({multiCount}):</span>
               </p>

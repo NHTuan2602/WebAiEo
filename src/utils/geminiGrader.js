@@ -395,7 +395,7 @@ export async function callGeminiWritingGrader({ apiKey, task1Prompt, task1Text, 
   }
 
   const systemPrompt = `You are an official IELTS Writing Senior Examiner (certified by IDP and British Council).
-Rate the candidate's IELTS Writing Task 1 and Task 2 essays STRICTLY, critically, and precisely as a professional IELTS examiner — do NOT inflate grades.
+Rate the candidate's IELTS Writing Task 1 and Task 2 essays STRICTLY, critically, and precisely as a professional IELTS examiner - do NOT inflate grades.
 
 STRICT SCORING RULES (MANDATORY):
 1. Individual Criterion Scores ("ta"/"tr", "cc", "lr", "gra") MUST STRICTLY BE WHOLE INTEGERS from 1 to 9 (0 if empty/blank, NO .5 decimals for criteria! Allowed criterion scores: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9).
@@ -405,7 +405,7 @@ STRICT SCORING RULES (MANDATORY):
    - Note ALL grammar mistakes, spelling typos, punctuation errors, and awkward collocations ("spellingGrammarNotes").
    - Provide a sentence-by-sentence analysis table ("sentenceAnalysis") with columns: Sentence (exact original sentence), Grammatical or Vocabulary Error (errorType + Vietnamese/English explanation), and Correction (natural Band 8-9 corrected version). Analyze EVERY sentence from the submitted essay(s).
    - Provide Sentence Structure Upgrades ("sentenceStructureUpgrades"): upgrade weak/simple sentences into Band 8.0-9.0 complex structures (inversion, participle clauses, concession, noun clauses).
-   - Provide Task & Logic Flaw Critique ("taskLogicCritiques" — "Lỗi tư duy đề & lập luận"): flag missing Overview, unaddressed prompt parts, logical leaps, contradictions, overgeneralizations, or weak Task 1 data comparisons.
+   - Provide Task & Logic Flaw Critique ("taskLogicCritiques" - "Lỗi tư duy đề & lập luận"): flag missing Overview, unaddressed prompt parts, logical leaps, contradictions, overgeneralizations, or weak Task 1 data comparisons.
    - Provide Vocabulary & Collocation Upgrades ("vocabularyUpgrades"): replace repetitive/basic words with natural C1-C2 academic collocations.
    - Provide FULL polished Revisions ("revisedTask1" and "revisedTask2") improving Task Achievement/Response, Coherence & Cohesion, Lexical Resource, and Grammatical Range while keeping the candidate's core ideas.
 

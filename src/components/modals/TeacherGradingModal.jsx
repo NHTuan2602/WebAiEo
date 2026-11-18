@@ -127,7 +127,7 @@ export default function TeacherGradingModal({
                 </span>
               )}
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-[#475569] dark:text-slate-400">
               {gradingAttempt.testTitle} - {gradingAttempt.submittedAt}
             </p>
           </div>
@@ -198,7 +198,7 @@ export default function TeacherGradingModal({
               <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                 Chỉnh Sửa Điểm Listening & Reading (Band 0.0 – 9.0)
               </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                 Đổi số câu đúng sẽ tự quy đổi Band chuẩn IELTS, hoặc giáo viên có thể nhập Band trực tiếp (`0` = bỏ trống / 0 câu đúng).
               </p>
             </div>
@@ -228,13 +228,13 @@ export default function TeacherGradingModal({
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                   <Headphones className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Listening
                 </span>
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <span className="text-xs font-semibold text-[#475569] dark:text-slate-400">
                   Thang chuẩn: {expectedLBand} ({lRawClean}/{lTotal} câu)
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     Số câu đúng (/ {lTotal})
                   </label>
                   <input
@@ -249,7 +249,7 @@ export default function TeacherGradingModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     Listening Band (0 – 9.0)
                   </label>
                   <input
@@ -272,13 +272,13 @@ export default function TeacherGradingModal({
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                   <BookOpen className="w-4 h-4 text-[#1447E6] dark:text-blue-400" /> Reading
                 </span>
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <span className="text-xs font-semibold text-[#475569] dark:text-slate-400">
                   Thang chuẩn: {expectedRBand} ({rRawClean}/{rTotal} câu)
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     Số câu đúng (/ {rTotal})
                   </label>
                   <input
@@ -293,7 +293,7 @@ export default function TeacherGradingModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     Reading Band (0 – 9.0)
                   </label>
                   <input
@@ -315,16 +315,16 @@ export default function TeacherGradingModal({
 
         {/* Speaking Audio Recordings & 4-Criteria Score Editor */}
         {isSpeakingAttempt && (
-          <div className="bg-indigo-50/75 dark:bg-indigo-950/25 border border-[#570DF8]/30 rounded-2xl p-5 mb-6 space-y-4">
+          <div className="bg-indigo-50/75 dark:bg-indigo-950/25 border border-[#007A7A]/30 rounded-2xl p-5 mb-6 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                <Mic className="w-4 h-4 text-[#570DF8] dark:text-[#C4B5FD]" /> Bài Ghi Âm &amp; Điểm Speaking AI
+                <Mic className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Bài Ghi Âm &amp; Điểm Speaking AI
               </h4>
               <button
                 type="button"
                 onClick={() => handleTeacherAIGradeSpeaking?.(gradingAttempt)}
                 disabled={isGradingAI}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#570DF8] hover:bg-[#490AD2] disabled:opacity-55 text-white flex items-center gap-1.5 shadow-sm transition"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#007A7A] hover:bg-[#065B5B] disabled:opacity-55 text-white flex items-center gap-1.5 shadow-sm transition"
               >
                 {isGradingAI ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-300" />}
                 <span>{isGradingAI ? 'Đang nghe & chấm AI...' : '✨ AI Chấm Lại Từ Ghi Âm'}</span>
@@ -340,7 +340,7 @@ export default function TeacherGradingModal({
                 { key: 'speakingBand', label: 'Speaking Overall' }
               ].map(f => (
                 <div key={f.key}>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
                     {f.label}
                   </label>
                   <input
@@ -351,9 +351,9 @@ export default function TeacherGradingModal({
                     value={gradingScores[f.key] ?? 0}
                     onChange={e => setGradingScores(prev => ({ ...prev, [f.key]: e.target.value }))}
                     onBlur={() => handleBandBlur(f.key, true)}
-                    className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-[#570DF8] ${
+                    className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-[#007A7A] ${
                       f.key === 'speakingBand'
-                        ? 'border-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD]'
+                        ? 'border-[#007A7A] text-[#0F766E] dark:text-[#1EE1D6]'
                         : 'border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white'
                     }`}
                   />
@@ -368,17 +368,17 @@ export default function TeacherGradingModal({
                     <span className="font-bold text-slate-800 dark:text-slate-100">
                       Part {rec.part || 1} • Câu {idx + 1}: {rec.prompt}
                     </span>
-                    <span className="text-[11px] font-bold text-[#570DF8] dark:text-[#C4B5FD] shrink-0">
+                    <span className="text-xs font-bold text-[#0F766E] dark:text-[#1EE1D6] shrink-0">
                       {rec.durationSec || 0}s • Band {rec.band ?? '-'}
                     </span>
                   </div>
                   {rec.audioUrl ? (
                     <audio controls src={rec.audioUrl} className="w-full h-9" />
                   ) : (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">Chưa có file ghi âm cho câu này.</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 italic">Chưa có file ghi âm cho câu này.</p>
                   )}
                   {rec.transcript && (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-[#475569] dark:text-slate-400">
                       <strong>Transcript:</strong> {rec.transcript}
                     </p>
                   )}
@@ -429,7 +429,7 @@ export default function TeacherGradingModal({
               disabled={isGradingAI}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition shadow-sm ${
                 isGradingAI
-                  ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                  ? 'bg-slate-300 dark:bg-slate-700 text-[#475569] dark:text-slate-400 cursor-not-allowed'
                   : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
               }`}
             >
@@ -518,7 +518,7 @@ export default function TeacherGradingModal({
             )}
             {isSpeakingAttempt && (
               <span className="px-2.5 py-1 rounded-lg bg-slate-800 dark:bg-slate-900 border border-slate-700 font-semibold">
-                Speaking: <strong className="text-[#C4B5FD]">{previewSpeaking}</strong>
+                Speaking: <strong className="text-[#1EE1D6]">{previewSpeaking}</strong>
               </span>
             )}
           </div>

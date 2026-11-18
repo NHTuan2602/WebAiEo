@@ -35,7 +35,7 @@ export default function MailConfigModal({
   const [form, setForm] = useState({
     provider: initialProvider || 'apps_script',
     fromEmail: '',
-    fromName: 'IELTS Nha Trang — Ms. Như',
+    fromName: 'IELTS Nha Trang - Ms. Như',
     resendApiKey: '',
     brevoApiKey: '',
     appsScriptUrl: '',
@@ -75,7 +75,7 @@ export default function MailConfigModal({
           ...prev,
           provider: c.provider && c.provider !== 'none' ? c.provider : (initialProvider || 'apps_script'),
           fromEmail: c.fromEmail || '',
-          fromName: c.fromName || 'IELTS Nha Trang — Ms. Như',
+          fromName: c.fromName || 'IELTS Nha Trang - Ms. Như',
           smtpHost: c.smtpHost || 'smtp.gmail.com',
           smtpPort: Number(c.smtpPort) || 465,
           smtpSecure: c.smtpSecure !== false,
@@ -171,7 +171,7 @@ export default function MailConfigModal({
               <h3 id="mail-config-title" className="text-sm sm:text-base font-extrabold">
                 Cấu Hình Dịch Vụ Gửi Email OTP
               </h3>
-              <p className="text-[11px] text-slate-300">
+              <p className="text-xs text-slate-300">
                 Dùng Gmail (HTTPS Apps Script), Brevo / Resend API hoặc Gmail SMTP để gửi mã xác minh cho học viên.
               </p>
             </div>
@@ -194,7 +194,7 @@ export default function MailConfigModal({
                   : 'bg-amber-50 dark:bg-amber-500/15 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200'
               }`}>
                 {flags.configured ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-                <span>{flags.configured ? 'Hệ thống gửi Email OTP đang sẵn sàng.' : 'Chưa kích hoạt gửi Email OTP — Hãy điền cấu hình bên dưới.'}</span>
+                <span>{flags.configured ? 'Hệ thống gửi Email OTP đang sẵn sàng.' : 'Chưa kích hoạt gửi Email OTP - Hãy điền cấu hình bên dưới.'}</span>
               </div>
 
               {error && (
@@ -216,7 +216,7 @@ export default function MailConfigModal({
                       key={opt.id}
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, provider: opt.id }))}
-                      className={`py-2 px-2.5 rounded-xl text-[11px] font-extrabold border transition ${
+                      className={`py-2 px-2.5 rounded-xl text-xs font-extrabold border transition ${
                         form.provider === opt.id
                           ? 'bg-[#007A7A] text-white border-[#007A7A]'
                           : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
@@ -230,7 +230,7 @@ export default function MailConfigModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Tên hiển thị người gửi</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tên hiển thị người gửi</label>
                   <input
                     type="text"
                     value={form.fromName}
@@ -239,7 +239,7 @@ export default function MailConfigModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Email gửi (From)</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Email gửi (From)</label>
                   <input
                     type="email"
                     value={form.fromEmail}
@@ -252,7 +252,7 @@ export default function MailConfigModal({
 
               {form.provider === 'apps_script' && (
                 <div className="space-y-3 p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/35">
-                  <div className="space-y-1 text-[11px] text-slate-700 dark:text-slate-200 leading-relaxed">
+                  <div className="space-y-1 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
                     <p className="font-extrabold text-emerald-800 dark:text-emerald-300">
                       ✓ Chạy ổn định 100% trên Railway miễn phí &amp; gửi trực tiếp bằng wuyan2511@gmail.com
                     </p>
@@ -269,11 +269,11 @@ export default function MailConfigModal({
                       → bấm <b>Dự án mới (New project)</b>.
                     </p>
                     <p>2. Xóa hết code mẫu, dán đoạn code bên dưới → bấm <b>Deploy → New deployment → Web app</b> (<b>Execute as: Me</b>, <b>Who has access: Anyone</b>).</p>
-                    <p>3. Copy link <b>Web app URL</b> (dạng <code className="font-mono text-[10px]">https://script.google.com/macros/s/.../exec</code>) dán vào ô dưới đây:</p>
+                    <p>3. Copy link <b>Web app URL</b> (dạng <code className="font-mono text-xs">https://script.google.com/macros/s/.../exec</code>) dán vào ô dưới đây:</p>
                   </div>
 
                   <div className="relative">
-                    <pre className="p-2.5 rounded-xl bg-slate-900 text-slate-100 text-[10px] font-mono overflow-x-auto leading-relaxed">
+                    <pre className="p-2.5 rounded-xl bg-slate-900 text-slate-100 text-xs font-mono overflow-x-auto leading-relaxed">
                       {APPS_SCRIPT_CODE}
                     </pre>
                     <button
@@ -283,7 +283,7 @@ export default function MailConfigModal({
                         setCopiedScript(true);
                         setTimeout(() => setCopiedScript(false), 1800);
                       }}
-                      className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-[10px] font-bold inline-flex items-center gap-1"
+                      className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-bold inline-flex items-center gap-1"
                     >
                       {copiedScript ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
                       {copiedScript ? 'Đã chép' : 'Copy Code'}
@@ -291,8 +291,8 @@ export default function MailConfigModal({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Google Apps Script Web App URL {flags.hasAppsScriptUrl ? '(Đã lưu — để trống nếu giữ nguyên)' : '*'}
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Google Apps Script Web App URL {flags.hasAppsScriptUrl ? '(Đã lưu - để trống nếu giữ nguyên)' : '*'}
                     </label>
                     <input
                       type="url"
@@ -307,8 +307,8 @@ export default function MailConfigModal({
 
               {form.provider === 'resend' && (
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Resend API Key {flags.hasResendKey ? '(Đã lưu — để trống nếu giữ nguyên)' : '*'}
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Resend API Key {flags.hasResendKey ? '(Đã lưu - để trống nếu giữ nguyên)' : '*'}
                   </label>
                   <input
                     type="password"
@@ -322,8 +322,8 @@ export default function MailConfigModal({
 
               {form.provider === 'brevo' && (
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Brevo API Key {flags.hasBrevoKey ? '(Đã lưu — để trống nếu giữ nguyên)' : '*'}
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Brevo API Key {flags.hasBrevoKey ? '(Đã lưu - để trống nếu giữ nguyên)' : '*'}
                   </label>
                   <input
                     type="password"
@@ -337,11 +337,11 @@ export default function MailConfigModal({
 
               {form.provider === 'smtp' && (
                 <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/35 text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
+                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/35 text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
                     <b>Lưu ý Railway:</b> Gói Free/Trial/Hobby của Railway <b>chặn kết nối SMTP cổng 465 &amp; 587</b> nên bấm Gửi thử trên web sẽ báo lỗi. Hãy dùng tab <b>Gmail (HTTPS)</b> hoặc <b>Brevo API</b> ở trên để gửi qua cổng 443.
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
-                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
                       Cài đặt Gmail gửi mã xác minh OTP
                     </span>
                     <button
@@ -357,14 +357,14 @@ export default function MailConfigModal({
                           fromEmail: prev.fromEmail || 'wuyan2511@gmail.com'
                         }))
                       }
-                      className="px-2.5 py-1 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/35 text-[11px] font-extrabold transition"
+                      className="px-2.5 py-1 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/35 text-xs font-extrabold transition"
                     >
                       Điền nhanh wuyan2511@gmail.com
                     </button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="col-span-2">
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">SMTP Host</label>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">SMTP Host</label>
                       <input
                         type="text"
                         value={form.smtpHost}
@@ -374,7 +374,7 @@ export default function MailConfigModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Port</label>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Port</label>
                       <input
                         type="number"
                         value={form.smtpPort}
@@ -387,7 +387,7 @@ export default function MailConfigModal({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">Tài khoản Gmail / SMTP User</label>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Tài khoản Gmail / SMTP User</label>
                     <input
                       type="text"
                       value={form.smtpUser}
@@ -397,8 +397,8 @@ export default function MailConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Mật khẩu ứng dụng (App Password) {flags.hasSmtpPass ? '(Đã lưu — để trống nếu giữ nguyên)' : ''}
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Mật khẩu ứng dụng (App Password) {flags.hasSmtpPass ? '(Đã lưu - để trống nếu giữ nguyên)' : ''}
                     </label>
                     <div className="relative">
                       <input
@@ -417,13 +417,13 @@ export default function MailConfigModal({
                         {showSmtpPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
                     </div>
-                    <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    <p className="mt-1.5 text-xs text-[#475569] dark:text-slate-400 leading-relaxed">
                       Dùng <b>App Password 16 ký tự</b> (không dùng mật khẩu Gmail thường) tại{' '}
                       <a
                         href="https://myaccount.google.com/apppasswords"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-mono text-[10px] text-[#007A7A] dark:text-[#1EE1D6] underline hover:opacity-80"
+                        className="font-mono text-xs text-[#007A7A] dark:text-[#1EE1D6] underline hover:opacity-80"
                       >
                         myaccount.google.com/apppasswords
                       </a>{' '}
@@ -434,7 +434,7 @@ export default function MailConfigModal({
               )}
 
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">Gửi thư kiểm tra nhanh (sau khi Lưu)</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Gửi thư kiểm tra nhanh (sau khi Lưu)</label>
                 <div className="flex gap-2">
                   <input
                     type="email"

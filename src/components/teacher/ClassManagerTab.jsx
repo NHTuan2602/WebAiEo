@@ -148,13 +148,13 @@ export default function ClassManagerTab({
   return (
     <div className="space-y-5">
       {/* Top Banner */}
-      <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+      <div className="bg-white/95 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
         <div>
           <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
             <Users className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
             <span>Quản Lý Lớp Học &amp; Giao Bài Theo Lớp ({classList.length} lớp)</span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
             Tạo nhiều lớp riêng biệt, thêm/kích học viên nhanh chóng và giao đề/bài tập về nhà đúng cho từng lớp (học viên trong lớp nhận thông báo ngay).
           </p>
         </div>
@@ -188,7 +188,7 @@ export default function ClassManagerTab({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 Tên lớp học *
               </label>
               <input
@@ -201,7 +201,7 @@ export default function ClassManagerTab({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 Lịch học / Ghi chú ngắn (tùy chọn)
               </label>
               <input
@@ -216,13 +216,13 @@ export default function ClassManagerTab({
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Màu nhãn:</span>
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Màu nhãn:</span>
               {CLASS_COLORS.map(c => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setClassForm(prev => ({ ...prev, color: c.id }))}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5 transition ${
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 transition ${
                     classForm.color === c.id
                       ? `${c.chip} ring-2 ring-[#007A7A]/30`
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
@@ -245,12 +245,12 @@ export default function ClassManagerTab({
       )}
 
       {classList.length === 0 ? (
-        <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-3xl p-10 text-center space-y-3">
+        <div className="bg-white/95 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-10 text-center space-y-3">
           <Users className="w-10 h-10 mx-auto text-[#007A7A] dark:text-[#1EE1D6] opacity-80" />
           <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
             Chưa có lớp học nào được tạo
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-[#475569] dark:text-slate-400 max-w-md mx-auto leading-relaxed">
             Bạn có thể tạo 3 lớp hoặc nhiều hơn (vd: Foundation, Target 6.5, Intensive 7.5+) để gom học viên, giao bài tập riêng và chỉ gửi thông báo bài tập về nhà đúng cho học viên lớp đó.
           </p>
           <button
@@ -288,7 +288,7 @@ export default function ClassManagerTab({
                   className={`p-4 rounded-2xl border cursor-pointer transition space-y-2 ${
                     isSelected
                       ? 'bg-white dark:bg-slate-900 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/15 shadow-sm'
-                      : 'bg-white/85 dark:bg-slate-900/80 border-pink-200/80 dark:border-slate-800 hover:border-[#007A7A]/50'
+                      : 'bg-white/85 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 hover:border-[#007A7A]/50'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -300,7 +300,7 @@ export default function ClassManagerTab({
                         </h3>
                       </div>
                       {cls.description && (
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
+                        <p className="text-xs text-[#475569] dark:text-slate-400 mt-1 line-clamp-1">
                           {cls.description}
                         </p>
                       )}
@@ -329,7 +329,7 @@ export default function ClassManagerTab({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-[11px] font-bold">
+                  <div className="flex items-center gap-2 text-xs font-bold">
                     <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
                       {(cls.studentUsernames || []).length} học viên
                     </span>
@@ -346,14 +346,14 @@ export default function ClassManagerTab({
           {activeClass && (
             <div className="lg:col-span-8 space-y-5">
               {/* Members Management Card */}
-              <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-3xl p-5 space-y-4 shadow-xs">
+              <div className="bg-white/95 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 space-y-4 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
                       Thành Viên: {activeClass.name} ({(activeClass.studentUsernames || []).length})
                     </h3>
                     {activeClass.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{activeClass.description}</p>
+                      <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">{activeClass.description}</p>
                     )}
                   </div>
 
@@ -383,7 +383,7 @@ export default function ClassManagerTab({
                               setCheckedCandidates(addableCandidates.map(u => u.username));
                             }
                           }}
-                          className="text-[11px] font-extrabold text-indigo-700 dark:text-indigo-300 hover:underline"
+                          className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300 hover:underline"
                         >
                           {checkedCandidates.length === addableCandidates.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                         </button>
@@ -402,7 +402,7 @@ export default function ClassManagerTab({
                     </div>
 
                     {addableCandidates.length === 0 ? (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 italic py-2">
+                      <p className="text-xs text-[#475569] dark:text-slate-400 italic py-2">
                         Không còn học viên nào ngoài lớp này (tạo thêm tài khoản học viên ở tab 5. Tài Khoản Lớp nếu cần).
                       </p>
                     ) : (
@@ -430,10 +430,10 @@ export default function ClassManagerTab({
                                 }}
                                 className="w-4 h-4 accent-indigo-600 shrink-0"
                               />
-                              <UserAvatarBadge user={stu} sizeClass="w-7 h-7" textClass="text-[11px]" rounded="rounded-xl" />
+                              <UserAvatarBadge user={stu} sizeClass="w-7 h-7" textClass="text-xs" rounded="rounded-xl" />
                               <div className="min-w-0 flex-1">
                                 <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{stu.name}</p>
-                                <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate">@{stu.username}</p>
+                                <p className="text-xs font-mono text-[#475569] dark:text-slate-400 truncate">@{stu.username}</p>
                               </div>
                             </label>
                           );
@@ -469,7 +469,7 @@ export default function ClassManagerTab({
                 )}
 
                 {activeMembers.length === 0 ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 italic py-4 text-center">
+                  <p className="text-xs text-[#475569] dark:text-slate-400 italic py-4 text-center">
                     {(activeClass.studentUsernames || []).length === 0
                       ? 'Lớp chưa có học viên nào. Bấm "+ Thêm Học Viên Vào Lớp" ở trên để đưa học viên vào lớp.'
                       : 'Không tìm thấy học viên khớp với từ khóa.'}
@@ -485,7 +485,7 @@ export default function ClassManagerTab({
                           <UserAvatarBadge user={stu} sizeClass="w-8 h-8" textClass="text-xs" rounded="rounded-xl" />
                           <div className="min-w-0">
                             <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{stu.name}</p>
-                            <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                            <p className="text-xs font-mono text-[#475569] dark:text-slate-400 truncate">
                               @{stu.username} · Target Band {stu.targetBand || 7.0}
                             </p>
                           </div>
@@ -495,14 +495,14 @@ export default function ClassManagerTab({
                           <button
                             type="button"
                             onClick={() => openMemberProfile?.(stu.username)}
-                            className="px-2.5 py-1.5 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] text-[11px] font-bold hover:opacity-90"
+                            className="px-2.5 py-1.5 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold hover:opacity-90"
                           >
                             Hồ sơ
                           </button>
                           <button
                             type="button"
                             onClick={() => onUpdateClassMembers?.(activeClass.id, 'remove', [stu.username])}
-                            className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-[11px] font-bold inline-flex items-center gap-1 hover:bg-rose-100 dark:hover:bg-rose-500/25"
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-bold inline-flex items-center gap-1 hover:bg-rose-100 dark:hover:bg-rose-500/25"
                             title="Kích học sinh khỏi lớp này"
                           >
                             <UserMinus className="w-3.5 h-3.5" /> Kích khỏi lớp
@@ -515,13 +515,13 @@ export default function ClassManagerTab({
               </div>
 
               {/* Homework & Tests Assigned to This Class */}
-              <div className="bg-white/95 dark:bg-slate-900 border border-pink-200/80 dark:border-slate-800 rounded-3xl p-5 space-y-4 shadow-xs">
+              <div className="bg-white/95 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 space-y-4 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
                       Bài Tập &amp; Đề Thi Của Lớp: {activeClass.name} ({classTests.length})
                     </h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                       Khi giao đề ở chế độ Công khai cho lớp này, chỉ học viên trong <b>{activeClass.name}</b> mới nhìn thấy bài &amp; nhận thông báo bài tập về nhà.
                     </p>
                   </div>
@@ -539,7 +539,7 @@ export default function ClassManagerTab({
                   <button
                     type="button"
                     onClick={() => onCreateSkillForClass?.(activeClass.id, 'speaking')}
-                    className="px-3 py-2 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-xs"
+                    className="px-3 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-xs"
                   >
                     <Mic className="w-3.5 h-3.5" /> + Bài Tập Speaking AI
                   </button>
@@ -599,7 +599,7 @@ export default function ClassManagerTab({
                 )}
 
                 {classTests.length === 0 ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 italic text-center py-3">
+                  <p className="text-xs text-[#475569] dark:text-slate-400 italic text-center py-3">
                     Chưa có đề thi/bài tập nào được gán riêng cho {activeClass.name}.
                   </p>
                 ) : (
@@ -617,7 +617,7 @@ export default function ClassManagerTab({
                                 {t.title}
                               </span>
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                                className={`text-xs font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
                                   isPrivate
                                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
                                     : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
@@ -632,7 +632,7 @@ export default function ClassManagerTab({
                             <button
                               type="button"
                               onClick={() => openExamBuilder?.(t)}
-                              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:border-[#007A7A]"
+                              className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-[#007A7A]"
                             >
                               Sửa bài
                             </button>
@@ -642,7 +642,7 @@ export default function ClassManagerTab({
                                 const remaining = (t.assignedClassIds || []).filter(cid => cid !== activeClass.id);
                                 onAssignTestClasses?.(t.id, remaining, { notify: false, makePrivateIfEmpty: true });
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[11px] font-bold hover:bg-rose-100"
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100"
                             >
                               Gỡ khỏi lớp
                             </button>

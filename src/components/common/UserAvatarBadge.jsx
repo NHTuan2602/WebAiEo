@@ -24,10 +24,10 @@ export default function UserAvatarBadge({
     );
   }
   const fallbackGradient = user?.isSuperAdmin
-    ? 'bg-gradient-to-tr from-purple-600 to-amber-500'
+    ? 'bg-[#334155]'
     : user?.role === 'teacher'
-    ? 'bg-gradient-to-tr from-amber-500 to-orange-500'
-    : 'bg-gradient-to-tr from-[#007A7A] to-teal-500';
+    ? 'bg-[#B45309]'
+    : 'bg-[#047857]';
   return (
     <div className={`${sizeClass} ${rounded} ${fallbackGradient} flex items-center justify-center font-black ${textClass} text-white uppercase shadow-sm shrink-0 ${frameClass} ${auraCls} ${className}`}>
       {initial}

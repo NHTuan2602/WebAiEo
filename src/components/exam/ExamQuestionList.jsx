@@ -43,7 +43,7 @@ export default function ExamQuestionList({
             e.stopPropagation();
             onSwitchScope?.(q.trackIdx);
           }}
-          className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#262626] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#3A3A3A] hover:border-[#2563EB]"
+          className="shrink-0 text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#262626] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#3A3A3A] hover:border-[#2563EB]"
         >
           {scopeLabelPrefix || 'Part'} {q.trackIdx + 1}
         </button>
@@ -57,7 +57,7 @@ export default function ExamQuestionList({
             e.stopPropagation();
             onSwitchScope?.(q.passageIdx);
           }}
-          className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#262626] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#3A3A3A] hover:border-[#2563EB]"
+          className="shrink-0 text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#262626] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#3A3A3A] hover:border-[#2563EB]"
         >
           {scopeLabelPrefix || 'Passage'} {q.passageIdx + 1}
         </button>
@@ -213,7 +213,7 @@ export default function ExamQuestionList({
             onClick={() => onSelectQuestion?.(q)}
             className={`py-3 transition ${
               isActive
-                ? 'bg-pink-100/45 dark:bg-[#1E232D]/70 rounded-md px-2.5 -mx-2.5'
+                ? 'bg-[#F1F5F9]/45 dark:bg-[#1E232D]/70 rounded-md px-2.5 -mx-2.5'
                 : 'px-0'
             }`}
           >
@@ -231,12 +231,12 @@ export default function ExamQuestionList({
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {q.type && q.type !== 'mcq' && q.type !== 'fill' && q.type !== 'tfng' && (
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
+                      <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
                         {typeMeta.shortLabel}
                       </span>
                     )}
                     {wordLimitHint && (
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                      <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
                         {wordLimitHint}
                       </span>
                     )}
@@ -276,7 +276,7 @@ export default function ExamQuestionList({
                       className={`flex items-start gap-2.5 px-2 py-1 rounded-[4px] cursor-pointer transition ${
                         isSelected
                           ? 'bg-[#DBEAFE]/80 dark:bg-[#2563EB]/25 text-[#111827] dark:text-white font-semibold'
-                          : 'text-[#1F2937] dark:text-[#E5E7EB] hover:bg-pink-100/50 dark:hover:bg-[#232323]'
+                          : 'text-[#1F2937] dark:text-[#E5E7EB] hover:bg-[#F1F5F9]/50 dark:hover:bg-[#232323]'
                       }`}
                     >
                       <input

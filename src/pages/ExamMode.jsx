@@ -103,7 +103,7 @@ export default function ExamMode({
   const activeTest = tests.find(t => t.id === selectedTestId);
   if (!activeTest) {
     return (
-      <div className="min-h-screen bg-[#FDECF2] dark:bg-[#121212] flex items-center justify-center p-6 font-exam">
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#121212] flex items-center justify-center p-6 font-exam">
         <div className="max-w-md w-full bg-white dark:bg-[#1B1B1B] border border-[#D5D9E0] dark:border-[#333333] rounded-2xl p-6 text-center shadow-xl">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
             <BookOpen className="w-6 h-6" />
@@ -181,7 +181,7 @@ export default function ExamMode({
     const remSec = safeRem % 60;
     const currLabel = skillMeta[examState.skill]?.label || examState.skill;
     showToast?.(
-      `Lưu ý: Phần ${currLabel} vẫn còn ${remMin} phút ${remSec.toString().padStart(2, '0')} giây — nếu chuyển sang kỹ năng mới sẽ KHÔNG thể quay lại kỹ năng cũ!`,
+      `Lưu ý: Phần ${currLabel} vẫn còn ${remMin} phút ${remSec.toString().padStart(2, '0')} giây - nếu chuyển sang kỹ năng mới sẽ KHÔNG thể quay lại kỹ năng cũ!`,
       'warning'
     );
     setEarlyNextConfirmOpen(true);
@@ -418,15 +418,15 @@ export default function ExamMode({
     <div
       translate="no"
       onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
-      className="min-h-screen bg-[#FDECF2] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam notranslate"
+      className="min-h-screen bg-[#F8FAFC] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam notranslate"
     >
       {/* Top Computer-Delivered Header (matches Real IELTS bar) */}
-      <header className="bg-[#FDF2F6] dark:bg-[#161616] text-[#111827] dark:text-white px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-pink-200 dark:border-[#2C2C2C] sticky top-0 z-50">
+      <header className="bg-white dark:bg-[#161616] text-[#111827] dark:text-white px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-slate-200 dark:border-[#2C2C2C] sticky top-0 z-50">
         {/* Left: Golden IELTS emblem + Test Title + Minutes Remaining */}
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-black text-[11px] flex items-center justify-center shrink-0 shadow-sm ring-2 ring-amber-400/30"
-            title="Luyện Thi IELTS Nha Trang — IELTS with Ms. Như"
+            className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 shadow-sm ring-2 ring-amber-400/30"
+            title="Luyện Thi IELTS Nha Trang - IELTS with Ms. Như"
           >
             IELTS
           </div>
@@ -444,19 +444,19 @@ export default function ExamMode({
                 className={`inline-flex items-center gap-1 font-mono font-bold px-1.5 py-0.5 rounded ${
                   examState.timeRemaining <= 60
                     ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse'
-                    : 'bg-pink-100/80 dark:bg-[#242424] text-[#111827] dark:text-[#E5E7EB]'
+                    : 'bg-[#F1F5F9] dark:bg-[#242424] text-[#111827] dark:text-[#E5E7EB]'
                 }`}
               >
                 <Clock className="w-3 h-3 text-amber-500" />
                 {formatTime(examState.timeRemaining)}
               </span>
               {cfg.scheduleMode !== 'flexible' && cfg.dueAt && (
-                <span className="hidden lg:inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                <span className="hidden lg:inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
                   Hạn: {formatViDateTime(cfg.dueAt)}
                 </span>
               )}
               {examState.skill === 'listening' && isPlayingAudio && (
-                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-[#111827] dark:text-amber-300 ml-1">
+                <span className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-[#111827] dark:text-amber-300 ml-1">
                   <Volume2 className="w-3.5 h-3.5" /> Audio is playing
                 </span>
               )}
@@ -549,7 +549,7 @@ export default function ExamMode({
           >
             <Menu className="w-4 h-4" />
             {(examState.highlights.length + examState.notes.length + bookmarkedList.length > 0) && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-xs font-black flex items-center justify-center">
                 {examState.highlights.length + examState.notes.length + bookmarkedList.length}
               </span>
             )}
@@ -573,7 +573,7 @@ export default function ExamMode({
             </button>
           ) : (
             <span
-              className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30 items-center gap-1 whitespace-nowrap"
+              className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30 items-center gap-1 whitespace-nowrap"
               title="Bài thi thật: thí sinh không được phép tạm thoát khi chưa nộp bài"
             >
               <Lock className="w-3 h-3" />
@@ -626,7 +626,7 @@ export default function ExamMode({
                   visitedSkills: Array.from(new Set([...(prev.visitedSkills || [prev.skill]), sId]))
                 }));
               }}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1 whitespace-nowrap ${
+              className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 whitespace-nowrap ${
                 isCurrent
                   ? 'bg-[#2563EB] text-white'
                   : isDone
@@ -664,7 +664,7 @@ export default function ExamMode({
 
             {!showInlineNoteForm ? (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-neutral-300 font-semibold">Highlight:</span>
+                <span className="text-xs text-neutral-300 font-semibold">Highlight:</span>
                 <button
                   type="button"
                   onClick={() => addHighlight('#fef08a')}
@@ -686,7 +686,7 @@ export default function ExamMode({
                 <button
                   type="button"
                   onClick={() => setShowInlineNoteForm(true)}
-                  className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-[11px] font-bold transition"
+                  className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-bold transition"
                 >
                   <MessageSquare className="w-3 h-3" /> Ghi Chú
                 </button>
@@ -697,7 +697,7 @@ export default function ExamMode({
                       onCopyInternalText(selectedPassageText);
                       handleCancelInlineNote();
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
                     title="Sao chép đoạn nội dung trong bài thi (chỉ dán được trong bài thi)"
                   >
                     <Copy className="w-3 h-3" /> Sao chép
@@ -724,14 +724,14 @@ export default function ExamMode({
                 />
                 <button
                   type="submit"
-                  className="px-2.5 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-[11px] font-bold"
+                  className="px-2.5 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-bold"
                 >
                   Lưu
                 </button>
                 <button
                   type="button"
                   onClick={handleCancelInlineNote}
-                  className="px-2 h-7 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-[11px] font-semibold"
+                  className="px-2 h-7 rounded-lg bg-neutral-700 hover:bg-neutral-600 text-xs font-semibold"
                 >
                   Hủy
                 </button>
@@ -744,7 +744,7 @@ export default function ExamMode({
       {/* Main Computer-Delivered Workspace (Full width left-aligned matching Real IELTS) */}
       <main className="flex-1 w-full px-4 sm:px-6 pt-3 pb-16 flex flex-col relative">
         {/* Part / Passage / Task Banner Strip */}
-        <div className="rounded-[4px] border border-pink-200 dark:border-[#363636] bg-[#F8DCE7] dark:bg-[#242424] px-4 sm:px-5 py-2.5 mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-[4px] border border-slate-200 dark:border-[#363636] bg-[#F1F5F9] dark:bg-[#242424] px-4 sm:px-5 py-2.5 mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[14px] sm:text-[15px] font-bold uppercase tracking-wide text-[#111827] dark:text-white">
               {activePartObj?.label || (examState.skill === 'writing' ? `TASK ${activeWritingTask + 1}` : 'PART 1')}
@@ -798,7 +798,7 @@ export default function ExamMode({
                     style={{ width: `${audioPercent}%` }}
                   />
                 </div>
-                <span className="text-[11px] font-mono text-slate-600 dark:text-neutral-300 tabular-nums">
+                <span className="text-xs font-mono text-slate-600 dark:text-neutral-300 tabular-nums">
                   {audioProgress.duration > 0
                     ? `${formatTime(audioProgress.currentTime)} / ${formatTime(audioProgress.duration)}`
                     : `${examState.audioPlays?.[activeTrackPlayKey] || 0}/${activeTest.maxAudioPlays}`}
@@ -811,7 +811,7 @@ export default function ExamMode({
               <button
                 type="button"
                 onClick={() => setExamState(prev => ({ ...prev, showAllReadingQs: !prev.showAllReadingQs }))}
-                className="text-[11px] font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
+                className="text-xs font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
               >
                 {examState.showAllReadingQs ? `Chỉ xem Passage ${safePassageIdx + 1}` : `Xem tất cả (${allReadingQs.length})`}
               </button>
@@ -820,7 +820,7 @@ export default function ExamMode({
               <button
                 type="button"
                 onClick={() => setExamState(prev => ({ ...prev, showAllListeningQs: !prev.showAllListeningQs }))}
-                className="text-[11px] font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
+                className="text-xs font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
               >
                 {examState.showAllListeningQs ? `Chỉ xem Part ${safeTrackIdx + 1}` : `Xem tất cả (${allListeningQs.length})`}
               </button>
@@ -832,7 +832,7 @@ export default function ExamMode({
               onClick={() =>
                 setFontSizeMode(prev => (prev === 'regular' ? 'large' : prev === 'large' ? 'xl' : 'regular'))
               }
-              className="text-[11px] font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] flex items-center gap-1 transition"
+              className="text-xs font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] flex items-center gap-1 transition"
               title="Đổi cỡ chữ đề thi"
             >
               <Type className="w-3.5 h-3.5" />
@@ -849,7 +849,7 @@ export default function ExamMode({
             splitPercent={splitPercent}
             onChangeSplit={setSplitPercent}
             left={
-              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
                   <h3 className="font-extrabold text-[#111827] dark:text-white text-base sm:text-[17px] leading-snug">
                     {activePassage?.title || `Passage ${safePassageIdx + 1}`}
@@ -872,7 +872,7 @@ export default function ExamMode({
                       <button
                         type="button"
                         onClick={() => setZoomedReadingImg(activePassage.imageUrl)}
-                        className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] hover:underline"
+                        className="mt-2 mx-auto flex items-center gap-1.5 text-xs font-bold text-[#2563EB] hover:underline"
                       >
                         <Eye className="w-3.5 h-3.5" /> Phóng to ảnh minh họa
                       </button>
@@ -920,7 +920,7 @@ export default function ExamMode({
               </div>
             }
             right={
-              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
                   {activeReadingCloze.trim() && (
                     <ClozeNoteSheet
@@ -996,7 +996,7 @@ export default function ExamMode({
               splitPercent={splitPercent}
               onChangeSplit={setSplitPercent}
               left={
-                <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
                   <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
                     <h3 className="font-extrabold text-[#111827] dark:text-white text-base">
                       {activeTrack?.title || `Part ${safeTrackIdx + 1}`}
@@ -1018,7 +1018,7 @@ export default function ExamMode({
                         <button
                           type="button"
                           onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
-                          className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] hover:underline"
+                          className="mt-2 mx-auto flex items-center gap-1.5 text-xs font-bold text-[#2563EB] hover:underline"
                         >
                           <Eye className="w-3.5 h-3.5" /> Phóng to bản đồ / sơ đồ
                         </button>
@@ -1029,7 +1029,7 @@ export default function ExamMode({
                 </div>
               }
               right={
-                <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
+                <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
                     {activeListeningCloze.trim() && (
                       <ClozeNoteSheet
@@ -1160,7 +1160,7 @@ export default function ExamMode({
             splitPercent={splitPercent}
             onChangeSplit={setSplitPercent}
             left={
-              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden">
+              <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div
                   onMouseUp={handlePassageTextSelect}
                   data-exam-copy-source="true"
@@ -1195,7 +1195,7 @@ export default function ExamMode({
                       <button
                         type="button"
                         onClick={() => setZoomedReadingImg(currentWritingCfg.imageUrl)}
-                        className="mt-2 mx-auto flex items-center gap-1.5 text-[11px] font-bold text-[#2563EB] hover:underline"
+                        className="mt-2 mx-auto flex items-center gap-1.5 text-xs font-bold text-[#2563EB] hover:underline"
                       >
                         <Eye className="w-3.5 h-3.5" /> Phóng to biểu đồ / hình minh họa
                       </button>
@@ -1205,7 +1205,7 @@ export default function ExamMode({
               </div>
             }
             right={
-              <div className="h-full rounded-lg border border-pink-200/90 dark:border-[#323232] bg-[#FFF5F8] dark:bg-[#141414] flex flex-col overflow-hidden p-4 sm:p-5">
+              <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm sm:text-base font-extrabold text-[#111827] dark:text-white">
                     Your answer
@@ -1251,7 +1251,7 @@ export default function ExamMode({
                     <span className="text-slate-500 dark:text-neutral-400 font-semibold">Words Count:</span>
                     <span className="font-mono font-extrabold text-sm">{currentWritingWords}</span>
                   </div>
-                  <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+                  <span className="text-xs text-slate-400 dark:text-neutral-500">
                     Tự động lưu nháp liên tục
                   </span>
                 </div>
@@ -1282,7 +1282,7 @@ export default function ExamMode({
       </main>
 
       {/* Bottom Sticky Part & Question Palette Bar (matches Screenshots 1–5) */}
-      <footer className="bg-[#FDF2F6] dark:bg-[#141414] border-t border-pink-200 dark:border-[#2C2C2C] px-4 sm:px-6 py-2 sticky bottom-0 z-40">
+      <footer className="bg-white dark:bg-[#141414] border-t border-slate-200 dark:border-[#2C2C2C] px-4 sm:px-6 py-2 sticky bottom-0 z-40">
         <div className="w-full flex items-center justify-between gap-3">
           <div className="flex items-center justify-start sm:justify-center gap-4 overflow-x-auto cd-exam-scroll flex-1 py-0.5">
             {navParts.map(part => {
@@ -1303,7 +1303,7 @@ export default function ExamMode({
                     className="shrink-0 px-3 py-1.5 rounded-md border border-transparent hover:border-[#CBD5E1] dark:hover:border-[#3A3A3A] text-xs font-extrabold text-[#111827] dark:text-[#E5E7EB] hover:bg-slate-100 dark:hover:bg-[#222222] transition flex items-center gap-2 whitespace-nowrap"
                   >
                     <span>{part.label}</span>
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+                    <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">
                       {answeredInPart} of {part.questions.length}
                     </span>
                   </button>
@@ -1339,7 +1339,7 @@ export default function ExamMode({
                             if (examState.skill !== 'writing') scrollToQuestionOrBlank(q, qIdx);
                           }}
                           title={`Câu ${displayNum}${isAnswered ? ' • Đã trả lời' : ''}${isFlagged ? ' • Đã đánh dấu' : ''}`}
-                          className={`relative min-w-[27px] h-7 px-1.5 rounded-[4px] text-[11px] font-extrabold transition flex items-center justify-center border ${
+                          className={`relative min-w-[27px] h-7 px-1.5 rounded-[4px] text-xs font-extrabold transition flex items-center justify-center border ${
                             isFocused
                               ? 'bg-white dark:bg-[#2A2A2A] text-[#111827] dark:text-white border-[#2563EB] dark:border-white ring-1 ring-[#2563EB] dark:ring-white/80'
                               : isAnswered
@@ -1407,7 +1407,7 @@ export default function ExamMode({
             <div className="flex-1 overflow-y-auto cd-exam-scroll p-5 space-y-5 text-xs">
               {/* Display Settings (Contrast + Font Size) */}
               <div className="space-y-3">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
                   Hiển Thị Màn Hình
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -1455,7 +1455,7 @@ export default function ExamMode({
 
               {/* Bookmarked Questions */}
               <div className="space-y-2">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400 flex items-center justify-between">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400 flex items-center justify-between">
                   <span>Câu Đánh Dấu Xem Lại ({bookmarkedList.length})</span>
                 </p>
                 {bookmarkedList.length === 0 ? (
@@ -1505,7 +1505,7 @@ export default function ExamMode({
 
               {/* Saved Highlights & Notes */}
               <div className="space-y-2">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
                   Highlight &amp; Ghi Chú ({examState.highlights.length + examState.notes.length})
                 </p>
                 {examState.highlights.length === 0 && examState.notes.length === 0 ? (
@@ -1548,7 +1548,7 @@ export default function ExamMode({
                         <div className="space-y-0.5 min-w-0">
                           <p className="font-bold text-[#1E3A8A] dark:text-blue-200">📝 {n.note}</p>
                           {n.text && (
-                            <p className="text-[11px] italic text-slate-500 dark:text-neutral-400 truncate">
+                            <p className="text-xs italic text-slate-500 dark:text-neutral-400 truncate">
                               “{n.text}”
                             </p>
                           )}
@@ -1573,7 +1573,7 @@ export default function ExamMode({
               </div>
 
               {/* Official CD Exam Tips */}
-              <div className="p-3.5 rounded-lg border border-[#E5E7EB] dark:border-[#2E2E2E] bg-slate-50 dark:bg-[#222222] space-y-1.5 text-[11px] leading-relaxed text-slate-600 dark:text-neutral-300">
+              <div className="p-3.5 rounded-lg border border-[#E5E7EB] dark:border-[#2E2E2E] bg-slate-50 dark:bg-[#222222] space-y-1.5 text-xs leading-relaxed text-slate-600 dark:text-neutral-300">
                 <p className="font-extrabold text-[#111827] dark:text-white">Lưu Ý Giao Diện Thi IELTS:</p>
                 <p>• Kéo thanh ↔ ở giữa màn hình để mở rộng khung Bài đọc / Biểu đồ hoặc khung Câu hỏi.</p>
                 <p>• Bôi đen từ/câu trong Passage để Highlight vàng/xanh hoặc lưu ghi chú.</p>
@@ -1599,7 +1599,7 @@ export default function ExamMode({
                   <span>{isTeacherUser ? 'Thoát Xem Trước' : 'Lưu Nháp & Thoát'}</span>
                 </button>
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 dark:text-rose-300">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-300">
                   <Lock className="w-3.5 h-3.5 shrink-0" />
                   <span>Thi thật: không cho phép tạm thoát</span>
                 </span>
@@ -1828,23 +1828,23 @@ export default function ExamMode({
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Listening</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Listening</p>
                   <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
                     {answeredListeningCount}/{allListeningQs.length} câu
                   </p>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Reading</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Reading</p>
                   <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
                     {answeredReadingCount}/{allReadingQs.length} câu
                   </p>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 1</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 1</p>
                   <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w1Words} từ</p>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 2</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 2</p>
                   <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w2Words} từ</p>
                 </div>
               </div>
@@ -1933,7 +1933,7 @@ export default function ExamMode({
               <div className="p-5 sm:p-6 space-y-3.5">
                 <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/35 border border-blue-200 dark:border-blue-800 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
                       Thời gian còn lại phần {currMeta.label}
                     </p>
                     <p className="text-xs text-blue-600 dark:text-blue-200 mt-0.5">

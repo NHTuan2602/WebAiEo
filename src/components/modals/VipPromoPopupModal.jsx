@@ -56,12 +56,12 @@ export default function VipPromoPopupModal({
           >
             <X className="w-4 h-4" />
           </button>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-xs text-[11px] font-black uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-xs text-xs font-black uppercase tracking-wider mb-2">
             <Sparkles className="w-3.5 h-3.5 text-amber-200" /> Đặc Quyền Thành Viên Tháng
           </div>
           <h3 id="vip-promo-popup-title" className="text-lg sm:text-xl font-black leading-snug pr-8 flex items-center gap-2">
             <Crown className="w-6 h-6 text-amber-200 shrink-0" />
-            <span>Nâng Cấp Gói Ai Eo VIP — Chỉ {vipPriceLabel}/Tháng</span>
+            <span>Nâng Cấp Gói Ai Eo VIP - Chỉ {vipPriceLabel}/Tháng</span>
           </h3>
           <p className="text-xs text-rose-50/95 mt-1 leading-relaxed">
             Mở khóa toàn bộ đặc quyền nổi bật cho tài khoản <strong>{currentUser.name || currentUser.username}</strong> ngay hôm nay!
@@ -78,13 +78,13 @@ export default function VipPromoPopupModal({
                 <CheckCircle2 className="w-4 h-4 text-rose-600 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold text-slate-900 dark:text-white">{perk.title}</p>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{perk.desc}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{perk.desc}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/35 text-[11px] font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
+          <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
             <Gamepad2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
             <span>
               Mẹo nhỏ: Nếu chỉ muốn chơi nhanh với bạn bè, bạn có thể mua vé lẻ <strong>{roomTicketLabel}/lần tạo phòng</strong>! Kho Bài Tập 4 Kỹ Năng luôn miễn phí 100%.

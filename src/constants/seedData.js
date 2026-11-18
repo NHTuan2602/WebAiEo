@@ -836,7 +836,7 @@ export const DEFAULT_TESTS = [
   {
     id: 'test-ielts-cam-18-01',
     seedTag: 'cam18_t1_v1',
-    title: 'IELTS Academic Mock Test 02 — Cambridge Standard (Đục Lỗ + Full 3 Skills)',
+    title: 'IELTS Academic Mock Test 02 - Cambridge Standard (Đục Lỗ + Full 3 Skills)',
     description:
       'Đề thi IELTS Academic hoàn chỉnh chuẩn phòng thi Luyện thi IELTS Nha Trang (Ms. Như): Listening 3 Parts (Note Completion đục lỗ Q1–Q10, Bảo tàng Hàng hải Q11–Q15, Nghiên cứu đất đô thị Q16–Q20 có giọng đọc tiếng Anh), Reading 2 Academic Passages (16 câu Đục lỗ, TFNG, MCQ) và Writing Task 1 (kèm biểu đồ) + Task 2.',
     createdAt: '2026-11-14',
@@ -1025,11 +1025,11 @@ Write ONE WORD ONLY for each answer.
       passageTitle: 'Passage 1: How Ancient Salt Shaped Trade and Empire',
       passageText: `A For thousands of years before artificial cooling transformed kitchens and shipping, sodium chloride was far more than a culinary seasoning: it functioned as the world’s premier natural preservative. By drawing moisture out of beef, pork, and ocean harvests, curing prevented lethal bacterial decay during winter scarcity and sustained crews across multi-month maritime voyages.
 
-B Because fertile coastal pans and rock-salt deposits were unevenly scattered across continents, salt quickly forged long-distance highways. In Roman Italy, the Via Salaria—one of the peninsula’s oldest engineered roads—carried coastal salt inland toward upland towns. Historians frequently debate whether the modern word “salary” grew directly out of salt stipends; archaeological pay ledgers confirm legionaries were primarily paid in minted silver coins alongside occasional salt rations. Across North Africa, Saharan mines at Taghaza supplied immense rectangular slabs hauled south by camel caravans along desert tracks to Timbuktu, where scarcity made salt slabs rival equal weights of gold dust in regional barter.
+B Because fertile coastal pans and rock-salt deposits were unevenly scattered across continents, salt quickly forged long-distance highways. In Roman Italy, the Via Salaria - one of the peninsula’s oldest engineered roads - carried coastal salt inland toward upland towns. Historians frequently debate whether the modern word “salary” grew directly out of salt stipends; archaeological pay ledgers confirm legionaries were primarily paid in minted silver coins alongside occasional salt rations. Across North Africa, Saharan mines at Taghaza supplied immense rectangular slabs hauled south by camel caravans along desert tracks to Timbuktu, where scarcity made salt slabs rival equal weights of gold dust in regional barter.
 
-C Inevitably, anything indispensable became a tempting fiscal target for monarchs and colonial empires. Medieval French kings imposed the notorious gabelle, forcing citizens above age eight to purchase fixed quotas of heavily taxed state salt—a grievance frequently cited in petitions before the 1789 Revolution. More than a century later, in 1930, Mahatma Gandhi selected British salt monopolies as the symbolic focal point of a 390-kilometre civil disobedience march to the Arabian Sea, demonstrating how an everyday mineral could mobilise political solidarity across social classes.
+C Inevitably, anything indispensable became a tempting fiscal target for monarchs and colonial empires. Medieval French kings imposed the notorious gabelle, forcing citizens above age eight to purchase fixed quotas of heavily taxed state salt - a grievance frequently cited in petitions before the 1789 Revolution. More than a century later, in 1930, Mahatma Gandhi selected British salt monopolies as the symbolic focal point of a 390-kilometre civil disobedience march to the Arabian Sea, demonstrating how an everyday mineral could mobilise political solidarity across social classes.
 
-D Everything changed once household iceboxes gave way to electric refrigeration in the early twentieth century. Salt lost its historical monopoly over food preservation, yet modern industry consumes unprecedented tonnages today—over half of global production now feeds chemical manufacturing, producing chlorine, caustic soda, and glass rather than dining-table shakers.`,
+D Everything changed once household iceboxes gave way to electric refrigeration in the early twentieth century. Salt lost its historical monopoly over food preservation, yet modern industry consumes unprecedented tonnages today - over half of global production now feeds chemical manufacturing, producing chlorine, caustic soda, and glass rather than dining-table shakers.`,
       clozeText: `Questions 1-5
 Complete the summary below.
 Choose NO MORE THAN TWO WORDS from the passage for each answer.
@@ -1048,11 +1048,11 @@ Choose NO MORE THAN TWO WORDS from the passage for each answer.
           imageFileName: '',
           passageText: `A For thousands of years before artificial cooling transformed kitchens and shipping, sodium chloride was far more than a culinary seasoning: it functioned as the world’s premier natural preservative. By drawing moisture out of beef, pork, and ocean harvests, curing prevented lethal bacterial decay during winter scarcity and sustained crews across multi-month maritime voyages.
 
-B Because fertile coastal pans and rock-salt deposits were unevenly scattered across continents, salt quickly forged long-distance highways. In Roman Italy, the Via Salaria—one of the peninsula’s oldest engineered roads—carried coastal salt inland toward upland towns. Historians frequently debate whether the modern word “salary” grew directly out of salt stipends; archaeological pay ledgers confirm legionaries were primarily paid in minted silver coins alongside occasional salt rations. Across North Africa, Saharan mines at Taghaza supplied immense rectangular slabs hauled south by camel caravans along desert tracks to Timbuktu, where scarcity made salt slabs rival equal weights of gold dust in regional barter.
+B Because fertile coastal pans and rock-salt deposits were unevenly scattered across continents, salt quickly forged long-distance highways. In Roman Italy, the Via Salaria - one of the peninsula’s oldest engineered roads - carried coastal salt inland toward upland towns. Historians frequently debate whether the modern word “salary” grew directly out of salt stipends; archaeological pay ledgers confirm legionaries were primarily paid in minted silver coins alongside occasional salt rations. Across North Africa, Saharan mines at Taghaza supplied immense rectangular slabs hauled south by camel caravans along desert tracks to Timbuktu, where scarcity made salt slabs rival equal weights of gold dust in regional barter.
 
-C Inevitably, anything indispensable became a tempting fiscal target for monarchs and colonial empires. Medieval French kings imposed the notorious gabelle, forcing citizens above age eight to purchase fixed quotas of heavily taxed state salt—a grievance frequently cited in petitions before the 1789 Revolution. More than a century later, in 1930, Mahatma Gandhi selected British salt monopolies as the symbolic focal point of a 390-kilometre civil disobedience march to the Arabian Sea, demonstrating how an everyday mineral could mobilise political solidarity across social classes.
+C Inevitably, anything indispensable became a tempting fiscal target for monarchs and colonial empires. Medieval French kings imposed the notorious gabelle, forcing citizens above age eight to purchase fixed quotas of heavily taxed state salt - a grievance frequently cited in petitions before the 1789 Revolution. More than a century later, in 1930, Mahatma Gandhi selected British salt monopolies as the symbolic focal point of a 390-kilometre civil disobedience march to the Arabian Sea, demonstrating how an everyday mineral could mobilise political solidarity across social classes.
 
-D Everything changed once household iceboxes gave way to electric refrigeration in the early twentieth century. Salt lost its historical monopoly over food preservation, yet modern industry consumes unprecedented tonnages today—over half of global production now feeds chemical manufacturing, producing chlorine, caustic soda, and glass rather than dining-table shakers.`,
+D Everything changed once household iceboxes gave way to electric refrigeration in the early twentieth century. Salt lost its historical monopoly over food preservation, yet modern industry consumes unprecedented tonnages today - over half of global production now feeds chemical manufacturing, producing chlorine, caustic soda, and glass rather than dining-table shakers.`,
           clozeText: `Questions 1-5
 Complete the summary below.
 Choose NO MORE THAN TWO WORDS from the passage for each answer.
@@ -1069,11 +1069,11 @@ Choose NO MORE THAN TWO WORDS from the passage for each answer.
           title: 'Passage 2: Designing Cooler Cities & Urban Microclimates',
           imageUrl: '',
           imageFileName: '',
-          passageText: `A Modern metropolises routinely register night-time temperatures three to five degrees Celsius warmer than adjacent agricultural fields—a phenomenon climatologists term the Urban Heat Island (UHI) effect. Dense concentrations of dark slate roofing and asphalt roadways possess low albedo, a technical measure of solar reflectance; instead of bouncing sunlight skyward, these dark materials absorb up to ninety percent of incoming solar radiation throughout the afternoon.
+          passageText: `A Modern metropolises routinely register night-time temperatures three to five degrees Celsius warmer than adjacent agricultural fields - a phenomenon climatologists term the Urban Heat Island (UHI) effect. Dense concentrations of dark slate roofing and asphalt roadways possess low albedo, a technical measure of solar reflectance; instead of bouncing sunlight skyward, these dark materials absorb up to ninety percent of incoming solar radiation throughout the afternoon.
 
 B After sunset, geometry determines how rapidly that trapped energy escapes. In leafy rural meadows, warmth radiates directly upward toward the night sky. By contrast, narrow downtown "street canyons" flanked by glass and concrete facades repeatedly re-emit and trap outgoing longwave thermal radiation between opposing walls, keeping pavements hot well past midnight and driving peak air-conditioning electricity demand.
 
-C Field experiments in Athens and Los Angeles indicate that coating flat commercial rooftops with pale high-albedo paint lowers top-floor indoor temperatures by two to three degrees Celsius across sunny climates without mechanical cooling. Complementing reflective roofs, porous stone pavements—pioneered under "Sponge City" drainage plans—capture rainwater below porous bricks and passively cool surrounding pedestrian air through gradual daytime evaporation.
+C Field experiments in Athens and Los Angeles indicate that coating flat commercial rooftops with pale high-albedo paint lowers top-floor indoor temperatures by two to three degrees Celsius across sunny climates without mechanical cooling. Complementing reflective roofs, porous stone pavements - pioneered under "Sponge City" drainage plans - capture rainwater below porous bricks and passively cool surrounding pedestrian air through gradual daytime evaporation.
 
 D Green infrastructure must still obey aerodynamic logic. Planting shade trees lowers surface temperatures under canopies, yet urban meteorologists caution that overly dense, unbroken rows of broadleaf trees can inadvertently block nocturnal sea breezes from flushing polluted warm air down central avenues. Well-designed cooling corridors carefully pair staggered shade trees with open wind channels so sunlit districts cool naturally once evening arrives.`,
           clozeText: ''
@@ -1197,7 +1197,7 @@ D Green infrastructure must still obey aerodynamic logic. Planting shade trees l
         minWords: 150,
         imageUrl: CAMBRIDGE_TASK1_CHART_SVG_URL,
         modelAnswer:
-          'The bar chart illustrates electricity output across four energy sources—coal, natural gas, hydroelectric power, and wind and solar—measured in terawatt-hours (TWh) in Northland for 2005, 2015, and 2025. Overall, total reliance on coal plummeted dramatically over the twenty-year period, whereas wind and solar generation surged more than thirteenfold to overtake every other fuel by 2025. In 2005, coal dominated Northland’s grid at 140 TWh, followed by natural gas at 80 TWh, hydroelectricity at 45 TWh, and wind and solar at merely 10 TWh. Over the following decade, natural gas rose to 105 TWh while coal slipped to 115 TWh and renewables climbed steadily to 42 TWh. Between 2015 and 2025, energy transition accelerated sharply: coal output contracted to 45 TWh and gas eased back to 90 TWh, while wind and solar expanded rapidly to reach a peak of 135 TWh. Hydroelectric output remained the steadiest source, inching upward gradually from 45 to 55 TWh.'
+          'The bar chart illustrates electricity output across four energy sources - coal, natural gas, hydroelectric power, and wind and solar - measured in terawatt-hours (TWh) in Northland for 2005, 2015, and 2025. Overall, total reliance on coal plummeted dramatically over the twenty-year period, whereas wind and solar generation surged more than thirteenfold to overtake every other fuel by 2025. In 2005, coal dominated Northland’s grid at 140 TWh, followed by natural gas at 80 TWh, hydroelectricity at 45 TWh, and wind and solar at merely 10 TWh. Over the following decade, natural gas rose to 105 TWh while coal slipped to 115 TWh and renewables climbed steadily to 42 TWh. Between 2015 and 2025, energy transition accelerated sharply: coal output contracted to 45 TWh and gas eased back to 90 TWh, while wind and solar expanded rapidly to reach a peak of 135 TWh. Hydroelectric output remained the steadiest source, inching upward gradually from 45 to 55 TWh.'
       },
       task2: {
         prompt:
@@ -1309,7 +1309,7 @@ However, energy storage remains a critical bottleneck. Solar power output fluctu
   {
     id: 'test-spk-luyennoi-1',
     seedTag: 'speaking_luyennoi_full_v1',
-    title: 'IELTS Speaking Full Test 01 — Hometown, Memorable Trip & Tourism',
+    title: 'IELTS Speaking Full Test 01 - Hometown, Memorable Trip & Tourism',
     description: 'Đề thi thử IELTS Speaking đầy đủ 3 phần (Part 1, Cue Card Part 2, Part 3). Ghi âm câu trả lời lưu trực tiếp lên hệ thống và AI chấm band 4 tiêu chí.',
     createdAt: '2026-11-16',
     testMode: 'single_skill',
@@ -1333,7 +1333,7 @@ However, energy storage remains a critical bottleneck. Solar power output fluctu
   {
     id: 'test-spk-forecast-2',
     seedTag: 'speaking_forecast_q4_v1',
-    title: 'Forecast Speaking Mới Nhất — AI Technology, Study & Modern Lifestyle',
+    title: 'Forecast Speaking Mới Nhất - AI Technology, Study & Modern Lifestyle',
     description: 'Bộ câu hỏi Forecast Speaking cập nhật để học viên luyện từng Part hoặc thi Full Test với AI chấm điểm & gợi ý nâng Band.',
     createdAt: '2026-11-16',
     testMode: 'single_skill',
@@ -1418,7 +1418,7 @@ However, energy storage remains a critical bottleneck. Solar power output fluctu
   {
     id: 'test-single-reading-alltypes-01',
     seedTag: 'single_r_all_v1',
-    title: 'Reading Lẻ Full 11 Dạng — Ocean Kelp Forests & Urban Microgrids',
+    title: 'Reading Lẻ Full 11 Dạng - Ocean Kelp Forests & Urban Microgrids',
     description:
       'Đề Reading lẻ chuẩn IELTSMate tổng hợp đủ 11 dạng bài Reading: Multiple Choice, TRUE/FALSE/NOT GIVEN, YES/NO/NOT GIVEN, Matching Headings, Matching Information, Matching Features, Summary Box, Summary No Box, Correct Ending, Fill in the Blank (đục lỗ), Diagram Label & Short Answer.',
     createdAt: '2026-11-18',
@@ -1431,7 +1431,7 @@ However, energy storage remains a critical bottleneck. Solar power output fluctu
     sectionOrder: ['reading'],
     sectionDurations: { listening: 10, reading: 25, writing: 20 },
     reading: {
-      passageTitle: 'Passage 1: Giant Kelp Forests — Underwater Climate Engineers',
+      passageTitle: 'Passage 1: Giant Kelp Forests - Underwater Climate Engineers',
       passageText: `A Along rocky temperate coastlines from California to Tasmania, towering brown macroalgae known as giant kelp form dense underwater canopies growing up to half a metre per day. Far from being passive seaweed, these three-dimensional forests shelter over 800 marine species, buffer coastlines against storm surges, and capture dissolved carbon at rates rivaling tropical rainforests.
 
 B Rather than drawing nutrients through underground roots like terrestrial trees, kelp anchors itself onto bedrock with a tough root-like structure called a holdfast. Gas-filled bladders known as pneumatocysts buoy each textured blade upward toward sunlit surface waters, allowing fronds to photosynthesise efficiently across towering 30-metre columns.
@@ -1443,7 +1443,7 @@ C Marine ecologist Dr. Hannah Sato emphasizes that healthy kelp ecosystems depen
       passages: [
         {
           id: 'pass_sr_1',
-          title: 'Passage 1: Giant Kelp Forests — Underwater Climate Engineers',
+          title: 'Passage 1: Giant Kelp Forests - Underwater Climate Engineers',
           passageText: `A Along rocky temperate coastlines from California to Tasmania, towering brown macroalgae known as giant kelp form dense underwater canopies growing up to half a metre per day. Far from being passive seaweed, these three-dimensional forests shelter over 800 marine species, buffer coastlines against storm surges, and capture dissolved carbon at rates rivaling tropical rainforests.
 
 B Rather than drawing nutrients through underground roots like terrestrial trees, kelp anchors itself onto bedrock with a tough root-like structure called a holdfast. Gas-filled bladders known as pneumatocysts buoy each textured blade upward toward sunlit surface waters, allowing fronds to photosynthesise efficiently across towering 30-metre columns.
@@ -1517,7 +1517,7 @@ B Engineer Priya Nair argues in a 2025 IEEE report that islandable microgrids el
           id: 'sr_q6',
           type: 'summary_box',
           passageIdx: 0,
-          question: '6. [Summary Completion — Box] Predatory ______ help protect kelp beds from overgrazing urchins.',
+          question: '6. [Summary Completion - Box] Predatory ______ help protect kelp beds from overgrazing urchins.',
           options: ['A. lobsters', 'B. sharks', 'C. penguins', 'D. corals'],
           correctAnswer: 'A. lobsters'
         },
@@ -1526,7 +1526,7 @@ B Engineer Priya Nair argues in a 2025 IEEE report that islandable microgrids el
           type: 'summary_nobox',
           passageIdx: 0,
           wordLimit: 'ONE WORD',
-          question: '7. [Summary Completion — No Box] Dense kelp beds provide shelter for more than 800 ______ species.',
+          question: '7. [Summary Completion - No Box] Dense kelp beds provide shelter for more than 800 ______ species.',
           options: [],
           correctAnswer: 'marine'
         },
@@ -1586,9 +1586,9 @@ B Engineer Priya Nair argues in a 2025 IEEE report that islandable microgrids el
   {
     id: 'test-single-listening-alltypes-01',
     seedTag: 'single_l_all_v1',
-    title: 'Listening Lẻ Full 6 Dạng — Botanical Garden Tour & Eco-Packaging Lab',
+    title: 'Listening Lẻ Full 6 Dạng - Botanical Garden Tour & Eco-Packaging Lab',
     description:
-      'Đề Listening lẻ tổng hợp đủ 6 dạng bài IELTS Listening: Form Completion (đục lỗ), Flow-chart Completion, Multiple Choice, Matching, Map/Plan/Diagram Labelling & Short Answer Questions — tích hợp giọng đọc AI tiếng Anh sẵn.',
+      'Đề Listening lẻ tổng hợp đủ 6 dạng bài IELTS Listening: Form Completion (đục lỗ), Flow-chart Completion, Multiple Choice, Matching, Map/Plan/Diagram Labelling & Short Answer Questions - tích hợp giọng đọc AI tiếng Anh sẵn.',
     createdAt: '2026-11-18',
     visibility: 'public',
     testMode: 'single_skill',
@@ -1607,7 +1607,7 @@ B Engineer Priya Nair argues in a 2025 IEEE report that islandable microgrids el
           id: 'sl_track_1',
           title: 'Part 1: Botanical Volunteer Registration & Map (Q1–6)',
           audioUrl: '',
-          transcript: `Coordinator: Hello! Thanks for signing up for our Botanical Garden Volunteer Programme. Can I take your surname for the badge? Volunteer: Yes, it is Bellamy, spelt B-E-L-L-A-M-Y. Coordinator: Great. And for the morning shift you will help water herbs starting at nine fifteen, so 9:15 a.m. Note that volunteers get free entry to the Glasshouse Cafe, and your team supervisor is Dr. Carter. Before heading out, look at our garden map: directly opposite the Main Gate is the Orchid Pavilion on Zone B, while the Seed Vault sits in Zone C beside the Pond. If you have allergies, inform Nurse Kim at reception by twelve pounds fee waiver—wait, there is no fee, just bring sturdy boots!`,
+          transcript: `Coordinator: Hello! Thanks for signing up for our Botanical Garden Volunteer Programme. Can I take your surname for the badge? Volunteer: Yes, it is Bellamy, spelt B-E-L-L-A-M-Y. Coordinator: Great. And for the morning shift you will help water herbs starting at nine fifteen, so 9:15 a.m. Note that volunteers get free entry to the Glasshouse Cafe, and your team supervisor is Dr. Carter. Before heading out, look at our garden map: directly opposite the Main Gate is the Orchid Pavilion on Zone B, while the Seed Vault sits in Zone C beside the Pond. If you have allergies, inform Nurse Kim at reception by twelve pounds fee waiver - wait, there is no fee, just bring sturdy boots!`,
           clozeText: `Questions 1-2: Complete the Volunteer Form below.
 Write **ONE WORD AND/OR A NUMBER** for each answer.
 
@@ -1726,7 +1726,7 @@ Write **ONE WORD** for the answer.
   {
     id: 'test-single-writing-academic-01',
     seedTag: 'single_w_acad_v1',
-    title: 'Writing Lẻ Chuẩn Giám Khảo — Clean Energy Transition & AI in Education',
+    title: 'Writing Lẻ Chuẩn Giám Khảo - Clean Energy Transition & AI in Education',
     description:
       'Đề Writing Task 1 + Task 2 chuẩn để test bộ chấm khắt khe IELTS Examiner: điểm thành phần nguyên 1–9, công thức làm tròn xuống (T2×2+T1)/3, phát hiện lỗi ngữ pháp/chính tả, bảng phân tích từng câu, lỗi tư duy đề & nâng cấp Collocation.',
     createdAt: '2026-11-18',
@@ -1759,7 +1759,7 @@ Write **ONE WORD** for the answer.
   {
     id: 'test-single-speaking-examroom-01',
     seedTag: 'single_s_room_v1',
-    title: 'Phòng Thi Speaking Thực Chiến 01 — AI Tự Ghi 3s (Pass: 1234)',
+    title: 'Phòng Thi Speaking Thực Chiến 01 - AI Tự Ghi 3s (Pass: 1234)',
     description:
       'Đề Speaking Phòng Thi Thực Chiến mẫu để kiểm tra giọng AI đọc toàn bộ câu hỏi và chế độ đếm ngược 3 giây tự động bật Micro ghi âm xuyên suốt Part 1 · Part 2 · Part 3. Mật khẩu test: 1234',
     createdAt: '2026-11-18',
@@ -1815,7 +1815,7 @@ Write **ONE WORD** for the answer.
 export const DEFAULT_ATTEMPTS = [];
 
 export const DEFAULT_USERS = {
-  'teacher_ielts': { username: 'teacher_ielts', pass: '123456', name: 'Ms. Như — IELTS Nha Trang', role: 'teacher', targetBand: 9.0, joinedDate: '2026-01-01' }
+  'teacher_ielts': { username: 'teacher_ielts', pass: '123456', name: 'Ms. Như - IELTS Nha Trang', role: 'teacher', targetBand: 9.0, joinedDate: '2026-01-01' }
 };
 
 export const DEFAULT_ROOMS = {

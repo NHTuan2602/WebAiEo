@@ -12,8 +12,8 @@
   --lexi-mint-bg: #EDFFFD;
   --lexi-mint-border: #B5F5F1;
   --lexi-navy: #0F172B;
-  --lexi-slate: #314158;
-  --lexi-muted: #62748E;
+  --lexi-slate: #334155;
+  --lexi-muted: #475569;
   --lexi-emerald: #059271;
   --lexi-coral: #F25220;
   --lexi-royal: #1447E6;
@@ -62,17 +62,11 @@ html.dark .lexi-underlined::after {
 }
 
 .lexi-hero-surface {
-  background-color: #FDEEF4;
-  background-image:
-    radial-gradient(at 88% 12%, rgba(244, 114, 182, 0.16) 0px, transparent 52%),
-    radial-gradient(at 8% 88%, rgba(0, 178, 173, 0.09) 0px, transparent 50%);
+  background-color: #F8FAFC;
 }
 
 html.dark .lexi-hero-surface {
   background-color: #020618;
-  background-image:
-    radial-gradient(at 88% 12%, rgba(0, 178, 173, 0.16) 0px, transparent 52%),
-    radial-gradient(at 10% 85%, rgba(20, 71, 230, 0.12) 0px, transparent 50%);
 }
 
 .lexi-card {
@@ -91,8 +85,6 @@ html.dark .lexi-card:hover {
 @media (prefers-reduced-motion: reduce) {
   .lexi-card,
   .animate-crewmate-bob,
-  .vip-shimmer-badge,
-  .vip-shimmer-badge::after,
   .vip-avatar-aura,
   .vip-neon-aurora-frame,
   .vip-neon-aurora-seam,
@@ -114,11 +106,6 @@ html.dark .lexi-card:hover {
   animation: crewmateBob 2.2s ease-in-out infinite;
 }
 
-@keyframes vipSheenSweep {
-  0% { transform: translateX(-140%) skewX(-18deg); }
-  55%, 100% { transform: translateX(220%) skewX(-18deg); }
-}
-
 @keyframes vipAuraPulse {
   0%, 100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55), 0 0 14px rgba(239, 68, 68, 0.28); }
   50% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9), 0 0 22px rgba(239, 68, 68, 0.45); }
@@ -128,17 +115,6 @@ html.dark .lexi-card:hover {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-}
-
-.vip-shimmer-badge::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.52), transparent);
-  animation: vipSheenSweep 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-  pointer-events: none;
-  z-index: 0;
 }
 
 .vip-avatar-aura {
@@ -221,7 +197,7 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #FDECF2;
+  background-color: #F8FAFC;
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

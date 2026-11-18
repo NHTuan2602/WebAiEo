@@ -220,7 +220,7 @@ export default function AccountSecurityModal({
               <h3 id="account-security-modal-title" className="text-sm sm:text-base font-extrabold truncate">
                 Bảo Mật Tài Khoản (@{currentUser.username})
               </h3>
-              <p className="text-[11px] text-slate-300 truncate">
+              <p className="text-xs text-slate-300 truncate">
                 Đổi mật khẩu &amp; xác minh Email nhận OTP khôi phục
               </p>
             </div>
@@ -367,7 +367,7 @@ export default function AccountSecurityModal({
                     <button
                       type="button"
                       onClick={() => setUnlinkMode(v => !v)}
-                      className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline inline-flex items-center gap-1"
+                      className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline inline-flex items-center gap-1"
                     >
                       <Unlink className="w-3 h-3" /> Gỡ email
                     </button>
@@ -375,14 +375,14 @@ export default function AccountSecurityModal({
                   <p className="text-xs font-mono font-bold text-slate-900 dark:text-white break-all">
                     {currentUser.email || currentUser.maskedEmail}
                   </p>
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
                     Nếu quên mật khẩu, hệ thống sẽ gửi mã OTP về địa chỉ email này.
                   </p>
                 </div>
               ) : (
                 <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 space-y-1">
                   <p className="font-extrabold">Chưa liên kết Email khôi phục</p>
-                  <p className="text-[11px] opacity-90">
+                  <p className="text-xs opacity-90">
                     Xác minh email ngay để tự nhận mã OTP lấy lại mật khẩu. Nếu quên mật khẩu khi chưa liên kết email, bạn cần liên hệ Giáo viên để đặt lại mật khẩu mặc định.
                   </p>
                 </div>
@@ -417,7 +417,7 @@ export default function AccountSecurityModal({
                       onClose?.();
                       onOpenMailConfig();
                     }}
-                    className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-extrabold shrink-0"
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold shrink-0"
                   >
                     Cài đặt ngay
                   </button>
@@ -482,7 +482,7 @@ export default function AccountSecurityModal({
 
                   {otpSentTo && (
                     <form onSubmit={handleVerifyEmailOtp} className="p-3.5 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/35 border border-[#007A7A]/35 space-y-2.5">
-                      <p className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6]">
+                      <p className="text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6]">
                         Mã OTP 6 chữ số đã được gửi tới <b>{otpSentTo}</b> (hiệu lực 10 phút).
                       </p>
                       <div className="flex gap-2">

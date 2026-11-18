@@ -158,7 +158,7 @@ export default function ClozeNoteSheet({
       <div
         className={
           readOnlyPreview
-            ? 'rounded-xl border border-rose-200/90 dark:border-[#343434] bg-[#FFF5F8] dark:bg-[#191919] p-4 sm:p-6 space-y-2 shadow-xs'
+            ? 'rounded-lg border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191919] p-4 sm:p-6 space-y-2'
             : 'space-y-1.5'
         }
       >

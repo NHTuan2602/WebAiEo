@@ -194,7 +194,7 @@ export default function SpeakingBuilderPanel({
     return (
       <div className="pt-2 mt-1 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#570DF8]/10 hover:bg-[#570DF8]/20 text-[#570DF8] dark:text-[#C4B5FD] border border-[#570DF8]/25 text-[11px] font-bold transition">
+          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EDFFFD] hover:bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] border border-[#007A7A]/25 text-xs font-bold transition">
             {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
             <span>{isBusy ? 'Đang tải...' : 'Nhập File Ghi Âm (.mp3/.wav/.m4a)'}</span>
             <input
@@ -213,7 +213,7 @@ export default function SpeakingBuilderPanel({
             type="button"
             disabled={isBusy}
             onClick={() => handleToggleRecordPromptAudio(uploadKey, onApplyAudio)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition ${
               isRecHere
                 ? 'bg-rose-600 text-white border-rose-600 animate-pulse'
                 : 'bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
@@ -227,13 +227,13 @@ export default function SpeakingBuilderPanel({
             value={audioUrl.startsWith('data:') ? '' : audioUrl}
             onChange={e => onApplyAudio({ audioUrl: e.target.value.trim(), audioFileName: '' })}
             placeholder="Hoặc dán Link Audio URL ngoài (tùy chọn)..."
-            className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-200"
+            className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-200"
           />
           {audioUrl && (
             <button
               type="button"
               onClick={() => onApplyAudio({ audioUrl: '', audioFileName: '' })}
-              className="px-2 py-1 rounded-lg text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition"
+              className="px-2 py-1 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition"
             >
               Xóa Audio
             </button>
@@ -242,11 +242,11 @@ export default function SpeakingBuilderPanel({
         {audioUrl && (
           <div className="space-y-1.5 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-500/35">
             <div className="flex flex-wrap items-center gap-2.5">
-              <FileAudio className="w-4 h-4 text-[#570DF8] shrink-0" />
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate max-w-[220px]">
+              <FileAudio className="w-4 h-4 text-[#0F766E] shrink-0" />
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate max-w-[220px]">
                 {audioFileName || 'File ghi âm của Giáo viên'}
               </span>
-              <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+              <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
                 ✓ Học viên sẽ nghe trực tiếp file này (không qua AI đọc)
               </span>
             </div>
@@ -325,14 +325,14 @@ export default function SpeakingBuilderPanel({
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-5 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#570DF8]/10 text-[#570DF8] dark:text-[#A78BFA] border border-[#570DF8]/25 flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] border border-[#007A7A]/25 flex items-center justify-center shrink-0">
               <Mic className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
                 Thiết Kế Đề Thi IELTS Speaking (Part 1 · Cue Card Part 2 · Part 3)
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                 Học viên nói qua Micro, hệ thống lưu file ghi âm vĩnh viễn và AI tự động chấm 4 tiêu chí IELTS (Fluency, Lexical, Grammar, Pronunciation).
               </p>
             </div>
@@ -350,7 +350,7 @@ export default function SpeakingBuilderPanel({
         {/* AI Generator Bar */}
         <div className="p-4 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-500/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
           <div className="flex-1 flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-indigo-200 dark:border-slate-700">
-            <Wand2 className="w-4 h-4 text-[#570DF8] dark:text-[#A78BFA] shrink-0" />
+            <Wand2 className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0" />
             <input
               type="text"
               value={aiTopic}
@@ -376,7 +376,7 @@ export default function SpeakingBuilderPanel({
               type="button"
               disabled={isGenerating}
               onClick={handleAiGenerateSpeaking}
-              className="px-4 py-2 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] disabled:opacity-60 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition whitespace-nowrap"
+              className="px-4 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] disabled:opacity-60 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition whitespace-nowrap"
             >
               {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-300" />}
               <span>{isGenerating ? 'Đang tạo câu hỏi...' : 'AI Tạo Đề Speaking P1·2·3'}</span>
@@ -387,7 +387,7 @@ export default function SpeakingBuilderPanel({
         {/* Timers & Options */}
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 pt-1">
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-            <label className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1">
+            <label className="text-xs font-bold uppercase text-[#475569] dark:text-slate-400 flex items-center gap-1 mb-1">
               <Clock className="w-3 h-3" /> Part 1 Nói (giây)
             </label>
             <input
@@ -400,7 +400,7 @@ export default function SpeakingBuilderPanel({
             />
           </div>
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-            <label className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1">
+            <label className="text-xs font-bold uppercase text-[#475569] dark:text-slate-400 flex items-center gap-1 mb-1">
               <Clock className="w-3 h-3" /> Part 2 Chuẩn bị (giây)
             </label>
             <input
@@ -413,7 +413,7 @@ export default function SpeakingBuilderPanel({
             />
           </div>
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-            <label className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1">
+            <label className="text-xs font-bold uppercase text-[#475569] dark:text-slate-400 flex items-center gap-1 mb-1">
               <Clock className="w-3 h-3" /> Part 2 Nói (giây)
             </label>
             <input
@@ -426,7 +426,7 @@ export default function SpeakingBuilderPanel({
             />
           </div>
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-            <label className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1">
+            <label className="text-xs font-bold uppercase text-[#475569] dark:text-slate-400 flex items-center gap-1 mb-1">
               <Clock className="w-3 h-3" /> Part 3 Nói (giây)
             </label>
             <input
@@ -441,13 +441,13 @@ export default function SpeakingBuilderPanel({
           <label className="col-span-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2 cursor-pointer">
             <div>
               <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-100">Gắn nhãn Đề Forecast</span>
-              <span className="block text-[10px] text-slate-500 dark:text-slate-400">Hiển thị thêm trong nhóm Đề Dự Đoán Forecast</span>
+              <span className="block text-xs text-[#475569] dark:text-slate-400">Hiển thị thêm trong nhóm Đề Dự Đoán Forecast</span>
             </div>
             <input
               type="checkbox"
               checked={sp.isForecast}
               onChange={e => patchSpeaking({ isForecast: e.target.checked })}
-              className="w-4 h-4 accent-[#570DF8]"
+              className="w-4 h-4 accent-[#007A7A]"
             />
           </label>
         </div>
@@ -463,7 +463,7 @@ export default function SpeakingBuilderPanel({
             />
             <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
               <strong>Tắt hẳn giọng AI đọc câu hỏi</strong>
-              <span className="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+              <span className="block text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                 Câu có file ghi âm của Giáo viên luôn tự động phát giọng thật (không qua AI đọc). Bật mục này nếu muốn tắt AI đọc trên mọi câu.
               </span>
             </span>
@@ -477,7 +477,7 @@ export default function SpeakingBuilderPanel({
             />
             <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
               <strong>Chỉ nghe file ghi âm &amp; trả lời (Ẩn chữ câu hỏi)</strong>
-              <span className="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+              <span className="block text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                 Khi câu hỏi đã có file ghi âm của Giáo viên, học viên chỉ nghe Audio rồi nói trả lời giống thi thật.
               </span>
             </span>
@@ -490,7 +490,7 @@ export default function SpeakingBuilderPanel({
             <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100">
               Phân Loại Mục Speaking AI
             </h4>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
               Chia rõ mục <strong>1. Luyện Daily</strong> (quăng đề mỗi ngày · báo người chưa làm) và <strong>2. Luyện Thực Chiến Phòng Thi</strong> (Team sắp thi cần Password).
             </p>
           </div>
@@ -516,7 +516,7 @@ export default function SpeakingBuilderPanel({
                 title: '2. Phòng Thi Thực Chiến',
                 desc: 'Team sắp thi · Cần Password vào thi',
                 icon: Lock,
-                activeCls: 'border-[#570DF8] bg-[#570DF8] text-white shadow-sm'
+                activeCls: 'border-[#007A7A] bg-[#007A7A] text-white shadow-sm'
               }
             ].map(opt => {
               const IconC = opt.icon;
@@ -540,7 +540,7 @@ export default function SpeakingBuilderPanel({
                   <IconC className="w-4 h-4 shrink-0 mt-0.5" />
                   <div className="min-w-0">
                     <p className="text-xs font-extrabold leading-snug">{opt.title}</p>
-                    <p className={`text-[10px] mt-0.5 leading-snug ${active ? 'opacity-90' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <p className={`text-xs mt-0.5 leading-snug ${active ? 'opacity-90' : 'text-[#475569] dark:text-slate-400'}`}>
                       {opt.desc}
                     </p>
                   </div>
@@ -552,7 +552,7 @@ export default function SpeakingBuilderPanel({
           {sp.speakingTrack === 'daily' && (
             <div className="p-3.5 rounded-xl bg-orange-50/90 dark:bg-orange-950/25 border border-orange-200 dark:border-orange-500/35 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
               <div>
-                <label className="block text-[11px] font-bold text-orange-900 dark:text-orange-200 mb-1 flex items-center gap-1">
+                <label className="block text-xs font-bold text-orange-900 dark:text-orange-200 mb-1 flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" /> Ngày giao bài Daily
                 </label>
                 <input
@@ -570,7 +570,7 @@ export default function SpeakingBuilderPanel({
                   className="mt-0.5 w-4 h-4 accent-orange-600"
                 />
                 <span className="text-xs text-slate-700 dark:text-slate-200 leading-snug">
-                  <strong>Bắt buộc hoàn thành mỗi ngày</strong> — Tự động báo danh sách học viên chưa làm &amp; nhắc trên màn hình học viên.
+                  <strong>Bắt buộc hoàn thành mỗi ngày</strong> - Tự động báo danh sách học viên chưa làm &amp; nhắc trên màn hình học viên.
                 </span>
               </label>
             </div>
@@ -578,8 +578,8 @@ export default function SpeakingBuilderPanel({
 
           {sp.speakingTrack === 'exam_room' && (
             <div className="p-3.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-500/35 space-y-2">
-              <label className="block text-[11px] font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#570DF8]" />
+              <label className="block text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#0F766E]" />
                 Mật khẩu Phòng Thi Thực Chiến (Cấp riêng cho Team sắp thi)
               </label>
               <div className="flex items-center gap-2">
@@ -612,7 +612,7 @@ export default function SpeakingBuilderPanel({
               type="checkbox"
               checked={sp.part1.enabled}
               onChange={e => patchPart('part1', { enabled: e.target.checked })}
-              className="w-4 h-4 accent-[#570DF8]"
+              className="w-4 h-4 accent-[#007A7A]"
             />
             <span className="text-sm font-extrabold text-slate-900 dark:text-white">
               Part 1: Introduction &amp; Interview ({sp.part1.questions.length} câu)
@@ -621,7 +621,7 @@ export default function SpeakingBuilderPanel({
           <button
             type="button"
             onClick={() => addQuestionToPart('part1')}
-            className="px-3 py-1.5 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-bold flex items-center gap-1 transition"
+            className="px-3 py-1.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-1 transition"
           >
             <Plus className="w-3.5 h-3.5" /> Thêm Câu Part 1
           </button>
@@ -643,8 +643,8 @@ export default function SpeakingBuilderPanel({
             {sp.part1.questions.map((q, idx) => (
               <div key={q.id || idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-[#570DF8] dark:text-[#A78BFA]">
-                    Part 1 — Câu {idx + 1}
+                  <span className="text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
+                    Part 1 - Câu {idx + 1}
                   </span>
                   <button
                     type="button"
@@ -667,7 +667,7 @@ export default function SpeakingBuilderPanel({
                   value={q.hint || ''}
                   onChange={e => updateQuestionInPart('part1', idx, 'hint', e.target.value)}
                   placeholder="Gợi ý ý tưởng / từ vựng (tùy chọn)..."
-                  className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300"
+                  className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300"
                 />
                 {renderAudioAttachmentBox({
                   uploadKey: `part1-${q.id || idx}`,
@@ -688,7 +688,7 @@ export default function SpeakingBuilderPanel({
             type="checkbox"
             checked={sp.part2.enabled}
             onChange={e => patchPart('part2', { enabled: e.target.checked })}
-            className="w-4 h-4 accent-[#570DF8]"
+            className="w-4 h-4 accent-[#007A7A]"
           />
           <span className="text-sm font-extrabold text-slate-900 dark:text-white">
             Part 2: Cue Card (Chuẩn bị 1 phút &amp; Nói 2 phút)
@@ -737,7 +737,7 @@ export default function SpeakingBuilderPanel({
                 <button
                   type="button"
                   onClick={() => patchPart('part2', { bullets: [...(sp.part2.bullets || []), ''] })}
-                  className="text-xs font-bold text-[#570DF8] dark:text-[#A78BFA] hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-[#0F766E] dark:text-[#1EE1D6] hover:underline flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" /> Thêm ý
                 </button>
@@ -783,7 +783,7 @@ export default function SpeakingBuilderPanel({
               type="checkbox"
               checked={sp.part3.enabled}
               onChange={e => patchPart('part3', { enabled: e.target.checked })}
-              className="w-4 h-4 accent-[#570DF8]"
+              className="w-4 h-4 accent-[#007A7A]"
             />
             <span className="text-sm font-extrabold text-slate-900 dark:text-white">
               Part 3: Two-Way Discussion ({sp.part3.questions.length} câu)
@@ -792,7 +792,7 @@ export default function SpeakingBuilderPanel({
           <button
             type="button"
             onClick={() => addQuestionToPart('part3')}
-            className="px-3 py-1.5 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-bold flex items-center gap-1 transition"
+            className="px-3 py-1.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-1 transition"
           >
             <Plus className="w-3.5 h-3.5" /> Thêm Câu Part 3
           </button>
@@ -815,7 +815,7 @@ export default function SpeakingBuilderPanel({
               <div key={q.id || idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                    Part 3 — Câu {idx + 1}
+                    Part 3 - Câu {idx + 1}
                   </span>
                   <button
                     type="button"
@@ -837,7 +837,7 @@ export default function SpeakingBuilderPanel({
                   value={q.hint || ''}
                   onChange={e => updateQuestionInPart('part3', idx, 'hint', e.target.value)}
                   placeholder="Gợi ý hướng phân tích / từ vựng (tùy chọn)..."
-                  className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300"
+                  className="w-full px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300"
                 />
                 {renderAudioAttachmentBox({
                   uploadKey: `part3-${q.id || idx}`,

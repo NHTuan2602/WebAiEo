@@ -15,8 +15,8 @@ export default function VipMemberName({
 
   const badgeCls =
     badgeSize === 'xs'
-      ? 'text-[9px] px-1.5 py-0.2 gap-0.5 rounded-full'
-      : 'text-[10px] px-2 py-0.5 gap-1 rounded-full';
+      ? 'text-xs px-2 py-0.5 gap-1 rounded-full'
+      : 'text-xs px-2.5 py-0.5 gap-1 rounded-full';
 
   return (
     <span className={`inline-flex items-center gap-1.5 flex-wrap min-w-0 ${className}`}>

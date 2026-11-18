@@ -430,7 +430,7 @@ export default function App() {
     showToast(
       nextVisibility === 'private'
         ? 'Đã chuyển đề thi sang chế độ Ẩn (Chỉ mình giáo viên thấy).'
-        : 'Đã công khai đề thi — Học viên có thể nhìn thấy & làm bài.'
+        : 'Đã công khai đề thi - Học viên có thể nhìn thấy & làm bài.'
     );
     dispatchSyncAction('TOGGLE_TEST_VISIBILITY', { testId });
   };
@@ -461,8 +461,8 @@ export default function App() {
       testId,
       t => ({ ...t, maxAttempts: nextMaxAttempts }),
       nextMaxAttempts === 1
-        ? `Đã bật THI THẬT cho "${target.title}" — Học sinh chỉ được làm 1 lần!`
-        : `Đã bật THI THỬ cho "${target.title}" — Học sinh được làm nhiều lần để ôn thi!`
+        ? `Đã bật THI THẬT cho "${target.title}" - Học sinh chỉ được làm 1 lần!`
+        : `Đã bật THI THỬ cho "${target.title}" - Học sinh được làm nhiều lần để ôn thi!`
     );
   };
 
@@ -2473,7 +2473,7 @@ export default function App() {
       });
     }
     if (!snap && !serverSyncConnectedRef.current) {
-      showToast('Không kết nối được server — Avatar chỉ mới lưu tạm trên máy này.', 'error');
+      showToast('Không kết nối được server - Avatar chỉ mới lưu tạm trên máy này.', 'error');
       return false;
     }
     showToast(
@@ -2748,7 +2748,7 @@ export default function App() {
         : 0;
 
     if (newPin !== oldPin && roomsDb[newPin]) {
-      showToast(`Mã phòng "${newPin}" đã tồn tại — hãy chọn mã PIN khác hoặc bấm chọn phòng đó!`, 'error');
+      showToast(`Mã phòng "${newPin}" đã tồn tại - hãy chọn mã PIN khác hoặc bấm chọn phòng đó!`, 'error');
       return;
     }
 
@@ -4096,9 +4096,9 @@ export default function App() {
     });
     showToast(
       isAutoTimeout
-        ? `Hết giờ ${skillNames[prevSkill] || prevSkill} — Tự động chuyển sang ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
+        ? `Hết giờ ${skillNames[prevSkill] || prevSkill} - Tự động chuyển sang ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
         : cfg.sequentialMode
-        ? `Đã khóa ${skillNames[prevSkill] || prevSkill} (còn ${remLabel} — không thể quay lại)! Bắt đầu ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút).`
+        ? `Đã khóa ${skillNames[prevSkill] || prevSkill} (còn ${remLabel} - không thể quay lại)! Bắt đầu ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút).`
         : `Đã chuyển sang phần ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
     );
   };
@@ -4161,7 +4161,7 @@ export default function App() {
       } catch (apiErr) {
         console.warn('Gemini API error:', apiErr);
         showToast(`Gemini API lỗi: ${apiErr.message}`, 'error');
-        setAiGradingStep(`API lỗi (${apiErr.message}) — chuyển sang máy chủ / bộ phân tích tích hợp...`);
+        setAiGradingStep(`API lỗi (${apiErr.message}) - chuyển sang máy chủ / bộ phân tích tích hợp...`);
       }
     }
 
@@ -4316,7 +4316,7 @@ export default function App() {
       showToast(
         evaluation?._gradedMode === 'gemini_audio'
           ? `AI (${evaluation._usedModel}) đã nghe lại file ghi âm & chấm Band ${spBand}!`
-          : `Đã chấm Speaking theo dữ liệu ghi âm (${evaluation?._fallbackReason || 'Bộ chấm tích hợp'}) — Band ${spBand}`
+          : `Đã chấm Speaking theo dữ liệu ghi âm (${evaluation?._fallbackReason || 'Bộ chấm tích hợp'}) - Band ${spBand}`
       );
     } catch (err) {
       showToast('Lỗi chấm AI Speaking: ' + (err?.message || err), 'error');
@@ -4789,7 +4789,7 @@ export default function App() {
     setView('EXAM_BUILDER');
   };
 
-  // Upload Audio & Optional Media for Listening (Teacher Builder — supports multiple topics)
+  // Upload Audio & Optional Media for Listening (Teacher Builder - supports multiple topics)
   const readFileAsDataUrl = (file, onLoad) => {
     if (!file) return;
     const reader = new FileReader();
@@ -4845,7 +4845,7 @@ export default function App() {
     });
   };
 
-  // Upload Image for Reading Passage (Teacher Builder — supports multiple passages)
+  // Upload Image for Reading Passage (Teacher Builder - supports multiple passages)
   const updateReadingPassageField = (idx, patch) => {
     setTestForm(prev => {
       const passages = getReadingPassages(prev.reading);
@@ -5372,7 +5372,7 @@ export default function App() {
     const activeRoom = normalizeRoomObject(roomsDb[activePin] || {}, activePin);
     const hasStudents = Object.values(activeRoom?.lobbyPlayers || {}).some((p) => p?.role !== 'teacher');
     if (hasStudents) {
-      showToast('Phòng đã có học sinh — Giáo viên chỉ giám sát Đua Top, không chơi lúc này!', 'info');
+      showToast('Phòng đã có học sinh - Giáo viên chỉ giám sát Đua Top, không chơi lúc này!', 'info');
       return;
     }
     clearTimeout(autoNextTimerRef.current);
@@ -5714,7 +5714,7 @@ export default function App() {
     resolveGameChoiceAttempt(choiceText, isCorrect);
   };
 
-  // Handle typing input in Round 2 (Full Word Typing — V2)
+  // Handle typing input in Round 2 (Full Word Typing - V2)
   const handleGameTypingInput = (char) => {
     const rt = gameRuntimeRef.current;
     if (rt.subState !== 'PLAYING' || rt.round !== 2 || !rt.activeQuestion || rt.questionResolved) return;
@@ -6209,7 +6209,7 @@ export default function App() {
         ctx.restore();
       }
 
-      // Draw Chickens (Round 1, 3, 4) — smoothly descend with timer
+      // Draw Chickens (Round 1, 3, 4) - smoothly descend with timer
       if ((rt.round === 1 || rt.round === 3 || rt.round === 4) && rt.subState === 'PLAYING') {
         const topBaseY = Math.max(46, height * 0.14);
         const maxDescendY = Math.max(topBaseY + 20, height - 172);
@@ -6283,7 +6283,7 @@ export default function App() {
         });
       }
 
-      // Draw Boss Chicken (Round 2: Gõ Từ Full) — descends toward player ship as time expires!
+      // Draw Boss Chicken (Round 2: Gõ Từ Full) - descends toward player ship as time expires!
       if (rt.round === 2 && rt.activeQuestion && rt.subState === 'PLAYING') {
         const swayX = Math.sin(Date.now() * 0.0025) * Math.min(75, width * 0.14);
         const bossX = width / 2 + swayX;
@@ -6565,7 +6565,7 @@ export default function App() {
   // MAIN VIEW ROUTER
   // ==========================================
   return (
-    <div className={`min-h-screen ${view === 'STUDENT_PROFILE' ? 'bg-[#F8FAFC]' : 'bg-[#FDECF2]'} dark:bg-[#020618] font-sans text-[#0F172B] dark:text-white antialiased selection:bg-[#007A7A]/20 dark:selection:bg-teal-700 transition-colors duration-200`}>
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#020618] font-sans text-[#0F172B] dark:text-white antialiased selection:bg-[#007A7A]/20 dark:selection:bg-teal-700 transition-colors duration-200">
       {/* Navbar rendered when not on Auth, Full Exam, Speaking Room, or Game Arena */}
       {view !== 'AUTH' && view !== 'EXAM_MODE' && view !== 'SPEAKING_MODE' && view !== 'GAME_ARENA' && (
         <Navbar

@@ -776,7 +776,7 @@ export const STUDENT_TITLES = [
       text: `${Math.min(stats.totalLoginDays, 180)}/180 ngày (6 tháng)`
     })
   },
-  // ==== DANH HIỆU BÍ ẨN (MỞ KHÓA BẤT NGỜ — CHE TÊN & ĐIỀU KIỆN ĐẾN KHI ĐẠT ĐƯỢC) ====
+  // ==== DANH HIỆU BÍ ẨN (MỞ KHÓA BẤT NGỜ - CHE TÊN & ĐIỀU KIỆN ĐẾN KHI ĐẠT ĐƯỢC) ====
   {
     id: 'secret_night_owl',
     label: 'Cú Đêm Khổ Luyện',
@@ -956,7 +956,7 @@ export const STUDENT_TITLES = [
     tier: 'Độc Quyền GV & QT',
     difficulty: 'Độc Quyền',
     isStaffOnly: true,
-    conditionText: 'Đặc quyền tối thượng dành riêng cho Giáo Viên IELTS & Quản Trị Hệ Thống — biểu tượng đỉnh cao 10.0 IELTS.',
+    conditionText: 'Đặc quyền tối thượng dành riêng cho Giáo Viên IELTS & Quản Trị Hệ Thống - biểu tượng đỉnh cao 10.0 IELTS.',
     badgeClass: 'bg-gradient-to-r from-purple-100 via-amber-100 to-rose-100 text-amber-950 border-amber-400 dark:from-purple-600/35 dark:via-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/75',
     heroBadgeClass: 'bg-gradient-to-r from-amber-500/45 via-purple-500/40 to-rose-500/40 text-amber-100 border-amber-300/80',
     gameBadgeClass: 'bg-gradient-to-r from-purple-100 via-amber-100 to-rose-100 text-amber-950 border-amber-400 dark:from-purple-600/35 dark:via-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/75',
@@ -1552,7 +1552,7 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
         : unlockedByPurchase
         ? (subLeftLabel ? `💎 Gói 1 tháng (${subLeftLabel})` : '💎 Đã mua mở khóa')
         : purchaseExpired
-        ? '⌛ Hết hạn 1 tháng — Bấm gia hạn để đeo tiếp'
+        ? '⌛ Hết hạn 1 tháng - Bấm gia hạn để đeo tiếp'
         : unlocked && t.isHolidayTitle && progress?.text
         ? progress.text
         : unlocked

@@ -245,25 +245,25 @@ export default function SkillPracticeHub({
     );
 
     return (
-      <section className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs">
+      <section className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-5 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-500" />
-              BXH Ranking Điểm — Zone Đề Thi Lẻ ({skillFilter === 'all' ? 'Đọc · Nghe · Viết' : skillFilter.toUpperCase()})
+              BXH Ranking Điểm - Zone Đề Thi Lẻ ({skillFilter === 'all' ? 'Đọc · Nghe · Viết' : skillFilter.toUpperCase()})
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
               Xếp hạng thành tích cao nhất của học viên trong lớp sau khi hoàn thành đề thi lẻ.
             </p>
           </div>
-          <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40">
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
             {ranked.length} thí sinh đã xếp hạng
           </span>
         </div>
 
         {ranked.length === 0 ? (
-          <div className="p-6 rounded-2xl bg-white/80 dark:bg-[#23222B] border border-dashed border-pink-200 dark:border-[#34323F] text-center text-xs text-slate-500 dark:text-slate-400">
-            Chưa có bài hoàn thành nào trong mục này — hãy làm ngay đề đầu tiên để giữ Top #1 BXH!
+          <div className="py-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-[#475569] dark:text-slate-400">
+            Chưa có bài hoàn thành nào trong mục này - hãy làm ngay đề đầu tiên để giữ Top #1 BXH!
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -277,35 +277,35 @@ export default function SkillPracticeHub({
                   key={rowVipVisual.showNeonCover ? undefined : row.username}
                   className={`flex items-center justify-between gap-3 p-3.5 transition ${
                     rowVipVisual.showNeonCover
-                      ? 'rounded-[14px] bg-white dark:bg-[#23222B]'
+                      ? 'rounded-[10px] bg-[#F8FAFC] dark:bg-slate-900'
                       : isMe
-                      ? 'rounded-2xl border bg-[#EDFFFD] dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6]'
-                      : 'rounded-2xl border bg-white dark:bg-[#23222B] border-pink-200/80 dark:border-[#34323F]'
+                      ? 'rounded-lg border bg-[#EDFFFD] dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6]'
+                      : 'rounded-lg border bg-[#F8FAFC] dark:bg-slate-900 border-slate-200 dark:border-slate-800'
                   }`}
                 >
                   <div className="min-w-0">
-                    <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1 flex-wrap">
+                    <p className="text-sm font-extrabold text-[#0F172B] dark:text-white truncate flex items-center gap-1 flex-wrap">
                       <span>#{idx + 1}</span>
                       <VipMemberName
                         user={rowUserObj}
                         fallbackName={row.name}
                         badgeSize="xs"
                       />
-                      {isMe && <span className="text-[10px] text-[#007A7A] dark:text-[#1EE1D6]">(Bạn)</span>}
+                      {isMe && <span className="text-xs text-[#0F766E] dark:text-[#1EE1D6]">(Bạn)</span>}
                     </p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                    <p className="text-xs text-[#475569] dark:text-slate-400 truncate mt-0.5">
                       {row.count} bài • TB {avgBand.toFixed(1)} • {row.bestTestTitle}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <span className="inline-block px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono font-black text-sm border border-amber-200 dark:border-amber-500/35">
+                    <span className="inline-block px-2.5 py-1 rounded-lg bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-300 font-mono font-black text-sm border border-amber-300 dark:border-amber-500/35">
                       {row.bestBand}
                     </span>
                   </div>
                 </div>
               );
               return rowVipVisual.showNeonCover ? (
-                <div key={row.username} className={`rounded-2xl p-[2px] transition-all ${rowVipVisual.neonCoverMeta.cardRimWrapClass}`}>
+                <div key={row.username} className={`rounded-lg p-[2px] transition-all ${rowVipVisual.neonCoverMeta.cardRimWrapClass}`}>
                   {rankCard}
                 </div>
               ) : rankCard;
@@ -326,23 +326,23 @@ export default function SkillPracticeHub({
       ? combinedList
       : combinedList.filter(t => t._resolvedSkill === singleHubSkill);
     const skillMetaMap = {
-      reading: { label: 'ĐỌC (READING)', cls: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300', icon: BookOpen },
-      listening: { label: 'NGHE (LISTENING)', cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6]', icon: Headphones },
-      writing: { label: 'VIẾT (WRITING)', cls: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300', icon: PenTool }
+      reading: { label: 'ĐỌC (READING)', cls: 'bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 border border-blue-200 dark:border-blue-500/30', icon: BookOpen },
+      listening: { label: 'NGHE (LISTENING)', cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30', icon: Headphones },
+      writing: { label: 'VIẾT (WRITING)', cls: 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30', icon: PenTool }
     };
 
     return (
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-              <span className="w-10 h-10 rounded-2xl bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172B] dark:text-white tracking-tight flex items-center gap-2.5">
+              <span className="w-10 h-10 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 flex items-center justify-center">
                 <Layers className="w-5 h-5" />
               </span>
               <span>Zone Tổng Đề Thi Lẻ (Đọc · Nghe · Viết)</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Luyện đề riêng từng kỹ năng chuẩn format IELTSMate &amp; Cambridge — xem ngay BXH Ranking điểm sau khi hoàn thành!
+            <p className="text-sm text-[#475569] dark:text-slate-400 mt-1 max-w-2xl">
+              Luyện đề riêng từng kỹ năng chuẩn format IELTSMate &amp; Cambridge - xem ngay BXH Ranking điểm sau khi hoàn thành!
             </p>
           </div>
           {isTeacher && (
@@ -352,7 +352,7 @@ export default function SkillPracticeHub({
                   key={sk}
                   type="button"
                   onClick={() => onOpenSkillBuilder?.(sk)}
-                  className="px-3 py-2 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold flex items-center gap-1 shadow-xs transition"
+                  className="px-3.5 py-2 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-1.5 transition"
                 >
                   <Plus className="w-3.5 h-3.5" /> + {sk.toUpperCase()}
                 </button>
@@ -362,21 +362,21 @@ export default function SkillPracticeHub({
         </div>
 
         {/* Sub-Tabs Split: Reading / Listening / Writing */}
-        <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] w-fit">
+        <div className="flex flex-wrap gap-2 p-1.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 w-fit">
           {[
             { id: 'all', label: `Tất cả Đề Lẻ (${combinedList.length})` },
-            { id: 'reading', label: `📖 Đọc · Reading (${readingTests.length})` },
-            { id: 'listening', label: `🎧 Nghe · Listening (${listeningTests.length})` },
-            { id: 'writing', label: `✍️ Viết · Writing (${writingTests.length})` }
+            { id: 'reading', label: `Đọc · Reading (${readingTests.length})` },
+            { id: 'listening', label: `Nghe · Listening (${listeningTests.length})` },
+            { id: 'writing', label: `Viết · Writing (${writingTests.length})` }
           ].map(sub => (
             <button
               key={sub.id}
               type="button"
               onClick={() => setSingleHubSkill(sub.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
                 singleHubSkill === sub.id
-                  ? 'bg-[#570DF8] text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-rose-100/70 dark:hover:bg-[#24232E]'
+                  ? 'bg-[#007A7A] text-white'
+                  : 'text-[#334155] dark:text-slate-300 hover:bg-[#F1F5F9] dark:hover:bg-slate-800'
               }`}
             >
               {sub.label}
@@ -385,12 +385,12 @@ export default function SkillPracticeHub({
         </div>
 
         {filteredList.length === 0 ? (
-          <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-dashed border-pink-300 dark:border-[#34323F] rounded-3xl p-10 text-center space-y-2">
-            <Layers className="w-10 h-10 mx-auto text-slate-400" />
-            <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-2">
+            <Layers className="w-10 h-10 mx-auto text-[#475569] dark:text-slate-400" />
+            <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
               Chưa có đề thi lẻ nào trong mục này
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            </h2>
+            <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
               Giáo viên có thể tạo nhanh Đề Lẻ Đọc, Nghe hoặc Viết bằng nút phía trên.
             </p>
           </div>
@@ -415,40 +415,40 @@ export default function SkillPracticeHub({
               return (
                 <div
                   key={test.id}
-                  className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] hover:border-[#570DF8]/60 rounded-2xl p-5 flex flex-col justify-between gap-4 transition"
+                  className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 hover:border-[#007A7A] rounded-lg p-5 flex flex-col justify-between gap-4 transition"
                 >
                   <div className="space-y-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${sMeta.cls}`}>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sMeta.cls}`}>
                         {sMeta.label} • {cfg.durations[sk]} phút
                       </span>
                       <div className="flex items-center gap-1.5">
                         {myBest > 0 && (
-                          <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300">
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
                             Kỷ lục: Band {myBest}
                           </span>
                         )}
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#24232C] text-slate-600 dark:text-slate-300">
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
                           {cfg.maxAttempts === 0 ? `${usedCount} lượt` : `${usedCount}/${cfg.maxAttempts} lượt`}
                         </span>
                       </div>
                     </div>
 
-                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-snug">
+                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                       {test.title}
-                    </h3>
+                    </h2>
                     {test.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{test.description}</p>
+                      <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
                       {qList.length > 0 && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-700 dark:text-slate-200">
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#334155] dark:text-slate-200">
                           {qList.length} câu
                         </span>
                       )}
                       {typeTags.map(tag => (
-                        <span key={tag} className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-500/30">
+                        <span key={tag} className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                           {tag}
                         </span>
                       ))}
@@ -460,10 +460,10 @@ export default function SkillPracticeHub({
                       type="button"
                       disabled={isLocked}
                       onClick={() => guardSingleSkillStart(test.id)}
-                      className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
+                      className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
                         isLocked
-                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                          : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
+                          ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
+                          : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                       }`}
                     >
                       {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
@@ -475,7 +475,7 @@ export default function SkillPracticeHub({
                       <button
                         type="button"
                         onClick={() => onOpenSkillBuilder?.(sk, test)}
-                        className="p-2.5 rounded-xl bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-600 dark:text-slate-300 hover:text-[#570DF8]"
+                        className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
                         title="Chỉnh sửa bài này"
                       >
                         <Edit className="w-4 h-4" />
@@ -495,9 +495,9 @@ export default function SkillPracticeHub({
 
   const renderSkillTestCards = (skillId, list) => {
     const metaMap = {
-      listening: { name: 'Listening', color: 'text-[#007A7A] dark:text-[#1EE1D6]', bg: 'bg-[#EDFFFD] dark:bg-teal-500/15', icon: Headphones },
-      reading: { name: 'Reading', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/15', icon: BookOpen },
-      writing: { name: 'Writing', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/15', icon: PenTool }
+      listening: { name: 'Listening', color: 'text-[#0F766E] dark:text-[#1EE1D6]', bg: 'bg-[#EDFFFD] dark:bg-teal-500/15', icon: Headphones },
+      reading: { name: 'Reading', color: 'text-[#1D4ED8] dark:text-blue-400', bg: 'bg-[#EFF6FF] dark:bg-blue-500/15', icon: BookOpen },
+      writing: { name: 'Writing', color: 'text-[#065F46] dark:text-emerald-400', bg: 'bg-[#D1FAE5] dark:bg-emerald-500/15', icon: PenTool }
     };
     const meta = metaMap[skillId] || metaMap.reading;
     const IconComp = meta.icon;
@@ -508,13 +508,13 @@ export default function SkillPracticeHub({
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-              <span className={`w-10 h-10 rounded-2xl ${meta.bg} ${meta.color} flex items-center justify-center`}>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172B] dark:text-white tracking-tight flex items-center gap-2.5">
+              <span className={`w-10 h-10 rounded-lg ${meta.bg} ${meta.color} border border-slate-200 dark:border-slate-700 flex items-center justify-center`}>
                 <IconComp className="w-5 h-5" />
               </span>
               <span>Bài Tập Kỹ Năng: {meta.name}</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-sm text-[#475569] dark:text-slate-400 mt-1 max-w-2xl">
               Bài tập thực hành chuyên sâu theo từng kỹ năng, tách biệt hoàn toàn khỏi bộ Đề Thi IELTS (L·R·W).
             </p>
           </div>
@@ -522,7 +522,7 @@ export default function SkillPracticeHub({
             <button
               type="button"
               onClick={() => onOpenSkillBuilder?.(skillId)}
-              className="px-4 py-2.5 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold flex items-center gap-2 shadow-sm transition self-start sm:self-auto"
+              className="px-4 py-2.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-2 transition self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" /> Tạo Bài Tập {skillId.toUpperCase()}
             </button>
@@ -530,14 +530,14 @@ export default function SkillPracticeHub({
         </div>
 
         {focusedMatch && onClearFocusedTest && (
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/40 border border-[#007A7A]/40 dark:border-[#1EE1D6]/30">
-            <span className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-[#EDFFFD] dark:bg-teal-950/40 border border-[#007A7A]/40 dark:border-[#1EE1D6]/30">
+            <span className="text-xs font-bold text-[#0F766E] dark:text-[#1EE1D6]">
               📌 Đang hiển thị bài tập từ thông báo
             </span>
             <button
               type="button"
               onClick={onClearFocusedTest}
-              className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-[#007A7A] transition"
+              className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 hover:border-[#007A7A] transition"
             >
               ← Xem tất cả bài {meta.name} ({list.length})
             </button>
@@ -545,12 +545,12 @@ export default function SkillPracticeHub({
         )}
 
         {displayedList.length === 0 ? (
-          <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-dashed border-pink-300 dark:border-[#34323F] rounded-3xl p-10 text-center space-y-3">
-            <IconComp className="w-10 h-10 mx-auto text-slate-400" />
-            <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-3">
+            <IconComp className="w-10 h-10 mx-auto text-[#475569] dark:text-slate-400" />
+            <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
               Chưa có bài tập {skillId.toUpperCase()} nào
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+            </h2>
+            <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
               {isTeacher
                 ? `Hãy bấm "Tạo Bài Tập ${skillId.toUpperCase()}" để tạo nhanh một bài tập luyện riêng kỹ năng ${skillId.toUpperCase()}.`
                 : 'Giáo viên sẽ đăng tải các bài tập luyện tập chuyên sâu theo từng kỹ năng tại đây.'}
@@ -585,61 +585,61 @@ export default function SkillPracticeHub({
               return (
                 <div
                   key={test.id}
-                  className={`bg-[#FFF5F8] dark:bg-[#191820] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition ${
+                  className={`bg-white dark:bg-[#0F172B] border rounded-lg p-5 flex flex-col justify-between gap-4 transition ${
                     focusedMatch?.id === test.id
                       ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
-                      : 'border-pink-200/90 dark:border-[#2C2A35] hover:border-[#570DF8]/60'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                   }`}
                 >
                   <div className="space-y-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${meta.bg} ${meta.color}`}>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${meta.bg} ${meta.color}`}>
                         {skillId.toUpperCase()} ONLY • {cfg.durations[skillId]} phút
                       </span>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
                           <span
                             key={cls.id}
-                            className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30"
+                            className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                           >
                             Lớp {cls.name}
                           </span>
                         ))}
                         {isTeacher && cfg.visibility === 'private' && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 flex items-center gap-1">
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 flex items-center gap-1">
                             <EyeOff className="w-3 h-3" /> Đang ẩn
                           </span>
                         )}
-                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#24232C] text-slate-600 dark:text-slate-300">
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
                           {cfg.maxAttempts === 0 ? `Tự do (${usedCount})` : `${usedCount}/${cfg.maxAttempts} lượt`}
                         </span>
                       </div>
                     </div>
 
-                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-snug">
+                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                       {test.title}
-                    </h3>
+                    </h2>
                     {test.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{test.description}</p>
+                      <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
                     )}
-                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <p className="text-xs font-semibold text-[#334155] dark:text-slate-300">
                       Nội dung: {subCountLabel}
                     </p>
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
                       {cfg.scheduleMode === 'flexible' ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 inline-flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
                         </span>
                       ) : schedule.lockedBySchedule ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
                           <Lock className="w-3 h-3" /> {schedule.notYetOpen ? `Mở lúc ${formatViDateTime(schedule.openAt)}` : `Đã hết hạn (${formatViDateTime(schedule.dueAt)})`}
                         </span>
                       ) : schedule.isLateWindow ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn cho làm (báo trễ)
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
                         </span>
                       )}
@@ -651,10 +651,10 @@ export default function SkillPracticeHub({
                       type="button"
                       disabled={isLocked}
                       onClick={() => guardSingleSkillStart(test.id)}
-                      className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
+                      className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
                         isLocked
-                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                          : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
+                          ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
+                          : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                       }`}
                     >
                       {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
@@ -666,7 +666,7 @@ export default function SkillPracticeHub({
                       <button
                         type="button"
                         onClick={() => onOpenSkillBuilder?.(skillId, test)}
-                        className="p-2.5 rounded-xl bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-600 dark:text-slate-300 hover:text-[#570DF8]"
+                        className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
                         title="Chỉnh sửa bài tập này"
                       >
                         <Edit className="w-4 h-4" />
@@ -684,11 +684,11 @@ export default function SkillPracticeHub({
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#FDECF2] dark:bg-[#141318] text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-[calc(100vh-4rem)] bg-[#F8FAFC] dark:bg-[#020618] text-[#0F172B] dark:text-slate-100 transition-colors">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-6 flex flex-col lg:flex-row gap-6">
-        {/* LEFT SIDEBAR — Luyennoi.com Style */}
+        {/* LEFT SIDEBAR */}
         <aside className="lg:w-64 shrink-0">
-          <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-3xl p-4 flex flex-col justify-between gap-5 lg:sticky lg:top-20 shadow-xs">
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-4 flex flex-col justify-between gap-5 lg:sticky lg:top-20">
             <div className="space-y-4">
               {/* Brand lockup with Ms. Như Brand Avatar */}
               <div className="flex items-center justify-between gap-2 px-1">
@@ -696,13 +696,13 @@ export default function SkillPracticeHub({
                   <img
                     src={BRAND_INFO.avatarUrl}
                     alt={BRAND_INFO.shortName}
-                    className="w-10 h-10 rounded-full object-cover border border-pink-200 dark:border-[#34323F] bg-white shadow-xs shrink-0"
+                    className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 bg-white shrink-0"
                   />
                   <div>
-                    <span className="block font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
+                    <span className="block font-extrabold text-sm text-[#0F172B] dark:text-white leading-tight">
                       Luyện Nói IELTS
                     </span>
-                    <span className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                    <span className="block text-xs font-medium text-[#475569] dark:text-slate-400">
                       Speaking AI · 4 Kỹ Năng
                     </span>
                   </div>
@@ -710,7 +710,7 @@ export default function SkillPracticeHub({
                 <button
                   type="button"
                   onClick={() => setSidebarOpenMobile(v => !v)}
-                  className="lg:hidden px-2.5 py-1 rounded-lg text-xs font-bold bg-pink-100/80 dark:bg-[#25242E] text-slate-700 dark:text-slate-200"
+                  className="lg:hidden px-2.5 py-1 rounded-lg text-xs font-bold bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200"
                 >
                   Menu
                 </button>
@@ -720,13 +720,13 @@ export default function SkillPracticeHub({
                 <button
                   type="button"
                   onClick={onOpenFullExamCatalog}
-                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-rose-100/70 dark:hover:bg-[#24232E] flex items-center gap-2.5 transition"
+                  className="w-full px-3 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-slate-300 hover:bg-[#F1F5F9] dark:hover:bg-slate-800 flex items-center gap-2.5 transition"
                 >
                   <ArrowLeft className="w-4 h-4 shrink-0" />
                   <span>Kho Đề Thi IELTS (L·R·W)</span>
                 </button>
 
-                <div className="h-px bg-pink-200/70 dark:bg-[#2C2A35] my-2" />
+                <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
 
                 {navItems.map(item => {
                   const IconComp = item.icon;
@@ -739,20 +739,20 @@ export default function SkillPracticeHub({
                         onChangeTab?.(item.id);
                         setSidebarOpenMobile(false);
                       }}
-                      className={`w-full px-3 py-2.5 rounded-xl text-xs font-extrabold flex items-center justify-between gap-2 transition ${
+                      className={`w-full px-3 py-2.5 rounded-lg text-xs font-bold flex items-center justify-between gap-2 transition ${
                         isActive
-                          ? 'bg-[#570DF8]/15 dark:bg-[#570DF8]/25 text-[#570DF8] dark:text-[#C4B5FD] border border-[#570DF8]/30'
-                          : 'text-slate-600 dark:text-slate-300 hover:bg-rose-100/70 dark:hover:bg-[#24232E] border border-transparent'
+                          ? 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#007A7A]/30'
+                          : 'text-[#334155] dark:text-slate-300 hover:bg-[#F1F5F9] dark:hover:bg-slate-800 border border-transparent'
                       }`}
                     >
                       <span className="flex items-center gap-2.5 truncate">
                         <IconComp className="w-4 h-4 shrink-0" />
                         <span className="truncate">{item.label}</span>
                       </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                         isActive
-                          ? 'bg-[#570DF8] text-white'
-                          : 'bg-pink-100 dark:bg-[#262530] text-slate-600 dark:text-slate-400'
+                          ? 'bg-[#007A7A] text-white'
+                          : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300'
                       }`}>
                         {item.badge}
                       </span>
@@ -762,21 +762,21 @@ export default function SkillPracticeHub({
               </div>
             </div>
 
-            {/* Bottom Progress Ring Widget (matches Luyennoi bottom-left ring) */}
-            <div className={`${sidebarOpenMobile ? 'block' : 'hidden'} lg:block pt-3 border-t border-pink-200/70 dark:border-[#2C2A35] space-y-3`}>
-              <div className="bg-white/75 dark:bg-[#212029] border border-pink-200/80 dark:border-[#302E3B] rounded-2xl p-3.5 text-center space-y-2">
-                <div className="mx-auto w-14 h-14 rounded-full border-4 border-[#570DF8] flex flex-col items-center justify-center bg-white dark:bg-[#191820] shadow-inner">
-                  <span className="text-sm font-black text-slate-900 dark:text-white leading-none">
+            {/* Bottom Progress Ring Widget (flat section divider) */}
+            <div className={`${sidebarOpenMobile ? 'block' : 'hidden'} lg:block pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3`}>
+              <div className="py-1 text-center space-y-2">
+                <div className="mx-auto w-14 h-14 rounded-full border-4 border-[#007A7A] flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-slate-900">
+                  <span className="text-sm font-black text-[#0F172B] dark:text-white leading-none">
                     {mySpeakingAttempts.length}
                   </span>
-                  <span className="text-[9px] text-slate-400 font-bold">lần thi</span>
+                  <span className="text-xs text-[#475569] dark:text-slate-400 font-semibold leading-none mt-0.5">lần</span>
                 </div>
                 <div>
-                  <p className="text-xs font-extrabold text-slate-900 dark:text-white">
+                  <p className="text-xs font-extrabold text-[#0F172B] dark:text-white">
                     {bestSpeakingBand !== null ? `Band Cao Nhất: ${bestSpeakingBand}` : 'Chưa có điểm Speaking'}
                   </p>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center justify-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#570DF8] dark:text-[#A78BFA]" />
+                  <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 flex items-center justify-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
                     <span>{aiConfigured ? 'Gemini Audio AI Sẵn Sàng' : 'AI Chấm Tự Động Đang Bật'}</span>
                   </p>
                 </div>
@@ -786,7 +786,7 @@ export default function SkillPracticeHub({
                 <button
                   type="button"
                   onClick={() => onOpenSkillBuilder?.(activeTab === 'listening' || activeTab === 'reading' || activeTab === 'writing' ? activeTab : 'speaking')}
-                  className="w-full py-2.5 px-3 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition"
+                  className="w-full py-2.5 px-3 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition"
                 >
                   <Plus className="w-4 h-4" /> Tạo Bài Tập Kỹ Năng Mới
                 </button>
@@ -795,26 +795,26 @@ export default function SkillPracticeHub({
           </div>
         </aside>
 
-        {/* MAIN LUYENNOI-STYLE WORKSPACE */}
+        {/* MAIN WORKSPACE */}
         <main className="flex-1 min-w-0 space-y-8">
           {!isTeacher && (
-            <div className="rounded-2xl bg-gradient-to-r from-emerald-50 via-white to-rose-50/70 dark:from-emerald-950/30 dark:via-[#191820] dark:to-rose-950/20 border border-emerald-200 dark:border-emerald-500/35 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs shadow-xs">
-              <span className="font-extrabold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className="rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="font-bold text-[#065F46] dark:text-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-[#047857] dark:text-emerald-400 shrink-0" />
                 <span>
                   {studentHasVip
-                    ? `👑 Bài Tập 4 Kỹ Năng MIỄN PHÍ 100% • Đang bật Ai eo VIP (${activeAccessExpiryText})`
-                    : '🎓 Khu Bài Tập 4 Kỹ Năng & Đề Lẻ đang mở MIỄN PHÍ 100% cho toàn bộ học viên!'}
+                    ? `Bài Tập 4 Kỹ Năng MIỄN PHÍ 100% • Đang bật Ai eo VIP (${activeAccessExpiryText})`
+                    : 'Khu Bài Tập 4 Kỹ Năng & Đề Lẻ đang mở MIỄN PHÍ 100% cho toàn bộ học viên!'}
                 </span>
               </span>
               {!studentHasVip && (
                 <button
                   type="button"
                   onClick={() => openSkillPassCheckout('aieo_vip')}
-                  className="vip-shimmer-badge px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white text-[11px] font-black shadow-xs hover:opacity-95 transition inline-flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-lg bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-bold transition inline-flex items-center gap-1.5"
                 >
                   <Crown className="w-3.5 h-3.5 text-amber-200" />
-                  <span>Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1T) — Viền Neon, Màu Chữ &amp; Tạo Phòng</span>
+                  <span>Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1T) - Viền Neon, Màu Chữ &amp; Tạo Phòng</span>
                 </button>
               )}
             </div>
@@ -840,25 +840,25 @@ export default function SkillPracticeHub({
 
             return (
             <>
-              {/* 2 Core Speaking Mode Switcher: Daily vs Exam Room (Team Sắp Thi 🔒) */}
+              {/* 2 Core Speaking Mode Switcher: Daily vs Exam Room (Team Sắp Thi) */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => onChangeTab?.('speaking_daily')}
-                  className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
+                  className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
                     activeTab === 'speaking_daily'
-                      ? 'bg-orange-600 text-white border-orange-600 shadow-md'
-                      : 'bg-[#FFF5F8] dark:bg-[#191820] border-pink-200 dark:border-[#2C2A35] hover:border-orange-400'
+                      ? 'bg-[#C2410C] text-white border-[#C2410C]'
+                      : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-[#C2410C]'
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${activeTab === 'speaking_daily' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300'}`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'speaking_daily' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#C2410C] dark:bg-orange-500/20 dark:text-orange-300'}`}>
                     <Flame className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-extrabold flex items-center gap-1.5">
                       <span>1. Speaking Daily ({dailySpeakingTests.length})</span>
                     </p>
-                    <p className={`text-[11px] mt-0.5 leading-snug ${activeTab === 'speaking_daily' ? 'text-orange-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'speaking_daily' ? 'text-orange-50' : 'text-[#475569] dark:text-slate-400'}`}>
                       Bài nói bắt buộc mỗi ngày · Ai chưa xong sẽ báo
                     </p>
                   </div>
@@ -867,18 +867,18 @@ export default function SkillPracticeHub({
                 <button
                   type="button"
                   onClick={() => onChangeTab?.('speaking_exam_room')}
-                  className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
+                  className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
                     activeTab === 'speaking_exam_room'
-                      ? 'bg-[#570DF8] text-white border-[#570DF8] shadow-md'
-                      : 'bg-[#FFF5F8] dark:bg-[#191820] border-pink-200 dark:border-[#2C2A35] hover:border-[#570DF8]'
+                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                      : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${activeTab === 'speaking_exam_room' ? 'bg-white/20 text-white' : 'bg-[#570DF8]/12 text-[#570DF8] dark:text-[#C4B5FD]'}`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'speaking_exam_room' ? 'bg-white/20 text-white' : 'bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6]'}`}>
                     <Lock className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-extrabold">2. Thực Chiến Phòng Thi ({examRoomSpeakingTests.length})</p>
-                    <p className={`text-[11px] mt-0.5 leading-snug ${activeTab === 'speaking_exam_room' ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'speaking_exam_room' ? 'text-teal-50' : 'text-[#475569] dark:text-slate-400'}`}>
                       Team sắp thi thật · Yêu cầu nhập Password
                     </p>
                   </div>
@@ -887,18 +887,18 @@ export default function SkillPracticeHub({
                 <button
                   type="button"
                   onClick={() => onChangeTab?.('speaking')}
-                  className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
+                  className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
                     activeTab === 'speaking' || activeTab === 'forecast'
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 border-slate-900 shadow-md'
-                      : 'bg-[#FFF5F8] dark:bg-[#191820] border-pink-200 dark:border-[#2C2A35] hover:border-slate-400'
+                      ? 'bg-[#0F172B] text-white dark:bg-white dark:text-slate-950 border-[#0F172B]'
+                      : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-slate-400'
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${activeTab === 'speaking' || activeTab === 'forecast' ? 'bg-white/15 text-amber-300 dark:bg-slate-900/15 dark:text-amber-600' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'speaking' || activeTab === 'forecast' ? 'bg-white/15 text-amber-300 dark:bg-slate-900/15 dark:text-amber-600' : 'bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300'}`}>
                     <Mic className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-extrabold">Tất Cả &amp; Forecast ({speakingTests.length})</p>
-                    <p className={`text-[11px] mt-0.5 leading-snug ${activeTab === 'speaking' || activeTab === 'forecast' ? 'opacity-80' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'speaking' || activeTab === 'forecast' ? 'opacity-85' : 'text-[#475569] dark:text-slate-400'}`}>
                       Kho bài luyện Speaking &amp; Đề Forecast
                     </p>
                   </div>
@@ -907,16 +907,16 @@ export default function SkillPracticeHub({
 
               {/* Daily Compliance Alert Strip for Students OR Teacher Missing Tracker */}
               {!isTeacher && dailyCompliance.myPendingDailyTests.length > 0 && (
-                <div className="rounded-3xl bg-gradient-to-r from-rose-500/15 via-orange-500/15 to-amber-500/10 border-2 border-orange-400/70 dark:border-orange-500/50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                <div className="rounded-lg bg-[#FFFBEB] dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-orange-600 text-white flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-[#C2410C] text-white flex items-center justify-center shrink-0">
                       <AlertTriangle className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-extrabold text-rose-800 dark:text-rose-200">
-                        🔥 Bắt Buộc Hôm Nay: Bạn còn {dailyCompliance.myPendingDailyTests.length} bài Speaking Daily chưa hoàn thành!
+                      <p className="text-xs sm:text-sm font-extrabold text-[#9A3412] dark:text-amber-200">
+                        Bắt Buộc Hôm Nay: Bạn còn {dailyCompliance.myPendingDailyTests.length} bài Speaking Daily chưa hoàn thành!
                       </p>
-                      <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                      <p className="text-xs sm:text-sm text-[#334155] dark:text-slate-300 mt-0.5 max-w-2xl">
                         Đề chờ hoàn thành: <strong>{dailyCompliance.myPendingDailyTests.map(d => d.title).join(', ')}</strong>. Hãy hoàn thành sớm để hệ thống ghi nhận đạt Daily!
                       </p>
                     </div>
@@ -924,7 +924,7 @@ export default function SkillPracticeHub({
                   <button
                     type="button"
                     onClick={() => handleTriggerSpeakingStart(dailyCompliance.myPendingDailyTests[0], 'full')}
-                    className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-extrabold shrink-0 shadow-sm inline-flex items-center gap-1.5 transition"
+                    className="px-4 py-2.5 rounded-lg bg-[#C2410C] hover:bg-[#9A3412] text-white text-xs font-bold shrink-0 inline-flex items-center gap-1.5 transition"
                   >
                     <Play className="w-3.5 h-3.5 fill-current" /> Làm Bài Daily Ngay →
                   </button>
@@ -932,49 +932,49 @@ export default function SkillPracticeHub({
               )}
 
               {!isTeacher && activeTab === 'speaking_daily' && dailyCompliance.myDailyTests.length > 0 && dailyCompliance.myPendingDailyTests.length === 0 && (
-                <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/40 px-4 py-3 flex items-center gap-2.5 text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                <div className="rounded-lg bg-[#D1FAE5] dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/40 px-4 py-3 flex items-center gap-2.5 text-xs font-bold text-[#065F46] dark:text-emerald-300">
                   <CheckCircle2 className="w-4 h-4 shrink-0" /> Tuyệt vời! Bạn đã hoàn thành toàn bộ Speaking Daily bắt buộc hôm nay.
                 </div>
               )}
 
               {isTeacher && activeTab === 'speaking_daily' && dailyCompliance.perTest.length > 0 && (
-                <div className="rounded-3xl bg-white/95 dark:bg-slate-900 border border-orange-200 dark:border-orange-500/35 p-5 space-y-4 shadow-xs">
+                <div className="rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 p-5 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Users className="w-4 h-4 text-orange-600" />
+                      <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+                        <Users className="w-4 h-4 text-[#C2410C]" />
                         Báo Cáo Speaking Daily: Ai Chưa Hoàn Thành ({dailyCompliance.missingStudentSummaries.length} HS)
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      </h2>
+                      <p className="text-sm text-[#475569] dark:text-slate-400 mt-0.5 max-w-2xl">
                         Tự động đối chiếu học viên trong lớp/hệ thống với bài nộp Speaking Daily. Học viên chưa nộp sẽ hiển thị bên dưới để báo nhắc ngay.
                       </p>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="divide-y divide-slate-200 dark:divide-slate-800">
                     {dailyCompliance.perTest.map(row => (
                       <div
                         key={row.test.id}
-                        className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-2.5"
+                        className="py-3.5 first:pt-0 last:pb-0 space-y-2.5"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-extrabold text-slate-900 dark:text-white">{row.test.title}</span>
+                            <span className="text-sm font-bold text-[#0F172B] dark:text-white">{row.test.title}</span>
                             {row.dailyDate && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300 inline-flex items-center gap-1">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 inline-flex items-center gap-1">
                                 <Calendar className="w-3 h-3" /> {row.dailyDate}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 text-[11px] font-extrabold">
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                          <div className="flex items-center gap-2 text-xs font-bold">
+                            <span className="px-2.5 py-0.5 rounded-full bg-[#D1FAE5] text-[#065F46] dark:bg-emerald-500/20 dark:text-emerald-300">
                               ✓ Đã nộp: {row.doneStudents.length}/{row.targetStudents.length}
                             </span>
                             {row.missingStudents.length > 0 && onNotifyMissingDaily && (
                               <button
                                 type="button"
                                 onClick={() => onNotifyMissingDaily(row.test, row.missingStudents)}
-                                className="px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-extrabold inline-flex items-center gap-1 shadow-xs transition"
+                                className="px-3 py-1 rounded-lg bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-bold inline-flex items-center gap-1 transition"
                               >
                                 <Send className="w-3 h-3" /> Báo &amp; Nhắc {row.missingStudents.length} HS Chưa Làm
                               </button>
@@ -983,16 +983,16 @@ export default function SkillPracticeHub({
                         </div>
 
                         {row.missingStudents.length === 0 ? (
-                          <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                          <p className="text-xs font-bold text-[#065F46] dark:text-emerald-400">
                             ✓ 100% học viên mục tiêu đã hoàn thành bài Daily này!
                           </p>
                         ) : (
                           <div className="flex flex-wrap gap-1.5">
-                            <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mr-1">Chưa hoàn thành:</span>
+                            <span className="text-xs font-bold text-[#B91C1C] dark:text-rose-400 mr-1">Chưa hoàn thành:</span>
                             {row.missingStudents.map(stu => (
                               <span
                                 key={stu.username}
-                                className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-200 border border-rose-200 dark:border-rose-500/40"
+                                className="text-xs font-semibold px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/20 text-[#991B1B] dark:text-rose-200 border border-rose-200 dark:border-rose-500/40"
                               >
                                 {stu.name || stu.username} (@{stu.username})
                               </span>
@@ -1024,20 +1024,20 @@ export default function SkillPracticeHub({
               {!focusedSpeakingMatch && (
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-center">
                 <div className="xl:col-span-7 space-y-4">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#570DF8]/12 dark:bg-[#570DF8]/25 border border-[#570DF8]/25 text-[#570DF8] dark:text-[#C4B5FD] text-[11px] font-bold">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 text-[#0F766E] dark:text-[#1EE1D6] text-xs font-bold">
                     <Mic className="w-3.5 h-3.5" />
                     <span>
                       {activeTab === 'speaking_daily'
-                        ? 'Mục 1: Speaking Daily — Hoàn Thành Mỗi Ngày · Nhắc Người Chưa Làm'
+                        ? 'Mục 1: Speaking Daily - Hoàn Thành Mỗi Ngày · Nhắc Người Chưa Làm'
                         : activeTab === 'speaking_exam_room'
-                        ? 'Mục 2: Phòng Thi Thực Chiến — Team Sắp Thi (Cần Password)'
+                        ? 'Mục 2: Phòng Thi Thực Chiến - Team Sắp Thi (Cần Password)'
                         : activeTab === 'forecast'
                         ? 'Kho Đề Dự Đoán Forecast IELTS Speaking Mới Nhất'
                         : 'Phòng Thi IELTS Speaking AI • Ghi Âm & Chấm 4 Tiêu Chí'}
                     </span>
                   </div>
 
-                  <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                  <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0F172B] dark:text-white tracking-tight">
                     {activeTab === 'speaking_daily'
                       ? 'Speaking Daily'
                       : activeTab === 'speaking_exam_room'
@@ -1046,11 +1046,11 @@ export default function SkillPracticeHub({
                       ? 'Luyện Forecast'
                       : 'Thi thử'}
                   </h1>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
+                  <p className="text-sm text-[#475569] dark:text-slate-300 leading-relaxed max-w-2xl">
                     {activeTab === 'speaking_daily'
                       ? 'Bài luyện nói cập nhật hàng ngày cho cả lớp. Mọi học viên cần hoàn thành đúng ngày; hệ thống sẽ báo ngay những bạn chưa làm.'
                       : activeTab === 'speaking_exam_room'
-                      ? 'Phòng luyện thực chiến mô phỏng áp lực phòng thi thật dành cho team sắp đi thi — yêu cầu mật khẩu giáo viên cấp mới vào thi được.'
+                      ? 'Phòng luyện thực chiến mô phỏng áp lực phòng thi thật dành cho team sắp đi thi - yêu cầu mật khẩu giáo viên cấp mới vào thi được.'
                       : activeTab === 'forecast'
                       ? 'Luyện phản xạ từng Part 1, Cue Card Part 2 và Discussion Part 3 theo bộ câu hỏi Forecast giáo viên biên soạn.'
                       : 'Nhận điểm sát thi thật, tự động lưu file ghi âm lên hệ thống để AI phân tích 4 tiêu chí (Fluency, Lexical, Grammar, Pronunciation) và góp ý nâng Band.'}
@@ -1063,10 +1063,10 @@ export default function SkillPracticeHub({
                           type="button"
                           disabled={featuredLocked}
                           onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'full')}
-                          className={`px-7 py-3 rounded-2xl text-sm font-extrabold uppercase tracking-wide flex items-center gap-2 transition ${
+                          className={`px-7 py-3 rounded-lg text-sm font-bold tracking-wide flex items-center gap-2 transition ${
                             featuredLocked
-                              ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                              : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-lg shadow-indigo-900/20 active:scale-[0.99]'
+                              ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
+                              : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                           }`}
                         >
                           {featuredLocked || (!isTeacher && featuredSpMeta?.speakingTrack === 'exam_room' && featuredSpMeta?.hasRoomPassword && !speakingUnlockTokens?.[featuredSpeakingTest.id])
@@ -1076,23 +1076,23 @@ export default function SkillPracticeHub({
                             {featuredLocked
                               ? 'Đã Khóa / Hết Hạn'
                               : !isTeacher && featuredSpMeta?.speakingTrack === 'exam_room' && featuredSpMeta?.hasRoomPassword && !speakingUnlockTokens?.[featuredSpeakingTest.id]
-                              ? 'NHẬP PASS & THI FULL TEST'
-                              : 'FULL TEST'}
+                              ? 'Nhập Pass & Thi Full Test'
+                              : 'Full Test'}
                           </span>
                         </button>
                         {isTeacher && (
                           <button
                             type="button"
                             onClick={() => onOpenSkillBuilder?.('speaking')}
-                            className="px-4 py-3 rounded-2xl bg-white dark:bg-[#212029] hover:bg-slate-50 dark:hover:bg-[#2A2935] text-slate-800 dark:text-white border border-pink-200 dark:border-[#34323F] text-xs font-extrabold flex items-center gap-1.5 transition"
+                            className="px-4 py-3 rounded-lg bg-white dark:bg-[#0F172B] hover:bg-[#F1F5F9] dark:hover:bg-slate-800 text-[#0F172B] dark:text-white border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold flex items-center gap-1.5 transition"
                           >
-                            <Plus className="w-4 h-4 text-[#570DF8]" /> Tạo Đề Speaking Mới
+                            <Plus className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Tạo Đề Speaking Mới
                           </button>
                         )}
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        <p className="text-xs font-semibold text-[#475569] dark:text-slate-400">
                           Hoặc thi từng part đơn lẻ ({featuredSpeakingTest.title}):
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
@@ -1100,31 +1100,31 @@ export default function SkillPracticeHub({
                             type="button"
                             disabled={featuredLocked || !featuredSpMeta?.part1?.enabled}
                             onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'part1')}
-                            className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
+                            className="px-4 py-2 rounded-full bg-white dark:bg-[#0F172B] hover:border-[#007A7A] disabled:opacity-40 border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-100 transition"
                           >
-                            THI PART 1
+                            Thi Part 1
                           </button>
                           <button
                             type="button"
                             disabled={featuredLocked || !featuredSpMeta?.part2?.enabled}
                             onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'part2')}
-                            className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
+                            className="px-4 py-2 rounded-full bg-white dark:bg-[#0F172B] hover:border-[#007A7A] disabled:opacity-40 border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-100 transition"
                           >
-                            THI PART 2
+                            Thi Part 2
                           </button>
                           <button
                             type="button"
                             disabled={featuredLocked || !featuredSpMeta?.part3?.enabled}
                             onClick={() => handleTriggerSpeakingStart(featuredSpeakingTest, 'part3')}
-                            className="px-4 py-2 rounded-full bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8] disabled:opacity-40 border border-pink-300 dark:border-[#34323F] text-xs font-extrabold uppercase tracking-wide text-slate-800 dark:text-slate-100 transition"
+                            className="px-4 py-2 rounded-full bg-white dark:bg-[#0F172B] hover:border-[#007A7A] disabled:opacity-40 border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-100 transition"
                           >
-                            THI PART 3
+                            Thi Part 3
                           </button>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 rounded-2xl bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] text-xs text-slate-600 dark:text-slate-300">
+                    <div className="p-4 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 text-sm text-[#475569] dark:text-slate-300">
                       Chưa có bài tập nào trong mục này. {isTeacher ? 'Bấm "Tạo Bài Tập Kỹ Năng Mới" và chọn phân loại tương ứng để đăng bài ngay.' : 'Vui lòng chờ giáo viên mở bài tập Speaking.'}
                     </div>
                   )}
@@ -1141,16 +1141,16 @@ export default function SkillPracticeHub({
               <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
+                    <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172B] dark:text-white">
                       {activeTab === 'speaking_daily'
                         ? 'Danh Sách Bài Speaking Daily'
                         : activeTab === 'speaking_exam_room'
-                        ? 'Phòng Thi Thực Chiến (Team Sắp Thi 🔒)'
+                        ? 'Phòng Thi Thực Chiến (Team Sắp Thi)'
                         : activeTab === 'forecast'
                         ? 'Danh Sách Bài Tập Forecast Speaking'
                         : 'Danh Sách Bài Tập Speaking Do Giáo Viên Tạo'}
                     </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
                       Chọn làm trọn bộ 3 Part hoặc chọn thi nhanh 1 Part tùy thích
                     </p>
                   </div>
@@ -1177,40 +1177,40 @@ export default function SkillPracticeHub({
                     return (
                       <div
                         key={test.id}
-                        className={`bg-[#FFF5F8] dark:bg-[#191820] border rounded-2xl p-5 flex flex-col justify-between gap-4 transition ${
+                        className={`bg-white dark:bg-[#0F172B] border rounded-lg p-5 flex flex-col justify-between gap-4 transition ${
                           focusedSpeakingMatch?.id === test.id
                             ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
-                            : 'border-pink-200/90 dark:border-[#2C2A35] hover:border-[#570DF8]/60'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                         }`}
                       >
                         <div className="space-y-2.5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
                               {sp.speakingTrack === 'daily' && (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-orange-600 text-white">
-                                  🔥 Daily {sp.dailyDate || ''}
+                                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#C2410C] text-white">
+                                  Daily {sp.dailyDate || ''}
                                 </span>
                               )}
                               {sp.speakingTrack === 'exam_room' && (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-rose-600 text-white inline-flex items-center gap-1">
-                                  <Lock className="w-2.5 h-2.5" /> Phòng Thi Thực Chiến
+                                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#B91C1C] text-white inline-flex items-center gap-1">
+                                  <Lock className="w-3 h-3" /> Phòng Thi Thực Chiến
                                 </span>
                               )}
                               {sp.isForecast && (
-                                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30">
                                   Forecast
                                 </span>
                               )}
-                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD]">
+                              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30">
                                 {totalItems} câu · AI Chấm 4 Tiêu Chí
                               </span>
                               {sp.speakingTrack === 'daily' && !isTeacher && (
                                 usedCount > 0 ? (
-                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#D1FAE5] text-[#065F46] dark:bg-emerald-500/20 dark:text-emerald-300">
                                     ✓ Đã hoàn thành
                                   </span>
                                 ) : (
-                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+                                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-[#991B1B] dark:bg-rose-500/20 dark:text-rose-300">
                                     Chưa làm
                                   </span>
                                 )
@@ -1220,50 +1220,50 @@ export default function SkillPracticeHub({
                               {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
                                 <span
                                   key={cls.id}
-                                  className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30"
+                                  className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                                 >
                                   Lớp {cls.name}
                                 </span>
                               ))}
                               {isTeacher && cfg.visibility === 'private' && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] dark:bg-amber-500/20 dark:text-amber-300">
                                   Đang ẩn
                                 </span>
                               )}
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/80 dark:bg-[#23222B] text-slate-600 dark:text-slate-300 border border-pink-200/80 dark:border-[#34323F]">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                                 {cfg.maxAttempts === 0 ? `Tự do (${usedCount})` : `Thi thật ${usedCount}/${cfg.maxAttempts}`}
                               </span>
                             </div>
                           </div>
 
-                          <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-snug">
+                          <h3 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                             {test.title}
                           </h3>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                          <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">
                             {test.description}
                           </p>
 
-                          <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                            {p1Count > 0 && <span className="px-2 py-0.5 rounded-lg bg-white/80 dark:bg-[#23222B] border border-pink-200/70 dark:border-[#34323F]">P1: {p1Count} câu</span>}
-                            {p2Count > 0 && <span className="px-2 py-0.5 rounded-lg bg-white/80 dark:bg-[#23222B] border border-pink-200/70 dark:border-[#34323F]">P2: Cue Card</span>}
-                            {p3Count > 0 && <span className="px-2 py-0.5 rounded-lg bg-white/80 dark:bg-[#23222B] border border-pink-200/70 dark:border-[#34323F]">P3: {p3Count} câu</span>}
+                          <div className="flex flex-wrap gap-1.5 text-xs font-semibold text-[#334155] dark:text-slate-300">
+                            {p1Count > 0 && <span className="px-2 py-0.5 rounded-md bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700">P1: {p1Count} câu</span>}
+                            {p2Count > 0 && <span className="px-2 py-0.5 rounded-md bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700">P2: Cue Card</span>}
+                            {p3Count > 0 && <span className="px-2 py-0.5 rounded-md bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700">P3: {p3Count} câu</span>}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
                             {cfg.scheduleMode === 'flexible' ? (
-                              <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 inline-flex items-center gap-1">
+                              <span className="px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 inline-flex items-center gap-1">
                                 <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
                               </span>
                             ) : schedule.lockedBySchedule ? (
-                              <span className="px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
+                              <span className="px-2.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
                                 <Lock className="w-3 h-3" /> {schedule.notYetOpen ? `Mở lúc ${formatViDateTime(schedule.openAt)}` : `Đã hết hạn (${formatViDateTime(schedule.dueAt)})`}
                               </span>
                             ) : schedule.isLateWindow ? (
-                              <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                              <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
                                 <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn cho làm (báo trễ)
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 inline-flex items-center gap-1">
+                              <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
                                 <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
                               </span>
                             )}
@@ -1275,10 +1275,10 @@ export default function SkillPracticeHub({
                             type="button"
                             disabled={isLocked}
                             onClick={() => handleTriggerSpeakingStart(test, 'full')}
-                            className={`flex-1 py-2.5 px-3.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
+                            className={`flex-1 py-2.5 px-3.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
                               isLocked
-                                ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                                : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
+                                ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
+                                : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                             }`}
                           >
                             {isLocked || (!isTeacher && sp.speakingTrack === 'exam_room' && sp.hasRoomPassword && !speakingUnlockTokens?.[test.id])
@@ -1297,7 +1297,7 @@ export default function SkillPracticeHub({
                             <button
                               type="button"
                               onClick={() => handleTriggerSpeakingStart(test, 'part1')}
-                              className="px-3 py-2.5 rounded-xl bg-white dark:bg-[#23222B] hover:border-[#570DF8] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-700 dark:text-slate-200"
+                              className="px-3 py-2.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 text-xs font-bold text-[#334155] dark:text-slate-200"
                             >
                               P1
                             </button>
@@ -1306,7 +1306,7 @@ export default function SkillPracticeHub({
                             <button
                               type="button"
                               onClick={() => handleTriggerSpeakingStart(test, 'part2')}
-                              className="px-3 py-2.5 rounded-xl bg-white dark:bg-[#23222B] hover:border-[#570DF8] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-700 dark:text-slate-200"
+                              className="px-3 py-2.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 text-xs font-bold text-[#334155] dark:text-slate-200"
                             >
                               P2
                             </button>
@@ -1315,7 +1315,7 @@ export default function SkillPracticeHub({
                             <button
                               type="button"
                               onClick={() => handleTriggerSpeakingStart(test, 'part3')}
-                              className="px-3 py-2.5 rounded-xl bg-white dark:bg-[#23222B] hover:border-[#570DF8] border border-pink-200 dark:border-[#34323F] text-xs font-bold text-slate-700 dark:text-slate-200"
+                              className="px-3 py-2.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 text-xs font-bold text-[#334155] dark:text-slate-200"
                             >
                               P3
                             </button>
@@ -1324,7 +1324,7 @@ export default function SkillPracticeHub({
                             <button
                               type="button"
                               onClick={() => onOpenSkillBuilder?.('speaking', test)}
-                              className="p-2.5 rounded-xl bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-600 dark:text-slate-300 hover:text-[#570DF8]"
+                              className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
                               title="Chỉnh sửa bài tập Speaking này"
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -1337,15 +1337,15 @@ export default function SkillPracticeHub({
                 </div>
               </section>
 
-              {/* LỊCH SỬ THI SPEAKING (Matching Luyennoi Screenshot Bottom List!) */}
+              {/* LỊCH SỬ THI SPEAKING */}
               <section className="space-y-3">
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
+                <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172B] dark:text-white">
                   Lịch sử thi Speaking
                 </h2>
 
                 {mySpeakingAttempts.length === 0 ? (
-                  <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-2xl p-8 text-center text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    Bạn chưa có bài thi Speaking nào. Bấm <strong>FULL TEST</strong> hoặc chọn một Part ở trên để bắt đầu!
+                  <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-8 text-center text-sm text-[#475569] dark:text-slate-400">
+                    Bạn chưa có bài thi Speaking nào. Bấm <strong>Full Test</strong> hoặc chọn một Part ở trên để bắt đầu!
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1363,34 +1363,34 @@ export default function SkillPracticeHub({
                           key={att.id}
                           type="button"
                           onClick={() => onOpenResult?.(att.id)}
-                          className="w-full text-left bg-[#FFF5F8] dark:bg-[#191820] hover:border-[#570DF8]/60 border border-pink-200/90 dark:border-[#2C2A35] rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 transition shadow-xs group"
+                          className="w-full text-left bg-white dark:bg-[#0F172B] hover:border-[#007A7A] border border-slate-200 dark:border-slate-800 rounded-lg p-4 sm:p-5 flex items-center justify-between gap-4 transition group"
                         >
                           <div className="min-w-0 space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-[11px] font-black uppercase tracking-wider text-[#570DF8] dark:text-[#A78BFA]">
+                              <span className="text-xs font-extrabold uppercase tracking-wider text-[#0F766E] dark:text-[#1EE1D6]">
                                 {modeLabel}
                               </span>
-                              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
+                              <span className="text-sm font-bold text-[#0F172B] dark:text-slate-200 truncate">
                                 • {att.testTitle}
                               </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-[#475569] dark:text-slate-400">
                               <span className="inline-flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5" /> {att.submittedAt}
                               </span>
-                              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                              <span className="inline-flex items-center gap-1 text-[#065F46] dark:text-emerald-400 font-semibold">
                                 <FileAudio className="w-3.5 h-3.5" /> {recCount} file ghi âm
                               </span>
                               {att.aiGraded && (
-                                <span className="inline-flex items-center gap-1 text-[#570DF8] dark:text-[#C4B5FD] font-semibold">
+                                <span className="inline-flex items-center gap-1 text-[#0F766E] dark:text-[#1EE1D6] font-semibold">
                                   <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm AI
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          <div className="shrink-0 w-14 h-12 rounded-xl bg-white dark:bg-[#23222D] border border-pink-200 dark:border-[#34323F] group-hover:border-[#570DF8] flex flex-col items-center justify-center transition">
-                            <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums leading-none">
+                          <div className="shrink-0 w-14 h-12 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 group-hover:border-[#007A7A] flex flex-col items-center justify-center transition">
+                            <span className="text-lg font-black text-[#0F172B] dark:text-white tabular-nums leading-none">
                               {formattedBand}
                             </span>
                           </div>
@@ -1426,32 +1426,32 @@ export default function SkillPracticeHub({
           <form
             onSubmit={handleSubmitRoomPassword}
             onClick={e => e.stopPropagation()}
-            className="bg-white dark:bg-slate-900 border border-pink-200 dark:border-[#34323F] rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg max-w-md w-full p-6 space-y-4 shadow-2xl"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 flex items-center justify-center shrink-0">
                   <Lock className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#B91C1C] dark:text-rose-400">
                     Team Sắp Thi · Phòng Thi Thực Chiến
                   </span>
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-snug">
+                  <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                     {passwordPromptTarget.test?.title}
-                  </h3>
+                  </h2>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setPasswordPromptTarget(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                className="p-1.5 rounded-lg text-[#475569] hover:text-[#0F172B] dark:hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 leading-relaxed">
               Vui lòng nhập <strong>Mật khẩu Phòng Thi</strong> do giáo viên cung cấp để mở khóa vào làm bài.
             </p>
 
@@ -1463,10 +1463,10 @@ export default function SkillPracticeHub({
                 value={roomPassInput}
                 onChange={e => setRoomPassInput(e.target.value)}
                 placeholder="Nhập mật khẩu phòng thi..."
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#570DF8]"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm font-mono font-bold text-[#0F172B] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007A7A]"
               />
               {roomPassError && (
-                <p className="text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                <p className="text-xs font-bold text-[#B91C1C] dark:text-rose-400 flex items-center gap-1">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {roomPassError}
                 </p>
               )}
@@ -1476,14 +1476,14 @@ export default function SkillPracticeHub({
               <button
                 type="button"
                 onClick={() => setPasswordPromptTarget(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="px-4 py-2 rounded-lg text-xs font-bold text-[#334155] dark:text-slate-300 hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
               >
                 Hủy
               </button>
               <button
                 type="submit"
                 disabled={verifyingRoomPass}
-                className="px-5 py-2 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] disabled:opacity-60 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm"
+                className="px-5 py-2 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] disabled:opacity-60 text-white text-xs font-bold inline-flex items-center gap-1.5"
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>{verifyingRoomPass ? 'Đang kiểm tra...' : 'Mở Khóa & Vào Thi'}</span>

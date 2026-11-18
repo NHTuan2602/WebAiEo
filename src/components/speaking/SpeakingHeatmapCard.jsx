@@ -72,19 +72,19 @@ export default function SpeakingHeatmapCard({ attempts = [] }) {
   }
 
   const getCellColorClass = (count, isFuture) => {
-    if (isFuture) return 'bg-transparent border border-rose-200/40 dark:border-white/[0.04]';
-    if (count === 0) return 'bg-rose-100/80 dark:bg-[#23222A]';
-    if (count === 1) return 'bg-indigo-300 dark:bg-[#4338CA]';
-    if (count === 2) return 'bg-indigo-500 dark:bg-[#570DF8]';
-    return 'bg-indigo-700 dark:bg-[#7C3AED]';
+    if (isFuture) return 'bg-transparent border border-slate-200 dark:border-white/[0.04]';
+    if (count === 0) return 'bg-[#F1F5F9] dark:bg-[#23222A]';
+    if (count === 1) return 'bg-[#99F6E4] dark:bg-teal-800';
+    if (count === 2) return 'bg-[#14B8A6] dark:bg-teal-600';
+    return 'bg-[#0F766E] dark:bg-teal-400';
   };
 
   return (
-    <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-2xl p-4 sm:p-5 shadow-xs">
+    <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-lg p-4 sm:p-5">
       <div className="overflow-x-auto pb-1">
         <div className="min-w-[295px]">
           {/* Top Month Header Row */}
-          <div className="flex items-center gap-[3px] pl-6 mb-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-[3px] pl-7 mb-1.5 text-xs font-semibold text-[#475569] dark:text-slate-400">
             {columns.map((_col, wIdx) => {
               const found = monthLabels.find(m => m.weekIdx === wIdx);
               return (
@@ -97,7 +97,7 @@ export default function SpeakingHeatmapCard({ attempts = [] }) {
 
           {/* 7-row Heatmap Body */}
           <div className="flex items-start gap-1.5">
-            <div className="flex flex-col justify-between h-[96px] text-[10px] font-semibold text-slate-400 dark:text-slate-500 pr-1 py-0.5 select-none">
+            <div className="flex flex-col justify-between h-[96px] text-xs font-semibold text-[#475569] dark:text-slate-400 pr-1 py-0.5 select-none">
               <span className="invisible">T2</span>
               <span>T3</span>
               <span className="invisible">T4</span>
@@ -124,14 +124,14 @@ export default function SpeakingHeatmapCard({ attempts = [] }) {
       </div>
 
       {/* Footer Counter + Legend matching Luyennoi screenshot */}
-      <div className="mt-3 pt-2 border-t border-pink-200/60 dark:border-[#2C2A35] flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
+      <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between text-xs text-[#475569] dark:text-slate-400 font-semibold">
         <span>Đã luyện {attempts.length} lần</span>
         <div className="flex items-center gap-1">
           <span className="mr-1">Ít</span>
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-rose-100 dark:bg-[#23222A]" />
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-indigo-300 dark:bg-[#4338CA]" />
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-indigo-500 dark:bg-[#570DF8]" />
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-indigo-700 dark:bg-[#7C3AED]" />
+          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#F1F5F9] dark:bg-[#23222A]" />
+          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#99F6E4] dark:bg-teal-800" />
+          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#14B8A6] dark:bg-teal-600" />
+          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#0F766E] dark:bg-teal-400" />
           <span className="ml-1">Nhiều</span>
         </div>
       </div>

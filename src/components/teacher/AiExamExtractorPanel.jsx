@@ -155,7 +155,7 @@ export default function AiExamExtractorPanel({
     <div className="bg-gradient-to-br from-[#EDFFFD]/90 via-white to-[#EFF6FF]/70 dark:from-[#003538]/40 dark:via-[#0F172B] dark:to-slate-900 rounded-3xl border border-[#B5F5F1] dark:border-teal-500/35 p-5 sm:p-6 shadow-sm space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#B5F5F1]/70 dark:border-teal-500/20 pb-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#007A7A] text-white mb-1.5">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-[#007A7A] text-white mb-1.5">
             <Sparkles className="w-3 h-3 text-amber-300" /> AI Exam Vision • Không Cần Gõ Tay
           </div>
           <h3 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
@@ -197,7 +197,7 @@ export default function AiExamExtractorPanel({
               <button
                 type="button"
                 onClick={() => setQuestionImages([])}
-                className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
               >
                 Xóa tất cả
               </button>
@@ -236,7 +236,7 @@ export default function AiExamExtractorPanel({
             )}
           </div>
 
-          <p className="text-[11px] text-[#62748E] dark:text-slate-400">
+          <p className="text-xs text-[#475569] dark:text-slate-400">
             Mẹo: Bấm vào khung này rồi nhấn <strong>Ctrl + V</strong> để dán trực tiếp ảnh vừa chụp màn hình.
           </p>
 
@@ -245,7 +245,7 @@ export default function AiExamExtractorPanel({
               {questionImages.map((img, idx) => (
                 <div key={img.id} className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 aspect-[4/3]">
                   <img src={img.dataUrl} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 text-[10px] font-bold bg-black/70 text-white px-1.5 py-0.5 rounded">
+                  <span className="absolute bottom-1 left-1 text-xs font-bold bg-black/70 text-white px-1.5 py-0.5 rounded">
                     #{idx + 1}
                   </span>
                   <button
@@ -276,7 +276,7 @@ export default function AiExamExtractorPanel({
               <button
                 type="button"
                 onClick={() => setAnswerKeyImages([])}
-                className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
               >
                 Xóa ảnh key
               </button>
@@ -318,7 +318,7 @@ export default function AiExamExtractorPanel({
           )}
 
           <div className="pt-1 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-            <label className="block text-[11px] font-bold text-[#62748E] dark:text-slate-400">
+            <label className="block text-xs font-bold text-[#475569] dark:text-slate-400">
               Hoặc dán nhanh danh sách đáp án dạng text (không cần AI):
             </label>
             <div className="flex gap-2 items-start">
