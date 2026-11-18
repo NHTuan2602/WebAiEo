@@ -180,7 +180,7 @@ async function createPayosPaymentRequest({ order, originUrl, secrets }) {
       err.payosCode = String(json?.code || res.status);
       throw err;
     }
-    const qrDataUrl = await QRCode.toDataURL(String(json.data.qrCode), { width: 340, margin: 2 });
+    const qrDataUrl = await QRCode.toDataURL(String(json.data.qrCode), { width: 520, margin: 2 });
     return {
       payosPaymentLinkId: String(json.data.paymentLinkId || ''),
       payosCheckoutUrl: String(json.data.checkoutUrl || ''),
@@ -1398,7 +1398,8 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
     createdByName: notif.createdByName || viewer?.name || 'Giáo viên',
     createdAt: notif.createdAt || new Date().toLocaleString('vi-VN'),
     timestamp: Number(notif.timestamp) || Date.now(),
-    readBy: Array.isArray(notif.readBy) ? [...new Set(notif.readBy)] : []
+    readBy: Array.isArray(notif.readBy) ? [...new Set(notif.readBy)] : [],
+    dismissedBy: Array.isArray(notif.dismissedBy) ? [...new Set(notif.dismissedBy)] : []
   };
   const prevList = Array.isArray(store.notifications) ? store.notifications : [];
   store.notifications = [item, ...prevList].slice(0, 80);
@@ -1438,6 +1439,7 @@ function serializeNotificationsForViewer(store, viewer) {
   return list
     .filter(n => {
       if (!n || (n.createdBy && n.createdBy === uname)) return false;
+      if (Array.isArray(n.dismissedBy) && n.dismissedBy.includes(uname)) return false;
       const targetUsers = Array.isArray(n.targetUsernames) ? n.targetUsernames.map(u => String(u || '').toLowerCase()).filter(Boolean) : [];
       if (targetUsers.length > 0 && !targetUsers.includes(unameLower)) {
         return false;
@@ -1994,7 +1996,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: true };
     }
 
-    case 'MARK_NOTIFICATIONS_READ': {
+    case 'MARK_NOTIFICATIONS_READ':
+    case 'DISMISS_NOTIFICATIONS': {
       return { allowed: true };
     }
 
@@ -2822,6 +2825,31 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         if (readArr.includes(uname)) return n;
         touched = true;
         return { ...n, readBy: [...readArr, uname] };
+      });
+      if (touched) changed = true;
+      break;
+    }
+
+    case 'DISMISS_NOTIFICATIONS': {
+      const uname = viewer?.username;
+      if (!uname) break;
+      const targetId = String(payload?.notificationId || 'read').trim();
+      const list = Array.isArray(store.notifications) ? store.notifications : [];
+      let touched = false;
+      store.notifications = list.map(n => {
+        if (!n) return n;
+        const dismissArr = Array.isArray(n.dismissedBy) ? n.dismissedBy : [];
+        if (dismissArr.includes(uname)) return n;
+        const readArr = Array.isArray(n.readBy) ? n.readBy : [];
+        const shouldDismiss =
+          targetId === 'all'
+            ? true
+            : targetId === 'read'
+            ? readArr.includes(uname)
+            : n.id === targetId;
+        if (!shouldDismiss) return n;
+        touched = true;
+        return { ...n, dismissedBy: [...dismissArr, uname] };
       });
       if (touched) changed = true;
       break;

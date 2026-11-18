@@ -14,7 +14,9 @@ import {
   ShieldAlert,
   Sparkles,
   Sun,
-  UserCheck
+  Trash2,
+  UserCheck,
+  X
 } from 'lucide-react';
 import { BRAND_INFO } from '../../constants/brandInfo';
 import UserAvatarBadge from './UserAvatarBadge';
@@ -25,6 +27,7 @@ export default function Navbar({
   darkMode,
   handleLogout,
   notifications = [],
+  onDismissNotifications = null,
   onMarkNotificationsRead,
   onOpenAccountSecurity,
   onOpenNotificationTarget,
@@ -55,6 +58,7 @@ export default function Navbar({
   const isTeacher = currentUser?.role === 'teacher';
   const notifList = Array.isArray(notifications) ? notifications : [];
   const unreadNotifCount = notifList.filter(n => !n?.isRead).length;
+  const readNotifCount = notifList.filter(n => Boolean(n?.isRead)).length;
   const goToOwnProfile = () => {
     if (openMemberProfile) {
       openMemberProfile(currentUser?.username);
@@ -259,15 +263,28 @@ export default function Navbar({
                         {unreadNotifCount > 0 ? `${unreadNotifCount} thông báo chưa đọc` : 'Đã xem hết tất cả thông báo'}
                       </p>
                     </div>
-                    {unreadNotifCount > 0 && onMarkNotificationsRead && (
-                      <button
-                        type="button"
-                        onClick={() => onMarkNotificationsRead('all')}
-                        className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline flex items-center gap-1 shrink-0"
-                      >
-                        <CheckCheck className="w-3.5 h-3.5" /> Đọc tất cả
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {unreadNotifCount > 0 && onMarkNotificationsRead && (
+                        <button
+                          type="button"
+                          onClick={() => onMarkNotificationsRead('all')}
+                          className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] hover:underline flex items-center gap-1 shrink-0"
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" /> Đọc tất cả
+                        </button>
+                      )}
+                      {notifList.length > 0 && onDismissNotifications && (
+                        <button
+                          type="button"
+                          onClick={() => onDismissNotifications(readNotifCount > 0 ? 'read' : 'all')}
+                          title={readNotifCount > 0 ? 'Xóa toàn bộ thông báo cũ đã đọc' : 'Xóa tất cả thông báo'}
+                          className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 dark:hover:bg-rose-500/25 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-[10px] font-extrabold inline-flex items-center gap-1 transition shrink-0"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          {readNotifCount > 0 ? `Xóa tin cũ (${readNotifCount})` : 'Xóa hết'}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="max-h-96 overflow-y-auto divide-y divide-pink-100/80 dark:divide-slate-800">
@@ -323,6 +340,20 @@ export default function Navbar({
                                     )}
                                     {notif.title}
                                   </p>
+                                  {onDismissNotifications && (
+                                    <button
+                                      type="button"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        onDismissNotifications(notif.id);
+                                      }}
+                                      aria-label={`Xóa thông báo ${notif.title}`}
+                                      title="Xóa thông báo này"
+                                      className="p-1 -mt-0.5 -mr-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition shrink-0"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
                                   {notif.message}

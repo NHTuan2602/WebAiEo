@@ -2147,6 +2147,24 @@ export default function App() {
     dispatchSyncAction('MARK_NOTIFICATIONS_READ', { notificationId });
   };
 
+  const handleDismissNotifications = (modeOrId = 'read') => {
+    const cleanMode = String(modeOrId || 'read').trim();
+    if (!cleanMode) return;
+    setNotifications(prev => {
+      if (cleanMode === 'all') return [];
+      if (cleanMode === 'read') return prev.filter(n => !n?.isRead);
+      return prev.filter(n => n?.id !== cleanMode);
+    });
+    dispatchSyncAction('DISMISS_NOTIFICATIONS', { notificationId: cleanMode });
+    showToast(
+      cleanMode === 'read'
+        ? 'Đã xóa các thông báo cũ.'
+        : cleanMode === 'all'
+        ? 'Đã xóa tất cả thông báo.'
+        : 'Đã xóa thông báo.'
+    );
+  };
+
   const handleDeleteNotification = (notificationId) => {
     if (currentUser?.role !== 'teacher' || !notificationId) return;
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
@@ -5860,6 +5878,7 @@ export default function App() {
           handleLogout={handleLogout}
           notifications={notifications}
           onDeleteNotification={handleDeleteNotification}
+          onDismissNotifications={handleDismissNotifications}
           onMarkNotificationsRead={handleMarkNotificationsRead}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           onOpenNotificationTarget={handleOpenNotificationTarget}

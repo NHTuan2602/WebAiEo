@@ -96,25 +96,25 @@ export default function CoverUnlockQrCard({
       </div>
 
       {activeQrUrl && !qrLoadError ? (
-        <div className={`flex flex-col ${isPreview ? '' : 'md:flex-row'} gap-3.5 items-stretch ${isPreview ? '' : 'md:items-start'}`}>
-          <div className={`shrink-0 mx-auto ${isPreview ? '' : 'md:mx-0'} bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center gap-1.5 w-fit`}>
+        <div className={`flex flex-col ${isPreview ? '' : 'md:flex-row'} gap-4 ${isPreview ? '' : 'md:gap-5'} items-stretch ${isPreview ? '' : 'md:items-center'}`}>
+          <div className={`shrink-0 mx-auto ${isPreview ? '' : 'md:mx-0'} bg-white ${isPreview ? 'p-2.5' : 'p-3.5'} rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center gap-2 w-fit`}>
             <img
               src={activeQrUrl}
               alt={`Mã QR chuyển khoản ${priceLabel}`}
               onError={() => setQrLoadError(true)}
-              className="w-40 h-40 object-contain rounded-lg"
+              className={`${isPreview ? 'w-44 h-44' : 'w-60 h-60 sm:w-64 sm:h-64'} object-contain rounded-xl`}
             />
-            <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1 whitespace-nowrap">
-              <QrCode className="w-3 h-3 text-[#007A7A]" /> {payosQrDataUrl ? 'VietQR PayOS • Tự động 24/7' : 'VietQR • Quét bằng app Ngân hàng'}
+            <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1 whitespace-nowrap">
+              <QrCode className="w-3.5 h-3.5 text-[#007A7A]" /> {payosQrDataUrl ? 'VietQR PayOS • Tự động 24/7' : 'VietQR • Quét bằng app Ngân hàng'}
             </span>
             {payosCheckoutUrl && (
               <a
                 href={payosCheckoutUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full justify-center px-2.5 py-1 rounded-lg bg-[#007A7A]/10 hover:bg-[#007A7A]/20 text-[#007A7A] text-[10px] font-extrabold inline-flex items-center gap-1 transition"
+                className="w-full justify-center px-3 py-1.5 rounded-lg bg-[#007A7A]/10 hover:bg-[#007A7A]/20 text-[#007A7A] text-[11px] font-extrabold inline-flex items-center gap-1.5 transition"
               >
-                <ExternalLink className="w-3 h-3" /> Mở cổng PayOS
+                <ExternalLink className="w-3.5 h-3.5" /> Mở cổng PayOS
               </a>
             )}
           </div>
