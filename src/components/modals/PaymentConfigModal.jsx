@@ -43,6 +43,7 @@ export default function PaymentConfigModal({
 }) {
   const [draft, setDraft] = useState(() => normalizePaymentConfig(paymentConfig || {}));
   const [secretsForm, setSecretsForm] = useState({ sepayApiKey: '', payosChecksumKey: '' });
+  const [clearSecrets, setClearSecrets] = useState({ sepayApiKey: false, payosChecksumKey: false });
   const [flags, setFlags] = useState({
     hasSepayApiKey: Boolean(paymentConfig?.hasSepayApiKey),
     hasPayosChecksumKey: Boolean(paymentConfig?.hasPayosChecksumKey),
@@ -68,6 +69,7 @@ export default function PaymentConfigModal({
           autoVerifyEnabled: Boolean(c.autoVerifyEnabled)
         });
         setSecretsForm({ sepayApiKey: '', payosChecksumKey: '' });
+        setClearSecrets({ sepayApiKey: false, payosChecksumKey: false });
       })
       .catch(() => {});
     return () => {
@@ -118,7 +120,9 @@ export default function PaymentConfigModal({
         body: JSON.stringify({
           paymentConfig: normalized,
           sepayApiKey: secretsForm.sepayApiKey.trim(),
-          payosChecksumKey: secretsForm.payosChecksumKey.trim()
+          payosChecksumKey: secretsForm.payosChecksumKey.trim(),
+          clearSepayApiKey: clearSecrets.sepayApiKey && !secretsForm.sepayApiKey.trim(),
+          clearPayosChecksumKey: clearSecrets.payosChecksumKey && !secretsForm.payosChecksumKey.trim()
         })
       });
       const data = await res.json().catch(() => ({}));
@@ -343,38 +347,92 @@ export default function PaymentConfigModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-1 gap-2.5">
                   <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
-                        SePay API Key {flags.hasSepayApiKey ? '(Đã lưu — để trống nếu giữ nguyên)' : '(Khuyên dùng — Miễn phí 50 GD/tháng)'}
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">
+                        <span>SePay API Key</span>
+                        {flags.hasSepayApiKey && !clearSecrets.sepayApiKey ? (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-extrabold">
+                            ✓ Đã lưu trên server
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 dark:text-slate-400 font-normal">(Miễn phí 50 GD/tháng)</span>
+                        )}
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowSecrets(v => !v)}
-                        className="text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white inline-flex items-center gap-0.5"
-                      >
-                        {showSecrets ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {showSecrets ? 'Ẩn' : 'Hiện'}
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {flags.hasSepayApiKey && !clearSecrets.sepayApiKey && (
+                          <button
+                            type="button"
+                            onClick={() => setClearSecrets(prev => ({ ...prev, sepayApiKey: true }))}
+                            className="text-[10px] font-bold text-rose-500 hover:underline"
+                          >
+                            Xóa khóa
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowSecrets(v => !v)}
+                          className="text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white inline-flex items-center gap-0.5"
+                        >
+                          {showSecrets ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {showSecrets ? 'Ẩn' : 'Hiện'}
+                        </button>
+                      </div>
                     </div>
                     <input
                       type={showSecrets ? 'text' : 'password'}
+                      autoComplete="new-password"
                       value={secretsForm.sepayApiKey}
-                      onChange={e => setSecretsForm(prev => ({ ...prev, sepayApiKey: e.target.value }))}
-                      placeholder={flags.hasSepayApiKey ? '••••••••••••••••' : 'Dán API Key từ SePay (chọn chứng thực API Key)...'}
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-mono"
+                      onChange={e => {
+                        const v = e.target.value;
+                        setSecretsForm(prev => ({ ...prev, sepayApiKey: v }));
+                        if (v.trim()) setClearSecrets(prev => ({ ...prev, sepayApiKey: false }));
+                      }}
+                      placeholder={
+                        flags.hasSepayApiKey && !clearSecrets.sepayApiKey
+                          ? 'Đã lưu an toàn — để trống nếu giữ nguyên (nhập mới để thay)...'
+                          : 'Dán API Key từ SePay (chọn chứng thực API Key)...'
+                      }
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-mono placeholder:font-sans placeholder:text-slate-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                      Hoặc PayOS Checksum Key {flags.hasPayosChecksumKey ? '(Đã lưu — để trống nếu giữ nguyên)' : '(tùy chọn)'}
-                    </label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">
+                        <span>Hoặc PayOS Checksum Key</span>
+                        {flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey ? (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-extrabold">
+                            ✓ Đã lưu trên server
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 dark:text-slate-400 font-normal">(tùy chọn)</span>
+                        )}
+                      </label>
+                      {flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey && (
+                        <button
+                          type="button"
+                          onClick={() => setClearSecrets(prev => ({ ...prev, payosChecksumKey: true }))}
+                          className="text-[10px] font-bold text-rose-500 hover:underline shrink-0"
+                        >
+                          Xóa khóa
+                        </button>
+                      )}
+                    </div>
                     <input
                       type={showSecrets ? 'text' : 'password'}
+                      autoComplete="new-password"
                       value={secretsForm.payosChecksumKey}
-                      onChange={e => setSecretsForm(prev => ({ ...prev, payosChecksumKey: e.target.value }))}
-                      placeholder={flags.hasPayosChecksumKey ? '••••••••••••••••' : 'Dán Checksum Key từ kênh thanh toán PayOS...'}
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-mono"
+                      onChange={e => {
+                        const v = e.target.value;
+                        setSecretsForm(prev => ({ ...prev, payosChecksumKey: v }));
+                        if (v.trim()) setClearSecrets(prev => ({ ...prev, payosChecksumKey: false }));
+                      }}
+                      placeholder={
+                        flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey
+                          ? 'Đã lưu an toàn — để trống nếu giữ nguyên (nhập mới để thay)...'
+                          : 'Dán Checksum Key từ kênh thanh toán PayOS...'
+                      }
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-mono placeholder:font-sans placeholder:text-slate-400"
                     />
                   </div>
                 </div>

@@ -84,15 +84,15 @@ export default function CoverUnlockQrCard({
       </div>
 
       {activeQrUrl && !qrLoadError ? (
-        <div className="flex flex-col sm:flex-row gap-3.5 items-stretch sm:items-start">
-          <div className="shrink-0 mx-auto sm:mx-0 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center gap-1">
+        <div className={`flex flex-col ${isPreview ? '' : 'md:flex-row'} gap-3.5 items-stretch ${isPreview ? '' : 'md:items-start'}`}>
+          <div className={`shrink-0 mx-auto ${isPreview ? '' : 'md:mx-0'} bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center gap-1 w-fit`}>
             <img
               src={activeQrUrl}
               alt={`Mã QR chuyển khoản ${priceLabel}`}
               onError={() => setQrLoadError(true)}
-              className="w-40 h-40 sm:w-44 sm:h-44 object-contain rounded-lg"
+              className="w-40 h-40 object-contain rounded-lg"
             />
-            <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+            <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1 whitespace-nowrap">
               <QrCode className="w-3 h-3 text-[#007A7A]" /> VietQR • Quét bằng app Ngân hàng
             </span>
           </div>
@@ -101,23 +101,23 @@ export default function CoverUnlockQrCard({
             {hasBankDetails && (
               <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-700 space-y-1.5">
                 <div className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1 whitespace-nowrap shrink-0">
                     <CreditCard className="w-3 h-3" /> Ngân hàng
                   </span>
-                  <span className="font-extrabold text-slate-900 dark:text-white text-right truncate">
+                  <span className="font-extrabold text-slate-900 dark:text-white text-right">
                     {cfg.bankName || cfg.bankCode}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="text-slate-500 dark:text-slate-400">Số TK</span>
-                  <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">Số TK</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <span className="font-mono font-extrabold text-slate-900 dark:text-white tabular-nums">
                       {cfg.accountNumber}
                     </span>
                     <button
                       type="button"
                       onClick={() => copyText(cfg.accountNumber, 'stk', 'số tài khoản')}
-                      className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-200 inline-flex items-center gap-0.5"
+                      className="shrink-0 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-200 inline-flex items-center gap-0.5"
                     >
                       {copiedField === 'stk' ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
                       {copiedField === 'stk' ? 'Đã chép' : 'Copy'}
@@ -126,8 +126,8 @@ export default function CoverUnlockQrCard({
                 </div>
                 {cfg.accountName && (
                   <div className="flex items-center justify-between gap-2 text-[11px]">
-                    <span className="text-slate-500 dark:text-slate-400">Chủ TK</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-100 uppercase truncate">
+                    <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">Chủ TK</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 uppercase text-right">
                       {cfg.accountName}
                     </span>
                   </div>
@@ -137,13 +137,13 @@ export default function CoverUnlockQrCard({
 
             <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-emerald-200 dark:border-emerald-500/35 space-y-1.5">
               <div className="flex items-center justify-between gap-2 text-[11px]">
-                <span className="text-slate-500 dark:text-slate-400">Số tiền chính xác</span>
+                <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">Số tiền chính xác</span>
                 <span className="font-black text-emerald-700 dark:text-emerald-300 tabular-nums">{priceLabel}</span>
               </div>
               <div className="flex items-center justify-between gap-2 text-[11px]">
-                <span className="text-slate-500 dark:text-slate-400 shrink-0">Nội dung CK</span>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <code className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 font-mono font-extrabold text-[11px] truncate">
+                <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">Nội dung CK</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <code className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 font-mono font-extrabold text-[11px] whitespace-nowrap">
                     {transferNote}
                   </code>
                   <button
