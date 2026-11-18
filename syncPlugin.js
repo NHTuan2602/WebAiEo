@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import QRCode from 'qrcode';
 import {
   buildSpeakingExaminerPrompt,
   cleanAudioMimeType,
@@ -74,7 +75,7 @@ function verifyPayosWebhookSignature(dataObj, signatureHex, checksumKey) {
     .filter(k => sorted[k] !== undefined)
     .map(k => {
       let val = sorted[k];
-      if (val === null || val === undefined) val = '';
+      if (val === null || val === undefined || val === 'null' || val === 'undefined') val = '';
       else if (typeof val === 'object') val = JSON.stringify(val);
       return `${k}=${val}`;
     })
@@ -83,10 +84,19 @@ function verifyPayosWebhookSignature(dataObj, signatureHex, checksumKey) {
   return timingSafeHexMatch(expected, String(signatureHex).trim().toLowerCase());
 }
 
+function maskSecretHint(secret = '') {
+  const raw = String(secret || '').trim();
+  if (!raw) return '';
+  if (raw.length <= 10) return '••••••••';
+  return `${raw.slice(0, 4)}••••••••${raw.slice(-4)}`;
+}
+
 function getEffectivePaymentSecrets(store) {
   const sec = store?.paymentSecrets && typeof store.paymentSecrets === 'object' ? store.paymentSecrets : {};
   return {
     sepayApiKey: String(sec.sepayApiKey || process.env.SEPAY_API_KEY || '').trim(),
+    payosClientId: String(sec.payosClientId || process.env.PAYOS_CLIENT_ID || '').trim(),
+    payosApiKey: String(sec.payosApiKey || process.env.PAYOS_API_KEY || '').trim(),
     payosChecksumKey: String(sec.payosChecksumKey || process.env.PAYOS_CHECKSUM_KEY || '').trim()
   };
 }
@@ -94,13 +104,120 @@ function getEffectivePaymentSecrets(store) {
 function getPublicPaymentConfigSummary(store) {
   const cfg = normalizePaymentConfig(store?.paymentConfig || {});
   const secrets = getEffectivePaymentSecrets(store);
+  const hasSepayApiKey = Boolean(secrets.sepayApiKey);
+  const hasPayosClientId = Boolean(secrets.payosClientId);
+  const hasPayosApiKey = Boolean(secrets.payosApiKey);
+  const hasPayosChecksumKey = Boolean(secrets.payosChecksumKey);
+  const hasPayosFull = Boolean(hasPayosClientId && hasPayosApiKey && hasPayosChecksumKey);
   return {
     ...cfg,
-    qrReady: Boolean(cfg.customQrUrl || (cfg.bankCode && cfg.accountNumber)),
-    hasSepayApiKey: Boolean(secrets.sepayApiKey),
-    hasPayosChecksumKey: Boolean(secrets.payosChecksumKey),
-    autoVerifyEnabled: Boolean(secrets.sepayApiKey || secrets.payosChecksumKey)
+    qrReady: Boolean(cfg.customQrUrl || (cfg.bankCode && cfg.accountNumber) || hasPayosFull),
+    hasSepayApiKey,
+    hasPayosClientId,
+    hasPayosApiKey,
+    hasPayosChecksumKey,
+    hasPayosFull,
+    autoVerifyEnabled: Boolean(hasSepayApiKey || hasPayosFull || hasPayosChecksumKey)
   };
+}
+
+function getAdminPaymentConfigSummary(store) {
+  const base = getPublicPaymentConfigSummary(store);
+  const secrets = getEffectivePaymentSecrets(store);
+  return {
+    ...base,
+    sepayApiKeyMasked: maskSecretHint(secrets.sepayApiKey),
+    payosClientId: secrets.payosClientId,
+    payosApiKeyMasked: maskSecretHint(secrets.payosApiKey),
+    payosChecksumKeyMasked: maskSecretHint(secrets.payosChecksumKey)
+  };
+}
+
+function resolveRequestOrigin(req) {
+  const rawHost = String(req?.headers?.['x-forwarded-host'] || req?.headers?.host || '').split(',')[0].trim();
+  if (!rawHost || !/^[a-z0-9.-]+(?::\d+)?$/i.test(rawHost)) {
+    return 'https://luyenthiieltsnhatrang.up.railway.app';
+  }
+  const rawProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(rawHost);
+  const proto = rawProto === 'http' || rawProto === 'https' ? rawProto : (isLocal ? 'http' : 'https');
+  return `${proto}://${rawHost}`;
+}
+
+async function createPayosPaymentRequest({ order, originUrl, secrets }) {
+  const amount = Math.round(Number(order?.amount) || 0);
+  const orderCode = Number(order?.numericOrderCode) || 0;
+  const description = String(order?.orderCode || `MKN${orderCode}`).replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
+  const returnUrl = `${originUrl}/?payos=success&order=${encodeURIComponent(order.orderCode)}`;
+  const cancelUrl = `${originUrl}/?payos=cancel&order=${encodeURIComponent(order.orderCode)}`;
+  const sigStr = `amount=${amount}&cancelUrl=${cancelUrl}&description=${description}&orderCode=${orderCode}&returnUrl=${returnUrl}`;
+  const signature = crypto.createHmac('sha256', String(secrets.payosChecksumKey)).update(sigStr).digest('hex');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch('https://api-merchant.payos.vn/v2/payment-requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': secrets.payosClientId,
+        'x-api-key': secrets.payosApiKey
+      },
+      body: JSON.stringify({
+        orderCode,
+        amount,
+        description,
+        cancelUrl,
+        returnUrl,
+        expiredAt: Math.floor((Number(order.expiresAt) || Date.now() + 30 * 60 * 1000) / 1000),
+        signature
+      }),
+      signal: controller.signal
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json || json.code !== '00' || !json.data?.qrCode) {
+      const err = new Error(json?.desc || json?.message || `PayOS HTTP ${res.status}`);
+      err.payosCode = String(json?.code || res.status);
+      throw err;
+    }
+    const qrDataUrl = await QRCode.toDataURL(String(json.data.qrCode), { width: 340, margin: 2 });
+    return {
+      payosPaymentLinkId: String(json.data.paymentLinkId || ''),
+      payosCheckoutUrl: String(json.data.checkoutUrl || ''),
+      payosQrCode: String(json.data.qrCode || ''),
+      payosQrDataUrl: qrDataUrl,
+      payosBin: String(json.data.bin || ''),
+      payosAccountNumber: String(json.data.accountNumber || ''),
+      payosAccountName: String(json.data.accountName || ''),
+      payosDescription: String(json.data.description || description)
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function confirmPayosWebhookOnGateway({ webhookUrl, secrets }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch('https://api-merchant.payos.vn/confirm-webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': secrets.payosClientId,
+        'x-api-key': secrets.payosApiKey
+      },
+      body: JSON.stringify({ webhookUrl }),
+      signal: controller.signal
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || (json?.code && json.code !== '00')) {
+      throw new Error(json?.desc || json?.message || `PayOS trả mã HTTP ${res.status}`);
+    }
+    return json || { code: '00', desc: 'Ok' };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function getOtpMap(store) {
@@ -814,7 +931,7 @@ function createInitialStore(audioDir = '') {
     notifications: [],
     aiConfig: { geminiApiKey: '' },
     paymentConfig: normalizePaymentConfig({}),
-    paymentSecrets: { sepayApiKey: '', payosChecksumKey: '' },
+    paymentSecrets: { sepayApiKey: '', payosClientId: '', payosApiKey: '', payosChecksumKey: '' },
     paymentOrders: [],
     processedWebhookTxIds: [],
     mailConfig: {
@@ -969,6 +1086,8 @@ function applyParsedStoreSnapshot(store, parsed) {
   if (parsed.paymentSecrets && typeof parsed.paymentSecrets === 'object') {
     store.paymentSecrets = {
       sepayApiKey: String(parsed.paymentSecrets.sepayApiKey || '').trim(),
+      payosClientId: String(parsed.paymentSecrets.payosClientId || '').trim(),
+      payosApiKey: String(parsed.paymentSecrets.payosApiKey || '').trim(),
       payosChecksumKey: String(parsed.paymentSecrets.payosChecksumKey || '').trim()
     };
   }
@@ -3928,7 +4047,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Quản Trị Hệ Thống mới xem được cấu hình giá tiền & thanh toán.' });
         return;
       }
-      sendJsonResponse(res, 200, { ok: true, config: getPublicPaymentConfigSummary(store) });
+      sendJsonResponse(res, 200, { ok: true, config: getAdminPaymentConfigSummary(store) });
       return;
     }
 
@@ -3944,11 +4063,20 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         store.paymentConfig = normalizePaymentConfig(rawCfg);
         const prevSec = store.paymentSecrets && typeof store.paymentSecrets === 'object'
           ? store.paymentSecrets
-          : { sepayApiKey: '', payosChecksumKey: '' };
+          : { sepayApiKey: '', payosClientId: '', payosApiKey: '', payosChecksumKey: '' };
+        const nextClientId = body?.clearPayosClientId
+          ? ''
+          : body?.payosClientId !== undefined
+          ? String(body.payosClientId || '').trim()
+          : String(prevSec.payosClientId || '');
         store.paymentSecrets = {
           sepayApiKey: body?.clearSepayApiKey
             ? ''
             : (String(body?.sepayApiKey || '').trim() || prevSec.sepayApiKey || ''),
+          payosClientId: nextClientId,
+          payosApiKey: body?.clearPayosApiKey
+            ? ''
+            : (String(body?.payosApiKey || '').trim() || prevSec.payosApiKey || ''),
           payosChecksumKey: body?.clearPayosChecksumKey
             ? ''
             : (String(body?.payosChecksumKey || '').trim() || prevSec.payosChecksumKey || '')
@@ -3958,9 +4086,47 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         if (onFlush) onFlush(store);
         else onChanged?.(store);
         scheduleBroadcast(50);
-        sendJsonResponse(res, 200, { ok: true, config: getPublicPaymentConfigSummary(store) });
+        sendJsonResponse(res, 200, { ok: true, config: getAdminPaymentConfigSummary(store) });
       } catch (err) {
         sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Lưu cấu hình QR thanh toán thất bại.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/payment/test-payos') {
+      const isViewerSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+      if (!isViewerSuperAdmin) {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Quản Trị Hệ Thống mới kiểm tra được PayOS.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req).catch(() => ({}));
+        const secrets = getEffectivePaymentSecrets(store);
+        const eff = {
+          payosClientId: String(body?.payosClientId || secrets.payosClientId || '').trim(),
+          payosApiKey: String(body?.payosApiKey || secrets.payosApiKey || '').trim(),
+          payosChecksumKey: String(body?.payosChecksumKey || secrets.payosChecksumKey || '').trim()
+        };
+        if (!eff.payosClientId || !eff.payosApiKey || !eff.payosChecksumKey) {
+          sendJsonResponse(res, 400, {
+            ok: false,
+            error: 'Vui lòng nhập & lưu đủ 3 mã PayOS: Client ID, Api Key và Checksum Key trước khi kiểm tra.'
+          });
+          return;
+        }
+        const originUrl = resolveRequestOrigin(req);
+        const webhookUrl = String(body?.webhookUrl || `${originUrl}/api/sync/payment/webhook`).trim();
+        await confirmPayosWebhookOnGateway({ webhookUrl, secrets: eff });
+        sendJsonResponse(res, 200, {
+          ok: true,
+          webhookUrl,
+          message: 'Kết nối PayOS & xác nhận Webhook thành công!'
+        });
+      } catch (err) {
+        sendJsonResponse(res, 502, {
+          ok: false,
+          error: `PayOS từ chối kiểm tra: ${err?.message || 'Kiểm tra lại Client ID / Api Key / Checksum Key'}`
+        });
       }
       return;
     }
@@ -4043,11 +4209,47 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           if (onFlush) onFlush(store);
           else onChanged?.(store);
         }
+
+        let payosWarning = '';
+        const secrets = getEffectivePaymentSecrets(store);
+        const shouldCreatePayosLink = Boolean(
+          !cfg.customQrUrl &&
+          secrets.payosClientId &&
+          secrets.payosApiKey &&
+          secrets.payosChecksumKey &&
+          amount >= 1000 &&
+          !activeOrder.payosQrDataUrl
+        );
+        if (shouldCreatePayosLink) {
+          const originUrl = resolveRequestOrigin(req);
+          try {
+            let payosRes;
+            try {
+              payosRes = await createPayosPaymentRequest({ order: activeOrder, originUrl, secrets });
+            } catch (firstErr) {
+              if (firstErr?.payosCode === '231') {
+                activeOrder.numericOrderCode = crypto.randomInt(10_000_000, 999_999_999);
+                payosRes = await createPayosPaymentRequest({ order: activeOrder, originUrl, secrets });
+              } else {
+                throw firstErr;
+              }
+            }
+            Object.assign(activeOrder, payosRes);
+            store.version += 1;
+            store._localMutated = true;
+            if (onFlush) onFlush(store);
+            else onChanged?.(store);
+          } catch (payosErr) {
+            payosWarning = payosErr?.message || 'Không tạo được QR PayOS động, đang dùng VietQR dự phòng.';
+          }
+        }
+
         sendJsonResponse(res, 200, {
           ok: true,
           alreadyUnlocked: false,
           order: activeOrder,
-          paymentConfig: cfg
+          paymentConfig: cfg,
+          ...(payosWarning ? { payosWarning } : {})
         });
       } catch (err) {
         sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Không thể khởi tạo đơn hàng.' });
@@ -4079,6 +4281,17 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         unlocked: itemUnlocked,
         order: matched || null
       });
+      return;
+    }
+
+    if ((req.method === 'GET' || req.method === 'HEAD') && reqUrl === '/payment/webhook') {
+      if (req.method === 'HEAD') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end();
+      } else {
+        sendJsonResponse(res, 200, { ok: true, error: 0, success: true, ready: true });
+      }
       return;
     }
 

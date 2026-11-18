@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, CheckCircle2, Clock, Copy, CreditCard, Lock, Phone, QrCode, Send, Settings, Sparkles } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Copy, CreditCard, ExternalLink, Lock, Phone, QrCode, Send, Settings, Sparkles } from 'lucide-react';
 import { ADMIN_PAYMENT_CONTACT } from '../../constants/brandInfo';
 import {
   buildCoverUnlockTransferNote,
@@ -12,6 +12,7 @@ import {
 export default function CoverUnlockQrCard({
   username = '',
   orderCode = '',
+  order = null,
   itemType = 'cover',
   itemId = '',
   itemTitle = '',
@@ -36,15 +37,26 @@ export default function CoverUnlockQrCard({
       : cfg.coverUnlockPrice;
   const priceLabel = formatVndCurrency(resolvedAmount);
   const transferNote = buildCoverUnlockTransferNote(username, orderCode);
+  const payosQrDataUrl = !isPreview ? String(order?.payosQrDataUrl || '') : '';
+  const payosCheckoutUrl = !isPreview ? String(order?.payosCheckoutUrl || '') : '';
+  const displayAccountNumber = (!cfg.customQrUrl && payosQrDataUrl && order?.payosAccountNumber)
+    ? String(order.payosAccountNumber)
+    : cfg.accountNumber;
+  const displayAccountName = (!cfg.customQrUrl && payosQrDataUrl && order?.payosAccountName)
+    ? String(order.payosAccountName)
+    : cfg.accountName;
+  const displayTransferNote = (!cfg.customQrUrl && payosQrDataUrl && order?.payosDescription)
+    ? String(order.payosDescription)
+    : transferNote;
   const vietQrUrl = buildVietQrImageUrl({
     bankCode: cfg.bankCode,
-    accountNumber: cfg.accountNumber,
-    accountName: cfg.accountName,
+    accountNumber: displayAccountNumber,
+    accountName: displayAccountName,
     amount: resolvedAmount,
-    addInfo: transferNote
+    addInfo: displayTransferNote
   });
-  const activeQrUrl = cfg.customQrUrl || vietQrUrl;
-  const hasBankDetails = Boolean(cfg.accountNumber && (cfg.bankCode || cfg.bankName));
+  const activeQrUrl = cfg.customQrUrl || payosQrDataUrl || vietQrUrl;
+  const hasBankDetails = Boolean(displayAccountNumber && (cfg.bankCode || cfg.bankName || payosQrDataUrl));
   const headingText = itemType === 'title' && itemTitle
     ? `Mua Danh Hiệu VIP: ${itemTitle}`
     : 'Mở Khóa Tải Ảnh Nền Riêng';
@@ -85,7 +97,7 @@ export default function CoverUnlockQrCard({
 
       {activeQrUrl && !qrLoadError ? (
         <div className={`flex flex-col ${isPreview ? '' : 'md:flex-row'} gap-3.5 items-stretch ${isPreview ? '' : 'md:items-start'}`}>
-          <div className={`shrink-0 mx-auto ${isPreview ? '' : 'md:mx-0'} bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center gap-1 w-fit`}>
+          <div className={`shrink-0 mx-auto ${isPreview ? '' : 'md:mx-0'} bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center gap-1.5 w-fit`}>
             <img
               src={activeQrUrl}
               alt={`Mã QR chuyển khoản ${priceLabel}`}
@@ -93,8 +105,18 @@ export default function CoverUnlockQrCard({
               className="w-40 h-40 object-contain rounded-lg"
             />
             <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1 whitespace-nowrap">
-              <QrCode className="w-3 h-3 text-[#007A7A]" /> VietQR • Quét bằng app Ngân hàng
+              <QrCode className="w-3 h-3 text-[#007A7A]" /> {payosQrDataUrl ? 'VietQR PayOS • Tự động 24/7' : 'VietQR • Quét bằng app Ngân hàng'}
             </span>
+            {payosCheckoutUrl && (
+              <a
+                href={payosCheckoutUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full justify-center px-2.5 py-1 rounded-lg bg-[#007A7A]/10 hover:bg-[#007A7A]/20 text-[#007A7A] text-[10px] font-extrabold inline-flex items-center gap-1 transition"
+              >
+                <ExternalLink className="w-3 h-3" /> Mở cổng PayOS
+              </a>
+            )}
           </div>
 
           <div className="flex-1 min-w-0 space-y-2 text-xs">
@@ -105,18 +127,18 @@ export default function CoverUnlockQrCard({
                     <CreditCard className="w-3 h-3" /> Ngân hàng
                   </span>
                   <span className="font-extrabold text-slate-900 dark:text-white text-right">
-                    {cfg.bankName || cfg.bankCode}
+                    {cfg.bankName || cfg.bankCode || 'Ngân hàng nhận VietQR'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">Số TK</span>
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="font-mono font-extrabold text-slate-900 dark:text-white tabular-nums">
-                      {cfg.accountNumber}
+                      {displayAccountNumber}
                     </span>
                     <button
                       type="button"
-                      onClick={() => copyText(cfg.accountNumber, 'stk', 'số tài khoản')}
+                      onClick={() => copyText(displayAccountNumber, 'stk', 'số tài khoản')}
                       className="shrink-0 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-200 inline-flex items-center gap-0.5"
                     >
                       {copiedField === 'stk' ? <Check className="w-2.5 h-2.5 text-emerald-600" /> : <Copy className="w-2.5 h-2.5" />}
@@ -124,11 +146,11 @@ export default function CoverUnlockQrCard({
                     </button>
                   </div>
                 </div>
-                {cfg.accountName && (
+                {displayAccountName && (
                   <div className="flex items-center justify-between gap-2 text-[11px]">
                     <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">Chủ TK</span>
                     <span className="font-bold text-slate-800 dark:text-slate-100 uppercase text-right">
-                      {cfg.accountName}
+                      {displayAccountName}
                     </span>
                   </div>
                 )}
@@ -144,11 +166,11 @@ export default function CoverUnlockQrCard({
                 <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">Nội dung CK</span>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <code className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 font-mono font-extrabold text-[11px] whitespace-nowrap">
-                    {transferNote}
+                    {displayTransferNote}
                   </code>
                   <button
                     type="button"
-                    onClick={() => copyText(transferNote, 'note', 'nội dung chuyển khoản')}
+                    onClick={() => copyText(displayTransferNote, 'note', 'nội dung chuyển khoản')}
                     className="shrink-0 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/30 text-[10px] font-bold text-emerald-700 dark:text-emerald-200 inline-flex items-center gap-0.5"
                   >
                     {copiedField === 'note' ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
@@ -157,7 +179,7 @@ export default function CoverUnlockQrCard({
                 </div>
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                Giữ nguyên nội dung <b>{transferNote}</b> khi chuyển để hệ thống khớp đúng đơn hàng.
+                Giữ nguyên nội dung <b>{displayTransferNote}</b> khi chuyển để hệ thống khớp đúng đơn hàng.
               </p>
             </div>
 

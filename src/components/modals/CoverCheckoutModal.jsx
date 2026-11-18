@@ -213,6 +213,7 @@ export default function CoverCheckoutModal({
               <CoverUnlockQrCard
                 username={currentUser?.username || ''}
                 orderCode={order?.orderCode || ''}
+                order={order}
                 itemType={isTitleOrder ? 'title' : 'cover'}
                 itemId={itemId}
                 itemTitle={itemLabel}

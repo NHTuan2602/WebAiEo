@@ -1,5 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Check, CheckCircle2, Copy, Crown, Eye, EyeOff, QrCode, Save, ShieldCheck, Trash2, Upload, Webhook, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Copy,
+  Crown,
+  Eye,
+  EyeOff,
+  Lock,
+  QrCode,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  Webhook,
+  X
+} from 'lucide-react';
 import { ADMIN_PAYMENT_CONTACT } from '../../constants/brandInfo';
 import {
   CUSTOM_COVER_UNLOCK_PRICE_VND,
@@ -34,6 +51,104 @@ async function compressQrImagePreserveFullFrame(rawDataUrl) {
   return canvas.toDataURL('image/jpeg', 0.45);
 }
 
+/** Reusable field displaying either a saved locked secret badge or an editable paste input. */
+function SecretKeySlot({
+  label,
+  subtitle = '',
+  hasSaved = false,
+  maskedHint = '',
+  markedClear = false,
+  isEditing = false,
+  value = '',
+  placeholder = '',
+  showSecret = false,
+  onToggleShow = null,
+  onStartEdit,
+  onCancelEdit,
+  onMarkClear,
+  onUndoClear,
+  onChange
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">
+          <span>{label}</span>
+          {subtitle && !hasSaved && (
+            <span className="text-slate-500 dark:text-slate-400 font-normal">{subtitle}</span>
+          )}
+        </label>
+        {(!hasSaved || isEditing) && onToggleShow && (
+          <button
+            type="button"
+            onClick={onToggleShow}
+            className="text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white inline-flex items-center gap-0.5 shrink-0"
+          >
+            {showSecret ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {showSecret ? 'Ẩn' : 'Hiện'}
+          </button>
+        )}
+      </div>
+
+      {hasSaved && !markedClear && !isEditing ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-2 rounded-lg bg-emerald-100/80 dark:bg-emerald-500/15 border border-emerald-300 dark:border-emerald-500/40">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Lock className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-300 shrink-0" />
+            <span className="text-[10px] font-extrabold text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+              Đã lưu:
+            </span>
+            <code className="text-[11px] font-mono font-bold text-emerald-950 dark:text-white truncate">
+              {maskedHint || '••••••••'}
+            </code>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onStartEdit}
+              className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-500/40 text-[10px] font-bold text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50"
+            >
+              Đổi khóa
+            </button>
+            <button
+              type="button"
+              onClick={onMarkClear}
+              className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+            >
+              Xóa
+            </button>
+          </div>
+        </div>
+      ) : markedClear ? (
+        <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg bg-amber-100/80 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/40 text-[10px] font-bold text-amber-900 dark:text-amber-200">
+          <span>Sẽ xóa khóa này khi bấm Lưu</span>
+          <button type="button" onClick={onUndoClear} className="text-[#007A7A] dark:text-[#1EE1D6] hover:underline">
+            Hoàn tác
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <input
+            type={showSecret ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="flex-1 min-w-0 px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-mono placeholder:font-sans placeholder:text-slate-400"
+          />
+          {hasSaved && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="shrink-0 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300"
+            >
+              Hủy
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PaymentConfigModal({
   isOpen,
   paymentConfig = null,
@@ -42,34 +157,57 @@ export default function PaymentConfigModal({
   showToast
 }) {
   const [draft, setDraft] = useState(() => normalizePaymentConfig(paymentConfig || {}));
-  const [secretsForm, setSecretsForm] = useState({ sepayApiKey: '', payosChecksumKey: '' });
-  const [clearSecrets, setClearSecrets] = useState({ sepayApiKey: false, payosChecksumKey: false });
+  const [payosClientId, setPayosClientId] = useState('');
+  const [secretsForm, setSecretsForm] = useState({ sepayApiKey: '', payosApiKey: '', payosChecksumKey: '' });
+  const [clearSecrets, setClearSecrets] = useState({ sepayApiKey: false, payosApiKey: false, payosChecksumKey: false });
+  const [editingSecrets, setEditingSecrets] = useState({ sepayApiKey: false, payosApiKey: false, payosChecksumKey: false });
   const [flags, setFlags] = useState({
     hasSepayApiKey: Boolean(paymentConfig?.hasSepayApiKey),
+    sepayApiKeyMasked: '',
+    hasPayosClientId: Boolean(paymentConfig?.hasPayosClientId),
+    hasPayosApiKey: Boolean(paymentConfig?.hasPayosApiKey),
+    payosApiKeyMasked: '',
     hasPayosChecksumKey: Boolean(paymentConfig?.hasPayosChecksumKey),
+    payosChecksumKeyMasked: '',
+    hasPayosFull: Boolean(paymentConfig?.hasPayosFull),
     autoVerifyEnabled: Boolean(paymentConfig?.autoVerifyEnabled)
   });
   const [showSecrets, setShowSecrets] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testingPayos, setTestingPayos] = useState(false);
+  const [payosTestResult, setPayosTestResult] = useState(null);
   const [error, setError] = useState('');
+
+  const applyServerConfigToState = c => {
+    if (!c) return;
+    setDraft(normalizePaymentConfig(c));
+    setPayosClientId(String(c.payosClientId || ''));
+    setFlags({
+      hasSepayApiKey: Boolean(c.hasSepayApiKey),
+      sepayApiKeyMasked: String(c.sepayApiKeyMasked || ''),
+      hasPayosClientId: Boolean(c.hasPayosClientId),
+      hasPayosApiKey: Boolean(c.hasPayosApiKey),
+      payosApiKeyMasked: String(c.payosApiKeyMasked || ''),
+      hasPayosChecksumKey: Boolean(c.hasPayosChecksumKey),
+      payosChecksumKeyMasked: String(c.payosChecksumKeyMasked || ''),
+      hasPayosFull: Boolean(c.hasPayosFull),
+      autoVerifyEnabled: Boolean(c.autoVerifyEnabled)
+    });
+    setSecretsForm({ sepayApiKey: '', payosApiKey: '', payosChecksumKey: '' });
+    setClearSecrets({ sepayApiKey: false, payosApiKey: false, payosChecksumKey: false });
+    setEditingSecrets({ sepayApiKey: false, payosApiKey: false, payosChecksumKey: false });
+  };
 
   useEffect(() => {
     if (!isOpen) return undefined;
     let cancelled = false;
+    setPayosTestResult(null);
     fetch('/api/sync/payment/config', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         if (cancelled || !data?.ok || !data.config) return;
-        const c = data.config;
-        setDraft(normalizePaymentConfig(c));
-        setFlags({
-          hasSepayApiKey: Boolean(c.hasSepayApiKey),
-          hasPayosChecksumKey: Boolean(c.hasPayosChecksumKey),
-          autoVerifyEnabled: Boolean(c.autoVerifyEnabled)
-        });
-        setSecretsForm({ sepayApiKey: '', payosChecksumKey: '' });
-        setClearSecrets({ sepayApiKey: false, payosChecksumKey: false });
+        applyServerConfigToState(data.config);
       })
       .catch(() => {});
     return () => {
@@ -107,38 +245,89 @@ export default function PaymentConfigModal({
     }
   };
 
+  const persistConfigToServer = async () => {
+    const normalized = normalizePaymentConfig(draft);
+    const res = await fetch('/api/sync/payment/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paymentConfig: normalized,
+        sepayApiKey: secretsForm.sepayApiKey.trim(),
+        payosClientId: payosClientId.trim(),
+        payosApiKey: secretsForm.payosApiKey.trim(),
+        payosChecksumKey: secretsForm.payosChecksumKey.trim(),
+        clearSepayApiKey: clearSecrets.sepayApiKey && !secretsForm.sepayApiKey.trim(),
+        clearPayosClientId: !payosClientId.trim() && flags.hasPayosClientId,
+        clearPayosApiKey: clearSecrets.payosApiKey && !secretsForm.payosApiKey.trim(),
+        clearPayosChecksumKey: clearSecrets.payosChecksumKey && !secretsForm.payosChecksumKey.trim()
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data?.error || 'Không thể lưu cấu hình thanh toán.');
+    }
+    applyServerConfigToState(data.config);
+    onSaved?.(data.config);
+    return data.config;
+  };
+
   const handleSubmit = async e => {
     e.preventDefault();
-    if (saving) return;
+    if (saving || testingPayos) return;
     setError('');
     setSaving(true);
     try {
-      const normalized = normalizePaymentConfig(draft);
-      const res = await fetch('/api/sync/payment/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentConfig: normalized,
-          sepayApiKey: secretsForm.sepayApiKey.trim(),
-          payosChecksumKey: secretsForm.payosChecksumKey.trim(),
-          clearSepayApiKey: clearSecrets.sepayApiKey && !secretsForm.sepayApiKey.trim(),
-          clearPayosChecksumKey: clearSecrets.payosChecksumKey && !secretsForm.payosChecksumKey.trim()
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        setError(data?.error || 'Không thể lưu cấu hình thanh toán.');
-        return;
-      }
-      onSaved?.(data.config);
+      await persistConfigToServer();
       showToast?.('Đã lưu bảng giá, QR & cấu hình Webhook Quản Trị!');
       onClose?.();
-    } catch {
-      setError('Lỗi kết nối tới máy chủ.');
+    } catch (err) {
+      setError(err?.message || 'Lỗi kết nối tới máy chủ.');
     } finally {
       setSaving(false);
     }
   };
+
+  const handleTestPayosConnection = async () => {
+    if (saving || testingPayos) return;
+    setError('');
+    setPayosTestResult(null);
+    setTestingPayos(true);
+    try {
+      await persistConfigToServer();
+      const res = await fetch('/api/sync/payment/test-payos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setPayosTestResult({ ok: false, message: data?.error || 'Kiểm tra PayOS thất bại.' });
+      } else {
+        setPayosTestResult({ ok: true, message: data?.message || 'Kết nối PayOS & Webhook thành công!' });
+        showToast?.('Đã lưu & kích hoạt Webhook PayOS thành công!');
+      }
+    } catch (err) {
+      setPayosTestResult({ ok: false, message: err?.message || 'Không thể kiểm tra kết nối PayOS.' });
+    } finally {
+      setTestingPayos(false);
+    }
+  };
+
+  const effectivePayosFull = Boolean(
+    payosClientId.trim() &&
+    (secretsForm.payosApiKey.trim() || (flags.hasPayosApiKey && !clearSecrets.payosApiKey)) &&
+    (secretsForm.payosChecksumKey.trim() || (flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey))
+  );
+  const payosPartiallyFilled = Boolean(
+    (payosClientId.trim() || secretsForm.payosApiKey.trim() || secretsForm.payosChecksumKey.trim() || flags.hasPayosChecksumKey || flags.hasPayosApiKey) &&
+    !effectivePayosFull
+  );
+  const effectiveAutoVerify = Boolean(
+    effectivePayosFull ||
+    secretsForm.sepayApiKey.trim() ||
+    (flags.hasSepayApiKey && !clearSecrets.sepayApiKey) ||
+    (flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey)
+  );
 
   return (
     <div
@@ -305,24 +494,24 @@ export default function PaymentConfigModal({
               </div>
 
               {/* Automatic Webhook Verification Section */}
-              <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/35 space-y-2.5">
+              <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/35 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-extrabold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
                     <Webhook className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    Tự Động Duyệt Quét QR (SePay / PayOS)
+                    Tự Động Duyệt Quét QR (PayOS / SePay)
                   </span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                    flags.autoVerifyEnabled || secretsForm.sepayApiKey.trim() || secretsForm.payosChecksumKey.trim()
+                    effectiveAutoVerify
                       ? 'bg-emerald-600 text-white'
                       : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200'
                   }`}>
-                    {flags.autoVerifyEnabled ? 'Đang bật Tự Động' : 'Duyệt Tay'}
+                    {effectiveAutoVerify ? 'Đang bật Tự Động' : 'Duyệt Tay'}
                   </span>
                 </div>
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Webhook URL (dán vào my.sepay.vn hoặc my.payos.vn)
+                    Webhook URL (dán vào my.payos.vn hoặc my.sepay.vn)
                   </label>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -347,98 +536,135 @@ export default function PaymentConfigModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2.5">
+                {/* PayOS Card (requires all 3: Client ID + API Key + Checksum Key) */}
+                <div className="p-3 rounded-xl bg-white/85 dark:bg-slate-900/70 border border-emerald-200/80 dark:border-slate-700 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-extrabold text-slate-800 dark:text-white">
+                      1. Cổng PayOS (dán đủ 3 mã từ Thông tin tích hợp)
+                    </span>
+                    {effectivePayosFull && (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[9px] font-black">
+                        ✓ Đủ 3 mã PayOS
+                      </span>
+                    )}
+                  </div>
+
                   <div>
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">
-                        <span>SePay API Key</span>
-                        {flags.hasSepayApiKey && !clearSecrets.sepayApiKey ? (
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-extrabold">
-                            ✓ Đã lưu trên server
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 dark:text-slate-400 font-normal">(Miễn phí 50 GD/tháng)</span>
-                        )}
-                      </label>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {flags.hasSepayApiKey && !clearSecrets.sepayApiKey && (
-                          <button
-                            type="button"
-                            onClick={() => setClearSecrets(prev => ({ ...prev, sepayApiKey: true }))}
-                            className="text-[10px] font-bold text-rose-500 hover:underline"
-                          >
-                            Xóa khóa
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setShowSecrets(v => !v)}
-                          className="text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white inline-flex items-center gap-0.5"
-                        >
-                          {showSecrets ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {showSecrets ? 'Ẩn' : 'Hiện'}
-                        </button>
-                      </div>
-                    </div>
+                    <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      PayOS Client ID
+                    </label>
                     <input
-                      type={showSecrets ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      value={secretsForm.sepayApiKey}
-                      onChange={e => {
-                        const v = e.target.value;
-                        setSecretsForm(prev => ({ ...prev, sepayApiKey: v }));
-                        if (v.trim()) setClearSecrets(prev => ({ ...prev, sepayApiKey: false }));
-                      }}
-                      placeholder={
-                        flags.hasSepayApiKey && !clearSecrets.sepayApiKey
-                          ? 'Đã lưu an toàn — để trống nếu giữ nguyên (nhập mới để thay)...'
-                          : 'Dán API Key từ SePay (chọn chứng thực API Key)...'
-                      }
+                      type="text"
+                      value={payosClientId}
+                      onChange={e => setPayosClientId(e.target.value)}
+                      placeholder="vd: 0afb7d7c-2804-42ba-..."
                       className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-mono placeholder:font-sans placeholder:text-slate-400"
                     />
                   </div>
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">
-                        <span>Hoặc PayOS Checksum Key</span>
-                        {flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey ? (
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-extrabold">
-                            ✓ Đã lưu trên server
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 dark:text-slate-400 font-normal">(tùy chọn)</span>
-                        )}
-                      </label>
-                      {flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey && (
-                        <button
-                          type="button"
-                          onClick={() => setClearSecrets(prev => ({ ...prev, payosChecksumKey: true }))}
-                          className="text-[10px] font-bold text-rose-500 hover:underline shrink-0"
-                        >
-                          Xóa khóa
-                        </button>
-                      )}
+
+                  <SecretKeySlot
+                    label="PayOS Api Key"
+                    hasSaved={flags.hasPayosApiKey}
+                    maskedHint={flags.payosApiKeyMasked}
+                    markedClear={clearSecrets.payosApiKey}
+                    isEditing={editingSecrets.payosApiKey}
+                    value={secretsForm.payosApiKey}
+                    placeholder="Dán Api Key từ my.payos.vn..."
+                    showSecret={showSecrets}
+                    onToggleShow={() => setShowSecrets(v => !v)}
+                    onStartEdit={() => setEditingSecrets(p => ({ ...p, payosApiKey: true }))}
+                    onCancelEdit={() => {
+                      setEditingSecrets(p => ({ ...p, payosApiKey: false }));
+                      setSecretsForm(p => ({ ...p, payosApiKey: '' }));
+                    }}
+                    onMarkClear={() => setClearSecrets(p => ({ ...p, payosApiKey: true }))}
+                    onUndoClear={() => setClearSecrets(p => ({ ...p, payosApiKey: false }))}
+                    onChange={v => {
+                      setSecretsForm(p => ({ ...p, payosApiKey: v }));
+                      if (v.trim()) setClearSecrets(p => ({ ...p, payosApiKey: false }));
+                    }}
+                  />
+
+                  <SecretKeySlot
+                    label="PayOS Checksum Key"
+                    hasSaved={flags.hasPayosChecksumKey}
+                    maskedHint={flags.payosChecksumKeyMasked}
+                    markedClear={clearSecrets.payosChecksumKey}
+                    isEditing={editingSecrets.payosChecksumKey}
+                    value={secretsForm.payosChecksumKey}
+                    placeholder="Dán Checksum Key từ my.payos.vn..."
+                    showSecret={showSecrets}
+                    onToggleShow={() => setShowSecrets(v => !v)}
+                    onStartEdit={() => setEditingSecrets(p => ({ ...p, payosChecksumKey: true }))}
+                    onCancelEdit={() => {
+                      setEditingSecrets(p => ({ ...p, payosChecksumKey: false }));
+                      setSecretsForm(p => ({ ...p, payosChecksumKey: '' }));
+                    }}
+                    onMarkClear={() => setClearSecrets(p => ({ ...p, payosChecksumKey: true }))}
+                    onUndoClear={() => setClearSecrets(p => ({ ...p, payosChecksumKey: false }))}
+                    onChange={v => {
+                      setSecretsForm(p => ({ ...p, payosChecksumKey: v }));
+                      if (v.trim()) setClearSecrets(p => ({ ...p, payosChecksumKey: false }));
+                    }}
+                  />
+
+                  {payosPartiallyFilled && (
+                    <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/40 text-[10px] text-amber-900 dark:text-amber-200 flex items-start gap-1.5 leading-relaxed">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <span>
+                        PayOS cần <b>đủ cả 3 mã</b> (Client ID + Api Key + Checksum Key) để web tạo QR động &amp; PayOS tự bắn Webhook khi học viên quét!
+                      </span>
                     </div>
-                    <input
-                      type={showSecrets ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      value={secretsForm.payosChecksumKey}
-                      onChange={e => {
-                        const v = e.target.value;
-                        setSecretsForm(prev => ({ ...prev, payosChecksumKey: v }));
-                        if (v.trim()) setClearSecrets(prev => ({ ...prev, payosChecksumKey: false }));
-                      }}
-                      placeholder={
-                        flags.hasPayosChecksumKey && !clearSecrets.payosChecksumKey
-                          ? 'Đã lưu an toàn — để trống nếu giữ nguyên (nhập mới để thay)...'
-                          : 'Dán Checksum Key từ kênh thanh toán PayOS...'
-                      }
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-[11px] font-mono placeholder:font-sans placeholder:text-slate-400"
-                    />
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      disabled={saving || testingPayos || !effectivePayosFull}
+                      onClick={handleTestPayosConnection}
+                      className="px-3 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-[10px] font-bold inline-flex items-center gap-1.5"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${testingPayos ? 'animate-spin' : ''}`} />
+                      {testingPayos ? 'Đang lưu & kiểm tra...' : 'Lưu & Kích hoạt Webhook PayOS'}
+                    </button>
+                    {payosTestResult && (
+                      <span className={`text-[10px] font-bold ${payosTestResult.ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {payosTestResult.message}
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                {/* SePay Card */}
+                <div className="p-3 rounded-xl bg-white/85 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-700 space-y-2">
+                  <SecretKeySlot
+                    label="2. Hoặc SePay API Key"
+                    subtitle="(tùy chọn • miễn phí 50 GD/tháng)"
+                    hasSaved={flags.hasSepayApiKey}
+                    maskedHint={flags.sepayApiKeyMasked}
+                    markedClear={clearSecrets.sepayApiKey}
+                    isEditing={editingSecrets.sepayApiKey}
+                    value={secretsForm.sepayApiKey}
+                    placeholder="Dán API Key từ SePay (chọn chứng thực API Key)..."
+                    showSecret={showSecrets}
+                    onToggleShow={() => setShowSecrets(v => !v)}
+                    onStartEdit={() => setEditingSecrets(p => ({ ...p, sepayApiKey: true }))}
+                    onCancelEdit={() => {
+                      setEditingSecrets(p => ({ ...p, sepayApiKey: false }));
+                      setSecretsForm(p => ({ ...p, sepayApiKey: '' }));
+                    }}
+                    onMarkClear={() => setClearSecrets(p => ({ ...p, sepayApiKey: true }))}
+                    onUndoClear={() => setClearSecrets(p => ({ ...p, sepayApiKey: false }))}
+                    onChange={v => {
+                      setSecretsForm(p => ({ ...p, sepayApiKey: v }));
+                      if (v.trim()) setClearSecrets(p => ({ ...p, sepayApiKey: false }));
+                    }}
+                  />
+                </div>
+
                 <p className="text-[10px] text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed flex items-start gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>Khi chưa nhập API Key, học viên vẫn quét được QR và liên hệ SĐT/Zalo Quản trị {ADMIN_PAYMENT_CONTACT.phoneRaw} để duyệt nhanh.</span>
+                  <span>Khi chưa nhập khóa, học viên vẫn quét được QR và liên hệ SĐT/Zalo Quản trị {ADMIN_PAYMENT_CONTACT.phoneRaw} để duyệt nhanh.</span>
                 </p>
               </div>
             </div>
@@ -452,12 +678,12 @@ export default function PaymentConfigModal({
                 orderCode="MKN8F2A9C"
                 paymentConfig={{
                   ...draft,
-                  autoVerifyEnabled: flags.autoVerifyEnabled || Boolean(secretsForm.sepayApiKey.trim() || secretsForm.payosChecksumKey.trim())
+                  autoVerifyEnabled: effectiveAutoVerify
                 }}
                 isPreview={true}
                 showToast={showToast}
               />
-              {flags.autoVerifyEnabled && (
+              {effectiveAutoVerify && (
                 <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 px-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Chế độ tự động 24/7 đang hoạt động!
                 </p>
