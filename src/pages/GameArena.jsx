@@ -235,10 +235,10 @@ export default function GameArena({
     <button
       type="button"
       onClick={() => setDarkMode(d => !d)}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-pink-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition"
       title={darkMode ? 'Chuyển sang giao diện Sáng (Hồng dịu)' : 'Chuyển sang giao diện Tối (Vũ trụ)'}
     >
-      {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-[#007A7A]" />}
+      {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-[#007A7A]" />}
       <span className="hidden sm:inline">{darkMode ? 'Sáng' : 'Tối'}</span>
     </button>
   ) : null;
@@ -963,30 +963,26 @@ export default function GameArena({
     return (
       <div className="h-[100dvh] w-full overflow-hidden bg-[#FDECF2] dark:bg-[#070b15] text-[#0F172B] dark:text-white flex flex-col select-none relative transition-colors duration-200">
         {/* Top Lobby Header */}
-        <header className="shrink-0 bg-[#FFF5F8]/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-pink-200/80 dark:border-slate-800 px-4 py-2.5 flex items-center justify-between gap-2.5 flex-wrap z-30">
+        <header className="shrink-0 bg-[#FFF5F8]/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-pink-200/80 dark:border-slate-800 px-4 py-2.5 flex items-center justify-between gap-2.5 flex-wrap z-30">
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleLeaveGameLobby}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-pink-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-white transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition"
             >
               <ChevronLeft className="w-4 h-4" /> Rời Sảnh
             </button>
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-800/80 border border-pink-200 dark:border-slate-700 px-3 py-1.5 rounded-xl">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-[#334155] px-3 py-1.5 rounded-lg">
+              <span className="w-2 h-2 rounded-full bg-[#007A7A] dark:bg-[#1EE1D6]" />
               <span className="text-xs font-bold text-[#0F172B] dark:text-slate-200 max-w-[180px] truncate">{room.name}</span>
             </div>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border ${
-              serverSyncConnected
-                ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
-                : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
-            }`}>
-              <Wifi className="w-3 h-3" /> {serverSyncConnected ? 'Live' : 'Local'}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-white dark:bg-slate-800 border border-slate-300 dark:border-[#334155] text-[#475569] dark:text-slate-300">
+              <Wifi className={`w-3 h-3 ${serverSyncConnected ? 'text-[#007A7A] dark:text-[#1EE1D6]' : 'text-amber-500'}`} /> {serverSyncConnected ? 'Live' : 'Local'}
             </span>
             {isRoomHost && (
-              <div className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs">
-                <span className="text-[#334155] dark:text-slate-300">PIN: <b className="font-mono text-amber-700 dark:text-amber-300">{room.pin}</b></span>
-                <span className="text-slate-400 dark:text-slate-500">•</span>
-                <span className="text-[#334155] dark:text-slate-300">Pass: <b className="font-mono text-[#007A7A] dark:text-cyan-300">{room.pass}</b></span>
+              <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-[#334155] px-3 py-1.5 rounded-lg text-xs">
+                <span className="text-[#475569] dark:text-slate-300">PIN: <b className="font-mono text-[#0F172B] dark:text-white">{room.pin}</b></span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="text-[#475569] dark:text-slate-300">Pass: <b className="font-mono text-[#007A7A] dark:text-[#1EE1D6]">{room.pass}</b></span>
                 <button
                   onClick={() => {
                     navigator.clipboard?.writeText(`Mã phòng Game Từ Vựng: ${room.pin} | Mật khẩu: ${room.pass}`);
@@ -994,15 +990,15 @@ export default function GameArena({
                     setTimeout(() => setCopiedRoomPin(false), 1800);
                     showToast(`Đã sao chép PIN ${room.pin} & Pass "${room.pass}"!`);
                   }}
-                  className="ml-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-white"
+                  className="ml-1 text-slate-500 hover:text-[#007A7A] dark:text-slate-400 dark:hover:text-[#1EE1D6]"
                   title="Sao chép mã PIN & Mật khẩu"
                 >
-                  {copiedRoomPin ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedRoomPin ? <Check className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleCopyInviteLink(room.pin)}
-                  className="text-[#007A7A] hover:text-[#065B5B] dark:text-cyan-300 dark:hover:text-white pl-1 border-l border-indigo-200 dark:border-indigo-500/30"
+                  className="text-slate-500 hover:text-[#007A7A] dark:text-slate-400 dark:hover:text-[#1EE1D6] pl-1.5 border-l border-slate-200 dark:border-[#334155]"
                   title="Sao chép Link mời tự điền PIN (?pin=...)"
                 >
                   <Share2 className="w-3.5 h-3.5" />
@@ -1013,23 +1009,23 @@ export default function GameArena({
 
           <div className="flex items-center gap-2 flex-wrap">
             {themeToggleButton}
-            <span className="bg-white dark:bg-slate-800 border border-pink-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-[#007A7A] dark:text-cyan-300">
-              <Users className="w-3.5 h-3.5" /> {lobbyPlayersList.length}/{room.maxPlayers}
+            <span className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-[#334155] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-[#0F172B] dark:text-slate-200">
+              <Users className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> {lobbyPlayersList.length}/{room.maxPlayers}
             </span>
             {isRoomHost && (
               <>
                 <button
                   onClick={() => setShowCreateRoomModal(true)}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition flex items-center gap-1"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Tạo Phòng
+                  <Plus className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Tạo Phòng
                 </button>
                 <button
                   onClick={() => {
                     setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
                     setShowVocabModal(true);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-xs font-bold text-amber-700 dark:text-amber-300 transition"
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition"
                 >
                   Kho Từ ({roomVocabCount})
                 </button>
@@ -1037,7 +1033,7 @@ export default function GameArena({
                   !hasStudentsInLobby ? (
                     <button
                       onClick={() => jumpToGameSandboxRound(1)}
-                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-pink-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-xs font-bold text-[#334155] dark:text-slate-300 transition hidden sm:inline-flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition hidden sm:inline-flex items-center gap-1"
                       title="Chỉ khả dụng khi phòng chưa có học sinh"
                     >
                       Chơi Thử GV
@@ -1045,13 +1041,13 @@ export default function GameArena({
                   ) : room.status === 'PLAYING' ? (
                     <button
                       onClick={() => setGameSubState('HOST_SPECTATE')}
-                      className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 border border-amber-300 dark:border-amber-400/40 text-xs font-bold text-amber-800 dark:text-amber-300 transition inline-flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition inline-flex items-center gap-1"
                     >
-                      <Trophy className="w-3.5 h-3.5" /> Bảng Đua Top
+                      <Trophy className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Bảng Đua Top
                     </button>
                   ) : (
-                    <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#EDFFFD] dark:bg-cyan-500/10 border border-[#B5F5F1] dark:border-cyan-500/30 text-[11px] font-bold text-[#007A7A] dark:text-cyan-300">
-                      <Trophy className="w-3.5 h-3.5" /> Giám Sát Đua Top
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-[#334155] text-[11px] font-semibold text-[#475569] dark:text-slate-300">
+                      <Trophy className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Giám Sát Đua Top
                     </span>
                   )
                 )}
@@ -1061,23 +1057,23 @@ export default function GameArena({
         </header>
 
         {/* Main Lobby Content Area */}
-        <div className="flex-1 min-h-0 flex flex-col justify-between gap-3 p-3 sm:p-5 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_rgba(255,255,255,0.85),_rgba(253,236,242,1)_75%)] dark:bg-[radial-gradient(ellipse_at_top,_rgba(30,58,138,0.28),_rgba(7,11,21,1)_70%)]">
+        <div className="flex-1 min-h-0 flex flex-col justify-between gap-3 p-3 sm:p-5 overflow-y-auto bg-[#FDECF2] dark:bg-[#070b15]">
           <div className="max-w-6xl w-full mx-auto space-y-3">
             {/* HOST INLINE ROOM NAME / PIN / PASSWORD EDITOR */}
             {isRoomHost && (
-              <div className="bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200/90 dark:border-indigo-500/30 rounded-2xl p-3.5 backdrop-blur-md shadow-lg space-y-3">
+              <div className="bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200/90 dark:border-[#334155] rounded-xl p-3.5 space-y-3">
                 {manageableRooms.length > 1 && (
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-bold text-[#62748E] dark:text-slate-400">Chuyển phòng:</span>
+                    <span className="text-[11px] font-semibold text-[#62748E] dark:text-slate-400">Chuyển phòng:</span>
                     {manageableRooms.map(r => (
-                      <div key={r.pin} className="inline-flex items-center rounded-lg overflow-hidden border border-pink-200 dark:border-slate-700">
+                      <div key={r.pin} className="inline-flex items-center rounded-lg overflow-hidden border border-slate-300 dark:border-[#334155]">
                         <button
                           type="button"
                           onClick={() => handleTeacherOpenLobby(r.pin)}
-                          className={`px-2.5 py-1 text-[11px] font-bold transition ${
+                          className={`px-2.5 py-1 text-[11px] font-semibold transition ${
                             r.pin === activePin
-                              ? 'bg-[#007A7A] dark:bg-indigo-600 text-white'
-                              : 'bg-white dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-pink-50 dark:hover:bg-slate-700'
+                              ? 'bg-[#007A7A] text-white'
+                              : 'bg-white dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                           }`}
                         >
                           #{r.pin} • {r.name}
@@ -1085,7 +1081,7 @@ export default function GameArena({
                         <button
                           type="button"
                           onClick={() => handleDeleteRoom(r.pin)}
-                          className="px-1.5 py-1 bg-white dark:bg-slate-900 hover:bg-rose-600 text-slate-500 dark:text-slate-400 hover:text-white text-[11px] transition border-l border-pink-200 dark:border-slate-700"
+                          className="px-1.5 py-1 bg-white dark:bg-slate-900 hover:bg-rose-600 text-slate-500 dark:text-slate-400 hover:text-white text-[11px] transition border-l border-slate-300 dark:border-[#334155]"
                           title={`Xóa phòng #${r.pin}`}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -1097,7 +1093,7 @@ export default function GameArena({
 
                 <form onSubmit={handleSaveHostRoomSettings} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
                   <div className="sm:col-span-4">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#475569] dark:text-slate-400 mb-1">
                       Tên phòng hiển thị
                     </label>
                     <input
@@ -1105,11 +1101,11 @@ export default function GameArena({
                       value={hostRoomDraft.name}
                       onChange={e => setHostRoomDraft(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Nhập tên phòng..."
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-[#0F172B] dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-[#007A7A] dark:focus:ring-indigo-500 focus:outline-none"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-xs font-semibold text-[#0F172B] dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 mb-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#475569] dark:text-slate-400 mb-1">
                       Mã PIN
                     </label>
                     <input
@@ -1117,11 +1113,11 @@ export default function GameArena({
                       value={hostRoomDraft.pin}
                       onChange={e => setHostRoomDraft(prev => ({ ...prev, pin: e.target.value }))}
                       placeholder="686868"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-700 dark:text-amber-300 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-xs font-mono font-bold text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#007A7A] dark:text-cyan-300 mb-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#475569] dark:text-slate-400 mb-1">
                       Mật khẩu
                     </label>
                     <input
@@ -1129,17 +1125,17 @@ export default function GameArena({
                       value={hostRoomDraft.pass}
                       onChange={e => setHostRoomDraft(prev => ({ ...prev, pass: e.target.value }))}
                       placeholder="Mật khẩu..."
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-[#007A7A] dark:text-cyan-300 focus:ring-2 focus:ring-[#007A7A] dark:focus:ring-cyan-500 focus:outline-none"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-xs font-mono font-bold text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                     />
                   </div>
                   <div className="sm:col-span-1">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#475569] dark:text-slate-400 mb-1">
                       Từ/vòng
                     </label>
                     <select
                       value={hostRoomDraft.roundSize || 4}
                       onChange={e => setHostRoomDraft(prev => ({ ...prev, roundSize: Number(e.target.value) }))}
-                      className="w-full px-2 py-2 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      className="w-full px-2 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-xs font-semibold text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                     >
                       {[2, 3, 4, 5, 6, 8].map(num => (
                         <option key={num} value={num}>{num}</option>
@@ -1147,13 +1143,13 @@ export default function GameArena({
                     </select>
                   </div>
                   <div className="sm:col-span-1">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-pink-700 dark:text-pink-300 mb-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#475569] dark:text-slate-400 mb-1">
                       Tốc độ
                     </label>
                     <select
                       value={hostRoomDraft.speedMode || 'normal'}
                       onChange={e => setHostRoomDraft(prev => ({ ...prev, speedMode: e.target.value }))}
-                      className="w-full px-1.5 py-2 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-xl text-xs font-bold text-pink-700 dark:text-pink-300 focus:ring-2 focus:ring-pink-500 focus:outline-none"
+                      className="w-full px-1.5 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-xs font-semibold text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                     >
                       <option value="relaxed">Chậm</option>
                       <option value="normal">Chuẩn</option>
@@ -1163,14 +1159,14 @@ export default function GameArena({
                   <div className="sm:col-span-2">
                     <button
                       type="submit"
-                      className="w-full py-2 px-3 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow"
+                      className="w-full py-2 px-3 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold transition flex items-center justify-center gap-1.5"
                     >
                       <Save className="w-3.5 h-3.5" /> Lưu Phòng
                     </button>
                   </div>
-                  <div className="sm:col-span-12 flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-pink-100 dark:border-slate-800/80">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0F172B] dark:text-slate-200">
+                  <div className="sm:col-span-12 flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200/80 dark:border-slate-800">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#475569] dark:text-slate-300">
                         <span>Tối đa:</span>
                         <select
                           value={Math.max(2, Math.min(30, Number(hostRoomDraft.maxPlayers || 30)))}
@@ -1185,19 +1181,19 @@ export default function GameArena({
                               };
                             });
                           }}
-                          className="px-2 py-1 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-lg text-[11px] font-extrabold text-sky-700 dark:text-sky-300"
+                          className="px-2 py-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-[11px] font-semibold text-[#0F172B] dark:text-slate-200"
                         >
                           {[2, 4, 6, 8, 10, 12, 16, 20, 30].map(n => (
                             <option key={n} value={n}>{n} người</option>
                           ))}
                         </select>
                       </label>
-                      <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0F172B] dark:text-slate-200">
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#475569] dark:text-slate-300">
                         <span>Chia Team:</span>
                         <select
                           value={Number(hostRoomDraft.teamCount || 0)}
                           onChange={e => setHostRoomDraft(prev => ({ ...prev, teamCount: Number(e.target.value) || 0 }))}
-                          className="px-2 py-1 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-lg text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300"
+                          className="px-2 py-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-[11px] font-semibold text-[#0F172B] dark:text-slate-200"
                         >
                           <option value={0}>Đấu Đơn (Solo)</option>
                           <option value={2} disabled={Number(hostRoomDraft.maxPlayers || 30) < 2}>2 Team (A vs B)</option>
@@ -1205,7 +1201,7 @@ export default function GameArena({
                           <option value={4} disabled={Number(hostRoomDraft.maxPlayers || 30) < 4}>4 Team (A·B·C·D)</option>
                         </select>
                       </label>
-                      <label className="inline-flex items-center gap-2 text-xs font-bold text-[#0F172B] dark:text-slate-200 cursor-pointer">
+                      <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#0F172B] dark:text-slate-200 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={Boolean(hostRoomDraft.shufflePerPlayer)}
@@ -1215,72 +1211,57 @@ export default function GameArena({
                         <span>Đảo thứ tự từ riêng cho từng HS</span>
                       </label>
                     </div>
-                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                      hostRoomDraft.shufflePerPlayer
-                        ? 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-200 border-purple-200 dark:border-purple-500/30'
-                        : 'bg-[#EDFFFD] dark:bg-cyan-500/15 text-[#007A7A] dark:text-cyan-200 border-[#B5F5F1] dark:border-cyan-500/30'
-                    }`}>
+                    <span className="text-[11px] font-medium text-[#62748E] dark:text-slate-400">
                       {hostRoomDraft.shufflePerPlayer
-                        ? '🔀 BẬT: Mỗi HS 1 thứ tự câu'
-                        : '⚡ TẮT: Đua tốc độ cùng bộ câu'}
+                        ? 'Chế độ: Đảo riêng thứ tự câu mỗi học sinh'
+                        : 'Chế độ: Đua tốc độ cùng bộ câu'}
                     </span>
                   </div>
                 </form>
               </div>
             )}
+          </div>
 
-            {/* Console Banner */}
-            <div className="bg-[#FFF5F8] dark:bg-slate-900/75 border border-pink-200/90 dark:border-slate-700/80 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 backdrop-blur-md">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#EDFFFD] dark:bg-cyan-500/15 border border-[#B5F5F1] dark:border-cyan-500/30 flex items-center justify-center text-[#007A7A] dark:text-cyan-300 shrink-0">
-                  <Rocket className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="font-extrabold text-sm text-[#0F172B] dark:text-white">Khoang Chờ Tàu Vũ Trụ (Dropship Lobby)</h2>
-                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                      room.shufflePerPlayer
-                        ? 'bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border-purple-200 dark:border-purple-500/30'
-                        : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
-                    }`}>
-                      {room.shufflePerPlayer ? '🔀 Đảo từ riêng HS' : '⚡ Thi tốc độ • Nhanh nhất +điểm'}
-                    </span>
-                    {isTeamRoom && (
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30">
-                        ⚔️ Đấu Đội ({room.teamCount} Team · {studentLobbyPlayers.length}/{roomMaxPlayers} người)
-                      </span>
-                    )}
+          {/* 2-Column Stage: Integrated Dropship Crewmates Grid + Persistent Lobby Chat */}
+          <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 my-auto py-1">
+            {/* Left: Crewmates Deck (with Integrated Header, Large PIN Board & Empty Slots) */}
+            <div className="lg:col-span-7 xl:col-span-8 relative rounded-2xl border border-pink-200/90 dark:border-[#334155] bg-[#FFF5F8] dark:bg-slate-900/85 p-4 sm:p-6 min-h-[300px] flex flex-col justify-between gap-4">
+              {/* Integrated Dropship Lobby Header & Flat Specs */}
+              <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 flex items-center justify-center text-[#007A7A] dark:text-[#1EE1D6] shrink-0 mt-0.5">
+                    <Rocket className="w-4 h-4" />
                   </div>
+                  <div className="min-w-0">
+                    <h2 className="font-extrabold text-sm sm:text-base text-[#0F172B] dark:text-white leading-tight">
+                      Khoang Chờ Tàu Vũ Trụ (Dropship Lobby)
+                    </h2>
+                    <p className="text-[11px] text-[#62748E] dark:text-slate-400 mt-0.5">
+                      {isTeacher
+                        ? 'Học sinh nhập Mã PIN & Mật khẩu để vào khoang. Nhấn Bắt Đầu Trận Đấu để tất cả cùng vào game.'
+                        : isFriendVipHost
+                        ? 'Bạn là Chủ Phòng Bạn Bè — chia sẻ Mã PIN & Pass để bạn bè vào và bấm Bắt Đầu!'
+                        : isRoomAlreadyPlayingWithoutLaunch
+                        ? 'Lượt chơi trước đang chạy hoặc đã xong — chờ Chủ phòng mở lại sảnh.'
+                        : isFriendVipRoom
+                        ? 'Bạn đã vào Phòng Bạn Bè! Bấm Sẵn Sàng và chờ Chủ phòng bấm khởi hành.'
+                        : 'Bạn đã ở trong Sảnh Chờ! Bấm Sẵn Sàng và chờ Chủ phòng bấm khởi hành.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right shrink-0 space-y-0.5">
+                  <p className="text-xs font-semibold text-[#0F172B] dark:text-slate-200 tabular-nums">
+                    {roomVocabCount} từ • {room.roundSize || 4}/vòng • {room.speedMode === 'relaxed' ? 'Chậm' : room.speedMode === 'turbo' ? 'Nhanh' : 'Chuẩn'} • {studentLobbyPlayers.length}/{roomMaxPlayers} người
+                  </p>
                   <p className="text-[11px] text-[#62748E] dark:text-slate-400">
-                    {isTeacher
-                      ? 'Học sinh nhập Mã PIN & Mật khẩu để vào khoang. Nhấn Bắt Đầu Trận Đấu để tất cả cùng vào game.'
-                      : isFriendVipHost
-                      ? 'Bạn là Chủ Phòng Bạn Bè (Ai eo VIP) — chia sẻ Mã PIN & Pass để bạn bè vào tự động và bấm Bắt Đầu để cùng đua!'
-                      : isRoomAlreadyPlayingWithoutLaunch
-                      ? 'Lượt chơi trước đang chạy hoặc đã xong — chờ Chủ phòng bấm Bắt Đầu / Mở Sảnh Mới để cùng khởi hành.'
-                      : isFriendVipRoom
-                      ? 'Bạn đã vào Phòng Bạn Bè (VIP)! Bấm Sẵn Sàng và chờ Chủ phòng bấm khởi hành để cùng đua.'
-                      : 'Bạn đã ở trong Sảnh Chờ! Bấm Sẵn Sàng và chờ Chủ phòng (Giáo viên) bấm khởi hành.'}
+                    {readyCount}/{lobbyPlayersList.length} Sẵn sàng • {room.shufflePerPlayer ? 'Đảo từ riêng HS' : 'Thi tốc độ'}
+                    {isTeamRoom ? ` • Đấu đội ${room.teamCount} Team` : ''}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs flex-wrap">
-                <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-pink-200/80 dark:border-transparent text-[#334155] dark:text-slate-300 font-semibold">
-                  {roomVocabCount} từ • {room.roundSize || 4}/vòng • {room.speedMode === 'relaxed' ? 'Chậm (+6s)' : room.speedMode === 'turbo' ? 'Siêu tốc (-5s)' : 'Chuẩn'} • {studentLobbyPlayers.length}/{roomMaxPlayers} người
-                </span>
-                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-bold">
-                  {readyCount}/{lobbyPlayersList.length} Sẵn sàng
-                </span>
-              </div>
-            </div>
-          </div>
 
-          {/* 2-Column Stage: Dropship Crewmates Grid + Persistent Lobby Chat */}
-          <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 my-auto py-1">
-            {/* Left: Crewmates Deck */}
-            <div className="lg:col-span-7 xl:col-span-8 relative rounded-3xl border-2 border-pink-200 dark:border-slate-700/70 bg-gradient-to-b from-sky-100/85 via-[#FFF5F8]/90 to-teal-50/85 dark:from-slate-900/75 dark:via-slate-900/60 dark:to-slate-900/75 backdrop-blur-sm pt-5 pb-6 px-5 sm:px-8 shadow-2xl min-h-[260px] flex flex-col justify-between gap-4">
               {isTeamRoom && (
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-pink-200/70 dark:border-slate-800/80">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/80 dark:border-slate-800">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {activeTeamIds.map(tid => {
                       const tMeta = GAME_TEAM_META[tid];
@@ -1297,11 +1278,11 @@ export default function GameArena({
                           type="button"
                           disabled={!canSwitchToTeam}
                           onClick={() => canSwitchToTeam && handleSetPlayerTeam?.(activePin, currentUser.username, tid)}
-                          className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition flex items-center gap-1.5 ${
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition flex items-center gap-1.5 ${
                             isMyTeam
-                              ? `${tMeta.badgeCls} ring-2 ring-offset-1 ring-amber-400/70`
+                              ? `${tMeta.badgeCls} ring-2 ring-[#007A7A]/60`
                               : tMeta.pillCls
-                          } ${canSwitchToTeam ? 'cursor-pointer hover:scale-[1.03]' : 'cursor-default'}`}
+                          } ${canSwitchToTeam ? 'cursor-pointer hover:opacity-90' : 'cursor-default'}`}
                           title={canSwitchToTeam ? `Bấm để đổi sang ${tMeta.name}` : tMeta.name}
                         >
                           <span>{tMeta.dot}</span>
@@ -1314,21 +1295,67 @@ export default function GameArena({
                     <button
                       type="button"
                       onClick={() => handleShuffleRoomTeams?.(activePin)}
-                      className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300 flex items-center gap-1 transition shadow-2xs"
+                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-[11px] font-semibold text-[#0F172B] dark:text-slate-200 flex items-center gap-1 transition"
                     >
-                      <Shuffle className="w-3 h-3" /> Chia Team Cân Bằng
+                      <Shuffle className="w-3 h-3 text-[#007A7A] dark:text-[#1EE1D6]" /> Chia Team Cân Bằng
                     </button>
                   )}
                 </div>
               )}
 
-              <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center my-auto ${isTeamRoom ? 'pt-2' : 'pt-6'}`}>
-                {lobbyPlayersList.length === 0 ? (
-                  <div className="col-span-full py-10 text-center text-[#62748E] dark:text-slate-400 text-sm">
-                    Chưa có thành viên nào trong khoang chờ...
+              {/* Central Large PIN & Password Invitation Board when room has 0-4 players */}
+              {lobbyPlayersList.length <= 4 && (
+                <div className="rounded-xl border border-dashed border-slate-300 dark:border-[#334155] bg-white/80 dark:bg-slate-950/60 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#62748E] dark:text-slate-400">
+                        Mã PIN Vào Phòng
+                      </p>
+                      <p className="text-2xl sm:text-3xl font-mono font-extrabold tracking-widest text-[#0F172B] dark:text-white leading-tight">
+                        {room.pin}
+                      </p>
+                    </div>
+                    {isRoomHost && (
+                      <div className="pl-4 border-l border-slate-200 dark:border-slate-800">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#62748E] dark:text-slate-400">
+                          Mật Khẩu Phòng
+                        </p>
+                        <p className="text-lg sm:text-2xl font-mono font-bold text-[#007A7A] dark:text-[#1EE1D6] leading-tight">
+                          {room.pass || 'Không cần'}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  lobbyPlayersList.map((player, idx) => {
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isRoomHost && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(`Mã phòng Game Từ Vựng: ${room.pin} | Mật khẩu: ${room.pass}`);
+                          setCopiedRoomPin(true);
+                          setTimeout(() => setCopiedRoomPin(false), 1800);
+                          showToast(`Đã sao chép PIN ${room.pin} & Pass "${room.pass}"!`);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition inline-flex items-center gap-1.5"
+                      >
+                        {copiedRoomPin ? <Check className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>Chép PIN &amp; Pass</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleCopyInviteLink(room.pin)}
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition inline-flex items-center gap-1.5"
+                    >
+                      <Share2 className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Chép Link Mời
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Crewmates + Empty Waiting Slots Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 justify-items-center items-start my-auto pt-1">
+                {lobbyPlayersList.map((player, idx) => {
                     const isHost = player.role === 'teacher' || (isFriendVipRoom && player.username === room.hostUsername);
                     const isSelf = player.username === currentUser?.username;
                     const showBubble = Boolean(player.chat && player.chatAt && Math.abs(lobbyNowTick - player.chatAt) < 5500);
@@ -1383,8 +1410,8 @@ export default function GameArena({
                                 onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, player.username, false)}
                                 className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold border transition ${
                                   player.approved
-                                    ? 'bg-emerald-600 text-white border-emerald-600'
-                                    : 'bg-amber-50 hover:bg-emerald-600 text-amber-800 hover:text-white border-amber-300'
+                                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                                    : 'bg-white dark:bg-slate-800 hover:bg-[#007A7A] text-[#0F172B] dark:text-slate-200 hover:text-white border-slate-300 dark:border-[#334155]'
                                 }`}
                               >
                                 {player.approved ? '✓ Đã duyệt' : '+ Duyệt vào thi'}
@@ -1411,10 +1438,10 @@ export default function GameArena({
                         <button
                           type="button"
                           onClick={() => setInspectedLobbyUsername(player.username)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 border transition hover:scale-105 cursor-pointer shadow-2xs ${
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 border transition hover:scale-105 cursor-pointer ${
                             isSelf
-                              ? 'bg-[#EDFFFD] dark:bg-cyan-500/20 border-[#007A7A]/60 dark:border-cyan-400/60 text-[#007A7A] dark:text-cyan-200 hover:bg-[#D5FBF7] dark:hover:bg-cyan-500/30'
-                              : 'bg-white/95 dark:bg-slate-800/90 border-pink-200 dark:border-slate-700 text-[#0F172B] dark:text-slate-200 hover:border-[#007A7A] dark:hover:border-cyan-400/60'
+                              ? 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A]/60 dark:border-[#1EE1D6]/50 text-[#007A7A] dark:text-[#1EE1D6]'
+                              : 'bg-white/95 dark:bg-slate-800/90 border-slate-300 dark:border-[#334155] text-[#0F172B] dark:text-slate-200 hover:border-[#007A7A]'
                           }`}
                           title={`Xem nhanh hồ sơ ${player.name}`}
                         >
@@ -1449,8 +1476,27 @@ export default function GameArena({
                         )}
                       </div>
                     );
-                  })
-                )}
+                  })}
+
+                {Array.from({
+                  length: Math.max(
+                    0,
+                    Math.min(Math.max(2, Number(roomMaxPlayers || 4)), 4) - lobbyPlayersList.length
+                  )
+                }).map((_, emptyIdx) => (
+                  <div
+                    key={`empty-slot-${emptyIdx}`}
+                    className="w-full max-w-[132px] h-[116px] rounded-xl border border-dashed border-slate-300/85 dark:border-slate-700/75 bg-white/45 dark:bg-slate-950/35 flex flex-col items-center justify-center gap-1.5 text-center px-2 opacity-65"
+                  >
+                    <Users className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      Vị trí trống #{lobbyPlayersList.length + emptyIdx + 1}
+                    </span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                      Chờ tham gia
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1461,12 +1507,12 @@ export default function GameArena({
           {/* Bottom Controls Bar (Animal Pilot Customize + Ready / Host Launch) */}
           <div className="max-w-6xl w-full mx-auto space-y-2">
             {showPilotDrawer && (
-              <div className="bg-[#FFF5F8] dark:bg-slate-900/95 border border-[#007A7A]/40 dark:border-cyan-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-md">
+              <div className="bg-[#FFF5F8] dark:bg-slate-900/95 border border-slate-300 dark:border-[#334155] rounded-xl p-4 shadow-lg backdrop-blur-md">
                 {renderPilotCustomizer(true)}
               </div>
             )}
-            <div className="bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200/90 dark:border-slate-700/80 rounded-2xl p-3 flex flex-col md:flex-row items-center justify-between gap-3 backdrop-blur-md">
-              <div className="flex items-center gap-3 bg-white dark:bg-slate-950/70 px-3 py-1.5 rounded-xl border border-pink-200/80 dark:border-slate-800 flex-wrap justify-center">
+            <div className="bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200/90 dark:border-[#334155] rounded-xl p-3 flex flex-col md:flex-row items-center justify-between gap-3 backdrop-blur-md">
+              <div className="flex items-center gap-3 bg-white dark:bg-slate-950/70 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#334155] flex-wrap justify-center">
                 <AnimalPilotAvatar
                   animalId={activeAnimalId}
                   accessoryId={activeAccessoryId}
@@ -1479,19 +1525,19 @@ export default function GameArena({
                 <div className="text-left">
                   <p className="text-xs font-extrabold text-[#0F172B] dark:text-white flex items-center gap-1.5">
                     <span>{activeAnimalObj.label}</span>
-                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                    <span className="text-[11px] font-semibold text-[#62748E] dark:text-slate-400">
                       {activeAccessoryObj.icon} {activeAccessoryObj.label}
                     </span>
                   </p>
-                  <p className="text-[10px] text-[#007A7A] dark:text-cyan-300 font-medium">Lái phi thuyền cả 4 vòng (V1–V4)</p>
+                  <p className="text-[10px] text-[#007A7A] dark:text-[#1EE1D6] font-medium">Lái phi thuyền cả 4 vòng (V1–V4)</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowPilotDrawer(v => !v)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
                     showPilotDrawer
-                      ? 'bg-[#007A7A] dark:bg-cyan-500 text-white dark:text-slate-950 border-[#007A7A] dark:border-cyan-400'
-                      : 'bg-[#FFF5F8] hover:bg-pink-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#007A7A] dark:text-cyan-300 border-pink-200 dark:border-slate-700'
+                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                      : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border-slate-300 dark:border-[#334155]'
                   }`}
                 >
                   {showPilotDrawer ? 'Thu Gọn' : 'Đổi Thú & Phụ Kiện'}
@@ -1503,10 +1549,10 @@ export default function GameArena({
                 <button
                   type="button"
                   onClick={handleToggleLobbyReady}
-                  className={`px-5 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm transition flex items-center gap-2 shadow-lg ${
+                  className={`px-5 py-2.5 rounded-lg font-bold text-xs sm:text-sm transition flex items-center gap-2 ${
                     myLobbyEntry?.ready
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                      ? 'bg-white dark:bg-slate-800 border border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6]'
+                      : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                   }`}
                 >
                   <CheckCircle className="w-4 h-4" />
@@ -1524,18 +1570,18 @@ export default function GameArena({
                     <button
                       type="button"
                       onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, '', true)}
-                      className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
+                      className="px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-[#0F172B] dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition"
                     >
-                      <Check className="w-3.5 h-3.5" /> Duyệt Tất Cả HS
+                      <Check className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Duyệt Tất Cả HS
                     </button>
                   )}
                   {room.status === 'PLAYING' && (
                     <button
                       type="button"
                       onClick={() => handleTeacherResetLobby(activePin)}
-                      className="px-4 py-2.5 rounded-xl bg-white hover:bg-pink-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-600 text-xs font-bold text-[#0F172B] dark:text-slate-200 flex items-center gap-1.5 transition"
+                      className="px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 flex items-center gap-1.5 transition"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" /> Mở Lại Sảnh (Cho Bạn Vào)
+                      <RefreshCw className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Mở Lại Sảnh (Cho Bạn Vào)
                     </button>
                   )}
                   <button
@@ -1543,10 +1589,10 @@ export default function GameArena({
                     onClick={() => handleTeacherStartLobbyGame(activePin)}
                     disabled={!canHostLaunch}
                     title={canHostLaunch ? 'Khởi động trận đấu Đua Top ngay' : 'Cần ít nhất 1 thành viên vào sảnh mới có thể bắt đầu'}
-                    className={`px-6 py-2.5 rounded-xl font-extrabold text-sm transition flex items-center gap-2 shadow-xl ${
+                    className={`px-6 py-2.5 rounded-lg font-bold text-sm transition flex items-center gap-2 ${
                       canHostLaunch
-                        ? 'bg-gradient-to-r from-[#007A7A] to-emerald-600 hover:from-[#065B5B] hover:to-emerald-500 dark:from-emerald-500 dark:to-cyan-500 text-white dark:text-slate-950 shadow-teal-900/15 dark:shadow-emerald-500/25'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                        ? 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                     }`}
                   >
                     <Rocket className="w-4 h-4" />
