@@ -8,12 +8,14 @@ import {
   FileText,
   Gamepad2,
   Headphones,
+  KeyRound,
   Lock,
   Mic,
   MonitorCheck,
   PenTool,
   Play,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
   TrendingUp
 } from 'lucide-react';
@@ -23,19 +25,27 @@ import { loadExamDraft } from '../utils/sessionPersistence';
 import BrandContactFooter from '../components/common/BrandContactFooter';
 import { Users as ClassMembersIcon } from 'lucide-react';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
-import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
+import {
+  formatVndCurrency,
+  getTestPurchasePriceVnd,
+  hasTestPurchaseAccess,
+  resolveVisibleTitleBadge
+} from '../constants/profileCustomization';
 
 export default function StudentHome({
   attempts,
   classesDb = {},
   currentUser,
   customTitles = [],
+  examUnlockTokens = {},
   focusedTestId = null,
   onClearFocusedTest,
+  onOpenCheckoutModal = null,
   openMemberProfile,
   openSkillPracticeHub,
   openSpeakingDaily,
   openStudentGamePortal,
+  paymentConfig = null,
   roomsDb = {},
   serverClockOffsetMs = 0,
   setEditingTargetUser,
@@ -90,7 +100,9 @@ export default function StudentHome({
     const cfg = normalizeExamConfig(t);
     const used = studentAttempts.filter(a => a.testId === t.id).length;
     const sched = evaluateTestSchedule(cfg, serverNowMs);
-    return !(cfg.maxAttempts > 0 && used >= cfg.maxAttempts) && (isTeacher || !sched.lockedBySchedule);
+    const paidPrice = getTestPurchasePriceVnd(t, paymentConfig);
+    const lockedPaid = !isTeacher && paidPrice > 0 && !hasTestPurchaseAccess(currentUser, t);
+    return !lockedPaid && !(cfg.maxAttempts > 0 && used >= cfg.maxAttempts) && (isTeacher || !sched.lockedBySchedule);
   }) || fullExamTests[0];
   const firstTestHasDraft = firstPlayableTest ? Boolean(draftByTestId[firstPlayableTest.id]) : false;
   const dailyCompliance = evaluateSpeakingDailyCompliance({
@@ -447,6 +459,11 @@ export default function StudentHome({
                 const myUsedCount = studentAttempts.filter(a => a.testId === test.id).length;
                 const isExhausted = cfg.maxAttempts > 0 && myUsedCount >= cfg.maxAttempts;
                 const isLockedBySchedule = !isTeacher && schedule.lockedBySchedule;
+                const testPrice = getTestPurchasePriceVnd(test, paymentConfig);
+                const isPurchasedTest = hasTestPurchaseAccess(currentUser, test);
+                const isPaidLocked = !isTeacher && testPrice > 0 && !isPurchasedTest;
+                const hasExamPassword = Boolean(cfg.hasExamPassword || cfg.examPassword);
+                const requiresPasswordPrompt = !isTeacher && hasExamPassword && !examUnlockTokens?.[test.id];
                 const isButtonDisabled = isExhausted || isLockedBySchedule;
                 const skillShort = { listening: 'L', reading: 'R', writing: 'W' };
                 const totalMins = cfg.order.reduce((sum, s) => sum + (cfg.durations[s] || 0), 0);
@@ -482,6 +499,29 @@ export default function StudentHome({
                             : `Thi thật ${myUsedCount}/${cfg.maxAttempts} lượt`}
                         </span>
                       </div>
+
+                      {testPrice > 0 && (
+                        <div
+                          className={`mb-2.5 inline-flex items-center gap-1.5 text-[11px] font-extrabold px-2.5 py-1 rounded-lg border mr-2 ${
+                            isPurchasedTest || isTeacher
+                              ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                              : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-500/40'
+                          }`}
+                        >
+                          <ShoppingBag className="w-3 h-3" />
+                          <span>
+                            {isPurchasedTest || isTeacher
+                              ? `Đã Mở Đề (${formatVndCurrency(testPrice)}) · Làm nhiều lần`
+                              : `Đề Đăng Bán ${formatVndCurrency(testPrice)} · Làm nhiều lần`}
+                          </span>
+                        </div>
+                      )}
+
+                      {hasExamPassword && (
+                        <div className="mb-2.5 inline-flex items-center gap-1.5 text-[11px] font-extrabold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 mr-2">
+                          <KeyRound className="w-3 h-3" /> Thi Thực Chiến • Nhập Pass Lớp
+                        </div>
+                      )}
 
                       {isTeacher && cfg.visibility === 'private' && (
                         <div className="mb-3 inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 mr-2">
@@ -571,11 +611,24 @@ export default function StudentHome({
                     </div>
 
                     <button
-                      onClick={() => startExam(test.id)}
+                      onClick={() => {
+                        if (isPaidLocked && onOpenCheckoutModal) {
+                          onOpenCheckoutModal({
+                            itemType: 'test',
+                            itemId: test.id,
+                            itemLabel: test.title,
+                            itemPrice: testPrice
+                          });
+                          return;
+                        }
+                        startExam(test.id);
+                      }}
                       disabled={isButtonDisabled}
                       className={`w-full font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm ${
                         isButtonDisabled
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                          : isPaidLocked
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
                           : hasDraft
                           ? 'bg-[#1447E6] hover:bg-[#1C398E] text-white'
                           : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
@@ -591,6 +644,16 @@ export default function StudentHome({
                               ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
                               : 'Đã hết hạn nộp bài'}
                           </span>
+                        </>
+                      ) : isPaidLocked ? (
+                        <>
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <span>Mua Đề Thi ({formatVndCurrency(testPrice)})</span>
+                        </>
+                      ) : requiresPasswordPrompt ? (
+                        <>
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>{hasDraft ? 'Nhập Pass · Tiếp Tục Bài' : 'Nhập Mật Khẩu Thi Thật'}</span>
                         </>
                       ) : (
                         <>

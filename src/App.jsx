@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { normalizeBrandTeacherUser } from './constants/brandInfo';
 import {
   AIEO_VIP_PRICE_VND,
-  SKILL_PASS_PRICE_VND,
+  DEFAULT_EXAM_PRICE_VND,
   evaluateTitleUnlockNotification,
-  hasSkillPracticeAccess,
+  getTestPurchasePriceVnd,
+  hasTestPurchaseAccess,
   normalizePaymentConfig,
   resolveStudentTitleSummary
 } from './constants/profileCustomization';
@@ -52,14 +53,17 @@ import {
   pruneExpiredRoomChat,
   buildSeededRoundQueues,
   buildPracticeRoundQueues,
-  buildDefaultQuestionFields
+  buildDefaultQuestionFields,
+  getActiveTeamIds,
+  pickBalancedTeamId
 } from './utils/examHelpers';
 import {
   testGeminiApiConnection,
   callGeminiWritingGrader,
   simulateAIWritingGrading
 } from './utils/geminiGrader';
-import { requestAiSpeakingGrading, requestAiWritingGrading } from './utils/speakingApi';
+import { requestAiSpeakingGrading, requestAiWritingGrading, verifyExamRoomPassword } from './utils/speakingApi';
+import { KeyRound, Lock, X } from 'lucide-react';
 import { roundSpeakingBand } from './utils/speakingAiEngine';
 import { speakWord, playSound } from './utils/mediaHelpers';
 import { syncClozeBlanksWithQuestions } from './utils/clozeHelpers';
@@ -296,14 +300,16 @@ export default function App() {
   const avatarImageRef = useRef(null);
   const [lobbyCountdown, setLobbyCountdown] = useState(null);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
-  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core' });
-  const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
+  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core', maxPlayers: 4, teamCount: 2 });
+  const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, maxPlayers: 30, teamCount: 0 });
   const [globalCheckoutState, setGlobalCheckoutState] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [sentNotifications, setSentNotifications] = useState([]);
   const [classesDb, setClassesDb] = useState({});
   const [customTitles, setCustomTitles] = useState([]);
   const [speakingUnlockTokens, setSpeakingUnlockTokens] = useState({});
+  const [examUnlockTokens, setExamUnlockTokens] = useState({});
+  const [examPasswordModal, setExamPasswordModal] = useState(null);
   const [adminTitleModalState, setAdminTitleModalState] = useState({ isOpen: false, targetUsername: null });
   const [focusedTestId, setFocusedTestId] = useState(null);
   const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
@@ -614,16 +620,22 @@ export default function App() {
     return true;
   };
 
-  const handleToggleUserSubscription = async (targetUsername, planType = 'skill_pass', unlocked = true) => {
+  const handleToggleUserSubscription = async (targetUsername, planType = 'aieo_vip', unlocked = true, testId = '') => {
     if (!currentUser?.isSuperAdmin || !targetUsername) return false;
     const snap = await dispatchSyncAction('TOGGLE_USER_SUBSCRIPTION', {
       username: targetUsername,
       kind: planType,
+      testId: planType === 'test' ? String(testId || '') : undefined,
       active: Boolean(unlocked)
     });
     if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
     const targetName = usersDb[targetUsername]?.name || targetUsername;
-    const planLabel = planType === 'aieo_vip' ? 'Gói Ai eo VIP (1 Tháng)' : 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)';
+    const planLabel =
+      planType === 'aieo_vip'
+        ? 'Gói Ai eo VIP (1 Tháng)'
+        : planType === 'test'
+        ? 'quyền làm Đề Thi 3 Kỹ Năng'
+        : 'quyền mở gói tháng';
     showToast(
       unlocked
         ? `Đã kích hoạt ${planLabel} cho ${targetName}!`
@@ -635,18 +647,18 @@ export default function App() {
 
   const openGlobalCheckoutModal = (opts = {}) => {
     const cfgPay = normalizePaymentConfig(paymentConfig || {});
-    const itemType = opts.itemType || 'skill_pass';
+    const itemType = opts.itemType || 'aieo_vip';
     const defaultLabel =
       itemType === 'aieo_vip'
         ? 'Gói Ai eo VIP Full Quyền (1 Tháng)'
-        : itemType === 'skill_pass'
-        ? 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)'
+        : itemType === 'test'
+        ? 'Mở Khóa Đề Thi IELTS (3 Kỹ Năng)'
         : 'Ảnh Nền Riêng (1 Tháng)';
     const defaultPrice =
       itemType === 'aieo_vip'
         ? (cfgPay.aieoVipPrice ?? AIEO_VIP_PRICE_VND)
-        : itemType === 'skill_pass'
-        ? (cfgPay.skillPassPrice ?? SKILL_PASS_PRICE_VND)
+        : itemType === 'test'
+        ? (cfgPay.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND)
         : cfgPay.coverUnlockPrice;
     setGlobalCheckoutState({
       itemType,
@@ -662,7 +674,9 @@ export default function App() {
     const payload =
       reqOpts?.itemType === 'title' && reqOpts?.itemId
         ? { itemType: 'title', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
-        : reqOpts?.itemType === 'skill_pass' || reqOpts?.itemType === 'aieo_vip'
+        : reqOpts?.itemType === 'test' && reqOpts?.itemId
+        ? { itemType: 'test', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
+        : reqOpts?.itemType === 'aieo_vip'
         ? { itemType: reqOpts.itemType, renew: Boolean(reqOpts.renew) }
         : { itemType: 'cover', renew: Boolean(reqOpts.renew) };
     const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', payload);
@@ -1792,7 +1806,9 @@ export default function App() {
         pass: r.pass ?? 'ielts',
         roundSize: Math.max(2, Math.min(8, Number(r.roundSize) || 4)),
         speedMode: ['relaxed', 'normal', 'turbo'].includes(r.speedMode) ? r.speedMode : 'normal',
-        shufflePerPlayer: Boolean(r.shufflePerPlayer)
+        shufflePerPlayer: Boolean(r.shufflePerPlayer),
+        maxPlayers: Math.max(2, Math.min(30, Number(r.maxPlayers || 30))),
+        teamCount: [2, 3, 4].includes(Math.round(Number(r.teamCount))) ? Math.round(Number(r.teamCount)) : 0
       });
     }
   }, [currentRoomPin]);
@@ -2549,15 +2565,31 @@ export default function App() {
       setRoomJoinError('Trận đấu đang diễn ra! Hãy bảo Giáo viên bấm "Mở Sảnh Mới" hoặc "Bắt đầu ván mới" để bạn vào sảnh chờ.');
       return;
     }
+    const maxCap = Math.max(2, Math.min(30, Number(targetRoom.maxPlayers || 30)));
+    const participantCount = Object.values(targetRoom.lobbyPlayers || {}).filter(
+      p => targetRoom.roomMode === 'friend_vip' || p.role !== 'teacher'
+    ).length;
+    if (!alreadyJoined && participantCount >= maxCap) {
+      setRoomJoinError(`Phòng đã đủ tối đa ${maxCap}/${maxCap} người chơi!`);
+      return;
+    }
 
     setRoomJoinError('');
     setCurrentRoomPin(cleanPin);
     setJoinedRoomPin(cleanPin);
     lastLaunchedAtRef.current = targetRoom.startedAt || null;
 
+    const existingTeamId = targetRoom.lobbyPlayers?.[currentUser?.username]?.teamId;
+    const assignedTeamId = targetRoom.teamCount >= 2
+      ? (getActiveTeamIds(targetRoom.teamCount).includes(existingTeamId)
+        ? existingTeamId
+        : pickBalancedTeamId(targetRoom.lobbyPlayers, targetRoom.teamCount, targetRoom.roomMode, currentUser?.username))
+      : '';
+
     const studentEntry = buildLobbyPlayerEntry(currentUser, {
       ready: false,
-      approved: targetRoom.roomMode === 'friend_vip'
+      approved: targetRoom.roomMode === 'friend_vip',
+      teamId: assignedTeamId
     });
     setRoomsDb(prev => {
       const r = normalizeRoomObject(prev[cleanPin] || targetRoom, cleanPin);
@@ -2602,15 +2634,25 @@ export default function App() {
       name: baseRoom.name,
       pass: baseRoom.pass,
       roundSize: baseRoom.roundSize || 4,
-      speedMode: baseRoom.speedMode || 'normal'
+      speedMode: baseRoom.speedMode || 'normal',
+      shufflePerPlayer: Boolean(baseRoom.shufflePerPlayer),
+      maxPlayers: baseRoom.maxPlayers || 30,
+      teamCount: baseRoom.teamCount || 0
     });
 
     const isTeacherHost = currentUser?.role === 'teacher';
+    const existingHostTeam = baseRoom.lobbyPlayers?.[currentUser?.username]?.teamId;
+    const hostTeamId = !isTeacherHost && baseRoom.teamCount >= 2
+      ? (getActiveTeamIds(baseRoom.teamCount).includes(existingHostTeam)
+        ? existingHostTeam
+        : pickBalancedTeamId(baseRoom.lobbyPlayers, baseRoom.teamCount, baseRoom.roomMode, currentUser?.username))
+      : '';
     const teacherEntry = buildLobbyPlayerEntry(currentUser, {
       name: currentUser?.name || (isTeacherHost ? 'Giáo viên' : currentUser?.username),
       role: isTeacherHost ? 'teacher' : 'student',
       ready: true,
-      approved: true
+      approved: true,
+      teamId: hostTeamId
     });
 
     setRoomsDb(prev => {
@@ -2648,14 +2690,39 @@ export default function App() {
     const cleanRoundSize = Math.max(2, Math.min(8, Number(hostRoomDraft.roundSize) || 4));
     const cleanSpeedMode = ['relaxed', 'normal', 'turbo'].includes(hostRoomDraft.speedMode) ? hostRoomDraft.speedMode : 'normal';
     const cleanShufflePerPlayer = Boolean(hostRoomDraft.shufflePerPlayer);
+    const cleanMaxPlayers = Math.max(2, Math.min(30, Number(hostRoomDraft.maxPlayers || 30)));
+    const rawTeamCount = Number(hostRoomDraft.teamCount || 0);
+    const cleanTeamCount =
+      [2, 3, 4].includes(rawTeamCount) && rawTeamCount <= cleanMaxPlayers
+        ? rawTeamCount
+        : rawTeamCount > cleanMaxPlayers && cleanMaxPlayers >= 2
+        ? 2
+        : 0;
 
     if (newPin !== oldPin && roomsDb[newPin]) {
       showToast(`Mã phòng "${newPin}" đã tồn tại — hãy chọn mã PIN khác hoặc bấm chọn phòng đó!`, 'error');
       return;
     }
 
+    const teamIds = getActiveTeamIds(cleanTeamCount);
     setRoomsDb(prev => {
       const source = normalizeRoomObject(prev[oldPin], oldPin);
+      const nextLobby = { ...(source.lobbyPlayers || {}) };
+      let teamAssignCursor = 0;
+      Object.keys(nextLobby).forEach(uname => {
+        const entry = nextLobby[uname];
+        if (!entry) return;
+        const participates = source.roomMode === 'friend_vip' || entry.role !== 'teacher';
+        if (teamIds.length >= 2 && participates) {
+          const keepValid = teamIds.includes(entry.teamId);
+          nextLobby[uname] = {
+            ...entry,
+            teamId: keepValid ? entry.teamId : teamIds[teamAssignCursor++ % teamIds.length]
+          };
+        } else {
+          nextLobby[uname] = { ...entry, teamId: '' };
+        }
+      });
       const updatedRoom = normalizeRoomObject(
         {
           ...source,
@@ -2664,7 +2731,10 @@ export default function App() {
           pass: newPass,
           roundSize: cleanRoundSize,
           speedMode: cleanSpeedMode,
-          shufflePerPlayer: cleanShufflePerPlayer
+          shufflePerPlayer: cleanShufflePerPlayer,
+          maxPlayers: cleanMaxPlayers,
+          teamCount: cleanTeamCount,
+          lobbyPlayers: nextLobby
         },
         newPin
       );
@@ -2683,7 +2753,9 @@ export default function App() {
       pass: newPass,
       roundSize: cleanRoundSize,
       speedMode: cleanSpeedMode,
-      shufflePerPlayer: cleanShufflePerPlayer
+      shufflePerPlayer: cleanShufflePerPlayer,
+      maxPlayers: cleanMaxPlayers,
+      teamCount: cleanTeamCount
     });
 
     dispatchSyncAction('UPSERT_ROOM', {
@@ -2694,10 +2766,84 @@ export default function App() {
         pass: newPass,
         roundSize: cleanRoundSize,
         speedMode: cleanSpeedMode,
-        shufflePerPlayer: cleanShufflePerPlayer
+        shufflePerPlayer: cleanShufflePerPlayer,
+        maxPlayers: cleanMaxPlayers,
+        teamCount: cleanTeamCount
       }
     });
-    showToast(`Đã cập nhật phòng "${newName}" (${cleanShufflePerPlayer ? 'Đảo từ riêng' : 'Chung câu hỏi'} • ${cleanRoundSize} từ/vòng)!`);
+    showToast(
+      `Đã cập nhật phòng "${newName}" (${cleanMaxPlayers} người · ${
+        cleanTeamCount >= 2 ? `${cleanTeamCount} Team` : 'Đấu Đơn'
+      } • ${cleanRoundSize} từ/vòng)!`
+    );
+  };
+
+  const handleSetPlayerTeam = (pin = currentRoomPin, targetUsername = '', teamId = '') => {
+    const targetPin = pin || joinedRoomPin || currentRoomPin;
+    const uname = String(targetUsername || currentUser?.username || '').trim();
+    if (!targetPin || !uname) return;
+    const sourceRoom = normalizeRoomObject(roomsDb[targetPin], targetPin);
+    const activeIds = getActiveTeamIds(sourceRoom.teamCount || 0);
+    if (!activeIds.includes(teamId)) return;
+
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[targetPin], targetPin);
+      if (!r.lobbyPlayers?.[uname]) return prev;
+      return {
+        ...prev,
+        [targetPin]: {
+          ...r,
+          lobbyPlayers: {
+            ...r.lobbyPlayers,
+            [uname]: { ...r.lobbyPlayers[uname], teamId }
+          },
+          ...(r.liveMatch?.[uname]
+            ? {
+                liveMatch: {
+                  ...r.liveMatch,
+                  [uname]: { ...r.liveMatch[uname], teamId }
+                }
+              }
+            : {})
+        }
+      };
+    });
+    dispatchSyncAction('SET_PLAYER_TEAM', { pin: targetPin, username: uname, teamId });
+  };
+
+  const handleShuffleRoomTeams = (pin = currentRoomPin) => {
+    const targetPin = pin || joinedRoomPin || currentRoomPin;
+    if (!targetPin) return;
+    const sourceRoom = normalizeRoomObject(roomsDb[targetPin], targetPin);
+    const activeIds = getActiveTeamIds(sourceRoom.teamCount || 0);
+    if (activeIds.length < 2) {
+      showToast('Hãy bật Chế độ chia Team (2–4 Team) trước khi chia ngẫu nhiên!', 'info');
+      return;
+    }
+
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[targetPin], targetPin);
+      const participants = Object.values(r.lobbyPlayers || {}).filter(
+        lp => r.roomMode === 'friend_vip' || lp.role !== 'teacher'
+      );
+      const shuffled = [...participants];
+      for (let i = shuffled.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      const nextLobby = { ...(r.lobbyPlayers || {}) };
+      shuffled.forEach((lp, idx) => {
+        if (nextLobby[lp.username]) {
+          nextLobby[lp.username] = { ...nextLobby[lp.username], teamId: activeIds[idx % activeIds.length] };
+        }
+      });
+      return {
+        ...prev,
+        [targetPin]: { ...r, lobbyPlayers: nextLobby }
+      };
+    });
+    dispatchSyncAction('SHUFFLE_ROOM_TEAMS', { pin: targetPin });
+    showToast(`Đã chia ngẫu nhiên cân bằng vào ${activeIds.length} Team!`);
   };
 
   const handleTeacherResetLobby = (pin = currentRoomPin) => {
@@ -2778,6 +2924,7 @@ export default function App() {
         username: lp.username,
         name: lp.name || lp.username,
         role: 'student',
+        teamId: lp.teamId || '',
         colorId: lp.colorId || 'cyan',
         avatarUrl: lp.avatarUrl || usersDb[lp.username]?.avatarUrl || '',
         score: 0,
@@ -3055,6 +3202,14 @@ export default function App() {
     }
 
     const isTeacherCreator = currentUser?.role === 'teacher';
+    const cleanMaxPlayers = Math.max(2, Math.min(30, Number(newRoomForm.maxPlayers || (isTeacherCreator ? 30 : 4))));
+    const rawTeamCount = Number(newRoomForm.teamCount || 0);
+    const cleanTeamCount =
+      [2, 3, 4].includes(rawTeamCount) && rawTeamCount <= cleanMaxPlayers
+        ? rawTeamCount
+        : rawTeamCount > cleanMaxPlayers && cleanMaxPlayers >= 2
+        ? 2
+        : 0;
     const selectedPresetVocab =
       newRoomForm.topicPreset && newRoomForm.topicPreset !== 'core' && VOCAB_PRESETS?.[newRoomForm.topicPreset]?.text
         ? VOCAB_PRESETS[newRoomForm.topicPreset].text
@@ -3065,7 +3220,8 @@ export default function App() {
           name: currentUser.name || (isTeacherCreator ? 'Giáo viên' : currentUser.username),
           role: isTeacherCreator ? 'teacher' : 'student',
           ready: true,
-          approved: true
+          approved: true,
+          teamId: cleanTeamCount >= 2 && !isTeacherCreator ? 'A' : ''
         })
       : null;
 
@@ -3078,7 +3234,8 @@ export default function App() {
       hostUsername: currentUser?.username || '',
       hostName: currentUser?.name || currentUser?.username || '',
       status: 'LOBBY',
-      maxPlayers: 30,
+      maxPlayers: cleanMaxPlayers,
+      teamCount: cleanTeamCount,
       roundSize: Math.max(2, Math.min(8, Number(newRoomForm.roundSize) || 4)),
       speedMode: ['relaxed', 'normal', 'turbo'].includes(newRoomForm.speedMode) ? newRoomForm.speedMode : 'normal',
       shufflePerPlayer: Boolean(newRoomForm.shufflePerPlayer),
@@ -3102,13 +3259,15 @@ export default function App() {
       pass: cleanPass,
       roundSize: newRoomObj.roundSize,
       speedMode: newRoomObj.speedMode,
-      shufflePerPlayer: newRoomObj.shufflePerPlayer
+      shufflePerPlayer: newRoomObj.shufflePerPlayer,
+      maxPlayers: cleanMaxPlayers,
+      teamCount: cleanTeamCount
     });
     setShowCreateRoomModal(false);
-    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core' });
+    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core', maxPlayers: 4, teamCount: 2 });
 
     dispatchSyncAction('UPSERT_ROOM', { pin: generatedPin, updates: newRoomObj });
-    showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} • Pass: ${cleanPass})!`);
+    showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} · ${cleanMaxPlayers} người${cleanTeamCount >= 2 ? ` · ${cleanTeamCount} Team` : ''})!`);
 
     if (isTeacherCreator || newRoomObj.roomMode === 'friend_vip') {
       setGameSubState('LOBBY');
@@ -3395,6 +3554,8 @@ export default function App() {
     setSentNotifications([]);
     setCustomTitles([]);
     setSpeakingUnlockTokens({});
+    setExamUnlockTokens({});
+    setExamPasswordModal(null);
     setAdminTitleModalState({ isOpen: false, targetUsername: null });
     setFocusedTestId(null);
     setAccountSecurityTab(null);
@@ -3437,7 +3598,7 @@ export default function App() {
     setAudioProgress({ currentTime: 0, duration: 0 });
   };
 
-  const startExam = (testId, partModeOverride = 'full') => {
+  const startExam = (testId, partModeOverride = 'full', unlockTokenOverride = '') => {
     const test = tests.find(t => t.id === testId);
     if (!test) return;
 
@@ -3462,16 +3623,18 @@ export default function App() {
       return;
     }
 
-    if (currentUser?.role !== 'teacher' && cfg.testMode === 'single_skill' && !hasSkillPracticeAccess(currentUser)) {
-      const cfgPay = normalizePaymentConfig(paymentConfig || {});
-      showToast('Chức năng Bài Tập 4 Kỹ Năng yêu cầu gói tháng (20k/1T) hoặc Gói Ai eo VIP (80k/1T)!', 'info');
-      setGlobalCheckoutState({
-        itemType: 'skill_pass',
-        itemId: '',
-        itemLabel: 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
-        itemPrice: cfgPay.skillPassPrice ?? SKILL_PASS_PRICE_VND
-      });
-      return;
+    if (currentUser?.role !== 'teacher' && cfg.testMode !== 'single_skill') {
+      const testPrice = getTestPurchasePriceVnd(test, paymentConfig);
+      if (testPrice > 0 && !hasTestPurchaseAccess(currentUser, test)) {
+        showToast(`Đề thi "${test.title}" cần mở khóa trước khi làm (mua 1 lần được làm lại nhiều lượt)!`, 'info');
+        openGlobalCheckoutModal({
+          itemType: 'test',
+          itemId: test.id,
+          itemLabel: test.title,
+          itemPrice: testPrice
+        });
+        return;
+      }
     }
 
     if (currentUser?.role !== 'teacher' && cfg.maxAttempts > 0) {
@@ -3482,6 +3645,24 @@ export default function App() {
         showToast(`Bạn đã dùng hết ${cfg.maxAttempts} lượt làm đề thi này!`);
         return;
       }
+    }
+
+    const activeUnlockToken = unlockTokenOverride || examUnlockTokens[testId] || '';
+    if (
+      currentUser?.role !== 'teacher' &&
+      cfg.testMode !== 'single_skill' &&
+      (cfg.hasExamPassword || cfg.examPassword) &&
+      !activeUnlockToken
+    ) {
+      setExamPasswordModal({
+        testId,
+        testTitle: test.title,
+        partMode: partModeOverride || 'full',
+        password: '',
+        error: '',
+        verifying: false
+      });
+      return;
     }
 
     examAutoAdvanceHandledRef.current = null;
@@ -3513,6 +3694,33 @@ export default function App() {
       });
     }
     setView('EXAM_MODE');
+  };
+
+  const handleVerifyExamPasswordSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!examPasswordModal?.testId) return;
+    const { testId, password, partMode } = examPasswordModal;
+    const cleanPass = String(password || '').trim();
+    if (!cleanPass) {
+      setExamPasswordModal(prev => (prev ? { ...prev, error: 'Vui lòng nhập mật khẩu phòng thi do giáo viên cung cấp.' } : null));
+      return;
+    }
+    setExamPasswordModal(prev => (prev ? { ...prev, verifying: true, error: '' } : null));
+    try {
+      const result = await verifyExamRoomPassword({ testId, password: cleanPass });
+      const token = String(result?.examUnlockToken || result?.unlockToken || '');
+      if (!token) {
+        throw new Error('Không nhận được mã mở khóa phòng thi từ máy chủ.');
+      }
+      setExamUnlockTokens(prev => ({ ...prev, [testId]: token }));
+      setExamPasswordModal(null);
+      showToast('Mật khẩu chính xác! Bắt đầu phòng thi thực chiến...');
+      startExam(testId, partMode || 'full', token);
+    } catch (err) {
+      setExamPasswordModal(prev =>
+        prev ? { ...prev, verifying: false, error: err?.message || 'Mật khẩu phòng thi không chính xác.' } : null
+      );
+    }
   };
 
   const handleExitExamMode = () => {
@@ -3670,6 +3878,7 @@ export default function App() {
       testTitle: activeTest.title,
       testMode: cfg.testMode,
       focusSkill: cfg.focusSkill,
+      examUnlockToken: examUnlockTokens[activeTest.id] || undefined,
       studentId: currentUser?.username || 'std_guest',
       studentName: currentUser?.name || 'Học sinh',
       startedAtMs,
@@ -3780,13 +3989,18 @@ export default function App() {
       return;
     }
 
+    const prevSkill = examState.skill || cfg.order[currentIdx];
     const nextSkill = cfg.order[nextIdx];
     const nextDurationSecs = (cfg.durations[nextSkill] || 15) * 60;
     const skillNames = { listening: 'Listening', reading: 'Reading', writing: 'Writing' };
+    const safePrevRem = Math.max(0, Math.floor(Number(examState.timeRemaining) || 0));
+    const remMin = Math.floor(safePrevRem / 60);
+    const remSec = safePrevRem % 60;
+    const remLabel = `${remMin}p${remSec.toString().padStart(2, '0')}s`;
 
     setExamState(prev => {
-      const prevSkill = prev.skill || cfg.order[currentIdx];
-      const prevAllocatedSecs = (cfg.durations[prevSkill] || 15) * 60;
+      const currentPrevSkill = prev.skill || cfg.order[currentIdx];
+      const prevAllocatedSecs = (cfg.durations[currentPrevSkill] || 15) * 60;
       const prevSpentSecs = Math.max(0, prevAllocatedSecs - (Number(prev.timeRemaining) || 0));
       return {
         ...prev,
@@ -3801,7 +4015,9 @@ export default function App() {
     });
     showToast(
       isAutoTimeout
-        ? `Hết giờ phần trước — Tự động chuyển sang ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
+        ? `Hết giờ ${skillNames[prevSkill] || prevSkill} — Tự động chuyển sang ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
+        : cfg.sequentialMode
+        ? `Đã khóa ${skillNames[prevSkill] || prevSkill} (còn ${remLabel} — không thể quay lại)! Bắt đầu ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút).`
         : `Đã chuyển sang phần ${skillNames[nextSkill]} (${cfg.durations[nextSkill]} phút)!`
     );
   };
@@ -4720,6 +4936,13 @@ export default function App() {
       testMode: cfg.testMode,
       focusSkill: cfg.focusSkill,
       visibility: cfg.visibility,
+      examPurpose: cfg.testMode === 'single_skill' ? 'free_practice' : cfg.examPurpose,
+      priceVnd: cfg.testMode === 'single_skill' ? 0 : cfg.priceVnd,
+      examPassword: cfg.testMode === 'single_skill' ? '' : cfg.examPassword,
+      hasExamPassword:
+        cfg.testMode === 'single_skill'
+          ? false
+          : Boolean(cfg.examPassword || testForm.hasExamPassword),
       maxAttempts: cfg.maxAttempts,
       sequentialMode: cfg.sequentialMode,
       allowEarlyNextSection: cfg.allowEarlyNextSection,
@@ -6274,8 +6497,10 @@ export default function App() {
           classesDb={classesDb}
           currentUser={currentUser}
           customTitles={customTitles}
+          examUnlockTokens={examUnlockTokens}
           focusedTestId={focusedTestId}
           onClearFocusedTest={() => setFocusedTestId(null)}
+          onOpenCheckoutModal={openGlobalCheckoutModal}
           openMemberProfile={openMemberProfile}
           openSkillPracticeHub={(tab = 'speaking_daily') => {
             setFocusedTestId(null);
@@ -6284,6 +6509,7 @@ export default function App() {
           }}
           openSpeakingDaily={openSpeakingDaily}
           openStudentGamePortal={openStudentGamePortal}
+          paymentConfig={paymentConfig}
           roomsDb={roomsDb}
           serverClockOffsetMs={serverClockOffsetMs}
           setEditingTargetUser={setEditingTargetUser}
@@ -6451,6 +6677,8 @@ export default function App() {
           handleLeaveGameLobby={handleLeaveGameLobby}
           handleSaveHostRoomSettings={handleSaveHostRoomSettings}
           handleSendLobbyChat={handleSendLobbyChat}
+          handleSetPlayerTeam={handleSetPlayerTeam}
+          handleShuffleRoomTeams={handleShuffleRoomTeams}
           handleStudentJoinRoom={handleStudentJoinRoom}
           handleTeacherApproveLobbyPlayer={handleTeacherApproveLobbyPlayer}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
@@ -6661,6 +6889,7 @@ export default function App() {
           builderTab={builderTab}
           classesDb={classesDb}
           currentUser={currentUser}
+          defaultExamPriceVnd={normalizePaymentConfig(paymentConfig || {}).defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND}
           editingTest={editingTest}
           handleAudioFileUpload={handleAudioFileUpload}
           handleListeningImageUpload={handleListeningImageUpload}
@@ -6812,10 +7041,95 @@ export default function App() {
         />
       )}
 
+      {Boolean(examPasswordModal && currentUser) && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !examPasswordModal.verifying && setExamPasswordModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/40 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    Nhập Mật Khẩu Phòng Thi Thực Chiến
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-2">
+                    {examPasswordModal.testTitle}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={examPasswordModal.verifying}
+                onClick={() => setExamPasswordModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                aria-label="Đóng hộp thoại mật khẩu phòng thi"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyExamPasswordSubmit} className="p-5 space-y-4">
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-200 dark:border-amber-700/50 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <span>
+                  Nhập mật khẩu giáo viên đã gửi cho lớp để mở phòng thi. Khi làm tuần tự từng kỹ năng, bạn <strong>không thể quay lại kỹ năng cũ</strong> sau khi đã chuyển phần.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Mật khẩu phòng thi
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={examPasswordModal.password}
+                  onChange={e =>
+                    setExamPasswordModal(prev => (prev ? { ...prev, password: e.target.value, error: '' } : null))
+                  }
+                  placeholder="VD: THI2026"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-sm font-extrabold tracking-wider text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                {examPasswordModal.error && (
+                  <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1.5">
+                    {examPasswordModal.error}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={examPasswordModal.verifying}
+                  onClick={() => setExamPasswordModal(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={examPasswordModal.verifying}
+                  className="px-4 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white shadow-md transition"
+                >
+                  {examPasswordModal.verifying ? 'Đang kiểm tra...' : 'Vào Phòng Thi Thật'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {Boolean(globalCheckoutState && currentUser) && (
         <CoverCheckoutModal
           isOpen={true}
-          itemType={globalCheckoutState.itemType || 'skill_pass'}
+          itemType={globalCheckoutState.itemType || 'aieo_vip'}
           itemId={globalCheckoutState.itemId || ''}
           itemLabel={globalCheckoutState.itemLabel || ''}
           itemPrice={globalCheckoutState.itemPrice}
@@ -6823,8 +7137,13 @@ export default function App() {
           currentUser={currentUser}
           paymentConfig={paymentConfig}
           onClose={() => setGlobalCheckoutState(null)}
-          onNavigateAfterPurchase={(nextView, tab) => {
-            if (tab) setSkillHubTab(tab);
+          onNavigateAfterPurchase={(nextView, arg) => {
+            setGlobalCheckoutState(null);
+            if (nextView === 'EXAM_START' && arg) {
+              startExam(arg);
+              return;
+            }
+            if (arg) setSkillHubTab(arg);
             setView(nextView);
           }}
           onRequestUnlock={handleRequestCoverUnlock}

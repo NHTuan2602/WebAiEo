@@ -23,6 +23,7 @@ import {
   Send,
   Share2,
   ShieldCheck,
+  Shuffle,
   Snowflake,
   Sun,
   Target,
@@ -46,7 +47,10 @@ import {
   VOCAB_PRESETS
 } from '../constants/seedData';
 import {
+  GAME_TEAM_META,
   LOBBY_CHAT_RESET_MS,
+  computeRoomTeamStandings,
+  getActiveTeamIds,
   getSpeedAdjustedTimeLimit,
   normalizeRoomObject,
   parseRawVocabText
@@ -107,6 +111,8 @@ export default function GameArena({
   handleLeaveGameLobby,
   handleSaveHostRoomSettings,
   handleSendLobbyChat,
+  handleSetPlayerTeam,
+  handleShuffleRoomTeams,
   handleStudentJoinRoom,
   handleTeacherApproveLobbyPlayer,
   handleTeacherOpenLobby,
@@ -197,6 +203,9 @@ export default function GameArena({
   const readyCount = lobbyPlayersList.filter(p => p.ready || p.role === 'teacher').length;
   const studentLobbyPlayers = lobbyPlayersList.filter(p => p.role !== 'teacher');
   const hasStudentsInLobby = studentLobbyPlayers.length > 0;
+  const activeTeamIds = getActiveTeamIds(room.teamCount || 0);
+  const isTeamRoom = activeTeamIds.length >= 2;
+  const roomMaxPlayers = Math.max(2, Math.min(30, Number(room.maxPlayers || 30)));
   const activeCrewColorId = myLobbyEntry?.colorId || myCrewColor;
   const activeAnimalId = myLobbyEntry?.animalId || myAnimalId;
   const activeAccessoryId = myLobbyEntry?.accessoryId || myAccessoryId;
@@ -1102,24 +1111,61 @@ export default function GameArena({
                       <Save className="w-3.5 h-3.5" /> Lưu Phòng
                     </button>
                   </div>
-                  <div className="sm:col-span-12 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-pink-100 dark:border-slate-800/80">
-                    <label className="inline-flex items-center gap-2 text-xs font-bold text-[#0F172B] dark:text-slate-200 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(hostRoomDraft.shufflePerPlayer)}
-                        onChange={e => setHostRoomDraft(prev => ({ ...prev, shufflePerPlayer: e.target.checked }))}
-                        className="w-4 h-4 rounded accent-[#007A7A]"
-                      />
-                      <span>Đảo thứ tự từ riêng cho từng học sinh</span>
-                    </label>
+                  <div className="sm:col-span-12 flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-pink-100 dark:border-slate-800/80">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0F172B] dark:text-slate-200">
+                        <span>Tối đa:</span>
+                        <select
+                          value={Math.max(2, Math.min(30, Number(hostRoomDraft.maxPlayers || 30)))}
+                          onChange={e => {
+                            const nextMax = Number(e.target.value) || 30;
+                            setHostRoomDraft(prev => {
+                              const prevTeam = Number(prev.teamCount || 0);
+                              return {
+                                ...prev,
+                                maxPlayers: nextMax,
+                                teamCount: prevTeam > nextMax ? (nextMax >= 2 ? 2 : 0) : prevTeam
+                              };
+                            });
+                          }}
+                          className="px-2 py-1 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-lg text-[11px] font-extrabold text-sky-700 dark:text-sky-300"
+                        >
+                          {[2, 4, 6, 8, 10, 12, 16, 20, 30].map(n => (
+                            <option key={n} value={n}>{n} người</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0F172B] dark:text-slate-200">
+                        <span>Chia Team:</span>
+                        <select
+                          value={Number(hostRoomDraft.teamCount || 0)}
+                          onChange={e => setHostRoomDraft(prev => ({ ...prev, teamCount: Number(e.target.value) || 0 }))}
+                          className="px-2 py-1 bg-white dark:bg-slate-950 border border-pink-200 dark:border-slate-700 rounded-lg text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300"
+                        >
+                          <option value={0}>Đấu Đơn (Solo)</option>
+                          <option value={2} disabled={Number(hostRoomDraft.maxPlayers || 30) < 2}>2 Team (A vs B)</option>
+                          <option value={3} disabled={Number(hostRoomDraft.maxPlayers || 30) < 3}>3 Team (A·B·C)</option>
+                          <option value={4} disabled={Number(hostRoomDraft.maxPlayers || 30) < 4}>4 Team (A·B·C·D)</option>
+                        </select>
+                      </label>
+                      <label className="inline-flex items-center gap-2 text-xs font-bold text-[#0F172B] dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(hostRoomDraft.shufflePerPlayer)}
+                          onChange={e => setHostRoomDraft(prev => ({ ...prev, shufflePerPlayer: e.target.checked }))}
+                          className="w-4 h-4 rounded accent-[#007A7A]"
+                        />
+                        <span>Đảo thứ tự từ riêng cho từng HS</span>
+                      </label>
+                    </div>
                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                       hostRoomDraft.shufflePerPlayer
                         ? 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-200 border-purple-200 dark:border-purple-500/30'
                         : 'bg-[#EDFFFD] dark:bg-cyan-500/15 text-[#007A7A] dark:text-cyan-200 border-[#B5F5F1] dark:border-cyan-500/30'
                     }`}>
                       {hostRoomDraft.shufflePerPlayer
-                        ? '🔀 BẬT: Mỗi học sinh gặp bộ câu xếp ngẫu nhiên riêng'
-                        : '⚡ TẮT: Cả lớp cùng câu hỏi — nhanh nhất cùng đáp án được điểm cao hơn'}
+                        ? '🔀 BẬT: Mỗi HS 1 thứ tự câu'
+                        : '⚡ TẮT: Đua tốc độ cùng bộ câu'}
                     </span>
                   </div>
                 </form>
@@ -1142,6 +1188,11 @@ export default function GameArena({
                     }`}>
                       {room.shufflePerPlayer ? '🔀 Đảo từ riêng HS' : '⚡ Thi tốc độ • Nhanh nhất +điểm'}
                     </span>
+                    {isTeamRoom && (
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30">
+                        ⚔️ Đấu Đội ({room.teamCount} Team · {studentLobbyPlayers.length}/{roomMaxPlayers} người)
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-[#62748E] dark:text-slate-400">
                     {isTeacher
@@ -1156,9 +1207,9 @@ export default function GameArena({
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs flex-wrap">
                 <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-pink-200/80 dark:border-transparent text-[#334155] dark:text-slate-300 font-semibold">
-                  {roomVocabCount} từ • {room.roundSize || 4}/vòng • {room.speedMode === 'relaxed' ? 'Chậm (+6s)' : room.speedMode === 'turbo' ? 'Siêu tốc (-5s)' : 'Chuẩn'}
+                  {roomVocabCount} từ • {room.roundSize || 4}/vòng • {room.speedMode === 'relaxed' ? 'Chậm (+6s)' : room.speedMode === 'turbo' ? 'Siêu tốc (-5s)' : 'Chuẩn'} • {studentLobbyPlayers.length}/{roomMaxPlayers} người
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 font-bold">
                   {readyCount}/{lobbyPlayersList.length} Sẵn sàng
@@ -1170,8 +1221,51 @@ export default function GameArena({
           {/* 2-Column Stage: Dropship Crewmates Grid + Persistent Lobby Chat */}
           <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 my-auto py-1">
             {/* Left: Crewmates Deck */}
-            <div className="lg:col-span-7 xl:col-span-8 relative rounded-3xl border-2 border-pink-200 dark:border-slate-700/70 bg-gradient-to-b from-sky-100/85 via-[#FFF5F8]/90 to-teal-50/85 dark:from-slate-900/75 dark:via-slate-900/60 dark:to-slate-900/75 backdrop-blur-sm pt-12 pb-6 px-5 sm:px-8 shadow-2xl min-h-[260px] flex flex-col justify-center">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center">
+            <div className="lg:col-span-7 xl:col-span-8 relative rounded-3xl border-2 border-pink-200 dark:border-slate-700/70 bg-gradient-to-b from-sky-100/85 via-[#FFF5F8]/90 to-teal-50/85 dark:from-slate-900/75 dark:via-slate-900/60 dark:to-slate-900/75 backdrop-blur-sm pt-5 pb-6 px-5 sm:px-8 shadow-2xl min-h-[260px] flex flex-col justify-between gap-4">
+              {isTeamRoom && (
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-pink-200/70 dark:border-slate-800/80">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {activeTeamIds.map(tid => {
+                      const tMeta = GAME_TEAM_META[tid];
+                      const teamMembers = studentLobbyPlayers.filter(
+                        p => (activeTeamIds.includes(p.teamId) ? p.teamId : '') === tid || (isFriendVipRoom && p.username === room.hostUsername && p.teamId === tid)
+                      );
+                      const isMyTeam = myLobbyEntry?.teamId === tid;
+                      const canSwitchToTeam = Boolean(
+                        myLobbyEntry && (isFriendVipRoom || myLobbyEntry.role !== 'teacher')
+                      );
+                      return (
+                        <button
+                          key={tid}
+                          type="button"
+                          disabled={!canSwitchToTeam}
+                          onClick={() => canSwitchToTeam && handleSetPlayerTeam?.(activePin, currentUser.username, tid)}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition flex items-center gap-1.5 ${
+                            isMyTeam
+                              ? `${tMeta.badgeCls} ring-2 ring-offset-1 ring-amber-400/70`
+                              : tMeta.pillCls
+                          } ${canSwitchToTeam ? 'cursor-pointer hover:scale-[1.03]' : 'cursor-default'}`}
+                          title={canSwitchToTeam ? `Bấm để đổi sang ${tMeta.name}` : tMeta.name}
+                        >
+                          <span>{tMeta.dot}</span>
+                          <span>{tMeta.short}: {teamMembers.length}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {isRoomHost && (
+                    <button
+                      type="button"
+                      onClick={() => handleShuffleRoomTeams?.(activePin)}
+                      className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300 flex items-center gap-1 transition shadow-2xs"
+                    >
+                      <Shuffle className="w-3 h-3" /> Chia Team Cân Bằng
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center my-auto ${isTeamRoom ? 'pt-2' : 'pt-6'}`}>
                 {lobbyPlayersList.length === 0 ? (
                   <div className="col-span-full py-10 text-center text-[#62748E] dark:text-slate-400 text-sm">
                     Chưa có thành viên nào trong khoang chờ...
@@ -1181,6 +1275,17 @@ export default function GameArena({
                     const isHost = player.role === 'teacher' || (isFriendVipRoom && player.username === room.hostUsername);
                     const isSelf = player.username === currentUser?.username;
                     const showBubble = Boolean(player.chat && player.chatAt && Math.abs(lobbyNowTick - player.chatAt) < 5500);
+                    const participatesInTeam = isTeamRoom && (isFriendVipRoom || player.role !== 'teacher');
+                    const playerTeamId = participatesInTeam
+                      ? activeTeamIds.includes(player.teamId)
+                        ? player.teamId
+                        : activeTeamIds[idx % activeTeamIds.length]
+                      : '';
+                    const playerTeamMeta = playerTeamId ? GAME_TEAM_META[playerTeamId] : null;
+                    const nextTeamId = playerTeamId
+                      ? activeTeamIds[(activeTeamIds.indexOf(playerTeamId) + 1) % activeTeamIds.length]
+                      : '';
+                    const canCycleTeam = Boolean(participatesInTeam && (isRoomHost || isSelf));
 
                     return (
                       <div key={player.username} className="flex flex-col items-center relative group">
@@ -1272,6 +1377,19 @@ export default function GameArena({
                             </span>
                           );
                         })()}
+                        {playerTeamMeta && (
+                          <button
+                            type="button"
+                            disabled={!canCycleTeam}
+                            onClick={() => canCycleTeam && handleSetPlayerTeam?.(activePin, player.username, nextTeamId)}
+                            className={`mt-1 text-[9px] font-extrabold px-2 py-0.5 rounded-full border transition ${playerTeamMeta.badgeCls} ${
+                              canCycleTeam ? 'cursor-pointer hover:opacity-90' : 'cursor-default'
+                            }`}
+                            title={canCycleTeam ? `Bấm để chuyển sang ${GAME_TEAM_META[nextTeamId]?.name}` : playerTeamMeta.name}
+                          >
+                            {playerTeamMeta.dot} {playerTeamMeta.short}{canCycleTeam ? ' ↻' : ''}
+                          </button>
+                        )}
                       </div>
                     );
                   })
@@ -1518,6 +1636,7 @@ export default function GameArena({
         username: lp.username,
         name: lp.name || lp.username,
         role: 'student',
+        teamId: lp.teamId || '',
         colorId: lp.colorId || 'cyan',
         avatarUrl: lp.avatarUrl || usersDb[lp.username]?.avatarUrl || '',
         score: 0,
@@ -1534,6 +1653,7 @@ export default function GameArena({
       mergedMap[lm.username] = {
         ...(mergedMap[lm.username] || {}),
         ...lm,
+        teamId: lm.teamId || mergedMap[lm.username]?.teamId || '',
         avatarUrl: lm.avatarUrl || mergedMap[lm.username]?.avatarUrl || usersDb[lm.username]?.avatarUrl || ''
       };
     });
@@ -1628,6 +1748,40 @@ export default function GameArena({
         <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 relative z-10">
           {/* Left 8 Cols: Live Top-3 Podium + Animated Rank Tracks */}
           <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+            {/* Live Team Standings (When Room Uses Teams) */}
+            {isTeamRoom && (() => {
+              const spectateTeamStandings = computeRoomTeamStandings(room);
+              if (spectateTeamStandings.length === 0) return null;
+              return (
+                <div className="bg-[#FFF5F8]/95 dark:bg-slate-900/80 border border-pink-200/90 dark:border-slate-800 rounded-3xl p-4 sm:p-5 backdrop-blur-md shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-xs font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                      <Trophy className="w-4 h-4" /> Bảng Đua Điểm Theo Đội ({room.teamCount} Team)
+                    </h2>
+                    <span className="text-[11px] text-[#62748E] dark:text-slate-400">Tổng điểm thành viên cùng team</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+                    {spectateTeamStandings.map((team, tIdx) => (
+                      <div key={team.teamId} className={`rounded-2xl border p-3 ${team.meta.cardCls}`}>
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-black text-[#0F172B] dark:text-white flex items-center gap-1.5">
+                            <span>#{tIdx + 1}</span>
+                            <span>{team.meta.dot} {team.meta.name}</span>
+                          </span>
+                          <span className="font-mono text-sm font-black text-amber-600 dark:text-amber-300 tabular-nums">
+                            {team.totalScore}đ
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-[#62748E] dark:text-slate-300 truncate">
+                          {team.members.length} thành viên{team.members.length > 0 ? `: ${team.members.map(m => m.name).join(', ')}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Top 3 Live Podium */}
             {rankedPlayers.length > 0 && (
               <div className="bg-[#FFF5F8]/95 dark:bg-slate-900/80 border border-pink-200/90 dark:border-slate-800 rounded-3xl p-4 sm:p-5 backdrop-blur-md shadow-xl">
@@ -2296,8 +2450,35 @@ export default function GameArena({
                     ? [...matchEntries].sort((a, b) => (b.score || 0) - (a.score || 0))
                     : leaderboardPlayers
                 ).slice(0, 5);
-                if (topStandings.length === 0) return null;
+                const gameoverTeamStandings = isTeamRoom ? computeRoomTeamStandings(room) : [];
+                if (topStandings.length === 0 && gameoverTeamStandings.length === 0) return null;
                 return (
+                  <>
+                    {gameoverTeamStandings.length > 0 && (
+                      <div className="max-w-xl w-full bg-white/95 dark:bg-slate-900/90 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-3 mb-2.5 text-left text-xs shadow-sm">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-2 flex items-center gap-1.5">
+                          <Trophy className="w-3.5 h-3.5" /> Xếp Hạng Đội — Phòng #{activePin} ({room.teamCount} Team)
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {gameoverTeamStandings.map((team, tIdx) => (
+                            <div key={team.teamId} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border ${team.meta.cardCls}`}>
+                              <div className="min-w-0">
+                                <p className="font-extrabold text-[#0F172B] dark:text-white truncate">
+                                  #{tIdx + 1} {team.meta.dot} {team.meta.name}
+                                </p>
+                                <p className="text-[10px] text-[#62748E] dark:text-slate-300 truncate">
+                                  {team.members.length} thành viên
+                                </p>
+                              </div>
+                              <span className="font-mono font-black text-amber-600 dark:text-amber-300 ml-2 shrink-0">
+                                {team.totalScore}đ
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {topStandings.length > 0 && (
                   <div className="max-w-xl w-full bg-white/95 dark:bg-slate-900/90 border border-pink-200 dark:border-indigo-500/30 rounded-xl p-3 mb-3 text-left text-xs shadow-sm">
                     <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 mb-2 flex items-center gap-1.5">
                       <Trophy className="w-3.5 h-3.5" /> Bảng Xếp Hạng Phòng #{activePin} (Top {topStandings.length})
@@ -2334,6 +2515,8 @@ export default function GameArena({
                       })}
                     </div>
                   </div>
+                    )}
+                  </>
                 );
               })()}
 

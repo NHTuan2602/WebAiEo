@@ -72,7 +72,6 @@ import {
   formatVndCurrency,
   hasActiveAieoVip,
   hasCustomCoverPermission,
-  hasSkillPracticeAccess,
   normalizePaymentConfig,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
@@ -2274,22 +2273,9 @@ export default function TeacherDashboard({
                                         )}
                                       </button>
                                       {onToggleUserSubscription && (() => {
-                                        const hasSkill = hasSkillPracticeAccess(account);
                                         const hasVip = hasActiveAieoVip(account);
                                         return (
                                           <span className="inline-flex flex-wrap items-center gap-1 ml-1">
-                                            <button
-                                              type="button"
-                                              onClick={() => onToggleUserSubscription(account.username, 'skill_pass', !(account.skillPracticeExpiresAt > Date.now()))}
-                                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition ${
-                                                hasSkill
-                                                  ? 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/35'
-                                                  : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-sky-400'
-                                              }`}
-                                              title="Bật/Tắt gói Bài Tập 4 Kỹ Năng 1 tháng"
-                                            >
-                                              {hasSkill ? '✓ 4 Kỹ Năng' : '+ 4 Kỹ Năng'}
-                                            </button>
                                             <button
                                               type="button"
                                               onClick={() => onToggleUserSubscription(account.username, 'aieo_vip', !hasVip)}

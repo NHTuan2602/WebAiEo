@@ -58,14 +58,12 @@ import {
   AIEO_VIP_PRICE_VND,
   AVATAR_FRAMES,
   PROFILE_BANNERS,
-  SKILL_PASS_PRICE_VND,
   buildVietQrImageUrl,
   formatRemainingSubscriptionText,
   formatVndCurrency,
   getProfileBannerById,
   hasActiveAieoVip,
   hasCustomCoverPermission,
-  hasSkillPracticeAccess,
   normalizePaymentConfig,
   resolveStudentTitleSummary,
   resolveVisibleTitleBadge
@@ -172,18 +170,13 @@ export default function StudentProfile({
   const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles, paymentConfig);
   const heroBanner = getProfileBannerById(student.profileBannerId);
   const studentHasCoverPermission = hasCustomCoverPermission(student);
-  const studentHasSkillPass = hasSkillPracticeAccess(student);
   const studentHasAieoVip = hasActiveAieoVip(student);
   const canUseCustomCover = canEditTargetInfo && (isTeacherViewer || studentHasCoverPermission);
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
   const unlockPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
-  const skillPassPriceLabel = formatVndCurrency(normalizedPayCfg.skillPassPrice ?? SKILL_PASS_PRICE_VND);
   const aieoVipPriceLabel = formatVndCurrency(normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
   const coverRemainingText = student.customCoverExpiresAt > Date.now()
     ? formatRemainingSubscriptionText(student.customCoverExpiresAt)
-    : '';
-  const skillPassRemainingText = student.skillPracticeExpiresAt > Date.now()
-    ? formatRemainingSubscriptionText(student.skillPracticeExpiresAt)
     : '';
   const aieoVipRemainingText = student.aieoVipExpiresAt > Date.now()
     ? formatRemainingSubscriptionText(student.aieoVipExpiresAt)
@@ -702,48 +695,26 @@ export default function StudentProfile({
                     </button>
                   )}
                   {isViewerSuperAdmin && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserSubscription && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={isTogglingSubscription}
-                        onClick={async () => {
-                          if (student.skillPracticeExpiresAt > Date.now() && !window.confirm(`Thu hồi gói Bài Tập 4 Kỹ Năng của ${student.name || student.username}?`)) {
-                            return;
-                          }
-                          setIsTogglingSubscription(true);
-                          await onToggleUserSubscription(student.username, 'skill_pass', !(student.skillPracticeExpiresAt > Date.now()));
-                          setIsTogglingSubscription(false);
-                        }}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-                          student.skillPracticeExpiresAt > Date.now()
-                            ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-white hover:bg-sky-50 dark:bg-slate-800 border-sky-300 dark:border-sky-500/40 text-sky-700 dark:text-sky-300'
-                        }`}
-                      >
-                        <BookOpen className="w-3.5 h-3.5" />
-                        {student.skillPracticeExpiresAt > Date.now() ? '✓ Đang mở 4 Kỹ Năng (1T)' : '+ Mở 4 Kỹ Năng (1T)'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isTogglingSubscription}
-                        onClick={async () => {
-                          if (studentHasAieoVip && !window.confirm(`Thu hồi gói Ai eo VIP của ${student.name || student.username}?`)) {
-                            return;
-                          }
-                          setIsTogglingSubscription(true);
-                          await onToggleUserSubscription(student.username, 'aieo_vip', !studentHasAieoVip);
-                          setIsTogglingSubscription(false);
-                        }}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-                          studentHasAieoVip
-                            ? 'bg-gradient-to-r from-red-500 to-amber-500 text-white border-amber-300 shadow-xs'
-                            : 'bg-white hover:bg-rose-50 dark:bg-slate-800 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300'
-                        }`}
-                      >
-                        <Crown className="w-3.5 h-3.5" />
-                        {studentHasAieoVip ? '✓ Đang mở Ai eo VIP (1T)' : '+ Cấp Ai eo VIP (1T)'}
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      disabled={isTogglingSubscription}
+                      onClick={async () => {
+                        if (studentHasAieoVip && !window.confirm(`Thu hồi gói Ai eo VIP của ${student.name || student.username}?`)) {
+                          return;
+                        }
+                        setIsTogglingSubscription(true);
+                        await onToggleUserSubscription(student.username, 'aieo_vip', !studentHasAieoVip);
+                        setIsTogglingSubscription(false);
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
+                        studentHasAieoVip
+                          ? 'bg-gradient-to-r from-red-500 to-amber-500 text-white border-amber-300 shadow-xs'
+                          : 'bg-white hover:bg-rose-50 dark:bg-slate-800 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300'
+                      }`}
+                    >
+                      <Crown className="w-3.5 h-3.5" />
+                      {studentHasAieoVip ? '✓ Đang mở Ai eo VIP (1T)' : '+ Cấp Ai eo VIP (1T)'}
+                    </button>
                   )}
                   {isSelf && onOpenAccountSecurity && (
                     <>
@@ -1463,49 +1434,31 @@ export default function StudentProfile({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4">
-            {/* Card 1: Gói 4 Kỹ Năng (20k / 1 tháng) */}
-            <div className={`rounded-2xl border p-4 flex flex-col justify-between gap-3 ${
-              studentHasSkillPass
-                ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40'
-                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-            }`}>
+            {/* Card 1: Bài Tập 4 Kỹ Năng (Miễn phí) & Đề 3 Kỹ Năng Đã Mua */}
+            <div className="rounded-2xl border p-4 flex flex-col justify-between gap-3 bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-sky-700 dark:text-sky-300 flex items-center gap-1">
+                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
                     <BookOpen className="w-4 h-4" /> Bài Tập 4 Kỹ Năng
                   </span>
-                  <span className="text-[11px] font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                    {skillPassPriceLabel}/1T
+                  <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 rounded-full">
+                    Miễn Phí
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Mở toàn bộ bài tập Đọc, Nghe, Viết, Nói &amp; Phòng thi Speaking chấm AI trong 1 tháng.
+                  Luyện Đọc, Nghe, Viết &amp; Speaking AI miễn phí 100%. Bộ Đề Thi 3 Kỹ Năng nâng cao có giá riêng theo từng đề ({(student.purchasedTestIds || []).length} đề đã mua).
                 </p>
-                <p className={`text-[11px] font-bold ${studentHasSkillPass ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>
-                  {studentHasAieoVip && !(student.skillPracticeExpiresAt > Date.now())
-                    ? '✓ Đang mở miễn phí kèm Ai eo VIP'
-                    : skillPassRemainingText
-                    ? `✓ Đang hoạt động (${skillPassRemainingText})`
-                    : 'Chưa kích hoạt'}
+                <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                  ✓ Sẵn sàng mở không giới hạn
                 </p>
               </div>
               {isSelf && (
                 <button
                   type="button"
-                  onClick={() =>
-                    setCheckoutModalState({
-                      itemType: 'skill_pass',
-                      itemId: '',
-                      itemLabel: 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
-                      itemPrice: normalizedPayCfg.skillPassPrice ?? SKILL_PASS_PRICE_VND,
-                      renew: student.skillPracticeExpiresAt > Date.now()
-                    })
-                  }
-                  className="w-full py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold transition"
+                  onClick={() => setView('HOME')}
+                  className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition"
                 >
-                  {student.skillPracticeExpiresAt > Date.now()
-                    ? `Gia hạn +30N (${skillPassPriceLabel})`
-                    : `Mở Gói 1 Tháng (${skillPassPriceLabel})`}
+                  Xem Kho Đề Thi 3 Kỹ Năng
                 </button>
               )}
             </div>
@@ -1526,7 +1479,7 @@ export default function StudentProfile({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                  • Free 4 Kỹ Năng (1T) • Danh hiệu <b>👑 Ai eo VIP</b> • Tạo phòng Đấu Trường cùng bạn bè • Tên Đỏ + Nhãn <b>AIEOVIP</b>.
+                  • Danh hiệu <b>👑 Ai eo VIP</b> • Tạo phòng Đấu Trường bạn bè (tùy chỉnh số người &amp; chia Team) • Tên Đỏ + Nhãn <b>AIEOVIP</b>.
                 </p>
                 <p className={`text-[11px] font-bold ${studentHasAieoVip ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
                   {studentHasAieoVip

@@ -36,12 +36,16 @@ export default function CoverCheckoutModal({
   const [error, setError] = useState('');
 
   const isTitleOrder = itemType === 'title' && Boolean(itemId);
+  const isTestOrder = itemType === 'test' && Boolean(itemId);
   const isSkillPassOrder = itemType === 'skill_pass';
   const isAieoVipOrder = itemType === 'aieo_vip';
   const [orderPaidConfirmed, setOrderPaidConfirmed] = useState(false);
   const isUnlocked = orderPaidConfirmed || (!renew && (
     isTitleOrder
       ? hasActivePaidTitlePermission(currentUser, itemId)
+      : isTestOrder
+      ? (Boolean(currentUser?.isSuperAdmin || currentUser?.role === 'teacher') ||
+          (Array.isArray(currentUser?.purchasedTestIds) && currentUser.purchasedTestIds.map(String).includes(String(itemId))))
       : isSkillPassOrder
       ? hasSkillPracticeAccess(currentUser)
       : isAieoVipOrder
@@ -58,6 +62,8 @@ export default function CoverCheckoutModal({
       ? itemPrice
       : isTitleOrder
       ? getTitlePriceVnd(itemId, effectiveCfg)
+      : isTestOrder
+      ? effectiveCfg.defaultExamPriceVnd
       : isSkillPassOrder
       ? effectiveCfg.skillPassPrice
       : isAieoVipOrder
@@ -67,6 +73,8 @@ export default function CoverCheckoutModal({
   const creating = isOpen && !isUnlocked && !order && !error;
   const pendingRequestedAt = isTitleOrder
     ? (currentUser?.paidTitleRequested?.titleId === itemId ? currentUser.paidTitleRequested.requestedAt : 0)
+    : isTestOrder
+    ? (currentUser?.subscriptionRequested?.itemId === itemId ? currentUser.subscriptionRequested.requestedAt : 0)
     : (isSkillPassOrder || isAieoVipOrder)
     ? (currentUser?.subscriptionRequested?.itemType === itemType ? currentUser.subscriptionRequested.requestedAt : 0)
     : (currentUser?.coverUnlockRequestedAt || 0);
@@ -79,7 +87,7 @@ export default function CoverCheckoutModal({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         itemType,
-        itemId: isTitleOrder ? itemId : '',
+        itemId: (isTitleOrder || isTestOrder) ? itemId : '',
         renew: Boolean(renew)
       })
     })
@@ -104,7 +112,7 @@ export default function CoverCheckoutModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isUnlocked, itemType, isTitleOrder, itemId, renew, onPullSync]);
+  }, [isOpen, isUnlocked, itemType, isTitleOrder, isTestOrder, itemId, renew, onPullSync]);
 
   // Poll order status every 3s while checkout modal stays open (backup alongside instant SSE)
   useEffect(() => {
@@ -173,8 +181,8 @@ export default function CoverCheckoutModal({
                 <span>
                   {isTitleOrder
                     ? `Mua Danh Hiệu ${itemLabel || 'VIP'} (1 Tháng)`
-                    : isSkillPassOrder
-                    ? 'Mở Khóa Bài Tập 4 Kỹ Năng (1 Tháng)'
+                    : isTestOrder
+                    ? `Mua Đề Thi: ${itemLabel || 'IELTS 3 Kỹ Năng'}`
                     : isAieoVipOrder
                     ? 'Đăng Ký Gói Ai eo VIP (1 Tháng)'
                     : 'Mở Khóa Ảnh Nền Riêng (1 Tháng)'}
@@ -207,8 +215,8 @@ export default function CoverCheckoutModal({
               <h4 className="text-base font-extrabold text-emerald-900 dark:text-emerald-200">
                 {isTitleOrder
                   ? `Thanh toán thành công — Đã sở hữu ${itemLabel || 'Danh Hiệu VIP'}!`
-                  : isSkillPassOrder
-                  ? 'Thanh toán thành công — Đã kích hoạt Bài Tập 4 Kỹ Năng!'
+                  : isTestOrder
+                  ? `Thanh toán thành công — Đã mở khóa Đề Thi!`
                   : isAieoVipOrder
                   ? 'Thanh toán thành công — Chào mừng thành viên Ai eo VIP!'
                   : 'Thanh toán thành công — Đã mở khóa Ảnh Nền Riêng!'}
@@ -216,10 +224,10 @@ export default function CoverCheckoutModal({
               <p className="text-xs text-emerald-800/90 dark:text-emerald-300 leading-relaxed">
                 {isTitleOrder
                   ? `Tài khoản @${currentUser?.username} đã mở khóa danh hiệu ${itemLabel} (thời hạn 1 tháng${expiryPreview ? ` • ${expiryPreview}` : ''}).`
-                  : isSkillPassOrder
-                  ? `Tài khoản @${currentUser?.username} đã mở khóa toàn bộ Khu Bài Tập 4 Kỹ Năng & Đề Lẻ trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`
+                  : isTestOrder
+                  ? `Tài khoản @${currentUser?.username} đã mở khóa đề thi "${itemLabel}" — được làm lại nhiều lần không giới hạn!`
                   : isAieoVipOrder
-                  ? `Tài khoản @${currentUser?.username} đã sở hữu Gói Ai eo VIP 1 tháng: Bài tập 4 Kỹ năng miễn phí, Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè & Màu Chữ Đỏ + Nhãn AIEOVIP!`
+                  ? `Tài khoản @${currentUser?.username} đã sở hữu Gói Ai eo VIP 1 tháng: Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè (tùy chỉnh số người & chia Team) & Màu Chữ Đỏ + Nhãn AIEOVIP!`
                   : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`}
               </p>
               <p className="text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100/75 dark:bg-amber-500/15 border border-amber-300/70 dark:border-amber-500/30 rounded-xl px-3.5 py-2 leading-relaxed">
@@ -232,8 +240,8 @@ export default function CoverCheckoutModal({
                     onClose?.();
                     if (isTitleOrder) {
                       onEquipPurchasedTitle?.(itemId);
-                    } else if (isSkillPassOrder) {
-                      onNavigateAfterPurchase?.('SKILL_HUB');
+                    } else if (isTestOrder) {
+                      onNavigateAfterPurchase?.('EXAM_START', itemId);
                     } else if (isAieoVipOrder) {
                       onNavigateAfterPurchase?.('STUDENT_PROFILE');
                     } else {
@@ -246,9 +254,9 @@ export default function CoverCheckoutModal({
                     <>
                       <Award className="w-4 h-4" /> Đeo Danh Hiệu Ngay
                     </>
-                  ) : isSkillPassOrder ? (
+                  ) : isTestOrder ? (
                     <>
-                      <Sparkles className="w-4 h-4" /> Vào Bài Tập 4 Kỹ Năng Ngay
+                      <Sparkles className="w-4 h-4" /> Vào Làm Đề Thi Ngay
                     </>
                   ) : isAieoVipOrder ? (
                     <>
@@ -286,7 +294,7 @@ export default function CoverCheckoutModal({
                 requesting={requestingManual}
                 onRequestUnlock={onRequestUnlock ? async () => {
                   setRequestingManual(true);
-                  await onRequestUnlock(isTitleOrder ? { itemType: 'title', itemId } : { itemType });
+                  await onRequestUnlock((isTitleOrder || isTestOrder) ? { itemType, itemId } : { itemType });
                   setRequestingManual(false);
                 } : null}
                 showToast={showToast}

@@ -18,7 +18,9 @@ import {
 import {
   calculateOverallIeltsBand,
   calculateWritingBand,
+  getActiveTeamIds,
   isObjectiveAnswerCorrect,
+  pickBalancedTeamId,
   roundWholeBand
 } from './src/utils/examHelpers.js';
 import {
@@ -34,12 +36,15 @@ import {
 import {
   PAID_SHOP_TITLES,
   SKILL_PASS_PRICE_VND,
+  DEFAULT_EXAM_PRICE_VND,
   AIEO_VIP_PRICE_VND,
   SUBSCRIPTION_DURATION_MS,
   formatVndCurrency,
+  getTestPurchasePriceVnd,
   getTitlePriceVnd,
   hasCustomCoverPermission,
   hasSkillPracticeAccess,
+  hasTestPurchaseAccess,
   hasVipFriendRoomAccess,
   normalizePaymentConfig
 } from './src/constants/profileCustomization.js';
@@ -668,6 +673,7 @@ function sanitizeUserForViewer(user, viewer) {
     showTitleBadge: user.showTitleBadge !== false,
     grantedTitleIds: Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String).filter(Boolean) : [],
     purchasedTitleIds: Array.isArray(user.purchasedTitleIds) ? user.purchasedTitleIds.map(String).filter(Boolean) : [],
+    purchasedTestIds: Array.isArray(user.purchasedTestIds) ? user.purchasedTestIds.map(String).filter(Boolean) : [],
     purchasedTitleExpiries:
       user.purchasedTitleExpiries && typeof user.purchasedTitleExpiries === 'object'
         ? user.purchasedTitleExpiries
@@ -899,6 +905,12 @@ export function normalizeServerRoom(raw = {}, pinKey = '', now = Date.now()) {
   const pin = String(raw?.pin || pinKey || '').trim();
   const prunedChat = pruneServerRoomChat(raw, now);
   const rawRoundSize = Number(raw?.roundSize);
+  const rawMaxPlayers = Number(raw?.maxPlayers);
+  const maxPlayers = Number.isFinite(rawMaxPlayers) && rawMaxPlayers >= 2
+    ? Math.min(30, Math.round(rawMaxPlayers))
+    : 30;
+  const rawTeamCount = Number(raw?.teamCount);
+  const teamCount = [2, 3, 4].includes(Math.round(rawTeamCount)) ? Math.round(rawTeamCount) : 0;
   return {
     pin,
     name: raw?.name || `Phòng Từ Vựng #${pin || '686868'}`,
@@ -908,7 +920,8 @@ export function normalizeServerRoom(raw = {}, pinKey = '', now = Date.now()) {
     hostUsername: String(raw?.hostUsername || ''),
     hostName: String(raw?.hostName || ''),
     status: raw?.status === 'PLAYING' || raw?.status === 'ENDED' ? raw.status : 'LOBBY',
-    maxPlayers: Number(raw?.maxPlayers) || 30,
+    maxPlayers,
+    teamCount,
     roundSize: Number.isFinite(rawRoundSize) && rawRoundSize >= 2 ? Math.min(8, Math.round(rawRoundSize)) : 4,
     speedMode: ['relaxed', 'normal', 'turbo'].includes(raw?.speedMode) ? raw.speedMode : 'normal',
     shufflePerPlayer: Boolean(raw?.shufflePerPlayer),
@@ -1009,6 +1022,7 @@ function createInitialStore(audioDir = '') {
     _rateLimits: new Map(),
     _otpChallenges: new Map(),
     _unlockedSpeakingRooms: new Map(),
+    _unlockedExamRooms: new Map(),
     _audioDir: audioDir,
     _audioMem: new Map()
   };
@@ -1645,19 +1659,25 @@ function getSnapshotForViewer(store, viewer = null) {
     })
     .map(t => {
       const canSeeKeys = Boolean(t?.allowViewAnswers) && submittedTestIds.has(t.id);
-      const safeTest = canSeeKeys ? t : stripAnswerKeysFromTest(t);
-      if (safeTest?.speaking && typeof safeTest.speaking === 'object') {
-        const rawPass = String(safeTest.speaking.roomPassword || '').trim();
+      const safeTest = canSeeKeys ? { ...t } : stripAnswerKeysFromTest(t);
+      const rawExamPass = String(safeTest?.examPassword || '').trim();
+      const sanitizedExamTest = {
+        ...safeTest,
+        examPassword: '',
+        hasExamPassword: Boolean(safeTest?.hasExamPassword || rawExamPass.length > 0)
+      };
+      if (sanitizedExamTest?.speaking && typeof sanitizedExamTest.speaking === 'object') {
+        const rawPass = String(sanitizedExamTest.speaking.roomPassword || '').trim();
         return {
-          ...safeTest,
+          ...sanitizedExamTest,
           speaking: {
-            ...safeTest.speaking,
+            ...sanitizedExamTest.speaking,
             roomPassword: '',
-            hasRoomPassword: Boolean(safeTest.speaking.hasRoomPassword || rawPass.length > 0)
+            hasRoomPassword: Boolean(sanitizedExamTest.speaking.hasRoomPassword || rawPass.length > 0)
           }
         };
       }
-      return safeTest;
+      return sanitizedExamTest;
     });
 
   const studentAttempts = (store.attempts || [])
@@ -1802,10 +1822,22 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     case 'KICK_LOBBY_PLAYER':
     case 'DELETE_ROOM':
     case 'RESET_LOBBY':
-    case 'APPROVE_LOBBY_PLAYER': {
+    case 'APPROVE_LOBBY_PLAYER':
+    case 'SHUFFLE_ROOM_TEAMS': {
       const cleanPin = String(payload?.pin || '').trim();
       if (!canManageTargetRoom(cleanPin)) {
         return { allowed: false, status: 403, error: 'Chỉ Giáo viên hoặc Chủ phòng Gói Ai eo VIP mới được điều khiển phòng đấu này.' };
+      }
+      return { allowed: true };
+    }
+    case 'SET_PLAYER_TEAM': {
+      const cleanPin = String(payload?.pin || '').trim();
+      const targetU = String(payload?.username || '').trim();
+      if (!cleanPin || !store.rooms?.[cleanPin]) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy phòng đấu.' };
+      }
+      if (!canManageTargetRoom(cleanPin) && targetU !== viewer.username) {
+        return { allowed: false, status: 403, error: 'Bạn chỉ có quyền đổi Team cho chính mình.' };
       }
       return { allowed: true };
     }
@@ -1962,6 +1994,14 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         }
         return { allowed: true };
       }
+      if (payload?.itemType === 'test') {
+        const tid = String(payload?.itemId || '').trim();
+        const targetTest = (store.tests || []).find(t => t?.id === tid);
+        if (!targetTest || getTestPurchasePriceVnd(targetTest) <= 0) {
+          return { allowed: false, status: 400, error: 'Đề thi không hợp lệ hoặc đang miễn phí.' };
+        }
+        return { allowed: true };
+      }
       if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip') {
         return { allowed: true };
       }
@@ -1984,13 +2024,31 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         }
         const test = (store.tests || []).find(t => t.id === att.testId);
         const viewerRecord = store.users?.[viewer.username] || viewer;
-        const resolvedTestMode = test?.testMode || att?.testMode;
-        if (!existingAtt && resolvedTestMode === 'single_skill' && !hasSkillPracticeAccess(viewerRecord)) {
+        if (test && !existingAtt && !hasTestPurchaseAccess(viewerRecord, test)) {
+          const priceLabel = formatVndCurrency(getTestPurchasePriceVnd(test));
           return {
             allowed: false,
             status: 403,
-            error: 'Bạn cần đăng ký Gói Bài Tập 4 Kỹ Năng (20.000đ/tháng) hoặc Gói Ai eo VIP (80.000đ/tháng) để vào làm & nộp bài tập kỹ năng.'
+            error: `Đề thi 3 kỹ năng này có giá ${priceLabel}. Vui lòng mở khóa trước khi làm & nộp bài!`
           };
+        }
+        const examPass = test?.testMode !== 'single_skill' ? String(test?.examPassword || '').trim() : '';
+        if (test && !existingAtt && examPass) {
+          const unlockedExamMem = Boolean(store._unlockedExamRooms?.has(`${viewer.username}::${test.id}`));
+          const examUnlockPayload = att.examUnlockToken ? verifyToken(att.examUnlockToken, store._authSecret) : null;
+          const examTokenOk = Boolean(
+            examUnlockPayload &&
+            examUnlockPayload.kind === 'exam_unlock' &&
+            examUnlockPayload.username === viewer.username &&
+            examUnlockPayload.testId === test.id
+          );
+          if (!unlockedExamMem && !examTokenOk) {
+            return {
+              allowed: false,
+              status: 403,
+              error: 'Đề thi Thực Chiến yêu cầu nhập đúng Mật khẩu lớp thi do giáo viên cấp trước khi nộp bài.'
+            };
+          }
         }
         if (test && !existingAtt) {
           const assigned = normalizeClassIdList(test.assignedClassIds);
@@ -2052,6 +2110,11 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         }
         const alreadyIn = Boolean(room.lobbyPlayers?.[viewer.username]);
         const isVipSelfHost = room.roomMode === 'friend_vip' && room.hostUsername === viewer.username;
+        const maxPlayers = Math.max(2, Math.min(30, Number(room.maxPlayers) || 30));
+        const currentLobbyCount = Object.keys(room.lobbyPlayers || {}).length;
+        if (!alreadyIn && !isVipSelfHost && currentLobbyCount >= maxPlayers) {
+          return { allowed: false, status: 403, error: `Phòng đấu đã đủ số lượng tối đa ${maxPlayers} người chơi!` };
+        }
         if (!alreadyIn && !isVipSelfHost && room.pass && String(payload?.roomPass || '').trim() !== String(room.pass).trim()) {
           return { allowed: false, status: 403, error: 'Mật khẩu phòng không chính xác.' };
         }
@@ -2176,6 +2239,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
       grantedTitleIds: Array.isArray(prevUser.grantedTitleIds) ? prevUser.grantedTitleIds : [],
       purchasedTitleIds: Array.isArray(prevUser.purchasedTitleIds) ? prevUser.purchasedTitleIds : [],
+      purchasedTestIds: Array.isArray(prevUser.purchasedTestIds) ? prevUser.purchasedTestIds : [],
       purchasedTitleExpiries:
         prevUser.purchasedTitleExpiries && typeof prevUser.purchasedTitleExpiries === 'object'
           ? prevUser.purchasedTitleExpiries
@@ -2209,6 +2273,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     if (!isSuperAdmin) {
       incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
       incoming.purchasedTitleIds = Array.isArray(prevUser?.purchasedTitleIds) ? prevUser.purchasedTitleIds : [];
+      incoming.purchasedTestIds = Array.isArray(prevUser?.purchasedTestIds) ? prevUser.purchasedTestIds : [];
       incoming.purchasedTitleExpiries =
         prevUser?.purchasedTitleExpiries && typeof prevUser.purchasedTitleExpiries === 'object'
           ? prevUser.purchasedTitleExpiries
@@ -2531,6 +2596,22 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       if (oldPin && oldPin !== cleanPin && store.rooms[oldPin]) {
         delete store.rooms[oldPin];
       }
+      const activeTeams = getActiveTeamIds(merged.teamCount);
+      if (activeTeams.length > 0) {
+        const balancedLobby = { ...(merged.lobbyPlayers || {}) };
+        Object.keys(balancedLobby).forEach(uname => {
+          const lp = balancedLobby[uname];
+          if (!lp) return;
+          if (merged.roomMode !== 'friend_vip' && lp.role === 'teacher') return;
+          if (!activeTeams.includes(lp.teamId)) {
+            balancedLobby[uname] = {
+              ...lp,
+              teamId: pickBalancedTeamId(balancedLobby, merged.teamCount, merged.roomMode, uname)
+            };
+          }
+        });
+        merged.lobbyPlayers = balancedLobby;
+      }
       store.rooms[cleanPin] = merged;
       store.seeded = true;
       changed = true;
@@ -2549,11 +2630,64 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         : viewer?.role === 'teacher'
         ? Boolean(player.approved ?? existingPlayer?.approved)
         : Boolean(existingPlayer?.approved);
+      const activeTeams = getActiveTeamIds(base.teamCount);
+      const needsAutoTeam = activeTeams.length > 0 && (base.roomMode === 'friend_vip' || player.role !== 'teacher');
+      const requestedTeam = activeTeams.includes(player.teamId)
+        ? player.teamId
+        : activeTeams.includes(existingPlayer?.teamId)
+        ? existingPlayer.teamId
+        : '';
+      const resolvedTeamId = needsAutoTeam
+        ? (requestedTeam || pickBalancedTeamId(base.lobbyPlayers, base.teamCount, base.roomMode, player.username))
+        : '';
       base.lobbyPlayers[player.username] = {
         ...(existingPlayer || {}),
         ...player,
+        ...(resolvedTeamId ? { teamId: resolvedTeamId } : {}),
         approved
       };
+      store.rooms[cleanPin] = base;
+      changed = true;
+      break;
+    }
+
+    case 'SET_PLAYER_TEAM': {
+      const cleanPin = String(payload.pin || '').trim();
+      const username = String(payload.username || '').trim();
+      if (!cleanPin || !username || !store.rooms[cleanPin]) break;
+      const base = normalizeServerRoom(store.rooms[cleanPin], cleanPin);
+      const activeTeams = getActiveTeamIds(base.teamCount);
+      if (activeTeams.length === 0 || !base.lobbyPlayers[username]) break;
+      const nextTeam = activeTeams.includes(payload.teamId) ? payload.teamId : activeTeams[0];
+      base.lobbyPlayers[username] = {
+        ...base.lobbyPlayers[username],
+        teamId: nextTeam
+      };
+      store.rooms[cleanPin] = base;
+      changed = true;
+      break;
+    }
+
+    case 'SHUFFLE_ROOM_TEAMS': {
+      const cleanPin = String(payload.pin || '').trim();
+      if (!cleanPin || !store.rooms[cleanPin]) break;
+      const base = normalizeServerRoom(store.rooms[cleanPin], cleanPin);
+      const activeTeams = getActiveTeamIds(base.teamCount);
+      if (activeTeams.length === 0) break;
+      const candidates = Object.keys(base.lobbyPlayers || {}).filter(uname => {
+        const lp = base.lobbyPlayers[uname];
+        return lp && (base.roomMode === 'friend_vip' || lp.role !== 'teacher');
+      });
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      candidates.forEach((uname, idx) => {
+        base.lobbyPlayers[uname] = {
+          ...base.lobbyPlayers[uname],
+          teamId: activeTeams[idx % activeTeams.length]
+        };
+      });
       store.rooms[cleanPin] = base;
       changed = true;
       break;
@@ -2669,12 +2803,17 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       }
       const freshLive = {};
       const isFriendVipMatch = base.roomMode === 'friend_vip';
+      const activeTeams = getActiveTeamIds(base.teamCount);
       Object.values(base.lobbyPlayers || {}).forEach(lp => {
         if (lp && (isFriendVipMatch || lp.role !== 'teacher')) {
+          const teamId = activeTeams.length > 0
+            ? (activeTeams.includes(lp.teamId) ? lp.teamId : pickBalancedTeamId(base.lobbyPlayers, base.teamCount, base.roomMode, lp.username))
+            : '';
           freshLive[lp.username] = {
             username: lp.username,
             name: lp.name || lp.username,
             role: lp.role || 'student',
+            ...(teamId ? { teamId } : {}),
             colorId: lp.colorId || 'cyan',
             animalId: lp.animalId || 'cat',
             accessoryId: lp.accessoryId || 'none',
@@ -2797,6 +2936,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         ...prevEntry,
         ...entry,
         username,
+        teamId: entry.teamId || prevEntry.teamId || base.lobbyPlayers[username]?.teamId || '',
         clientBaseScore,
         serverFirstBonusTotal,
         lastFastestRank,
@@ -3217,6 +3357,35 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           );
         }
         changed = true;
+      } else if (kind === 'test') {
+        const testId = String(payload?.testId || '').trim();
+        if (testId) {
+          const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
+          const nextTests = active
+            ? Array.from(new Set([...prevTests, testId]))
+            : prevTests.filter(id => id !== testId);
+          store.users[targetKey] = {
+            ...targetUser,
+            purchasedTestIds: nextTests,
+            ...(active && targetUser.subscriptionRequested?.itemId === testId ? { subscriptionRequested: null } : {})
+          };
+          if (active && targetUser.role !== 'teacher') {
+            const targetTestTitle = (store.tests || []).find(t => t?.id === testId)?.title || testId;
+            appendStoreNotification(
+              store,
+              {
+                title: '🎉 Đã mở khóa Đề Thi 3 Kỹ Năng!',
+                message: `Quản Trị Hệ Thống đã mở khóa đề thi "${targetTestTitle}" — bạn có thể vào làm nhiều lần không giới hạn.`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+                createdByName: viewer?.name || 'Quản Trị Hệ Thống'
+              },
+              viewer
+            );
+          }
+          changed = true;
+        }
       } else if (kind === 'aieo_vip') {
         const nextVipExp = extendFrom(targetUser.aieoVipExpiresAt);
         const nextSkillExp = active
@@ -3261,6 +3430,22 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           paidTitleRequested: {
             titleId: paidTitle.id,
             titleLabel: `${paidTitle.icon} ${paidTitle.label}`,
+            requestedAt: Date.now()
+          }
+        };
+        changed = true;
+        break;
+      }
+      if (payload?.itemType === 'test' && payload?.itemId) {
+        const tid = String(payload.itemId).trim();
+        const targetTest = (store.tests || []).find(t => t?.id === tid);
+        if (!targetTest) break;
+        store.users[uname] = {
+          ...targetUser,
+          subscriptionRequested: {
+            itemType: 'test',
+            itemId: tid,
+            itemLabel: `Mua Đề Thi: ${targetTest.title}`,
             requestedAt: Date.now()
           }
         };
@@ -4656,9 +4841,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const cfg = getPublicPaymentConfigSummary(store);
         const rawType = String(body?.itemType || 'cover').trim();
         const isTitleOrder = rawType === 'title';
+        const isTestOrder = rawType === 'test';
         const isSkillPassOrder = rawType === 'skill_pass';
         const isAieoVipOrder = rawType === 'aieo_vip';
-        const itemType = isTitleOrder ? 'title' : isSkillPassOrder ? 'skill_pass' : isAieoVipOrder ? 'aieo_vip' : 'cover';
+        const itemType = isTitleOrder ? 'title' : isTestOrder ? 'test' : isSkillPassOrder ? 'skill_pass' : isAieoVipOrder ? 'aieo_vip' : 'cover';
         const renewFlag = Boolean(body?.renew);
         let itemId = '';
         let itemLabel = 'Ảnh Nền Riêng (1 Tháng)';
@@ -4686,6 +4872,17 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             purchasedActive ||
             (Array.isArray(viewerUser?.grantedTitleIds) && viewerUser.grantedTitleIds.includes(itemId))
           );
+        } else if (isTestOrder) {
+          itemId = String(body?.itemId || '').trim();
+          const targetTest = (store.tests || []).find(t => t?.id === itemId);
+          const testPrice = getTestPurchasePriceVnd(targetTest, cfg);
+          if (!targetTest || testPrice <= 0) {
+            sendJsonResponse(res, 400, { ok: false, error: 'Đề thi không tồn tại hoặc đang được mở miễn phí.' });
+            return;
+          }
+          itemLabel = `Đề Thi 3 Kỹ Năng: ${targetTest.title}`;
+          amount = testPrice;
+          alreadyUnlocked = hasTestPurchaseAccess(viewerUser, targetTest);
         } else if (isSkillPassOrder) {
           itemLabel = 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)';
           amount = Number(cfg.skillPassPrice) >= 0 ? cfg.skillPassPrice : SKILL_PASS_PRICE_VND;
@@ -4809,6 +5006,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               ((Number(viewerUser?.purchasedTitleExpiries?.[matched.itemId]) || 0) === 0 ||
                 Number(viewerUser.purchasedTitleExpiries[matched.itemId]) > Date.now())) ||
             (Array.isArray(viewerUser?.grantedTitleIds) && viewerUser.grantedTitleIds.includes(matched.itemId))
+          )
+        : matched?.itemType === 'test'
+        ? Boolean(
+            isViewerSuperAdmin ||
+            (Array.isArray(viewerUser?.purchasedTestIds) && viewerUser.purchasedTestIds.includes(matched.itemId))
           )
         : matched?.itemType === 'skill_pass'
         ? hasSkillPracticeAccess(viewerUser)
@@ -4957,6 +5159,26 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               },
               null
             );
+          } else if (matchedOrder.itemType === 'test' && matchedOrder.itemId) {
+            const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
+            const nextTests = Array.from(new Set([...prevTests, matchedOrder.itemId]));
+            store.users[targetKey] = {
+              ...targetUser,
+              purchasedTestIds: nextTests,
+              ...(targetUser.subscriptionRequested?.itemId === matchedOrder.itemId ? { subscriptionRequested: null } : {})
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '🎉 Đã mở khóa Đề Thi 3 Kỹ Năng!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa vĩnh viễn ${matchedOrder.itemLabel || matchedOrder.itemId} (làm không giới hạn số lượt). Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
           } else if (matchedOrder.itemType === 'skill_pass') {
             const baseExp = Math.max(nowMs, Number(targetUser.skillPracticeExpiresAt) || 0);
             store.users[targetKey] = {
@@ -5095,9 +5317,70 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           },
           store._authSecret
         );
-        sendJsonResponse(res, 200, { ok: true, unlockToken });
+        sendJsonResponse(res, 200, { ok: true, unlockToken, examUnlockToken: unlockToken });
       } catch (err) {
         sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Xác nhận mật khẩu phòng thi thất bại.' });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/exam/verify-password') {
+      if (!viewer) {
+        sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để vào phòng thi Thực Chiến.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const testId = String(body?.testId || '').trim();
+        const password = String(body?.password || '').trim();
+        const ip = getClientIp(req);
+        if (!checkRateLimit(store._rateLimits, `exam_room:${ip}:${viewer.username}`, 25, 5 * 60 * 1000)) {
+          sendJsonResponse(res, 429, { ok: false, error: 'Nhập sai mật khẩu phòng thi quá nhiều lần. Vui lòng thử lại sau ít phút.' });
+          return;
+        }
+        const targetTest = (store.tests || []).find(t => t?.id === testId);
+        if (!targetTest) {
+          sendJsonResponse(res, 404, { ok: false, error: 'Không tìm thấy đề thi này.' });
+          return;
+        }
+        const isTeacherViewer = viewer.role === 'teacher' || Boolean(viewer.isSuperAdmin);
+        if (!isTeacherViewer) {
+          if ((targetTest.visibility || 'public') === 'private') {
+            sendJsonResponse(res, 403, { ok: false, error: 'Đề thi này đang ở chế độ riêng tư.' });
+            return;
+          }
+          const assigned = normalizeClassIdList(targetTest.assignedClassIds);
+          if (assigned.length > 0) {
+            const vClasses = getViewerClassIdSet(store, viewer.username);
+            if (!assigned.some(cid => vClasses.has(cid))) {
+              sendJsonResponse(res, 403, { ok: false, error: 'Bạn không thuộc lớp học được giao đề thi này.' });
+              return;
+            }
+          }
+          if (!hasTestPurchaseAccess(store.users?.[viewer.username] || viewer, targetTest)) {
+            sendJsonResponse(res, 403, { ok: false, error: 'Bạn cần mở khóa đề thi trước khi nhập mật khẩu phòng thi.' });
+            return;
+          }
+          const expectedPass = String(targetTest.examPassword || '').trim();
+          if (expectedPass && expectedPass !== password) {
+            sendJsonResponse(res, 403, { ok: false, error: 'Mật khẩu Phòng Thi Thực Chiến chưa chính xác!' });
+            return;
+          }
+        }
+        if (!store._unlockedExamRooms) store._unlockedExamRooms = new Map();
+        store._unlockedExamRooms.set(`${viewer.username}::${targetTest.id}`, Date.now());
+        const unlockToken = signToken(
+          {
+            kind: 'exam_unlock',
+            username: viewer.username,
+            testId: targetTest.id,
+            exp: Date.now() + 12 * 60 * 60 * 1000
+          },
+          store._authSecret
+        );
+        sendJsonResponse(res, 200, { ok: true, unlockToken, examUnlockToken: unlockToken });
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Xác nhận mật khẩu đề thi thất bại.' });
       }
       return;
     }
@@ -5142,6 +5425,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           return;
         }
         const alreadyJoined = Boolean(normRoom.lobbyPlayers?.[viewer.username]);
+        const currentCount = Object.keys(normRoom.lobbyPlayers || {}).length;
+        if (!alreadyJoined && viewer.role !== 'teacher' && !isRoomHostJoin && currentCount >= normRoom.maxPlayers) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: `Phòng đấu đã đủ số lượng tối đa ${normRoom.maxPlayers} người chơi!` }));
+          return;
+        }
         if (normRoom.status === 'PLAYING' && !alreadyJoined && viewer.role !== 'teacher' && !isRoomHostJoin) {
           res.statusCode = 403;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -5151,12 +5441,20 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
 
         const pilot = body?.pilot || {};
         const existingPlayer = normRoom.lobbyPlayers?.[viewer.username];
+        const activeTeams = getActiveTeamIds(normRoom.teamCount);
+        const needsTeam = activeTeams.length > 0 && (normRoom.roomMode === 'friend_vip' || viewer.role !== 'teacher');
+        const resolvedTeamId = needsTeam
+          ? (activeTeams.includes(existingPlayer?.teamId)
+              ? existingPlayer.teamId
+              : pickBalancedTeamId(normRoom.lobbyPlayers, normRoom.teamCount, normRoom.roomMode, viewer.username))
+          : '';
         normRoom.lobbyPlayers[viewer.username] = {
           ...(existingPlayer || {}),
           username: viewer.username,
           name: viewer.name || viewer.username,
           role: viewer.role,
           isHost: isRoomHostJoin || viewer.role === 'teacher',
+          ...(resolvedTeamId ? { teamId: resolvedTeamId } : {}),
           colorId: pilot.colorId || existingPlayer?.colorId || 'cyan',
           animalId: pilot.animalId || existingPlayer?.animalId || 'cat',
           accessoryId: pilot.accessoryId || existingPlayer?.accessoryId || 'crown',

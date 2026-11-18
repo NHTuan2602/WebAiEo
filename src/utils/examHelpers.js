@@ -658,15 +658,142 @@ export function pruneExpiredRoomChat(room, now = Date.now()) {
   };
 }
 
+export const GAME_TEAM_META = {
+  A: {
+    id: 'A',
+    name: 'Team Đỏ (A)',
+    short: 'Team A',
+    dot: '🔴',
+    badgeCls: 'bg-rose-600 text-white border-rose-400',
+    pillCls: 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-200 border-rose-300 dark:border-rose-500/40',
+    cardCls: 'bg-rose-50/85 dark:bg-rose-950/25 border-rose-300/80 dark:border-rose-500/40'
+  },
+  B: {
+    id: 'B',
+    name: 'Team Xanh (B)',
+    short: 'Team B',
+    dot: '🔵',
+    badgeCls: 'bg-blue-600 text-white border-blue-400',
+    pillCls: 'bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-200 border-blue-300 dark:border-blue-500/40',
+    cardCls: 'bg-blue-50/85 dark:bg-blue-950/25 border-blue-300/80 dark:border-blue-500/40'
+  },
+  C: {
+    id: 'C',
+    name: 'Team Lục (C)',
+    short: 'Team C',
+    dot: '🟢',
+    badgeCls: 'bg-emerald-600 text-white border-emerald-400',
+    pillCls: 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-200 border-emerald-300 dark:border-emerald-500/40',
+    cardCls: 'bg-emerald-50/85 dark:bg-emerald-950/25 border-emerald-300/80 dark:border-emerald-500/40'
+  },
+  D: {
+    id: 'D',
+    name: 'Team Vàng (D)',
+    short: 'Team D',
+    dot: '🟡',
+    badgeCls: 'bg-amber-500 text-slate-950 border-amber-400',
+    pillCls: 'bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-500/40',
+    cardCls: 'bg-amber-50/85 dark:bg-amber-950/25 border-amber-300/80 dark:border-amber-500/40'
+  }
+};
+
+export function getActiveTeamIds(teamCount = 0) {
+  const cnt = Number(teamCount) || 0;
+  if (cnt < 2) return [];
+  return ['A', 'B', 'C', 'D'].slice(0, Math.min(4, Math.max(2, Math.round(cnt))));
+}
+
+export function pickBalancedTeamId(lobbyPlayers = {}, teamCount = 0, roomMode = 'teacher_live', excludeUsername = '') {
+  const activeIds = getActiveTeamIds(teamCount);
+  if (activeIds.length === 0) return '';
+  const counts = {};
+  activeIds.forEach(id => { counts[id] = 0; });
+  Object.values(lobbyPlayers || {}).forEach(lp => {
+    if (!lp || !lp.username || lp.username === excludeUsername) return;
+    if (roomMode !== 'friend_vip' && lp.role === 'teacher') return;
+    const tid = activeIds.includes(lp.teamId) ? lp.teamId : '';
+    if (tid) counts[tid] += 1;
+  });
+  let bestId = activeIds[0];
+  let minCount = Infinity;
+  activeIds.forEach(id => {
+    if (counts[id] < minCount) {
+      minCount = counts[id];
+      bestId = id;
+    }
+  });
+  return bestId;
+}
+
+export function computeRoomTeamStandings(roomInput = {}) {
+  const teamCount = Number(roomInput?.teamCount) || 0;
+  const activeIds = getActiveTeamIds(teamCount);
+  if (activeIds.length === 0) return [];
+  const buckets = {};
+  activeIds.forEach(tid => {
+    buckets[tid] = {
+      teamId: tid,
+      meta: GAME_TEAM_META[tid],
+      totalScore: 0,
+      members: [],
+      finishedCount: 0
+    };
+  });
+
+  const liveMap = roomInput?.liveMatch && typeof roomInput.liveMatch === 'object' ? roomInput.liveMatch : {};
+  const lobbyMap = roomInput?.lobbyPlayers && typeof roomInput.lobbyPlayers === 'object' ? roomInput.lobbyPlayers : {};
+  const playersMap = roomInput?.players && typeof roomInput.players === 'object' ? roomInput.players : {};
+
+  const seenUsers = new Set();
+  const addMember = (entry, fallbackTeam) => {
+    if (!entry?.username || seenUsers.has(entry.username)) return;
+    if (roomInput?.roomMode !== 'friend_vip' && entry.role === 'teacher') return;
+    seenUsers.add(entry.username);
+    const tid = activeIds.includes(entry.teamId)
+      ? entry.teamId
+      : activeIds.includes(fallbackTeam)
+      ? fallbackTeam
+      : activeIds[(seenUsers.size - 1) % activeIds.length];
+    const score = Number(entry.score) || 0;
+    buckets[tid].totalScore += score;
+    if (entry.finished) buckets[tid].finishedCount += 1;
+    buckets[tid].members.push({
+      username: entry.username,
+      name: entry.name || entry.username,
+      score,
+      finished: Boolean(entry.finished),
+      lives: entry.lives ?? 3
+    });
+  };
+
+  Object.values(liveMap).forEach(lm => addMember(lm, lobbyMap[lm?.username]?.teamId));
+  Object.values(lobbyMap).forEach(lp => {
+    if (!seenUsers.has(lp?.username)) {
+      const pScore = playersMap[lp?.username]?.score || 0;
+      addMember({ ...lp, score: pScore }, lp?.teamId);
+    }
+  });
+
+  return Object.values(buckets).sort((a, b) => b.totalScore - a.totalScore || b.members.length - a.members.length);
+}
+
 export function normalizeRoomObject(room, pinKey, now = Date.now()) {
   const prunedChat = pruneExpiredRoomChat(room, now);
+  const rawMax = Number(room?.maxPlayers);
+  const maxPlayers = Number.isFinite(rawMax) && rawMax >= 2 ? Math.min(30, Math.round(rawMax)) : 30;
+  const rawTeams = Number(room?.teamCount);
+  const teamCount = [2, 3, 4].includes(Math.round(rawTeams)) ? Math.round(rawTeams) : 0;
   return {
     pin: String(room?.pin || pinKey || ''),
     name: room?.name || `Phòng Đấu Từ Vựng #${room?.pin || pinKey}`,
     pass: room?.pass ?? 'ielts',
     teacher: room?.teacher || 'teacher_ielts',
+    roomMode: room?.roomMode === 'friend_vip' ? 'friend_vip' : 'teacher_live',
+    hostUsername: String(room?.hostUsername || ''),
+    hostName: String(room?.hostName || ''),
     status: room?.status || 'LOBBY',
-    maxPlayers: room?.maxPlayers || 30,
+    maxPlayers,
+    teamCount,
     roundSize: Math.max(2, Math.min(8, Number(room?.roundSize) || 4)),
     speedMode: ['relaxed', 'normal', 'turbo'].includes(room?.speedMode) ? room.speedMode : 'normal',
     shufflePerPlayer: Boolean(room?.shufflePerPlayer),

@@ -95,6 +95,7 @@ export default function ExamMode({
   const [inlineNoteDraft, setInlineNoteDraft] = useState('');
   const [showSubmitLockedModal, setShowSubmitLockedModal] = useState(false);
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
+  const [earlyNextConfirmOpen, setEarlyNextConfirmOpen] = useState(false);
 
   const blankInputRefs = useRef({});
   const questionCardRefs = useRef({});
@@ -171,6 +172,19 @@ export default function ExamMode({
     const m = Math.floor(safeSec / 60);
     const s = safeSec % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const openEarlyNextConfirmModal = () => {
+    if (!cfg.sequentialMode || currentSectionIdx >= cfg.order.length - 1) return;
+    const safeRem = Math.max(0, Math.floor(examState.timeRemaining || 0));
+    const remMin = Math.floor(safeRem / 60);
+    const remSec = safeRem % 60;
+    const currLabel = skillMeta[examState.skill]?.label || examState.skill;
+    showToast?.(
+      `Lưu ý: Phần ${currLabel} vẫn còn ${remMin} phút ${remSec.toString().padStart(2, '0')} giây — nếu chuyển sang kỹ năng mới sẽ KHÔNG thể quay lại kỹ năng cũ!`,
+      'warning'
+    );
+    setEarlyNextConfirmOpen(true);
   };
 
   const remainingMinutesLabel = `${Math.max(1, Math.ceil((examState.timeRemaining || 0) / 60))} minutes remaining`;
@@ -508,10 +522,10 @@ export default function ExamMode({
           {cfg.sequentialMode && cfg.allowEarlyNextSection && currentSectionIdx < cfg.order.length - 1 && (
             <button
               type="button"
-              onClick={() => advanceToNextExamSection(false)}
+              onClick={openEarlyNextConfirmModal}
               className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1 whitespace-nowrap"
             >
-              <span className="hidden sm:inline">Phần Tiếp</span>
+              <span className="hidden sm:inline">Chuyển Kỹ Năng Tiếp</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
@@ -1685,7 +1699,7 @@ export default function ExamMode({
                   onClick={() => {
                     setShowSubmitLockedModal(false);
                     if (cfg.sequentialMode) {
-                      advanceToNextExamSection(false);
+                      openEarlyNextConfirmModal();
                     } else {
                       const nextSkill = cfg.order[currentSectionIdx + 1];
                       setExamState(prev => ({
@@ -1867,6 +1881,105 @@ export default function ExamMode({
           </div>
         </div>
       )}
+
+      {/* Modal Xác Nhận Chuyển Sớm Kỹ Năng (Khóa Vĩnh Viễn Kỹ Năng Cũ) */}
+      {earlyNextConfirmOpen && cfg.sequentialMode && currentSectionIdx < cfg.order.length - 1 && (() => {
+        const currMeta = skillMeta[examState.skill] || { label: examState.skill };
+        const nextSkill = cfg.order[currentSectionIdx + 1];
+        const nextMeta = skillMeta[nextSkill] || { label: nextSkill };
+        const safeRem = Math.max(0, Math.floor(examState.timeRemaining || 0));
+        const remMin = Math.floor(safeRem / 60);
+        const remSec = safeRem % 60;
+        const currProgressText =
+          examState.skill === 'listening'
+            ? `${answeredListeningCount}/${allListeningQs.length} câu Listening`
+            : examState.skill === 'reading'
+            ? `${answeredReadingCount}/${allReadingQs.length} câu Reading`
+            : `${w1Words} từ Task 1 · ${w2Words} từ Task 2`;
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setEarlyNextConfirmOpen(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl bg-white dark:bg-[#181818] border border-amber-400/50 dark:border-amber-500/40 shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-5 sm:p-6 border-b border-[#E5E7EB] dark:border-[#2C2C2C] flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/30">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-extrabold text-[#111827] dark:text-white">
+                      Chuyển sang kỹ năng {nextMeta.label}?
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-neutral-400 mt-1">
+                      Bạn đang yêu cầu chuyển sớm từ <strong>{currMeta.label}</strong> sang <strong>{nextMeta.label}</strong>.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEarlyNextConfirmOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                  aria-label="Đóng thông báo chuyển kỹ năng"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-3.5">
+                <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/35 border border-blue-200 dark:border-blue-800 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                      Thời gian còn lại phần {currMeta.label}
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-200 mt-0.5">
+                      Tiến độ hiện tại: <strong>{currProgressText}</strong>
+                    </p>
+                  </div>
+                  <div className="text-xl font-black font-mono text-blue-700 dark:text-blue-300 tabular-nums shrink-0">
+                    {formatTime(safeRem)}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-2.5">
+                  <Lock className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                  <div className="space-y-1 leading-relaxed">
+                    <p className="font-extrabold">Cảnh báo: Không thể quay lại kỹ năng cũ!</p>
+                    <p>
+                      Bạn vẫn còn <strong>{remMin} phút {remSec.toString().padStart(2, '0')} giây</strong>. Sau khi xác nhận chuyển sang <strong>{nextMeta.label}</strong>, phần <strong>{currMeta.label}</strong> sẽ bị khóa vĩnh viễn và thời gian còn lại sẽ không cộng dồn sang phần sau.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 sm:px-6 py-4 bg-slate-50 dark:bg-[#141414] border-t border-[#E5E7EB] dark:border-[#2C2C2C] flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEarlyNextConfirmOpen(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-bold text-slate-700 dark:text-neutral-200 bg-white dark:bg-[#262626] border border-[#CBD5E1] dark:border-[#3A3A3A] hover:bg-slate-100 dark:hover:bg-[#323232] transition"
+                >
+                  Ở lại làm tiếp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEarlyNextConfirmOpen(false);
+                    advanceToNextExamSection(false);
+                  }}
+                  className="px-4 py-2 rounded-lg text-xs font-extrabold text-white bg-[#2563EB] hover:bg-[#1D4ED8] shadow-md flex items-center gap-1.5 transition"
+                >
+                  <span>Chuyển sang {nextMeta.label}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

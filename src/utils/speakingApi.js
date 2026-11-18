@@ -111,6 +111,22 @@ export async function verifySpeakingRoomPassword({ testId, password = '' }) {
   return data;
 }
 
+export async function verifyExamRoomPassword({ testId, password = '' }) {
+  const res = await fetch('/api/sync/exam/verify-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      testId: String(testId || '').trim(),
+      password: String(password || '').trim()
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || 'Mật khẩu đề thi thực chiến không chính xác!');
+  }
+  return data;
+}
+
 export async function requestAiWritingGrading({
   attemptId = '',
   task1Prompt = '',

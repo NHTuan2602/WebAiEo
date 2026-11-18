@@ -34,8 +34,8 @@ export default function CoverUnlockQrCard({
       ? Math.max(0, Number(itemPrice) || 0)
       : itemType === 'title'
       ? getTitlePriceVnd(itemId, cfg)
-      : itemType === 'skill_pass'
-      ? cfg.skillPassPrice
+      : itemType === 'test'
+      ? cfg.defaultExamPriceVnd
       : itemType === 'aieo_vip'
       ? cfg.aieoVipPrice
       : cfg.coverUnlockPrice;
@@ -63,17 +63,17 @@ export default function CoverUnlockQrCard({
   const hasBankDetails = Boolean(displayAccountNumber && (cfg.bankCode || cfg.bankName || payosQrDataUrl));
   const headingText = itemType === 'title' && itemTitle
     ? `Mua Danh Hiệu VIP (1 Tháng): ${itemTitle}`
-    : itemType === 'skill_pass'
-    ? 'Mở Khóa Gói Bài Tập 4 Kỹ Năng (1 Tháng)'
+    : itemType === 'test'
+    ? `Mua Đề Thi 3 Kỹ Năng: ${itemTitle || 'IELTS Practice Exam'}`
     : itemType === 'aieo_vip'
     ? 'Đăng Ký Gói Ai eo VIP Full Quyền (1 Tháng)'
     : 'Mở Khóa Tải Ảnh Nền Riêng (1 Tháng)';
   const subText = itemType === 'title'
     ? 'Quét mã VietQR để sở hữu danh hiệu Phú Quý ánh kim + hào quang Avatar nổi bật suốt 30 ngày!'
-    : itemType === 'skill_pass'
-    ? 'Quét mã VietQR để luyện tập & nộp toàn bộ Đề Lẻ Reading, Listening, Writing & Speaking AI suốt 30 ngày!'
+    : itemType === 'test'
+    ? 'Quét mã VietQR để mở khóa bộ Đề Thi 3 Kỹ Năng này và làm lại nhiều lần không giới hạn!'
     : itemType === 'aieo_vip'
-    ? 'Đặc quyền 30 ngày: Miễn phí Bài Tập 4 Kỹ Năng + Danh Hiệu Ai eo VIP + Tạo Phòng Đấu Bạn Bè + Chữ Tên Đỏ & Nhãn AIEOVIP!'
+    ? 'Đặc quyền 30 ngày: Danh Hiệu Ai eo VIP + Tạo Phòng Đấu Bạn Bè (tùy chỉnh số người & chia Team) + Chữ Tên Đỏ & Nhãn AIEOVIP!'
     : autoVerifyEnabled
     ? 'Quét mã QR bằng app Ngân hàng bất kỳ — hệ thống tự mở khóa quyền tải & cắt ảnh bìa trong 30 ngày ngay khi nhận đủ tiền!'
     : 'Quét mã QR chuyển khoản 1 lần để sử dụng tính năng tải & cắt ảnh nền riêng trong 1 tháng (30 ngày).';

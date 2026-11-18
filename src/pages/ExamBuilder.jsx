@@ -7,19 +7,23 @@ import {
   ChevronLeft,
   ChevronUp,
   Clock,
+  Copy,
   EyeOff,
   FileText,
   Globe,
   Headphones,
   HelpCircle,
   Image,
+  KeyRound,
   Layers,
   Lock,
   Mic,
   PenTool,
   Plus,
+  RefreshCw,
   Save,
   ShieldCheck,
+  ShoppingBag,
   SlidersHorizontal,
   Sparkles,
   Trash2,
@@ -27,6 +31,7 @@ import {
   Upload,
   Users
 } from 'lucide-react';
+import { formatVndCurrency } from '../constants/profileCustomization';
 import {
   ALL_SKILL_OPTIONS,
   formatViDateTime,
@@ -52,6 +57,7 @@ export default function ExamBuilder({
   builderTab,
   classesDb = {},
   currentUser,
+  defaultExamPriceVnd = 15000,
   editingTest,
   handleAudioFileUpload,
   handleListeningImageUpload,
@@ -254,10 +260,56 @@ Write ONE WORD AND/OR A NUMBER for each answer.
   };
 
   const applyQuickPreset = (presetType) => {
-    if (presetType === 'practice') {
+    const defaultPrice = Math.max(1000, Number(defaultExamPriceVnd) || 15000);
+    if (presetType === 'real_exam' || presetType === 'official') {
+      const generatedPass = `THI${Math.floor(1000 + Math.random() * 9000)}`;
+      setTestForm(prev => ({
+        ...prev,
+        testMode: 'full_exam',
+        focusSkill: null,
+        sectionOrder: prev.sectionOrder?.length === 3 ? prev.sectionOrder : ['listening', 'reading', 'writing'],
+        visibility: 'public',
+        examPurpose: 'real_exam',
+        priceVnd: 0,
+        examPassword: String(prev.examPassword || '').trim() || generatedPass,
+        maxAttempts: 1,
+        sequentialMode: true,
+        allowEarlyNextSection: true,
+        antiCheatEnabled: true,
+        allowInternalCopyPaste: false,
+        allowViewAnswers: false,
+        maxAudioPlays: 1,
+        sectionDurations: { listening: 30, reading: 60, writing: 60 }
+      }));
+      showToast?.('Đã áp dụng chế độ: Thi Thực Chiến (Cấp mật khẩu lớp · 1 lượt · Tuần tự khóa quay lại).');
+    } else if (presetType === 'paid_practice') {
+      const chosenPrice = Number(testForm.priceVnd) > 0 ? Number(testForm.priceVnd) : defaultPrice;
+      setTestForm(prev => ({
+        ...prev,
+        testMode: 'full_exam',
+        focusSkill: null,
+        sectionOrder: prev.sectionOrder?.length === 3 ? prev.sectionOrder : ['listening', 'reading', 'writing'],
+        visibility: 'public',
+        examPurpose: 'paid_practice',
+        priceVnd: Number(prev.priceVnd) > 0 ? Number(prev.priceVnd) : defaultPrice,
+        examPassword: '',
+        maxAttempts: 0,
+        sequentialMode: false,
+        allowEarlyNextSection: true,
+        antiCheatEnabled: false,
+        allowInternalCopyPaste: true,
+        allowViewAnswers: true,
+        maxAudioPlays: 3,
+        sectionDurations: { listening: 30, reading: 60, writing: 60 }
+      }));
+      showToast?.(`Đã áp dụng chế độ: Đề Đăng Bán (${formatVndCurrency(chosenPrice)} · Làm nhiều lần).`);
+    } else if (presetType === 'free_practice' || presetType === 'practice') {
       setTestForm(prev => ({
         ...prev,
         visibility: 'public',
+        examPurpose: 'free_practice',
+        priceVnd: 0,
+        examPassword: '',
         maxAttempts: 0,
         sequentialMode: false,
         allowEarlyNextSection: true,
@@ -266,24 +318,12 @@ Write ONE WORD AND/OR A NUMBER for each answer.
         maxAudioPlays: 3,
         sectionDurations: { listening: 20, reading: 30, writing: 30 }
       }));
-      showToast?.('Đã áp dụng cấu hình: Ôn Tập Tự Do (làm nhiều lần, mở đáp án).');
-    } else if (presetType === 'official') {
-      setTestForm(prev => ({
-        ...prev,
-        visibility: 'public',
-        maxAttempts: 1,
-        sequentialMode: true,
-        allowEarlyNextSection: false,
-        antiCheatEnabled: true,
-        allowViewAnswers: false,
-        maxAudioPlays: 1,
-        sectionDurations: { listening: 30, reading: 60, writing: 60 }
-      }));
-      showToast?.('Đã áp dụng cấu hình: Thi Thật Nghiêm Ngặt (1 lượt, bật chống gian lận).');
+      showToast?.('Đã áp dụng chế độ: Luyện Tập Miễn Phí (làm nhiều lần, mở đáp án).');
     } else {
       setTestForm(prev => ({
         ...prev,
         visibility: 'private',
+        examPurpose: 'draft',
         antiCheatEnabled: false
       }));
       showToast?.('Đã đặt về Nháp Chỉ Mình Tôi (học sinh chưa nhìn thấy đề này).', 'info');
@@ -625,13 +665,16 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   <button
                     key={sk}
                     type="button"
-                    onClick={() =>
+                      onClick={() =>
                       setTestForm(prev => ({
                         ...prev,
                         testMode: 'single_skill',
                         focusSkill: sk,
                         sectionOrder: [sk],
                         sequentialMode: false,
+                        examPurpose: 'free_practice',
+                        priceVnd: 0,
+                        examPassword: '',
                         autoAiGrade: sk === 'speaking' ? true : prev.autoAiGrade,
                         ...(!editingTest ? { maxAttempts: 0, allowViewAnswers: true, antiCheatEnabled: false } : {})
                       }))
@@ -649,49 +692,254 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             </div>
           </div>
           {/* 1-Click Quick Configuration Presets for Non-Tech Users */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#EDFFFD]/80 dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-500/30 space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#EDFFFD]/80 dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-500/30 space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-xs sm:text-sm font-extrabold text-[#007A7A] dark:text-[#1EE1D6] flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4" /> Chọn Nhanh Chế Độ Đề Thi (1 Chạm — Khỏi Chỉnh Nhiều)
+                  <Sparkles className="w-4 h-4" /> Chia Sẵn Chế Độ Đề Thi (1 Chạm — Đỡ Rối Khi Tạo)
                 </h3>
                 <p className="text-[11px] text-[#314158] dark:text-slate-300 mt-0.5">
-                  Chọn 1 mục phù hợp nhất bên dưới, hệ thống tự điền sẵn thời gian &amp; quyền xem đáp án giúp bạn:
+                  {cfg.testMode === 'single_skill'
+                    ? 'Bài tập 4 Kỹ Năng luôn miễn phí cho học viên. Bấm Công Khai hoặc Lưu Nháp bên dưới:'
+                    : 'Chỉ cần nhấn 1 nút phù hợp: Thi Thực Chiến (có pass lớp, không quay lại kỹ năng cũ) hoặc Đề Đăng Bán (làm nhiều lần):'}
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <button
-                type="button"
-                onClick={() => applyQuickPreset('practice')}
-                className="text-left p-3 rounded-xl bg-white dark:bg-slate-900 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 transition shadow-xs"
-              >
-                <div className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">⚡ Ôn Tập Tự Do</div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Công khai • Làm nhiều lần • Mở xem đáp án ngay
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => applyQuickPreset('official')}
-                className="text-left p-3 rounded-xl bg-white dark:bg-slate-900 hover:border-indigo-500 border border-slate-200 dark:border-slate-700 transition shadow-xs"
-              >
-                <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">🎓 Thi Thật Nghiêm Ngặt</div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  1 lượt làm • Khóa tuần tự • Bật chống gian lận
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => applyQuickPreset('draft')}
-                className="text-left p-3 rounded-xl bg-white dark:bg-slate-900 hover:border-amber-500 border border-slate-200 dark:border-slate-700 transition shadow-xs"
-              >
-                <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400">🔒 Lưu Nháp Soạn Dở</div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Chỉ mình tôi thấy • Học sinh chưa nhìn thấy đề
-                </p>
-              </button>
-            </div>
+
+            {cfg.testMode === 'single_skill' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => applyQuickPreset('free_practice')}
+                  className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
+                    testForm.visibility !== 'private'
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-emerald-500'
+                  }`}
+                >
+                  <div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">🌐 Mở Công Khai (Miễn Phí)</div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Học viên vào Kho Bài Tập 4 Kỹ Năng làm miễn phí không giới hạn
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyQuickPreset('draft')}
+                  className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
+                    testForm.visibility === 'private'
+                      ? 'border-amber-500 ring-2 ring-amber-500/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-amber-500'
+                  }`}
+                >
+                  <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400">🔒 Lưu Nháp Soạn Dở</div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Chỉ mình giáo viên thấy • Học sinh chưa nhìn thấy bài tập này
+                  </p>
+                </button>
+              </div>
+            ) : (() => {
+              const activePurpose =
+                testForm.visibility === 'private'
+                  ? 'draft'
+                  : testForm.examPurpose ||
+                    (Number(testForm.priceVnd || 0) > 0
+                      ? 'paid_practice'
+                      : testForm.examPassword || (cfg.maxAttempts === 1 && cfg.sequentialMode)
+                      ? 'real_exam'
+                      : 'free_practice');
+              const suggestedSalePrice = Number(testForm.priceVnd) > 0 ? Number(testForm.priceVnd) : (Number(defaultExamPriceVnd) || 15000);
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => applyQuickPreset('real_exam')}
+                      className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
+                        activePurpose === 'real_exam'
+                          ? 'border-indigo-500 ring-2 ring-indigo-500/25'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-indigo-500'
+                      }`}
+                    >
+                      <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">🏛️ Thi Thực Chiến (Thi Thật)</div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                        Tạo mật khẩu gửi lớp · 1 lượt · Tuần tự &amp; không quay lại kỹ năng cũ
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => applyQuickPreset('paid_practice')}
+                      className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
+                        activePurpose === 'paid_practice'
+                          ? 'border-amber-500 ring-2 ring-amber-500/25'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-amber-500'
+                      }`}
+                    >
+                      <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        <ShoppingBag className="w-3.5 h-3.5" /> Đề Đăng Bán ({formatVndCurrency(suggestedSalePrice)})
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                        Mở bán đề 3 kỹ năng · Học sinh mua xong được làm lại nhiều lần
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => applyQuickPreset('free_practice')}
+                      className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
+                        activePurpose === 'free_practice'
+                          ? 'border-[#007A7A] ring-2 ring-teal-500/25'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                      }`}
+                    >
+                      <div className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">📖 Luyện Tập Miễn Phí</div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                        Công khai 0đ · Làm nhiều lần · Tự do đổi phần &amp; xem đáp án
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => applyQuickPreset('draft')}
+                      className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
+                        activePurpose === 'draft'
+                          ? 'border-slate-500 ring-2 ring-slate-400/25'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                      }`}
+                    >
+                      <div className="text-xs font-extrabold text-slate-600 dark:text-slate-300">🔒 Lưu Nháp Soạn Dở</div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                        Chỉ mình tôi thấy · Chưa hiển thị cho học sinh
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Contextual Inline Strip for Real Exam Password & Paid Practice Price */}
+                  {(activePurpose === 'real_exam' || Boolean(testForm.examPassword || testForm.hasExamPassword)) && (
+                    <div className="p-3.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/35 border border-indigo-200 dark:border-indigo-700/50 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
+                            Mật Khẩu Phòng Thi Thực Chiến (Gửi cho lớp trước khi thi)
+                          </span>
+                        </div>
+                        {Boolean(testForm.examPassword || testForm.hasExamPassword) && (
+                          <button
+                            type="button"
+                            onClick={() => setTestForm(prev => ({ ...prev, examPassword: '', hasExamPassword: false }))}
+                            className="text-[11px] font-bold text-slate-500 hover:text-rose-600 underline"
+                          >
+                            Bỏ mật khẩu
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          value={testForm.examPassword || ''}
+                          onChange={e => setTestForm(prev => ({ ...prev, examPassword: e.target.value.trimStart() }))}
+                          placeholder={
+                            testForm.hasExamPassword && !testForm.examPassword
+                              ? 'Đang có mật khẩu cũ — nhập mã mới nếu muốn đổi'
+                              : 'VD: THI2026 hoặc IELTS80'
+                          }
+                          className="flex-1 min-w-[200px] px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-xs font-extrabold tracking-wider text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTestForm(prev => ({
+                              ...prev,
+                              examPurpose: 'real_exam',
+                              examPassword: `THI${Math.floor(1000 + Math.random() * 9000)}`
+                            }))
+                          }
+                          className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Tạo Pass Mới
+                        </button>
+                        {Boolean(testForm.examPassword) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(testForm.examPassword);
+                              showToast?.(`Đã sao chép mật khẩu phòng thi: ${testForm.examPassword}`);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-50 transition"
+                          >
+                            <Copy className="w-3.5 h-3.5" /> Copy Pass
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-indigo-800/80 dark:text-indigo-300/80">
+                        Học sinh phải nhập đúng mật khẩu này mới vào phòng thi thật; khi thi tuần tự đã kích hoạt, chuyển sang kỹ năng mới (kể cả chuyển sớm) sẽ không quay lại kỹ năng cũ được.
+                      </p>
+                    </div>
+                  )}
+
+                  {(activePurpose === 'paid_practice' || Number(testForm.priceVnd || 0) > 0) && (
+                    <div className="p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                          <span className="text-xs font-extrabold text-amber-900 dark:text-amber-200">
+                            Giá Bán Đề Thi Luyện 3 Kỹ Năng (Học viên mua xong làm nhiều lần)
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                          {Number(testForm.priceVnd || 0) > 0 ? formatVndCurrency(Number(testForm.priceVnd)) : 'Miễn phí (0đ)'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {[15000, 20000, 30000, 50000, 0].map(presetPrice => {
+                          const isSelected = Number(testForm.priceVnd || 0) === presetPrice;
+                          return (
+                            <button
+                              key={presetPrice}
+                              type="button"
+                              onClick={() =>
+                                setTestForm(prev => ({
+                                  ...prev,
+                                  priceVnd: presetPrice,
+                                  examPurpose: presetPrice > 0 ? 'paid_practice' : 'free_practice',
+                                  maxAttempts: 0
+                                }))
+                              }
+                              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition ${
+                                isSelected
+                                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-amber-200 dark:border-amber-700/50 hover:border-amber-500'
+                              }`}
+                            >
+                              {presetPrice === 0 ? 'Miễn phí 0đ' : formatVndCurrency(presetPrice)}
+                            </button>
+                          );
+                        })}
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Khác:</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1000}
+                            value={Number(testForm.priceVnd || 0)}
+                            onChange={e => {
+                              const nextPrice = Math.max(0, Math.round(Number(e.target.value) || 0));
+                              setTestForm(prev => ({
+                                ...prev,
+                                priceVnd: nextPrice,
+                                examPurpose: nextPrice > 0 ? 'paid_practice' : 'free_practice'
+                              }));
+                            }}
+                            className="w-28 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-700 text-xs font-bold text-slate-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1124,7 +1372,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   onChange={e => setTestForm(prev => ({ ...prev, sequentialMode: e.target.checked }))}
                   className="w-4 h-4 rounded text-indigo-600"
                 />
-                <span>Khóa tuần tự theo từng phần (Hết giờ mới tự động sang kỹ năng kế tiếp)</span>
+                <span>Khóa tuần tự theo từng phần (Làm xong kỹ năng này sang kỹ năng khác — không thể quay lại kỹ năng cũ)</span>
               </label>
 
               {cfg.sequentialMode && (
@@ -1135,7 +1383,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     onChange={e => setTestForm(prev => ({ ...prev, allowEarlyNextSection: e.target.checked }))}
                     className="w-4 h-4 rounded text-indigo-600"
                   />
-                  <span>Cho phép nộp sớm để sang phần sau</span>
+                  <span>Cho phép chuyển sớm sang phần sau (báo thời gian còn lại &amp; khóa phần cũ)</span>
                 </label>
               )}
             </div>

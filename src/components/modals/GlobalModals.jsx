@@ -486,6 +486,64 @@ export default function GlobalModals({
               </div>
             </div>
 
+            {(() => {
+              const chosenMax = Math.max(2, Math.min(30, Number(newRoomForm.maxPlayers || 4)));
+              const chosenTeams = [2, 3, 4].includes(Number(newRoomForm.teamCount)) && Number(newRoomForm.teamCount) <= chosenMax
+                ? Number(newRoomForm.teamCount)
+                : 0;
+              const perTeamAvg = chosenTeams >= 2 ? Math.max(1, Math.floor(chosenMax / chosenTeams)) : 0;
+              return (
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Số người tối đa
+                      </label>
+                      <select
+                        value={chosenMax}
+                        onChange={e => {
+                          const nextMax = Number(e.target.value) || 4;
+                          setNewRoomForm(prev => {
+                            const prevTeam = Number(prev.teamCount || 0);
+                            return {
+                              ...prev,
+                              maxPlayers: nextMax,
+                              teamCount: prevTeam > nextMax ? (nextMax >= 2 ? 2 : 0) : prevTeam
+                            };
+                          });
+                        }}
+                        className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      >
+                        {[2, 4, 6, 8, 10, 12, 16, 20, 30].map(n => (
+                          <option key={n} value={n}>{n} người</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Chế độ chia Team
+                      </label>
+                      <select
+                        value={chosenTeams}
+                        onChange={e => setNewRoomForm(prev => ({ ...prev, teamCount: Number(e.target.value) || 0 }))}
+                        className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      >
+                        <option value={0}>Đấu Đơn (Solo tự do)</option>
+                        <option value={2} disabled={chosenMax < 2}>Chia 2 Team (A vs B)</option>
+                        <option value={3} disabled={chosenMax < 3}>Chia 3 Team (A · B · C)</option>
+                        <option value={4} disabled={chosenMax < 4}>Chia 4 Team (A · B · C · D)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                    {chosenTeams >= 2
+                      ? `⚡ Dự kiến: ${chosenMax} người · ${chosenTeams} Team (~${perTeamAvg} người/team) — tự động chia cân bằng khi vào phòng.`
+                      : `⚡ Đấu Đơn: Tối đa ${chosenMax} người chơi tranh hạng trực tiếp.`}
+                  </p>
+                </div>
+              );
+            })()}
+
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bộ Từ Vựng Sử Dụng Trong Phòng</label>
               <select

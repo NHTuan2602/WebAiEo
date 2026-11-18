@@ -1162,7 +1162,8 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
 
 export const SUBSCRIPTION_DURATION_DAYS = 30;
 export const SUBSCRIPTION_DURATION_MS = SUBSCRIPTION_DURATION_DAYS * 24 * 60 * 60 * 1000;
-export const SKILL_PASS_PRICE_VND = 20000;
+export const SKILL_PASS_PRICE_VND = 0; // Bài Tập 4 Kỹ Năng đã mở miễn phí cho mọi học viên
+export const DEFAULT_EXAM_PRICE_VND = 15000;
 export const AIEO_VIP_PRICE_VND = 80000;
 
 export function formatRemainingSubscriptionText(expiresAt, nowMs = Date.now()) {
@@ -1179,12 +1180,28 @@ export function hasActiveAieoVip(user, nowMs = Date.now()) {
   return Number(user.aieoVipExpiresAt) > nowMs;
 }
 
-export function hasSkillPracticeAccess(user, nowMs = Date.now()) {
+export function hasSkillPracticeAccess(user) {
+  return Boolean(user && typeof user === 'object');
+}
+
+export function getTestPurchasePriceVnd(test, _paymentConfig = null) {
+  if (!test || typeof test !== 'object' || test.testMode === 'single_skill') return 0;
+  const raw = Number(test.priceVnd);
+  if (Number.isFinite(raw) && raw > 0) {
+    return Math.min(10_000_000, Math.round(raw));
+  }
+  return 0;
+}
+
+export function hasTestPurchaseAccess(user, test, _nowMs = Date.now()) {
+  if (!test || typeof test !== 'object' || test.testMode === 'single_skill') return true;
+  const price = getTestPurchasePriceVnd(test);
+  if (price <= 0) return true;
   if (!user || typeof user !== 'object') return false;
   if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
   if (user.role === 'teacher') return true;
-  if (Number(user.skillPracticeExpiresAt) > nowMs) return true;
-  if (Number(user.aieoVipExpiresAt) > nowMs) return true;
+  const purchased = Array.isArray(user.purchasedTestIds) ? user.purchasedTestIds.map(String) : [];
+  if (purchased.includes(String(test.id))) return true;
   return false;
 }
 
@@ -1525,6 +1542,7 @@ export function normalizePaymentConfig(raw = {}) {
   };
   const coverUnlockPrice = clampVnd(obj.coverUnlockPrice, CUSTOM_COVER_UNLOCK_PRICE_VND);
   const skillPassPrice = clampVnd(obj.skillPassPrice, SKILL_PASS_PRICE_VND);
+  const defaultExamPriceVnd = clampVnd(obj.defaultExamPriceVnd, DEFAULT_EXAM_PRICE_VND);
   const aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
 
   const bankCode = String(obj.bankCode || '')
@@ -1567,6 +1585,7 @@ export function normalizePaymentConfig(raw = {}) {
   return {
     coverUnlockPrice,
     skillPassPrice,
+    defaultExamPriceVnd,
     aieoVipPrice,
     bankCode,
     bankName,

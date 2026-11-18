@@ -384,13 +384,37 @@ export const normalizeExamConfig = (test) => {
     ? Array.from(new Set(test.assignedClassIds.map(id => String(id || '').trim()).filter(Boolean)))
     : [];
 
+  const visibility = test?.visibility === 'private' ? 'private' : 'public';
+  const maxAttempts = Math.max(0, Number(test?.maxAttempts ?? 0) || 0);
+  const sequentialMode = testMode === 'single_skill' ? false : test?.sequentialMode !== false;
+  const allowEarlyNextSection = testMode === 'single_skill' ? true : !!test?.allowEarlyNextSection;
+  const priceVnd = testMode === 'single_skill' ? 0 : Math.max(0, Math.min(10_000_000, Math.round(Number(test?.priceVnd) || 0)));
+  const examPassword = testMode === 'single_skill' ? '' : String(test?.examPassword || '').trim();
+  const hasExamPassword = testMode === 'single_skill' ? false : Boolean(test?.hasExamPassword || examPassword.length > 0);
+  const explicitPurpose = ['real_exam', 'paid_practice', 'free_practice', 'draft'].includes(test?.examPurpose)
+    ? test.examPurpose
+    : '';
+  const examPurpose = explicitPurpose || (
+    visibility === 'private'
+      ? 'draft'
+      : priceVnd > 0
+      ? 'paid_practice'
+      : (hasExamPassword || (maxAttempts === 1 && sequentialMode))
+      ? 'real_exam'
+      : 'free_practice'
+  );
+
   return {
     testMode,
     focusSkill,
-    visibility: test?.visibility === 'private' ? 'private' : 'public',
-    maxAttempts: Math.max(0, Number(test?.maxAttempts ?? 0) || 0),
-    sequentialMode: testMode === 'single_skill' ? false : test?.sequentialMode !== false,
-    allowEarlyNextSection: testMode === 'single_skill' ? true : !!test?.allowEarlyNextSection,
+    visibility,
+    maxAttempts,
+    sequentialMode,
+    allowEarlyNextSection,
+    priceVnd,
+    examPassword,
+    hasExamPassword,
+    examPurpose,
     antiCheatEnabled: test?.antiCheatEnabled !== false,
     allowInternalCopyPaste: test?.allowInternalCopyPaste !== false,
     assignedClassIds,
@@ -672,6 +696,9 @@ export const createEmptyTestForm = () => ({
   focusSkill: null,
   autoAiGrade: true,
   visibility: 'private',
+  examPurpose: 'draft',
+  priceVnd: 0,
+  examPassword: '',
   maxAttempts: 0,
   sequentialMode: true,
   allowEarlyNextSection: false,
