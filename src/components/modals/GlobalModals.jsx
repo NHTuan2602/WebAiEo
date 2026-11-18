@@ -4,9 +4,11 @@ import {
   Camera,
   CheckCircle,
   Crop,
+  Crown,
   Edit,
   Key,
   Loader2,
+  Lock,
   Plus,
   Rocket,
   Save,
@@ -19,11 +21,17 @@ import {
 } from 'lucide-react';
 import { DEFAULT_VOCAB_TEXT, VOCAB_PRESETS } from '../../constants/seedData';
 import {
+  AIEO_VIP_PRICE_VND,
+  VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH,
   canCreateFriendRoomNow,
+  formatVndCurrency,
   getFriendRoomTicketCredits,
-  hasVipFriendRoomAccess
+  hasAnimatedAvatarPermission,
+  hasVipFriendRoomAccess,
+  isAnimatedDataUrl,
+  normalizePaymentConfig
 } from '../../constants/profileCustomization';
-import { normalizeRoomObject, parseBulkStudentsText, parseRawVocabText, readImageFileAsDataUrl } from '../../utils/examHelpers';
+import { detectAnimatedImageFile, normalizeRoomObject, parseBulkStudentsText, parseRawVocabText, readImageFileAsDataUrl } from '../../utils/examHelpers';
 import UserAvatarBadge from '../../components/common/UserAvatarBadge';
 import AnimalPilotAvatar from '../../components/common/AnimalPilotAvatar';
 import TeacherGradingModal from './TeacherGradingModal';
@@ -63,6 +71,8 @@ export default function GlobalModals({
   myCrewColor,
   newRoomForm,
   newStudentForm,
+  onOpenVipCheckout = null,
+  paymentConfig = null,
   recalculateObjectiveScores,
   saveTeacherGrading,
   setAddStudentMode,
@@ -97,6 +107,11 @@ export default function GlobalModals({
   const [newTopicLabel, setNewTopicLabel] = useState('');
   const [newTopicText, setNewTopicText] = useState('');
   const [avatarCropState, setAvatarCropState] = useState(null);
+  const [gifAvatarLinkInput, setGifAvatarLinkInput] = useState('');
+
+  const canUseSelfAnimatedAvatar = hasAnimatedAvatarPermission(currentUser);
+  const canUseTargetAnimatedAvatar = hasAnimatedAvatarPermission(editingTargetUser);
+  const vipPriceLabel = formatVndCurrency(normalizePaymentConfig(paymentConfig || {}).aieoVipPrice ?? AIEO_VIP_PRICE_VND);
 
   return (
     <>
@@ -243,7 +258,22 @@ export default function GlobalModals({
                         e.target.value = '';
                         if (!file) return;
                         try {
+                          const animated = await detectAnimatedImageFile(file);
                           const rawDataUrl = await readImageFileAsDataUrl(file);
+                          if (animated) {
+                            if (!canUseTargetAnimatedAvatar) {
+                              showToast('Ảnh Avatar Động (.GIF/.WebP) thuộc gói Ai eo VIP — ảnh sẽ được cắt tĩnh.', 'info');
+                              setAvatarCropState({ sourceUrl: rawDataUrl, target: 'editing_avatar' });
+                              return;
+                            }
+                            if (rawDataUrl.length > VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH) {
+                              showToast('Ảnh động vượt giới hạn (~1.1 MB). Vui lòng chọn tệp GIF/WebP nhẹ hơn.', 'error');
+                              return;
+                            }
+                            setEditingTargetUser(prev => (prev ? { ...prev, avatarUrl: rawDataUrl } : prev));
+                            showToast('Đã chọn Ảnh Avatar Động VIP — bấm Lưu để hoàn tất!');
+                            return;
+                          }
                           setAvatarCropState({ sourceUrl: rawDataUrl, target: 'editing_avatar' });
                         } catch (err) {
                           showToast(err.message || 'Không thể xử lý ảnh này!', 'error');
@@ -1104,6 +1134,11 @@ export default function GlobalModals({
             <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center text-center">
               <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2">Avatar Tài Khoản</p>
               <UserAvatarBadge user={currentUser} sizeClass="w-20 h-20" textClass="text-2xl" rounded="rounded-2xl" />
+              {isAnimatedDataUrl(currentUser.avatarUrl) && (
+                <span className="mt-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-white text-[9px] font-black uppercase">
+                  ✨ Avatar Động VIP
+                </span>
+              )}
             </div>
             <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 flex flex-col items-center text-center">
               <p className="text-[11px] font-bold text-cyan-300 mb-2">Phi Thuyền Thú Cưng</p>
@@ -1119,14 +1154,72 @@ export default function GlobalModals({
             </div>
           </div>
 
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
             Tải ảnh khuôn mặt lên để dùng làm Avatar tài khoản và mở khóa tùy chọn <b>Đầu Avatar</b> trên phi hành gia trong Sảnh Chờ &amp; Bảng Đua Top.
           </p>
+
+          {canUseSelfAnimatedAvatar ? (
+            <div className="mb-3.5 p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 dark:from-amber-950/30 dark:to-rose-950/25 border border-amber-300 dark:border-amber-500/40 space-y-2">
+              <p className="text-[11px] font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>Đặc quyền Avatar Động VIP đang mở (.GIF / .WebP động ≤ 1.1 MB)</span>
+              </p>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="url"
+                  value={gifAvatarLinkInput}
+                  onChange={e => setGifAvatarLinkInput(e.target.value)}
+                  placeholder="Hoặc dán link ảnh động https://...gif"
+                  className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const cleanUrl = gifAvatarLinkInput.trim();
+                    if (!/^https:\/\/.+/i.test(cleanUrl)) {
+                      showToast('Vui lòng nhập đường dẫn ảnh bắt đầu bằng https://', 'error');
+                      return;
+                    }
+                    const ok = await handleUpdateUserAvatar(cleanUrl);
+                    if (ok) setGifAvatarLinkInput('');
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-extrabold shrink-0 transition"
+                >
+                  Lưu Link
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/75 border border-rose-200 dark:border-rose-500/35 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>Avatar Động (.GIF / .WebP động) — Đặc quyền Ai eo VIP</span>
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Mở Gói Ai eo VIP ({vipPriceLabel}/1T) để đặt ảnh đại diện chuyển động &amp; LED Neon nhiều màu.
+                </p>
+              </div>
+              {onOpenVipCheckout && (
+                <button
+                  type="button"
+                  onClick={onOpenVipCheckout}
+                  className="vip-shimmer-badge px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white text-[11px] font-black shrink-0 shadow-xs"
+                >
+                  Mở VIP ({vipPriceLabel})
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2.5">
             <label className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold cursor-pointer transition flex items-center justify-center gap-2 shadow-sm">
               <Upload className="w-4 h-4" />
-              <span>{currentUser.avatarUrl ? 'Chọn Ảnh Khác' : 'Tải Ảnh Khuôn Mặt Lên'}</span>
+              <span>
+                {canUseSelfAnimatedAvatar
+                  ? (currentUser.avatarUrl ? 'Chọn Ảnh / GIF Động Khác' : 'Tải Ảnh Hoặc GIF Động (.GIF / .WebP)')
+                  : (currentUser.avatarUrl ? 'Chọn Ảnh Khác' : 'Tải Ảnh Khuôn Mặt Lên')}
+              </span>
               <input
                 type="file"
                 accept="image/*"
@@ -1136,7 +1229,21 @@ export default function GlobalModals({
                   e.target.value = '';
                   if (!file) return;
                   try {
+                    const animated = await detectAnimatedImageFile(file);
                     const rawDataUrl = await readImageFileAsDataUrl(file);
+                    if (animated) {
+                      if (!canUseSelfAnimatedAvatar) {
+                        showToast(`Ảnh Avatar Động (.GIF/.WebP) chỉ dành cho Gói Ai eo VIP (${vipPriceLabel}/1T) — ảnh sẽ được cắt thành ảnh tĩnh.`, 'info');
+                        setAvatarCropState({ sourceUrl: rawDataUrl, target: 'self_avatar' });
+                        return;
+                      }
+                      if (rawDataUrl.length > VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH) {
+                        showToast('Ảnh GIF/WebP động vượt quá ~1.1 MB. Vui lòng nén nhẹ hơn hoặc dán link https:// bên trên!', 'error');
+                        return;
+                      }
+                      await handleUpdateUserAvatar(rawDataUrl);
+                      return;
+                    }
                     setAvatarCropState({ sourceUrl: rawDataUrl, target: 'self_avatar' });
                   } catch (err) {
                     showToast(err.message || 'Không thể xử lý ảnh này!', 'error');
@@ -1147,7 +1254,7 @@ export default function GlobalModals({
 
             {currentUser.avatarUrl && (
               <div className="flex flex-wrap items-center gap-2">
-                {currentUser.avatarUrl.startsWith('data:image/') && (
+                {currentUser.avatarUrl.startsWith('data:image/') && !isAnimatedDataUrl(currentUser.avatarUrl) && (
                   <button
                     type="button"
                     onClick={() => setAvatarCropState({ sourceUrl: currentUser.avatarUrl, target: 'self_avatar' })}

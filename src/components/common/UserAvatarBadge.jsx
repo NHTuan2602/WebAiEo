@@ -19,7 +19,7 @@ export default function UserAvatarBadge({
       <img
         src={user.avatarUrl}
         alt={user?.name || 'Avatar'}
-        className={`${sizeClass} ${rounded} object-cover bg-white border border-pink-200/80 dark:border-slate-700 shadow-sm shrink-0 ${frameClass} ${auraCls} ${className}`}
+        className={`${sizeClass} aspect-square ${rounded} block object-cover object-center bg-white border border-pink-200/80 dark:border-slate-700 shadow-sm shrink-0 overflow-hidden ${frameClass} ${auraCls} ${className}`}
       />
     );
   }

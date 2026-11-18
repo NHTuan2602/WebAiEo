@@ -11,6 +11,7 @@ import {
   hasActiveAieoVip,
   hasTestPurchaseAccess,
   hasVipFriendRoomAccess,
+  isAnimatedDataUrl,
   normalizePaymentConfig,
   normalizeVipNameColor,
   normalizeVipNeonCoverColor,
@@ -2475,7 +2476,13 @@ export default function App() {
       showToast('Không kết nối được server — Avatar chỉ mới lưu tạm trên máy này.', 'error');
       return false;
     }
-    showToast(newAvatarUrl ? 'Đã lưu Avatar lên hệ thống & bật chế độ Mặt Avatar!' : 'Đã gỡ ảnh Avatar tài khoản.');
+    showToast(
+      newAvatarUrl
+        ? (isAnimatedDataUrl(newAvatarUrl)
+            ? '✨ Đã lưu Ảnh Avatar Động VIP & bật chế độ Mặt Avatar!'
+            : 'Đã lưu Avatar lên hệ thống & bật chế độ Mặt Avatar!')
+        : 'Đã gỡ ảnh Avatar tài khoản.'
+    );
     return true;
   };
 
@@ -7060,6 +7067,16 @@ export default function App() {
         myCrewColor={myCrewColor}
         newRoomForm={newRoomForm}
         newStudentForm={newStudentForm}
+        onOpenVipCheckout={() => {
+          setShowAvatarModal(false);
+          setGlobalCheckoutState({
+            itemType: 'aieo_vip',
+            itemId: '',
+            itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+            itemPrice: normalizePaymentConfig(paymentConfig || {}).aieoVipPrice ?? AIEO_VIP_PRICE_VND
+          });
+        }}
+        paymentConfig={paymentConfig}
         recalculateObjectiveScores={recalculateObjectiveScores}
         saveTeacherGrading={saveTeacherGrading}
         setAddStudentMode={setAddStudentMode}

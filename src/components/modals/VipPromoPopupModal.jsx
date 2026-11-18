@@ -26,8 +26,8 @@ export default function VipPromoPopupModal({
       desc: 'Chọn màu chữ bất kỳ từ bảng màu VIP & mã Hex riêng + huy hiệu AIEOVIP nổi bật trên Navbar, Hồ sơ & BXH.'
     },
     {
-      title: 'Viền Bìa Màu Neon + Tặng Miễn Phí Ảnh Bìa Cá Nhân',
-      desc: '6 hiệu ứng Viền Bìa Neon (kể cả Aurora 7 sắc), miễn phí tải Ảnh Bìa Riêng (5k/1T) & mở khóa 3 Khung Avatar Neon VIP.'
+      title: 'Viền Bìa & Thẻ LED Neon Nhiều Màu + Ảnh Avatar Động',
+      desc: 'Đặt Avatar động (.GIF / .WebP), 6 hiệu ứng LED Neon nhiều màu, miễn phí tải Ảnh Bìa Riêng (5k/1T) & 3 Khung Avatar Neon VIP.'
     },
     {
       title: 'Tạo Phòng Đấu Trường Riêng Cùng Bạn Bè + Danh Hiệu VIP',

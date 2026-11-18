@@ -7,6 +7,7 @@ import {
   GAME_SPEED_OFFSETS,
   VOCAB_LEXICAL_RELATIONS
 } from '../constants/seedData.js';
+import { isWebpBufferAnimated } from '../constants/profileCustomization.js';
 
 const LISTENING_40_THRESHOLDS = [
   [39, 9.0], [37, 8.5], [35, 8.0], [32, 7.5], [30, 7.0],
@@ -503,8 +504,9 @@ export function drawCroppedImageToContext(ctx, img, targetWidth, targetHeight, c
 
 export function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
-    if (!file || !file.type?.startsWith('image/')) {
-      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP).'));
+    const mime = String(file?.type || '').toLowerCase();
+    if (!file || !mime.startsWith('image/') || mime === 'image/svg+xml') {
+      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP, GIF).'));
       return;
     }
     const reader = new FileReader();
@@ -512,6 +514,23 @@ export function readImageFileAsDataUrl(file) {
     reader.onload = () => resolve(String(reader.result || ''));
     reader.readAsDataURL(file);
   });
+}
+
+export async function detectAnimatedImageFile(file) {
+  const mime = String(file?.type || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  if (mime === 'image/gif' || mime === 'image/apng' || name.endsWith('.gif') || name.endsWith('.apng')) {
+    return true;
+  }
+  if (mime === 'image/webp' || name.endsWith('.webp')) {
+    try {
+      const buf = await file.slice(0, 64).arrayBuffer();
+      return isWebpBufferAnimated(new Uint8Array(buf));
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 export function loadImageElement(src) {

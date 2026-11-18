@@ -931,7 +931,7 @@ export const STUDENT_TITLES = [
     isVipBundleTitle: true,
     defaultPriceVnd: 80000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-red-500',
-    conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Tùy chọn Màu Chữ Tên VIP, Viền Bìa Màu Neon, Ảnh Nền Cá Nhân, Tạo Phòng Game Bạn Bè vô hạn, Khung Avatar VIP & Danh hiệu Ai eo VIP.',
+    conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu Ai eo VIP.',
     badgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-amber-300 ring-1 ring-amber-300 shadow-md',
     heroBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white border-amber-200 shadow-lg',
     gameBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-amber-200 shadow-md',
@@ -1336,7 +1336,7 @@ export const VIP_NEON_COVER_THEMES = [
     swatchClass: 'bg-gradient-to-r from-rose-500 via-amber-400 via-emerald-400 to-cyan-400',
     frameWrapClass: 'vip-neon-frame vip-neon-aurora-frame shadow-[0_14px_36px_-6px_rgba(236,72,153,0.55),0_10px_28px_-6px_rgba(34,211,238,0.55)]',
     cardRimWrapClass: 'vip-neon-aurora-frame shadow-[0_8px_22px_-6px_rgba(168,85,247,0.5),0_6px_18px_-6px_rgba(34,211,238,0.45)]',
-    coverLedInnerClass: 'vip-cover-led-aurora border-2 border-white/75',
+    coverLedInnerClass: 'vip-cover-led-aurora',
     seamBarClass: 'vip-neon-aurora-seam',
     cardAccentClass: 'ring-2 ring-fuchsia-400/85 border-cyan-400 shadow-[0_10px_24px_-8px_rgba(168,85,247,0.48)]'
   },
@@ -1347,7 +1347,7 @@ export const VIP_NEON_COVER_THEMES = [
     swatchClass: 'bg-gradient-to-r from-pink-500 via-fuchsia-500 to-cyan-400',
     frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#FF2E93] via-[#E879F9] to-[#22D3EE] shadow-[0_14px_34px_-6px_rgba(236,72,153,0.68)]',
     cardRimWrapClass: 'bg-gradient-to-r from-[#FF2E93] via-[#C084FC] to-[#22D3EE] shadow-[0_8px_22px_-6px_rgba(236,72,153,0.52)]',
-    coverLedInnerClass: 'border-2 border-pink-300/90 shadow-[inset_0_0_20px_rgba(255,46,147,0.72),0_0_18px_rgba(232,121,249,0.85)]',
+    coverLedInnerClass: 'shadow-[inset_0_0_26px_rgba(255,46,147,0.62),inset_0_3px_12px_rgba(34,211,238,0.45)]',
     seamBarClass: 'bg-gradient-to-r from-[#FF2E93] via-[#E879F9] to-[#22D3EE]',
     cardAccentClass: 'ring-2 ring-pink-500/80 border-pink-400 shadow-[0_10px_24px_-8px_rgba(236,72,153,0.45)]'
   },
@@ -1358,7 +1358,7 @@ export const VIP_NEON_COVER_THEMES = [
     swatchClass: 'bg-gradient-to-r from-cyan-400 via-sky-400 to-indigo-400',
     frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#6366F1] shadow-[0_14px_34px_-6px_rgba(6,182,212,0.7)]',
     cardRimWrapClass: 'bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#6366F1] shadow-[0_8px_22px_-6px_rgba(6,182,212,0.52)]',
-    coverLedInnerClass: 'border-2 border-cyan-200/95 shadow-[inset_0_0_20px_rgba(34,211,238,0.72),0_0_18px_rgba(0,245,212,0.85)]',
+    coverLedInnerClass: 'shadow-[inset_0_0_26px_rgba(34,211,238,0.65),inset_0_3px_12px_rgba(0,245,212,0.45)]',
     seamBarClass: 'bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#6366F1]',
     cardAccentClass: 'ring-2 ring-cyan-400/80 border-cyan-400 shadow-[0_10px_24px_-8px_rgba(6,182,212,0.45)]'
   },
@@ -1369,7 +1369,7 @@ export const VIP_NEON_COVER_THEMES = [
     swatchClass: 'bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400',
     frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#38BDF8] shadow-[0_14px_34px_-6px_rgba(16,185,129,0.68)]',
     cardRimWrapClass: 'bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#38BDF8] shadow-[0_8px_22px_-6px_rgba(16,185,129,0.52)]',
-    coverLedInnerClass: 'border-2 border-emerald-200/95 shadow-[inset_0_0_20px_rgba(30,225,214,0.7),0_0_18px_rgba(16,185,129,0.85)]',
+    coverLedInnerClass: 'shadow-[inset_0_0_26px_rgba(30,225,214,0.62),inset_0_3px_12px_rgba(16,185,129,0.45)]',
     seamBarClass: 'bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#38BDF8]',
     cardAccentClass: 'ring-2 ring-emerald-400/85 border-emerald-400 shadow-[0_10px_24px_-8px_rgba(16,185,129,0.45)]'
   },
@@ -1380,7 +1380,7 @@ export const VIP_NEON_COVER_THEMES = [
     swatchClass: 'bg-gradient-to-r from-red-500 via-rose-500 to-amber-400',
     frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#FBBF24] shadow-[0_14px_34px_-6px_rgba(239,68,68,0.68)]',
     cardRimWrapClass: 'bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#FBBF24] shadow-[0_8px_22px_-6px_rgba(239,68,68,0.52)]',
-    coverLedInnerClass: 'border-2 border-rose-200/95 shadow-[inset_0_0_20px_rgba(239,68,68,0.72),0_0_18px_rgba(251,113,133,0.85)]',
+    coverLedInnerClass: 'shadow-[inset_0_0_26px_rgba(239,68,68,0.62),inset_0_3px_12px_rgba(251,191,36,0.45)]',
     seamBarClass: 'bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#FBBF24]',
     cardAccentClass: 'ring-2 ring-rose-500/80 border-rose-400 shadow-[0_10px_24px_-8px_rgba(239,68,68,0.45)]'
   },
@@ -1391,7 +1391,7 @@ export const VIP_NEON_COVER_THEMES = [
     swatchClass: 'bg-gradient-to-r from-amber-400 via-yellow-300 to-rose-400',
     frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB7185] shadow-[0_14px_34px_-6px_rgba(245,158,11,0.7)]',
     cardRimWrapClass: 'bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB7185] shadow-[0_8px_22px_-6px_rgba(245,158,11,0.52)]',
-    coverLedInnerClass: 'border-2 border-amber-200/95 shadow-[inset_0_0_20px_rgba(251,191,36,0.75),0_0_18px_rgba(245,158,11,0.88)]',
+    coverLedInnerClass: 'shadow-[inset_0_0_26px_rgba(251,191,36,0.65),inset_0_3px_12px_rgba(251,113,133,0.42)]',
     seamBarClass: 'bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB7185]',
     cardAccentClass: 'ring-2 ring-amber-400/85 border-amber-400 shadow-[0_10px_24px_-8px_rgba(245,158,11,0.45)]'
   }
@@ -1723,6 +1723,49 @@ export const VIETQR_BANK_OPTIONS = [
   { code: 'CAKE', name: 'CAKE by VPBank' },
   { code: 'TIMO', name: 'Timo (BVBank)' }
 ];
+
+export const STATIC_IMAGE_MAX_DATA_URL_LENGTH = 500_000;
+export const VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH = 1_500_000;
+
+export function hasAnimatedAvatarPermission(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') return false;
+  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
+  if (user.role === 'teacher') return true;
+  return Number(user.aieoVipExpiresAt) > nowMs;
+}
+
+export function isWebpBufferAnimated(bytes) {
+  if (!bytes || bytes.length < 22) return false;
+  // RIFF .... WEBP VP8X <4-byte size> <flags>
+  const isRiff = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+  const isWebp = bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  const isVp8x = bytes[12] === 0x56 && bytes[13] === 0x50 && bytes[14] === 0x38 && bytes[15] === 0x58;
+  return isRiff && isWebp && isVp8x && (bytes[20] & 0x02) !== 0;
+}
+
+export function isAnimatedDataUrl(rawUrl) {
+  const str = String(rawUrl || '').trim();
+  if (!str) return false;
+  if (/^data:image\/(gif|apng);/i.test(str)) return true;
+  if (/^https:\/\/.+\.(gif|apng)([?#].*)?$/i.test(str)) return true;
+  if (/^data:image\/webp;base64,/i.test(str)) {
+    const b64 = str.slice(str.indexOf(',') + 1, str.indexOf(',') + 64);
+    try {
+      if (typeof Buffer !== 'undefined') {
+        return isWebpBufferAnimated(Buffer.from(b64, 'base64'));
+      }
+      if (typeof atob === 'function') {
+        const bin = atob(b64);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return isWebpBufferAnimated(arr);
+      }
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
 
 export function hasCustomCoverPermission(user, nowMs = Date.now()) {
   if (!user || typeof user !== 'object') return false;

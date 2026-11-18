@@ -623,7 +623,7 @@ export default function StudentProfile({
       <div
         className={
           vipVisual.showNeonCover
-            ? `rounded-3xl p-[3.5px] mb-7 transition-all ${vipVisual.neonCoverMeta.frameWrapClass}`
+            ? `rounded-3xl p-[3px] mb-7 transition-all ${vipVisual.neonCoverMeta.frameWrapClass}`
             : 'bg-white dark:bg-slate-900 rounded-3xl border border-rose-200/85 dark:border-slate-800 shadow-lg overflow-hidden mb-7'
         }
       >
@@ -631,7 +631,7 @@ export default function StudentProfile({
         <div
           className={`relative w-full h-52 sm:h-64 lg:h-72 overflow-hidden ${
             vipVisual.showNeonCover
-              ? 'rounded-t-[20px]'
+              ? 'rounded-t-[21px]'
               : 'border-b border-slate-200/75 dark:border-slate-800'
           } ${
             hasCustomCover ? 'bg-slate-100 dark:bg-slate-800' : heroBanner.heroClass
@@ -648,7 +648,7 @@ export default function StudentProfile({
           {vipVisual.showNeonCover && (
             <div
               aria-hidden="true"
-              className={`absolute inset-[6px] sm:inset-[8px] rounded-[15px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
+              className={`absolute inset-0 rounded-t-[21px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
             />
           )}
 
@@ -686,17 +686,17 @@ export default function StudentProfile({
             </div>
           )}
           {vipVisual.showNeonCover && (
-            <div className={`absolute bottom-0 inset-x-0 h-1 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
+            <div className={`absolute bottom-0 inset-x-0 h-1 z-10 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
           )}
         </div>
 
         {/* 2. Separate Profile Info & Controls Section Below Cover */}
-        <div className={`px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[20px]' : ''}`}>
+        <div className={`px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[21px]' : ''}`}>
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 min-w-0">
               {/* Overlapping Large Avatar */}
-              <div className="-mt-16 sm:-mt-20 relative shrink-0 w-fit">
-                <div className="p-1.5 rounded-full bg-white dark:bg-slate-900 shadow-xl inline-block">
+              <div className="-mt-16 sm:-mt-20 relative z-20 shrink-0 w-fit">
+                <div className="p-1.5 rounded-full bg-white dark:bg-slate-900 shadow-xl flex items-center justify-center">
                   <UserAvatarBadge
                     user={student}
                     sizeClass="w-28 h-28 sm:w-36 sm:h-36"
@@ -1668,7 +1668,7 @@ export default function StudentProfile({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                  • Đổi <b>Màu Chữ Tên</b> tùy chọn &amp; Nhãn <b>AIEOVIP</b> • <b>Viền Bìa Màu Neon</b> + Tặng miễn phí <b>Ảnh Nền Cá Nhân</b> (5k/1T) • <b>3 Khung Avatar Neon VIP</b> • Tạo phòng Đấu Trường bạn bè vô hạn (chia Team) • Danh hiệu <b>👑 Ai eo VIP</b>.
+                  • <b>Ảnh Avatar Động (.GIF/.WebP)</b> • Đổi <b>Màu Chữ Tên</b> &amp; Nhãn <b>AIEOVIP</b> • <b>Viền Bìa &amp; Thẻ LED Neon</b> + Miễn phí <b>Ảnh Nền Cá Nhân</b> • <b>3 Khung Avatar Neon VIP</b> • Tạo phòng Game bạn bè vô hạn • Danh hiệu <b>👑 Ai eo VIP</b>.
                 </p>
                 <p className={`text-[11px] font-bold ${studentHasAieoVip ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
                   {studentHasAieoVip
@@ -2718,7 +2718,7 @@ export default function StudentProfile({
                   <div
                     className={
                       vipVisual.showNeonCover
-                        ? `rounded-2xl p-[2.5px] ${vipVisual.neonCoverMeta.frameWrapClass}`
+                        ? `rounded-2xl p-[3px] ${vipVisual.neonCoverMeta.frameWrapClass}`
                         : 'rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm'
                     }
                   >
@@ -2742,14 +2742,14 @@ export default function StudentProfile({
                         <>
                           <div
                             aria-hidden="true"
-                            className={`absolute inset-[4px] rounded-[10px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
+                            className={`absolute inset-0 rounded-t-[13px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
                           />
-                          <div className={`absolute bottom-0 inset-x-0 h-[3px] pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
+                          <div className={`absolute bottom-0 inset-x-0 h-[3px] z-10 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
                         </>
                       )}
                     </div>
                     <div className={`px-4 pb-3.5 pt-2 flex items-end gap-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[13px]' : ''}`}>
-                      <div className="-mt-8 p-1 rounded-full bg-white dark:bg-slate-900 shadow-md shrink-0">
+                      <div className="-mt-8 relative z-20 p-1 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center shrink-0">
                         <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-full" />
                       </div>
                       <div className="min-w-0">

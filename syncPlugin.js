@@ -46,13 +46,17 @@ import {
   getTestPurchasePriceVnd,
   getTitlePriceVnd,
   hasCustomCoverPermission,
+  hasAnimatedAvatarPermission,
   hasSkillPracticeAccess,
   hasTestPurchaseAccess,
   hasUnlockedAvatarFrame,
   hasVipFriendRoomAccess,
+  isAnimatedDataUrl,
   normalizePaymentConfig,
   normalizeVipNameColor,
-  normalizeVipNeonCoverColor
+  normalizeVipNeonCoverColor,
+  STATIC_IMAGE_MAX_DATA_URL_LENGTH,
+  VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH
 } from './src/constants/profileCustomization.js';
 import { DEFAULT_TESTS } from './src/constants/seedData.js';
 
@@ -2246,12 +2250,24 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     return false;
   }
 
-  const sanitizeMediaUrl = (val, prevVal = '', allowRelativeBrand = false) => {
+  const sanitizeMediaUrl = (val, prevVal = '', opts = false) => {
+    const allowRelativeBrand = typeof opts === 'boolean' ? opts : Boolean(opts?.allowRelativeBrand);
+    const allowAnimated = typeof opts === 'object' && opts !== null ? Boolean(opts.allowAnimated) : false;
     if (val === undefined) return prevVal || '';
     const str = String(val || '').trim();
     if (!str) return '';
     if (allowRelativeBrand && str.startsWith('/brand-avatar.jpg')) return str;
-    if ((str.startsWith('data:image/') || str.startsWith('https://')) && str.length <= 500_000) {
+    const isHttps = /^https:\/\//i.test(str);
+    const isSafeDataImage = /^data:image\/(jpeg|jpg|png|webp|gif|apng);base64,/i.test(str);
+    if (!isHttps && !isSafeDataImage) {
+      return prevVal || '';
+    }
+    const animated = isAnimatedDataUrl(str);
+    if (animated && !allowAnimated) {
+      return prevVal || '';
+    }
+    const maxLen = animated && allowAnimated ? VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH : STATIC_IMAGE_MAX_DATA_URL_LENGTH;
+    if (str.length <= maxLen) {
       return str;
     }
     return prevVal || '';
@@ -2261,14 +2277,15 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     // Student may only update non-privilege profile fields on own account
     const mergedAckSelf = mergeAcknowledgedTitleIds(prevUser.acknowledgedTitleIds, rawUser.acknowledgedTitleIds);
     const hasCoverPerm = hasCustomCoverPermission(prevUser);
+    const hasAnimAvatarPerm = hasAnimatedAvatarPermission(prevUser);
     const cleanSelf = {
       ...prevUser,
       name: typeof rawUser.name === 'string' && rawUser.name.trim() ? rawUser.name.trim() : prevUser.name,
-      avatarUrl: sanitizeMediaUrl(rawUser.avatarUrl, prevUser.avatarUrl, true),
+      avatarUrl: sanitizeMediaUrl(rawUser.avatarUrl, prevUser.avatarUrl, { allowRelativeBrand: true, allowAnimated: hasAnimAvatarPerm }),
       targetBand: rawUser.targetBand ?? prevUser.targetBand,
       studyGoal: rawUser.studyGoal ?? prevUser.studyGoal,
       profileBannerId: typeof rawUser.profileBannerId === 'string' && rawUser.profileBannerId ? rawUser.profileBannerId.slice(0, 40) : (prevUser.profileBannerId || 'ocean'),
-      profileCoverUrl: hasCoverPerm ? sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, false) : '',
+      profileCoverUrl: hasCoverPerm ? sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, { allowRelativeBrand: false, allowAnimated: hasCoverPerm }) : '',
       avatarFrameId: (() => {
         const candidate = typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none');
         return hasUnlockedAvatarFrame(prevUser, candidate) ? candidate : (hasUnlockedAvatarFrame(prevUser, prevUser.avatarFrameId) ? prevUser.avatarFrameId : 'none');
@@ -2462,11 +2479,17 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       : mergeAcknowledgedTitleIds(['newbie'], incoming.acknowledgedTitleIds);
     if (mergedAckTeacher !== undefined) incoming.acknowledgedTitleIds = mergedAckTeacher;
     else delete incoming.acknowledgedTitleIds;
-    incoming.avatarUrl = sanitizeMediaUrl(incoming.avatarUrl, prevUser?.avatarUrl || '', true);
+    incoming.avatarUrl = sanitizeMediaUrl(incoming.avatarUrl, prevUser?.avatarUrl || '', {
+      allowRelativeBrand: true,
+      allowAnimated: hasAnimatedAvatarPermission({ ...prevUser, ...incoming, username: uname })
+    });
     incoming.profileBannerId = typeof incoming.profileBannerId === 'string' && incoming.profileBannerId
       ? incoming.profileBannerId.slice(0, 40)
       : (prevUser?.profileBannerId || 'ocean');
-    incoming.profileCoverUrl = sanitizeMediaUrl(incoming.profileCoverUrl, prevUser?.profileCoverUrl || '', false);
+    incoming.profileCoverUrl = sanitizeMediaUrl(incoming.profileCoverUrl, prevUser?.profileCoverUrl || '', {
+      allowRelativeBrand: false,
+      allowAnimated: true
+    });
     incoming.avatarFrameId = typeof incoming.avatarFrameId === 'string' && incoming.avatarFrameId
       ? incoming.avatarFrameId.slice(0, 40)
       : (prevUser?.avatarFrameId || 'none');
@@ -3562,7 +3585,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             store,
             {
               title: '👑 Đã kích hoạt Gói Ai eo VIP (1 Tháng)!',
-              message: `Quản Trị Hệ Thống đã kích hoạt 30 ngày Gói Ai eo VIP: Mở miễn phí Ảnh Bìa Cá Nhân, Viền Bìa Neon, Đổi Màu Chữ Tên + Nhãn AIEOVIP, Danh hiệu Ai eo VIP & Tạo phòng Game Bạn Bè vô hạn.`,
+              message: `Quản Trị Hệ Thống đã kích hoạt 30 ngày Gói Ai eo VIP: Mở khóa Ảnh Avatar Động (.GIF/.WebP), Ảnh Bìa Cá Nhân, Viền Bìa & Thẻ LED Neon Nhiều Màu, Đổi Màu Chữ Tên + Nhãn AIEOVIP, Danh hiệu Ai eo VIP & Tạo phòng Game Bạn Bè vô hạn.`,
               type: 'announcement',
               targetUsernames: [targetKey],
               createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
@@ -5402,7 +5425,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               store,
               {
                 title: '👑 Chào mừng thành viên Gói Ai eo VIP (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Tùy chọn Màu Chữ Tên & Viền Bìa Neon, Ảnh Bìa Cá Nhân miễn phí, Khung Avatar VIP, Danh hiệu 👑 Ai eo VIP & Tạo phòng Game bạn bè! Cảm ơn bạn đã ủng hộ Tuấn!`,
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Ảnh Avatar Động (.GIF/.WebP), Tùy chọn Màu Chữ Tên & Viền Bìa LED Neon Nhiều Màu, Ảnh Bìa Cá Nhân miễn phí, Khung Avatar VIP, Danh hiệu 👑 Ai eo VIP & Tạo phòng Game bạn bè! Cảm ơn bạn đã ủng hộ Tuấn!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
