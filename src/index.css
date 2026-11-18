@@ -93,7 +93,9 @@ html.dark .lexi-card:hover {
   .animate-crewmate-bob,
   .vip-shimmer-badge,
   .vip-shimmer-badge::after,
-  .vip-avatar-aura {
+  .vip-avatar-aura,
+  .vip-neon-aurora-frame,
+  .vip-neon-aurora-seam {
     transition: none !important;
     animation: none !important;
   }
@@ -142,13 +144,52 @@ html.dark .lexi-card:hover {
   animation: vipAuraPulse 2.8s ease-in-out infinite;
 }
 
-.vip-red-name-text {
-  color: #dc2626 !important;
+.vip-red-name-text,
+.vip-custom-name-text {
   font-weight: 900 !important;
 }
 
-html.dark .vip-red-name-text {
+.vip-red-name-text,
+.vip-color-crimson {
+  color: #dc2626 !important;
+}
+html.dark .vip-red-name-text,
+html.dark .vip-color-crimson {
   color: #f87171 !important;
+}
+
+.vip-color-orange { color: #c2410c !important; }
+html.dark .vip-color-orange { color: #fb923c !important; }
+
+.vip-color-amber { color: #b45309 !important; }
+html.dark .vip-color-amber { color: #fbbf24 !important; }
+
+.vip-color-emerald { color: #047857 !important; }
+html.dark .vip-color-emerald { color: #34d399 !important; }
+
+.vip-color-cyan { color: #0e7490 !important; }
+html.dark .vip-color-cyan { color: #22d3ee !important; }
+
+.vip-color-royal { color: #1d4ed8 !important; }
+html.dark .vip-color-royal { color: #60a5fa !important; }
+
+.vip-color-violet { color: #7e22ce !important; }
+html.dark .vip-color-violet { color: #c084fc !important; }
+
+.vip-color-pink { color: #be185d !important; }
+html.dark .vip-color-pink { color: #f472b6 !important; }
+
+@keyframes vipNeonShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.vip-neon-aurora-frame,
+.vip-neon-aurora-seam {
+  background-image: linear-gradient(90deg, #00f5d4, #22d3ee, #818cf8, #ec4899, #fbbf24, #00f5d4);
+  background-size: 240% 240%;
+  animation: vipNeonShift 6s ease infinite;
 }
 
 html.dark {

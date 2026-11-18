@@ -30,6 +30,7 @@ import {
   formatVndCurrency,
   getTestPurchasePriceVnd,
   hasTestPurchaseAccess,
+  resolveUserVipNameVisual,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 
@@ -775,9 +776,11 @@ export default function StudentHome({
                     .slice(0, 9)
                     .map(([uname, u]) => {
                       const isSelf = uname === currentUser?.username;
+                      const memberObj = { ...u, username: uname };
                       const memberIsAdmin = Boolean(u?.isSystemAdmin);
                       const memberIsTeacher = !memberIsAdmin && u?.role === 'teacher';
                       const memberAttCount = (attempts || []).filter(att => att.studentId === uname).length;
+                      const memberVip = resolveUserVipNameVisual(memberObj);
                       return (
                         <button
                           key={uname}
@@ -792,16 +795,18 @@ export default function StudentHome({
                             }
                           }}
                           className={`flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl border transition text-left group ${
-                            memberIsAdmin
+                            memberVip.showNeonCover
+                              ? `bg-white dark:bg-slate-900 ${memberVip.neonCoverMeta.cardAccentClass}`
+                              : memberIsAdmin
                               ? 'border-purple-200/90 dark:border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20 hover:border-purple-500'
                               : 'border-pink-200/90 dark:border-slate-800 bg-rose-50/55 dark:bg-slate-900/60 hover:border-[#007A7A] dark:hover:border-teal-500 hover:bg-[#EDFFFD]/70 dark:hover:bg-teal-950/30'
                           }`}
                         >
-                          <UserAvatarBadge user={{ ...u, username: uname }} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
+                          <UserAvatarBadge user={memberObj} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-sm font-extrabold text-[#0F172B] dark:text-white truncate group-hover:text-teal-700 dark:group-hover:text-teal-300">
-                                {u?.name || uname}
+                                <VipMemberName user={memberObj} fallbackName={u?.name || uname} badgeSize="xs" />
                               </span>
                               {isSelf && (
                                 <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-rose-200/70 dark:bg-slate-700 text-rose-900 dark:text-slate-200 shrink-0">Bạn</span>

@@ -67,6 +67,7 @@ import {
   getFriendRoomTicketCredits,
   hasVipFriendRoomAccess,
   normalizePaymentConfig,
+  resolveUserVipNameVisual,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 
@@ -793,7 +794,7 @@ export default function GameArena({
                       ? 'Tài khoản của bạn đã mở quyền tạo phòng không giới hạn — tự chọn số người, chia Team và đua cùng bạn bè ngay!'
                       : roomTicketCredits > 0
                       ? `Bạn đang có ${roomTicketCredits} vé tạo phòng lẻ (${roomTicketPriceLabel}/lần). Bấm Tạo Phòng Bạn Bè để mở phòng riêng ngay!`
-                      : `Chọn mua vé lẻ ${roomTicketPriceLabel}/lần tạo phòng hoặc nâng cấp Gói Ai eo VIP (${aieoVipPriceLabel}/1T) để tạo vô hạn & bật Tên Đỏ! Bạn bè vào phòng miễn phí — bạn vẫn có thể Tập luyện 1 mình miễn phí!`}
+                      : `Chọn mua vé lẻ ${roomTicketPriceLabel}/lần tạo phòng hoặc nâng cấp Gói Ai eo VIP (${aieoVipPriceLabel}/1T) để tạo vô hạn, Đổi Màu Chữ & Viền Bìa Neon! Bạn bè vào phòng miễn phí — bạn vẫn có thể Tập luyện 1 mình miễn phí!`}
                   </p>
                 </div>
                 {canCreateFriendVipRoom && (
@@ -1571,13 +1572,18 @@ export default function GameArena({
           const memberBands = memberAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
           const memberBest = memberBands.length > 0 ? Math.max(...memberBands) : null;
           const memberGameRec = room.players?.[member.name] || room.players?.[inspectedLobbyUsername];
+          const memberVip = resolveUserVipNameVisual(member);
           return (
             <div
               className="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4"
               onClick={() => setInspectedLobbyUsername(null)}
             >
               <div
-                className="bg-[#FFF5F8] dark:bg-slate-900 border border-pink-200 dark:border-slate-700 rounded-3xl max-w-sm w-full p-5 text-[#0F172B] dark:text-white shadow-2xl space-y-4"
+                className={`rounded-3xl max-w-sm w-full p-5 text-[#0F172B] dark:text-white shadow-2xl space-y-4 ${
+                  memberVip.showNeonCover
+                    ? `bg-white dark:bg-slate-900 border ${memberVip.neonCoverMeta.cardAccentClass}`
+                    : 'bg-[#FFF5F8] dark:bg-slate-900 border border-pink-200 dark:border-slate-700'
+                }`}
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -1585,7 +1591,9 @@ export default function GameArena({
                     <UserAvatarBadge user={member} sizeClass="w-12 h-12" textClass="text-lg" rounded="rounded-2xl" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="font-extrabold text-sm text-[#0F172B] dark:text-white truncate">{member.name || inspectedLobbyUsername}</h3>
+                        <h3 className="font-extrabold text-sm text-[#0F172B] dark:text-white truncate">
+                          <VipMemberName user={member} fallbackName={member.name || inspectedLobbyUsername} badgeSize="xs" />
+                        </h3>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                           isMemberTeacher
                             ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-400/40'

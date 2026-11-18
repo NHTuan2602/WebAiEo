@@ -48,8 +48,11 @@ import {
   hasCustomCoverPermission,
   hasSkillPracticeAccess,
   hasTestPurchaseAccess,
+  hasUnlockedAvatarFrame,
   hasVipFriendRoomAccess,
-  normalizePaymentConfig
+  normalizePaymentConfig,
+  normalizeVipNameColor,
+  normalizeVipNeonCoverColor
 } from './src/constants/profileCustomization.js';
 import { DEFAULT_TESTS } from './src/constants/seedData.js';
 
@@ -480,10 +483,11 @@ function ensureProtectedAccounts(store) {
     if (
       Number(u.aieoVipExpiresAt) > Date.now() &&
       !u.vipEffectsCustomizedAt &&
-      (u.vipRedNameEnabled === false || u.vipTagEnabled === false)
+      (u.vipRedNameEnabled === false || u.vipTagEnabled === false || u.vipNeonCoverEnabled === false)
     ) {
       u.vipRedNameEnabled = true;
       u.vipTagEnabled = true;
+      u.vipNeonCoverEnabled = true;
       changed = true;
     }
   });
@@ -705,12 +709,20 @@ function sanitizeUserForViewer(user, viewer) {
       if (isVip && !user.vipEffectsCustomizedAt) return true;
       return (isVip || isSa) && user.vipRedNameEnabled !== undefined ? Boolean(user.vipRedNameEnabled) : isVip;
     })(),
+    vipNameColor: normalizeVipNameColor(user.vipNameColor || 'crimson'),
     vipTagEnabled: (() => {
       const isVip = Number(user.aieoVipExpiresAt) > Date.now();
       const isSa = Boolean(user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME);
       if (isVip && !user.vipEffectsCustomizedAt) return true;
       return (isVip || isSa) && user.vipTagEnabled !== undefined ? Boolean(user.vipTagEnabled) : isVip;
     })(),
+    vipNeonCoverEnabled: (() => {
+      const isVip = Number(user.aieoVipExpiresAt) > Date.now();
+      const isSa = Boolean(user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME);
+      if (isVip && !user.vipEffectsCustomizedAt) return true;
+      return (isVip || isSa) && user.vipNeonCoverEnabled !== undefined ? Boolean(user.vipNeonCoverEnabled) : isVip;
+    })(),
+    vipNeonCoverColor: normalizeVipNeonCoverColor(user.vipNeonCoverColor || 'cyber_cyan'),
     ...(user.vipEffectsCustomizedAt ? { vipEffectsCustomizedAt: Number(user.vipEffectsCustomizedAt) || 0 } : {}),
     subscriptionRequested:
       user.subscriptionRequested && typeof user.subscriptionRequested === 'object' ? user.subscriptionRequested : null,
@@ -1387,7 +1399,10 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     grantedTitleIds: Array.isArray(superAdmin.grantedTitleIds) ? superAdmin.grantedTitleIds : [],
     purchasedTitleIds: Array.isArray(superAdmin.purchasedTitleIds) ? superAdmin.purchasedTitleIds : [],
     vipRedNameEnabled: superAdmin.vipRedNameEnabled === true,
+    vipNameColor: normalizeVipNameColor(superAdmin.vipNameColor || 'crimson'),
     vipTagEnabled: superAdmin.vipTagEnabled === true,
+    vipNeonCoverEnabled: superAdmin.vipNeonCoverEnabled === true,
+    vipNeonCoverColor: normalizeVipNeonCoverColor(superAdmin.vipNeonCoverColor || 'cyber_cyan'),
     aieoVipExpiresAt: Number(superAdmin.aieoVipExpiresAt) || 0,
     role: 'admin',
     isSystemAdmin: true,
@@ -2250,7 +2265,10 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       studyGoal: rawUser.studyGoal ?? prevUser.studyGoal,
       profileBannerId: typeof rawUser.profileBannerId === 'string' && rawUser.profileBannerId ? rawUser.profileBannerId.slice(0, 40) : (prevUser.profileBannerId || 'ocean'),
       profileCoverUrl: hasCoverPerm ? sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, false) : '',
-      avatarFrameId: typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none'),
+      avatarFrameId: (() => {
+        const candidate = typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none');
+        return hasUnlockedAvatarFrame(prevUser, candidate) ? candidate : (hasUnlockedAvatarFrame(prevUser, prevUser.avatarFrameId) ? prevUser.avatarFrameId : 'none');
+      })(),
       equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
@@ -2280,18 +2298,37 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
         rawUser.vipRedNameEnabled !== undefined
           ? Boolean(rawUser.vipRedNameEnabled)
           : (prevUser.vipRedNameEnabled !== undefined ? Boolean(prevUser.vipRedNameEnabled) : true);
+      cleanSelf.vipNameColor = normalizeVipNameColor(
+        rawUser.vipNameColor !== undefined ? rawUser.vipNameColor : (prevUser.vipNameColor || 'crimson')
+      );
       cleanSelf.vipTagEnabled =
         rawUser.vipTagEnabled !== undefined
           ? Boolean(rawUser.vipTagEnabled)
           : (prevUser.vipTagEnabled !== undefined ? Boolean(prevUser.vipTagEnabled) : true);
-      if (rawUser.vipRedNameEnabled !== undefined || rawUser.vipTagEnabled !== undefined) {
+      cleanSelf.vipNeonCoverEnabled =
+        rawUser.vipNeonCoverEnabled !== undefined
+          ? Boolean(rawUser.vipNeonCoverEnabled)
+          : (prevUser.vipNeonCoverEnabled !== undefined ? Boolean(prevUser.vipNeonCoverEnabled) : true);
+      cleanSelf.vipNeonCoverColor = normalizeVipNeonCoverColor(
+        rawUser.vipNeonCoverColor !== undefined ? rawUser.vipNeonCoverColor : (prevUser.vipNeonCoverColor || 'cyber_cyan')
+      );
+      if (
+        rawUser.vipRedNameEnabled !== undefined ||
+        rawUser.vipTagEnabled !== undefined ||
+        rawUser.vipNameColor !== undefined ||
+        rawUser.vipNeonCoverEnabled !== undefined ||
+        rawUser.vipNeonCoverColor !== undefined
+      ) {
         cleanSelf.vipEffectsCustomizedAt = Number(rawUser.vipEffectsCustomizedAt) || Date.now();
       } else if (prevUser.vipEffectsCustomizedAt) {
         cleanSelf.vipEffectsCustomizedAt = Number(prevUser.vipEffectsCustomizedAt) || 0;
       }
     } else {
       delete cleanSelf.vipRedNameEnabled;
+      delete cleanSelf.vipNameColor;
       delete cleanSelf.vipTagEnabled;
+      delete cleanSelf.vipNeonCoverEnabled;
+      delete cleanSelf.vipNeonCoverColor;
       delete cleanSelf.vipEffectsCustomizedAt;
     }
     if (mergedAckSelf !== undefined) cleanSelf.acknowledgedTitleIds = mergedAckSelf;
@@ -2364,6 +2401,9 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       } else {
         incoming.vipRedNameEnabled = true;
       }
+      incoming.vipNameColor = normalizeVipNameColor(
+        rawUser.vipNameColor !== undefined ? rawUser.vipNameColor : (prevUser?.vipNameColor || 'crimson')
+      );
       if (incoming.vipTagEnabled !== undefined) {
         incoming.vipTagEnabled = Boolean(incoming.vipTagEnabled);
       } else if (prevUser?.vipTagEnabled !== undefined) {
@@ -2371,14 +2411,33 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       } else {
         incoming.vipTagEnabled = true;
       }
-      if (rawUser.vipRedNameEnabled !== undefined || rawUser.vipTagEnabled !== undefined) {
+      if (incoming.vipNeonCoverEnabled !== undefined) {
+        incoming.vipNeonCoverEnabled = Boolean(incoming.vipNeonCoverEnabled);
+      } else if (prevUser?.vipNeonCoverEnabled !== undefined) {
+        incoming.vipNeonCoverEnabled = Boolean(prevUser.vipNeonCoverEnabled);
+      } else {
+        incoming.vipNeonCoverEnabled = true;
+      }
+      incoming.vipNeonCoverColor = normalizeVipNeonCoverColor(
+        rawUser.vipNeonCoverColor !== undefined ? rawUser.vipNeonCoverColor : (prevUser?.vipNeonCoverColor || 'cyber_cyan')
+      );
+      if (
+        rawUser.vipRedNameEnabled !== undefined ||
+        rawUser.vipTagEnabled !== undefined ||
+        rawUser.vipNameColor !== undefined ||
+        rawUser.vipNeonCoverEnabled !== undefined ||
+        rawUser.vipNeonCoverColor !== undefined
+      ) {
         incoming.vipEffectsCustomizedAt = Number(rawUser.vipEffectsCustomizedAt) || Date.now();
       } else if (prevUser?.vipEffectsCustomizedAt) {
         incoming.vipEffectsCustomizedAt = Number(prevUser.vipEffectsCustomizedAt) || 0;
       }
     } else {
       delete incoming.vipRedNameEnabled;
+      delete incoming.vipNameColor;
       delete incoming.vipTagEnabled;
+      delete incoming.vipNeonCoverEnabled;
+      delete incoming.vipNeonCoverColor;
       delete incoming.vipEffectsCustomizedAt;
     }
     incoming.customCoverUnlockedAt = incoming.customCoverUnlocked
@@ -3483,7 +3542,10 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           aieoVipExpiresAt: nextVipExp,
           skillPracticeExpiresAt: nextSkillExp,
           vipRedNameEnabled: active ? (keepCustomRed ? (targetUser.vipRedNameEnabled ?? true) : true) : false,
+          vipNameColor: normalizeVipNameColor(targetUser.vipNameColor || 'crimson'),
           vipTagEnabled: active ? (keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true) : false,
+          vipNeonCoverEnabled: active ? (keepCustomRed ? (targetUser.vipNeonCoverEnabled ?? true) : true) : false,
+          vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'cyber_cyan'),
           ...(active && !wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
           ...(!active ? { vipEffectsCustomizedAt: 0 } : {}),
           ...(active && (!targetUser.equippedTitleId || targetUser.equippedTitleId === 'newbie')
@@ -3496,7 +3558,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             store,
             {
               title: '👑 Đã kích hoạt Gói Ai eo VIP (1 Tháng)!',
-              message: `Quản Trị Hệ Thống đã kích hoạt 30 ngày Gói Ai eo VIP: Mở miễn phí Bài tập 4 Kỹ năng, Danh hiệu Ai eo VIP, Tạo phòng Game Bạn Bè & Tên Đỏ + Nhãn AIEOVIP.`,
+              message: `Quản Trị Hệ Thống đã kích hoạt 30 ngày Gói Ai eo VIP: Mở miễn phí Ảnh Bìa Cá Nhân, Viền Bìa Neon, Đổi Màu Chữ Tên + Nhãn AIEOVIP, Danh hiệu Ai eo VIP & Tạo phòng Game Bạn Bè vô hạn.`,
               type: 'announcement',
               targetUsernames: [targetKey],
               createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
@@ -5324,7 +5386,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               aieoVipExpiresAt: nextVipExp,
               skillPracticeExpiresAt: nextSkillExp,
               vipRedNameEnabled: keepCustomRed ? (targetUser.vipRedNameEnabled ?? true) : true,
+              vipNameColor: normalizeVipNameColor(targetUser.vipNameColor || 'crimson'),
               vipTagEnabled: keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true,
+              vipNeonCoverEnabled: keepCustomRed ? (targetUser.vipNeonCoverEnabled ?? true) : true,
+              vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'cyber_cyan'),
               ...(!wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
               ...(autoEquipVip ? { equippedTitleId: 'aieo_vip', showTitleBadge: true } : {}),
               ...(targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})
@@ -5333,7 +5398,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               store,
               {
                 title: '👑 Chào mừng thành viên Gói Ai eo VIP (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Bài tập 4 Kỹ năng miễn phí, Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè & Chữ Đỏ + Nhãn AIEOVIP! Cảm ơn bạn đã ủng hộ Tuấn!`,
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Tùy chọn Màu Chữ Tên & Viền Bìa Neon, Ảnh Bìa Cá Nhân miễn phí, Khung Avatar VIP, Danh hiệu 👑 Ai eo VIP & Tạo phòng Game bạn bè! Cảm ơn bạn đã ủng hộ Tuấn!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -5592,7 +5657,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           isHost: isRoomHostJoin || viewer.role === 'teacher',
           ...(Number(viewer.aieoVipExpiresAt) > 0 ? { aieoVipExpiresAt: Number(viewer.aieoVipExpiresAt) } : {}),
           ...(viewer.vipRedNameEnabled !== undefined ? { vipRedNameEnabled: Boolean(viewer.vipRedNameEnabled) } : {}),
+          ...(viewer.vipNameColor ? { vipNameColor: normalizeVipNameColor(viewer.vipNameColor) } : {}),
           ...(viewer.vipTagEnabled !== undefined ? { vipTagEnabled: Boolean(viewer.vipTagEnabled) } : {}),
+          ...(viewer.vipNeonCoverEnabled !== undefined ? { vipNeonCoverEnabled: Boolean(viewer.vipNeonCoverEnabled) } : {}),
+          ...(viewer.vipNeonCoverColor ? { vipNeonCoverColor: normalizeVipNeonCoverColor(viewer.vipNeonCoverColor) } : {}),
           ...(viewer.isSuperAdmin ? { isSuperAdmin: true } : {}),
           ...(resolvedTeamId ? { teamId: resolvedTeamId } : {}),
           colorId: pilot.colorId || existingPlayer?.colorId || 'cyan',

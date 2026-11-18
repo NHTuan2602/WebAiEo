@@ -12,6 +12,8 @@ import {
   hasTestPurchaseAccess,
   hasVipFriendRoomAccess,
   normalizePaymentConfig,
+  normalizeVipNameColor,
+  normalizeVipNeonCoverColor,
   resolveStudentTitleSummary
 } from './constants/profileCustomization';
 import {
@@ -546,7 +548,10 @@ export default function App() {
       ...(patch.equippedTitleId !== undefined ? { equippedTitleId: patch.equippedTitleId || 'newbie' } : {}),
       ...(patch.showTitleBadge !== undefined ? { showTitleBadge: Boolean(patch.showTitleBadge) } : {}),
       ...(patch.vipRedNameEnabled !== undefined ? { vipRedNameEnabled: Boolean(patch.vipRedNameEnabled) } : {}),
+      ...(patch.vipNameColor !== undefined ? { vipNameColor: normalizeVipNameColor(patch.vipNameColor) } : {}),
       ...(patch.vipTagEnabled !== undefined ? { vipTagEnabled: Boolean(patch.vipTagEnabled) } : {}),
+      ...(patch.vipNeonCoverEnabled !== undefined ? { vipNeonCoverEnabled: Boolean(patch.vipNeonCoverEnabled) } : {}),
+      ...(patch.vipNeonCoverColor !== undefined ? { vipNeonCoverColor: normalizeVipNeonCoverColor(patch.vipNeonCoverColor) } : {}),
       ...(patch.vipEffectsCustomizedAt !== undefined ? { vipEffectsCustomizedAt: Number(patch.vipEffectsCustomizedAt) || Date.now() } : {}),
       ...(Array.isArray(mergedAckIds) ? { acknowledgedTitleIds: mergedAckIds } : {})
     };
@@ -574,7 +579,10 @@ export default function App() {
         patch.equippedTitleId !== undefined ||
         patch.showTitleBadge !== undefined ||
         patch.vipRedNameEnabled !== undefined ||
-        patch.vipTagEnabled !== undefined;
+        patch.vipNameColor !== undefined ||
+        patch.vipTagEnabled !== undefined ||
+        patch.vipNeonCoverEnabled !== undefined ||
+        patch.vipNeonCoverColor !== undefined;
       showToast(
         patch.customToast
           ? patch.customToast
@@ -2485,7 +2493,10 @@ export default function App() {
     ...(overrides.teamId ? { teamId: overrides.teamId } : {}),
     ...(Number(user.aieoVipExpiresAt) > 0 ? { aieoVipExpiresAt: Number(user.aieoVipExpiresAt) } : {}),
     ...(user.vipRedNameEnabled !== undefined ? { vipRedNameEnabled: Boolean(user.vipRedNameEnabled) } : {}),
+    ...(user.vipNameColor ? { vipNameColor: normalizeVipNameColor(user.vipNameColor) } : {}),
     ...(user.vipTagEnabled !== undefined ? { vipTagEnabled: Boolean(user.vipTagEnabled) } : {}),
+    ...(user.vipNeonCoverEnabled !== undefined ? { vipNeonCoverEnabled: Boolean(user.vipNeonCoverEnabled) } : {}),
+    ...(user.vipNeonCoverColor ? { vipNeonCoverColor: normalizeVipNeonCoverColor(user.vipNeonCoverColor) } : {}),
     ...(user.isSuperAdmin ? { isSuperAdmin: true } : {}),
     chat: '',
     chatAt: 0,

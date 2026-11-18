@@ -33,7 +33,8 @@ import {
   formatRemainingSubscriptionText,
   formatVndCurrency,
   hasActiveAieoVip,
-  normalizePaymentConfig
+  normalizePaymentConfig,
+  resolveUserVipNameVisual
 } from '../constants/profileCustomization';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 import VipMemberName from '../components/common/VipMemberName';
@@ -269,11 +270,15 @@ export default function SkillPracticeHub({
             {ranked.slice(0, 9).map((row, idx) => {
               const isMe = row.username === currentUser?.username;
               const avgBand = Math.round(((row.totalBand / row.count) + 1e-9) * 2) / 2;
+              const rowUserObj = usersDb?.[row.username] || (row.username === currentUser?.username ? currentUser : null);
+              const rowVipVisual = resolveUserVipNameVisual(rowUserObj);
               return (
                 <div
                   key={row.username}
                   className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition ${
-                    isMe
+                    rowVipVisual.showNeonCover
+                      ? `bg-white dark:bg-[#23222B] ${rowVipVisual.neonCoverMeta.cardAccentClass}`
+                      : isMe
                       ? 'bg-[#EDFFFD] dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6]'
                       : 'bg-white dark:bg-[#23222B] border-pink-200/80 dark:border-[#34323F]'
                   }`}
@@ -282,7 +287,7 @@ export default function SkillPracticeHub({
                     <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1 flex-wrap">
                       <span>#{idx + 1}</span>
                       <VipMemberName
-                        user={usersDb?.[row.username] || (row.username === currentUser?.username ? currentUser : null)}
+                        user={rowUserObj}
                         fallbackName={row.name}
                         badgeSize="xs"
                       />
@@ -804,7 +809,7 @@ export default function SkillPracticeHub({
                   className="vip-shimmer-badge px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white text-[11px] font-black shadow-xs hover:opacity-95 transition inline-flex items-center gap-1"
                 >
                   <Crown className="w-3.5 h-3.5 text-amber-200" />
-                  <span>Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1T) — Tạo Phòng Team Game</span>
+                  <span>Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1T) — Viền Neon, Màu Chữ &amp; Tạo Phòng</span>
                 </button>
               )}
             </div>

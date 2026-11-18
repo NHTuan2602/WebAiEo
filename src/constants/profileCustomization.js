@@ -84,8 +84,39 @@ export const AVATAR_FRAMES = [
     name: 'Lục Bảo',
     ringClass: 'ring-4 ring-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.45)]',
     previewBg: 'bg-emerald-400'
+  },
+  {
+    id: 'vip_neon_cyan',
+    name: 'Neon Cyan VIP',
+    vipOnly: true,
+    ringClass: 'ring-4 ring-[#00F5D4] shadow-[0_8px_22px_-4px_rgba(0,245,212,0.75)]',
+    previewBg: 'bg-gradient-to-tr from-cyan-400 to-teal-300'
+  },
+  {
+    id: 'vip_neon_pink',
+    name: 'Cyber Hồng VIP',
+    vipOnly: true,
+    ringClass: 'ring-4 ring-[#FF2E93] shadow-[0_8px_22px_-4px_rgba(255,46,147,0.75)]',
+    previewBg: 'bg-gradient-to-tr from-pink-500 to-purple-500'
+  },
+  {
+    id: 'vip_neon_gold',
+    name: 'Hoàng Kim Neon VIP',
+    vipOnly: true,
+    ringClass: 'ring-4 ring-[#FBBF24] shadow-[0_8px_22px_-4px_rgba(251,191,36,0.8)]',
+    previewBg: 'bg-gradient-to-tr from-amber-400 to-rose-500'
   }
 ];
+
+export function hasUnlockedAvatarFrame(user, frameId, nowMs = Date.now()) {
+  const frame = AVATAR_FRAMES.find(f => f.id === frameId);
+  if (!frame || !frame.vipOnly) return true;
+  if (!user || typeof user !== 'object') return false;
+  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s' || user.role === 'teacher') {
+    return true;
+  }
+  return Number(user.aieoVipExpiresAt) > nowMs;
+}
 
 export function getVietnamDateKey(ts = Date.now()) {
   const num = Number(ts) || Date.now();
@@ -900,7 +931,7 @@ export const STUDENT_TITLES = [
     isVipBundleTitle: true,
     defaultPriceVnd: 80000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-red-500',
-    conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Mở khóa Bài Tập 4 Kỹ Năng, Tạo Phòng Game Bạn Bè, Danh hiệu Ai eo VIP & Màu Chữ Đỏ + Nhãn AIEOVIP.',
+    conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Tùy chọn Màu Chữ Tên VIP, Viền Bìa Màu Neon, Ảnh Nền Cá Nhân, Tạo Phòng Game Bạn Bè vô hạn, Khung Avatar VIP & Danh hiệu Ai eo VIP.',
     badgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-amber-300 ring-1 ring-amber-300 shadow-md',
     heroBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white border-amber-200 shadow-lg',
     gameBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-amber-200 shadow-md',
@@ -1246,14 +1277,168 @@ export function hasPaidTitleVisualPerk(user, nowMs = Date.now()) {
   return false;
 }
 
+export const VIP_NAME_COLORS = [
+  {
+    id: 'crimson',
+    label: 'Đỏ Ruby',
+    swatch: '#dc2626',
+    cssClass: 'vip-red-name-text vip-color-crimson !text-red-600 dark:!text-red-400 font-black'
+  },
+  {
+    id: 'orange',
+    label: 'Cam Lửa',
+    swatch: '#ea580c',
+    cssClass: 'vip-custom-name-text vip-color-orange !text-orange-700 dark:!text-orange-400 font-black'
+  },
+  {
+    id: 'amber',
+    label: 'Vàng Kim',
+    swatch: '#d97706',
+    cssClass: 'vip-custom-name-text vip-color-amber !text-amber-700 dark:!text-amber-300 font-black'
+  },
+  {
+    id: 'emerald',
+    label: 'Lục Bảo',
+    swatch: '#059669',
+    cssClass: 'vip-custom-name-text vip-color-emerald !text-emerald-700 dark:!text-emerald-400 font-black'
+  },
+  {
+    id: 'cyan',
+    label: 'Cyan Băng',
+    swatch: '#0891b2',
+    cssClass: 'vip-custom-name-text vip-color-cyan !text-cyan-700 dark:!text-cyan-300 font-black'
+  },
+  {
+    id: 'royal',
+    label: 'Sapphire',
+    swatch: '#2563eb',
+    cssClass: 'vip-custom-name-text vip-color-royal !text-blue-700 dark:!text-blue-400 font-black'
+  },
+  {
+    id: 'violet',
+    label: 'Tím Cyber',
+    swatch: '#9333ea',
+    cssClass: 'vip-custom-name-text vip-color-violet !text-purple-700 dark:!text-purple-300 font-black'
+  },
+  {
+    id: 'pink',
+    label: 'Hồng Neon',
+    swatch: '#db2777',
+    cssClass: 'vip-custom-name-text vip-color-pink !text-pink-700 dark:!text-pink-400 font-black'
+  }
+];
+
+export const VIP_NEON_COVER_THEMES = [
+  {
+    id: 'cyber_cyan',
+    name: 'Neon Cyan Băng',
+    desc: 'Viền xanh điện lạnh sắc nét',
+    swatchClass: 'bg-gradient-to-r from-cyan-400 via-sky-400 to-teal-300',
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#0EA5E9] shadow-[0_12px_32px_-8px_rgba(6,182,212,0.68)]',
+    seamBarClass: 'bg-gradient-to-r from-[#00F5D4] via-[#22D3EE] to-[#0EA5E9]',
+    cardAccentClass: 'ring-2 ring-cyan-400/80 border-cyan-400 shadow-[0_10px_24px_-8px_rgba(6,182,212,0.45)]'
+  },
+  {
+    id: 'neon_pink',
+    name: 'Neon Hồng Cyber',
+    desc: 'Viền hồng tím rực rỡ hiện đại',
+    swatchClass: 'bg-gradient-to-r from-pink-500 via-fuchsia-500 to-violet-500',
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#FF2E93] via-[#E879F9] to-[#7C3AED] shadow-[0_12px_32px_-8px_rgba(236,72,153,0.65)]',
+    seamBarClass: 'bg-gradient-to-r from-[#FF2E93] via-[#E879F9] to-[#7C3AED]',
+    cardAccentClass: 'ring-2 ring-pink-500/80 border-pink-400 shadow-[0_10px_24px_-8px_rgba(236,72,153,0.45)]'
+  },
+  {
+    id: 'emerald_volt',
+    name: 'Neon Lục Điện',
+    desc: 'Viền xanh ngọc phát sáng nổi bật',
+    swatchClass: 'bg-gradient-to-r from-emerald-400 via-teal-300 to-lime-300',
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#84CC16] shadow-[0_12px_32px_-8px_rgba(16,185,129,0.65)]',
+    seamBarClass: 'bg-gradient-to-r from-[#10B981] via-[#1EE1D6] to-[#84CC16]',
+    cardAccentClass: 'ring-2 ring-emerald-400/85 border-emerald-400 shadow-[0_10px_24px_-8px_rgba(16,185,129,0.45)]'
+  },
+  {
+    id: 'ruby_fire',
+    name: 'Neon Đỏ Hổ Phách',
+    desc: 'Viền đỏ rực năng lượng VIP',
+    swatchClass: 'bg-gradient-to-r from-red-500 via-rose-500 to-orange-400',
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#F97316] shadow-[0_12px_32px_-8px_rgba(239,68,68,0.65)]',
+    seamBarClass: 'bg-gradient-to-r from-[#EF4444] via-[#FB7185] to-[#F97316]',
+    cardAccentClass: 'ring-2 ring-rose-500/80 border-rose-400 shadow-[0_10px_24px_-8px_rgba(239,68,68,0.45)]'
+  },
+  {
+    id: 'solar_gold',
+    name: 'Neon Hoàng Kim',
+    desc: 'Viền vàng kim ánh sáng hoàng gia',
+    swatchClass: 'bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400',
+    frameWrapClass: 'vip-neon-frame bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB923C] shadow-[0_12px_32px_-8px_rgba(245,158,11,0.68)]',
+    seamBarClass: 'bg-gradient-to-r from-[#F59E0B] via-[#FDE047] to-[#FB923C]',
+    cardAccentClass: 'ring-2 ring-amber-400/85 border-amber-400 shadow-[0_10px_24px_-8px_rgba(245,158,11,0.45)]'
+  },
+  {
+    id: 'aurora_rgb',
+    name: 'Neon 7 Sắc Aurora',
+    desc: 'Viền đa sắc chuyển động mượt mà',
+    swatchClass: 'bg-gradient-to-r from-rose-500 via-amber-400 via-emerald-400 to-cyan-400',
+    frameWrapClass: 'vip-neon-frame vip-neon-aurora-frame shadow-[0_12px_34px_-8px_rgba(56,189,248,0.68)]',
+    seamBarClass: 'vip-neon-aurora-seam',
+    cardAccentClass: 'ring-2 ring-fuchsia-400/80 border-cyan-400 shadow-[0_10px_24px_-8px_rgba(168,85,247,0.45)]'
+  }
+];
+
+export function normalizeVipNameColor(raw) {
+  const clean = String(raw || '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(clean)) return clean.toLowerCase();
+  const matched = VIP_NAME_COLORS.find(c => c.id === clean.toLowerCase());
+  return matched ? matched.id : 'crimson';
+}
+
+export function getVipNameColorMeta(raw) {
+  const norm = normalizeVipNameColor(raw);
+  if (norm.startsWith('#')) {
+    return {
+      id: norm,
+      label: norm.toUpperCase(),
+      isCustomHex: true,
+      hex: norm,
+      swatch: norm,
+      cssClass: 'vip-custom-name-text font-black'
+    };
+  }
+  const preset = VIP_NAME_COLORS.find(c => c.id === norm) || VIP_NAME_COLORS[0];
+  return {
+    ...preset,
+    isCustomHex: false,
+    hex: preset.swatch
+  };
+}
+
+export function normalizeVipNeonCoverColor(raw) {
+  const clean = String(raw || '').trim().toLowerCase();
+  const matched = VIP_NEON_COVER_THEMES.find(t => t.id === clean);
+  return matched ? matched.id : 'cyber_cyan';
+}
+
+export function getVipNeonCoverMeta(raw) {
+  const norm = normalizeVipNeonCoverColor(raw);
+  return VIP_NEON_COVER_THEMES.find(t => t.id === norm) || VIP_NEON_COVER_THEMES[0];
+}
+
 export function resolveUserVipNameVisual(user, nowMs = Date.now()) {
+  const defaultColorMeta = getVipNameColorMeta('crimson');
+  const defaultNeonMeta = getVipNeonCoverMeta('cyber_cyan');
   if (!user || typeof user !== 'object') {
     return {
       isSuperAdmin: false,
       hasAieoVip: false,
       canToggleEffects: false,
       showRedName: false,
+      showNameColor: false,
+      nameColorValue: defaultColorMeta.id,
+      nameColorMeta: defaultColorMeta,
       showVipTag: false,
+      showNeonCover: false,
+      neonCoverColor: defaultNeonMeta.id,
+      neonCoverMeta: defaultNeonMeta,
       vipExpiresAt: 0
     };
   }
@@ -1262,14 +1447,25 @@ export function resolveUserVipNameVisual(user, nowMs = Date.now()) {
   const hasAieoVip = vipExpiresAt > nowMs;
   const canToggleEffects = hasAieoVip || isSuperAdmin;
   const defaultWhenActive = hasAieoVip;
-  const showRedName = canToggleEffects && (user.vipRedNameEnabled !== undefined ? Boolean(user.vipRedNameEnabled) : defaultWhenActive);
+  const showNameColor = canToggleEffects && (user.vipRedNameEnabled !== undefined ? Boolean(user.vipRedNameEnabled) : defaultWhenActive);
+  const nameColorValue = normalizeVipNameColor(user.vipNameColor || 'crimson');
+  const nameColorMeta = getVipNameColorMeta(nameColorValue);
   const showVipTag = canToggleEffects && (user.vipTagEnabled !== undefined ? Boolean(user.vipTagEnabled) : defaultWhenActive);
+  const showNeonCover = canToggleEffects && (user.vipNeonCoverEnabled !== undefined ? Boolean(user.vipNeonCoverEnabled) : defaultWhenActive);
+  const neonCoverColor = normalizeVipNeonCoverColor(user.vipNeonCoverColor || 'cyber_cyan');
+  const neonCoverMeta = getVipNeonCoverMeta(neonCoverColor);
   return {
     isSuperAdmin,
     hasAieoVip,
     canToggleEffects,
-    showRedName,
+    showRedName: showNameColor,
+    showNameColor,
+    nameColorValue,
+    nameColorMeta,
     showVipTag,
+    showNeonCover,
+    neonCoverColor,
+    neonCoverMeta,
     vipExpiresAt
   };
 }
@@ -1519,6 +1715,7 @@ export function hasCustomCoverPermission(user, nowMs = Date.now()) {
   if (!user || typeof user !== 'object') return false;
   if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
   if (user.role === 'teacher') return true;
+  if (hasActiveAieoVip(user, nowMs)) return true;
   const coverExp = Number(user.customCoverExpiresAt) || 0;
   if (coverExp > 0) return coverExp > nowMs;
   return Boolean(user.customCoverUnlocked);

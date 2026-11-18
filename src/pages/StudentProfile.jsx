@@ -58,12 +58,15 @@ import {
   AIEO_VIP_PRICE_VND,
   AVATAR_FRAMES,
   PROFILE_BANNERS,
+  VIP_NAME_COLORS,
+  VIP_NEON_COVER_THEMES,
   buildVietQrImageUrl,
   formatRemainingSubscriptionText,
   formatVndCurrency,
   getProfileBannerById,
   hasActiveAieoVip,
   hasCustomCoverPermission,
+  hasUnlockedAvatarFrame,
   normalizePaymentConfig,
   resolveStudentTitleSummary,
   resolveUserVipNameVisual,
@@ -172,6 +175,7 @@ export default function StudentProfile({
   const heroBanner = getProfileBannerById(student.profileBannerId);
   const studentHasCoverPermission = hasCustomCoverPermission(student);
   const studentHasAieoVip = hasActiveAieoVip(student);
+  const vipVisual = resolveUserVipNameVisual(student);
   const canUseCustomCover = canEditTargetInfo && (isTeacherViewer || studentHasCoverPermission);
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
   const unlockPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
@@ -354,61 +358,209 @@ export default function StudentProfile({
     if (!isSelf || (!studentHasAieoVip && !isTargetSystemAdmin) || !handleUpdateUserProfileFields) {
       return null;
     }
-    const { showRedName: redOn, showVipTag: tagOn } = resolveUserVipNameVisual(student);
+    const {
+      showNameColor: colorOn,
+      nameColorValue,
+      nameColorMeta,
+      showVipTag: tagOn,
+      showNeonCover: neonOn,
+      neonCoverColor,
+      neonCoverMeta
+    } = vipVisual;
+
+    const saveVipPatch = (patch) => {
+      handleUpdateUserProfileFields(student.username, {
+        ...patch,
+        vipEffectsCustomizedAt: Date.now()
+      });
+    };
+
     return (
-      <div className="mt-4 pt-4 border-t border-rose-200/80 dark:border-rose-500/30 space-y-2.5">
+      <div className="mt-4 pt-4 border-t border-rose-200/80 dark:border-rose-500/30 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-extrabold text-rose-800 dark:text-rose-200 flex items-center gap-1.5">
             <Crown className="w-4 h-4 text-amber-500" />
-            Tùy Chỉnh Hiển Thị Ai eo VIP (Bật / Tắt Độc Lập)
+            Tùy Chỉnh Hiển Thị Ai eo VIP (Màu Chữ Tên · Viền Bìa Neon · Nhãn AIEOVIP)
           </p>
-          <span className="text-[11px] bg-white/90 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-rose-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-            Xem trước: <VipMemberName user={student} fallbackName={student.name} badgeSize="xs" />
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={redOn}
-            onClick={() =>
-              handleUpdateUserProfileFields(student.username, {
-                vipRedNameEnabled: !redOn,
-                vipEffectsCustomizedAt: Date.now(),
-                customToast: !redOn
-                  ? 'Đã BẬT màu chữ ĐỎ VIP cho tên hiển thị!'
-                  : 'Đã TẮT màu chữ đỏ VIP.'
-              })
-            }
-            className={`p-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition ${
-              redOn
-                ? 'bg-red-50/90 dark:bg-red-500/15 border-red-300 dark:border-red-500/40'
-                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            <div>
-              <p className="text-xs font-extrabold text-slate-900 dark:text-white">Màu Chữ Đỏ VIP</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Hiện tên màu đỏ nổi bật trên Navbar, Hồ sơ &amp; BXH
-              </p>
-            </div>
-            <span
-              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${
-                redOn ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {redOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+          <div className="flex items-center gap-2 flex-wrap">
+            {neonOn && (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-cyan-200 dark:border-cyan-500/40 shadow-xs">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${neonCoverMeta.swatchClass}`} />
+                <span>Viền Bìa: {neonCoverMeta.name}</span>
+              </span>
+            )}
+            <span className="text-[11px] bg-white/90 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-rose-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              Xem trước: <VipMemberName user={student} fallbackName={student.name} badgeSize="xs" />
             </span>
-          </button>
+          </div>
+        </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
+          {/* 1. Custom VIP Name Text Color */}
+          <div className={`p-3 rounded-2xl border space-y-2.5 transition ${
+            colorOn
+              ? 'bg-rose-50/75 dark:bg-slate-800/85 border-rose-300 dark:border-rose-500/40'
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+          }`}>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={colorOn}
+              onClick={() =>
+                saveVipPatch({
+                  vipRedNameEnabled: !colorOn,
+                  customToast: !colorOn
+                    ? `Đã BẬT màu chữ VIP (${nameColorMeta.label})!`
+                    : 'Đã TẮT màu chữ nổi bật VIP.'
+                })
+              }
+              className="w-full text-left flex items-center justify-between gap-2"
+            >
+              <div>
+                <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Đổi Màu Chữ Tên VIP</span>
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Chọn màu chữ bất kỳ cho tên trên Navbar, Hồ sơ &amp; BXH
+                </p>
+              </div>
+              <span
+                className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                  colorOn ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {colorOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+              </span>
+            </button>
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/70 dark:border-slate-700/70">
+              {VIP_NAME_COLORS.map(preset => {
+                const selected = nameColorValue === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    title={`Màu chữ: ${preset.label}`}
+                    aria-label={`Chọn màu chữ ${preset.label}`}
+                    onClick={() =>
+                      saveVipPatch({
+                        vipRedNameEnabled: true,
+                        vipNameColor: preset.id,
+                        customToast: `Đã đổi màu chữ tên sang ${preset.label}!`
+                      })
+                    }
+                    className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                      selected
+                        ? 'border-slate-900 dark:border-white ring-2 ring-offset-1 ring-slate-400 scale-110'
+                        : 'border-white dark:border-slate-800 shadow-xs'
+                    }`}
+                    style={{ backgroundColor: preset.swatch }}
+                  />
+                );
+              })}
+              <label
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-extrabold cursor-pointer transition ${
+                  nameColorMeta.isCustomHex
+                    ? 'border-slate-900 dark:border-white bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-500'
+                }`}
+                title="Tự chọn mã màu bất kỳ (Hex)"
+              >
+                <input
+                  type="color"
+                  aria-label="Tự chọn màu chữ tùy ý"
+                  value={nameColorMeta.isCustomHex ? nameColorMeta.hex : nameColorMeta.hex}
+                  onChange={e =>
+                    saveVipPatch({
+                      vipRedNameEnabled: true,
+                      vipNameColor: e.target.value,
+                      customToast: `Đã đổi màu chữ tên sang mã ${e.target.value.toUpperCase()}!`
+                    })
+                  }
+                  className="w-3.5 h-3.5 rounded-full border-0 p-0 bg-transparent cursor-pointer"
+                />
+                <span>{nameColorMeta.isCustomHex ? nameColorMeta.label : 'Tự chọn'}</span>
+              </label>
+            </div>
+          </div>
+
+          {/* 2. Neon Cover Border */}
+          <div className={`p-3 rounded-2xl border space-y-2.5 transition ${
+            neonOn
+              ? 'bg-cyan-50/75 dark:bg-cyan-950/25 border-cyan-300 dark:border-cyan-500/45'
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+          }`}>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={neonOn}
+              onClick={() =>
+                saveVipPatch({
+                  vipNeonCoverEnabled: !neonOn,
+                  customToast: !neonOn
+                    ? `Đã BẬT Viền Bìa Màu Neon (${neonCoverMeta.name})!`
+                    : 'Đã TẮT Viền Bìa Neon.'
+                })
+              }
+              className="w-full text-left flex items-center justify-between gap-2"
+            >
+              <div>
+                <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
+                  <span>Viền Bìa Màu Neon VIP</span>
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Phát sáng viền Neon quanh ảnh bìa hồ sơ &amp; danh bạ lớp
+                </p>
+              </div>
+              <span
+                className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                  neonOn ? 'bg-cyan-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                {neonOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+              </span>
+            </button>
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/70 dark:border-slate-700/70">
+              {VIP_NEON_COVER_THEMES.map(theme => {
+                const selected = neonCoverColor === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    title={`${theme.name} — ${theme.desc}`}
+                    onClick={() =>
+                      saveVipPatch({
+                        vipNeonCoverEnabled: true,
+                        vipNeonCoverColor: theme.id,
+                        customToast: `Đã bật viền bìa ${theme.name}!`
+                      })
+                    }
+                    className={`h-7 px-2.5 rounded-full text-[10px] font-extrabold transition inline-flex items-center gap-1.5 border ${
+                      selected
+                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white shadow-xs'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                    }`}
+                  >
+                    <span className={`w-3 h-3 rounded-full shrink-0 ${theme.swatchClass}`} />
+                    <span>{theme.name.replace('Neon ', '')}</span>
+                    {selected && <Check className="w-2.5 h-2.5 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. AIEOVIP Badge Toggle */}
           <button
             type="button"
             role="switch"
             aria-checked={tagOn}
             onClick={() =>
-              handleUpdateUserProfileFields(student.username, {
+              saveVipPatch({
                 vipTagEnabled: !tagOn,
-                vipEffectsCustomizedAt: Date.now(),
                 customToast: !tagOn
                   ? 'Đã BẬT huy hiệu AIEOVIP bên cạnh tên!'
                   : 'Đã TẮT huy hiệu AIEOVIP.'
@@ -421,7 +573,10 @@ export default function StudentProfile({
             }`}
           >
             <div>
-              <p className="text-xs font-extrabold text-slate-900 dark:text-white">Nhãn AIEOVIP Cạnh Tên</p>
+              <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5 text-amber-500" />
+                <span>Nhãn AIEOVIP Cạnh Tên</span>
+              </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Hiện huy hiệu AIEOVIP ánh kim bên cạnh tên của bạn
               </p>
@@ -467,10 +622,20 @@ export default function StudentProfile({
       </div>
 
       {/* Facebook-Style Profile Header: Wide Bright Cover Banner Above + Separate Clean Info Section Below */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-rose-200/85 dark:border-slate-800 shadow-lg overflow-hidden mb-7">
+      <div
+        className={
+          vipVisual.showNeonCover
+            ? `rounded-3xl p-[3px] mb-7 transition-all ${vipVisual.neonCoverMeta.frameWrapClass}`
+            : 'bg-white dark:bg-slate-900 rounded-3xl border border-rose-200/85 dark:border-slate-800 shadow-lg overflow-hidden mb-7'
+        }
+      >
         {/* 1. Large Cover Photo / Banner Stage (zero dark fog so bright wallpapers stay crisp & vivid) */}
         <div
-          className={`relative w-full h-52 sm:h-64 lg:h-72 overflow-hidden border-b border-slate-200/75 dark:border-slate-800 ${
+          className={`relative w-full h-52 sm:h-64 lg:h-72 overflow-hidden ${
+            vipVisual.showNeonCover
+              ? 'rounded-t-[21px]'
+              : 'border-b border-slate-200/75 dark:border-slate-800'
+          } ${
             hasCustomCover ? 'bg-slate-100 dark:bg-slate-800' : heroBanner.heroClass
           }`}
         >
@@ -515,10 +680,13 @@ export default function StudentProfile({
               </button>
             </div>
           )}
+          {vipVisual.showNeonCover && (
+            <div className={`absolute bottom-0 inset-x-0 h-[3px] pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
+          )}
         </div>
 
         {/* 2. Separate Profile Info & Controls Section Below Cover */}
-        <div className="px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900">
+        <div className={`px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[21px]' : ''}`}>
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 min-w-0">
               {/* Overlapping Large Avatar */}
@@ -1495,7 +1663,7 @@ export default function StudentProfile({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                  • Danh hiệu <b>👑 Ai eo VIP</b> • Tạo phòng Đấu Trường bạn bè (tùy chỉnh số người &amp; chia Team) • Tên Đỏ + Nhãn <b>AIEOVIP</b>.
+                  • Đổi <b>Màu Chữ Tên</b> tùy chọn &amp; Nhãn <b>AIEOVIP</b> • <b>Viền Bìa Màu Neon</b> + Tặng miễn phí <b>Ảnh Nền Cá Nhân</b> (5k/1T) • <b>3 Khung Avatar Neon VIP</b> • Tạo phòng Đấu Trường bạn bè vô hạn (chia Team) • Danh hiệu <b>👑 Ai eo VIP</b>.
                 </p>
                 <p className={`text-[11px] font-bold ${studentHasAieoVip ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
                   {studentHasAieoVip
@@ -1546,11 +1714,13 @@ export default function StudentProfile({
                   {studentHasCoverPermission
                     ? coverRemainingText
                       ? `✓ Đang mở (${coverRemainingText})`
+                      : studentHasAieoVip
+                      ? `✓ Đã gồm miễn phí trong Ai eo VIP (${aieoVipRemainingText || '30 ngày'})`
                       : '✓ Đang mở khóa'
                     : 'Chưa mở khóa'}
                 </p>
               </div>
-              {isSelf && (
+              {isSelf && !studentHasAieoVip && (
                 <button
                   type="button"
                   onClick={() =>
@@ -1567,6 +1737,15 @@ export default function StudentProfile({
                   {studentHasCoverPermission && student.customCoverExpiresAt > 0
                     ? `Gia hạn +30N (${unlockPriceLabel})`
                     : `Mở Ảnh Nền (${unlockPriceLabel})`}
+                </button>
+              )}
+              {isSelf && studentHasAieoVip && (
+                <button
+                  type="button"
+                  onClick={openCustomizeModal}
+                  className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition"
+                >
+                  Đổi Ảnh Bìa Ngay
                 </button>
               )}
             </div>
@@ -2067,6 +2246,7 @@ export default function StudentProfile({
                   const isMemberTeacher = !isMemberAdmin && member.role === 'teacher';
                   const isMeChip = member.username === currentUser?.username;
                   const mBest = bestBandByStudent.get(member.username) ?? null;
+                  const memberVipVisual = resolveUserVipNameVisual(member);
 
                   return (
                     <button
@@ -2081,6 +2261,8 @@ export default function StudentProfile({
                           ? isMemberAdmin
                             ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-2 ring-purple-500/20'
                             : 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                          : memberVipVisual.showNeonCover
+                          ? `bg-white dark:bg-slate-900 ${memberVipVisual.neonCoverMeta.cardAccentClass}`
                           : isMemberAdmin
                           ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-200 dark:border-purple-500/30 hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800'
                           : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]/50 hover:bg-white dark:hover:bg-slate-800'
@@ -2517,9 +2699,19 @@ export default function StudentProfile({
                   avatarFrameId: customDraft.avatarFrameId
                 };
                 return (
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                  <div
+                    className={
+                      vipVisual.showNeonCover
+                        ? `rounded-2xl p-[2.5px] ${vipVisual.neonCoverMeta.frameWrapClass}`
+                        : 'rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm'
+                    }
+                  >
                     <div
-                      className={`h-24 w-full overflow-hidden border-b border-slate-200/80 dark:border-slate-700 ${
+                      className={`relative h-24 w-full overflow-hidden ${
+                        vipVisual.showNeonCover
+                          ? 'rounded-t-[13px]'
+                          : 'border-b border-slate-200/80 dark:border-slate-700'
+                      } ${
                         previewCoverOk ? 'bg-slate-100 dark:bg-slate-800' : previewBanner.heroClass
                       }`}
                     >
@@ -2530,8 +2722,11 @@ export default function StudentProfile({
                           className="w-full h-full object-cover object-center"
                         />
                       )}
+                      {vipVisual.showNeonCover && (
+                        <div className={`absolute bottom-0 inset-x-0 h-[2.5px] ${vipVisual.neonCoverMeta.seamBarClass}`} />
+                      )}
                     </div>
-                    <div className="px-4 pb-3.5 pt-2 flex items-end gap-3">
+                    <div className={`px-4 pb-3.5 pt-2 flex items-end gap-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[13px]' : ''}`}>
                       <div className="-mt-8 p-1 rounded-full bg-white dark:bg-slate-900 shadow-md shrink-0">
                         <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-full" />
                       </div>
@@ -2674,17 +2869,31 @@ export default function StudentProfile({
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {AVATAR_FRAMES.map(frame => {
                     const active = (customDraft.avatarFrameId || 'none') === frame.id;
+                    const frameAllowed = hasUnlockedAvatarFrame(student, frame.id);
                     return (
                       <button
                         key={frame.id}
                         type="button"
-                        onClick={() => setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }))}
-                        className={`p-2 rounded-2xl border flex flex-col items-center gap-1.5 transition ${
-                          active
+                        onClick={() => {
+                          if (!frameAllowed) {
+                            showToast?.('Khung Avatar Neon thuộc đặc quyền Gói Ai eo VIP (80k/1T)!', 'info');
+                            return;
+                          }
+                          setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }));
+                        }}
+                        className={`relative p-2 rounded-2xl border flex flex-col items-center gap-1.5 transition ${
+                          !frameAllowed
+                            ? 'border-amber-200 dark:border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/15 opacity-75'
+                            : active
                             ? 'border-[#007A7A] bg-[#EDFFFD] dark:bg-teal-950/35 ring-2 ring-[#007A7A]/25'
                             : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
                         }`}
                       >
+                        {frame.vipOnly && (
+                          <span className="absolute -top-1.5 right-1 px-1.5 py-0.2 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-[8px] font-black text-white shadow-2xs">
+                            VIP
+                          </span>
+                        )}
                         <span className={`w-7 h-7 rounded-full ${frame.previewBg} ${frame.id !== 'none' ? frame.ringClass : ''}`} />
                         <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate max-w-full">{frame.name}</span>
                       </button>

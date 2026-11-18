@@ -11,7 +11,7 @@ export default function VipMemberName({
   showVipBadge = true
 }) {
   const displayName = user?.name || fallbackName || user?.username || '';
-  const { showRedName, showVipTag } = resolveUserVipNameVisual(user);
+  const { showNameColor, nameColorMeta, showVipTag } = resolveUserVipNameVisual(user);
 
   const badgeCls =
     badgeSize === 'xs'
@@ -22,8 +22,9 @@ export default function VipMemberName({
     <span className={`inline-flex items-center gap-1.5 flex-wrap min-w-0 ${className}`}>
       <span
         className={`${nameClassName} ${
-          showRedName ? 'vip-red-name-text !text-red-600 dark:!text-red-400 font-black' : ''
+          showNameColor ? nameColorMeta.cssClass : ''
         }`}
+        style={showNameColor && nameColorMeta.isCustomHex ? { color: nameColorMeta.hex, fontWeight: 900 } : undefined}
       >
         {displayName}
       </span>

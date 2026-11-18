@@ -245,7 +245,7 @@ export default function CoverCheckoutModal({
                   : isRoomTicketOrder
                   ? `Tài khoản @${currentUser?.username} đã nhận +1 lượt tạo Phòng Đấu Trường Bạn Bè (hiện có ${Math.max(1, Number(currentUser?.roomCreateCredits) || 1)} lượt).`
                   : isAieoVipOrder
-                  ? `Tài khoản @${currentUser?.username} đã sở hữu Gói Ai eo VIP 1 tháng: Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè (tùy chỉnh số người & chia Team) & Màu Chữ Đỏ + Nhãn AIEOVIP!`
+                  ? `Tài khoản @${currentUser?.username} đã sở hữu Gói Ai eo VIP 1 tháng: Đổi Màu Chữ Tên + Nhãn AIEOVIP, Viền Bìa Màu Neon, Ảnh Bìa Cá Nhân miễn phí, 3 Khung Avatar Neon, Danh hiệu 👑 Ai eo VIP & Tạo phòng Game Team cùng bạn bè!`
                   : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`}
               </p>
               <p className="text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100/75 dark:bg-amber-500/15 border border-amber-300/70 dark:border-amber-500/30 rounded-xl px-3.5 py-2 leading-relaxed">

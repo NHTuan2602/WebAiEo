@@ -22,16 +22,16 @@ export default function VipPromoPopupModal({
 
   const vipPerks = [
     {
-      title: 'Tên Hiển Thị Màu Đỏ Rực + Huy Hiệu AIEOVIP',
-      desc: 'Nổi bật trên Navbar, Hồ sơ, Đấu Trường Từ Vựng & Bảng Xếp Hạng (bật/tắt độc lập trong Hồ sơ).'
+      title: 'Tự Do Đổi Màu Chữ Tên + Huy Hiệu AIEOVIP',
+      desc: 'Chọn màu chữ bất kỳ từ bảng màu VIP & mã Hex riêng + huy hiệu AIEOVIP nổi bật trên Navbar, Hồ sơ & BXH.'
     },
     {
-      title: 'Tạo Phòng Đấu Trường Riêng Cùng Bạn Bè (Không Giới Hạn)',
-      desc: 'Tùy chỉnh số người chơi (2–30 người), chia 2–4 Team thi đấu đối kháng trực tiếp suốt 30 ngày.'
+      title: 'Viền Bìa Màu Neon + Tặng Miễn Phí Ảnh Bìa Cá Nhân',
+      desc: '6 hiệu ứng Viền Bìa Neon (kể cả Aurora 7 sắc), miễn phí tải Ảnh Bìa Riêng (5k/1T) & mở khóa 3 Khung Avatar Neon VIP.'
     },
     {
-      title: 'Danh Hiệu Độc Quyền 👑 Ai Eo VIP + Hào Quang Avatar',
-      desc: 'Tự động kích hoạt danh hiệu 1 tháng và hiệu ứng tỏa sáng cho nhân vật hồ sơ.'
+      title: 'Tạo Phòng Đấu Trường Riêng Cùng Bạn Bè + Danh Hiệu VIP',
+      desc: 'Tùy chỉnh 2–30 người, chia 2–4 Team thi đấu không giới hạn suốt 30 ngày & đeo danh hiệu 👑 Ai Eo VIP.'
     }
   ];
 
