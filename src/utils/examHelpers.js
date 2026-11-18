@@ -2,9 +2,11 @@ import { ShieldAlert, CheckCircle, AlertTriangle } from 'lucide-react';
 import {
   DEFAULT_VOCAB_TEXT,
   FALLBACK_DISTRACTORS,
+  FALLBACK_LEXICAL_POOL,
   GAME_ROUND_TIME_LIMITS,
-  GAME_SPEED_OFFSETS
-} from '../constants/seedData';
+  GAME_SPEED_OFFSETS,
+  VOCAB_LEXICAL_RELATIONS
+} from '../constants/seedData.js';
 
 const LISTENING_40_THRESHOLDS = [
   [39, 9.0], [37, 8.5], [35, 8.0], [32, 7.5], [30, 7.0],
@@ -43,6 +45,20 @@ export function roundIeltsBand(score) {
   return Math.min(9.0, Math.round((num + 1e-9) * 2) / 2);
 }
 
+/** Round IELTS Writing/Speaking individual criterion band (or Speaking overall) strictly to whole integer 1..9 (0 if empty). */
+export function roundWholeBand(score) {
+  const num = Number(score);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return Math.min(9, Math.max(1, Math.round(num)));
+}
+
+/** Round IELTS Writing band strictly DOWN to nearest 0.5 step (e.g. 6.66 -> 6.5, 6.25 -> 6.0). */
+export function roundDownIeltsHalfBand(score) {
+  const num = Number(score);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  return Math.min(9.0, Math.floor((num + 1e-9) * 2) / 2);
+}
+
 /** Generate a collision-free attempt ID across concurrent multi-student submissions. */
 export function createUniqueAttemptId(prefix = 'att', username = 'std') {
   const cleanPrefix = String(prefix || 'att').replace(/[^a-zA-Z0-9_-]/g, '') || 'att';
@@ -54,12 +70,12 @@ export function createUniqueAttemptId(prefix = 'att', username = 'std') {
   return `${cleanPrefix}-${cleanUser}-${Date.now()}-${rand}`;
 }
 
-/** Compute official IELTS Writing band (Task 2 weighted 2x Task 1, rounded to 0.5). */
+/** Compute official IELTS Writing band ((Task 1 + Task 2 * 2) / 3, rounded DOWN to nearest 0.5 step). */
 export function calculateWritingBand(task1Band, task2Band) {
   const t1 = Math.min(9.0, Math.max(0, Number(task1Band) || 0));
   const t2 = Math.min(9.0, Math.max(0, Number(task2Band) || 0));
   if (t1 === 0 && t2 === 0) return 0;
-  return roundIeltsBand((t1 + t2 * 2) / 3);
+  return roundDownIeltsHalfBand((t1 + t2 * 2) / 3);
 }
 
 /** Compute official IELTS Overall band from active tested skill bands (rounded to 0.5). */
@@ -103,19 +119,97 @@ export function getSpeedAdjustedTimeLimit(roundNum, speedMode = 'normal') {
   return Math.max(8, base + offset);
 }
 
-// Shared answer checker supporting multi-variant IELTS fill-in-the-blank keys (e.g. "15 | fifteen" or "color / colour")
+// Canonical Reading (11 IELTS formats) & Listening (6 IELTS formats) question catalog
+export const READING_QUESTION_TYPES = [
+  { id: 'mcq', label: '1. Multiple Choice (Trắc nghiệm ABCD)', shortLabel: 'Multiple Choice', answerKind: 'choice', defaultOptions: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'] },
+  { id: 'tfng', label: '2. True / False / Not Given (hoặc Y/N/NG)', shortLabel: 'T / F / NG', answerKind: 'choice', defaultOptions: ['TRUE', 'FALSE', 'NOT GIVEN'] },
+  { id: 'matching_headings', label: '3. Matching Headings (Nối tiêu đề i, ii, iii...)', shortLabel: 'Matching Headings', answerKind: 'choice', defaultOptions: ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii'] },
+  { id: 'matching_information', label: '4. Matching Information (Nối đoạn A, B, C...)', shortLabel: 'Matching Info', answerKind: 'choice', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F'] },
+  { id: 'matching_features', label: '5. Matching Features (Nối đặc điểm / tên A-E)', shortLabel: 'Matching Features', answerKind: 'choice', defaultOptions: ['A', 'B', 'C', 'D', 'E'] },
+  { id: 'summary_box', label: '6. Summary Completion (Summary Box - Chọn từ)', shortLabel: 'Summary Box', answerKind: 'hybrid', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], wordLimit: 'CHỌN ĐÁP ÁN TRONG HỘP (A–H)' },
+  { id: 'summary_nobox', label: '7. Summary Completion – No Box (Điền từ tóm tắt)', shortLabel: 'Summary (No Box)', answerKind: 'text', defaultOptions: [], wordLimit: 'ONE WORD ONLY' },
+  { id: 'correct_ending', label: '8. Matching Sentence Endings (Correct Ending)', shortLabel: 'Correct Ending', answerKind: 'choice', defaultOptions: ['A. Ending A', 'B. Ending B', 'C. Ending C', 'D. Ending D', 'E. Ending E'] },
+  { id: 'fill', label: '9. Fill in the Blank (Điền từ vào chỗ trống)', shortLabel: 'Fill in the Blank', answerKind: 'text', defaultOptions: [], wordLimit: 'ONE WORD AND/OR A NUMBER' },
+  { id: 'diagram_label', label: '10. Diagram Label Completion (Điền nhãn sơ đồ)', shortLabel: 'Diagram Label', answerKind: 'hybrid', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS' },
+  { id: 'short_answer', label: '11. Short Answer Questions (Trả lời câu hỏi ngắn)', shortLabel: 'Short Answer', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN THREE WORDS AND/OR A NUMBER' }
+];
+
+export const LISTENING_QUESTION_TYPES = [
+  { id: 'form_completion', label: '1. Form Completion (Hoàn thành biểu mẫu)', shortLabel: 'Form Completion', answerKind: 'text', defaultOptions: [], wordLimit: 'ONE WORD AND/OR A NUMBER' },
+  { id: 'flowchart_completion', label: '2. Flow-chart Completion (Hoàn thành lưu đồ)', shortLabel: 'Flow-chart', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS' },
+  { id: 'mcq', label: '3. Multiple Choice (Trắc nghiệm)', shortLabel: 'Multiple Choice', answerKind: 'choice', defaultOptions: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C'] },
+  { id: 'matching', label: '4. Matching (Nối thông tin A–H)', shortLabel: 'Matching', answerKind: 'choice', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F'] },
+  { id: 'map_diagram', label: '5. Map / Plan / Diagram Labelling (Dán nhãn bản đồ)', shortLabel: 'Map / Diagram', answerKind: 'hybrid', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], wordLimit: 'CHỌN CHỮ CÁI TRÊN BẢN ĐỒ' },
+  { id: 'short_answer', label: '6. Short Answer Questions (Trả lời câu hỏi ngắn)', shortLabel: 'Short Answer', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS AND/OR A NUMBER' }
+];
+
+const ALL_QUESTION_TYPE_MAP = new Map(
+  [...READING_QUESTION_TYPES, ...LISTENING_QUESTION_TYPES].map(item => [item.id, item])
+);
+
+export function getQuestionTypesForSkill(skill = 'reading') {
+  return skill === 'listening' ? LISTENING_QUESTION_TYPES : READING_QUESTION_TYPES;
+}
+
+export function getQuestionTypeMeta(type = 'mcq', skill = 'reading') {
+  const list = getQuestionTypesForSkill(skill);
+  return list.find(t => t.id === type) || ALL_QUESTION_TYPE_MAP.get(type) || READING_QUESTION_TYPES[0];
+}
+
+export function buildDefaultQuestionFields(type = 'mcq', skill = 'reading', prevOptions = null) {
+  const meta = getQuestionTypeMeta(type, skill);
+  if (meta.answerKind === 'text') {
+    return {
+      type: meta.id,
+      options: [],
+      correctAnswer: '',
+      wordLimit: meta.wordLimit || ''
+    };
+  }
+  const hasCustomOpts = Array.isArray(prevOptions) && prevOptions.length >= 2 && meta.id === 'mcq';
+  const nextOptions = hasCustomOpts ? [...prevOptions] : [...(meta.defaultOptions || [])];
+  return {
+    type: meta.id,
+    options: nextOptions,
+    correctAnswer: nextOptions[0] || '',
+    wordLimit: meta.wordLimit || ''
+  };
+}
+
+function extractLeadingOptionCode(val = '') {
+  const m = String(val || '').trim().match(/^([ivxlcdm]+|[A-Za-z])(?:\s*[.):\-–]\s+|\s*$)/);
+  return m ? m[1].toLowerCase() : '';
+}
+
+// Shared answer checker supporting all 11 Reading + 6 Listening IELTS types & multi-variant keys (e.g. "15 | fifteen" or "color / colour")
 export function isObjectiveAnswerCorrect(question, userRaw) {
   const normalizedUser = String(userRaw ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
   const normalizedKey = String(question?.correctAnswer ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
   if (!normalizedUser || !normalizedKey) return false;
-  if (question?.type === 'mcq' || question?.type === 'tfng' || !/[|/]/.test(normalizedKey)) {
-    return normalizedUser === normalizedKey;
+
+  if (normalizedUser === normalizedKey) return true;
+
+  const hasVariants = /[|/]/.test(normalizedKey);
+  if (hasVariants && question?.type !== 'mcq' && question?.type !== 'tfng') {
+    const acceptedVariants = normalizedKey
+      .split(/[|/]/)
+      .map(part => part.trim().replace(/\s+/g, ' '))
+      .filter(Boolean);
+    if (acceptedVariants.includes(normalizedUser)) return true;
   }
-  const acceptedVariants = normalizedKey
-    .split(/[|/]/)
-    .map(part => part.trim().replace(/\s+/g, ' '))
-    .filter(Boolean);
-  return acceptedVariants.includes(normalizedUser);
+
+  // Also allow matching code shorthand (e.g. key "B" matches selected option "B. Heading Two" and vice versa)
+  const userCode = extractLeadingOptionCode(userRaw);
+  const keyCode = extractLeadingOptionCode(question?.correctAnswer);
+  if (
+    userCode &&
+    keyCode &&
+    userCode === keyCode &&
+    (normalizedKey === keyCode || normalizedUser === userCode)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function buildRoomInviteLink(pin) {
@@ -216,6 +310,22 @@ export function shuffleArrayWithSeed(items, seedStr) {
   return arr;
 }
 
+function buildDefaultLexicalCollocation(word, example = '') {
+  const lowerW = String(word || '').toLowerCase();
+  const cleanEx = String(example || '').trim();
+  if (cleanEx) {
+    const words = cleanEx.replace(/[.,!?;:"'()]/g, '').split(/\s+/).filter(Boolean);
+    const idx = words.findIndex(w => w.toLowerCase() === lowerW);
+    if (idx !== -1) {
+      const start = Math.max(0, idx - 1);
+      const end = Math.min(words.length, idx + 3);
+      const phrase = words.slice(start, end).join(' ');
+      if (phrase.split(/\s+/).length >= 2) return phrase;
+    }
+  }
+  return `effectively apply ${lowerW}`;
+}
+
 export function parseRawVocabText(rawText, seedStr = null) {
   const lines = String(rawText || '').split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
   const parsedItems = [];
@@ -233,30 +343,73 @@ export function parseRawVocabText(rawText, seedStr = null) {
     const cleanPrompt = (parts[1] || '').trim();
     const cleanIpa = (parts[2] || '').trim();
     const cleanExample = (parts[3] || '').trim();
+    const pipeSyn = (parts[4] || '').trim().toUpperCase();
+    const pipeAnt = (parts[5] || '').trim().toUpperCase();
+    const pipeColloc = (parts[6] || '').trim();
+    const pipeDef = (parts[7] || '').trim();
 
     if (cleanWord && cleanPrompt && !seenWords.has(cleanWord)) {
       seenWords.add(cleanWord);
+      const dict = VOCAB_LEXICAL_RELATIONS[cleanWord] || null;
+      const exampleText = cleanExample || `Ghi nhớ cách dùng từ "${cleanWord}" trong bài thi IELTS.`;
       parsedItems.push({
         word: cleanWord,
         prompt: cleanPrompt,
         ipa: cleanIpa || '',
-        example: cleanExample || `Ghi nhớ cách dùng từ "${cleanWord}" trong bài thi IELTS.`,
-        distractors: []
+        example: exampleText,
+        syn: pipeSyn || dict?.syn || cleanWord,
+        ant: pipeAnt || dict?.ant || '',
+        def: pipeDef || dict?.def || `Relating accurately to: ${cleanPrompt}`,
+        collocation: pipeColloc || dict?.collocation || buildDefaultLexicalCollocation(cleanWord, exampleText),
+        distractors: [],
+        synDistractors: [],
+        antDistractors: [],
+        defDistractors: [],
+        collocationDistractors: []
       });
     }
   });
 
   const allWords = parsedItems.map(item => item.word);
-  parsedItems.forEach(item => {
-    let pool = allWords.filter(w => w !== item.word);
-    for (let fb of FALLBACK_DISTRACTORS) {
-      if (pool.length >= 8) break;
-      if (fb !== item.word && !pool.includes(fb)) pool.push(fb);
+  const allSyns = parsedItems.map(item => item.syn).filter(Boolean);
+  const allAnts = parsedItems.map(item => item.ant).filter(Boolean);
+  const allDefs = parsedItems.map(item => item.def).filter(Boolean);
+  const allCollocs = parsedItems.map(item => item.collocation).filter(Boolean);
+
+  parsedItems.forEach((item, idx) => {
+    const orderList = (pool, tag) =>
+      seedStr
+        ? shuffleArrayWithSeed(pool, `${seedStr}:${tag}:${item.word}`)
+        : [...pool].sort(() => Math.random() - 0.5);
+
+    let wordPool = allWords.filter(w => w !== item.word);
+    for (const fb of FALLBACK_DISTRACTORS) {
+      if (wordPool.length >= 8) break;
+      if (fb !== item.word && !wordPool.includes(fb)) wordPool.push(fb);
     }
-    const orderedPool = seedStr
-      ? shuffleArrayWithSeed(pool, `${seedStr}:dist:${item.word}`)
-      : [...pool].sort(() => Math.random() - 0.5);
-    item.distractors = orderedPool.slice(0, 4);
+    item.distractors = orderList(wordPool, 'dist').slice(0, 4);
+
+    let synPool = [...new Set([...allSyns, ...allWords, ...(FALLBACK_LEXICAL_POOL.synonyms || [])])].filter(
+      s => s && s !== item.syn && s !== item.word
+    );
+    item.synDistractors = orderList(synPool, 'syn').slice(0, 3);
+
+    let antPool = [...new Set([...allAnts, ...allWords, ...(FALLBACK_LEXICAL_POOL.antonyms || [])])].filter(
+      s => s && s !== item.ant && s !== item.word
+    );
+    item.antDistractors = orderList(antPool, 'ant').slice(0, 3);
+
+    let defPool = [...new Set([...allDefs, ...(FALLBACK_LEXICAL_POOL.definitions || [])])].filter(
+      d => d && d !== item.def
+    );
+    item.defDistractors = orderList(defPool, 'def').slice(0, 3);
+
+    let collocPool = [...new Set([...allCollocs, ...(FALLBACK_LEXICAL_POOL.collocations || [])])].filter(
+      c => c && c !== item.collocation && !c.toLowerCase().includes(item.word.toLowerCase())
+    );
+    item.collocationDistractors = orderList(collocPool, 'col').slice(0, 3);
+
+    item._idx = idx;
   });
 
   return parsedItems;
@@ -528,6 +681,55 @@ export function normalizeRoomObject(room, pinKey, now = Date.now()) {
   };
 }
 
+function decorateV3Question(item, idx, seedStr) {
+  const modes = item.ant ? ['syn', 'ant', 'def'] : ['syn', 'def'];
+  const mode = modes[idx % modes.length];
+  if (mode === 'ant' && item.ant) {
+    const choices = shuffleArrayWithSeed([item.ant, ...(item.antDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}`);
+    return {
+      ...item,
+      v3Mode: 'ant',
+      v3Badge: 'TRÁI NGHĨA (ANTONYM)',
+      v3Question: `Chọn từ TRÁI NGHĨA với "${item.word}" (${item.prompt})`,
+      v3Target: item.ant,
+      v3Choices: choices
+    };
+  }
+  if (mode === 'syn' && item.syn && item.syn !== item.word) {
+    const choices = shuffleArrayWithSeed([item.syn, ...(item.synDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}`);
+    return {
+      ...item,
+      v3Mode: 'syn',
+      v3Badge: 'ĐỒNG NGHĨA (SYNONYM)',
+      v3Question: `Chọn từ ĐỒNG NGHĨA với "${item.word}" (${item.prompt})`,
+      v3Target: item.syn,
+      v3Choices: choices
+    };
+  }
+  const choices = shuffleArrayWithSeed([item.def, ...(item.defDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}`);
+  return {
+    ...item,
+    v3Mode: 'def',
+    v3Badge: 'ĐỊNH NGHĨA ANH–ANH (DEFINITION)',
+    v3Question: `Chọn định nghĩa tiếng Anh đúng cho "${item.word}"`,
+    v3Target: item.def,
+    v3Choices: choices
+  };
+}
+
+function decorateV4Question(item, seedStr) {
+  const choices = shuffleArrayWithSeed(
+    [item.collocation, ...(item.collocationDistractors || []).slice(0, 3)],
+    `${seedStr}:v4c:${item.word}`
+  );
+  return {
+    ...item,
+    v4Question: `Chọn cụm COLLOCATION chuẩn IELTS cho từ "${item.word}" (${item.prompt})`,
+    v4Target: item.collocation,
+    v4Choices: choices
+  };
+}
+
 export function buildSeededRoundQueues(roomInput, pinKey = '', username = '', fallbackVocab = DEFAULT_VOCAB_TEXT) {
   const room = normalizeRoomObject(roomInput || { rawVocab: fallbackVocab }, pinKey);
   const baseSeed = room.startedAt ? `${room.pin || pinKey}:${room.startedAt}` : `${room.pin || pinKey}:preview`;
@@ -535,13 +737,48 @@ export function buildSeededRoundQueues(roomInput, pinKey = '', username = '', fa
     ? `${baseSeed}:player:${String(username || 'guest')}`
     : `${baseSeed}:shared`;
   const vocabList = parseRawVocabText(room.rawVocab || fallbackVocab, seed);
-  const ordered = shuffleArrayWithSeed(vocabList, `${seed}:words`);
-  const total = ordered.length;
+  if (vocabList.length === 0) {
+    return { 1: [], 2: [], 3: [], 4: [] };
+  }
   const desiredPerRound = Math.max(2, Math.min(8, Number(room.roundSize) || 4));
-  const perRound = Math.max(1, Math.min(desiredPerRound, Math.floor(total / 3) || 1));
+  const pickRoundSlice = (roundNum) => {
+    const shuffled = shuffleArrayWithSeed(vocabList, `${seed}:r${roundNum}`);
+    const takeCount = Math.min(desiredPerRound, Math.max(2, shuffled.length));
+    const list = [];
+    for (let i = 0; i < takeCount; i++) {
+      list.push(shuffled[i % shuffled.length]);
+    }
+    return list;
+  };
+
   return {
-    1: ordered.slice(0, perRound),
-    2: ordered.slice(perRound, perRound * 2),
-    3: ordered.slice(perRound * 2, perRound * 3)
+    1: pickRoundSlice(1),
+    2: pickRoundSlice(2),
+    3: pickRoundSlice(3).map((item, idx) => decorateV3Question(item, idx, seed)),
+    4: pickRoundSlice(4).map(item => decorateV4Question(item, seed))
+  };
+}
+
+export function buildPracticeRoundQueues({ rawVocab = DEFAULT_VOCAB_TEXT, roundSize = 4, seedStr = '' } = {}) {
+  const seed = seedStr || `practice:${Date.now()}`;
+  const vocabList = parseRawVocabText(rawVocab || DEFAULT_VOCAB_TEXT, seed);
+  if (vocabList.length === 0) {
+    return { 1: [], 2: [], 3: [], 4: [] };
+  }
+  const desiredPerRound = Math.max(2, Math.min(8, Number(roundSize) || 4));
+  const pickRoundSlice = (roundNum) => {
+    const shuffled = shuffleArrayWithSeed(vocabList, `${seed}:r${roundNum}`);
+    const takeCount = Math.min(desiredPerRound, Math.max(2, shuffled.length));
+    const list = [];
+    for (let i = 0; i < takeCount; i++) {
+      list.push(shuffled[i % shuffled.length]);
+    }
+    return list;
+  };
+  return {
+    1: pickRoundSlice(1),
+    2: pickRoundSlice(2),
+    3: pickRoundSlice(3).map((item, idx) => decorateV3Question(item, idx, seed)),
+    4: pickRoundSlice(4).map(item => decorateV4Question(item, seed))
   };
 }

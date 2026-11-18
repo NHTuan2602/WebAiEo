@@ -18,13 +18,20 @@ import {
   calculateWritingBand,
   countExtensionCheatSignals,
   getWordCount,
-  roundIeltsBand
+  roundIeltsBand,
+  roundWholeBand
 } from '../../utils/examHelpers';
 
 function sanitizeBandInput(val) {
   const parsed = parseFloat(val);
   if (!Number.isFinite(parsed)) return 0;
   return roundIeltsBand(Math.max(0, Math.min(9.0, parsed)));
+}
+
+function sanitizeWholeBandInput(val) {
+  const parsed = parseFloat(val);
+  if (!Number.isFinite(parsed)) return 0;
+  return roundWholeBand(Math.max(0, Math.min(9, parsed)));
 }
 
 function sanitizeRawCount(val, total) {
@@ -77,7 +84,7 @@ export default function TeacherGradingModal({
   const previewT1 = sanitizeBandInput(gradingScores.task1Band);
   const previewT2 = sanitizeBandInput(gradingScores.task2Band);
   const previewWriting = calculateWritingBand(previewT1, previewT2);
-  const previewSpeaking = sanitizeBandInput(gradingScores.speakingBand);
+  const previewSpeaking = sanitizeWholeBandInput(gradingScores.speakingBand);
 
   const previewSkills = [];
   if (showListeningBlock && (lTotal > 0 || focusSkill === 'listening')) previewSkills.push(previewLBand);
@@ -100,10 +107,10 @@ export default function TeacherGradingModal({
     }));
   };
 
-  const handleBandBlur = (field) => {
+  const handleBandBlur = (field, integerOnly = false) => {
     setGradingScores(prev => ({
       ...prev,
-      [field]: sanitizeBandInput(prev[field])
+      [field]: integerOnly ? sanitizeWholeBandInput(prev[field]) : sanitizeBandInput(prev[field])
     }));
   };
 
@@ -338,12 +345,12 @@ export default function TeacherGradingModal({
                   </label>
                   <input
                     type="number"
-                    step="0.5"
+                    step="1"
                     min="0"
                     max="9"
                     value={gradingScores[f.key] ?? 0}
                     onChange={e => setGradingScores(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    onBlur={() => handleBandBlur(f.key)}
+                    onBlur={() => handleBandBlur(f.key, true)}
                     className={`w-full px-3 py-2 bg-white dark:bg-slate-900 border rounded-lg text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-[#570DF8] ${
                       f.key === 'speakingBand'
                         ? 'border-[#570DF8] text-[#570DF8] dark:text-[#C4B5FD]'

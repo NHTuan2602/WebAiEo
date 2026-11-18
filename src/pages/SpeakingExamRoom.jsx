@@ -87,6 +87,8 @@ export default function SpeakingExamRoom({
   const [part2Notes, setPart2Notes] = useState('');
   const [promptPlayBlocked, setPromptPlayBlocked] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
+  const [autoRecordCountdown, setAutoRecordCountdown] = useState(null);
 
   // Grading + Celebration state
   const [gradingProgressText, setGradingProgressText] = useState('');
@@ -104,9 +106,17 @@ export default function SpeakingExamRoom({
   const meterRafRef = useRef(null);
   const recordTimerRef = useRef(null);
   const prepTimerRef = useRef(null);
+  const autoRecordTimerRef = useRef(null);
+  const ttsFallbackTimerRef = useRef(null);
   const createdUrlsRef = useRef([]);
   const submitLockRef = useRef(false);
   const promptAudioRef = useRef(null);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const isRecordingRef = useRef(isRecording);
+  isRecordingRef.current = isRecording;
+  const recordingsByQidRef = useRef(recordingsByQid);
+  recordingsByQidRef.current = recordingsByQid;
 
   useEffect(() => {
     examStartedAtRef.current = Date.now();
@@ -120,7 +130,21 @@ export default function SpeakingExamRoom({
     setAudioLevel(0);
   };
 
+  const clearAutoRecordTimers = () => {
+    if (autoRecordTimerRef.current) {
+      clearInterval(autoRecordTimerRef.current);
+      autoRecordTimerRef.current = null;
+    }
+    if (ttsFallbackTimerRef.current) {
+      clearTimeout(ttsFallbackTimerRef.current);
+      ttsFallbackTimerRef.current = null;
+    }
+    setAutoRecordCountdown(null);
+  };
+
   const cleanupMediaResources = () => {
+    clearAutoRecordTimers();
+    setIsSpeakingPrompt(false);
     stopMeterLoop();
     if (recordTimerRef.current) {
       clearInterval(recordTimerRef.current);
@@ -176,6 +200,35 @@ export default function SpeakingExamRoom({
   const currentItem = items[currentIdx] || items[0] || null;
   const currentPromptText = currentItem?.prompt || '';
   const currentPromptAudioUrl = currentItem?.audioUrl || '';
+  const currentItemIdRef = useRef(currentItem?.id || '');
+  currentItemIdRef.current = currentItem?.id || '';
+  const handleBeginRecordingRef = useRef(null);
+
+  const startExamRoom3sCountdown = () => {
+    if (!isExamRoomMode) return;
+    const targetQid = currentItemIdRef.current;
+    if (phaseRef.current !== 'ACTIVE' || isRecordingRef.current || recordingsByQidRef.current?.[targetQid]) {
+      return;
+    }
+    clearAutoRecordTimers();
+    let remaining = 3;
+    setAutoRecordCountdown(remaining);
+    autoRecordTimerRef.current = setInterval(() => {
+      if (phaseRef.current !== 'ACTIVE' || isRecordingRef.current || currentItemIdRef.current !== targetQid) {
+        clearAutoRecordTimers();
+        return;
+      }
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearAutoRecordTimers();
+        handleBeginRecordingRef.current?.();
+      } else {
+        setAutoRecordCountdown(remaining);
+      }
+    }, 1000);
+  };
+  const startExamRoom3sCountdownRef = useRef(startExamRoom3sCountdown);
+  startExamRoom3sCountdownRef.current = startExamRoom3sCountdown;
 
   // Tick down Part 2 preparation timer cleanly without synchronous setState in effect
   useEffect(() => {
@@ -187,6 +240,8 @@ export default function SpeakingExamRoom({
   }, [phase, prepRemainingSec]);
 
   const stopPromptPlayback = () => {
+    clearAutoRecordTimers();
+    setIsSpeakingPrompt(false);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.cancel();
@@ -199,65 +254,140 @@ export default function SpeakingExamRoom({
     }
   };
 
-  const triggerPromptPlayback = (text, audioUrl = '', disableAiTts = false) => {
+  const pickBestEnglishVoice = () => {
+    try {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+      const voices = window.speechSynthesis.getVoices?.() || [];
+      return (
+        voices.find(v => /^en-GB/i.test(v.lang) && /natural|google|samantha|libby|ryan|sonia/i.test(v.name)) ||
+        voices.find(v => /^en-GB/i.test(v.lang)) ||
+        voices.find(v => /^en-US/i.test(v.lang) && /natural|google|aria|jenny|guy/i.test(v.name)) ||
+        voices.find(v => /^en/i.test(v.lang)) ||
+        null
+      );
+    } catch (_err) {
+      return null;
+    }
+  };
+
+  const triggerPromptPlayback = (text, audioUrl = '', { allowAutoCountdown = false } = {}) => {
     stopPromptPlayback();
     if (audioUrl) {
       const audioEl = promptAudioRef.current;
+      const onAudioDone = () => {
+        setIsSpeakingPrompt(false);
+        if (allowAutoCountdown) startExamRoom3sCountdownRef.current?.();
+      };
       if (audioEl && typeof audioEl.play === 'function') {
         try {
           audioEl.currentTime = 0;
+          audioEl.onended = onAudioDone;
+          setIsSpeakingPrompt(true);
           const playPromise = audioEl.play();
           if (playPromise && typeof playPromise.catch === 'function') {
             playPromise.catch(err => {
-              // Strictly NEVER fall back to AI TTS when teacher supplied an audio recording
+              setIsSpeakingPrompt(false);
               if (err?.name !== 'AbortError') {
                 setPromptPlayBlocked(true);
+                if (allowAutoCountdown) startExamRoom3sCountdownRef.current?.();
               }
             });
           }
         } catch (_err) {
+          setIsSpeakingPrompt(false);
           Promise.resolve().then(() => setPromptPlayBlocked(true));
+          if (allowAutoCountdown) startExamRoom3sCountdownRef.current?.();
         }
         return;
       }
       if (typeof Audio !== 'undefined') {
         try {
           const fallbackEl = new Audio(audioUrl);
+          fallbackEl.onended = onAudioDone;
           promptAudioRef.current = fallbackEl;
+          setIsSpeakingPrompt(true);
           fallbackEl.play().catch(err => {
-            if (err?.name !== 'AbortError') setPromptPlayBlocked(true);
+            setIsSpeakingPrompt(false);
+            if (err?.name !== 'AbortError') {
+              setPromptPlayBlocked(true);
+              if (allowAutoCountdown) startExamRoom3sCountdownRef.current?.();
+            }
           });
         } catch (_err) {
+          setIsSpeakingPrompt(false);
           Promise.resolve().then(() => setPromptPlayBlocked(true));
+          if (allowAutoCountdown) startExamRoom3sCountdownRef.current?.();
         }
       }
       return;
     }
-    if (disableAiTts) return;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
+
+    // Always provide English AI TTS reading for Speaking questions when teacher audio isn't uploaded
+    if (!text) {
+      if (allowAutoCountdown) startExamRoom3sCountdownRef.current?.();
+      return;
+    }
+    const wordCount = Math.max(1, String(text).trim().split(/\s+/).length);
+    const estMs = Math.min(18000, Math.max(2200, wordCount * 450 + 600));
+    let completed = false;
+    const finishSpeech = () => {
+      if (completed) return;
+      completed = true;
+      if (ttsFallbackTimerRef.current) {
+        clearTimeout(ttsFallbackTimerRef.current);
+        ttsFallbackTimerRef.current = null;
+      }
+      setIsSpeakingPrompt(false);
+      if (allowAutoCountdown) {
+        startExamRoom3sCountdownRef.current?.();
+      }
+    };
+
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      if (allowAutoCountdown) {
+        ttsFallbackTimerRef.current = setTimeout(finishSpeech, 400);
+      }
+      return;
+    }
+
     try {
       const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'en-GB';
+      const voice = pickBestEnglishVoice();
+      if (voice) utter.voice = voice;
+      utter.lang = voice?.lang || 'en-GB';
       utter.rate = 0.95;
+      utter.onend = finishSpeech;
+      utter.onerror = finishSpeech;
+      setIsSpeakingPrompt(true);
+      if (allowAutoCountdown) {
+        ttsFallbackTimerRef.current = setTimeout(finishSpeech, estMs);
+      }
       window.speechSynthesis.speak(utter);
-    } catch (_err) {}
+    } catch (_err) {
+      finishSpeech();
+    }
   };
 
   const speakPromptQuestion = (text, audioUrl = '') => {
     setPromptPlayBlocked(false);
-    triggerPromptPlayback(text, audioUrl, spMeta.disableAiTts);
+    triggerPromptPlayback(text, audioUrl, { allowAutoCountdown: false });
   };
 
   const triggerPromptPlaybackRef = useRef(triggerPromptPlayback);
   triggerPromptPlaybackRef.current = triggerPromptPlayback;
 
-  // Auto-play teacher recording (or TTS only when no teacher audio & TTS enabled) when entering a question
+  // Auto-play teacher recording or AI English TTS when entering a question.
+  // In Exam Room mode, after reading finishes across Part 1, 2 & 3 -> starts 3s countdown -> auto-records!
   useEffect(() => {
-    if (phase === 'ACTIVE' && autoSpeakPrompt && (currentPromptAudioUrl || (currentPromptText && !spMeta.disableAiTts))) {
-      triggerPromptPlaybackRef.current(currentPromptText, currentPromptAudioUrl, spMeta.disableAiTts);
+    if (phase === 'ACTIVE' && (isExamRoomMode || autoSpeakPrompt) && (currentPromptAudioUrl || currentPromptText)) {
+      const targetQid = currentItem?.id || '';
+      const alreadyRecorded = Boolean(recordingsByQidRef.current?.[targetQid]);
+      triggerPromptPlaybackRef.current(currentPromptText, currentPromptAudioUrl, {
+        allowAutoCountdown: isExamRoomMode && !alreadyRecorded
+      });
     }
     return () => stopPromptPlayback();
-  }, [phase, currentIdx, autoSpeakPrompt, currentPromptText, currentPromptAudioUrl, spMeta.disableAiTts]);
+  }, [phase, currentIdx, isExamRoomMode, autoSpeakPrompt, currentPromptText, currentPromptAudioUrl, currentItem?.id]);
 
   const startMeterFromStream = (stream) => {
     try {
@@ -413,6 +543,7 @@ export default function SpeakingExamRoom({
 
   const handleBeginRecording = async () => {
     if (!currentItem || isRecording) return;
+    clearAutoRecordTimers();
     if (prepRemainingSec > 0) {
       setPrepRemainingSec(0);
       if (prepTimerRef.current) {
@@ -480,6 +611,7 @@ export default function SpeakingExamRoom({
       }
     }, 250);
   };
+  handleBeginRecordingRef.current = handleBeginRecording;
 
   const handleGoQuestion = async (nextIdx) => {
     if (isRecording) {
@@ -852,13 +984,25 @@ export default function SpeakingExamRoom({
               )}
             </div>
 
-            {hasTeacherAudioAny && (
-              <div className="px-3.5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                🎧 Đề có {teacherAudioCount}/{items.length} câu dùng file ghi âm của Giáo viên — bạn sẽ nghe giọng thật và bấm Micro trả lời (không qua giọng AI đọc).
+            {isExamRoomMode ? (
+              <div className="px-4 py-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/35 text-xs font-bold text-rose-700 dark:text-rose-200 leading-relaxed">
+                ⏱️ <strong>Phòng Thi Thực Chiến (Part 1 · 2 · 3):</strong> Hệ thống dùng giọng Giám khảo AI (hoặc file Giáo viên) đọc toàn bộ câu hỏi, sau khi đọc xong sẽ tự đếm ngược <strong>3 giây</strong> rồi <strong>tự động bật Micro ghi âm</strong>!
+              </div>
+            ) : (
+              <div className="px-4 py-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-500/30 text-xs font-bold text-indigo-800 dark:text-indigo-200 leading-relaxed">
+                🎙️ <strong>Chế độ Test Thử / Tự Luyện:</strong> AI sẽ đọc toàn bộ câu hỏi bằng tiếng Anh, sau đó bạn chủ động bấm nút <strong>Bắt Đầu Trả Lời &amp; Ghi Âm</strong> bất kỳ lúc nào sẵn sàng.
               </div>
             )}
 
-            {(hasTeacherAudioAny || !spMeta.disableAiTts) && (
+            {hasTeacherAudioAny && (
+              <div className="px-3.5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                {allHaveTeacherAudio
+                  ? `🎧 Tất cả ${teacherAudioCount}/${items.length} câu dùng file ghi âm chuẩn của Giáo viên.`
+                  : `🎧 Đề có ${teacherAudioCount}/${items.length} câu dùng file ghi âm của Giáo viên — các câu còn lại dùng giọng Giám khảo AI đọc chuẩn IELTS.`}
+              </div>
+            )}
+
+            {!isExamRoomMode && (
               <label className="flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
@@ -870,8 +1014,8 @@ export default function SpeakingExamRoom({
                   {allHaveTeacherAudio
                     ? 'Tự động phát file ghi âm câu hỏi của Giáo viên khi sang câu mới'
                     : hasTeacherAudioAny
-                      ? 'Tự động phát Audio câu hỏi khi sang câu mới (ưu tiên file ghi âm Giáo viên)'
-                      : 'Giám khảo AI tự đọc câu hỏi bằng tiếng Anh khi sang câu mới'}
+                      ? 'Tự động đọc câu hỏi khi sang câu mới (ưu tiên file ghi âm Giáo viên)'
+                      : 'Giám khảo AI tự đọc toàn bộ câu hỏi bằng tiếng Anh khi sang câu mới'}
                 </span>
               </label>
             )}
@@ -933,21 +1077,43 @@ export default function SpeakingExamRoom({
                 </span>
               </div>
 
-              {(currentItem.audioUrl || !spMeta.disableAiTts) && (
+              <button
+                type="button"
+                onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${
+                  currentItem.audioUrl
+                    ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-200'
+                    : isSpeakingPrompt
+                    ? 'bg-[#570DF8] text-white border-[#570DF8] animate-pulse'
+                    : 'bg-white dark:bg-[#23222D] border-pink-200 dark:border-[#34323F] hover:border-[#570DF8] text-slate-700 dark:text-slate-200'
+                }`}
+              >
+                <Volume2 className={`w-3.5 h-3.5 ${currentItem.audioUrl ? 'text-emerald-600 dark:text-emerald-300' : isSpeakingPrompt ? 'text-white' : 'text-[#570DF8] dark:text-[#A78BFA]'}`} />
+                <span>
+                  {currentItem.audioUrl
+                    ? 'Nghe Lại File Ghi Âm Giáo Viên'
+                    : isSpeakingPrompt
+                    ? 'Giám Khảo AI Đang Đọc...'
+                    : 'Nghe Giám Khảo AI Đọc'}
+                </span>
+              </button>
+            </div>
+
+            {isExamRoomMode && autoRecordCountdown !== null && !isRecording && (
+              <div className="p-3.5 rounded-2xl bg-rose-600 text-white flex flex-wrap items-center justify-between gap-3 shadow-md animate-pulse">
+                <div className="flex items-center gap-2.5 text-xs sm:text-sm font-extrabold">
+                  <Mic className="w-4 h-4 shrink-0" />
+                  <span>Phòng Thi Thực Chiến: Tự động bật Micro ghi âm sau {autoRecordCountdown} giây...</span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
-                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${
-                    currentItem.audioUrl
-                      ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-200'
-                      : 'bg-white dark:bg-[#23222D] border-pink-200 dark:border-[#34323F] hover:border-[#570DF8] text-slate-700 dark:text-slate-200'
-                  }`}
+                  onClick={handleBeginRecording}
+                  className="px-3 py-1 rounded-xl bg-white text-rose-700 text-xs font-black hover:bg-rose-50 transition"
                 >
-                  <Volume2 className={`w-3.5 h-3.5 ${currentItem.audioUrl ? 'text-emerald-600 dark:text-emerald-300' : 'text-[#570DF8] dark:text-[#A78BFA]'}`} />
-                  <span>{currentItem.audioUrl ? 'Nghe Lại File Ghi Âm Giáo Viên' : 'Nghe Giám Khảo AI Đọc'}</span>
+                  Nói ngay
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {currentItem.audioUrl && (
               <div className="p-3.5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-500/40 space-y-2">
@@ -1158,7 +1324,7 @@ export default function SpeakingExamRoom({
           <img
             src={BRAND_INFO.avatarUrl}
             alt={BRAND_INFO.shortName}
-            className="w-28 h-28 rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-lg animate-bounce"
+            className="w-28 h-28 rounded-full object-cover border-2 border-pink-200 dark:border-[#34323F] bg-white shadow-lg animate-pulse"
           />
           <div className="space-y-2 max-w-md">
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">

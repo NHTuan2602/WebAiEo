@@ -1,4 +1,11 @@
-import { calculateWritingBand, getWordCount, roundIeltsBand } from './examHelpers';
+import {
+  calculateWritingBand,
+  getQuestionTypeMeta,
+  getQuestionTypesForSkill,
+  getWordCount,
+  roundDownIeltsHalfBand,
+  roundWholeBand
+} from './examHelpers.js';
 
 export const GEMINI_PREFERRED_MODELS = [
   'gemini-2.5-flash',
@@ -178,29 +185,144 @@ export async function testGeminiApiConnection(apiKey) {
   return result.usedModel;
 }
 
+function normalizeWritingAnalysisPayload(parsed = {}, { w1Count = 0, w2Count = 0, usedModel = 'gemini' } = {}) {
+  const zeroCriteria1 = { ta: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 1 (0 từ) → Band 0.' };
+  const zeroCriteria2 = { tr: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 2 (0 từ) → Band 0.' };
+
+  const rawT1Crit = parsed?.task1Criteria || {};
+  const t1Ta = w1Count === 0 ? 0 : roundWholeBand(rawT1Crit.ta ?? parsed?.task1Band ?? 0);
+  const t1Cc = w1Count === 0 ? 0 : roundWholeBand(rawT1Crit.cc ?? parsed?.task1Band ?? 0);
+  const t1Lr = w1Count === 0 ? 0 : roundWholeBand(rawT1Crit.lr ?? parsed?.task1Band ?? 0);
+  const t1Gra = w1Count === 0 ? 0 : roundWholeBand(rawT1Crit.gra ?? parsed?.task1Band ?? 0);
+  const t1Band = w1Count === 0
+    ? 0
+    : roundDownIeltsHalfBand((t1Ta + t1Cc + t1Lr + t1Gra) / 4);
+
+  const rawT2Crit = parsed?.task2Criteria || {};
+  const t2Tr = w2Count === 0 ? 0 : roundWholeBand(rawT2Crit.tr ?? parsed?.task2Band ?? 0);
+  const t2Cc = w2Count === 0 ? 0 : roundWholeBand(rawT2Crit.cc ?? parsed?.task2Band ?? 0);
+  const t2Lr = w2Count === 0 ? 0 : roundWholeBand(rawT2Crit.lr ?? parsed?.task2Band ?? 0);
+  const t2Gra = w2Count === 0 ? 0 : roundWholeBand(rawT2Crit.gra ?? parsed?.task2Band ?? 0);
+  const t2Band = w2Count === 0
+    ? 0
+    : roundDownIeltsHalfBand((t2Tr + t2Cc + t2Lr + t2Gra) / 4);
+
+  const sentenceAnalysis = (Array.isArray(parsed?.sentenceAnalysis) ? parsed.sentenceAnalysis : [])
+    .filter(row => row && (row.sentence || row.correction))
+    .slice(0, 24)
+    .map(row => ({
+      task: String(row.task || 'Task 2').trim(),
+      sentence: String(row.sentence || '').trim(),
+      errorType: String(row.errorType || 'Grammar & Vocabulary').trim(),
+      errorDescription: String(row.errorDescription || row.error || '').trim(),
+      correction: String(row.correction || '').trim()
+    }));
+
+  const spellingGrammarNotes = (Array.isArray(parsed?.spellingGrammarNotes) ? parsed.spellingGrammarNotes : [])
+    .filter(item => item && (item.wrong || item.fixed))
+    .slice(0, 16)
+    .map(item => ({
+      wrong: String(item.wrong || '').trim(),
+      fixed: String(item.fixed || '').trim(),
+      type: String(item.type || 'Ngữ pháp').trim(),
+      note: String(item.note || '').trim()
+    }));
+
+  const sentenceStructureUpgrades = (Array.isArray(parsed?.sentenceStructureUpgrades) ? parsed.sentenceStructureUpgrades : [])
+    .filter(item => item && (item.original || item.upgraded))
+    .slice(0, 10)
+    .map(item => ({
+      task: String(item.task || 'Task 2').trim(),
+      original: String(item.original || '').trim(),
+      upgraded: String(item.upgraded || '').trim(),
+      technique: String(item.technique || '').trim()
+    }));
+
+  const taskLogicCritiques = (Array.isArray(parsed?.taskLogicCritiques) ? parsed.taskLogicCritiques : [])
+    .filter(item => item && (item.issue || item.suggestion))
+    .slice(0, 8)
+    .map(item => ({
+      task: String(item.task || 'Task 2').trim(),
+      issue: String(item.issue || '').trim(),
+      suggestion: String(item.suggestion || '').trim()
+    }));
+
+  const vocabularyUpgrades = (Array.isArray(parsed?.vocabularyUpgrades) ? parsed.vocabularyUpgrades : [])
+    .filter(item => item && (item.basic || item.upgraded || item.collocation))
+    .slice(0, 14)
+    .map(item => ({
+      basic: String(item.basic || '').trim(),
+      upgraded: String(item.upgraded || '').trim(),
+      collocation: String(item.collocation || '').trim(),
+      meaning: String(item.meaning || '').trim()
+    }));
+
+  return {
+    ...parsed,
+    task1Band: t1Band,
+    task2Band: t2Band,
+    overallBand: calculateWritingBand(t1Band, t2Band),
+    task1Criteria: w1Count === 0
+      ? zeroCriteria1
+      : {
+          ta: t1Ta,
+          cc: t1Cc,
+          lr: t1Lr,
+          gra: t1Gra,
+          comment: String(rawT1Crit.comment || '').trim()
+        },
+    task2Criteria: w2Count === 0
+      ? zeroCriteria2
+      : {
+          tr: t2Tr,
+          cc: t2Cc,
+          lr: t2Lr,
+          gra: t2Gra,
+          comment: String(rawT2Crit.comment || '').trim()
+        },
+    sentenceAnalysis,
+    spellingGrammarNotes,
+    sentenceStructureUpgrades,
+    taskLogicCritiques,
+    vocabularyUpgrades,
+    revisedTask1: w1Count === 0 ? '' : String(parsed?.revisedTask1 || '').trim(),
+    revisedTask2: w2Count === 0 ? '' : String(parsed?.revisedTask2 || '').trim(),
+    feedback: String(parsed?.feedback || '').trim(),
+    strengths: Array.isArray(parsed?.strengths) ? parsed.strengths.map(s => String(s || '').trim()).filter(Boolean) : [],
+    improvements: Array.isArray(parsed?.improvements) ? parsed.improvements.map(s => String(s || '').trim()).filter(Boolean) : [],
+    _usedModel: usedModel
+  };
+}
+
 export async function callGeminiWritingGrader({ apiKey, task1Prompt, task1Text, task2Prompt, task2Text }) {
   const w1Count = getWordCount(task1Text);
   const w2Count = getWordCount(task2Text);
 
   if (w1Count === 0 && w2Count === 0) {
-    return {
-      task1Band: 0,
-      task2Band: 0,
-      overallBand: 0,
-      task1Criteria: { ta: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 1 (0 từ) → Band 0.0.' },
-      task2Criteria: { tr: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 2 (0 từ) → Band 0.0.' },
-      feedback: 'Thí sinh bỏ trống cả Task 1 và Task 2 (0 từ), không có nội dung để chấm điểm → Band Writing 0.0.',
-      strengths: [],
-      improvements: ['Cần viết đầy đủ bài làm Task 1 (tối thiểu 150 từ) và Task 2 (tối thiểu 250 từ) trước khi nộp bài.'],
-      _usedModel: 'empty-submission-guard'
-    };
+    return normalizeWritingAnalysisPayload(
+      {
+        feedback: 'Thí sinh bỏ trống cả Task 1 và Task 2 (0 từ), không có nội dung để chấm điểm → Band Writing 0.0.',
+        strengths: [],
+        improvements: ['Cần viết đầy đủ bài làm Task 1 (tối thiểu 150 từ) và Task 2 (tối thiểu 250 từ) trước khi nộp bài.']
+      },
+      { w1Count: 0, w2Count: 0, usedModel: 'empty-submission-guard' }
+    );
   }
 
   const systemPrompt = `You are an official IELTS Writing Senior Examiner (certified by IDP and British Council).
-Your task is to evaluate the candidate's IELTS Writing Task 1 and Task 2 submissions strictly according to the official IELTS Band Descriptors (scale 0.0 to 9.0, increments of 0.5):
-- CRITICAL RULE: Band 4.0 is NOT the minimum. If a task is "(No submission)", empty, or contains zero meaningful English writing, you MUST assign Band 0.0 for that task and 0.0 for all its criteria (ta/tr, cc, lr, gra).
-- Task 1 Criteria: Task Achievement (TA), Coherence & Cohesion (CC), Lexical Resource (LR), Grammatical Range & Accuracy (GRA).
-- Task 2 Criteria: Task Response (TR), Coherence & Cohesion (CC), Lexical Resource (LR), Grammatical Range & Accuracy (GRA).
+Rate the candidate's IELTS Writing Task 1 and Task 2 essays STRICTLY, critically, and precisely as a professional IELTS examiner — do NOT inflate grades.
+
+STRICT SCORING RULES (MANDATORY):
+1. Individual Criterion Scores ("ta"/"tr", "cc", "lr", "gra") MUST STRICTLY BE WHOLE INTEGERS from 1 to 9 (0 if empty/blank, NO .5 decimals for criteria! Allowed criterion scores: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9).
+2. Task Band ("task1Band", "task2Band") = average of that task's 4 integer criteria rounded DOWN to nearest 0.5 step. If a task is "(No submission)" or empty, assign 0 to the task and all its criteria.
+3. Overall Writing Band = ((2 * task2Band + task1Band) / 3) rounded DOWN to the nearest 0.5 step (e.g., 6.66 -> 6.5).
+4. Evaluate EVERY detail strictly:
+   - Note ALL grammar mistakes, spelling typos, punctuation errors, and awkward collocations ("spellingGrammarNotes").
+   - Provide a sentence-by-sentence analysis table ("sentenceAnalysis") with columns: Sentence (exact original sentence), Grammatical or Vocabulary Error (errorType + Vietnamese/English explanation), and Correction (natural Band 8-9 corrected version). Analyze EVERY sentence from the submitted essay(s).
+   - Provide Sentence Structure Upgrades ("sentenceStructureUpgrades"): upgrade weak/simple sentences into Band 8.0-9.0 complex structures (inversion, participle clauses, concession, noun clauses).
+   - Provide Task & Logic Flaw Critique ("taskLogicCritiques" — "Lỗi tư duy đề & lập luận"): flag missing Overview, unaddressed prompt parts, logical leaps, contradictions, overgeneralizations, or weak Task 1 data comparisons.
+   - Provide Vocabulary & Collocation Upgrades ("vocabularyUpgrades"): replace repetitive/basic words with natural C1-C2 academic collocations.
+   - Provide FULL polished Revisions ("revisedTask1" and "revisedTask2") improving Task Achievement/Response, Coherence & Cohesion, Lexical Resource, and Grammatical Range while keeping the candidate's core ideas.
 
 Task 1 Prompt: ${task1Prompt || 'No prompt specified'}
 Candidate Task 1 Essay:
@@ -214,136 +336,252 @@ Candidate Task 2 Essay:
 ${task2Text || '(No submission)'}
 """
 
-Calculate:
-- task1Band: float (0.0 - 9.0, increments of 0.5)
-- task2Band: float (0.0 - 9.0, increments of 0.5)
-- overallBand: float = round to nearest 0.5 of ((task1Band + 2 * task2Band) / 3)
-
-Return ONLY valid JSON format without markdown code fences or other prose:
+Return ONLY strictly valid JSON without markdown code fences or prose:
 {
-  "task1Band": 6.5,
-  "task2Band": 7.0,
-  "overallBand": 7.0,
   "task1Criteria": {
-    "ta": 6.5,
-    "cc": 6.5,
-    "lr": 7.0,
-    "gra": 6.0,
-    "comment": "Nhận xét chi tiết cho Task 1 bằng tiếng Việt"
+    "ta": 6,
+    "cc": 6,
+    "lr": 6,
+    "gra": 5,
+    "comment": "Phân tích chi tiết 4 tiêu chí Task 1 (kết luận từng band ước lượng rõ ràng bằng tiếng Việt)..."
   },
   "task2Criteria": {
-    "tr": 7.0,
-    "cc": 7.0,
-    "lr": 7.0,
-    "gra": 6.5,
-    "comment": "Nhận xét chi tiết cho Task 2 bằng tiếng Việt"
+    "tr": 7,
+    "cc": 6,
+    "lr": 6,
+    "gra": 6,
+    "comment": "Phân tích chi tiết 4 tiêu chí Task 2 (kết luận từng band ước lượng rõ ràng bằng tiếng Việt)..."
   },
-  "feedback": "Nhận xét tổng quan và phân tích điểm mạnh, điểm yếu, lỗi ngữ pháp từ vựng cần khắc phục bằng tiếng Việt.",
+  "spellingGrammarNotes": [
+    {
+      "wrong": "exact typo or grammar error",
+      "fixed": "corrected spelling/grammar",
+      "type": "Chính tả",
+      "note": "Giải thích ngắn bằng tiếng Việt"
+    }
+  ],
+  "sentenceAnalysis": [
+    {
+      "task": "Task 2",
+      "sentence": "Exact sentence from essay...",
+      "errorType": "Grammar & Vocabulary",
+      "errorDescription": "Chỉ rõ lỗi sai ngữ pháp, chính tả hoặc dùng từ...",
+      "correction": "Corrected and Band 8+ upgraded sentence..."
+    }
+  ],
+  "sentenceStructureUpgrades": [
+    {
+      "task": "Task 2",
+      "original": "Simple original sentence...",
+      "upgraded": "Complex high-band sentence using participle/inversion/concession...",
+      "technique": "Ví dụ: Mệnh đề nhượng bộ (Although...) / Cụm phân từ rút gọn"
+    }
+  ],
+  "taskLogicCritiques": [
+    {
+      "task": "Task 2",
+      "issue": "Lỗi tư duy đề / thiếu Overview / luận điểm chưa chứng minh nhân quả...",
+      "suggestion": "Hướng sửa tư duy triển khai luận điểm sát đề và logic hơn..."
+    }
+  ],
+  "vocabularyUpgrades": [
+    {
+      "basic": "many people",
+      "upgraded": "a substantial proportion of the population",
+      "collocation": "exert a profound impact on",
+      "meaning": "một bộ phận đáng kể dân số / gây ảnh hưởng sâu rộng lên"
+    }
+  ],
+  "revisedTask1": "Full improved Task 1 essay improving TA & CC (or empty string if Task 1 not submitted)...",
+  "revisedTask2": "Full improved Task 2 essay improving TR & CC (or empty string if Task 2 not submitted)...",
+  "feedback": "Tổng hợp đánh giá nghiêm khắc chuẩn giám khảo IELTS bằng tiếng Việt...",
   "strengths": ["Điểm mạnh 1", "Điểm mạnh 2"],
-  "improvements": ["Điểm cần khắc phục 1", "Điểm cần khắc phục 2"]
+  "improvements": ["Lỗi cần sửa 1", "Lỗi cần sửa 2"]
 }`;
 
   const { parsed, usedModel } = await callGeminiGenerateJson({
     apiKey,
     promptText: systemPrompt,
-    temperature: 0.2
+    temperature: 0.15
   });
 
-  const t1Band = w1Count === 0 ? 0 : roundIeltsBand(parsed?.task1Band ?? 0);
-  const t2Band = w2Count === 0 ? 0 : roundIeltsBand(parsed?.task2Band ?? 0);
-  const zeroCriteria = { ta: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 1 (0 từ) → Band 0.0.' };
-  const zeroCriteria2 = { tr: 0, cc: 0, lr: 0, gra: 0, comment: 'Thí sinh để trống Task 2 (0 từ) → Band 0.0.' };
+  return normalizeWritingAnalysisPayload(parsed, { w1Count, w2Count, usedModel });
+}
 
-  return {
-    ...parsed,
-    task1Band: t1Band,
-    task2Band: t2Band,
-    overallBand: calculateWritingBand(t1Band, t2Band),
-    task1Criteria: w1Count === 0 ? zeroCriteria : parsed?.task1Criteria,
-    task2Criteria: w2Count === 0 ? zeroCriteria2 : parsed?.task2Criteria,
-    _usedModel: usedModel
-  };
+const OFFLINE_WRITING_GRAMMAR_RULES = [
+  { regex: /\b(teh|recieve|seperate|definately|occured|untill|wich|becuase|goverment|enviroment|develope|experiance|importent|neccessary|successfull|beleive|arguement|alot|thier|peoples)\b/gi, type: 'Chính tả', map: { teh: 'the', recieve: 'receive', seperate: 'separate', definately: 'definitely', occured: 'occurred', untill: 'until', wich: 'which', becuase: 'because', goverment: 'government', enviroment: 'environment', develope: 'develop', experiance: 'experience', importent: 'important', neccessary: 'necessary', successfull: 'successful', beleive: 'believe', arguement: 'argument', alot: 'a lot / numerous', thier: 'their', peoples: 'people' }, note: 'Lỗi chính tả từ tiếng Anh học thuật hay nhầm.' },
+  { regex: /\bcan able to\b/gi, fixed: 'can / be able to', type: 'Ngữ pháp', note: 'Không dùng "can" đi kèm "able to".' },
+  { regex: /\bdespite of\b/gi, fixed: 'despite / in spite of', type: 'Ngữ pháp', note: '"Despite" không đi với giới từ "of".' },
+  { regex: /\bin my opinion,\s*i think\b/gi, fixed: 'In my opinion, / From my perspective,', type: 'Ngữ pháp', note: 'Tránh lặp ý giữa "In my opinion" và "I think".' },
+  { regex: /\bmore easier\b/gi, fixed: 'far easier', type: 'Ngữ pháp', note: 'Tính từ ngắn dùng dạng so sánh hơn "easier", không thêm "more".' },
+  { regex: /\bmore better\b/gi, fixed: 'substantially better', type: 'Ngữ pháp', note: 'Không dùng "more" trước "better".' },
+  { regex: /\bnowadays,\s*more and more people\b/gi, fixed: 'In contemporary society, a growing proportion of individuals', type: 'Từ vựng', note: 'Tránh mở bài sáo rỗng "more and more people".' },
+  { regex: /\ba lot of\b/gi, fixed: 'a substantial number of / considerable', type: 'Từ vựng', note: 'Thay cụm văn nói "a lot of" bằng collocation học thuật.' },
+  { regex: /\bvery good\b/gi, fixed: 'exceptionally beneficial / highly advantageous', type: 'Từ vựng', note: 'Tránh dùng "very + tính từ đơn giản".' },
+  { regex: /\bvery bad\b/gi, fixed: 'severely detrimental / deeply concerning', type: 'Từ vựng', note: 'Nâng cấp sang tính từ & trạng từ học thuật C1.' },
+  { regex: /\bmany people\b/gi, fixed: 'a significant segment of the population', type: 'Từ vựng', note: 'Paraphrase học thuật tránh lặp "many people".' }
+];
+
+function extractSentencesForTable(text = '', taskLabel = 'Task 2') {
+  const clean = String(text || '').trim();
+  if (!clean) return [];
+  const rawSentences = clean.split(/(?<=[.!?])\s+|\n+/).map(s => s.trim()).filter(s => s.length >= 6);
+  return rawSentences.slice(0, 12).map(sentence => {
+    const issues = [];
+    let revised = sentence;
+    OFFLINE_WRITING_GRAMMAR_RULES.forEach(rule => {
+      const m = sentence.match(rule.regex);
+      if (m) {
+        const hit = m[0];
+        const rep = rule.map ? (rule.map[hit.toLowerCase()] || hit) : rule.fixed;
+        issues.push(`${rule.type}: "${hit}" → "${rep}" (${rule.note})`);
+        revised = revised.replace(rule.regex, rep);
+      }
+    });
+    if (/^[a-z]/.test(revised)) {
+      issues.push('Chính tả/Viết hoa: Chữ cái đầu câu cần viết hoa.');
+      revised = revised.charAt(0).toUpperCase() + revised.slice(1);
+    }
+    const words = revised.split(/\s+/).filter(Boolean).length;
+    if (words < 9 && issues.length === 0) {
+      issues.push('Cấu trúc câu đơn giản/ngắn (< 9 từ): nên ghép mệnh đề quan hệ hoặc trạng từ nối để tăng GRA.');
+    }
+    return {
+      task: taskLabel,
+      sentence,
+      errorType: issues.length > 0 ? 'Grammar / Spelling / Vocabulary' : 'Acceptable (Có thể nâng cấp C1)',
+      errorDescription: issues.length > 0 ? issues.join(' | ') : 'Đúng ngữ pháp cơ bản; nên thêm collocation học thuật để nâng Band LR.',
+      correction: revised
+    };
+  });
 }
 
 export function simulateAIWritingGrading({ _task1Prompt, task1Text, _task2Prompt, task2Text }) {
   const w1Count = getWordCount(task1Text);
   const w2Count = getWordCount(task2Text);
+  const t1Str = String(task1Text || '');
+  const t2Str = String(task2Text || '');
+  const combined = `${t1Str}\n${t2Str}`;
 
-  let t1Band = 0;
-  if (w1Count === 0) t1Band = 0;
-  else if (w1Count < 20) t1Band = 1.5;
-  else if (w1Count < 50) t1Band = 3.0;
-  else if (w1Count < 80) t1Band = 4.0;
-  else if (w1Count < 120) t1Band = 5.0;
-  else if (w1Count < 150) t1Band = 5.5;
-  else if (w1Count < 180) t1Band = 6.5;
-  else t1Band = 7.0;
+  const spellingGrammarNotes = [];
+  OFFLINE_WRITING_GRAMMAR_RULES.forEach(rule => {
+    const matches = combined.match(rule.regex);
+    if (matches && matches.length > 0) {
+      const hit = matches[0];
+      const rep = rule.map ? (rule.map[hit.toLowerCase()] || hit) : rule.fixed;
+      spellingGrammarNotes.push({ wrong: hit, fixed: rep, type: rule.type, note: rule.note });
+    }
+  });
 
   const t1BonusWords = ['illustrates', 'depicts', 'fluctuated', 'significant', 'proportion', 'upward', 'downward', 'respectively', 'overall', 'decade', 'gradually'];
-  const t1HasKeywords = t1BonusWords.filter(w => (task1Text || '').toLowerCase().includes(w)).length;
-  if (w1Count >= 140 && t1HasKeywords >= 3) t1Band = Math.min(9.0, t1Band + 0.5);
+  const t1HasKeywords = t1BonusWords.filter(w => t1Str.toLowerCase().includes(w)).length;
 
-  let t2Band = 0;
-  if (w2Count === 0) t2Band = 0;
-  else if (w2Count < 20) t2Band = 1.5;
-  else if (w2Count < 80) t2Band = 3.0;
-  else if (w2Count < 150) t2Band = 4.5;
-  else if (w2Count < 200) t2Band = 5.5;
-  else if (w2Count < 250) t2Band = 6.0;
-  else if (w2Count < 300) t2Band = 7.0;
-  else t2Band = 7.5;
+  let rawT1Crit = { ta: 0, cc: 0, lr: 0, gra: 0, comment: 'Task 1 bỏ trống (0 từ) → Band 0.' };
+  if (w1Count > 0) {
+    const base1 = w1Count < 35 ? 2 : w1Count < 80 ? 4 : w1Count < 120 ? 5 : w1Count < 150 ? 5 : w1Count < 185 ? 6 : 7;
+    const hasOverview = /\b(overall|in general|in summary)\b/i.test(t1Str);
+    const errPenalty = spellingGrammarNotes.filter(n => n.type !== 'Từ vựng').length >= 2 ? 1 : 0;
+    const ta = roundWholeBand(Math.max(1, base1 - (hasOverview ? 0 : 1)));
+    const cc = roundWholeBand(base1);
+    const lr = roundWholeBand(Math.min(9, base1 + (t1HasKeywords >= 3 ? 1 : 0)));
+    const gra = roundWholeBand(Math.max(1, base1 - errPenalty));
+    rawT1Crit = {
+      ta, cc, lr, gra,
+      comment: `Task 1 (${w1Count} từ): TA=${ta}, CC=${cc}, LR=${lr}, GRA=${gra}. ${hasOverview ? 'Đã có câu Overview khái quát xu hướng chính.' : 'Thiếu từ nối khái quát "Overall" nên bị trừ điểm Task Achievement.'}`
+    };
+  }
 
   const t2BonusWords = ['furthermore', 'moreover', 'however', 'consequently', 'perspective', 'fundamental', 'substantial', 'infrastructure', 'crucial', 'in conclusion', 'allocate'];
-  const t2HasKeywords = t2BonusWords.filter(w => (task2Text || '').toLowerCase().includes(w)).length;
-  if (w2Count >= 240 && t2HasKeywords >= 3) t2Band = Math.min(9.0, t2Band + 0.5);
+  const t2HasKeywords = t2BonusWords.filter(w => t2Str.toLowerCase().includes(w)).length;
 
-  const overall = calculateWritingBand(t1Band, t2Band);
+  let rawT2Crit = { tr: 0, cc: 0, lr: 0, gra: 0, comment: 'Task 2 bỏ trống (0 từ) → Band 0.' };
+  if (w2Count > 0) {
+    const base2 = w2Count < 50 ? 2 : w2Count < 130 ? 4 : w2Count < 200 ? 5 : w2Count < 250 ? 6 : w2Count < 300 ? 6 : 7;
+    const errPenalty = spellingGrammarNotes.filter(n => n.type !== 'Từ vựng').length >= 2 ? 1 : 0;
+    const tr = roundWholeBand(base2 + (w2Count >= 250 ? 1 : 0));
+    const cc = roundWholeBand(base2 + (t2HasKeywords >= 2 ? 1 : 0));
+    const lr = roundWholeBand(base2 + (t2HasKeywords >= 3 ? 1 : 0));
+    const gra = roundWholeBand(Math.max(1, base2 - errPenalty));
+    rawT2Crit = {
+      tr, cc, lr, gra,
+      comment: `Task 2 (${w2Count} từ): TR=${tr}, CC=${cc}, LR=${lr}, GRA=${gra}. ${w2Count >= 250 ? 'Đạt chuẩn độ dài bài luận (>=250 từ).' : 'Chưa đủ 250 từ khiến phân tích luận điểm bị hạn chế.'}`
+    };
+  }
+
+  const taskLogicCritiques = [];
+  if (w1Count > 0 && !/\boverall\b/i.test(t1Str)) {
+    taskLogicCritiques.push({
+      task: 'Task 1',
+      issue: 'Thiếu đoạn/câu Overview nêu rõ xu hướng nổi bật (tăng/giảm/cao nhất/thấp nhất) không kèm số liệu chi tiết.',
+      suggestion: 'Thêm đoạn "Overall, it is evident that..." ngay sau câu mở bài để không bị khống chế TA ở Band 5.'
+    });
+  }
+  if (w2Count > 0 && w2Count < 250) {
+    taskLogicCritiques.push({
+      task: 'Task 2',
+      issue: `Lập luận còn mỏng (${w2Count}/250 từ tối thiểu), thiếu ví dụ thực tế hoặc phân tích hệ quả (cause -> effect).`,
+      suggestion: 'Áp dụng công thức PEEL cho từng đoạn thân bài: Point → Explanation → Example → Link.'
+    });
+  }
+  if (w2Count > 0 && !/\b(however|although|conversely|on the other hand|nevertheless)\b/i.test(t2Str)) {
+    taskLogicCritiques.push({
+      task: 'Task 2',
+      issue: 'Tư duy lập luận một chiều, chưa có phản biện / đối chiếu hai góc nhìn để thể hiện tư duy phản biện C1.',
+      suggestion: 'Chèn cấu trúc nhượng bộ ("Admittedly..., yet...") để cân bằng lập luận.'
+    });
+  }
+
+  const sentenceAnalysis = [
+    ...extractSentencesForTable(t1Str, 'Task 1'),
+    ...extractSentencesForTable(t2Str, 'Task 2')
+  ];
+
+  const sentenceStructureUpgrades = sentenceAnalysis
+    .filter(s => s.sentence.split(/\s+/).length >= 5)
+    .slice(0, 3)
+    .map(s => ({
+      task: s.task,
+      original: s.sentence,
+      upgraded: `Not only does this trend demonstrate clear significance, but it also ensures ${s.correction.charAt(0).toLowerCase() + s.correction.slice(1)}`,
+      technique: 'Đảo ngữ nhấn mạnh (Not only... but also) + Mệnh đề phức'
+    }));
+
+  const vocabularyUpgrades = [
+    { basic: 'important / big problem', upgraded: 'paramount importance / pressing concern', collocation: 'pose a pressing challenge to', meaning: 'tầm quan trọng hàng đầu / vấn đề cấp bách' },
+    { basic: 'make better / help', upgraded: 'foster / facilitate / alleviate', collocation: 'alleviate the burden on', meaning: 'thúc đẩy / giảm bớt gánh nặng lên' },
+    { basic: 'many people / bad effect', upgraded: 'a substantial demographic / adverse repercussions', collocation: 'yield adverse repercussions for', meaning: 'nhiều người / gây hệ lụy tiêu cực cho' }
+  ];
+
+  const basePayload = normalizeWritingAnalysisPayload(
+    {
+      task1Criteria: rawT1Crit,
+      task2Criteria: rawT2Crit,
+      spellingGrammarNotes,
+      sentenceAnalysis,
+      sentenceStructureUpgrades,
+      taskLogicCritiques,
+      vocabularyUpgrades,
+      revisedTask1: w1Count > 0 ? `${t1Str.trim()}\n\n[Gợi ý chỉnh sửa tăng TA & CC]: Nhấn mạnh rõ câu Overview ("Overall, a pronounced upward/downward trajectory can be observed...") và nhóm số liệu đối chiếu theo tỷ trọng tương đối thay vì liệt kê tuần tự.` : '',
+      revisedTask2: w2Count > 0 ? `${t2Str.trim()}\n\n[Gợi ý nâng cấp TR & CC]: Cấu trúc bài rõ ràng gồm Introduction (Paraphrase + Thesis Statement), 2 Body Paragraphs theo mô hình PEEL với từ nối chuyển mạch tự nhiên ("Conversely,", "A compelling case can be made that..."), và Conclusion khẳng định lại quan điểm. Bật Google Gemini API Key trong Tài Khoản GV để AI viết lại toàn văn bản Band 8.5+ cho từng câu của bài này.` : ''
+    },
+    { w1Count, w2Count, usedModel: 'built-in-writing-examiner' }
+  );
 
   const strengths = [];
   const improvements = [];
-
-  if (w1Count === 0) improvements.push('Task 1 bị bỏ trống (0 từ) → Band 0.0.');
-  else if (w1Count >= 150) strengths.push(`Task 1 đạt yêu cầu độ dài tiêu chuẩn (${w1Count} từ >= 150 từ).`);
-  else improvements.push(`Task 1 chưa đủ 150 từ (${w1Count} từ), bị giảm điểm tiêu chí Task Achievement.`);
-
-  if (w2Count === 0) improvements.push('Task 2 bị bỏ trống (0 từ) → Band 0.0.');
-  else if (w2Count >= 250) strengths.push(`Task 2 độ dài tốt (${w2Count} từ >= 250 từ), phát triển ý khá đầy đủ.`);
-  else improvements.push(`Task 2 chưa đạt 250 từ (${w2Count} từ), cần mở rộng thêm luận cứ.`);
-
-  if (w1Count > 0 || w2Count > 0) {
-    if (t2HasKeywords >= 3) strengths.push('Sử dụng tốt các liên từ nối học thuật (Coherence & Cohesion).');
-    else improvements.push('Cần đa dạng hóa cấu trúc câu phức và từ vựng học thuật (Lexical Resource).');
-  }
+  if (w1Count >= 150) strengths.push(`Task 1 đạt độ dài tiêu chuẩn (${w1Count} từ).`);
+  else if (w1Count > 0) improvements.push(`Task 1 chưa đủ 150 từ (${w1Count} từ).`);
+  if (w2Count >= 250) strengths.push(`Task 2 độ dài tốt (${w2Count} từ).`);
+  else if (w2Count > 0) improvements.push(`Task 2 chưa đạt 250 từ (${w2Count} từ).`);
+  if (spellingGrammarNotes.length > 0) improvements.push(`Phát hiện ${spellingGrammarNotes.length} lỗi chính tả/ngữ pháp/từ vựng cần chỉnh ngay trong bảng phân tích câu.`);
+  if (taskLogicCritiques.length > 0) improvements.push(`Cần khắc phục ${taskLogicCritiques.length} điểm yếu tư duy đề & lập luận.`);
 
   const feedback = (w1Count === 0 && w2Count === 0)
-    ? '[AI Examiner - Đánh Giá Writing Tự Động]:\n• Thí sinh bỏ trống cả Task 1 và Task 2 (0 từ) → Writing Band 0.0.'
-    : `[AI Examiner - Đánh Giá Writing Tự Động]:
-• Task 1 (Band ${t1Band}): ${w1Count === 0 ? 'Bỏ trống (0 từ).' : w1Count >= 150 ? 'Nêu được xu hướng tổng quát, phân bổ số liệu hợp lý.' : 'Cần bổ sung thêm câu Overview và đạt tối thiểu 150 từ.'}
-• Task 2 (Band ${t2Band}): ${w2Count === 0 ? 'Bỏ trống (0 từ).' : w2Count >= 250 ? 'Cấu trúc bài cân đối giữa các đoạn thân bài, quan điểm được bảo vệ nhất quán.' : 'Cần mở rộng lập luận, ví dụ thực tiễn và đạt tối thiểu 250 từ.'}
-• Khuyến nghị: Hoàn thiện cả 2 Task và dùng cấu trúc câu phức + Collocation chuẩn học thuật.`;
+    ? '[AI Examiner]: Thí sinh bỏ trống cả Task 1 và Task 2 → Writing Band 0.'
+    : `[AI Examiner - Phân Tích Chuẩn IDP/BC]:\n• Task 1 Band ${basePayload.task1Band} (TA ${basePayload.task1Criteria.ta} · CC ${basePayload.task1Criteria.cc} · LR ${basePayload.task1Criteria.lr} · GRA ${basePayload.task1Criteria.gra})\n• Task 2 Band ${basePayload.task2Band} (TR ${basePayload.task2Criteria.tr} · CC ${basePayload.task2Criteria.cc} · LR ${basePayload.task2Criteria.lr} · GRA ${basePayload.task2Criteria.gra})\n• Writing Overall (Bài 2×2 + Bài 1 : 3 → làm tròn xuống): Band ${basePayload.overallBand}`;
 
   return {
-    task1Band: t1Band,
-    task2Band: t2Band,
-    overallBand: overall,
-    task1Criteria: {
-      ta: t1Band,
-      cc: t1Band,
-      lr: t1Band,
-      gra: t1Band,
-      comment: w1Count === 0
-        ? 'Task 1 bỏ trống (0 từ) → Band 0.'
-        : `Task 1: Độ dài ${w1Count} từ. Đạt mức độ hoàn thành nhiệm vụ tương ứng Band ${t1Band}.`
-    },
-    task2Criteria: {
-      tr: t2Band,
-      cc: t2Band,
-      lr: t2Band,
-      gra: t2Band,
-      comment: w2Count === 0
-        ? 'Task 2 bỏ trống (0 từ) → Band 0.'
-        : `Task 2: Độ dài ${w2Count} từ. Đạt mức độ phản hồi đề tài tương ứng Band ${t2Band}.`
-    },
+    ...basePayload,
     feedback,
     strengths,
     improvements
@@ -383,10 +621,13 @@ RULES FOR INLINE CLOZE / NOTE / FORM / SUMMARY COMPLETION ("Đục Lỗ"):
      - "options": []
      - "correctAnswer": exact answer from Answer Key if known, otherwise ""
 
-RULES FOR MCQ / TRUE-FALSE-NOT GIVEN / STANDALONE QUESTIONS:
-- For Multiple Choice questions: set "type": "mcq", extract full question text into "question", and put clean array of options (e.g. ["A. ...", "B. ...", "C. ..."]) into "options".
-- For True/False/Not Given: set "type": "tfng", "options": ["TRUE", "FALSE", "NOT GIVEN"], and match "correctAnswer" cleanly.
-- If there are ONLY MCQ/TFNG questions and no note/summary cloze text, set "clozeText": "".
+RULES FOR READING (11 TYPES) & LISTENING (6 TYPES) CLASSIFICATION:
+- Supported ${skillLabel} question "type" values: ${getQuestionTypesForSkill(skill).map(t => `"${t.id}"`).join(', ')}.
+- For Multiple Choice: set "type": "mcq", put clean array of options (e.g. ["A. ...", "B. ...", "C. ..."]) into "options".
+- For True/False/Not Given or Yes/No/Not Given: set "type": "tfng", "options": ["TRUE", "FALSE", "NOT GIVEN"] (or ["YES", "NO", "NOT GIVEN"]).
+- For Matching Headings / Matching Info / Matching Features / Correct Ending / Matching / Map or Diagram Labelling (when options like i..viii or A..H or headings/features exist): set exact matching "type" and populate "options" with the clean choice list.
+- For Form Completion / Flow-chart Completion / Summary Completion (No Box) / Short Answer / Fill in the Blank: set the matching "type", "options": [], and optional "wordLimit" (e.g. "ONE WORD AND/OR A NUMBER").
+- If there are ONLY choice/matching questions and no inline note/summary cloze text, set "clozeText": "".
 
 RULES FOR READING PASSAGES & TITLES:
 - If ${skillLabel} includes a reading passage in the image(s), extract the full readable passage text cleanly into "passageText" (with paragraph breaks) and the title into "title". If not present, leave "passageText": "".
@@ -420,21 +661,22 @@ Return ONLY strictly valid JSON matching this schema:
   });
 
   const rawQuestions = Array.isArray(parsed?.questions) ? parsed.questions : [];
+  const validTypeSet = new Set(getQuestionTypesForSkill(skill).map(t => t.id));
   const normalizedQuestions = rawQuestions.map((q, idx) => {
     const rawType = String(q?.type || 'fill').toLowerCase().trim();
-    let type = 'fill';
-    if (rawType === 'mcq' || rawType === 'multiple_choice' || (Array.isArray(q?.options) && q.options.length >= 2 && rawType !== 'tfng')) {
-      type = 'mcq';
-    } else if (rawType === 'tfng' || rawType === 'true_false_not_given' || rawType === 'ynng') {
-      type = 'tfng';
-    }
+    let type = validTypeSet.has(rawType) ? rawType : 'fill';
+    if (rawType === 'multiple_choice') type = 'mcq';
+    else if (rawType === 'true_false_not_given' || rawType === 'ynng') type = 'tfng';
+    else if (type === 'fill' && Array.isArray(q?.options) && q.options.length >= 2) type = 'mcq';
 
+    const typeMeta = getQuestionTypeMeta(type, skill);
+    const parsedOpts = Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
     const options =
       type === 'tfng'
-        ? (Array.isArray(q?.options) && q.options.length > 0 ? q.options : ['TRUE', 'FALSE', 'NOT GIVEN'])
-        : type === 'mcq'
-        ? (Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [])
-        : [];
+        ? (parsedOpts.length > 0 ? parsedOpts : ['TRUE', 'FALSE', 'NOT GIVEN'])
+        : typeMeta.answerKind === 'text'
+        ? []
+        : parsedOpts;
 
     const blankNum = Number.isFinite(Number(q?.blankNum)) && Number(q.blankNum) > 0
       ? Number(q.blankNum)
@@ -445,6 +687,7 @@ Return ONLY strictly valid JSON matching this schema:
       type,
       question: String(q?.question || `${blankNum || idx + 1}. Câu hỏi`).trim(),
       options,
+      wordLimit: String(q?.wordLimit || '').trim(),
       correctAnswer: String(q?.correctAnswer ?? '').trim()
     };
   });

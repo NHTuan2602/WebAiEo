@@ -7,7 +7,8 @@
 export function roundSpeakingBand(score) {
   const num = Number(score);
   if (!Number.isFinite(num) || num <= 0) return 0;
-  return Math.min(9.0, Math.round((num + 1e-9) * 2) / 2);
+  // Speaking component bands and Speaking overall strictly use whole integer bands 1..9 (0 if silent/blank)
+  return Math.min(9, Math.max(1, Math.round(num)));
 }
 
 export function cleanAudioMimeType(rawMime = '') {
@@ -44,15 +45,16 @@ ${hintLine}`;
     .join('\n');
 
   return `You are an official IELTS Speaking Senior Examiner (certified by IDP and British Council).
-Evaluate the candidate's IELTS Speaking performance strictly according to the official 4 IELTS Speaking Band Descriptors (0.0 to 9.0, increments of 0.5):
+Evaluate the candidate's IELTS Speaking performance strictly according to the official 4 IELTS Speaking Band Descriptors:
 1. fc — Fluency and Coherence (độ trôi chảy, mạch lạc, tốc độ nói tự nhiên, phát triển ý, từ nối)
 2. lr — Lexical Resource (vốn từ vựng học thuật/idiomatic, collocation, paraphrase)
 3. gra — Grammatical Range and Accuracy (cấu trúc câu đơn/ghép/phức, thì, độ chính xác ngữ pháp)
 4. pr — Pronunciation (phát âm âm vị rõ ràng, trọng âm từ, ngữ điệu câu, độ dễ nghe)
 
 STRICT CRITICAL SCORING RULES:
-- Band 4.0 is NOT the minimum! If a recording is silent, background noise only, contains under 2 seconds of meaningless sounds, or has no English speech, assign Band 0.0 (or 1.0 if isolated unrelated words) for that question and 0.0 overall if all answers are empty/silent.
-- Judge primarily from the ACTUAL AUDIO RECORDINGS attached below when available (listen closely to pronunciation, intonation, pauses, filler words, self-corrections, grammar, and vocabulary).
+- MANDATORY INTEGER SCORING: Every IELTS Speaking criterion score (fc, lr, gra, pr) and overallBand MUST BE A WHOLE INTEGER from 1 to 9 (no .5 decimals like 6.5! Allowed scores: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9). Do NOT output half-bands.
+- Band 4 is NOT the minimum! If a recording is silent, background noise only, contains under 2 seconds of meaningless sounds, or has no English speech, assign Band 0 (or 1 if isolated unrelated words) for that question and 0 overall if all answers are empty/silent.
+- Judge strictly from the ACTUAL AUDIO RECORDINGS attached below when available (listen closely to pronunciation, intonation, pauses, filler words, self-corrections, grammar errors, spelling/word choice errors, and vocabulary).
 - Test Title: "${testTitle || 'IELTS Speaking Test'}"
 - Mode taken: "${partMode}" (${partMode === 'full' ? 'Full Test Parts 1-2-3' : `Quick Part Focus: ${partMode}`})
 
@@ -65,24 +67,24 @@ ${attachedAudioOrder || '(None attached)'}
 INSTRUCTIONS:
 1. For EVERY question listed above (matching exact "questionId"):
    - Write an accurate verbatim "transcript" of what the candidate actually said in the audio (include noticeable pauses like "[pause]" or fillers like "um/uh" if audible; write "(Không có giọng nói rõ ràng)" if silent/empty).
-   - Score individual "band" (0.0 - 9.0, step 0.5) AND per-question "criteria": { "fc": 7.0, "lr": 7.0, "gra": 7.0, "pr": 7.0 }.
+   - Score individual "band" (integer 0 - 9, NO decimals) AND per-question "criteria": { "fc": 7, "lr": 7, "gra": 6, "pr": 7 }.
    - Provide detailed helpful "feedback" in Vietnamese mentioning specific pronunciation/fluency/idea points.
    - Provide "fluencyMetrics": { "fillerWords": ["um", "like"], "pauseCount": 1, "paceNote": "Tốc độ nói tự nhiên (~130 WPM)", "comment": "Nhận xét độ trôi chảy & ngập ngừng bằng tiếng Việt..." }.
    - Provide up to 5 concrete "grammarVocabularyFixes": array of { "original": "exact substring copied verbatim from transcript", "corrected": "natural corrected English replacement", "reason": "giải thích ngắn tiếng Việt" }. IMPORTANT: "original" MUST match an exact phrase inside your "transcript" so the UI renders inline red strikethrough + green replacement right inside the text!
-   - Provide 2-4 "vocabularyUpgrades": array of { "basic": "simple word/phrase used", "upgraded": "Band 8.0+ academic/idiomatic collocation", "ipa": "/.../", "meaning": "nghĩa tiếng Việt" }.
-   - Provide "upgradedSample": a natural, high-scoring (Band 8.0-8.5) sample answer in English keeping and elevating the candidate's own ideas!
-2. Compute overall criterion scores: "fc", "lr", "gra", "pr" (0.0 - 9.0 step 0.5).
-3. Overall Speaking Band MUST equal average of the 4 criteria rounded to nearest 0.5 (or 0.0 if silent/no speech).
+   - Provide 2-4 "vocabularyUpgrades": array of { "basic": "simple word/phrase used", "upgraded": "Band 8+ academic/idiomatic collocation", "ipa": "/.../", "meaning": "nghĩa tiếng Việt" }.
+   - Provide "upgradedSample": a natural, high-scoring (Band 8-9) sample answer in English keeping and elevating the candidate's own ideas!
+2. Compute overall criterion scores: "fc", "lr", "gra", "pr" (strictly whole integers 0..9, NO .5 decimals).
+3. Overall Speaking Band MUST equal the average of the 4 criteria rounded to the nearest whole integer (0..9, NO .5 decimals; 0 if silent/no speech).
 4. Write "overallFeedback" in Vietnamese, plus 2-4 "strengths" and 2-4 "improvements" in Vietnamese.
 
 Return ONLY strictly valid JSON matching this schema (no markdown fences):
 {
-  "overallBand": 6.5,
+  "overallBand": 6,
   "criteria": {
-    "fc": 6.5,
-    "lr": 6.0,
-    "gra": 6.5,
-    "pr": 6.5
+    "fc": 6,
+    "lr": 6,
+    "gra": 6,
+    "pr": 6
   },
   "overallFeedback": "Nhận xét tổng quan chi tiết bằng tiếng Việt...",
   "strengths": ["Điểm mạnh 1", "Điểm mạnh 2"],
@@ -91,8 +93,8 @@ Return ONLY strictly valid JSON matching this schema (no markdown fences):
     {
       "questionId": "exact_question_id",
       "transcript": "Verbatim English spoken answer...",
-      "band": 6.5,
-      "criteria": { "fc": 6.5, "lr": 6.5, "gra": 6.0, "pr": 6.5 },
+      "band": 6,
+      "criteria": { "fc": 6, "lr": 6, "gra": 6, "pr": 6 },
       "feedback": "Nhận xét cụ thể bằng tiếng Việt cho câu này...",
       "fluencyMetrics": {
         "fillerWords": ["um", "like"],
@@ -115,7 +117,7 @@ Return ONLY strictly valid JSON matching this schema (no markdown fences):
           "meaning": "giúp tối ưu hóa việc đi lại hằng ngày"
         }
       ],
-      "upgradedSample": "Natural Band 8.0+ model response..."
+      "upgradedSample": "Natural Band 8+ model response..."
     }
   ]
 }`;

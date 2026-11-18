@@ -35,6 +35,8 @@ import {
   calculateWritingBand,
   getWordCount,
   roundIeltsBand,
+  roundDownIeltsHalfBand,
+  roundWholeBand,
   createUniqueAttemptId,
   getSpeedAdjustedTimeLimit,
   isObjectiveAnswerCorrect,
@@ -43,14 +45,16 @@ import {
   parseRawVocabText,
   normalizeRoomObject,
   pruneExpiredRoomChat,
-  buildSeededRoundQueues
+  buildSeededRoundQueues,
+  buildPracticeRoundQueues,
+  buildDefaultQuestionFields
 } from './utils/examHelpers';
 import {
   testGeminiApiConnection,
   callGeminiWritingGrader,
   simulateAIWritingGrading
 } from './utils/geminiGrader';
-import { requestAiSpeakingGrading } from './utils/speakingApi';
+import { requestAiSpeakingGrading, requestAiWritingGrading } from './utils/speakingApi';
 import { roundSpeakingBand } from './utils/speakingAiEngine';
 import { speakWord, playSound } from './utils/mediaHelpers';
 import { syncClozeBlanksWithQuestions } from './utils/clozeHelpers';
@@ -311,6 +315,7 @@ export default function App() {
   const [mailConfigured, setMailConfigured] = useState(false);
   const [showPaymentConfigModal, setShowPaymentConfigModal] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState(null);
+  const [gamePracticeLeaderboard, setGamePracticeLeaderboard] = useState([]);
   const [syncHydrated, setSyncHydrated] = useState(false);
   const [localSeenTitlesMap, setLocalSeenTitlesMap] = useState(() => {
     try {
@@ -1119,6 +1124,8 @@ export default function App() {
   const [gameTimeLimit, setGameTimeLimit] = useState(GAME_ROUND_TIME_LIMITS[1]);
   const [transitionCountdown, setTransitionCountdown] = useState(3);
   const [isSandboxRound, setIsSandboxRound] = useState(false);
+  const [isPracticeGameSession, setIsPracticeGameSession] = useState(false);
+  const [practiceTopicMeta, setPracticeTopicMeta] = useState({ topicId: 'core', topicLabel: 'IELTS Core Academic' });
   const [showMobileKeyboard, setShowMobileKeyboard] = useState(false);
   const [gameMuted, setGameMuted] = useState(false);
   const [gamePaused, setGamePaused] = useState(false);
@@ -1133,7 +1140,7 @@ export default function App() {
   const [gameToast, setGameToast] = useState({ text: '', isSuccess: true, visible: false });
   const [gameReviewLog, setGameReviewLog] = useState([]);
   const [activeQuestion, setActiveQuestion] = useState(null);
-  const [gameQueues, setGameQueues] = useState({ 1: [], 2: [], 3: [] });
+  const [gameQueues, setGameQueues] = useState({ 1: [], 2: [], 3: [], 4: [] });
 
   const lastLaunchedAtRef = useRef(null);
   const lobbyCountdownTimerRef = useRef(null);
@@ -1168,8 +1175,10 @@ export default function App() {
     typedProgress: 0,
     subState: 'JOIN',
     activeQuestion: null,
-    queues: { 1: [], 2: [], 3: [] },
+    queues: { 1: [], 2: [], 3: [], 4: [] },
     isSandbox: false,
+    isPractice: false,
+    practiceMeta: null,
     paused: false,
     darkMode: typeof localStorage !== 'undefined' && localStorage.getItem('ielts_theme') === 'dark',
     crewColorId: 'cyan',
@@ -1245,11 +1254,13 @@ export default function App() {
     setLobbyCountdown(null);
     setJoinedRoomPin(null);
     setGameSubState('JOIN');
+    setIsPracticeGameSession(false);
     setRoomJoinForm({ pin: '', pass: '' });
     setRoomJoinError('');
     gameRuntimeRef.current = {
       ...gameRuntimeRef.current,
       subState: 'JOIN',
+      isPractice: false,
       paused: false,
       activeQuestion: null,
       timeLimit: 18
@@ -1408,6 +1419,9 @@ export default function App() {
     }
     if (Array.isArray(snap.customTitles)) {
       setCustomTitles(prev => (JSON.stringify(prev) === JSON.stringify(snap.customTitles) ? prev : snap.customTitles));
+    }
+    if (Array.isArray(snap.gamePracticeLeaderboard)) {
+      setGamePracticeLeaderboard(prev => (JSON.stringify(prev) === JSON.stringify(snap.gamePracticeLeaderboard) ? prev : snap.gamePracticeLeaderboard));
     }
     if (snap.paymentConfig && typeof snap.paymentConfig === 'object') {
       setPaymentConfig(prev => (JSON.stringify(prev) === JSON.stringify(snap.paymentConfig) ? prev : snap.paymentConfig));
@@ -2653,6 +2667,40 @@ export default function App() {
     showToast(`Đã mở lại Sảnh Chờ cho phòng ${pin}! Học sinh có thể vào sảnh ngay.`);
   };
 
+  const handleTeacherApproveLobbyPlayer = (pin = currentRoomPin, targetUsername = '', approveAll = false) => {
+    if (currentUser?.role !== 'teacher') return;
+    const targetPin = pin || currentRoomPin;
+    setRoomsDb(prev => {
+      const r = normalizeRoomObject(prev[targetPin], targetPin);
+      const nextLobby = { ...(r.lobbyPlayers || {}) };
+      if (approveAll) {
+        Object.keys(nextLobby).forEach(uname => {
+          if (nextLobby[uname] && nextLobby[uname].role !== 'teacher') {
+            nextLobby[uname] = { ...nextLobby[uname], approved: true, ready: true };
+          }
+        });
+      } else if (targetUsername && nextLobby[targetUsername]) {
+        const nextVal = !(nextLobby[targetUsername].approved ?? nextLobby[targetUsername].ready);
+        nextLobby[targetUsername] = { ...nextLobby[targetUsername], approved: nextVal, ready: nextVal };
+      }
+      return {
+        ...prev,
+        [targetPin]: { ...r, lobbyPlayers: nextLobby }
+      };
+    });
+    const currentRoom = normalizeRoomObject(roomsDb[targetPin], targetPin);
+    const currentApproved = targetUsername
+      ? !(currentRoom.lobbyPlayers?.[targetUsername]?.approved ?? currentRoom.lobbyPlayers?.[targetUsername]?.ready)
+      : true;
+    dispatchSyncAction('APPROVE_LOBBY_PLAYER', {
+      pin: targetPin,
+      username: targetUsername,
+      approveAll,
+      approved: approveAll ? true : currentApproved
+    });
+    showToast(approveAll ? 'Đã duyệt tất cả học viên vào trận Thực Chiến Live!' : `Đã cập nhật trạng thái duyệt cho @${targetUsername}.`);
+  };
+
   const handleTeacherStartLobbyGame = (pin = currentRoomPin) => {
     const targetPin = pin || currentRoomPin;
     const targetRoom = normalizeRoomObject(roomsDb[targetPin], targetPin);
@@ -3279,6 +3327,8 @@ export default function App() {
     setShowMailConfigModal(false);
     setShowPaymentConfigModal(false);
     setPaymentConfig(null);
+    setGamePracticeLeaderboard([]);
+    setIsPracticeGameSession(false);
     setSyncHydrated(false);
     titleBaselinePersistedRef.current = '';
     serverBonusTotalRef.current = 0;
@@ -3574,6 +3624,54 @@ export default function App() {
       setResultReviewTab('listening');
     }
     setView('RESULT_VIEW');
+
+    const includesWriting = cfg.testMode !== 'single_skill' || cfg.focusSkill === 'writing';
+    const hasWrittenContent = getWordCount(examState.answers?.w1) > 0 || getWordCount(examState.answers?.w2) > 0;
+    if (includesWriting && hasWrittenContent) {
+      (async () => {
+        setIsGradingAI(true);
+        setAiGradingStep('AI Examiner đang bắt lỗi chính tả, ngữ pháp, tư duy đề & nâng cấp từ vựng Writing...');
+        try {
+          const { evaluation, attempt: serverUpdated } = await requestAiWritingGrading({
+            attemptId: newAttempt.id,
+            task1Prompt: activeTest?.writing?.task1?.prompt || '',
+            task1Text: newAttempt.answers?.w1 || '',
+            task2Prompt: activeTest?.writing?.task2?.prompt || '',
+            task2Text: newAttempt.answers?.w2 || '',
+            clientApiKey: currentUser?.role === 'teacher' ? (aiApiKey || '').trim() : ''
+          });
+
+          if (serverUpdated && serverUpdated.id === newAttempt.id) {
+            setAttempts(prev => prev.map(att => (att.id === newAttempt.id ? serverUpdated : att)));
+          } else if (evaluation) {
+            const t1 = roundDownIeltsHalfBand(evaluation.task1Band ?? 0);
+            const t2 = roundDownIeltsHalfBand(evaluation.task2Band ?? 0);
+            const wtOverall = calculateWritingBand(t1, t2);
+            const finalOverall = computeAttemptFinalOverall(newAttempt.scores, wtOverall, newAttempt);
+            const enrichedAttempt = {
+              ...newAttempt,
+              aiGraded: true,
+              aiDetails: evaluation,
+              aiWritingTicket: evaluation.aiWritingTicket || undefined,
+              scores: {
+                ...newAttempt.scores,
+                writing: { task1Band: t1, task2Band: t2, overallBand: wtOverall }
+              },
+              overallBand: finalOverall,
+              teacherFeedback: evaluation.feedback || ''
+            };
+            setAttempts(prev => prev.map(att => (att.id === newAttempt.id ? enrichedAttempt : att)));
+            dispatchSyncAction('UPSERT_ATTEMPT', { attempt: enrichedAttempt });
+          }
+          showToast('Đã hoàn tất bắt lỗi chính tả, ngữ pháp & gợi ý nâng band Writing!');
+        } catch (err) {
+          console.warn('Auto post-submit writing analysis skipped:', err?.message || err);
+        } finally {
+          setIsGradingAI(false);
+          setAiGradingStep('');
+        }
+      })();
+    }
   };
 
   const advanceToNextExamSection = (isAutoTimeout = false) => {
@@ -3652,13 +3750,13 @@ export default function App() {
     }
   };
 
-  // Shared Writing AI Grading helper (Teacher-controlled)
+  // Shared Writing AI Grading helper (Teacher & post-submit student analysis)
   const runWritingGradingEngine = async (targetAttempt) => {
     const test = tests.find(t => t.id === targetAttempt.testId);
-    const cleanKey = (aiApiKey || '').trim();
+    const cleanKey = currentUser?.role === 'teacher' ? (aiApiKey || '').trim() : '';
 
     if (cleanKey) {
-      setAiGradingStep('Đang kết nối Google Gemini API...');
+      setAiGradingStep('Đang kết nối Google Gemini API (Strict IELTS Senior Examiner)...');
       try {
         const res = await callGeminiWritingGrader({
           apiKey: cleanKey,
@@ -3671,22 +3769,25 @@ export default function App() {
       } catch (apiErr) {
         console.warn('Gemini API error:', apiErr);
         showToast(`Gemini API lỗi: ${apiErr.message}`, 'error');
-        setAiGradingStep(`API lỗi (${apiErr.message}) — chuyển sang bộ chấm tích hợp...`);
-        await new Promise(r => setTimeout(r, 900));
+        setAiGradingStep(`API lỗi (${apiErr.message}) — chuyển sang máy chủ / bộ phân tích tích hợp...`);
       }
-    } else {
-      await new Promise(r => setTimeout(r, 600));
-      setAiGradingStep('Đang phân tích cấu trúc & đối chiếu 4 tiêu chí IELTS...');
-      await new Promise(r => setTimeout(r, 700));
     }
 
-    const fallback = simulateAIWritingGrading({
-      _task1Prompt: test?.writing?.task1?.prompt,
-      task1Text: targetAttempt.answers?.w1,
-      _task2Prompt: test?.writing?.task2?.prompt,
-      task2Text: targetAttempt.answers?.w2
+    setAiGradingStep('AI Examiner đang phân tích lỗi ngữ pháp, chính tả, bảng sửa câu & nâng band...');
+    const { evaluation } = await requestAiWritingGrading({
+      attemptId: targetAttempt.id,
+      task1Prompt: test?.writing?.task1?.prompt || '',
+      task1Text: targetAttempt.answers?.w1 || '',
+      task2Prompt: test?.writing?.task2?.prompt || '',
+      task2Text: targetAttempt.answers?.w2 || '',
+      clientApiKey: cleanKey
     });
-    return { ...fallback, _engineLabel: 'AI Examiner Tích Hợp (Offline)' };
+    const usedModel = evaluation?._usedModel || 'built-in-writing-examiner';
+    const isGemini = usedModel.includes('gemini');
+    return {
+      ...evaluation,
+      _engineLabel: isGemini ? `Google Gemini (${usedModel})` : 'AI Examiner Tích Hợp (Strict Mode)'
+    };
   };
 
   const computeAttemptFinalOverall = (attemptScores, writingOverall, attemptRef = null) => {
@@ -3708,9 +3809,11 @@ export default function App() {
     return calculateOverallIeltsBand(activeSkillBands);
   };
 
-  // AI Writing Grading Trigger (Teacher only)
+  // AI Writing Grading Trigger (Teacher or student re-run for own ungraded Writing)
   const handleGradeWritingWithAI = async (targetAttempt) => {
-    if (!targetAttempt || currentUser?.role !== 'teacher') return;
+    const isTeacherUser = currentUser?.role === 'teacher';
+    const isOwnAttempt = currentUser?.username && targetAttempt?.studentId === currentUser.username;
+    if (!targetAttempt || (!isTeacherUser && !isOwnAttempt)) return;
     setIsGradingAI(true);
     setAiGradingStep('Khởi tạo AI IELTS Senior Examiner...');
 
@@ -3718,20 +3821,18 @@ export default function App() {
       const aiResult = await runWritingGradingEngine(targetAttempt);
       const rawT1 = parseFloat(aiResult.task1Band);
       const rawT2 = parseFloat(aiResult.task2Band);
-      const rawOverallW = parseFloat(aiResult.overallBand);
-      const t1 = Number.isFinite(rawT1) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT1))) : 0;
-      const t2 = Number.isFinite(rawT2) ? roundIeltsBand(Math.max(0, Math.min(9.0, rawT2))) : 0;
-      const writingOverall = Number.isFinite(rawOverallW)
-        ? roundIeltsBand(Math.max(0, Math.min(9.0, rawOverallW)))
-        : calculateWritingBand(t1, t2);
+      const t1 = Number.isFinite(rawT1) ? roundDownIeltsHalfBand(Math.max(0, Math.min(9.0, rawT1))) : 0;
+      const t2 = Number.isFinite(rawT2) ? roundDownIeltsHalfBand(Math.max(0, Math.min(9.0, rawT2))) : 0;
+      const writingOverall = calculateWritingBand(t1, t2);
 
       const finalOverall = computeAttemptFinalOverall(targetAttempt.scores, writingOverall, targetAttempt);
 
       const updatedAiAttempt = {
         ...targetAttempt,
-        teacherGraded: true,
+        teacherGraded: isTeacherUser ? true : Boolean(targetAttempt.teacherGraded),
         aiGraded: true,
         aiDetails: aiResult,
+        aiWritingTicket: aiResult.aiWritingTicket || undefined,
         scores: {
           ...targetAttempt.scores,
           writing: { task1Band: t1, task2Band: t2, overallBand: writingOverall }
@@ -3741,7 +3842,7 @@ export default function App() {
       };
       setAttempts(prev => prev.map(att => (att.id === targetAttempt.id ? updatedAiAttempt : att)));
       dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAiAttempt });
-      showToast(`Đã hoàn tất chấm điểm (${aiResult._engineLabel})!`);
+      showToast(`Đã hoàn tất chấm điểm & phân tích lỗi (${aiResult._engineLabel})!`);
     } catch (err) {
       alert('Có lỗi xảy ra trong quá trình chấm điểm: ' + err.message);
     } finally {
@@ -3975,12 +4076,16 @@ export default function App() {
     const isSpeakingAttempt = gradingAttempt.focusSkill === 'speaking' || Boolean(gradingAttempt.scores?.speaking);
     let updatedAttemptObj;
     if (isSpeakingAttempt) {
-      const spBand = sanitizeBandScore(gradingScores.speakingBand);
+      const spFc = roundWholeBand(gradingScores.speakingFc);
+      const spLr = roundWholeBand(gradingScores.speakingLr);
+      const spGra = roundWholeBand(gradingScores.speakingGra);
+      const spPr = roundWholeBand(gradingScores.speakingPr);
+      const spBand = roundWholeBand(gradingScores.speakingBand || (spFc + spLr + spGra + spPr) / 4);
       const nextCrit = {
-        fc: sanitizeBandScore(gradingScores.speakingFc),
-        lr: sanitizeBandScore(gradingScores.speakingLr),
-        gra: sanitizeBandScore(gradingScores.speakingGra),
-        pr: sanitizeBandScore(gradingScores.speakingPr)
+        fc: spFc,
+        lr: spLr,
+        gra: spGra,
+        pr: spPr
       };
       updatedAttemptObj = {
         ...gradingAttempt,
@@ -4400,24 +4505,16 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Question CRUD Helpers for Listening & Reading Builder
+  // Question CRUD Helpers for Listening & Reading Builder (all 11 Reading + 6 Listening types)
   const addQuestionToSkill = (skill, questionType = 'mcq') => {
     const currentQuestions = testForm[skill]?.questions || [];
     const nextNum = currentQuestions.length + 1;
-    const isTfng = questionType === 'tfng';
-    const isFill = questionType === 'fill';
-    const options = isTfng
-      ? ['TRUE', 'FALSE', 'NOT GIVEN']
-      : isFill
-      ? []
-      : ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'];
+    const defaults = buildDefaultQuestionFields(questionType, skill);
     const newQ = {
       id: `${skill[0]}q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      type: questionType,
+      ...defaults,
       source: 'manual',
       question: `${nextNum}. Nhập nội dung câu hỏi số ${nextNum}...`,
-      options,
-      correctAnswer: isTfng ? 'TRUE' : isFill ? '' : 'A. Đáp án A',
       ...(skill === 'reading' ? { passageIdx: builderReadingIdx } : {}),
       ...(skill === 'listening' ? { trackIdx: builderListeningIdx } : {})
     };
@@ -4438,16 +4535,8 @@ export default function App() {
         questions: (prev[skill]?.questions || []).map(q => {
           if (q.id !== qId) return q;
           if (field === 'type') {
-            if (value === 'tfng') {
-              return { ...q, type: 'tfng', options: ['TRUE', 'FALSE', 'NOT GIVEN'], correctAnswer: 'TRUE' };
-            }
-            if (value === 'mcq') {
-              const defaultOpts = q.options?.length === 4 ? q.options : ['A. Lựa chọn A', 'B. Lựa chọn B', 'C. Lựa chọn C', 'D. Lựa chọn D'];
-              return { ...q, type: 'mcq', options: defaultOpts, correctAnswer: defaultOpts[0] };
-            }
-            if (value === 'fill') {
-              return { ...q, type: 'fill', options: [], correctAnswer: '' };
-            }
+            const defaults = buildDefaultQuestionFields(value, skill, q.options);
+            return { ...q, ...defaults };
           }
           return { ...q, [field]: value };
         })
@@ -4719,10 +4808,103 @@ export default function App() {
     }
   }, [roomsDb, view, joinedRoomPin, currentRoomPin, currentUser]);
 
+  const submitPracticeGameScore = (scoreVal, passedWords, totalWords) => {
+    if (!currentUser?.username) return;
+    const meta = gameRuntimeRef.current.practiceMeta || practiceTopicMeta || { topicId: 'core', topicLabel: 'IELTS Core Academic', mode: 'full_4' };
+    dispatchSyncAction('SUBMIT_PRACTICE_GAME_SCORE', {
+      username: currentUser.username,
+      topicId: meta.topicId || 'core',
+      topicLabel: meta.topicLabel || 'IELTS Core Academic',
+      mode: meta.singleRoundOnly ? `round_${gameRuntimeRef.current.round}` : 'full_4',
+      score: scoreVal,
+      passedCount: passedWords,
+      totalCount: Math.max(1, totalWords)
+    });
+  };
+
+  const initPracticeGameCampaign = ({
+    topicId = 'core',
+    topicLabel = 'IELTS Core Academic',
+    rawVocab = DEFAULT_VOCAB_TEXT,
+    speedMode = 'normal',
+    startRound = 1,
+    singleRoundOnly = false
+  } = {}) => {
+    clearTimeout(autoNextTimerRef.current);
+    clearInterval(wordTimerRef.current);
+    clearInterval(lobbyCountdownTimerRef.current);
+    serverBonusTotalRef.current = 0;
+
+    const queues = buildPracticeRoundQueues({
+      rawVocab: rawVocab || DEFAULT_VOCAB_TEXT,
+      roundSize: 4,
+      seedStr: `practice:${currentUser?.username || 'guest'}:${Date.now()}`
+    });
+    const validRound = [1, 2, 3, 4].includes(Number(startRound)) ? Number(startRound) : 1;
+    const firstQ = queues[validRound]?.[0] || null;
+    const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
+
+    homingLasersRef.current = [];
+    particlesRef.current = [];
+    missedWordsMatchRef.current = [];
+    bonusTimeSecRef.current = 0;
+    freezeUntilRef.current = 0;
+
+    const limit = getSpeedAdjustedTimeLimit(validRound, speedMode);
+    const practiceMeta = { topicId, topicLabel, singleRoundOnly, mode: singleRoundOnly ? `round_${validRound}` : 'full_4' };
+    setPracticeTopicMeta(practiceMeta);
+    setIsPracticeGameSession(true);
+
+    gameRuntimeRef.current = {
+      round: validRound,
+      score: 0,
+      lives: 3,
+      combo: 0,
+      wordIdx: 0,
+      typedProgress: initialProgress,
+      subState: 'PLAYING',
+      activeQuestion: firstQ,
+      queues,
+      isSandbox: false,
+      isPractice: true,
+      practiceMeta,
+      paused: false,
+      speedMode,
+      crewColorId: myCrewColor,
+      animalId: myAnimalId,
+      accessoryId: myAccessoryId,
+      timeLimit: limit,
+      questionResolved: false
+    };
+
+    setGameQueues(queues);
+    setGameRound(validRound);
+    setGameScore(0);
+    setGameLives(3);
+    setGameCombo(0);
+    setGameWordIdx(0);
+    setGameTypedProgress(initialProgress);
+    setGameSubState('PLAYING');
+    setGamePaused(false);
+    setFreezeCharges(2);
+    setIsFrozenBoost(false);
+    setGameOutcome(null);
+    setIsSandboxRound(false);
+    setGameReviewLog([]);
+    setActiveQuestion(firstQ);
+    setView('GAME_ARENA');
+    resetWordTimer(validRound, speedMode);
+
+    if (validRound === 2 && firstQ) {
+      speakWord(firstQ.word);
+    }
+  };
+
   const initGameCampaign = (pin = joinedRoomPin || currentRoomPin, _userObj = currentUser) => {
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
     serverBonusTotalRef.current = 0;
+    setIsPracticeGameSession(false);
 
     const roomObj = normalizeRoomObject(roomsDb[pin] || {}, pin);
     const speedMode = roomObj.speedMode || 'normal';
@@ -4748,6 +4930,8 @@ export default function App() {
       activeQuestion: firstQ,
       queues,
       isSandbox: false,
+      isPractice: false,
+      practiceMeta: null,
       paused: false,
       speedMode,
       crewColorId: myCrewColor,
@@ -4778,7 +4962,7 @@ export default function App() {
       streakVal: 0,
       livesVal: 3,
       roundNum: 1,
-      progressText: `Vòng 1/3 • Câu 1/${Math.max(1, queues[1]?.length || 1)}`,
+      progressText: `Vòng 1/4 • Câu 1/${Math.max(1, queues[1]?.length || 1)}`,
       missedWords: []
     });
   };
@@ -4794,6 +4978,7 @@ export default function App() {
     }
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
+    setIsPracticeGameSession(false);
 
     let queues = gameRuntimeRef.current.queues;
     if (!queues?.[roundNum]?.length) {
@@ -4820,6 +5005,7 @@ export default function App() {
       subState: 'PLAYING',
       activeQuestion: firstQ,
       isSandbox: true,
+      isPractice: false,
       paused: false,
       speedMode,
       crewColorId: myCrewColor,
@@ -4842,25 +5028,26 @@ export default function App() {
     setActiveQuestion(firstQ);
     resetWordTimer(roundNum, speedMode);
 
-    if (roundNum === 3 && firstQ) {
+    if (roundNum === 2 && firstQ) {
       speakWord(firstQ.word);
     }
   };
 
   const advanceNextGameRound = () => {
     clearTimeout(autoNextTimerRef.current);
-    const nextR = gameRuntimeRef.current.round + 1;
-    const queue = gameRuntimeRef.current.queues[nextR] || [];
+    const rt = gameRuntimeRef.current;
+    const nextR = rt.round + 1;
+    const queue = rt.queues[nextR] || [];
     const firstQ = queue[0] || null;
     const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
 
     homingLasersRef.current = [];
-    gameRuntimeRef.current.round = nextR;
-    gameRuntimeRef.current.wordIdx = 0;
-    gameRuntimeRef.current.typedProgress = initialProgress;
-    gameRuntimeRef.current.subState = 'PLAYING';
-    gameRuntimeRef.current.activeQuestion = firstQ;
-    gameRuntimeRef.current.questionResolved = false;
+    rt.round = nextR;
+    rt.wordIdx = 0;
+    rt.typedProgress = initialProgress;
+    rt.subState = 'PLAYING';
+    rt.activeQuestion = firstQ;
+    rt.questionResolved = false;
 
     setGameRound(nextR);
     setGameWordIdx(0);
@@ -4868,16 +5055,18 @@ export default function App() {
     setGameSubState('PLAYING');
     setActiveQuestion(firstQ);
     resetWordTimer(nextR);
-    syncLiveMatchProgress({
-      scoreVal: gameRuntimeRef.current.score,
-      streakVal: gameRuntimeRef.current.combo,
-      livesVal: gameRuntimeRef.current.lives,
-      roundNum: nextR,
-      progressText: `Vòng ${nextR}/3 • Câu 1/${Math.max(1, queue.length)}`,
-      missedWords: [...missedWordsMatchRef.current]
-    });
+    if (!rt.isPractice) {
+      syncLiveMatchProgress({
+        scoreVal: rt.score,
+        streakVal: rt.combo,
+        livesVal: rt.lives,
+        roundNum: nextR,
+        progressText: `Vòng ${nextR}/4 • Câu 1/${Math.max(1, queue.length)}`,
+        missedWords: [...missedWordsMatchRef.current]
+      });
+    }
 
-    if (firstQ && nextR === 3) {
+    if (firstQ && nextR === 2) {
       speakWord(firstQ.word);
     }
   };
@@ -4912,35 +5101,39 @@ export default function App() {
       setActiveQuestion(nextQ);
       setGameTypedProgress(nextTyped);
       resetWordTimer(currentRoundNum);
-      syncLiveMatchProgress({
-        scoreVal: finalScore,
-        streakVal: finalCombo,
-        livesVal: rt.lives,
-        roundNum: currentRoundNum,
-        progressText: `Vòng ${currentRoundNum}/3 • Câu ${nextIdx + 1}/${Math.max(1, currentQueue.length)}`,
-        missedWords: [...missedWordsMatchRef.current],
-        ...(isCorrect && solveEvent ? { solveEvent } : {})
-      });
-
-      if (currentRoundNum === 3) {
-        speakWord(nextQ.word);
-      }
-    } else {
-      clearInterval(wordTimerRef.current);
-      // Round completed!
-      if (currentRoundNum < 3 && !rt.isSandbox) {
-        rt.subState = 'TRANSITION';
-        setGameSubState('TRANSITION');
-        setTransitionCountdown(3);
+      if (!rt.isPractice) {
         syncLiveMatchProgress({
           scoreVal: finalScore,
           streakVal: finalCombo,
           livesVal: rt.lives,
           roundNum: currentRoundNum,
-          progressText: `Xong Vòng ${currentRoundNum}/3`,
+          progressText: `Vòng ${currentRoundNum}/4 • Câu ${nextIdx + 1}/${Math.max(1, currentQueue.length)}`,
           missedWords: [...missedWordsMatchRef.current],
           ...(isCorrect && solveEvent ? { solveEvent } : {})
         });
+      }
+
+      if (currentRoundNum === 2) {
+        speakWord(nextQ.word);
+      }
+    } else {
+      clearInterval(wordTimerRef.current);
+      const isSingleStop = (rt.isSandbox) || (rt.isPractice && rt.practiceMeta?.singleRoundOnly);
+      if (currentRoundNum < 4 && !isSingleStop) {
+        rt.subState = 'TRANSITION';
+        setGameSubState('TRANSITION');
+        setTransitionCountdown(3);
+        if (!rt.isPractice) {
+          syncLiveMatchProgress({
+            scoreVal: finalScore,
+            streakVal: finalCombo,
+            livesVal: rt.lives,
+            roundNum: currentRoundNum,
+            progressText: `Xong Vòng ${currentRoundNum}/4`,
+            missedWords: [...missedWordsMatchRef.current],
+            ...(isCorrect && solveEvent ? { solveEvent } : {})
+          });
+        }
         let countdown = 3;
         clearTimeout(autoNextTimerRef.current);
         const tick = () => {
@@ -4955,28 +5148,34 @@ export default function App() {
         };
         autoNextTimerRef.current = setTimeout(tick, 1000);
       } else {
-        // Finished all 3 rounds or sandbox round
+        // Finished all 4 rounds, Practice Run, or Sandbox Round
         rt.subState = 'GAMEOVER';
         setGameOutcome('VICTORY');
         setGameSubState('GAMEOVER');
         const allMissed = [...missedWordsMatchRef.current];
-        syncLiveMatchProgress({
-          scoreVal: finalScore,
-          streakVal: finalCombo,
-          livesVal: rt.lives,
-          roundNum: currentRoundNum,
-          progressText: 'Hoàn thành 3 Vòng',
-          finished: true,
-          outcome: 'VICTORY',
-          missedWords: allMissed,
-          ...(isCorrect && solveEvent ? { solveEvent } : {})
-        });
-        syncScoreToLeaderboard(
-          finalScore,
-          rt.isSandbox ? `Hoàn thành Màn ${currentRoundNum} (GV)` : 'Hoàn thành 3 Vòng',
-          finalCombo,
-          allMissed
-        );
+        const passedTotal = (gameReviewLog.filter(i => i.passed).length) + (isCorrect ? 1 : 0);
+        const attemptedTotal = gameReviewLog.length + (gameReviewLog.some(i => i.word === q.word && i.round === currentRoundNum) ? 0 : 1);
+        if (rt.isPractice) {
+          submitPracticeGameScore(finalScore, passedTotal, attemptedTotal);
+        } else {
+          syncLiveMatchProgress({
+            scoreVal: finalScore,
+            streakVal: finalCombo,
+            livesVal: rt.lives,
+            roundNum: currentRoundNum,
+            progressText: 'Hoàn thành 4 Vòng',
+            finished: true,
+            outcome: 'VICTORY',
+            missedWords: allMissed,
+            ...(isCorrect && solveEvent ? { solveEvent } : {})
+          });
+          syncScoreToLeaderboard(
+            finalScore,
+            rt.isSandbox ? `Hoàn thành Màn ${currentRoundNum} (GV)` : 'Hoàn thành 4 Vòng',
+            finalCombo,
+            allMissed
+          );
+        }
       }
     }
   };
@@ -5011,43 +5210,115 @@ export default function App() {
       rt.questionResolved = true;
       setGameOutcome('LOST');
       setGameSubState('GAMEOVER');
-      syncLiveMatchProgress({
-        scoreVal: rt.score,
-        streakVal: 0,
-        livesVal: 0,
-        roundNum,
-        progressText: `Hết mạng ở Vòng ${roundNum}`,
-        finished: true,
-        outcome: 'LOST',
-        missedWords: allMissed
-      });
-      syncScoreToLeaderboard(
-        rt.score,
-        `Hết mạng ở Vòng ${roundNum}`,
-        0,
-        allMissed
-      );
+      if (rt.isPractice) {
+        const passedTotal = gameReviewLog.filter(i => i.passed).length;
+        const attemptedTotal = Math.max(1, gameReviewLog.length + 1);
+        submitPracticeGameScore(rt.score, passedTotal, attemptedTotal);
+      } else {
+        syncLiveMatchProgress({
+          scoreVal: rt.score,
+          streakVal: 0,
+          livesVal: 0,
+          roundNum,
+          progressText: `Hết mạng ở Vòng ${roundNum}/4`,
+          finished: true,
+          outcome: 'LOST',
+          missedWords: allMissed
+        });
+        syncScoreToLeaderboard(
+          rt.score,
+          `Hết mạng ở Vòng ${roundNum}`,
+          0,
+          allMissed
+        );
+      }
       return;
     }
 
     if (advanceOnSurvive) {
       handleWordCleared(false, rt.score, 0);
-    } else {
+    } else if (!rt.isPractice) {
       syncLiveMatchProgress({
         scoreVal: rt.score,
         streakVal: 0,
         livesVal: nextLives,
         roundNum,
-        progressText: `Vòng ${roundNum}/3 • Câu ${rt.wordIdx + 1}/${Math.max(1, (rt.queues[roundNum] || []).length)}`,
+        progressText: `Vòng ${roundNum}/4 • Câu ${rt.wordIdx + 1}/${Math.max(1, (rt.queues[roundNum] || []).length)}`,
         missedWords: allMissed
       });
     }
   };
 
-  // Handle typing input in Round 2 and Round 3
+  // Unified choice / target resolution helper for V1 (Meaning), V3 (Syn/Ant/Def) & V4 (Collocation)
+  const resolveGameChoiceAttempt = (choiceLabel, isCorrect, fxX = null, fxY = null) => {
+    const rt = gameRuntimeRef.current;
+    const q = rt.activeQuestion;
+    if (!q || rt.subState !== 'PLAYING' || rt.questionResolved || rt.paused) return false;
+    if (rt.round !== 1 && rt.round !== 3 && rt.round !== 4) return false;
+
+    const canvas = canvasRef.current;
+    const px = fxX ?? ((canvas?.width || 800) / 2);
+    const py = fxY ?? Math.max(90, (canvas?.height || 460) * 0.35);
+
+    if (isCorrect) {
+      rt.questionResolved = true;
+      const limitSec = Math.max(1, rt.timeLimit || 22);
+      const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
+      const reactionMs = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
+      const basePts = rt.round === 4 ? 220 : rt.round === 3 ? 180 : 120;
+      const speedBonus = Math.round(remainRatio * (rt.round === 4 ? 110 : 90));
+      const feverMult = rt.combo >= 3 ? 2 : 1;
+      const gain = (basePts + rt.combo * 25 + speedBonus) * feverMult;
+      const nextCombo = rt.combo + 1;
+      const nextScore = rt.score + gain;
+      rt.score = nextScore;
+      rt.combo = nextCombo;
+      setGameScore(nextScore);
+      setGameCombo(nextCombo);
+
+      pushGameParticles(px, py, feverMult > 1 ? '#fbbf24' : '#22d3ee', 26);
+      playSound('word_clear');
+      speakWord(q.word);
+      const feedbackTag = rt.round === 4 ? q.v4Target : rt.round === 3 ? q.v3Target : `${q.word} (${q.ipa})`;
+      triggerGameToast(
+        `✅ Chính xác! ${feedbackTag} +${gain}đ${speedBonus > 0 ? ` (⚡+${speedBonus})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+        true
+      );
+      handleWordCleared(true, nextScore, nextCombo, {
+        questionKey: `${rt.round}:${q.word}`,
+        word: q.word,
+        reactionMs
+      });
+      return true;
+    }
+
+    pushGameParticles(px, py, '#fb7185', 16);
+    const roundHint = rt.round === 4
+      ? 'Hãy chọn đúng cụm Collocation tự nhiên với từ khóa!'
+      : rt.round === 3
+      ? 'Hãy đọc kỹ yêu cầu Đồng nghĩa / Trái nghĩa / Định nghĩa!'
+      : 'Hãy nhìn kỹ nghĩa tiếng Việt & bắn mục tiêu đúng!';
+    handleGameLifeLoss(`❌ Chọn nhầm "${choiceLabel}"! ${roundHint}`, false);
+    return false;
+  };
+  const resolveGameChoiceAttemptRef = useRef(resolveGameChoiceAttempt);
+  resolveGameChoiceAttemptRef.current = resolveGameChoiceAttempt;
+
+  const handleGameChoiceSelect = (choiceText) => {
+    const rt = gameRuntimeRef.current;
+    const q = rt.activeQuestion;
+    if (!q || rt.subState !== 'PLAYING' || rt.questionResolved) return;
+    const targetAnswer =
+      rt.round === 1 ? q.word : rt.round === 3 ? q.v3Target : rt.round === 4 ? q.v4Target : '';
+    if (!targetAnswer) return;
+    const isCorrect = String(choiceText || '').trim().toLowerCase() === String(targetAnswer).trim().toLowerCase();
+    resolveGameChoiceAttempt(choiceText, isCorrect);
+  };
+
+  // Handle typing input in Round 2 (Full Word Typing — V2)
   const handleGameTypingInput = (char) => {
     const rt = gameRuntimeRef.current;
-    if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 3) || !rt.activeQuestion || rt.questionResolved) return;
+    if (rt.subState !== 'PLAYING' || rt.round !== 2 || !rt.activeQuestion || rt.questionResolved) return;
 
     const q = rt.activeQuestion;
     const target = q.word.toUpperCase();
@@ -5073,14 +5344,14 @@ export default function App() {
 
       if (nextProgress >= target.length) {
         rt.questionResolved = true;
-        const limitSec = Math.max(1, rt.timeLimit || (rt.round === 2 ? 22 : 24));
-        const remainRatioR23 = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
-        const reactionMsR23 = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
-        const speedBonusR23 = Math.round(remainRatioR23 * (rt.round === 2 ? 100 : 120));
+        const limitSec = Math.max(1, rt.timeLimit || 25);
+        const remainRatioR2 = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
+        const reactionMsR2 = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
+        const speedBonusR2 = Math.round(remainRatioR2 * 120);
         const feverMult = rt.combo >= 3 ? 2 : 1;
-        const bonus = rt.round === 2 ? 150 : 250;
+        const bonus = 200;
         const streakBonus = rt.combo * 25;
-        const totalGain = (bonus + streakBonus + speedBonusR23) * feverMult;
+        const totalGain = (bonus + streakBonus + speedBonusR2) * feverMult;
         const nextScore = rt.score + totalGain;
         const nextCombo = rt.combo + 1;
 
@@ -5093,13 +5364,13 @@ export default function App() {
         playSound('word_clear');
         speakWord(q.word);
         triggerGameToast(
-          `🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ${speedBonusR23 > 0 ? ` (⚡+${speedBonusR23})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+          `🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ${speedBonusR2 > 0 ? ` (⚡+${speedBonusR2})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
           true
         );
         handleWordCleared(true, nextScore, nextCombo, {
-          questionKey: `${rt.round}:${q.word}`,
+          questionKey: `2:${q.word}`,
           word: q.word,
-          reactionMs: reactionMsR23
+          reactionMs: reactionMsR2
         });
       }
     } else {
@@ -5112,7 +5383,7 @@ export default function App() {
 
   const handleGameHint = () => {
     const rt = gameRuntimeRef.current;
-    if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 3) || !rt.activeQuestion || rt.paused) return;
+    if (rt.subState !== 'PLAYING' || rt.round !== 2 || !rt.activeQuestion || rt.paused) return;
     const nextChar = rt.activeQuestion.word.toUpperCase()[rt.typedProgress];
     if (!nextChar) return;
     const nextScore = Math.max(0, rt.score - 15);
@@ -5221,7 +5492,7 @@ export default function App() {
         return;
       }
       if (rt.paused) return;
-      if (rt.round === 2 || rt.round === 3) {
+      if (rt.round === 2) {
         if (e.code === 'Digit1') {
           e.preventDefault();
           handleGameHint();
@@ -5268,13 +5539,28 @@ export default function App() {
       });
     }
 
-    const spawnRound1Chickens = (q) => {
+    const spawnRoundChickens = (q, roundNum = 1) => {
       chickens = [];
       if (!q) return;
-      const choices = [
-        { word: q.word, isCorrect: true },
-        ...q.distractors.map(w => ({ word: w, isCorrect: false }))
-      ].sort(() => Math.random() - 0.5);
+      let choices = [];
+      if (roundNum === 1) {
+        choices = [
+          { word: q.word, fullValue: q.word, isCorrect: true },
+          ...q.distractors.map(w => ({ word: w, fullValue: w, isCorrect: false }))
+        ].sort(() => Math.random() - 0.5);
+      } else if (roundNum === 3 && Array.isArray(q.v3Choices)) {
+        choices = q.v3Choices.map((c, cIdx) => {
+          const code = String.fromCharCode(65 + cIdx);
+          const shortWord = c.length > 16 ? `${code}. ${c.slice(0, 14)}…` : `${code}. ${c}`;
+          return { word: shortWord, fullValue: c, isCorrect: c === q.v3Target };
+        });
+      } else if (roundNum === 4 && Array.isArray(q.v4Choices)) {
+        choices = q.v4Choices.map((c, cIdx) => {
+          const code = String.fromCharCode(65 + cIdx);
+          const shortWord = c.length > 18 ? `${code}. ${c.slice(0, 16)}…` : `${code}. ${c}`;
+          return { word: shortWord, fullValue: c, isCorrect: c === q.v4Target };
+        });
+      }
 
       const twoRows = width < 620 && choices.length >= 4;
       const topCount = twoRows ? Math.ceil(choices.length / 2) : choices.length;
@@ -5295,9 +5581,10 @@ export default function App() {
           baseX: slotX,
           rowOffset: isSecondRow ? 74 : (idx % 2 === 0 ? 0 : 22),
           y: 70,
-          width: Math.min(118, Math.max(88, width / 5.5)),
+          width: Math.min(132, Math.max(88, width / 5)),
           height: 58,
           word: c.word,
+          fullValue: c.fullValue,
           isCorrect: c.isCorrect,
           wingPhase: Math.random() * Math.PI * 2,
           swayRange: width < 520 ? 8 : 16
@@ -5305,8 +5592,8 @@ export default function App() {
       });
     };
 
-    if (gameRound === 1 && activeQuestion && gameSubState === 'PLAYING') {
-      spawnRound1Chickens(activeQuestion);
+    if ((gameRound === 1 || gameRound === 3 || gameRound === 4) && activeQuestion && gameSubState === 'PLAYING') {
+      spawnRoundChickens(activeQuestion, gameRound);
     }
 
     const syncCanvasDimensions = () => {
@@ -5346,7 +5633,8 @@ export default function App() {
     };
 
     const fireBullet = () => {
-      if (gameRuntimeRef.current.round === 1 && gameRuntimeRef.current.subState === 'PLAYING' && !gameRuntimeRef.current.paused) {
+      const r = gameRuntimeRef.current.round;
+      if ((r === 1 || r === 3 || r === 4) && gameRuntimeRef.current.subState === 'PLAYING' && !gameRuntimeRef.current.paused) {
         bullets.push({ x: playerX, y: height - 74, speed: 13 });
         playSound('shoot');
       }
@@ -5355,7 +5643,8 @@ export default function App() {
     const handleClick = () => fireBullet();
 
     const handleTouchMove = (e) => {
-      if (gameRuntimeRef.current.round !== 1 || gameRuntimeRef.current.subState !== 'PLAYING') return;
+      const r = gameRuntimeRef.current.round;
+      if ((r !== 1 && r !== 3 && r !== 4) || gameRuntimeRef.current.subState !== 'PLAYING') return;
       if (!e.touches?.[0]) return;
       const rect = canvas.getBoundingClientRect();
       const scaleX = width / Math.max(1, rect.width);
@@ -5363,14 +5652,16 @@ export default function App() {
     };
 
     const handleTouchStart = (e) => {
-      if (gameRuntimeRef.current.round !== 1 || gameRuntimeRef.current.subState !== 'PLAYING') return;
+      const r = gameRuntimeRef.current.round;
+      if ((r !== 1 && r !== 3 && r !== 4) || gameRuntimeRef.current.subState !== 'PLAYING') return;
       handleTouchMove(e);
       fireBullet();
     };
 
     const handleKeyDownCanvas = (e) => {
       pressedKeys[e.code] = true;
-      if (e.code === 'Space' && gameRuntimeRef.current.round === 1 && gameRuntimeRef.current.subState === 'PLAYING') {
+      const r = gameRuntimeRef.current.round;
+      if (e.code === 'Space' && (r === 1 || r === 3 || r === 4) && gameRuntimeRef.current.subState === 'PLAYING') {
         e.preventDefault();
         fireBullet();
       }
@@ -5395,8 +5686,8 @@ export default function App() {
       const isDark = rt.darkMode !== false;
       const isFrozen = Date.now() < freezeUntilRef.current;
 
-      // Keyboard ship steering for Round 1
-      if (rt.round === 1 && rt.subState === 'PLAYING' && !rt.paused) {
+      // Keyboard ship steering for shooter rounds (1, 3, 4)
+      if ((rt.round === 1 || rt.round === 3 || rt.round === 4) && rt.subState === 'PLAYING' && !rt.paused) {
         if (pressedKeys['ArrowLeft'] || pressedKeys['KeyA']) {
           playerX = Math.max(36, playerX - 7);
         }
@@ -5454,7 +5745,7 @@ export default function App() {
         ctx.fill();
 
         let bulletRemoved = false;
-        if (rt.round === 1 && rt.subState === 'PLAYING' && !rt.questionResolved && !rt.paused) {
+        if ((rt.round === 1 || rt.round === 3 || rt.round === 4) && rt.subState === 'PLAYING' && !rt.questionResolved && !rt.paused) {
           for (let j = chickens.length - 1; j >= 0; j--) {
             const c = chickens[j];
             if (
@@ -5465,41 +5756,9 @@ export default function App() {
             ) {
               bullets.splice(i, 1);
               bulletRemoved = true;
-
-              if (c.isCorrect) {
-                rt.questionResolved = true;
-                const limitSec = Math.max(1, rt.timeLimit || 25);
-                const remainRatioR1 = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
-                const reactionMsR1 = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
-                const speedBonusR1 = Math.round(remainRatioR1 * 80);
-                const feverMult = rt.combo >= 3 ? 2 : 1;
-                const gain = (120 + rt.combo * 20 + speedBonusR1) * feverMult;
-                const nextCombo = rt.combo + 1;
-                const nextScore = rt.score + gain;
-                rt.score = nextScore;
-                rt.combo = nextCombo;
-                setGameScore(nextScore);
-                setGameCombo(nextCombo);
-
-                pushGameParticles(c.x, c.y, feverMult > 1 ? '#fbbf24' : '#22d3ee', 26);
-                playSound('word_clear');
-                speakWord(rt.activeQuestion.word);
-                triggerGameToast(
-                  `✅ Xuất sắc! ${rt.activeQuestion.word} (${rt.activeQuestion.ipa}) +${gain}đ${speedBonusR1 > 0 ? ` (⚡+${speedBonusR1})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
-                  true
-                );
-                handleWordCleared(true, nextScore, nextCombo, {
-                  questionKey: `1:${rt.activeQuestion.word}`,
-                  word: rt.activeQuestion.word,
-                  reactionMs: reactionMsR1
-                });
-              } else {
-                pushGameParticles(c.x, c.y, '#fb7185', 16);
+              const hitOk = resolveGameChoiceAttemptRef.current?.(c.fullValue || c.word, c.isCorrect, c.x, c.y);
+              if (!hitOk) {
                 chickens.splice(j, 1);
-                handleGameLifeLoss(
-                  `❌ Bắn nhầm "${c.word}"! Hãy nhìn kỹ nghĩa tiếng Việt & bắn mục tiêu đúng!`,
-                  false
-                );
               }
               break;
             }
@@ -5551,8 +5810,8 @@ export default function App() {
         ctx.restore();
       }
 
-      // Draw Chickens (Round 1) — smoothly descend with timer
-      if (rt.round === 1 && rt.subState === 'PLAYING') {
+      // Draw Chickens (Round 1, 3, 4) — smoothly descend with timer
+      if ((rt.round === 1 || rt.round === 3 || rt.round === 4) && rt.subState === 'PLAYING') {
         const topBaseY = Math.max(46, height * 0.14);
         const maxDescendY = Math.max(topBaseY + 20, height - 172);
         chickens.forEach(c => {
@@ -5625,8 +5884,8 @@ export default function App() {
         });
       }
 
-      // Draw Boss Chicken (Round 2 & Round 3) — descends toward player ship as time expires!
-      if ((rt.round === 2 || rt.round === 3) && rt.activeQuestion && rt.subState === 'PLAYING') {
+      // Draw Boss Chicken (Round 2: Gõ Từ Full) — descends toward player ship as time expires!
+      if (rt.round === 2 && rt.activeQuestion && rt.subState === 'PLAYING') {
         const swayX = Math.sin(Date.now() * 0.0025) * Math.min(75, width * 0.14);
         const bossX = width / 2 + swayX;
         const startBossY = Math.max(58, height * 0.2);
@@ -5704,12 +5963,11 @@ export default function App() {
         ctx.fillStyle = remainRatio > 0.4 ? (isDark ? '#22d3ee' : '#007a7a') : remainRatio > 0.2 ? '#f59e0b' : '#f43f5e';
         ctx.fillRect(-barW / 2, -52, barW * remainRatio, barH);
 
-        // Masked target label below Boss
+        // Full-word masked target label below Boss (NO partial middle hints)
         const wordUpper = rt.activeQuestion.word.toUpperCase();
         let masked = '';
         for (let k = 0; k < wordUpper.length; k++) {
           if (k < rt.typedProgress || !/^[A-Z]$/.test(wordUpper[k])) masked += wordUpper[k] + ' ';
-          else if (rt.round === 2 && k % 2 === 0) masked += wordUpper[k] + ' ';
           else masked += '_ ';
         }
         const label = masked.trim();
@@ -5731,8 +5989,8 @@ export default function App() {
         ctx.restore();
       }
 
-      // Draw Player Spaceship with chosen Animal Pilot + Accessory inside Glass Cockpit (Rounds 1, 2 & 3)
-      const shipX = rt.round === 1 ? playerX : width / 2;
+      // Draw Player Spaceship with chosen Animal Pilot + Accessory inside Glass Cockpit (Rounds 1..4)
+      const shipX = (rt.round === 1 || rt.round === 3 || rt.round === 4) ? playerX : width / 2;
       drawAnimalSpaceshipCanvas(ctx, {
         x: shipX,
         y: height - 48,
@@ -5868,7 +6126,7 @@ export default function App() {
   // MAIN VIEW ROUTER
   // ==========================================
   return (
-    <div className="min-h-screen bg-[#FDECF2] dark:bg-[#020618] font-sans text-[#0F172B] dark:text-slate-100 antialiased selection:bg-pink-200 dark:selection:bg-teal-700 transition-colors duration-200">
+    <div className="min-h-screen bg-[#FDECF2] dark:bg-[#020618] font-sans text-[#0F172B] dark:text-white antialiased selection:bg-[#007A7A]/20 dark:selection:bg-teal-700 transition-colors duration-200">
       {/* Navbar rendered when not on Auth, Full Exam, Speaking Room, or Game Arena */}
       {view !== 'AUTH' && view !== 'EXAM_MODE' && view !== 'SPEAKING_MODE' && view !== 'GAME_ARENA' && (
         <Navbar
@@ -6066,6 +6324,7 @@ export default function App() {
           gameOutcome={gameOutcome}
           gamePaused={gamePaused}
           gameQueues={gameQueues}
+          gamePracticeLeaderboard={gamePracticeLeaderboard}
           gameReviewLog={gameReviewLog}
           gameRound={gameRound}
           gameRuntimeRef={gameRuntimeRef}
@@ -6083,6 +6342,7 @@ export default function App() {
           handleCopyInviteLink={handleCopyInviteLink}
           handleDeleteRoom={handleDeleteRoom}
           handleFinishRoomMatch={handleFinishRoomMatch}
+          handleGameChoiceSelect={handleGameChoiceSelect}
           handleGameHint={handleGameHint}
           handleGameTypingInput={handleGameTypingInput}
           handleKickLobbyPlayer={handleKickLobbyPlayer}
@@ -6090,6 +6350,7 @@ export default function App() {
           handleSaveHostRoomSettings={handleSaveHostRoomSettings}
           handleSendLobbyChat={handleSendLobbyChat}
           handleStudentJoinRoom={handleStudentJoinRoom}
+          handleTeacherApproveLobbyPlayer={handleTeacherApproveLobbyPlayer}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
           handleTeacherResetLobby={handleTeacherResetLobby}
           handleTeacherStartLobbyGame={handleTeacherStartLobbyGame}
@@ -6099,8 +6360,11 @@ export default function App() {
           handleUseFreezePowerup={handleUseFreezePowerup}
           hostRoomDraft={hostRoomDraft}
           initGameCampaign={initGameCampaign}
+          initPracticeGameCampaign={initPracticeGameCampaign}
           isFrozenBoost={isFrozenBoost}
+          isPracticeGameSession={isPracticeGameSession}
           isSandboxRound={isSandboxRound}
+          practiceTopicMeta={practiceTopicMeta}
           joinedRoomPin={joinedRoomPin}
           jumpToGameSandboxRound={jumpToGameSandboxRound}
           liveRankDeltas={liveRankDeltas}

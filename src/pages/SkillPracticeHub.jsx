@@ -11,6 +11,7 @@ import {
   FileAudio,
   Flame,
   Headphones,
+  Layers,
   Lock,
   Mic,
   PenTool,
@@ -19,23 +20,13 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
+  Trophy,
   Users,
   X
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import {
-  canUserAccessTest,
-  evaluateSpeakingDailyCompliance,
-  evaluateTestSchedule,
-  formatViDateTime,
-  getAssignedClassNames,
-  getListeningTracks,
-  getReadingPassages,
-  getSpeakingQuestionItems,
-  getVietnamTodayDateKey,
-  normalizeExamConfig,
-  normalizeSpeakingSection
-} from '../constants/seedData';
+import { formatDurationVi, getAssignedClassNames, getListeningTracks, getReadingPassages, getSpeakingQuestionItems, getVietnamTodayDateKey, canUserAccessTest, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
+import { getQuestionTypeMeta } from '../utils/examHelpers';
 import { verifySpeakingRoomPassword } from '../utils/speakingApi';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 
@@ -62,6 +53,7 @@ export default function SkillPracticeHub({
   usersDb = {}
 }) {
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
+  const [singleHubSkill, setSingleHubSkill] = useState('all'); // 'all' | 'reading' | 'listening' | 'writing'
   const [passwordPromptTarget, setPasswordPromptTarget] = useState(null);
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
@@ -170,10 +162,284 @@ export default function SkillPracticeHub({
     { id: 'speaking_exam_room', label: '2. Phòng Thi Thực Chiến', icon: Lock, badge: examRoomSpeakingTests.length },
     { id: 'speaking', label: 'Kho Speaking AI', icon: Mic, badge: speakingTests.length },
     { id: 'forecast', label: 'Bài Tập Forecast', icon: Sparkles, badge: forecastTests.length },
-    { id: 'listening', label: 'Bài Tập Listening', icon: Headphones, badge: listeningTests.length },
-    { id: 'reading', label: 'Bài Tập Reading', icon: BookOpen, badge: readingTests.length },
-    { id: 'writing', label: 'Bài Tập Writing', icon: PenTool, badge: writingTests.length }
+    {
+      id: 'single_hub',
+      label: 'Zone Tổng Đề Thi Lẻ (Đ·N·V)',
+      icon: Layers,
+      badge: readingTests.length + listeningTests.length + writingTests.length
+    },
+    { id: 'reading', label: 'Đọc (Reading Lẻ)', icon: BookOpen, badge: readingTests.length },
+    { id: 'listening', label: 'Nghe (Listening Lẻ)', icon: Headphones, badge: listeningTests.length },
+    { id: 'writing', label: 'Viết (Writing Lẻ)', icon: PenTool, badge: writingTests.length }
   ];
+
+  const renderSingleSkillLeaderboard = (skillFilter = 'all') => {
+    const relevantAttempts = attempts.filter(a => {
+      if (!a || a.testMode !== 'single_skill') return false;
+      const sk = a.focusSkill || '';
+      if (!['reading', 'listening', 'writing'].includes(sk)) return false;
+      if (skillFilter !== 'all' && sk !== skillFilter) return false;
+      return typeof a.overallBand === 'number' && a.overallBand >= 0;
+    });
+    const playerBestMap = new Map();
+    relevantAttempts.forEach(a => {
+      const uname = a.studentId || a.studentUsername || a.studentName;
+      if (!uname) return;
+      const prev = playerBestMap.get(uname) || {
+        username: uname,
+        name: a.studentName || uname,
+        bestBand: 0,
+        totalBand: 0,
+        count: 0,
+        bestTestTitle: a.testTitle || '',
+        latestDuration: Number(a.durationSeconds) || 0
+      };
+      const band = Number(a.overallBand) || 0;
+      const isBetter = band > prev.bestBand || (band === prev.bestBand && (Number(a.durationSeconds) || 999999) < (prev.latestDuration || 999999));
+      playerBestMap.set(uname, {
+        ...prev,
+        count: prev.count + 1,
+        totalBand: prev.totalBand + band,
+        bestBand: Math.max(prev.bestBand, band),
+        bestTestTitle: isBetter ? (a.testTitle || prev.bestTestTitle) : prev.bestTestTitle,
+        latestDuration: isBetter ? (Number(a.durationSeconds) || 0) : prev.latestDuration
+      });
+    });
+    const ranked = Array.from(playerBestMap.values()).sort(
+      (a, b) => b.bestBand - a.bestBand || (b.totalBand / b.count) - (a.totalBand / a.count)
+    );
+
+    return (
+      <section className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] rounded-3xl p-5 sm:p-6 space-y-4 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              BXH Ranking Điểm — Zone Đề Thi Lẻ ({skillFilter === 'all' ? 'Đọc · Nghe · Viết' : skillFilter.toUpperCase()})
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Xếp hạng thành tích cao nhất của học viên trong lớp sau khi hoàn thành đề thi lẻ.
+            </p>
+          </div>
+          <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40">
+            {ranked.length} thí sinh đã xếp hạng
+          </span>
+        </div>
+
+        {ranked.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-white/80 dark:bg-[#23222B] border border-dashed border-pink-200 dark:border-[#34323F] text-center text-xs text-slate-500 dark:text-slate-400">
+            Chưa có bài hoàn thành nào trong mục này — hãy làm ngay đề đầu tiên để giữ Top #1 BXH!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {ranked.slice(0, 9).map((row, idx) => {
+              const isMe = row.username === currentUser?.username;
+              const avgBand = Math.round(((row.totalBand / row.count) + 1e-9) * 2) / 2;
+              return (
+                <div
+                  key={row.username}
+                  className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition ${
+                    isMe
+                      ? 'bg-[#EDFFFD] dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6]'
+                      : 'bg-white dark:bg-[#23222B] border-pink-200/80 dark:border-[#34323F]'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                      #{idx + 1} {row.name} {isMe ? '(Bạn)' : ''}
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {row.count} bài • TB {avgBand.toFixed(1)} • {row.bestTestTitle}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="inline-block px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono font-black text-sm border border-amber-200 dark:border-amber-500/35">
+                      {row.bestBand}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  const renderSingleHubZone = () => {
+    const combinedList = [
+      ...readingTests.map(t => ({ ...t, _resolvedSkill: 'reading' })),
+      ...listeningTests.map(t => ({ ...t, _resolvedSkill: 'listening' })),
+      ...writingTests.map(t => ({ ...t, _resolvedSkill: 'writing' }))
+    ];
+    const filteredList = singleHubSkill === 'all'
+      ? combinedList
+      : combinedList.filter(t => t._resolvedSkill === singleHubSkill);
+    const skillMetaMap = {
+      reading: { label: 'ĐỌC (READING)', cls: 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300', icon: BookOpen },
+      listening: { label: 'NGHE (LISTENING)', cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6]', icon: Headphones },
+      writing: { label: 'VIẾT (WRITING)', cls: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300', icon: PenTool }
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+              <span className="w-10 h-10 rounded-2xl bg-[#570DF8]/15 text-[#570DF8] dark:text-[#C4B5FD] flex items-center justify-center">
+                <Layers className="w-5 h-5" />
+              </span>
+              <span>Zone Tổng Đề Thi Lẻ (Đọc · Nghe · Viết)</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Luyện đề riêng từng kỹ năng chuẩn format IELTSMate &amp; Cambridge — xem ngay BXH Ranking điểm sau khi hoàn thành!
+            </p>
+          </div>
+          {isTeacher && (
+            <div className="flex flex-wrap gap-2">
+              {['reading', 'listening', 'writing'].map(sk => (
+                <button
+                  key={sk}
+                  type="button"
+                  onClick={() => onOpenSkillBuilder?.(sk)}
+                  className="px-3 py-2 rounded-xl bg-[#570DF8] hover:bg-[#490AD2] text-white text-xs font-extrabold flex items-center gap-1 shadow-xs transition"
+                >
+                  <Plus className="w-3.5 h-3.5" /> + {sk.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sub-Tabs Split: Reading / Listening / Writing */}
+        <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200 dark:border-[#2C2A35] w-fit">
+          {[
+            { id: 'all', label: `Tất cả Đề Lẻ (${combinedList.length})` },
+            { id: 'reading', label: `📖 Đọc · Reading (${readingTests.length})` },
+            { id: 'listening', label: `🎧 Nghe · Listening (${listeningTests.length})` },
+            { id: 'writing', label: `✍️ Viết · Writing (${writingTests.length})` }
+          ].map(sub => (
+            <button
+              key={sub.id}
+              type="button"
+              onClick={() => setSingleHubSkill(sub.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition ${
+                singleHubSkill === sub.id
+                  ? 'bg-[#570DF8] text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-rose-100/70 dark:hover:bg-[#24232E]'
+              }`}
+            >
+              {sub.label}
+            </button>
+          ))}
+        </div>
+
+        {filteredList.length === 0 ? (
+          <div className="bg-[#FFF5F8] dark:bg-[#191820] border border-dashed border-pink-300 dark:border-[#34323F] rounded-3xl p-10 text-center space-y-2">
+            <Layers className="w-10 h-10 mx-auto text-slate-400" />
+            <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+              Chưa có đề thi lẻ nào trong mục này
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Giáo viên có thể tạo nhanh Đề Lẻ Đọc, Nghe hoặc Viết bằng nút phía trên.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredList.map(test => {
+              const sk = test._resolvedSkill;
+              const sMeta = skillMetaMap[sk] || skillMetaMap.reading;
+              const cfg = normalizeExamConfig(test);
+              const schedule = evaluateTestSchedule(cfg, serverNowMs);
+              const myTestAttempts = myAttempts.filter(a => a.testId === test.id);
+              const usedCount = myTestAttempts.length;
+              const myBest = myTestAttempts
+                .map(a => a.overallBand)
+                .filter(b => typeof b === 'number')
+                .reduce((max, b) => Math.max(max, b), 0);
+              const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
+              const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
+              const qList = sk === 'listening' ? (test.listening?.questions || []) : sk === 'reading' ? (test.reading?.questions || []) : [];
+              const typeTags = Array.from(new Set(qList.map(q => getQuestionTypeMeta(q.type, sk).shortLabel))).slice(0, 3);
+
+              return (
+                <div
+                  key={test.id}
+                  className="bg-[#FFF5F8] dark:bg-[#191820] border border-pink-200/90 dark:border-[#2C2A35] hover:border-[#570DF8]/60 rounded-2xl p-5 flex flex-col justify-between gap-4 transition"
+                >
+                  <div className="space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${sMeta.cls}`}>
+                        {sMeta.label} • {cfg.durations[sk]} phút
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {myBest > 0 && (
+                          <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300">
+                            Kỷ lục: Band {myBest}
+                          </span>
+                        )}
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#24232C] text-slate-600 dark:text-slate-300">
+                          {cfg.maxAttempts === 0 ? `${usedCount} lượt` : `${usedCount}/${cfg.maxAttempts} lượt`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-snug">
+                      {test.title}
+                    </h3>
+                    {test.description && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{test.description}</p>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {qList.length > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-700 dark:text-slate-200">
+                          {qList.length} câu
+                        </span>
+                      )}
+                      {typeTags.map(tag => (
+                        <span key={tag} className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-500/30">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => onStartSingleSkillExam?.(test.id)}
+                      className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
+                        isLocked
+                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                          : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
+                      }`}
+                    >
+                      {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                      <span>{isLocked ? 'Đang khóa / Hết lượt' : `Làm Đề ${sk.toUpperCase()}`}</span>
+                    </button>
+                    {isTeacher && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenSkillBuilder?.(sk, test)}
+                        className="p-2.5 rounded-xl bg-white dark:bg-[#23222B] border border-pink-200 dark:border-[#34323F] text-slate-600 dark:text-slate-300 hover:text-[#570DF8]"
+                        title="Chỉnh sửa bài này"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {renderSingleSkillLeaderboard(singleHubSkill)}
+      </div>
+    );
+  };
 
   const renderSkillTestCards = (skillId, list) => {
     const metaMap = {
@@ -358,6 +624,7 @@ export default function SkillPracticeHub({
             })}
           </div>
         )}
+        {renderSingleSkillLeaderboard(skillId)}
       </div>
     );
   };
@@ -1008,7 +1275,7 @@ export default function SkillPracticeHub({
                   <div className="space-y-3">
                     {mySpeakingAttempts.map(att => {
                       const band = att.scores?.speaking?.band ?? att.overallBand;
-                      const formattedBand = typeof band === 'number' ? band.toFixed(1) : '--';
+                      const formattedBand = typeof band === 'number' ? String(Math.round(band)) : '--';
                       const modeLabel =
                         att.speakingPartMode && att.speakingPartMode !== 'full'
                           ? `TEST ${att.speakingPartMode.toUpperCase()}`
@@ -1059,7 +1326,9 @@ export default function SkillPracticeHub({
               </section>
             </>
             );
-          })() : (
+          })() : activeTab === 'single_hub' ? (
+            renderSingleHubZone()
+          ) : (
             renderSkillTestCards(
               activeTab,
               activeTab === 'listening'

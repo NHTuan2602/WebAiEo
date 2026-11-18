@@ -176,6 +176,9 @@ export default function CoverCheckoutModal({
                   ? `Tài khoản @${currentUser?.username} đã mở khóa vĩnh viễn danh hiệu ${itemLabel}.`
                   : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng vĩnh viễn.`}
               </p>
+              <p className="text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100/75 dark:bg-amber-500/15 border border-amber-300/70 dark:border-amber-500/30 rounded-xl px-3.5 py-2 leading-relaxed">
+                💛 Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web, server &amp; hạ tầng luyện thi IELTS! Chúc bạn học tập thật bứt phá.
+              </p>
               <button
                 type="button"
                 onClick={() => {

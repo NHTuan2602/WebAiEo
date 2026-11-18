@@ -44,9 +44,21 @@ function isShortMatrixOptionList(options) {
   return trimmed.every(opt => opt.length <= 12);
 }
 
+const MATRIX_ELIGIBLE_TYPES = new Set([
+  'mcq',
+  'matching_headings',
+  'matching_information',
+  'matching_features',
+  'summary_box',
+  'correct_ending',
+  'matching',
+  'map_diagram',
+  'diagram_label'
+]);
+
 /**
  * Group consecutive questions into standard cards or Computer-Delivered matrix grid tables
- * when 3+ consecutive MCQ questions share identical compact options (e.g., A–I, i–viii).
+ * when 3+ consecutive choice/matching questions share identical compact options (e.g., A–I, i–viii).
  */
 export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
   if (!Array.isArray(questions) || questions.length === 0) return [];
@@ -56,14 +68,14 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
   while (i < questions.length) {
     const q = questions[i];
     const opts = Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()) : [];
-    const signature = q?.type === 'mcq' && isShortMatrixOptionList(opts) ? opts.join('||') : null;
+    const signature = MATRIX_ELIGIBLE_TYPES.has(q?.type) && isShortMatrixOptionList(opts) ? opts.join('||') : null;
 
     if (signature) {
       let j = i + 1;
       while (j < questions.length) {
         const nextQ = questions[j];
         const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()) : [];
-        if (nextQ?.type === 'mcq' && nextOpts.join('||') === signature) {
+        if (MATRIX_ELIGIBLE_TYPES.has(nextQ?.type) && nextOpts.join('||') === signature) {
           j++;
         } else {
           break;

@@ -95,6 +95,11 @@ export default function CoverUnlockQrCard({
         </span>
       </div>
 
+      {/* Pre-payment Donate & Web Maintenance Support Message */}
+      <div className="px-3 py-2 rounded-xl bg-amber-100/80 dark:bg-amber-500/15 border border-amber-300/80 dark:border-amber-500/35 text-[11px] text-amber-950 dark:text-amber-100 font-semibold leading-relaxed">
+        ☕ {cfg.donateMessage || 'Donate để ủng hộ Tuấn chi phí duy trì trang web, tên miền, máy chủ & hệ thống AI phục vụ học tập miễn phí cho lớp. Xin trân trọng cảm ơn!'}
+      </div>
+
       {activeQrUrl && !qrLoadError ? (
         <div className={`flex flex-col ${isPreview ? '' : 'md:flex-row'} gap-4 ${isPreview ? '' : 'md:gap-5'} items-stretch ${isPreview ? '' : 'md:items-center'}`}>
           <div className={`shrink-0 mx-auto ${isPreview ? '' : 'md:mx-0'} bg-white ${isPreview ? 'p-2.5' : 'p-3.5'} rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center gap-2 w-fit`}>

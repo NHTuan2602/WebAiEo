@@ -347,7 +347,7 @@ export const STUDENT_TITLES = [
     label: 'Newbie',
     icon: '🌱',
     tier: 'Khởi Đầu',
-    difficulty: 'Khởi Đầu',
+    difficulty: 'Dễ',
     conditionText: 'Mặc định mở khóa cho mọi thành viên khi bắt đầu tham gia.',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-500/40',
     heroBadgeClass: 'bg-emerald-500/25 text-emerald-100 border-emerald-400/50',
@@ -356,11 +356,43 @@ export const STUDENT_TITLES = [
     getProgress: () => ({ pct: 100, text: 'Mặc định sở hữu' })
   },
   {
+    id: 'first_step',
+    label: 'Bước Chân Đầu Tiên',
+    icon: '👟',
+    tier: 'Khởi Đầu',
+    difficulty: 'Dễ',
+    conditionText: 'Hoàn thành và nộp bài thi hoặc bài tập thực hành đầu tiên (>= 1 bài).',
+    badgeClass: 'bg-lime-50 text-lime-700 border-lime-200 dark:bg-lime-500/20 dark:text-lime-200 dark:border-lime-500/40',
+    heroBadgeClass: 'bg-lime-500/25 text-lime-100 border-lime-400/50',
+    gameBadgeClass: 'bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-500/20 dark:text-lime-200 dark:border-lime-400/40',
+    isUnlocked: (stats) => stats.examCount >= 1,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.examCount / 1) * 100)),
+      text: `${Math.min(stats.examCount, 1)}/1 bài đầu tiên`
+    })
+  },
+  {
+    id: 'game_rookie',
+    label: 'Tân Binh Đấu Trường',
+    icon: '🎮',
+    tier: 'Game',
+    difficulty: 'Dễ',
+    conditionText: 'Chinh phục ít nhất 300 điểm trong Đấu Trường Từ Vựng.',
+    badgeClass: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/20 dark:text-cyan-200 dark:border-cyan-500/40',
+    heroBadgeClass: 'bg-cyan-500/25 text-cyan-100 border-cyan-400/50',
+    gameBadgeClass: 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-500/20 dark:text-cyan-200 dark:border-cyan-400/40',
+    isUnlocked: (stats) => stats.bestGameScore >= 300,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.bestGameScore / 300) * 100)),
+      text: `${Math.min(stats.bestGameScore, 300)}/300 điểm Game`
+    })
+  },
+  {
     id: 'diligent',
     label: 'Chiến Binh Chăm Chỉ',
     icon: '📚',
     tier: 'Luyện Đề',
-    difficulty: 'Cơ Bản',
+    difficulty: 'Dễ',
     conditionText: 'Hoàn thành ít nhất 3 bài thi hoặc bài tập 4 kỹ năng.',
     badgeClass: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/40',
     heroBadgeClass: 'bg-sky-500/25 text-sky-100 border-sky-400/50',
@@ -376,7 +408,7 @@ export const STUDENT_TITLES = [
     label: 'Học Bá Chinh Chiến',
     icon: '🔥',
     tier: 'Luyện Đề',
-    difficulty: 'Thử Thách',
+    difficulty: 'Bình Thường',
     conditionText: 'Hoàn thành ít nhất 10 bài thi hoặc bài tập 4 kỹ năng.',
     badgeClass: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-200 dark:border-orange-500/40',
     heroBadgeClass: 'bg-orange-500/25 text-orange-100 border-orange-400/50',
@@ -392,7 +424,7 @@ export const STUDENT_TITLES = [
     label: 'Thợ Săn Band 6.5+',
     icon: '🎯',
     tier: 'Điểm Thi',
-    difficulty: 'Cơ Bản',
+    difficulty: 'Bình Thường',
     conditionText: 'Đạt Overall Band từ 6.5 trở lên ở một bài thi bất kỳ.',
     badgeClass: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/20 dark:text-teal-200 dark:border-teal-500/40',
     heroBadgeClass: 'bg-teal-500/25 text-teal-100 border-teal-400/50',
@@ -408,7 +440,7 @@ export const STUDENT_TITLES = [
     label: 'Cao Thủ Band 7.5+',
     icon: '💎',
     tier: 'Điểm Thi',
-    difficulty: 'Thử Thách',
+    difficulty: 'Bình Thường',
     conditionText: 'Đạt Overall Band từ 7.5 trở lên ở một bài thi bất kỳ.',
     badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-300 dark:bg-cyan-500/20 dark:text-cyan-200 dark:border-cyan-400/50',
     heroBadgeClass: 'bg-cyan-500/30 text-cyan-100 border-cyan-300/60',
@@ -417,6 +449,54 @@ export const STUDENT_TITLES = [
     getProgress: (stats) => ({
       pct: Math.min(100, Math.round((stats.highestBand / 7.5) * 100)),
       text: `Band cao nhất: ${stats.highestBand > 0 ? stats.highestBand.toFixed(1) : '0.0'}/7.5`
+    })
+  },
+  {
+    id: 'speedster',
+    label: 'Tia Chớp Đấu Trường',
+    icon: '⚡',
+    tier: 'Game',
+    difficulty: 'Bình Thường',
+    conditionText: 'Đạt tối thiểu 1,200 điểm kỷ lục trong Game Từ Vựng.',
+    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-400/50',
+    heroBadgeClass: 'bg-indigo-500/30 text-indigo-100 border-indigo-300/60',
+    gameBadgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-indigo-400/50',
+    isUnlocked: (stats) => stats.bestGameScore >= 1200,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.bestGameScore / 1200) * 100)),
+      text: `${Math.min(stats.bestGameScore, 1200)}/1,200 điểm Game`
+    })
+  },
+  {
+    id: 'space_commander',
+    label: 'Thủ Lĩnh Vũ Trụ',
+    icon: '🚀',
+    tier: 'Game',
+    difficulty: 'Bình Thường',
+    conditionText: 'Đạt tối thiểu 2,500 điểm kỷ lục trong Game Từ Vựng.',
+    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-400/50',
+    heroBadgeClass: 'bg-purple-500/30 text-purple-100 border-purple-300/60',
+    gameBadgeClass: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-500/25 dark:text-purple-200 dark:border-purple-400/50',
+    isUnlocked: (stats) => stats.bestGameScore >= 2500,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.bestGameScore / 2500) * 100)),
+      text: `${Math.min(stats.bestGameScore, 2500)}/2,500 điểm Game`
+    })
+  },
+  {
+    id: 'steady_scholar',
+    label: 'Học Giả Vững Phong Độ',
+    icon: '📐',
+    tier: 'Điểm Thi',
+    difficulty: 'Bình Thường',
+    conditionText: 'Có ít nhất 2 bài thi/bài tập đạt Overall Band >= 7.0.',
+    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-200 dark:border-blue-400/50',
+    heroBadgeClass: 'bg-blue-500/30 text-blue-100 border-blue-300/60',
+    gameBadgeClass: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-500/25 dark:text-blue-200 dark:border-blue-400/50',
+    isUnlocked: (stats) => stats.band70Count >= 2,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.band70Count / 2) * 100)),
+      text: `${Math.min(stats.band70Count, 2)}/2 bài >= 7.0`
     })
   },
   {
@@ -433,38 +513,6 @@ export const STUDENT_TITLES = [
     getProgress: (stats) => ({
       pct: Math.min(100, Math.round((stats.highestBand / 8.5) * 100)),
       text: `Band cao nhất: ${stats.highestBand > 0 ? stats.highestBand.toFixed(1) : '0.0'}/8.5`
-    })
-  },
-  {
-    id: 'speedster',
-    label: 'Tia Chớp Đấu Trường',
-    icon: '⚡',
-    tier: 'Game',
-    difficulty: 'Cơ Bản',
-    conditionText: 'Đạt tối thiểu 1,200 điểm kỷ lục trong Game Từ Vựng.',
-    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-400/50',
-    heroBadgeClass: 'bg-indigo-500/30 text-indigo-100 border-indigo-300/60',
-    gameBadgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-indigo-400/50',
-    isUnlocked: (stats) => stats.bestGameScore >= 1200,
-    getProgress: (stats) => ({
-      pct: Math.min(100, Math.round((stats.bestGameScore / 1200) * 100)),
-      text: `${Math.min(stats.bestGameScore, 1200)}/1,200 điểm Game`
-    })
-  },
-  {
-    id: 'space_commander',
-    label: 'Thủ Lĩnh Vũ Trụ',
-    icon: '🚀',
-    tier: 'Game',
-    difficulty: 'Thử Thách',
-    conditionText: 'Đạt tối thiểu 2,500 điểm kỷ lục trong Game Từ Vựng.',
-    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-400/50',
-    heroBadgeClass: 'bg-purple-500/30 text-purple-100 border-purple-300/60',
-    gameBadgeClass: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-500/25 dark:text-purple-200 dark:border-purple-400/50',
-    isUnlocked: (stats) => stats.bestGameScore >= 2500,
-    getProgress: (stats) => ({
-      pct: Math.min(100, Math.round((stats.bestGameScore / 2500) * 100)),
-      text: `${Math.min(stats.bestGameScore, 2500)}/2,500 điểm Game`
     })
   },
   {
@@ -487,38 +535,6 @@ export const STUDENT_TITLES = [
         text: `Band ${stats.highestBand.toFixed(1)}/7.0 • Game ${stats.bestGameScore}/2,000đ`
       };
     }
-  },
-  {
-    id: 'streak_30d',
-    label: 'Kiên Trì 1 Tháng',
-    icon: '📅',
-    tier: 'Chuyên Cần',
-    difficulty: 'Thử Thách',
-    conditionText: 'Đăng nhập học tập tích lũy đủ 30 ngày khác nhau trên hệ thống.',
-    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50',
-    heroBadgeClass: 'bg-emerald-500/30 text-emerald-100 border-emerald-300/60',
-    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/50',
-    isUnlocked: (stats) => stats.totalLoginDays >= 30,
-    getProgress: (stats) => ({
-      pct: Math.min(100, Math.round((stats.totalLoginDays / 30) * 100)),
-      text: `${Math.min(stats.totalLoginDays, 30)}/30 ngày đăng nhập`
-    })
-  },
-  {
-    id: 'loyal_90d',
-    label: 'Chiến Binh 3 Tháng',
-    icon: '🗓️',
-    tier: 'Chuyên Cần',
-    difficulty: 'Khó',
-    conditionText: 'Đăng nhập học tập tích lũy đủ 90 ngày (3 tháng) trên hệ thống.',
-    badgeClass: 'bg-teal-50 text-teal-800 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/60',
-    heroBadgeClass: 'bg-teal-500/35 text-teal-100 border-teal-300/70',
-    gameBadgeClass: 'bg-teal-100 text-teal-900 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/60',
-    isUnlocked: (stats) => stats.totalLoginDays >= 90,
-    getProgress: (stats) => ({
-      pct: Math.min(100, Math.round((stats.totalLoginDays / 90) * 100)),
-      text: `${Math.min(stats.totalLoginDays, 90)}/90 ngày (3 tháng)`
-    })
   },
   {
     id: 'marathon_25',
@@ -553,35 +569,19 @@ export const STUDENT_TITLES = [
     })
   },
   {
-    id: 'unbroken_streak_30',
-    label: 'Ngọn Lửa Bất Diệt 30D',
-    icon: '☄️',
-    tier: 'Chuyên Cần',
-    difficulty: 'Cực Khó',
-    conditionText: 'CÀY CUỐC CỰC KHÓ: Đăng nhập liên tục 30 ngày liền không bỏ lỡ ngày nào.',
-    badgeClass: 'bg-rose-100 text-rose-800 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60',
-    heroBadgeClass: 'bg-rose-500/35 text-rose-100 border-rose-300/70',
-    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-500/30 dark:text-rose-100 dark:border-rose-400/60',
-    isUnlocked: (stats) => stats.bestLoginStreak >= 30,
+    id: 'reading_ace_5',
+    label: 'Bậc Thầy L & R 7.5+',
+    icon: '📖',
+    tier: 'Điểm Thi',
+    difficulty: 'Khó',
+    conditionText: 'Đạt Band Listening hoặc Reading >= 7.5 trong ít nhất 5 lượt thi.',
+    badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-300 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-indigo-400/60',
+    heroBadgeClass: 'bg-indigo-500/35 text-indigo-100 border-indigo-300/70',
+    gameBadgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-400 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-indigo-400/60',
+    isUnlocked: (stats) => stats.highLrCount >= 5,
     getProgress: (stats) => ({
-      pct: Math.min(100, Math.round((stats.bestLoginStreak / 30) * 100)),
-      text: `Chuỗi tốt nhất: ${Math.min(stats.bestLoginStreak, 30)}/30 ngày liên tiếp`
-    })
-  },
-  {
-    id: 'half_year_180d',
-    label: 'Cổ Thụ Nửa Năm',
-    icon: '🏛️',
-    tier: 'Chuyên Cần',
-    difficulty: 'Cực Khó',
-    conditionText: 'CÀY CUỐC CỰC KHÓ: Bền bỉ đăng nhập tích lũy đủ 180 ngày (6 tháng) đồng hành cùng lớp.',
-    badgeClass: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
-    heroBadgeClass: 'bg-amber-500/35 text-amber-100 border-amber-300/80',
-    gameBadgeClass: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
-    isUnlocked: (stats) => stats.totalLoginDays >= 180,
-    getProgress: (stats) => ({
-      pct: Math.min(100, Math.round((stats.totalLoginDays / 180) * 100)),
-      text: `${Math.min(stats.totalLoginDays, 180)}/180 ngày (6 tháng)`
+      pct: Math.min(100, Math.round((stats.highLrCount / 5) * 100)),
+      text: `${Math.min(stats.highLrCount, 5)}/5 lượt L/R >= 7.5`
     })
   },
   {
@@ -630,6 +630,188 @@ export const STUDENT_TITLES = [
     getProgress: (stats) => ({
       pct: Math.min(100, Math.round((stats.bestGameScore / 5000) * 100)),
       text: `${Math.min(stats.bestGameScore, 5000)}/5,000 điểm Game`
+    })
+  },
+  {
+    id: 'legend_100',
+    label: 'Bất Tử Trăm Đề',
+    icon: '🐉',
+    tier: 'Luyện Đề',
+    difficulty: 'Cực Khó',
+    conditionText: 'CÀY CUỐC CỰC KHÓ: Hoàn thành tối thiểu 100 bài thi & bài tập IELTS trên hệ thống.',
+    badgeClass: 'bg-rose-100 text-rose-900 border-rose-500 dark:bg-rose-500/35 dark:text-rose-100 dark:border-rose-400/70',
+    heroBadgeClass: 'bg-gradient-to-r from-rose-600/45 to-amber-500/40 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-rose-100 text-rose-950 border-rose-500 dark:bg-rose-500/35 dark:text-rose-100 dark:border-rose-400/70',
+    isUnlocked: (stats) => stats.examCount >= 100,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.examCount / 100) * 100)),
+      text: `${Math.min(stats.examCount, 100)}/100 bài hoàn thành`
+    })
+  },
+  // ==== NHÓM ĐIỂM DANH RIÊNG BIỆT (Không xếp chung vào Khó / Cực Khó) ====
+  {
+    id: 'streak_3d',
+    label: 'Mầm Non Chuyên Cần',
+    icon: '🌿',
+    tier: 'Điểm Danh',
+    difficulty: 'Điểm Danh',
+    conditionText: 'Điểm danh đăng nhập học tập tích lũy đủ 3 ngày khác nhau.',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50',
+    heroBadgeClass: 'bg-emerald-500/25 text-emerald-100 border-emerald-300/60',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/50',
+    isUnlocked: (stats) => stats.totalLoginDays >= 3,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.totalLoginDays / 3) * 100)),
+      text: `${Math.min(stats.totalLoginDays, 3)}/3 ngày điểm danh`
+    })
+  },
+  {
+    id: 'streak_7d',
+    label: 'Tuần Lễ Bền Bỉ',
+    icon: '🔆',
+    tier: 'Điểm Danh',
+    difficulty: 'Điểm Danh',
+    conditionText: 'Đăng nhập liên tục 7 ngày không gián đoạn.',
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-300 dark:bg-teal-500/20 dark:text-teal-200 dark:border-teal-400/50',
+    heroBadgeClass: 'bg-teal-500/30 text-teal-100 border-teal-300/60',
+    gameBadgeClass: 'bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/50',
+    isUnlocked: (stats) => stats.bestLoginStreak >= 7,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.bestLoginStreak / 7) * 100)),
+      text: `Chuỗi ${Math.min(stats.bestLoginStreak, 7)}/7 ngày liên tiếp`
+    })
+  },
+  {
+    id: 'streak_30d',
+    label: 'Kiên Trì 1 Tháng',
+    icon: '📅',
+    tier: 'Điểm Danh',
+    difficulty: 'Điểm Danh',
+    conditionText: 'Đăng nhập học tập tích lũy đủ 30 ngày khác nhau trên hệ thống.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50',
+    heroBadgeClass: 'bg-emerald-500/30 text-emerald-100 border-emerald-300/60',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/50',
+    isUnlocked: (stats) => stats.totalLoginDays >= 30,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.totalLoginDays / 30) * 100)),
+      text: `${Math.min(stats.totalLoginDays, 30)}/30 ngày đăng nhập`
+    })
+  },
+  {
+    id: 'loyal_90d',
+    label: 'Chiến Binh 3 Tháng',
+    icon: '🗓️',
+    tier: 'Điểm Danh',
+    difficulty: 'Điểm Danh',
+    conditionText: 'Đăng nhập học tập tích lũy đủ 90 ngày (3 tháng) trên hệ thống.',
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/60',
+    heroBadgeClass: 'bg-teal-500/35 text-teal-100 border-teal-300/70',
+    gameBadgeClass: 'bg-teal-100 text-teal-900 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/60',
+    isUnlocked: (stats) => stats.totalLoginDays >= 90,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.totalLoginDays / 90) * 100)),
+      text: `${Math.min(stats.totalLoginDays, 90)}/90 ngày (3 tháng)`
+    })
+  },
+  {
+    id: 'unbroken_streak_30',
+    label: 'Ngọn Lửa Bất Diệt 30D',
+    icon: '☄️',
+    tier: 'Điểm Danh',
+    difficulty: 'Điểm Danh',
+    conditionText: 'Đăng nhập điểm danh liên tục 30 ngày liền không bỏ lỡ ngày nào.',
+    badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/60',
+    heroBadgeClass: 'bg-emerald-500/35 text-emerald-100 border-emerald-300/70',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400 dark:bg-emerald-500/30 dark:text-emerald-100 dark:border-emerald-400/60',
+    isUnlocked: (stats) => stats.bestLoginStreak >= 30,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.bestLoginStreak / 30) * 100)),
+      text: `Chuỗi tốt nhất: ${Math.min(stats.bestLoginStreak, 30)}/30 ngày liên tiếp`
+    })
+  },
+  {
+    id: 'half_year_180d',
+    label: 'Cổ Thụ Nửa Năm',
+    icon: '🏛️',
+    tier: 'Điểm Danh',
+    difficulty: 'Điểm Danh',
+    conditionText: 'Bền bỉ điểm danh đăng nhập tích lũy đủ 180 ngày (6 tháng) đồng hành cùng lớp.',
+    badgeClass: 'bg-teal-100 text-teal-900 border-teal-400 dark:bg-teal-500/30 dark:text-teal-100 dark:border-teal-400/70',
+    heroBadgeClass: 'bg-teal-500/35 text-teal-100 border-teal-300/80',
+    gameBadgeClass: 'bg-teal-100 text-teal-900 border-teal-400 dark:bg-teal-500/30 dark:text-teal-100 dark:border-teal-400/70',
+    isUnlocked: (stats) => stats.totalLoginDays >= 180,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.totalLoginDays / 180) * 100)),
+      text: `${Math.min(stats.totalLoginDays, 180)}/180 ngày (6 tháng)`
+    })
+  },
+  // ==== DANH HIỆU BÍ ẨN (MỞ KHÓA BẤT NGỜ — CHE TÊN & ĐIỀU KIỆN ĐẾN KHI ĐẠT ĐƯỢC) ====
+  {
+    id: 'secret_night_owl',
+    label: 'Cú Đêm Khổ Luyện',
+    icon: '🦉',
+    tier: 'Bí Ẩn',
+    difficulty: 'Bí Ẩn',
+    isSecretTitle: true,
+    conditionText: 'Thử thách ẩn đã mở: Hoàn thành & nộp bài IELTS trong khung giờ khuya (23:00 – 03:59 giờ VN).',
+    badgeClass: 'bg-slate-800 text-amber-200 border-amber-400/60 dark:bg-slate-800 dark:text-amber-200 dark:border-amber-400/60',
+    heroBadgeClass: 'bg-slate-900/75 text-amber-200 border-amber-400/70',
+    gameBadgeClass: 'bg-slate-800 text-amber-200 border-amber-400/60 dark:bg-slate-800 dark:text-amber-200 dark:border-amber-400/60',
+    isUnlocked: (stats) => Boolean(stats.hasNightOwlSubmit),
+    getProgress: (stats) => ({
+      pct: stats.hasNightOwlSubmit ? 100 : 0,
+      text: stats.hasNightOwlSubmit ? '🦉 Đã khám phá bí ẩn cú đêm!' : '??? (Thử thách ẩn)'
+    })
+  },
+  {
+    id: 'secret_early_bird',
+    label: 'Bình Minh Chinh Phục',
+    icon: '🌅',
+    tier: 'Bí Ẩn',
+    difficulty: 'Bí Ẩn',
+    isSecretTitle: true,
+    conditionText: 'Thử thách ẩn đã mở: Dậy sớm nộp bài luyện thi trong khung giờ sáng sớm (04:30 – 06:30 giờ VN).',
+    badgeClass: 'bg-amber-50 text-orange-800 border-orange-300 dark:bg-orange-950/50 dark:text-orange-200 dark:border-orange-400/60',
+    heroBadgeClass: 'bg-orange-500/35 text-amber-100 border-orange-300/75',
+    gameBadgeClass: 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-500/25 dark:text-orange-200 dark:border-orange-400/60',
+    isUnlocked: (stats) => Boolean(stats.hasEarlyBirdSubmit),
+    getProgress: (stats) => ({
+      pct: stats.hasEarlyBirdSubmit ? 100 : 0,
+      text: stats.hasEarlyBirdSubmit ? '🌅 Đã đánh thức bình minh!' : '??? (Thử thách ẩn)'
+    })
+  },
+  {
+    id: 'secret_sniper_100',
+    label: 'Xạ Thủ Tuyệt Đối 100%',
+    icon: '🏹',
+    tier: 'Bí Ẩn',
+    difficulty: 'Bí Ẩn',
+    isSecretTitle: true,
+    conditionText: 'Thử thách ẩn đã mở: Đạt độ chính xác 100% câu đúng ở phần Listening hoặc Reading (>= 5 câu).',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950/50 dark:text-rose-200 dark:border-rose-400/60',
+    heroBadgeClass: 'bg-rose-500/35 text-rose-100 border-rose-300/75',
+    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60',
+    isUnlocked: (stats) => Boolean(stats.hasPerfectAccuracy),
+    getProgress: (stats) => ({
+      pct: stats.hasPerfectAccuracy ? 100 : 0,
+      text: stats.hasPerfectAccuracy ? '🏹 Phát bắn chuẩn xác 100%!' : '??? (Thử thách ẩn)'
+    })
+  },
+  {
+    id: 'secret_supporter',
+    label: 'Người Bạn Đồng Hành',
+    icon: '💜',
+    tier: 'Bí Ẩn',
+    difficulty: 'Bí Ẩn',
+    isSecretTitle: true,
+    conditionText: 'Thử thách ẩn đã mở: Ủng hộ duy trì trang web qua Ảnh Nền Riêng hoặc Danh Hiệu VIP.',
+    badgeClass: 'bg-violet-50 text-violet-800 border-violet-300 dark:bg-violet-950/50 dark:text-violet-200 dark:border-violet-400/60',
+    heroBadgeClass: 'bg-violet-500/35 text-violet-100 border-violet-300/75',
+    gameBadgeClass: 'bg-violet-100 text-violet-900 border-violet-300 dark:bg-violet-500/25 dark:text-violet-200 dark:border-violet-400/60',
+    isUnlocked: (stats) => Boolean(stats.hasSupporterPerk),
+    getProgress: (stats) => ({
+      pct: stats.hasSupporterPerk ? 100 : 0,
+      text: stats.hasSupporterPerk ? '💜 Cảm ơn bạn đã đồng hành!' : '??? (Thử thách ẩn)'
     })
   },
   ...HOLIDAY_TITLE_SPECS.map(buildHolidayTitleEntry),
@@ -845,7 +1027,13 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
       totalLoginDays: loginMetrics.totalLoginDays,
       currentLoginStreak: loginMetrics.currentStreak,
       bestLoginStreak: loginMetrics.bestStreak,
-      coveredSkillsCount: 0
+      coveredSkillsCount: 0,
+      band70Count: 0,
+      highLrCount: 0,
+      hasNightOwlSubmit: false,
+      hasEarlyBirdSubmit: false,
+      hasPerfectAccuracy: false,
+      hasSupporterPerk: false
     };
   }
 
@@ -853,12 +1041,40 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     a => a && (a.studentId === uname || a.studentUsername === uname)
   );
   let highestBand = 0;
+  let band70Count = 0;
+  let highLrCount = 0;
+  let hasNightOwlSubmit = false;
+  let hasEarlyBirdSubmit = false;
+  let hasPerfectAccuracy = false;
   const coveredSkills = new Set();
 
   userAttempts.forEach(a => {
     const val = Number(a.overallBand);
     if (!Number.isNaN(val) && val > highestBand) {
       highestBand = val;
+    }
+    if (!Number.isNaN(val) && val >= 7.0) {
+      band70Count += 1;
+    }
+    const lBand = Number(a.scores?.listening?.band);
+    const rBand = Number(a.scores?.reading?.band);
+    if ((!Number.isNaN(lBand) && lBand >= 7.5) || (!Number.isNaN(rBand) && rBand >= 7.5)) {
+      highLrCount += 1;
+    }
+    const lTotal = Number(a.scores?.listening?.total) || 0;
+    const lRaw = Number(a.scores?.listening?.raw) || 0;
+    const rTotal = Number(a.scores?.reading?.total) || 0;
+    const rRaw = Number(a.scores?.reading?.raw) || 0;
+    if ((lTotal >= 5 && lRaw === lTotal) || (rTotal >= 5 && rRaw === rTotal)) {
+      hasPerfectAccuracy = true;
+    }
+    const subMs = Number(a.submittedAtMs);
+    if (Number.isFinite(subMs) && subMs > 0) {
+      const vnDate = new Date(subMs + 7 * 60 * 60 * 1000);
+      const hr = vnDate.getUTCHours();
+      const min = vnDate.getUTCMinutes();
+      if (hr >= 23 || hr < 4) hasNightOwlSubmit = true;
+      if ((hr === 4 && min >= 30) || hr === 5 || (hr === 6 && min <= 30)) hasEarlyBirdSubmit = true;
     }
     const isSingle = a.testMode === 'single_skill' && a.focusSkill;
     if (typeof a.scores?.listening?.band === 'number' || (isSingle && a.focusSkill === 'listening')) {
@@ -889,10 +1105,21 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     if (liveScore > bestGameScore) bestGameScore = liveScore;
   });
 
+  const hasSupporterPerk = Boolean(
+    user?.customCoverUnlocked ||
+    (Array.isArray(user?.purchasedTitleIds) && user.purchasedTitleIds.length > 0)
+  );
+
   return {
     examCount: userAttempts.length,
     highestBand,
     bestGameScore,
+    band70Count,
+    highLrCount,
+    hasNightOwlSubmit,
+    hasEarlyBirdSubmit,
+    hasPerfectAccuracy,
+    hasSupporterPerk,
     totalLoginDays: loginMetrics.totalLoginDays,
     currentLoginStreak: loginMetrics.currentStreak,
     bestLoginStreak: loginMetrics.bestStreak,
@@ -934,6 +1161,7 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       isPaidTitle: Boolean(t.isPaidTitle),
       isStaffOnly: Boolean(t.isStaffOnly),
       isHolidayTitle: Boolean(t.isHolidayTitle),
+      isSecretTitle: Boolean(t.isSecretTitle),
       holidayDateHint: t.holidayDateHint || '',
       priceVnd,
       colorKey: t.colorKey || 'amber',
@@ -1032,14 +1260,18 @@ export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}, cust
 }
 
 export const TITLE_DIFFICULTY_RANK = {
-  'Độc Quyền': 7,
-  'Phú Quý': 6,
-  'Đặc Biệt': 6,
+  'Độc Quyền': 8,
+  'Phú Quý': 7,
+  'Đặc Biệt': 7,
+  'Bí Ẩn': 6,
   'Cực Khó': 5,
   'Lễ Hội': 4,
   'Khó': 4,
-  'Thử Thách': 3,
-  'Cơ Bản': 2,
+  'Điểm Danh': 3,
+  'Bình Thường': 2,
+  'Thử Thách': 2,
+  'Cơ Bản': 1,
+  'Dễ': 1,
   'Khởi Đầu': 1
 };
 
@@ -1169,6 +1401,13 @@ export function normalizePaymentConfig(raw = {}) {
       ? rawQr
       : '';
 
+  const rawDonateQr = String(obj.donateQrUrl || '').trim();
+  const donateQrUrl =
+    (rawDonateQr.startsWith('data:image/') || rawDonateQr.startsWith('https://')) && rawDonateQr.length <= 500_000
+      ? rawDonateQr
+      : '';
+  const donateMessage = String(obj.donateMessage || '').trim().slice(0, 240);
+
   const rawPaidPrices = obj.paidTitlePrices && typeof obj.paidTitlePrices === 'object' ? obj.paidTitlePrices : {};
   const paidTitlePrices = {};
   PAID_SHOP_TITLES.forEach(t => {
@@ -1186,6 +1425,8 @@ export function normalizePaymentConfig(raw = {}) {
     accountNumber,
     accountName,
     customQrUrl,
+    donateQrUrl,
+    donateMessage,
     paymentNoteHint,
     paidTitlePrices
   };

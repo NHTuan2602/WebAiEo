@@ -14,6 +14,7 @@ import {
   Mic,
   PenTool,
   Sparkles,
+  Trophy,
   Unlock,
   XCircle
 } from 'lucide-react';
@@ -98,26 +99,204 @@ export default function ResultView({
     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
       <div className="flex justify-between items-center mb-2">
         <span className={`font-bold text-xs flex items-center gap-1.5 ${colorClass}`}>
-          <PenTool className="w-3.5 h-3.5" /> {label}: Band {band}
+          <PenTool className="w-3.5 h-3.5" /> {label}: Band {band ?? 0}
         </span>
-        <span className="text-[10px] text-slate-400 font-semibold uppercase">4 Tiêu chí IELTS</span>
+        <span className="text-[10px] text-slate-400 font-semibold uppercase">4 Tiêu chí (Điểm chẵn 1–9)</span>
       </div>
       {criteria && (
         <div className="grid grid-cols-4 gap-1 text-center py-2 bg-slate-50 dark:bg-slate-800 rounded text-[11px] mb-2 font-mono text-slate-900 dark:text-slate-100">
-          <div><span className="text-[9px] text-slate-400 block font-sans">{firstCriterionLabel}</span><strong>{criteria[firstCriterionKey]}</strong></div>
-          <div><span className="text-[9px] text-slate-400 block font-sans">CC</span><strong>{criteria.cc}</strong></div>
-          <div><span className="text-[9px] text-slate-400 block font-sans">LR</span><strong>{criteria.lr}</strong></div>
-          <div><span className="text-[9px] text-slate-400 block font-sans">GRA</span><strong>{criteria.gra}</strong></div>
+          <div><span className="text-[9px] text-slate-400 block font-sans">{firstCriterionLabel}</span><strong>{criteria[firstCriterionKey] ?? 0}</strong></div>
+          <div><span className="text-[9px] text-slate-400 block font-sans">CC</span><strong>{criteria.cc ?? 0}</strong></div>
+          <div><span className="text-[9px] text-slate-400 block font-sans">LR</span><strong>{criteria.lr ?? 0}</strong></div>
+          <div><span className="text-[9px] text-slate-400 block font-sans">GRA</span><strong>{criteria.gra ?? 0}</strong></div>
         </div>
       )}
       <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed italic">{criteria?.comment}</p>
     </div>
   );
 
-  const writingCriteriaGrid = attempt.aiDetails ? (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {renderWritingCriteriaBox('Task 1', attempt.scores.writing.task1Band, attempt.aiDetails.task1Criteria, 'text-blue-700 dark:text-blue-400', 'ta', 'TA')}
-      {renderWritingCriteriaBox('Task 2', attempt.scores.writing.task2Band, attempt.aiDetails.task2Criteria, 'text-indigo-700 dark:text-indigo-400', 'tr', 'TR')}
+  const aiD = attempt.aiDetails || null;
+  const hasWritingEssays = getWordCount(attempt.answers?.w1) > 0 || getWordCount(attempt.answers?.w2) > 0;
+  const writingCriteriaGrid = aiD ? (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/35 border border-indigo-200 dark:border-indigo-500/30 text-[11px] text-indigo-900 dark:text-indigo-200 font-semibold">
+        <span>
+          Quy chuẩn chấm điểm IELTS Examiner: 4 tiêu chí thành phần tính <strong>điểm chẵn (1–9)</strong> • Overall Writing = <strong>(Bài 2 × 2 + Bài 1) ÷ 3 → làm tròn xuống 0.5</strong>
+        </span>
+        <span className="font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
+          Writing Band: {attempt.scores?.writing?.overallBand ?? aiD.overallBand ?? '--'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {renderWritingCriteriaBox('Task 1', attempt.scores?.writing?.task1Band ?? aiD.task1Band, aiD.task1Criteria, 'text-blue-700 dark:text-blue-400', 'ta', 'TA')}
+        {renderWritingCriteriaBox('Task 2', attempt.scores?.writing?.task2Band ?? aiD.task2Band, aiD.task2Criteria, 'text-indigo-700 dark:text-indigo-400', 'tr', 'TR')}
+      </div>
+
+      {/* Quick Spelling / Grammar / Vocab Error List */}
+      {Array.isArray(aiD.spellingGrammarNotes) && aiD.spellingGrammarNotes.length > 0 && (
+        <div className="bg-rose-50/75 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-500/30 rounded-2xl p-4 space-y-2.5">
+          <h4 className="text-xs font-extrabold text-rose-800 dark:text-rose-300 uppercase tracking-wide flex items-center gap-1.5">
+            <XCircle className="w-4 h-4 shrink-0" /> Lỗi Chính Tả, Ngữ Pháp &amp; Dùng Từ Cần Sửa Ngay ({aiD.spellingGrammarNotes.length})
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {aiD.spellingGrammarNotes.map((item, idx) => (
+              <div key={idx} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-rose-200/80 dark:border-rose-500/20 text-xs space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300">
+                    {item.type || 'Lỗi'}
+                  </span>
+                </div>
+                <p className="text-slate-800 dark:text-slate-100">
+                  <span className="line-through text-rose-600 dark:text-rose-400 font-semibold">{item.wrong}</span>
+                  {' → '}
+                  <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">{item.fixed}</span>
+                </p>
+                {item.note && <p className="text-[11px] text-slate-500 dark:text-slate-400">{item.note}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Professional IELTS Examiner Sentence-by-Sentence Table */}
+      {Array.isArray(aiD.sentenceAnalysis) && aiD.sentenceAnalysis.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+          <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+            <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wide">
+              Bảng Phân Tích Từng Câu (Examiner Sentence Table)
+            </h4>
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+              {aiD.sentenceAnalysis.length} câu đã rà soát
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-100/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+                  <th className="py-2.5 px-3 font-extrabold w-[32%]">Sentence</th>
+                  <th className="py-2.5 px-3 font-extrabold w-[34%]">Grammatical or Vocabulary Error</th>
+                  <th className="py-2.5 px-3 font-extrabold w-[34%]">Correction</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {aiD.sentenceAnalysis.map((row, idx) => (
+                  <tr key={idx} className="align-top hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                    <td className="py-2.5 px-3 text-slate-800 dark:text-slate-200 leading-relaxed">
+                      <span className="inline-block text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 mr-1.5">
+                        {row.task || 'Essay'}
+                      </span>
+                      {row.sentence}
+                    </td>
+                    <td className="py-2.5 px-3 text-rose-700 dark:text-rose-300 leading-relaxed">
+                      {row.errorType && (
+                        <span className="block text-[10px] font-bold uppercase text-rose-500 dark:text-rose-400 mb-0.5">
+                          {row.errorType}
+                        </span>
+                      )}
+                      {row.errorDescription}
+                    </td>
+                    <td className="py-2.5 px-3 text-emerald-800 dark:text-emerald-300 font-medium leading-relaxed">
+                      {row.correction}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Task & Logic Flaws + Sentence Structure Upgrades */}
+      {((Array.isArray(aiD.taskLogicCritiques) && aiD.taskLogicCritiques.length > 0) ||
+        (Array.isArray(aiD.sentenceStructureUpgrades) && aiD.sentenceStructureUpgrades.length > 0)) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {Array.isArray(aiD.taskLogicCritiques) && aiD.taskLogicCritiques.length > 0 && (
+            <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/30 rounded-2xl p-4 space-y-2.5">
+              <h4 className="text-xs font-extrabold text-amber-900 dark:text-amber-300 uppercase tracking-wide">
+                Lỗi Tư Duy Đề &amp; Lập Luận (TA / TR)
+              </h4>
+              <div className="space-y-2">
+                {aiD.taskLogicCritiques.map((c, idx) => (
+                  <div key={idx} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-amber-200/80 dark:border-amber-500/20 text-xs space-y-1">
+                    <span className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400">{c.task || 'Lập luận'}</span>
+                    <p className="font-semibold text-slate-800 dark:text-slate-100">{c.issue}</p>
+                    {c.suggestion && (
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300">→ Hướng khắc phục: {c.suggestion}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {Array.isArray(aiD.sentenceStructureUpgrades) && aiD.sentenceStructureUpgrades.length > 0 && (
+            <div className="bg-sky-50/80 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-500/30 rounded-2xl p-4 space-y-2.5">
+              <h4 className="text-xs font-extrabold text-sky-900 dark:text-sky-300 uppercase tracking-wide">
+                Nâng Cấp Cấu Trúc Câu (Grammatical Range 8.0+)
+              </h4>
+              <div className="space-y-2">
+                {aiD.sentenceStructureUpgrades.map((up, idx) => (
+                  <div key={idx} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-sky-200/80 dark:border-sky-500/20 text-xs space-y-1">
+                    {up.technique && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300">
+                        {up.technique}
+                      </span>
+                    )}
+                    <p className="text-slate-500 dark:text-slate-400 line-through">{up.original}</p>
+                    <p className="text-sky-800 dark:text-sky-200 font-bold">→ {up.upgraded}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Vocabulary & Collocations Upgrades */}
+      {Array.isArray(aiD.vocabularyUpgrades) && aiD.vocabularyUpgrades.length > 0 && (
+        <div className="bg-emerald-50/75 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/30 rounded-2xl p-4 space-y-2.5">
+          <h4 className="text-xs font-extrabold text-emerald-900 dark:text-emerald-300 uppercase tracking-wide flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Kho Từ Vựng &amp; Collocation Nâng Band
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {aiD.vocabularyUpgrades.map((v, idx) => (
+              <div key={idx} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-emerald-200/80 dark:border-emerald-500/25 text-xs space-y-1">
+                {v.basic && <p className="text-[11px] text-slate-400 line-through">{v.basic}</p>}
+                <p className="font-extrabold text-emerald-700 dark:text-emerald-300">{v.upgraded}</p>
+                {v.collocation && (
+                  <p className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6]">
+                    Collocation: {v.collocation}
+                  </p>
+                )}
+                {v.meaning && <p className="text-[11px] text-slate-500 dark:text-slate-400">{v.meaning}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Revised Essays Improving TA/TR & CC */}
+      {(aiD.revisedTask1 || aiD.revisedTask2) && (
+        <div className="grid grid-cols-1 gap-4">
+          {aiD.revisedTask1 && (
+            <div className="bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/30 rounded-2xl p-4 space-y-1.5">
+              <h4 className="text-xs font-extrabold text-blue-800 dark:text-blue-300 uppercase">
+                Bài Sửa Nâng Cấp Task 1 (Tối ưu Task Achievement &amp; Coherence/Cohesion)
+              </h4>
+              <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed">{aiD.revisedTask1}</p>
+            </div>
+          )}
+          {aiD.revisedTask2 && (
+            <div className="bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/30 rounded-2xl p-4 space-y-1.5">
+              <h4 className="text-xs font-extrabold text-indigo-800 dark:text-indigo-300 uppercase">
+                Bài Sửa Nâng Cấp Task 2 (Tối ưu Task Response, Coherence &amp; Lexical/Grammar)
+              </h4>
+              <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed">{aiD.revisedTask2}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   ) : null;
 
@@ -349,9 +528,88 @@ export default function ResultView({
           )}
         </div>
 
+        {/* TEST RANKING LEADERBOARD (BXH ĐIỂM SAU KHI HOÀN THÀNH) */}
+        {(() => {
+          const sameTestAttempts = attempts.filter(a => a && a.testId === attempt.testId);
+          const bestByStudent = new Map();
+          sameTestAttempts.forEach(a => {
+            const stuKey = a.studentId || a.studentUsername || a.studentName;
+            if (!stuKey) return;
+            const bandScore =
+              typeof a.overallBand === 'number'
+                ? a.overallBand
+                : typeof a.scores?.reading?.band === 'number'
+                ? a.scores.reading.band
+                : typeof a.scores?.listening?.band === 'number'
+                ? a.scores.listening.band
+                : typeof a.scores?.writing?.overallBand === 'number'
+                ? a.scores.writing.overallBand
+                : typeof a.scores?.speaking?.band === 'number'
+                ? a.scores.speaking.band
+                : null;
+            if (bandScore === null) return;
+            const prev = bestByStudent.get(stuKey);
+            const dur = Number(a.durationSeconds) || 999999;
+            if (!prev || bandScore > prev.band || (bandScore === prev.band && dur < prev.durationSeconds)) {
+              bestByStudent.set(stuKey, {
+                studentId: stuKey,
+                studentName: a.studentName || stuKey,
+                band: bandScore,
+                durationSeconds: Number(a.durationSeconds) || 0,
+                submittedAt: a.submittedAt || '',
+                isCurrentUser: stuKey === (attempt.studentId || currentUser?.username)
+              });
+            }
+          });
+          const rankedList = Array.from(bestByStudent.values()).sort(
+            (a, b) => b.band - a.band || (a.durationSeconds || 999999) - (b.durationSeconds || 999999)
+          );
+          if (rankedList.length === 0) return null;
+          const myRank = rankedList.findIndex(r => r.studentId === (attempt.studentId || currentUser?.username)) + 1;
+          return (
+            <div className="bg-amber-50/75 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/30 rounded-2xl p-5 mb-8 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-extrabold text-amber-950 dark:text-amber-200 flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  Bảng Xếp Hạng Điểm Bài Thi Này ({rankedList.length} thí sinh)
+                </h3>
+                {myRank > 0 && (
+                  <span className="px-3 py-1 rounded-full bg-amber-500 text-white text-xs font-black">
+                    Hạng hiện tại: #{myRank} / {rankedList.length}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {rankedList.slice(0, 9).map((row, idx) => (
+                  <div
+                    key={row.studentId}
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs ${
+                      row.isCurrentUser
+                        ? 'bg-[#EDFFFD] dark:bg-teal-950/40 border-[#007A7A] dark:border-[#1EE1D6] ring-1 ring-[#007A7A]/30'
+                        : 'bg-white dark:bg-slate-900 border-amber-200/80 dark:border-slate-700'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-extrabold text-slate-900 dark:text-white truncate">
+                        #{idx + 1} {row.studentName} {row.isCurrentUser ? '(Bạn)' : ''}
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {row.durationSeconds > 0 ? formatDurationVi(row.durationSeconds) : row.submittedAt}
+                      </p>
+                    </div>
+                    <span className="font-mono font-black text-sm text-[#007A7A] dark:text-[#1EE1D6] shrink-0 ml-2">
+                      {row.band}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* SPEAKING 4 CRITERIA & TEACHER RE-GRADE PANEL */}
         {showSpeakingCard && (
-          <div className="bg-gradient-to-r from-indigo-50/90 via-white to-pink-50/60 dark:from-[#201D2E] dark:via-[#191820] dark:to-slate-900 rounded-2xl border border-[#570DF8]/30 p-5 sm:p-6 mb-8 space-y-4">
+          <div className="bg-[#FFF5F8] dark:bg-[#191820] rounded-2xl border border-[#570DF8]/30 p-5 sm:p-6 mb-8 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -515,26 +773,44 @@ export default function ResultView({
           </div>
         ) : (
           <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
-            {!(attempt.teacherGraded || (attempt.scores.writing.overallBand !== null && attempt.scores.writing.overallBand !== undefined)) ? (
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5" />
+            {isGradingAI ? (
+              <div className="flex flex-col items-center justify-center py-6 space-y-2 text-center">
+                <Loader2 className="w-8 h-8 text-[#007A7A] dark:text-[#1EE1D6] animate-spin" />
+                <p className="text-xs font-extrabold text-slate-800 dark:text-white">
+                  {aiGradingStep || 'AI Examiner đang chấm lỗi chính tả, ngữ pháp & phân tích từng câu...'}
+                </p>
+              </div>
+            ) : !(attempt.teacherGraded || (attempt.scores.writing.overallBand !== null && attempt.scores.writing.overallBand !== undefined) || writingCriteriaGrid) ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Phần thi Writing đang chờ hoàn tất chấm điểm</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Bài viết Task 1 &amp; Task 2 đã lưu an toàn. Bạn có thể bấm chạy AI phân tích lỗi chính tả, ngữ pháp &amp; gợi ý nâng Band ngay!
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">Phần thi Writing đang chờ Giáo viên chấm điểm</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Bài viết Task 1 & Task 2 của bạn đã được lưu lại an toàn. Điểm và nhận xét sẽ hiển thị sau khi Giáo viên hoàn tất chấm bài.
-                  </p>
-                </div>
+                {hasWritingEssays && (
+                  <button
+                    type="button"
+                    onClick={() => handleGradeWritingWithAI?.(attempt)}
+                    className="px-4 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm shrink-0"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Bắt Lỗi &amp; Nâng Band Ngay
+                  </button>
+                )}
               </div>
             ) : writingCriteriaGrid ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
-                    <PenTool className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Bảng Điểm Chi Tiết Phần Thi Writing
+                    <PenTool className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Bảng Chấm Lỗi &amp; Nâng Band Writing Chi Tiết
                   </h3>
                   <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-500/30">
-                    Đã công bố điểm
+                    {attempt.teacherGraded ? 'Giáo viên đã chốt điểm' : 'AI Examiner đã phân tích'}
                   </span>
                 </div>
                 {writingCriteriaGrid}

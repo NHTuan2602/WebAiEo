@@ -42,7 +42,8 @@ import {
   ANIMAL_ACCESSORIES,
   ANIMAL_CHARACTERS,
   CREWMATE_COLORS,
-  DEFAULT_VOCAB_TEXT
+  DEFAULT_VOCAB_TEXT,
+  VOCAB_PRESETS
 } from '../constants/seedData';
 import {
   LOBBY_CHAT_RESET_MS,
@@ -73,6 +74,7 @@ export default function GameArena({
   gameMuted,
   gameOutcome,
   gamePaused,
+  gamePracticeLeaderboard = [],
   gameQueues,
   gameReviewLog,
   gameRound,
@@ -91,6 +93,7 @@ export default function GameArena({
   handleCopyInviteLink,
   handleDeleteRoom,
   handleFinishRoomMatch,
+  handleGameChoiceSelect,
   handleGameHint,
   handleGameTypingInput,
   handleKickLobbyPlayer,
@@ -98,6 +101,7 @@ export default function GameArena({
   handleSaveHostRoomSettings,
   handleSendLobbyChat,
   handleStudentJoinRoom,
+  handleTeacherApproveLobbyPlayer,
   handleTeacherOpenLobby,
   handleTeacherResetLobby,
   handleTeacherStartLobbyGame,
@@ -107,8 +111,11 @@ export default function GameArena({
   handleUseFreezePowerup,
   hostRoomDraft,
   initGameCampaign,
+  initPracticeGameCampaign,
   isFrozenBoost,
+  isPracticeGameSession = false,
   isSandboxRound,
+  practiceTopicMeta = null,
   joinedRoomPin,
   jumpToGameSandboxRound,
   liveRankDeltas,
@@ -149,6 +156,9 @@ export default function GameArena({
 }) {
   const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
   const [showPilotDrawer, setShowPilotDrawer] = useState(false);
+  const [entryZone, setEntryZone] = useState('live'); // 'live' | 'practice'
+  const [practiceTopicId, setPracticeTopicId] = useState('core');
+  const [practiceSpeed, setPracticeSpeed] = useState('normal');
   const isTeacher = currentUser?.role === 'teacher';
   const activePin = joinedRoomPin || currentRoomPin;
   const room = normalizeRoomObject(roomsDb[activePin], activePin, lobbyNowTick);
@@ -488,7 +498,206 @@ export default function GameArena({
           </div>
         </div>
 
-        <div className="max-w-2xl w-full mx-auto my-auto py-4 relative z-10">
+        <div className="max-w-3xl w-full mx-auto my-auto py-4 relative z-10 space-y-4">
+          {/* 2-Zone Selector: Live (Teacher Approval) vs Open Self-Practice + BXH */}
+          <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#FFF5F8]/95 dark:bg-slate-900/90 border border-pink-200/90 dark:border-slate-800 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setEntryZone('live')}
+              className={`px-4 py-3 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition ${
+                entryZone === 'live'
+                  ? 'bg-[#007A7A] text-white shadow-md'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-pink-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              <span>Zone Thực Chiến Live (GV Duyệt)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setEntryZone('practice')}
+              className={`px-4 py-3 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition ${
+                entryZone === 'practice'
+                  ? 'bg-gradient-to-r from-[#570DF8] to-indigo-600 text-white shadow-md'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-pink-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Rocket className="w-4 h-4 shrink-0" />
+              <span>Zone Tự Luyện Tập Cùng Nhau (BXH)</span>
+            </button>
+          </div>
+
+          {entryZone === 'practice' ? (
+            <div className="bg-[#FFF5F8]/95 dark:bg-slate-900/90 backdrop-blur-xl border border-pink-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5">
+              <div className="text-center space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#570DF8] dark:text-[#C4B5FD] bg-indigo-50 dark:bg-[#570DF8]/20 border border-indigo-200 dark:border-[#570DF8]/40 px-3 py-1 rounded-full">
+                  4 Vòng Chuẩn IELTS: V1 Bắn Nghĩa • V2 Gõ Full • V3 Đồng/Trái/Định Nghĩa • V4 Collocation
+                </span>
+                <h1 className="text-2xl font-extrabold text-[#0F172B] dark:text-white pt-1">
+                  Khu Tự Luyện Tập Từ Vựng &amp; BXH
+                </h1>
+                <p className="text-xs text-[#62748E] dark:text-slate-400 max-w-lg mx-auto">
+                  Vào luyện tự do không cần chờ giáo viên mở phòng — chinh phục đủ 4 vòng hoặc chọn từng vòng để cày kỷ lục trên Bảng Xếp Hạng lớp!
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/90 dark:bg-slate-950/70 p-4 rounded-2xl border border-pink-200/80 dark:border-slate-800">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                    Chọn Chủ Đề Từ Vựng
+                  </label>
+                  <select
+                    value={practiceTopicId}
+                    onChange={e => setPracticeTopicId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-pink-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                  >
+                    <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
+                    {Object.entries(VOCAB_PRESETS || {}).map(([key, preset]) => (
+                      <option key={key} value={key}>
+                        📚 {preset.label}
+                      </option>
+                    ))}
+                    {roomVocabCount > 0 && (
+                      <option value="room_custom">🏫 Bộ từ Phòng Đấu #{activePin} ({roomVocabCount} từ)</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                    Chọn Tốc Độ Luyện Tập
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'relaxed', label: 'Thư giãn (+6s)' },
+                      { id: 'normal', label: 'Chuẩn' },
+                      { id: 'turbo', label: 'Siêu tốc (-5s)' }
+                    ].map(sp => (
+                      <button
+                        key={sp.id}
+                        type="button"
+                        onClick={() => setPracticeSpeed(sp.id)}
+                        className={`px-2 py-2.5 rounded-xl text-[11px] font-extrabold border transition ${
+                          practiceSpeed === sp.id
+                            ? 'bg-[#570DF8] text-white border-[#570DF8]'
+                            : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {sp.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {(() => {
+                const selectedPreset = VOCAB_PRESETS?.[practiceTopicId];
+                const chosenTopicLabel =
+                  practiceTopicId === 'room_custom'
+                    ? `Phòng #${activePin}`
+                    : selectedPreset?.label || 'IELTS Core Academic';
+                const chosenRawVocab =
+                  practiceTopicId === 'room_custom'
+                    ? (room.rawVocab || DEFAULT_VOCAB_TEXT)
+                    : selectedPreset?.text || DEFAULT_VOCAB_TEXT;
+                return (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        initPracticeGameCampaign?.({
+                          topicId: practiceTopicId,
+                          topicLabel: chosenTopicLabel,
+                          rawVocab: chosenRawVocab,
+                          speedMode: practiceSpeed,
+                          startRound: 1,
+                          singleRoundOnly: false
+                        })
+                      }
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#570DF8] to-indigo-600 hover:opacity-95 text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2 transition"
+                    >
+                      <Play className="w-4 h-4 fill-current" /> BẮT ĐẦU TỰ LUYỆN ĐỦ 4 VÒNG (V1 → V4)
+                    </button>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { r: 1, title: 'V1: Bắn Nghĩa', desc: 'Từ ↔ Nghĩa' },
+                        { r: 2, title: 'V2: Gõ Từ Full', desc: 'Chính tả đầy đủ' },
+                        { r: 3, title: 'V3: Đồng/Trái/ĐN', desc: 'Linh hoạt từ vựng' },
+                        { r: 4, title: 'V4: Collocation', desc: 'Cụm từ chuẩn Band 8' }
+                      ].map(item => (
+                        <button
+                          key={item.r}
+                          type="button"
+                          onClick={() =>
+                            initPracticeGameCampaign?.({
+                              topicId: practiceTopicId,
+                              topicLabel: chosenTopicLabel,
+                              rawVocab: chosenRawVocab,
+                              speedMode: practiceSpeed,
+                              startRound: item.r,
+                              singleRoundOnly: true
+                            })
+                          }
+                          className="p-2.5 rounded-xl bg-white dark:bg-slate-950/75 hover:border-[#570DF8] border border-pink-200 dark:border-slate-700 text-left transition"
+                        >
+                          <span className="block text-xs font-extrabold text-[#570DF8] dark:text-[#C4B5FD]">
+                            {item.title}
+                          </span>
+                          <span className="block text-[10px] text-slate-500 dark:text-slate-400">
+                            {item.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Practice Leaderboard (BXH Ranking) */}
+              <div className="bg-white/95 dark:bg-slate-950/80 border border-pink-200/80 dark:border-slate-800 rounded-2xl p-4 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 flex items-center gap-1.5">
+                    <Trophy className="w-4 h-4" /> BXH Khu Tự Luyện Tập ({gamePracticeLeaderboard.length} kỷ lục)
+                  </h3>
+                  <span className="text-[11px] text-slate-400 font-semibold">Tự động cập nhật sau mỗi lượt chơi</span>
+                </div>
+                {gamePracticeLeaderboard.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-4">
+                    Chưa có kỷ lục nào trong Khu Tự Luyện Tập — hãy chơi ngay để lên Top #1!
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                    {gamePracticeLeaderboard.slice(0, 10).map((row, idx) => {
+                      const isMe = row.username === currentUser?.username;
+                      return (
+                        <div
+                          key={row.id || `${row.username}-${idx}`}
+                          className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs ${
+                            isMe
+                              ? 'bg-[#EDFFFD] dark:bg-cyan-500/15 border-[#007A7A]/50 dark:border-cyan-400/50'
+                              : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-slate-900 dark:text-white truncate">
+                              #{idx + 1} {row.name || row.username} {isMe ? '(Bạn)' : ''}
+                            </p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                              {row.topicLabel} • {row.accuracyPct ?? 100}% đúng
+                            </p>
+                          </div>
+                          <span className="font-mono font-black text-amber-600 dark:text-amber-300 shrink-0 ml-2">
+                            {row.score}đ
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
           <div className="bg-[#FFF5F8]/95 dark:bg-slate-900/90 backdrop-blur-xl border border-pink-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-[0_18px_45px_-18px_rgba(15,23,42,0.14)] dark:shadow-2xl">
             <div className="flex flex-col items-center text-center mb-5">
               <div className="flex items-center justify-center gap-5 mb-3 bg-white/90 dark:bg-slate-950/75 px-6 py-3 rounded-2xl border border-pink-200/80 dark:border-slate-800/80 shadow-xs">
@@ -513,15 +722,15 @@ export default function GameArena({
                     size={62}
                     onShip={true}
                   />
-                  <span className="text-[10px] font-bold text-[#007A7A] dark:text-cyan-300 mt-1">Phi Thuyền 3 Vòng</span>
+                  <span className="text-[10px] font-bold text-[#007A7A] dark:text-cyan-300 mt-1">Phi Thuyền 4 Vòng</span>
                 </div>
               </div>
               <span className="text-[11px] font-bold uppercase tracking-widest text-[#007A7A] dark:text-cyan-400 bg-[#EDFFFD] dark:bg-cyan-500/10 border border-[#B5F5F1] dark:border-cyan-500/30 px-3 py-1 rounded-full mb-2">
-                Sảnh Chờ Phi Hành Đoàn Thú Cưng
+                Zone Thực Chiến Live · Cần Giáo Viên Duyệt
               </span>
               <h1 className="text-2xl font-extrabold text-[#0F172B] dark:text-white">Tham Gia Phòng Đấu Từ Vựng</h1>
               <p className="text-xs text-[#62748E] dark:text-slate-400 mt-1 max-w-md leading-relaxed">
-                Chọn <b>Thú Cưng &amp; Phụ Kiện</b> để cùng bạn lái phi thuyền vượt qua 3 vòng đấu. Trận đấu bắt đầu khi giáo viên bấm khởi hành!
+                Chọn <b>Thú Cưng &amp; Phụ Kiện</b> để cùng bạn lái phi thuyền vượt qua <b>4 vòng đấu (Bắn nghĩa → Gõ Full → Đồng/Trái nghĩa → Collocation)</b>. Trận đấu bắt đầu khi giáo viên duyệt &amp; bấm khởi hành!
               </p>
             </div>
 
@@ -602,6 +811,7 @@ export default function GameArena({
               </div>
             )}
           </div>
+          )}
         </div>
 
         <div className="text-center text-[11px] text-[#62748E] dark:text-slate-500 relative z-10">
@@ -919,14 +1129,29 @@ export default function GameArena({
                           </button>
                         )}
 
-                        {/* Host Crown */}
+                        {/* Host Crown / Teacher Approval Status */}
                         {isHost ? (
                           <div className="mb-0.5 text-amber-600 dark:text-amber-400 flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider">
                             <Crown className="w-3.5 h-3.5" /> Chủ Phòng
                           </div>
                         ) : (
-                          <div className={`mb-0.5 text-[10px] font-bold uppercase tracking-wider ${player.ready ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                            {player.ready ? 'Sẵn sàng' : 'Đang chờ'}
+                          <div className="mb-0.5 flex flex-col items-center gap-0.5">
+                            <div className={`text-[10px] font-bold uppercase tracking-wider ${player.approved || player.ready ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                              {player.approved ? '✓ GV Đã Duyệt' : player.ready ? 'Sẵn sàng (Chờ GV duyệt)' : 'Chờ GV duyệt'}
+                            </div>
+                            {isTeacher && (
+                              <button
+                                type="button"
+                                onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, player.username, false)}
+                                className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold border transition ${
+                                  player.approved
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-amber-50 hover:bg-emerald-600 text-amber-800 hover:text-white border-amber-300'
+                                }`}
+                              >
+                                {player.approved ? '✓ Đã duyệt' : '+ Duyệt vào thi'}
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -1005,7 +1230,7 @@ export default function GameArena({
                       {activeAccessoryObj.icon} {activeAccessoryObj.label}
                     </span>
                   </p>
-                  <p className="text-[10px] text-[#007A7A] dark:text-cyan-300 font-medium">Lái phi thuyền cả 3 vòng chơi</p>
+                  <p className="text-[10px] text-[#007A7A] dark:text-cyan-300 font-medium">Lái phi thuyền cả 4 vòng (V1–V4)</p>
                 </div>
                 <button
                   type="button"
@@ -1032,10 +1257,23 @@ export default function GameArena({
                   }`}
                 >
                   <CheckCircle className="w-4 h-4" />
-                  {myLobbyEntry?.ready ? 'Đã Sẵn Sàng (Bấm để Hủy)' : 'Bấm Sẵn Sàng'}
+                  {myLobbyEntry?.approved
+                    ? 'GV Đã Duyệt — Chờ Khởi Hành!'
+                    : myLobbyEntry?.ready
+                    ? 'Đã Sẵn Sàng (Chờ GV Duyệt)'
+                    : 'Xin Duyệt & Sẵn Sàng'}
                 </button>
               ) : (
                 <>
+                  {hasStudentsInLobby && (
+                    <button
+                      type="button"
+                      onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, '', true)}
+                      className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Duyệt Tất Cả HS
+                    </button>
+                  )}
                   {room.status === 'PLAYING' && (
                     <button
                       type="button"
@@ -1178,11 +1416,11 @@ export default function GameArena({
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#007A7A] dark:text-cyan-400 mb-3">
               Tất cả phi hành gia chuẩn bị
             </p>
-            <div className="text-7xl sm:text-8xl font-black text-[#0F172B] dark:text-white font-mono animate-bounce">
+            <div className="text-7xl sm:text-8xl font-black text-[#0F172B] dark:text-white font-mono transition-transform duration-300 animate-pulse">
               {lobbyCountdown ?? 1}
             </div>
             <p className="text-sm text-[#475569] dark:text-slate-300 mt-4 font-semibold">
-              {isTeacher ? 'Đang mở Bảng Xếp Hạng Đua Top Trực Tiếp...' : 'Đang khởi động Đấu Trường Từ Vựng 3 Vòng...'}
+              {isTeacher ? 'Đang mở Bảng Xếp Hạng Đua Top Trực Tiếp...' : 'Đang khởi động Đấu Trường Từ Vựng 4 Vòng...'}
             </p>
           </div>
         )}
@@ -1566,9 +1804,15 @@ export default function GameArena({
           >
             <ChevronLeft className="w-4 h-4" /> Thoát Game
           </button>
-          <span className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/40 px-2.5 py-1 rounded-full font-bold">
-            Phòng: {activePin}
-          </span>
+          {isPracticeGameSession ? (
+            <span className="bg-indigo-600 text-white px-2.5 py-1 rounded-full font-bold">
+              Tự Luyện: {practiceTopicMeta?.topicLabel || 'IELTS Core'}
+            </span>
+          ) : (
+            <span className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/40 px-2.5 py-1 rounded-full font-bold">
+              Phòng: {activePin}
+            </span>
+          )}
           <span className="hidden sm:inline-flex bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/40 px-2.5 py-1 rounded-full font-bold">
             {currentUser?.name || currentUser?.username}
           </span>
@@ -1615,7 +1859,7 @@ export default function GameArena({
           )}
         </div>
 
-        {/* Teacher Sandbox Controls */}
+        {/* Teacher Sandbox Controls (4 Rounds) */}
         {isTeacher && (
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <span className="text-[#62748E] dark:text-slate-400 font-bold hidden sm:inline">GV Sandbox:</span>
@@ -1633,9 +1877,15 @@ export default function GameArena({
             </button>
             <button
               onClick={() => jumpToGameSandboxRound(3)}
-              className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 3 ? 'bg-pink-500 text-white' : 'bg-white dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-pink-50 dark:hover:bg-slate-700 border border-pink-200 dark:border-transparent'}`}
+              className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 3 ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-pink-50 dark:hover:bg-slate-700 border border-pink-200 dark:border-transparent'}`}
             >
               Màn 3
+            </button>
+            <button
+              onClick={() => jumpToGameSandboxRound(4)}
+              className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 4 ? 'bg-pink-500 text-white' : 'bg-white dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-pink-50 dark:hover:bg-slate-700 border border-pink-200 dark:border-transparent'}`}
+            >
+              Màn 4
             </button>
             <button
               onClick={() => setShowVocabModal(true)}
@@ -1653,9 +1903,21 @@ export default function GameArena({
           <div className="flex items-center justify-between font-bold text-xs sm:text-sm gap-2 flex-wrap mb-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`px-2.5 py-1 rounded-lg text-white font-extrabold text-[11px] sm:text-xs ${
-                gameRound === 1 ? 'bg-gradient-to-r from-[#007A7A] to-teal-500 dark:from-blue-600 dark:to-cyan-500' : gameRound === 2 ? 'bg-gradient-to-r from-amber-600 to-orange-500' : 'bg-gradient-to-r from-pink-600 to-purple-600'
+                gameRound === 1
+                  ? 'bg-[#007A7A] dark:bg-sky-600'
+                  : gameRound === 2
+                  ? 'bg-amber-600'
+                  : gameRound === 3
+                  ? 'bg-sky-600'
+                  : 'bg-rose-600'
               }`}>
-                {gameRound === 1 ? 'VÒNG 1/3: NHẬN DIỆN' : gameRound === 2 ? 'VÒNG 2/3: GÕ TỪ KHUYẾT' : 'VÒNG 3/3: BOSS IPA'}
+                {gameRound === 1
+                  ? 'VÒNG 1/4: NHẬN DIỆN TỪ'
+                  : gameRound === 2
+                  ? 'VÒNG 2/4: GÕ TỪ FULL'
+                  : gameRound === 3
+                  ? 'VÒNG 3/4: ĐỒNG · TRÁI NGHĨA · ĐN'
+                  : 'VÒNG 4/4: COLLOCATION BOSS'}
               </span>
               <span className="bg-white dark:bg-slate-800 border border-pink-200 dark:border-transparent px-2 py-1 rounded-lg text-[#334155] dark:text-slate-300 text-xs">
                 Từ: {gameWordIdx + 1}/{gameQueues[gameRound]?.length || 1}
@@ -1714,8 +1976,12 @@ export default function GameArena({
               <div className="flex justify-center items-center gap-2 flex-wrap mb-1">
                 <span className="text-[10px] text-[#007A7A] dark:text-cyan-400 uppercase font-bold tracking-wider">
                   {gameRound === 1
-                    ? `Di chuyển & bắn gà đúng (${gameTimeLimit}s)`
-                    : `Nghe & gõ đủ từ trước khi Boss chạm tàu (${gameTimeLimit}s)`}
+                    ? `Di chuyển & bắn từ đúng (hoặc bấm nút chọn — ${gameTimeLimit}s)`
+                    : gameRound === 2
+                    ? `Nghe & gõ đủ từ đầy đủ (GÕ FULL — ${gameTimeLimit}s)`
+                    : gameRound === 3
+                    ? `${activeQuestion.v3Badge || 'ĐỒNG · TRÁI NGHĨA · ĐỊNH NGHĨA'} — Bắn hoặc bấm đáp án (${gameTimeLimit}s)`
+                    : `CỤM TỪ COLLOCATION — Bắn hoặc bấm đáp án (${gameTimeLimit}s)`}
                 </span>
                 <button
                   onClick={() => speakWord(activeQuestion.word)}
@@ -1736,7 +2002,7 @@ export default function GameArena({
                 >
                   <Snowflake className="w-3 h-3" /> Đóng băng +8s [2] ({freezeCharges})
                 </button>
-                {(gameRound === 2 || gameRound === 3) && (
+                {gameRound === 2 && (
                   <>
                     <button
                       onClick={handleGameHint}
@@ -1755,25 +2021,50 @@ export default function GameArena({
               </div>
 
               <p className="text-sm sm:text-base font-bold text-[#0F172B] dark:text-white leading-snug">
-                {activeQuestion.prompt}
+                {gameRound === 3
+                  ? activeQuestion.v3Question
+                  : gameRound === 4
+                  ? activeQuestion.v4Question
+                  : activeQuestion.prompt}
               </p>
 
-              {(gameRound === 2 || gameRound === 3) && (
+              {/* Clickable Choice Cards for V3 (Syn/Ant/Def) & V4 (Collocation) synced seamlessly with Shooter */}
+              {(gameRound === 3 || gameRound === 4) && (() => {
+                const choices = gameRound === 3 ? (activeQuestion.v3Choices || []) : (activeQuestion.v4Choices || []);
+                if (choices.length === 0) return null;
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2 text-left">
+                    {choices.map((choiceText, cIdx) => (
+                      <button
+                        key={`${choiceText}-${cIdx}`}
+                        type="button"
+                        onClick={() => handleGameChoiceSelect?.(choiceText)}
+                        className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-[#EDFFFD] dark:bg-slate-900 dark:hover:bg-cyan-500/20 border border-pink-200/80 dark:border-slate-700 hover:border-[#007A7A] dark:hover:border-cyan-400 text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 transition"
+                      >
+                        <span className="w-5 h-5 rounded-md bg-[#007A7A] text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                          {String.fromCharCode(65 + cIdx)}
+                        </span>
+                        <span className="leading-snug">{choiceText}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {gameRound === 2 && (
                 <p className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-300 font-mono mt-0.5">
-                  Phiên âm: {activeQuestion.ipa || 'N/A'} • {activeQuestion.word.length} ký tự (Bắt đầu: "{activeQuestion.word[0]}")
+                  Phiên âm: {activeQuestion.ipa || 'N/A'} • {activeQuestion.word.length} ký tự (Bắt đầu: &quot;{activeQuestion.word[0]}&quot;)
                 </p>
               )}
 
-              {/* Typing Character Boxes for Round 2 & Round 3 */}
-              {(gameRound === 2 || gameRound === 3) && (
+              {/* Full Typing Character Boxes for Round 2 (V2: GÕ TỪ FULL) */}
+              {gameRound === 2 && (
                 <div className="flex justify-center gap-1 sm:gap-1.5 mt-2 flex-wrap">
                   {activeQuestion.word.toUpperCase().split('').map((char, cIdx) => {
                     const isAlpha = /^[A-Z]$/.test(char);
                     const isTyped = cIdx < gameTypedProgress || !isAlpha;
                     const isCurrent = cIdx === gameTypedProgress;
-                    const displayChar = isTyped
-                      ? char
-                      : (gameRound === 2 && cIdx % 2 === 0 ? char : '_');
+                    const displayChar = isTyped ? char : '_';
 
                     return (
                       <div
@@ -1794,7 +2085,7 @@ export default function GameArena({
               )}
 
               {/* Optional On-Screen Keyboard */}
-              {(gameRound === 2 || gameRound === 3) && showMobileKeyboard && gameSubState === 'PLAYING' && (
+              {gameRound === 2 && showMobileKeyboard && gameSubState === 'PLAYING' && (
                 <div className="mt-2.5 space-y-1">
                   {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map(rowStr => (
                     <div key={rowStr} className="flex justify-center gap-1">
@@ -1849,9 +2140,9 @@ export default function GameArena({
           {/* Round Transition Screen */}
           {gameSubState === 'TRANSITION' && (
             <div className="absolute inset-0 bg-[#FFF5F8]/95 dark:bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-amber-600 dark:text-amber-400 mb-2">HOÀN THÀNH VÒNG {gameRound}/3!</h2>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-amber-600 dark:text-amber-400 mb-2">HOÀN THÀNH VÒNG {gameRound}/4!</h2>
               <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-md mb-3 leading-relaxed">
-                Chuẩn bị bước sang <b>Vòng {gameRound + 1}</b> với <b>bộ từ vựng mới</b> (giới hạn {getSpeedAdjustedTimeLimit(gameRound + 1, room.speedMode || 'normal')} giây/từ)!
+                Chuẩn bị bước sang <b>Vòng {gameRound + 1}/4</b> ({gameRound + 1 === 2 ? 'Gõ Từ Full' : gameRound + 1 === 3 ? 'Đồng nghĩa / Trái nghĩa / Định nghĩa' : 'Cụm từ Collocation'}) — giới hạn {getSpeedAdjustedTimeLimit(gameRound + 1, room.speedMode || 'normal')} giây/từ!
               </p>
               <p className="text-xs font-mono text-[#007A7A] dark:text-cyan-300 mb-5">
                 Tự động bắt đầu sau {transitionCountdown} giây...
@@ -1872,17 +2163,45 @@ export default function GameArena({
                 gameOutcome === 'LOST' ? 'text-rose-600 dark:text-rose-400' : 'text-[#007A7A] dark:text-cyan-300'
               }`}>
                 {gameOutcome === 'LOST'
-                  ? `HẾT MẠNG TẠI VÒNG ${gameRound}`
+                  ? `HẾT MẠNG TẠI VÒNG ${gameRound}/4`
                   : isSandboxRound
                   ? `HOÀN THÀNH MÀN ${gameRound} (GV)`
+                  : isPracticeGameSession
+                  ? 'HOÀN THÀNH LUYỆN TẬP TỪ VỰNG'
                   : 'TỔNG KẾT KẾT QUẢ ĐẤU TRƯỜNG'}
               </h2>
               <p className="text-xs text-[#475569] dark:text-slate-300 mb-4">
                 Điểm số: <b className="text-amber-600 dark:text-amber-400 text-base">{gameScore} điểm</b> • Đạt: <b className="text-emerald-600 dark:text-emerald-400">{passedWordsCount}/{gameReviewLog.length} từ</b> • Đã lưu vào Bảng Xếp Hạng!
               </p>
 
-              {/* Live Room Top 5 Standings at End of Match */}
-              {(() => {
+              {/* Practice BXH OR Live Room Top 5 Standings */}
+              {isPracticeGameSession ? (
+                gamePracticeLeaderboard.length > 0 && (
+                  <div className="max-w-xl w-full bg-white/95 dark:bg-slate-900/90 border border-pink-200 dark:border-indigo-500/30 rounded-xl p-3 mb-3 text-left text-xs shadow-sm">
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                      <Trophy className="w-3.5 h-3.5" /> BXH Khu Tự Luyện Tập (Top {Math.min(5, gamePracticeLeaderboard.length)})
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {gamePracticeLeaderboard.slice(0, 5).map((st, sIdx) => {
+                        const isMe = st.username === currentUser?.username;
+                        return (
+                          <div
+                            key={st.id || sIdx}
+                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border ${
+                              isMe
+                                ? 'bg-[#EDFFFD] dark:bg-cyan-500/15 border-[#007A7A]/50 dark:border-cyan-400/50 text-[#007A7A] dark:text-cyan-200'
+                                : 'bg-[#FFF5F8] dark:bg-slate-950/70 border-pink-200/80 dark:border-slate-800 text-[#0F172B] dark:text-slate-200'
+                            }`}
+                          >
+                            <span className="truncate font-semibold">#{sIdx + 1} {st.name || st.username} ({st.topicLabel})</span>
+                            <span className="font-mono font-extrabold text-amber-600 dark:text-amber-300 ml-2 shrink-0">{st.score}đ</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              ) : (() => {
                 const matchEntries = Object.values(room.liveMatch || {});
                 const topStandings = (
                   matchEntries.length > 0
@@ -1959,7 +2278,21 @@ export default function GameArena({
               </div>
 
               <div className="flex gap-3 flex-wrap justify-center">
-                {isTeacher ? (
+                {isPracticeGameSession ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEntryZone('practice');
+                        setGameSubState('JOIN');
+                        gameRuntimeRef.current.subState = 'JOIN';
+                      }}
+                      className="bg-[#570DF8] hover:bg-[#490AD2] text-white font-bold px-5 py-2.5 rounded-xl transition shadow flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Về Khu Luyện Tập &amp; Xem BXH
+                    </button>
+                  </>
+                ) : isTeacher ? (
                   <>
                     <button
                       onClick={() => handleTeacherResetLobby(activePin)}
@@ -2001,10 +2334,14 @@ export default function GameArena({
       <div className="shrink-0 w-full bg-[#FFF5F8] dark:bg-slate-900 border-t border-pink-200/80 dark:border-slate-800">
         <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between text-[11px] sm:text-xs text-[#62748E] dark:text-slate-400 gap-2 flex-wrap">
           <span className="truncate">
-            Top: {leaderboardPlayers.slice(0, 3).map((p, i) => `${i + 1}. ${p.name} (${p.score}đ)`).join(' • ') || 'Chưa có điểm'}
+            {isPracticeGameSession
+              ? `Top Tự Luyện: ${gamePracticeLeaderboard.slice(0, 3).map((p, i) => `${i + 1}. ${p.name} (${p.score}đ)`).join(' • ') || 'Chưa có kỷ lục'}`
+              : `Top: ${leaderboardPlayers.slice(0, 3).map((p, i) => `${i + 1}. ${p.name} (${p.score}đ)`).join(' • ') || 'Chưa có điểm'}`}
           </span>
           <span className="font-mono text-[#007A7A] dark:text-cyan-400">
-            {gameRound === 1 ? 'Chuột / ← → để lái • Click / Space để bắn • [TAB] Nghe' : '[TAB] Nghe lại • [1] Gợi ý • Gõ bàn phím'}
+            {gameRound === 2
+              ? '[TAB] Nghe lại • [1] Gợi ý • Gõ bàn phím (Full từ)'
+              : 'Chuột / ← → để lái • Click / Space để bắn hoặc Bấm chọn • [TAB] Nghe'}
           </span>
         </div>
       </div>

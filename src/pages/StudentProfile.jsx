@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   Clock,
+  Copy,
   Crown,
   Edit,
   ExternalLink,
@@ -20,6 +21,7 @@ import {
   Globe,
   GraduationCap,
   Headphones,
+  Heart,
   History,
   Key,
   Lock,
@@ -30,6 +32,7 @@ import {
   PenTool,
   Phone,
   Play,
+  QrCode,
   Save,
   Search,
   Send,
@@ -54,6 +57,7 @@ import ImageCropperModal from '../components/modals/ImageCropperModal';
 import {
   AVATAR_FRAMES,
   PROFILE_BANNERS,
+  buildVietQrImageUrl,
   formatVndCurrency,
   getProfileBannerById,
   hasCustomCoverPermission,
@@ -111,6 +115,7 @@ export default function StudentProfile({
   const [statusDrafts, setStatusDrafts] = useState({});
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [titleFilter, setTitleFilter] = useState('all');
+  const [donateAmount, setDonateAmount] = useState(0);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [checkoutModalState, setCheckoutModalState] = useState(null);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
@@ -658,9 +663,118 @@ export default function StudentProfile({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-8 space-y-6 min-w-0">
 
-      {/* SYSTEM ADMIN PROFILE: FEEDBACK & FEATURE REQUEST INBOX */}
-      {isTargetSystemAdmin ? (
+      {/* SYSTEM ADMIN PROFILE: DEDICATED DONATE QR + FEEDBACK & FEATURE REQUEST INBOX */}
+      {isTargetSystemAdmin ? (() => {
+        const donateBankCode = normalizedPayCfg.bankCode || 'MB';
+        const donateAccountNumber = normalizedPayCfg.accountNumber || '0335613426';
+        const donateAccountName = normalizedPayCfg.accountName || 'NGUYEN HOANG TUAN';
+        const donateAddInfo = 'UNG HO ADMIN TUAN DUY TRI WEB IELTS';
+        const dynamicDonateQr = buildVietQrImageUrl({
+          bankCode: donateBankCode,
+          accountNumber: donateAccountNumber,
+          accountName: donateAccountName,
+          amount: donateAmount,
+          addInfo: donateAddInfo
+        });
+        const adminDonateQrSrc = normalizedPayCfg.donateQrUrl || dynamicDonateQr;
+
+        return (
         <div className="space-y-6">
+          {/* Dedicated Admin Donate / Web Maintenance QR Card */}
+          <div className="bg-gradient-to-br from-amber-50 via-white to-rose-50/70 dark:from-amber-950/30 dark:via-slate-900 dark:to-rose-950/25 rounded-3xl border border-amber-300/80 dark:border-amber-500/35 shadow-sm p-5 sm:p-6">
+            <div className="flex flex-col md:flex-row items-center gap-5">
+              <div className="shrink-0 bg-white p-3 rounded-2xl border border-amber-200 shadow-sm flex flex-col items-center gap-1.5">
+                {adminDonateQrSrc ? (
+                  <img
+                    src={adminDonateQrSrc}
+                    alt="Mã QR Ủng Hộ Admin Tuấn"
+                    className="w-48 h-48 sm:w-52 sm:h-52 object-contain rounded-xl"
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center bg-slate-100 rounded-xl text-xs text-slate-500 text-center p-4">
+                    Chưa cấu hình QR ủng hộ
+                  </div>
+                )}
+                <span className="text-[11px] font-extrabold text-amber-800 flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5 text-amber-600" /> VietQR Ủng Hộ Riêng Admin Tuấn
+                </span>
+              </div>
+
+              <div className="flex-1 space-y-3 text-left">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-white text-[11px] font-black shadow-xs">
+                    <Heart className="w-3.5 h-3.5 fill-current" /> Quỹ Duy Trì Website &amp; Server
+                  </span>
+                  {donateAmount > 0 && (
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 text-xs font-extrabold">
+                      Mức gợi ý: {formatVndCurrency(donateAmount)}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
+                    Ủng Hộ Admin Tuấn Chi Phí Duy Trì Trang Web &amp; Server
+                  </h2>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                    {normalizedPayCfg.donateMessage ||
+                      'Mọi khoản đóng góp tùy tâm đều giúp Tuấn duy trì máy chủ, tên miền, API chấm AI và phát triển thêm nhiều tính năng mới miễn phí cho cộng đồng.'}
+                  </p>
+                </div>
+
+                {!normalizedPayCfg.donateQrUrl && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { val: 0, label: 'Tùy tâm' },
+                      { val: 10000, label: '10.000đ' },
+                      { val: 20000, label: '20.000đ' },
+                      { val: 50000, label: '50.000đ' },
+                      { val: 100000, label: '100.000đ' }
+                    ].map(opt => (
+                      <button
+                        key={opt.val}
+                        type="button"
+                        onClick={() => setDonateAmount(opt.val)}
+                        className={`px-3 py-1 rounded-xl text-xs font-extrabold border transition ${
+                          donateAmount === opt.val
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-amber-200 dark:border-slate-700 hover:border-amber-500'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-100">
+                    <span className="text-slate-400">Ngân hàng:</span> <b>{normalizedPayCfg.bankName || donateBankCode}</b>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(donateAccountNumber);
+                      showToast?.(`Đã sao chép STK ${donateAccountNumber}!`);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-slate-700 hover:border-amber-500 font-bold text-slate-800 dark:text-slate-100 inline-flex items-center gap-1.5 transition"
+                  >
+                    <span className="text-slate-400 font-normal">STK:</span>
+                    <span className="font-mono">{donateAccountNumber}</span>
+                    <Copy className="w-3.5 h-3.5 text-amber-600" />
+                  </button>
+                  <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-100">
+                    <b>{donateAccountName}</b>
+                  </div>
+                </div>
+
+                <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                  💛 Cảm ơn bạn đã ủng hộ &amp; tin tưởng đồng hành cùng website Luyện Thi IELTS Nha Trang!
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
             {/* Submit New Feedback Card (for Students & Teachers & Admin) */}
             <form
@@ -917,7 +1031,8 @@ export default function StudentProfile({
             </div>
           </div>
         </div>
-      ) : isTargetTeacher ? (
+        );
+      })() : isTargetTeacher ? (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-8">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
@@ -1729,24 +1844,35 @@ export default function StudentProfile({
       {/* Modal: Bảng Danh Hiệu & Cách Đạt Được (Học viên, Giáo viên & Quản trị) */}
       {showTitlesModal && titleSummary && (() => {
         const allTitleItems = titleSummary.itemsWithProgress || [];
+        const easyCount = allTitleItems.filter(i => i.difficulty === 'Dễ' || i.difficulty === 'Khởi Đầu' || i.difficulty === 'Cơ Bản').length;
+        const normalCount = allTitleItems.filter(i => i.difficulty === 'Bình Thường' || i.difficulty === 'Thử Thách').length;
         const hardTitleCount = allTitleItems.filter(i => i.difficulty === 'Khó' || i.difficulty === 'Cực Khó').length;
+        const checkinTitleCount = allTitleItems.filter(i => i.difficulty === 'Điểm Danh').length;
+        const secretTitleCount = allTitleItems.filter(i => i.isSecretTitle || i.difficulty === 'Bí Ẩn').length;
         const holidayTitleCount = allTitleItems.filter(i => i.isHolidayTitle).length;
         const vipTitleCount = allTitleItems.filter(i => i.isPaidTitle).length;
         const filteredTitles = allTitleItems.filter(item => {
           if (titleFilter === 'unlocked') return item.unlocked;
           if (titleFilter === 'locked') return !item.unlocked;
+          if (titleFilter === 'easy') return item.difficulty === 'Dễ' || item.difficulty === 'Khởi Đầu' || item.difficulty === 'Cơ Bản';
+          if (titleFilter === 'normal') return item.difficulty === 'Bình Thường' || item.difficulty === 'Thử Thách';
+          if (titleFilter === 'hard') return item.difficulty === 'Khó' || item.difficulty === 'Cực Khó';
+          if (titleFilter === 'checkin') return item.difficulty === 'Điểm Danh';
+          if (titleFilter === 'secret') return item.isSecretTitle || item.difficulty === 'Bí Ẩn';
           if (titleFilter === 'holiday') return item.isHolidayTitle;
           if (titleFilter === 'vip') return item.isPaidTitle;
-          if (titleFilter === 'hard') return item.difficulty === 'Khó' || item.difficulty === 'Cực Khó';
           return true;
         });
         const diffBadgeCls = (diff) => {
           if (diff === 'Độc Quyền') return 'bg-purple-100 text-purple-900 border-purple-400 dark:bg-purple-500/25 dark:text-purple-200 dark:border-purple-400/50';
           if (diff === 'Phú Quý') return 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 border-amber-400 dark:from-amber-500/25 dark:to-yellow-500/25 dark:text-amber-100 dark:border-amber-400/60';
+          if (diff === 'Bí Ẩn') return 'bg-slate-900 text-amber-200 border-amber-400/70 dark:bg-slate-800 dark:text-amber-200 dark:border-amber-400/70';
           if (diff === 'Lễ Hội') return 'bg-gradient-to-r from-pink-100 to-rose-100 text-rose-800 border-rose-300 dark:from-pink-500/25 dark:to-rose-500/25 dark:text-rose-200 dark:border-rose-400/50';
+          if (diff === 'Điểm Danh') return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50';
           if (diff === 'Cực Khó') return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/40';
           if (diff === 'Khó') return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/40';
-          if (diff === 'Thử Thách') return 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/40';
+          if (diff === 'Bình Thường' || diff === 'Thử Thách') return 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/40';
+          if (diff === 'Dễ' || diff === 'Cơ Bản' || diff === 'Khởi Đầu') return 'bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-500/20 dark:text-lime-200 dark:border-lime-500/40';
           return 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
         };
 
@@ -1819,11 +1945,15 @@ export default function StudentProfile({
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { id: 'all', label: `Tất cả (${allTitleItems.length})` },
+                  { id: 'easy', label: `🌱 Dễ (${easyCount})` },
+                  { id: 'normal', label: `⚡ Bình Thường (${normalCount})` },
+                  { id: 'hard', label: `🔥 Khó & Cực Khó (${hardTitleCount})` },
+                  { id: 'checkin', label: `📅 Điểm Danh (${checkinTitleCount})` },
+                  { id: 'secret', label: `❓ Bí Ẩn (${secretTitleCount})` },
                   { id: 'holiday', label: `🎉 Ngày Lễ (${holidayTitleCount})` },
                   { id: 'vip', label: `💎 Cửa Hàng VIP (${vipTitleCount})` },
                   { id: 'unlocked', label: `Đã mở (${titleSummary.unlockedIds?.length || 0})` },
-                  { id: 'locked', label: `Chưa mở (${Math.max(0, allTitleItems.length - (titleSummary.unlockedIds?.length || 0))})` },
-                  { id: 'hard', label: `Khó & Cực Khó (${hardTitleCount})` }
+                  { id: 'locked', label: `Chưa mở (${Math.max(0, allTitleItems.length - (titleSummary.unlockedIds?.length || 0))})` }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -1848,6 +1978,7 @@ export default function StudentProfile({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {filteredTitles.map(item => {
                   const isEquipped = titleSummary.title?.id === item.id;
+                  const maskSecret = Boolean(item.isSecretTitle && !item.unlocked && !isViewerSuperAdmin);
                   return (
                     <div
                       key={item.id}
@@ -1863,19 +1994,19 @@ export default function StudentProfile({
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <span className="w-10 h-10 rounded-xl bg-white dark:bg-slate-950 border border-pink-200/80 dark:border-slate-700 flex items-center justify-center text-xl shrink-0 shadow-2xs">
-                              {item.icon}
+                              {maskSecret ? '❓' : item.icon}
                             </span>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                                  {item.tier}
+                                  {maskSecret ? 'Bí Ẩn' : item.tier}
                                 </span>
                                 <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border ${diffBadgeCls(item.difficulty)}`}>
                                   {item.difficulty}
                                 </span>
                               </div>
                               <h4 className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
-                                {item.label}
+                                {maskSecret ? 'Danh Hiệu Bí Ẩn (???)' : item.label}
                               </h4>
                             </div>
                           </div>
@@ -1884,12 +2015,15 @@ export default function StudentProfile({
                               ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/40'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                           }`}>
-                            {item.unlocked ? 'Đã đạt' : 'Chưa mở'}
+                            {item.unlocked ? 'Đã đạt' : maskSecret ? 'Bí ẩn' : 'Chưa mở'}
                           </span>
                         </div>
 
                         <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                          <b>Cách đạt được:</b> {item.conditionText}
+                          <b>Cách đạt được:</b>{' '}
+                          {maskSecret
+                            ? 'Thử thách ẩn — Hãy luyện tập chăm chỉ ở nhiều khung giờ và bứt phá kỷ lục bất ngờ để tự động khai mở!'
+                            : item.conditionText}
                         </p>
                       </div>
 

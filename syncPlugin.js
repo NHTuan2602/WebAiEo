@@ -12,6 +12,16 @@ import {
   simulateAISpeakingGrading
 } from './src/utils/speakingAiEngine.js';
 import {
+  callGeminiWritingGrader,
+  simulateAIWritingGrading
+} from './src/utils/geminiGrader.js';
+import {
+  calculateOverallIeltsBand,
+  calculateWritingBand,
+  isObjectiveAnswerCorrect,
+  roundWholeBand
+} from './src/utils/examHelpers.js';
+import {
   buildOtpEmailContent,
   formatMailTransportError,
   getEffectiveMailConfig,
@@ -758,17 +768,7 @@ function roundIeltsBandServer(score) {
 }
 
 function isObjectiveAnswerCorrectServer(question, userRaw) {
-  const normalizedUser = String(userRaw ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-  const normalizedKey = String(question?.correctAnswer ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-  if (!normalizedUser || !normalizedKey) return false;
-  if (question?.type === 'mcq' || question?.type === 'tfng' || !/[|/]/.test(normalizedKey)) {
-    return normalizedUser === normalizedKey;
-  }
-  const acceptedVariants = normalizedKey
-    .split(/[|/]/)
-    .map(part => part.trim().replace(/\s+/g, ' '))
-    .filter(Boolean);
-  return acceptedVariants.includes(normalizedUser);
+  return isObjectiveAnswerCorrect(question, userRaw);
 }
 
 function evaluateObjectiveScoresForAttempt(test, answers = {}) {
@@ -952,6 +952,7 @@ function createInitialStore(audioDir = '') {
     users: {},
     customVocabTopics: [],
     customTitles: [],
+    gamePracticeLeaderboard: [],
     adminFeedbacks: [],
     notifications: [],
     aiConfig: { geminiApiKey: '' },
@@ -1093,6 +1094,11 @@ function applyParsedStoreSnapshot(store, parsed) {
   }
   if (Array.isArray(parsed.customTitles)) {
     store.customTitles = parsed.customTitles.filter(t => t?.id && t?.label).slice(0, 60);
+  }
+  if (Array.isArray(parsed.gamePracticeLeaderboard)) {
+    store.gamePracticeLeaderboard = parsed.gamePracticeLeaderboard
+      .filter(e => e && e.username && Number.isFinite(Number(e.score)))
+      .slice(0, 300);
   }
   if (Array.isArray(parsed.adminFeedbacks)) {
     store.adminFeedbacks = parsed.adminFeedbacks.filter(f => f?.id && f?.content);
@@ -1493,6 +1499,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: {},
       customVocabTopics: [],
       customTitles: [],
+      gamePracticeLeaderboard: [],
       paymentConfig: null,
       supportAdminProfile: null,
       adminFeedbacks: [],
@@ -1552,6 +1559,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
+      gamePracticeLeaderboard: Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : [],
       paymentConfig: getPublicPaymentConfigSummary(store),
       ...adminFields,
       notifications,
@@ -1637,6 +1645,13 @@ function getSnapshotForViewer(store, viewer = null) {
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
     customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
+    gamePracticeLeaderboard: (Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : []).filter(entry => {
+      if (!entry?.username) return false;
+      const uLower = String(entry.username).trim().toLowerCase();
+      if (uLower === String(viewer.username || '').toLowerCase()) return true;
+      if (sameClassPeerSet.has(uLower)) return true;
+      return store.users?.[entry.username]?.role === 'teacher';
+    }),
     paymentConfig: getPublicPaymentConfigSummary(store),
     ...adminFields,
     notifications,
@@ -1992,6 +2007,21 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     case 'GRANT_USER_TITLES': {
       if (!isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới có quyền tạo hoặc trao tặng danh hiệu!' };
+      }
+      return { allowed: true };
+    }
+
+    case 'APPROVE_LOBBY_PLAYER': {
+      if (!isTeacher) {
+        return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới có quyền duyệt học viên vào phòng Thực Chiến Live.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'SUBMIT_PRACTICE_GAME_SCORE': {
+      const targetUname = payload?.username;
+      if (!isTeacher && targetUname && targetUname !== viewer.username) {
+        return { allowed: false, status: 403, error: 'Không thể gửi điểm luyện tập dưới tên người khác.' };
       }
       return { allowed: true };
     }
@@ -3033,6 +3063,21 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           validTicket.testTitle === attempt.testTitle
         );
 
+        const validWritingTicket = !isSpeakingMode && attempt.aiWritingTicket
+          ? verifyToken(attempt.aiWritingTicket, store._authSecret)
+          : null;
+        const writingDigest = crypto
+          .createHash('sha256')
+          .update(`${String(attempt.answers?.w1 || '')}||${String(attempt.answers?.w2 || '')}`)
+          .digest('hex')
+          .slice(0, 24);
+        const writingTicketOk = Boolean(
+          validWritingTicket &&
+          validWritingTicket.kind === 'writing_eval' &&
+          validWritingTicket.username === viewer.username &&
+          validWritingTicket.digest === writingDigest
+        );
+
         let sanitizedScores = {
           listening: attempt.scores?.listening || { raw: 0, total: 0, band: null },
           reading: attempt.scores?.reading || { raw: 0, total: 0, band: null },
@@ -3053,12 +3098,29 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         if (isSpeakingMode && ticketOk && typeof validTicket.band === 'number') {
           sanitizedScores = {
             ...sanitizedScores,
-            speaking: { band: validTicket.band, criteria: validTicket.criteria || {} }
+            speaking: { band: roundWholeBand(validTicket.band), criteria: validTicket.criteria || {} }
           };
-          finalOverallBand = validTicket.band;
+          finalOverallBand = roundWholeBand(validTicket.band);
           finalTeacherGraded = true;
           finalAiGraded = true;
           finalFeedback = typeof validTicket.overallFeedback === 'string' ? validTicket.overallFeedback : '';
+        } else if (!isSpeakingMode && writingTicketOk && typeof validWritingTicket.overallBand === 'number') {
+          const wt1 = Number(validWritingTicket.task1Band) || 0;
+          const wt2 = Number(validWritingTicket.task2Band) || 0;
+          const wtOverall = calculateWritingBand(wt1, wt2);
+          sanitizedScores = {
+            ...sanitizedScores,
+            writing: { task1Band: wt1, task2Band: wt2, overallBand: wtOverall }
+          };
+          const activeSkillBands = [];
+          if ((sanitizedScores.listening?.total || 0) > 0) activeSkillBands.push(Number(sanitizedScores.listening.band) || 0);
+          if ((sanitizedScores.reading?.total || 0) > 0) activeSkillBands.push(Number(sanitizedScores.reading.band) || 0);
+          activeSkillBands.push(wtOverall);
+          finalOverallBand = attempt.testMode === 'single_skill' && attempt.focusSkill === 'writing'
+            ? wtOverall
+            : calculateOverallIeltsBand(activeSkillBands);
+          finalAiGraded = true;
+          finalFeedback = typeof validWritingTicket.feedback === 'string' ? validWritingTicket.feedback : '';
         }
 
         const submittedAtMs = Date.now();
@@ -3087,6 +3149,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           teacherFeedback: finalFeedback
         };
         delete attempt.aiGradingTicket;
+        delete attempt.aiWritingTicket;
       } else {
         const testObj = (store.tests || []).find(t => t.id === attempt.testId);
         const submittedAtMs = parseScheduleTimestampServer(attempt.submittedAtMs) || Date.now();
@@ -3286,6 +3349,75 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         store.adminFeedbacks = filtered;
         changed = true;
       }
+      break;
+    }
+
+    case 'APPROVE_LOBBY_PLAYER': {
+      const cleanPin = String(payload?.pin || '').trim();
+      const base = cleanPin && store.rooms?.[cleanPin] ? normalizeServerRoom(store.rooms[cleanPin], cleanPin) : null;
+      if (!base) break;
+      const approveAll = Boolean(payload?.approveAll);
+      const targetUname = String(payload?.username || '').trim();
+      const nextApproved = payload?.approved !== false;
+      const nextLobby = { ...(base.lobbyPlayers || {}) };
+      if (approveAll) {
+        Object.keys(nextLobby).forEach(uname => {
+          if (nextLobby[uname] && nextLobby[uname].role !== 'teacher') {
+            nextLobby[uname] = { ...nextLobby[uname], approved: nextApproved, ready: nextApproved ? true : nextLobby[uname].ready };
+          }
+        });
+      } else if (targetUname && nextLobby[targetUname]) {
+        nextLobby[targetUname] = {
+          ...nextLobby[targetUname],
+          approved: nextApproved,
+          ready: nextApproved ? true : nextLobby[targetUname].ready
+        };
+      }
+      base.lobbyPlayers = nextLobby;
+      store.rooms[cleanPin] = base;
+      changed = true;
+      break;
+    }
+
+    case 'SUBMIT_PRACTICE_GAME_SCORE': {
+      if (!viewer?.username) break;
+      const cleanScore = Math.max(0, Math.min(250_000, Math.round(Number(payload?.score) || 0)));
+      const topicId = String(payload?.topicId || 'core').trim().slice(0, 60);
+      const topicLabel = String(payload?.topicLabel || 'IELTS Core').trim().slice(0, 80);
+      const mode = String(payload?.mode || 'full_4').trim().slice(0, 32);
+      const passedCount = Math.max(0, Math.min(200, Math.round(Number(payload?.passedCount) || 0)));
+      const totalCount = Math.max(1, Math.min(200, Math.round(Number(payload?.totalCount) || 1)));
+      const accuracyPct = Math.min(100, Math.max(0, Math.round((passedCount / totalCount) * 100)));
+      const nowMs = Date.now();
+      const list = Array.isArray(store.gamePracticeLeaderboard) ? [...store.gamePracticeLeaderboard] : [];
+      const existingIdx = list.findIndex(
+        e => e.username === viewer.username && e.topicId === topicId && e.mode === mode
+      );
+      const bestScore = existingIdx >= 0 ? Math.max(Number(list[existingIdx].score) || 0, cleanScore) : cleanScore;
+      const bestAccuracy = existingIdx >= 0
+        ? (cleanScore >= (Number(list[existingIdx].score) || 0) ? accuracyPct : list[existingIdx].accuracyPct)
+        : accuracyPct;
+      const nextEntry = {
+        id: existingIdx >= 0 ? list[existingIdx].id : `gpr_${viewer.username}_${topicId}_${mode}`,
+        username: viewer.username,
+        name: viewer.name || viewer.username,
+        topicId,
+        topicLabel,
+        mode,
+        score: bestScore,
+        lastScore: cleanScore,
+        passedCount,
+        totalCount,
+        accuracyPct: bestAccuracy,
+        runsCount: existingIdx >= 0 ? (Number(list[existingIdx].runsCount) || 1) + 1 : 1,
+        updatedAt: new Date(nowMs).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+        updatedAtMs: nowMs
+      };
+      if (existingIdx >= 0) list[existingIdx] = nextEntry;
+      else list.push(nextEntry);
+      list.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
+      store.gamePracticeLeaderboard = list.slice(0, 250);
+      changed = true;
       break;
     }
 
@@ -4463,7 +4595,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               store,
               {
                 title: '🎉 Đã mở khóa Danh Hiệu VIP tự động!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId}.`,
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId}. Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web & server học tập!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -4483,7 +4615,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               store,
               {
                 title: '🎉 Đã mở khóa Ảnh Nền Riêng tự động!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ ngay bây giờ!`,
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ ngay bây giờ! Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -4813,6 +4945,120 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Speaking grading failed' }));
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/grade-writing') {
+      if (!viewer) {
+        res.statusCode = 401;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để sử dụng AI phân tích Writing.' }));
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const task1Prompt = String(body?.task1Prompt || '');
+        const task1Text = String(body?.task1Text || '');
+        const task2Prompt = String(body?.task2Prompt || '');
+        const task2Text = String(body?.task2Text || '');
+        const attemptId = String(body?.attemptId || '').trim();
+        const clientOverrideKey = viewer.role === 'teacher' ? (body?.clientApiKey || '') : '';
+        const effectiveKey = getEffectiveGeminiKey(store, clientOverrideKey);
+
+        let evaluation = null;
+        let warning = '';
+
+        if (effectiveKey) {
+          try {
+            evaluation = await callGeminiWritingGrader({
+              apiKey: effectiveKey,
+              task1Prompt,
+              task1Text,
+              task2Prompt,
+              task2Text
+            });
+          } catch (geminiErr) {
+            warning = geminiErr?.message || 'Gemini Writing API failed, fallback used';
+          }
+        }
+
+        if (!evaluation) {
+          evaluation = simulateAIWritingGrading({
+            _task1Prompt: task1Prompt,
+            task1Text,
+            _task2Prompt: task2Prompt,
+            task2Text
+          });
+          if (warning) evaluation._fallbackReason = warning;
+        }
+
+        const writingDigest = crypto
+          .createHash('sha256')
+          .update(`${task1Text}||${task2Text}`)
+          .digest('hex')
+          .slice(0, 24);
+
+        const aiWritingTicket = signToken(
+          {
+            kind: 'writing_eval',
+            username: viewer.username,
+            digest: writingDigest,
+            task1Band: evaluation.task1Band,
+            task2Band: evaluation.task2Band,
+            overallBand: evaluation.overallBand,
+            feedback: evaluation.feedback || '',
+            exp: Date.now() + 30 * 60 * 1000
+          },
+          store._authSecret
+        );
+
+        let updatedAttempt = null;
+        if (attemptId) {
+          const attIdx = (store.attempts || []).findIndex(a => a.id === attemptId);
+          if (attIdx >= 0) {
+            const targetAtt = store.attempts[attIdx];
+            const canUpdate = viewer.role === 'teacher' || (targetAtt.studentId === viewer.username && !targetAtt.teacherGraded);
+            if (canUpdate) {
+              const nextScores = {
+                ...(targetAtt.scores || {}),
+                writing: {
+                  task1Band: evaluation.task1Band,
+                  task2Band: evaluation.task2Band,
+                  overallBand: evaluation.overallBand
+                }
+              };
+              const activeBands = [];
+              if ((nextScores.listening?.total || 0) > 0) activeBands.push(Number(nextScores.listening.band) || 0);
+              if ((nextScores.reading?.total || 0) > 0) activeBands.push(Number(nextScores.reading.band) || 0);
+              activeBands.push(evaluation.overallBand);
+              const nextOverall = targetAtt.testMode === 'single_skill' && targetAtt.focusSkill === 'writing'
+                ? evaluation.overallBand
+                : calculateOverallIeltsBand(activeBands);
+              updatedAttempt = {
+                ...targetAtt,
+                aiGraded: true,
+                teacherGraded: viewer.role === 'teacher' ? true : Boolean(targetAtt.teacherGraded),
+                aiDetails: evaluation,
+                scores: nextScores,
+                overallBand: nextOverall,
+                teacherFeedback: evaluation.feedback || targetAtt.teacherFeedback || ''
+              };
+              store.attempts[attIdx] = updatedAttempt;
+              store.version += 1;
+              onChanged?.(store);
+              scheduleBroadcast(40);
+            }
+          }
+        }
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: true, evaluation: { ...evaluation, aiWritingTicket }, attempt: updatedAttempt }));
+      } catch (err) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: err?.message || 'Writing grading failed' }));
       }
       return;
     }

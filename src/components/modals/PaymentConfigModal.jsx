@@ -472,13 +472,13 @@ export default function PaymentConfigModal({
                 </div>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-2.5">
                 <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
                   Hoặc tải sẵn ảnh QR Ngân hàng / MoMo (tùy chọn)
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold cursor-pointer hover:opacity-90 transition">
-                    <Upload className="w-3.5 h-3.5" /> Chọn ảnh QR
+                    <Upload className="w-3.5 h-3.5" /> Chọn ảnh QR Thanh Toán
                     <input type="file" accept="image/*" className="hidden" onChange={handleUploadQrFile} />
                   </label>
                   {draft.customQrUrl && (
@@ -490,6 +490,49 @@ export default function PaymentConfigModal({
                       <Trash2 className="w-3 h-3" /> Dùng VietQR tự động
                     </button>
                   )}
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold cursor-pointer transition">
+                    <Upload className="w-3.5 h-3.5" /> Ảnh QR Ủng Hộ (Trang Cá Nhân Admin)
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        try {
+                          const rawUrl = await readImageFileAsDataUrl(file);
+                          const compactUrl = await compressQrImagePreserveFullFrame(rawUrl);
+                          setDraft(prev => ({ ...prev, donateQrUrl: compactUrl }));
+                          showToast?.('Đã nạp ảnh QR Ủng Hộ riêng cho trang cá nhân Admin!');
+                        } catch (err) {
+                          showToast?.(err?.message || 'Không thể đọc ảnh QR.', 'error');
+                        }
+                      }}
+                    />
+                  </label>
+                  {draft.donateQrUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setDraft(prev => ({ ...prev, donateQrUrl: '' }))}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-[11px] font-bold"
+                    >
+                      <Trash2 className="w-3 h-3" /> Gỡ QR Ủng Hộ riêng
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Lời nhắn Donate hiển thị trên mã QR (tùy chọn)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={240}
+                    placeholder="Donate để ủng hộ Tuấn chi phí duy trì trang web & server..."
+                    value={draft.donateMessage || ''}
+                    onChange={e => setDraft(prev => ({ ...prev, donateMessage: e.target.value }))}
+                    className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+                  />
                 </div>
               </div>
 

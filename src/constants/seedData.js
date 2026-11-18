@@ -12,8 +12,75 @@ AMBIGUOUS | Mơ hồ, nhập nhằng nhiều nghĩa | /æmˈbɪɡ.ju.əs/ | The 
 RESILIENT | Kiên cường, có khả năng phục hồi nhanh | /rɪˈzɪl.i.ənt/ | Local communities proved resilient in the face of natural disasters.`;
 
 export const FALLBACK_DISTRACTORS = ['ABUNDANT', 'OBSOLETE', 'FLOURISH', 'STAGNANT', 'CONDUCIVE', 'SPORADIC', 'EMPIRICAL', 'TRIVIAL'];
-export const GAME_ROUND_TIME_LIMITS = { 1: 20, 2: 25, 3: 25 };
+export const GAME_ROUND_TIME_LIMITS = { 1: 20, 2: 25, 3: 22, 4: 22 };
 export const GAME_SPEED_OFFSETS = { relaxed: 6, normal: 0, turbo: -5 };
+
+// Lexical relations for V3 (Synonym / Antonym / Definition) & V4 (Collocation)
+export const VOCAB_LEXICAL_RELATIONS = {
+  UBIQUITOUS: { syn: 'OMNIPRESENT', ant: 'RARE / SCARCE', def: 'Found or seeming to exist everywhere at the same time', collocation: 'become increasingly ubiquitous' },
+  MITIGATE: { syn: 'ALLEVIATE', ant: 'AGGRAVATE', def: 'To make something less harmful, unpleasant, or severe', collocation: 'mitigate the adverse effects' },
+  DETERIORATE: { syn: 'WORSEN', ant: 'IMPROVE', def: 'To progressively become worse in quality or condition', collocation: 'rapidly deteriorate over time' },
+  PLAUSIBLE: { syn: 'CREDIBLE', ant: 'IMPLAUSIBLE', def: 'Seeming reasonable, believable, or likely to be true', collocation: 'a plausible explanation' },
+  LUCRATIVE: { syn: 'PROFITABLE', ant: 'UNPROFITABLE', def: 'Producing a great deal of profit or financial reward', collocation: 'a highly lucrative career' },
+  INEVITABLE: { syn: 'UNAVOIDABLE', ant: 'PREVENTABLE', def: 'Certain to happen and unable to be avoided', collocation: 'an inevitable consequence' },
+  SCRUTINIZE: { syn: 'EXAMINE', ant: 'OVERLOOK', def: 'To examine or inspect something very carefully and critically', collocation: 'closely scrutinize data' },
+  DETRIMENTAL: { syn: 'HARMFUL', ant: 'BENEFICIAL', def: 'Tending to cause harm, damage, or negative consequences', collocation: 'have a detrimental impact on' },
+  PROLIFERATE: { syn: 'MULTIPLY', ant: 'DWINDLE', def: 'To increase rapidly in number or spread widely', collocation: 'proliferate across the globe' },
+  ALLEVIATE: { syn: 'EASE / RELIEVE', ant: 'INTENSIFY', def: 'To make suffering, deficiency, or a problem less severe', collocation: 'alleviate traffic congestion' },
+  AMBIGUOUS: { syn: 'VAGUE', ant: 'EXPLICIT', def: 'Open to more than one interpretation; unclear or inexact', collocation: 'deliberately ambiguous wording' },
+  RESILIENT: { syn: 'ADAPTABLE', ant: 'FRAGILE', def: 'Able to recover quickly from difficulties or tough conditions', collocation: 'resilient to economic shocks' },
+  SUSTAINABLE: { syn: 'ECO-FRIENDLY', ant: 'UNSUSTAINABLE', def: 'Able to continue over time without depleting natural resources', collocation: 'sustainable urban development' },
+  BIODIVERSITY: { syn: 'ECOLOGICAL VARIETY', ant: 'MONOCULTURE', def: 'The variety of plant and animal life in a particular habitat', collocation: 'preserve global biodiversity' },
+  ECOSYSTEM: { syn: 'BIOME / HABITAT', ant: 'BARREN VOID', def: 'A biological community of interacting organisms and their environment', collocation: 'fragile marine ecosystem' },
+  EMISSION: { syn: 'DISCHARGE', ant: 'ABSORPTION', def: 'The production and release of gases or radiation into the air', collocation: 'curb carbon emissions' },
+  CONTAMINATE: { syn: 'POLLUTE', ant: 'PURIFY', def: 'To make something impure or poisonous by adding harmful substances', collocation: 'contaminate water supplies' },
+  CONSERVATION: { syn: 'PRESERVATION', ant: 'EXPLOITATION', def: 'Protection and careful management of natural environments', collocation: 'wildlife conservation efforts' },
+  DEPLETE: { syn: 'EXHAUST', ant: 'REPLENISH', def: 'To use up the supply or resources of something drastically', collocation: 'deplete natural reserves' },
+  RENEWABLE: { syn: 'SUSTAINABLE', ant: 'FINITE / FOSSIL', def: 'Natural energy or resource not depleted when used', collocation: 'transition to renewable energy' },
+  AUTOMATION: { syn: 'MECHANIZATION', ant: 'MANUAL LABOR', def: 'Use of machines and software to perform tasks with minimal human input', collocation: 'industrial automation shift' },
+  ALGORITHM: { syn: 'COMPUTATION RULE', ant: 'RANDOM GUESS', def: 'A step-by-step mathematical procedure used by computers to solve tasks', collocation: 'recommendation algorithm bias' },
+  DISRUPTIVE: { syn: 'GAME-CHANGING', ant: 'CONVENTIONAL', def: 'Causing radical change in an existing industry or market', collocation: 'disruptive technological innovation' },
+  OBSOLETE: { syn: 'OUTDATED', ant: 'CUTTING-EDGE', def: 'No longer produced or used because something newer exists', collocation: 'render skills obsolete' },
+  CYBERSECURITY: { syn: 'DIGITAL DEFENSE', ant: 'VULNERABILITY', def: 'Practice of protecting networks and data from digital attacks', collocation: 'strengthen cybersecurity measures' },
+  CONNECTIVITY: { syn: 'NETWORK ACCESS', ant: 'ISOLATION', def: 'The state or capability of being connected digitally across distances', collocation: 'high-speed internet connectivity' },
+  INNOVATE: { syn: 'PIONEER', ant: 'STAGNATE', def: 'To introduce new methods, ideas, or creative solutions', collocation: 'continuously innovate solutions' },
+  SYNTHETIC: { syn: 'ARTIFICIAL', ant: 'NATURAL / GENUINE', def: 'Made by chemical synthesis or computer generation rather than natural origin', collocation: 'generate synthetic training data' },
+  CURRICULUM: { syn: 'SYLLABUS', ant: 'EXTRACURRICULAR', def: 'The structured set of subjects taught in a school or university', collocation: 'reform the national curriculum' },
+  PEDAGOGY: { syn: 'TEACHING METHOD', ant: 'ROTE MEMORIZATION', def: 'The theory, principles, and practice of education and instruction', collocation: 'adopt student-centered pedagogy' },
+  LITERACY: { syn: 'PROFICIENCY', ant: 'ILLITERACY', def: 'Competence or foundational knowledge in a specific area or reading/writing', collocation: 'boost digital literacy' },
+  EMPIRICAL: { syn: 'EVIDENCE-BASED', ant: 'HYPOTHETICAL', def: 'Based on observation and verifiable experience rather than pure theory', collocation: 'backed by empirical evidence' },
+  CRITICAL: { syn: 'ANALYTICAL / VITAL', ant: 'TRIVIAL', def: 'Involving careful objective judgment, or crucially important', collocation: 'foster critical thinking skills' },
+  SCHOLARLY: { syn: 'ACADEMIC', ant: 'INFORMAL', def: 'Involving serious academic study, research, and citations', collocation: 'peer-reviewed scholarly journals' },
+  MENTORSHIP: { syn: 'GUIDANCE', ant: 'NEGLECT', def: 'Support and advice provided by a more experienced person', collocation: 'peer mentorship program' },
+  APTITUDE: { syn: 'NATURAL TALENT', ant: 'INABILITY', def: 'A natural ability or quick capacity to learn a particular skill', collocation: 'demonstrate analytical aptitude' },
+  SEDENTARY: { syn: 'INACTIVE', ant: 'PHYSICALLY ACTIVE', def: 'Characterized by sitting much of the day with little exercise', collocation: 'adopt a sedentary lifestyle' },
+  PREVALENT: { syn: 'WIDESPREAD', ant: 'UNCOMMON', def: 'Very common in a particular area or at a particular time', collocation: 'increasingly prevalent issue' },
+  IMMUNITY: { syn: 'RESISTANCE', ant: 'SUSCEPTIBILITY', def: 'The body ability to resist infection and disease', collocation: 'boost natural immunity' },
+  WELLBEING: { syn: 'WELFARE / HEALTH', ant: 'DISTRESS', def: 'The state of being comfortable, healthy, and happy', collocation: 'promote mental wellbeing' },
+  NUTRITION: { syn: 'NOURISHMENT', ant: 'MALNUTRITION', def: 'The process of obtaining food necessary for health and growth', collocation: 'maintain balanced nutrition' },
+  CHRONIC: { syn: 'PERSISTENT', ant: 'ACUTE / TEMPORARY', def: 'Persisting for a long time or constantly recurring', collocation: 'suffer from chronic stress' },
+  THERAPEUTIC: { syn: 'HEALING', ant: 'DAMAGING', def: 'Relating to the healing of disease or calming of the mind', collocation: 'offer therapeutic benefits' },
+  SANITATION: { syn: 'HYGIENE SYSTEM', ant: 'CONTAMINATION', def: 'Public infrastructure providing clean water and sewage disposal', collocation: 'improve urban sanitation' }
+};
+
+export const FALLBACK_LEXICAL_POOL = {
+  synonyms: ['PROMINENT', 'VITAL', 'SUBSTANTIAL', 'ENHANCE', 'ACCELERATE', 'FLOURISH', 'SIGNIFICANT'],
+  antonyms: ['NEGLIGIBLE', 'DECLINE', 'HINDER', 'SCARCE', 'MINIMAL', 'SUPERFICIAL', 'OBSTRUCT'],
+  definitions: [
+    'Relating to minor decorative details with no lasting effect',
+    'Referring to a brief, purely accidental misunderstanding',
+    'Describing an outdated rule enforced only during emergencies',
+    'Measuring short-term weather variations in coastal areas'
+  ],
+  collocations: [
+    'spark trivial controversy',
+    'yield negligible returns',
+    'hinder routine paperwork',
+    'trigger temporary delays',
+    'ignore minor discrepancies',
+    'bypass standard guidelines'
+  ]
+};
 
 export const VOCAB_PRESETS = {
   environment: {

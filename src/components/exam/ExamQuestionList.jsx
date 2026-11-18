@@ -1,4 +1,5 @@
 import { Bookmark } from 'lucide-react';
+import { getQuestionTypeMeta } from '../../utils/examHelpers';
 import {
   groupQuestionsForRendering,
   stripLeadingQuestionNumber
@@ -196,6 +197,10 @@ export default function ExamQuestionList({
         const isActive = activeQuestionId === q.id;
         const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
         const cleanPrompt = stripLeadingQuestionNumber(q.question) || q.question;
+        const typeMeta = getQuestionTypeMeta(q.type, scopeType);
+        const optionList = Array.isArray(q.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+        const hasChoiceOptions = optionList.length > 0;
+        const wordLimitHint = String(q.wordLimit || '').trim();
 
         return (
           <div
@@ -223,9 +228,23 @@ export default function ExamQuestionList({
                 >
                   {displayNum}
                 </span>
-                <p className={`font-bold text-[#111827] dark:text-[#F3F4F6] ${fontSizeClass}`}>
-                  {formatText(cleanPrompt)}
-                </p>
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {q.type && q.type !== 'mcq' && q.type !== 'fill' && q.type !== 'tfng' && (
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
+                        {typeMeta.shortLabel}
+                      </span>
+                    )}
+                    {wordLimitHint && (
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                        {wordLimitHint}
+                      </span>
+                    )}
+                  </div>
+                  <p className={`font-bold text-[#111827] dark:text-[#F3F4F6] ${fontSizeClass}`}>
+                    {formatText(cleanPrompt)}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                 {renderScopeJumpChip(q)}
@@ -247,9 +266,9 @@ export default function ExamQuestionList({
               </div>
             </div>
 
-            {(q.type === 'mcq' || q.type === 'tfng') && (
+            {hasChoiceOptions ? (
               <div className="space-y-1.5 pl-1">
-                {(q.options || []).map((opt, optIdx) => {
+                {optionList.map((opt, optIdx) => {
                   const isSelected = answers?.[q.id] === opt;
                   return (
                     <label
@@ -275,9 +294,7 @@ export default function ExamQuestionList({
                   );
                 })}
               </div>
-            )}
-
-            {q.type === 'fill' && (
+            ) : (
               <div className="pl-1 pt-1">
                 <input
                   type="text"
@@ -285,10 +302,10 @@ export default function ExamQuestionList({
                   autoCorrect="off"
                   autoCapitalize="off"
                   autoComplete="off"
-                  placeholder={`${displayNum}`}
+                  placeholder={wordLimitHint ? `Câu ${displayNum} (${wordLimitHint})` : `${displayNum}`}
                   value={answers?.[q.id] || ''}
                   onChange={e => onAnswerChange?.(q.id, e.target.value)}
-                  className="w-48 sm:w-64 h-[34px] px-3 rounded-[3px] text-center text-[15px] font-bold transition outline-none border bg-white dark:bg-[#3A3B40] text-[#111827] dark:text-white border-[#767676] dark:border-[#5D5F66] focus:bg-[#FFFDF7] dark:focus:bg-[#23262E] focus:border-[#A16207] dark:focus:border-[#EAB308] placeholder:text-[#111827] dark:placeholder:text-[#E5E7EB] placeholder:font-bold"
+                  className="w-56 sm:w-72 h-[34px] px-3 rounded-[3px] text-center text-[15px] font-bold transition outline-none border bg-white dark:bg-[#3A3B40] text-[#111827] dark:text-white border-[#767676] dark:border-[#5D5F66] focus:bg-[#FFFDF7] dark:focus:bg-[#23262E] focus:border-[#A16207] dark:focus:border-[#EAB308] placeholder:text-slate-500 dark:placeholder:text-slate-300 placeholder:text-xs placeholder:font-semibold"
                 />
               </div>
             )}

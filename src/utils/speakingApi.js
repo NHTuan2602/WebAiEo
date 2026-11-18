@@ -1,4 +1,5 @@
 import { cleanAudioMimeType, simulateAISpeakingGrading } from './speakingAiEngine';
+import { simulateAIWritingGrading } from './geminiGrader';
 
 export function pickSupportedAudioMimeType() {
   if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -108,4 +109,49 @@ export async function verifySpeakingRoomPassword({ testId, password = '' }) {
     throw new Error(data?.error || 'Mật khẩu phòng thi không chính xác!');
   }
   return data;
+}
+
+export async function requestAiWritingGrading({
+  attemptId = '',
+  task1Prompt = '',
+  task1Text = '',
+  task2Prompt = '',
+  task2Text = '',
+  clientApiKey = ''
+}) {
+  try {
+    const res = await fetch('/api/sync/grade-writing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        attemptId,
+        task1Prompt,
+        task1Text,
+        task2Prompt,
+        task2Text,
+        clientApiKey
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.ok && data?.evaluation) {
+        return {
+          evaluation: data.evaluation,
+          attempt: data.attempt || null
+        };
+      }
+    }
+  } catch (_err) {
+    // Fall back to deterministic examiner analyzer when offline
+  }
+
+  return {
+    evaluation: simulateAIWritingGrading({
+      _task1Prompt: task1Prompt,
+      task1Text,
+      _task2Prompt: task2Prompt,
+      task2Text
+    }),
+    attempt: null
+  };
 }
