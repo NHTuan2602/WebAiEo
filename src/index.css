@@ -142,6 +142,15 @@ html.dark .lexi-card:hover {
   animation: vipAuraPulse 2.8s ease-in-out infinite;
 }
 
+.vip-red-name-text {
+  color: #dc2626 !important;
+  font-weight: 900 !important;
+}
+
+html.dark .vip-red-name-text {
+  color: #f87171 !important;
+}
+
 html.dark {
   color-scheme: dark;
 }

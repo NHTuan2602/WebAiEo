@@ -3,9 +3,14 @@ import { normalizeBrandTeacherUser } from './constants/brandInfo';
 import {
   AIEO_VIP_PRICE_VND,
   DEFAULT_EXAM_PRICE_VND,
+  FRIEND_ROOM_TICKET_PRICE_VND,
+  canCreateFriendRoomNow,
   evaluateTitleUnlockNotification,
+  getFriendRoomTicketCredits,
   getTestPurchasePriceVnd,
+  hasActiveAieoVip,
   hasTestPurchaseAccess,
+  hasVipFriendRoomAccess,
   normalizePaymentConfig,
   resolveStudentTitleSummary
 } from './constants/profileCustomization';
@@ -88,6 +93,7 @@ import PaymentConfigModal from './components/modals/PaymentConfigModal';
 import AdminTitleManagerModal from './components/modals/AdminTitleManagerModal';
 import TitleUnlockedCelebrationModal from './components/modals/TitleUnlockedCelebrationModal';
 import CoverCheckoutModal from './components/modals/CoverCheckoutModal';
+import VipPromoPopupModal from './components/modals/VipPromoPopupModal';
 import AuthScreen from './pages/AuthScreen';
 import StudentHome from './pages/StudentHome';
 import SkillPracticeHub from './pages/SkillPracticeHub';
@@ -303,6 +309,7 @@ export default function App() {
   const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core', maxPlayers: 4, teamCount: 2 });
   const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, maxPlayers: 30, teamCount: 0 });
   const [globalCheckoutState, setGlobalCheckoutState] = useState(null);
+  const [showVipPromoModal, setShowVipPromoModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [sentNotifications, setSentNotifications] = useState([]);
   const [classesDb, setClassesDb] = useState({});
@@ -633,6 +640,8 @@ export default function App() {
     const planLabel =
       planType === 'aieo_vip'
         ? 'Gói Ai eo VIP (1 Tháng)'
+        : planType === 'room_ticket'
+        ? 'Vé Tạo 1 Phòng Đấu Riêng (5k)'
         : planType === 'test'
         ? 'quyền làm Đề Thi 3 Kỹ Năng'
         : 'quyền mở gói tháng';
@@ -651,12 +660,16 @@ export default function App() {
     const defaultLabel =
       itemType === 'aieo_vip'
         ? 'Gói Ai eo VIP Full Quyền (1 Tháng)'
+        : itemType === 'room_ticket'
+        ? 'Vé Tạo 1 Phòng Đấu Riêng (5k/lần)'
         : itemType === 'test'
         ? 'Mở Khóa Đề Thi IELTS (3 Kỹ Năng)'
         : 'Ảnh Nền Riêng (1 Tháng)';
     const defaultPrice =
       itemType === 'aieo_vip'
         ? (cfgPay.aieoVipPrice ?? AIEO_VIP_PRICE_VND)
+        : itemType === 'room_ticket'
+        ? (cfgPay.friendRoomTicketPrice ?? FRIEND_ROOM_TICKET_PRICE_VND)
         : itemType === 'test'
         ? (cfgPay.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND)
         : cfgPay.coverUnlockPrice;
@@ -676,7 +689,7 @@ export default function App() {
         ? { itemType: 'title', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
         : reqOpts?.itemType === 'test' && reqOpts?.itemId
         ? { itemType: 'test', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
-        : reqOpts?.itemType === 'aieo_vip'
+        : reqOpts?.itemType === 'aieo_vip' || reqOpts?.itemType === 'room_ticket'
         ? { itemType: reqOpts.itemType, renew: Boolean(reqOpts.renew) }
         : { itemType: 'cover', renew: Boolean(reqOpts.renew) };
     const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', payload);
@@ -3202,6 +3215,12 @@ export default function App() {
     }
 
     const isTeacherCreator = currentUser?.role === 'teacher';
+    if (!isTeacherCreator && !canCreateFriendRoomNow(currentUser)) {
+      setShowCreateRoomModal(false);
+      openGlobalCheckoutModal({ itemType: 'room_ticket' });
+      return;
+    }
+    const consumesRoomTicket = !isTeacherCreator && !hasVipFriendRoomAccess(currentUser) && getFriendRoomTicketCredits(currentUser) > 0;
     const cleanMaxPlayers = Math.max(2, Math.min(30, Number(newRoomForm.maxPlayers || (isTeacherCreator ? 30 : 4))));
     const rawTeamCount = Number(newRoomForm.teamCount || 0);
     const cleanTeamCount =
@@ -3265,6 +3284,21 @@ export default function App() {
     });
     setShowCreateRoomModal(false);
     setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core', maxPlayers: 4, teamCount: 2 });
+
+    if (consumesRoomTicket && currentUser?.username) {
+      const nextCredits = Math.max(0, getFriendRoomTicketCredits(currentUser) - 1);
+      setCurrentUser(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev, roomCreateCredits: nextCredits };
+        currentUserRef.current = updated;
+        return updated;
+      });
+      setUsersDb(prev => {
+        const u = prev[currentUser.username];
+        if (!u) return prev;
+        return { ...prev, [currentUser.username]: { ...u, roomCreateCredits: nextCredits } };
+      });
+    }
 
     dispatchSyncAction('UPSERT_ROOM', { pin: generatedPin, updates: newRoomObj });
     showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} · ${cleanMaxPlayers} người${cleanTeamCount >= 2 ? ` · ${cleanTeamCount} Team` : ''})!`);
@@ -3522,11 +3556,23 @@ export default function App() {
     } else {
       setView('HOME');
       showToast(`Chào mừng trở lại, ${loggedInUser.name}!`);
+      if (!hasActiveAieoVip(loggedInUser)) {
+        try {
+          sessionStorage.setItem(`ielts_vip_promo_shown_${loggedInUser.username.toLowerCase()}`, '1');
+        } catch {}
+        setShowVipPromoModal(true);
+      }
     }
   };
 
   const handleLogout = () => {
     const prevUsername = currentUserRef.current?.username || currentUser?.username || '';
+    if (prevUsername) {
+      try {
+        sessionStorage.removeItem(`ielts_vip_promo_shown_${prevUsername.toLowerCase()}`);
+      } catch {}
+    }
+    setShowVipPromoModal(false);
     authEpochRef.current += 1;
     lastSyncVersionRef.current = -1;
     lastBootIdRef.current = '';
@@ -6413,6 +6459,46 @@ export default function App() {
 
   const activeCelebratingTitles = canShowTitleCelebration ? titleUnlockEval.newlyUnlockedItems : [];
 
+  useEffect(() => {
+    const uname = String(currentUser?.username || '').trim().toLowerCase();
+    if (
+      !syncHydrated ||
+      !uname ||
+      currentUser?.role === 'teacher' ||
+      hasActiveAieoVip(currentUser) ||
+      view !== 'HOME'
+    ) {
+      return undefined;
+    }
+    try {
+      const seenKey = `ielts_vip_promo_shown_${uname}`;
+      if (sessionStorage.getItem(seenKey)) return undefined;
+      sessionStorage.setItem(seenKey, '1');
+    } catch {
+      return undefined;
+    }
+    const timerId = setTimeout(() => {
+      setShowVipPromoModal(true);
+    }, 220);
+    return () => clearTimeout(timerId);
+  }, [syncHydrated, currentUser, view]);
+
+  const handleNavigateAfterPurchase = (nextView, arg) => {
+    setGlobalCheckoutState(null);
+    if (nextView === 'EXAM_START' && arg) {
+      startExam(arg);
+      return;
+    }
+    if (nextView === 'CREATE_FRIEND_ROOM') {
+      setGameSubState('JOIN');
+      setView('GAME_ARENA');
+      setShowCreateRoomModal(true);
+      return;
+    }
+    if (arg) setSkillHubTab(arg);
+    setView(nextView);
+  };
+
   const handleAcknowledgeTitles = ({ equipTitle = null, openProfile = false } = {}) => {
     const uname = currentUser?.username;
     if (!uname) return;
@@ -6604,10 +6690,7 @@ export default function App() {
           onRequestCoverUnlock={handleRequestCoverUnlock}
           onToggleUserCoverUnlock={currentUser?.isSuperAdmin ? handleToggleUserCoverUnlock : undefined}
           onToggleUserSubscription={currentUser?.isSuperAdmin ? handleToggleUserSubscription : undefined}
-          onNavigateAfterPurchase={(nextView, tab) => {
-            if (tab) setSkillHubTab(tab);
-            setView(nextView);
-          }}
+          onNavigateAfterPurchase={handleNavigateAfterPurchase}
           openStudentGamePortal={openStudentGamePortal}
           paymentConfig={paymentConfig}
           previousView={previousView}
@@ -7126,8 +7209,20 @@ export default function App() {
         </div>
       )}
 
+      {Boolean(showVipPromoModal && currentUser && currentUser.role !== 'teacher' && !hasActiveAieoVip(currentUser) && view !== 'AUTH') && (
+        <VipPromoPopupModal
+          isOpen={true}
+          currentUser={currentUser}
+          paymentConfig={paymentConfig}
+          onClose={() => setShowVipPromoModal(false)}
+          onOpenVipCheckout={() => openGlobalCheckoutModal({ itemType: 'aieo_vip' })}
+          onOpenRoomTicketCheckout={() => openGlobalCheckoutModal({ itemType: 'room_ticket' })}
+        />
+      )}
+
       {Boolean(globalCheckoutState && currentUser) && (
         <CoverCheckoutModal
+          key={`${globalCheckoutState.itemType || 'aieo_vip'}:${globalCheckoutState.itemId || ''}:${globalCheckoutState.renew ? 1 : 0}`}
           isOpen={true}
           itemType={globalCheckoutState.itemType || 'aieo_vip'}
           itemId={globalCheckoutState.itemId || ''}
@@ -7137,15 +7232,7 @@ export default function App() {
           currentUser={currentUser}
           paymentConfig={paymentConfig}
           onClose={() => setGlobalCheckoutState(null)}
-          onNavigateAfterPurchase={(nextView, arg) => {
-            setGlobalCheckoutState(null);
-            if (nextView === 'EXAM_START' && arg) {
-              startExam(arg);
-              return;
-            }
-            if (arg) setSkillHubTab(arg);
-            setView(nextView);
-          }}
+          onNavigateAfterPurchase={handleNavigateAfterPurchase}
           onRequestUnlock={handleRequestCoverUnlock}
           onPullSync={() => pullServerSyncState(true)}
           showToast={showToast}

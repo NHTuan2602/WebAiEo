@@ -39,8 +39,12 @@ export default function CoverCheckoutModal({
   const isTestOrder = itemType === 'test' && Boolean(itemId);
   const isSkillPassOrder = itemType === 'skill_pass';
   const isAieoVipOrder = itemType === 'aieo_vip';
+  const isRoomTicketOrder = itemType === 'room_ticket';
+  const [baselineCredits] = useState(() => Math.max(0, Math.floor(Number(currentUser?.roomCreateCredits) || 0)));
   const [orderPaidConfirmed, setOrderPaidConfirmed] = useState(false);
-  const isUnlocked = orderPaidConfirmed || (!renew && (
+  const isUnlocked = orderPaidConfirmed || (
+    isRoomTicketOrder && (Number(currentUser?.roomCreateCredits) || 0) > baselineCredits
+  ) || (!renew && (
     isTitleOrder
       ? hasActivePaidTitlePermission(currentUser, itemId)
       : isTestOrder
@@ -50,6 +54,8 @@ export default function CoverCheckoutModal({
       ? hasSkillPracticeAccess(currentUser)
       : isAieoVipOrder
       ? (Boolean(currentUser?.isSuperAdmin || currentUser?.username === 'tuanpro123s') || hasActiveAieoVip(currentUser))
+      : isRoomTicketOrder
+      ? false
       : hasCustomCoverPermission(currentUser)
   ));
 
@@ -64,6 +70,8 @@ export default function CoverCheckoutModal({
       ? getTitlePriceVnd(itemId, effectiveCfg)
       : isTestOrder
       ? effectiveCfg.defaultExamPriceVnd
+      : isRoomTicketOrder
+      ? effectiveCfg.friendRoomTicketPrice
       : isSkillPassOrder
       ? effectiveCfg.skillPassPrice
       : isAieoVipOrder
@@ -75,7 +83,7 @@ export default function CoverCheckoutModal({
     ? (currentUser?.paidTitleRequested?.titleId === itemId ? currentUser.paidTitleRequested.requestedAt : 0)
     : isTestOrder
     ? (currentUser?.subscriptionRequested?.itemId === itemId ? currentUser.subscriptionRequested.requestedAt : 0)
-    : (isSkillPassOrder || isAieoVipOrder)
+    : (isSkillPassOrder || isAieoVipOrder || isRoomTicketOrder)
     ? (currentUser?.subscriptionRequested?.itemType === itemType ? currentUser.subscriptionRequested.requestedAt : 0)
     : (currentUser?.coverUnlockRequestedAt || 0);
 
@@ -183,6 +191,8 @@ export default function CoverCheckoutModal({
                     ? `Mua Danh Hiệu ${itemLabel || 'VIP'} (1 Tháng)`
                     : isTestOrder
                     ? `Mua Đề Thi: ${itemLabel || 'IELTS 3 Kỹ Năng'}`
+                    : isRoomTicketOrder
+                    ? 'Mua 1 Lượt Tạo Phòng Đấu Riêng'
                     : isAieoVipOrder
                     ? 'Đăng Ký Gói Ai eo VIP (1 Tháng)'
                     : 'Mở Khóa Ảnh Nền Riêng (1 Tháng)'}
@@ -192,7 +202,11 @@ export default function CoverCheckoutModal({
                 </span>
               </h3>
               <p className="text-[11px] text-slate-300">
-                {order?.orderCode ? `Mã đơn thanh toán: #${order.orderCode}` : 'Quét mã VietQR để mở khóa tự động trên hệ thống (Thời hạn 30 ngày)'}
+                {order?.orderCode
+                  ? `Mã đơn thanh toán: #${order.orderCode}`
+                  : isRoomTicketOrder
+                  ? 'Quét mã VietQR để cộng ngay +1 lượt tạo Phòng Đấu Trường Bạn Bè!'
+                  : 'Quét mã VietQR để mở khóa tự động trên hệ thống (Thời hạn 30 ngày)'}
               </p>
             </div>
           </div>
@@ -217,6 +231,8 @@ export default function CoverCheckoutModal({
                   ? `Thanh toán thành công — Đã sở hữu ${itemLabel || 'Danh Hiệu VIP'}!`
                   : isTestOrder
                   ? `Thanh toán thành công — Đã mở khóa Đề Thi!`
+                  : isRoomTicketOrder
+                  ? 'Thanh toán thành công — Đã cộng +1 Lượt Tạo Phòng!'
                   : isAieoVipOrder
                   ? 'Thanh toán thành công — Chào mừng thành viên Ai eo VIP!'
                   : 'Thanh toán thành công — Đã mở khóa Ảnh Nền Riêng!'}
@@ -226,6 +242,8 @@ export default function CoverCheckoutModal({
                   ? `Tài khoản @${currentUser?.username} đã mở khóa danh hiệu ${itemLabel} (thời hạn 1 tháng${expiryPreview ? ` • ${expiryPreview}` : ''}).`
                   : isTestOrder
                   ? `Tài khoản @${currentUser?.username} đã mở khóa đề thi "${itemLabel}" — được làm lại nhiều lần không giới hạn!`
+                  : isRoomTicketOrder
+                  ? `Tài khoản @${currentUser?.username} đã nhận +1 lượt tạo Phòng Đấu Trường Bạn Bè (hiện có ${Math.max(1, Number(currentUser?.roomCreateCredits) || 1)} lượt).`
                   : isAieoVipOrder
                   ? `Tài khoản @${currentUser?.username} đã sở hữu Gói Ai eo VIP 1 tháng: Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè (tùy chỉnh số người & chia Team) & Màu Chữ Đỏ + Nhãn AIEOVIP!`
                   : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`}
@@ -242,6 +260,8 @@ export default function CoverCheckoutModal({
                       onEquipPurchasedTitle?.(itemId);
                     } else if (isTestOrder) {
                       onNavigateAfterPurchase?.('EXAM_START', itemId);
+                    } else if (isRoomTicketOrder) {
+                      onNavigateAfterPurchase?.('CREATE_FRIEND_ROOM');
                     } else if (isAieoVipOrder) {
                       onNavigateAfterPurchase?.('STUDENT_PROFILE');
                     } else {
@@ -257,6 +277,10 @@ export default function CoverCheckoutModal({
                   ) : isTestOrder ? (
                     <>
                       <Sparkles className="w-4 h-4" /> Vào Làm Đề Thi Ngay
+                    </>
+                  ) : isRoomTicketOrder ? (
+                    <>
+                      <Sparkles className="w-4 h-4" /> Vào Tạo Phòng Đấu Ngay
                     </>
                   ) : isAieoVipOrder ? (
                     <>

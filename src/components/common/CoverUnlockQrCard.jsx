@@ -36,6 +36,8 @@ export default function CoverUnlockQrCard({
       ? getTitlePriceVnd(itemId, cfg)
       : itemType === 'test'
       ? cfg.defaultExamPriceVnd
+      : itemType === 'room_ticket'
+      ? cfg.friendRoomTicketPrice
       : itemType === 'aieo_vip'
       ? cfg.aieoVipPrice
       : cfg.coverUnlockPrice;
@@ -65,6 +67,8 @@ export default function CoverUnlockQrCard({
     ? `Mua Danh Hiệu VIP (1 Tháng): ${itemTitle}`
     : itemType === 'test'
     ? `Mua Đề Thi 3 Kỹ Năng: ${itemTitle || 'IELTS Practice Exam'}`
+    : itemType === 'room_ticket'
+    ? 'Mua 1 Lượt Tạo Phòng Đấu Riêng (5k/lần)'
     : itemType === 'aieo_vip'
     ? 'Đăng Ký Gói Ai eo VIP Full Quyền (1 Tháng)'
     : 'Mở Khóa Tải Ảnh Nền Riêng (1 Tháng)';
@@ -72,6 +76,8 @@ export default function CoverUnlockQrCard({
     ? 'Quét mã VietQR để sở hữu danh hiệu Phú Quý ánh kim + hào quang Avatar nổi bật suốt 30 ngày!'
     : itemType === 'test'
     ? 'Quét mã VietQR để mở khóa bộ Đề Thi 3 Kỹ Năng này và làm lại nhiều lần không giới hạn!'
+    : itemType === 'room_ticket'
+    ? 'Quét mã VietQR để nhận ngay +1 lượt Tạo Phòng Đấu Trường Bạn Bè (tùy chỉnh số người & chia Team)!'
     : itemType === 'aieo_vip'
     ? 'Đặc quyền 30 ngày: Danh Hiệu Ai eo VIP + Tạo Phòng Đấu Bạn Bè (tùy chỉnh số người & chia Team) + Chữ Tên Đỏ & Nhãn AIEOVIP!'
     : autoVerifyEnabled

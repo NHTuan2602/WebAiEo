@@ -61,7 +61,10 @@ import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 import {
   AIEO_VIP_PRICE_VND,
+  FRIEND_ROOM_TICKET_PRICE_VND,
+  canCreateFriendRoomNow,
   formatVndCurrency,
+  getFriendRoomTicketCredits,
   hasVipFriendRoomAccess,
   normalizePaymentConfig,
   resolveVisibleTitleBadge
@@ -180,9 +183,12 @@ export default function GameArena({
   const isFriendVipRoom = room.roomMode === 'friend_vip';
   const isFriendVipHost = Boolean(isFriendVipRoom && currentUser?.username && room.hostUsername === currentUser.username);
   const isRoomHost = isTeacher || isFriendVipHost;
-  const canCreateFriendVipRoom = isTeacher || hasVipFriendRoomAccess(currentUser);
+  const hasFullVipRoomAccess = isTeacher || hasVipFriendRoomAccess(currentUser);
+  const roomTicketCredits = getFriendRoomTicketCredits(currentUser);
+  const canCreateFriendVipRoom = isTeacher || canCreateFriendRoomNow(currentUser);
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
   const aieoVipPriceLabel = formatVndCurrency(normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
+  const roomTicketPriceLabel = formatVndCurrency(normalizedPayCfg.friendRoomTicketPrice ?? FRIEND_ROOM_TICKET_PRICE_VND);
   const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin, lobbyNowTick));
   const roomChatMessages = Array.isArray(room.chatMessages) ? room.chatMessages : [];
   const chatRemainingMs =
@@ -765,46 +771,96 @@ export default function GameArena({
               {renderPilotCustomizer(false)}
             </div>
 
-            {/* VIP Friend Room Creation Banner (Ai eo VIP 80k/1T) */}
-            <div className={`mb-5 rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            {/* VIP / 5k Pay-Per-Room Friend Room Creation Banner */}
+            <div className={`mb-5 rounded-2xl border p-4 flex flex-col gap-3 ${
               canCreateFriendVipRoom
                 ? 'bg-gradient-to-r from-amber-50 via-rose-50 to-white dark:from-amber-950/30 dark:via-rose-950/20 dark:to-slate-900 border-amber-300 dark:border-amber-500/40'
                 : 'bg-gradient-to-r from-rose-50/90 via-white to-amber-50/80 dark:from-rose-950/25 dark:via-slate-900 dark:to-amber-950/20 border-rose-200 dark:border-rose-500/30'
             }`}>
-              <div className="space-y-0.5 text-left">
-                <p className="text-xs font-extrabold text-rose-800 dark:text-rose-200 flex items-center gap-1.5">
-                  <Crown className="w-4 h-4 text-amber-500 shrink-0" />
-                  Phòng Đấu Riêng Chơi Cùng Bạn Bè (Gói Ai eo VIP)
-                </p>
-                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {canCreateFriendVipRoom
-                    ? 'Tài khoản của bạn đã mở quyền tạo phòng — tự chọn chủ đề từ vựng, chia sẻ mã PIN/Pass và đua cùng bạn bè ngay!'
-                    : 'Chỉ chủ phòng cần Gói Ai eo VIP để mở phòng riêng chơi cùng bạn bè (bạn bè vào phòng miễn phí). Bạn vẫn có thể Tập luyện 1 mình miễn phí!'}
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5 text-left">
+                  <p className="text-xs font-extrabold text-rose-800 dark:text-rose-200 flex items-center gap-1.5 flex-wrap">
+                    <Crown className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Phòng Đấu Riêng Chơi Cùng Bạn Bè ({roomTicketPriceLabel}/lần hoặc Gói Ai eo VIP)</span>
+                    {!hasFullVipRoomAccess && roomTicketCredits > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black">
+                        Còn {roomTicketCredits} lượt tạo
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {hasFullVipRoomAccess
+                      ? 'Tài khoản của bạn đã mở quyền tạo phòng không giới hạn — tự chọn số người, chia Team và đua cùng bạn bè ngay!'
+                      : roomTicketCredits > 0
+                      ? `Bạn đang có ${roomTicketCredits} vé tạo phòng lẻ (${roomTicketPriceLabel}/lần). Bấm Tạo Phòng Bạn Bè để mở phòng riêng ngay!`
+                      : `Chọn mua vé lẻ ${roomTicketPriceLabel}/lần tạo phòng hoặc nâng cấp Gói Ai eo VIP (${aieoVipPriceLabel}/1T) để tạo vô hạn & bật Tên Đỏ! Bạn bè vào phòng miễn phí — bạn vẫn có thể Tập luyện 1 mình miễn phí!`}
+                  </p>
+                </div>
+                {canCreateFriendVipRoom && (
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateRoomModal(true)}
+                      className="vip-shimmer-badge px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>
+                        {!hasFullVipRoomAccess && roomTicketCredits > 0
+                          ? `Tạo Phòng Bạn Bè (Dùng 1 vé · còn ${roomTicketCredits})`
+                          : 'Tạo Phòng Bạn Bè'}
+                      </span>
+                    </button>
+                    {!hasFullVipRoomAccess && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenCheckoutModal?.({
+                            itemType: 'aieo_vip',
+                            itemId: '',
+                            itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                            itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                          })
+                        }
+                        className="px-3 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 border border-rose-200 dark:border-rose-500/40 text-rose-700 dark:text-rose-200 text-xs font-extrabold transition"
+                      >
+                        Mở VIP Vô Hạn
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-              {canCreateFriendVipRoom ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCreateRoomModal(true)}
-                  className="vip-shimmer-badge shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4" /> Tạo Phòng Bạn Bè
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onOpenCheckoutModal?.({
-                      itemType: 'aieo_vip',
-                      itemId: '',
-                      itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
-                      itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
-                    })
-                  }
-                  className="vip-shimmer-badge shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
-                >
-                  <Crown className="w-4 h-4 text-amber-200" /> Mở Ai eo VIP ({aieoVipPriceLabel}/1T)
-                </button>
+
+              {!canCreateFriendVipRoom && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenCheckoutModal?.({
+                        itemType: 'room_ticket',
+                        itemId: '',
+                        itemLabel: 'Vé Tạo 1 Phòng Đấu Riêng (5k/lần)',
+                        itemPrice: normalizedPayCfg.friendRoomTicketPrice ?? FRIEND_ROOM_TICKET_PRICE_VND
+                      })
+                    }
+                    className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                  >
+                    <Zap className="w-4 h-4" /> Mua 1 Lượt Tạo Phòng ({roomTicketPriceLabel}/lần)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenCheckoutModal?.({
+                        itemType: 'aieo_vip',
+                        itemId: '',
+                        itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                        itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                      })
+                    }
+                    className="vip-shimmer-badge px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                  >
+                    <Crown className="w-4 h-4 text-amber-200" /> Mở Ai eo VIP ({aieoVipPriceLabel}/1T — Vô hạn)
+                  </button>
+                </div>
               )}
             </div>
 

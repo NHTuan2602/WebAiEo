@@ -1164,6 +1164,7 @@ export const SUBSCRIPTION_DURATION_DAYS = 30;
 export const SUBSCRIPTION_DURATION_MS = SUBSCRIPTION_DURATION_DAYS * 24 * 60 * 60 * 1000;
 export const SKILL_PASS_PRICE_VND = 0; // Bài Tập 4 Kỹ Năng đã mở miễn phí cho mọi học viên
 export const DEFAULT_EXAM_PRICE_VND = 15000;
+export const FRIEND_ROOM_TICKET_PRICE_VND = 5000;
 export const AIEO_VIP_PRICE_VND = 80000;
 
 export function formatRemainingSubscriptionText(expiresAt, nowMs = Date.now()) {
@@ -1210,6 +1211,16 @@ export function hasVipFriendRoomAccess(user, nowMs = Date.now()) {
   if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
   if (user.role === 'teacher') return true;
   return Number(user.aieoVipExpiresAt) > nowMs;
+}
+
+export function getFriendRoomTicketCredits(user) {
+  if (!user || typeof user !== 'object') return 0;
+  return Math.max(0, Math.floor(Number(user.roomCreateCredits) || 0));
+}
+
+export function canCreateFriendRoomNow(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') return false;
+  return hasVipFriendRoomAccess(user, nowMs) || getFriendRoomTicketCredits(user) > 0;
 }
 
 export function hasActivePaidTitlePermission(user, titleId, nowMs = Date.now()) {
@@ -1543,6 +1554,7 @@ export function normalizePaymentConfig(raw = {}) {
   const coverUnlockPrice = clampVnd(obj.coverUnlockPrice, CUSTOM_COVER_UNLOCK_PRICE_VND);
   const skillPassPrice = clampVnd(obj.skillPassPrice, SKILL_PASS_PRICE_VND);
   const defaultExamPriceVnd = clampVnd(obj.defaultExamPriceVnd, DEFAULT_EXAM_PRICE_VND);
+  const friendRoomTicketPrice = clampVnd(obj.friendRoomTicketPrice, FRIEND_ROOM_TICKET_PRICE_VND);
   const aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
 
   const bankCode = String(obj.bankCode || '')
@@ -1586,6 +1598,7 @@ export function normalizePaymentConfig(raw = {}) {
     coverUnlockPrice,
     skillPassPrice,
     defaultExamPriceVnd,
+    friendRoomTicketPrice,
     aieoVipPrice,
     bankCode,
     bankName,

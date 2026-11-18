@@ -37,9 +37,12 @@ import {
   PAID_SHOP_TITLES,
   SKILL_PASS_PRICE_VND,
   DEFAULT_EXAM_PRICE_VND,
+  FRIEND_ROOM_TICKET_PRICE_VND,
   AIEO_VIP_PRICE_VND,
   SUBSCRIPTION_DURATION_MS,
+  canCreateFriendRoomNow,
   formatVndCurrency,
+  getFriendRoomTicketCredits,
   getTestPurchasePriceVnd,
   getTitlePriceVnd,
   hasCustomCoverPermission,
@@ -474,6 +477,15 @@ function ensureProtectedAccounts(store) {
       u.avatarUrl = '/brand-avatar.jpg?v=2';
       changed = true;
     }
+    if (
+      Number(u.aieoVipExpiresAt) > Date.now() &&
+      !u.vipEffectsCustomizedAt &&
+      (u.vipRedNameEnabled === false || u.vipTagEnabled === false)
+    ) {
+      u.vipRedNameEnabled = true;
+      u.vipTagEnabled = true;
+      changed = true;
+    }
   });
 
   if (Array.isArray(store.deletedUserIds) && store.deletedUserIds.includes(SUPER_ADMIN_USERNAME)) {
@@ -686,14 +698,20 @@ function sanitizeUserForViewer(user, viewer) {
     paidTitleRequested: user.paidTitleRequested && typeof user.paidTitleRequested === 'object' ? user.paidTitleRequested : null,
     skillPracticeExpiresAt: Number(user.skillPracticeExpiresAt) || 0,
     aieoVipExpiresAt: Number(user.aieoVipExpiresAt) || 0,
-    vipRedNameEnabled:
-      user.vipRedNameEnabled !== undefined
-        ? Boolean(user.vipRedNameEnabled)
-        : Number(user.aieoVipExpiresAt) > Date.now(),
-    vipTagEnabled:
-      user.vipTagEnabled !== undefined
-        ? Boolean(user.vipTagEnabled)
-        : Number(user.aieoVipExpiresAt) > Date.now(),
+    roomCreateCredits: getFriendRoomTicketCredits(user),
+    vipRedNameEnabled: (() => {
+      const isVip = Number(user.aieoVipExpiresAt) > Date.now();
+      const isSa = Boolean(user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME);
+      if (isVip && !user.vipEffectsCustomizedAt) return true;
+      return (isVip || isSa) && user.vipRedNameEnabled !== undefined ? Boolean(user.vipRedNameEnabled) : isVip;
+    })(),
+    vipTagEnabled: (() => {
+      const isVip = Number(user.aieoVipExpiresAt) > Date.now();
+      const isSa = Boolean(user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME);
+      if (isVip && !user.vipEffectsCustomizedAt) return true;
+      return (isVip || isSa) && user.vipTagEnabled !== undefined ? Boolean(user.vipTagEnabled) : isVip;
+    })(),
+    ...(user.vipEffectsCustomizedAt ? { vipEffectsCustomizedAt: Number(user.vipEffectsCustomizedAt) || 0 } : {}),
     subscriptionRequested:
       user.subscriptionRequested && typeof user.subscriptionRequested === 'object' ? user.subscriptionRequested : null,
     loginDays: Array.isArray(user.loginDays) ? user.loginDays : [],
@@ -1773,12 +1791,11 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
   const canManageTargetRoom = (pin) => {
     if (isTeacher) return true;
     const viewerRecord = store.users?.[viewer.username] || viewer;
-    if (!hasVipFriendRoomAccess(viewerRecord)) return false;
     const cleanPin = String(pin || '').trim();
     if (!cleanPin) return false;
     const existingRoom = store.rooms?.[cleanPin];
     if (!existingRoom) {
-      return type === 'UPSERT_ROOM';
+      return type === 'UPSERT_ROOM' && canCreateFriendRoomNow(viewerRecord);
     }
     return existingRoom.roomMode === 'friend_vip' && existingRoom.hostUsername === viewer.username;
   };
@@ -1795,15 +1812,15 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       const cleanPin = String(payload?.pin || '').trim();
       if (!isTeacher) {
         const viewerRecord = store.users?.[viewer.username] || viewer;
-        if (!hasVipFriendRoomAccess(viewerRecord)) {
-          return { allowed: false, status: 403, error: 'Cần Gói Ai eo VIP (80k/1 tháng) hoặc tài khoản Giáo viên để tạo phòng đấu bạn bè!' };
-        }
         if (cleanPin === '686868') {
           return { allowed: false, status: 403, error: 'Mã phòng 686868 dành riêng cho Giáo viên.' };
         }
         const existingRoom = cleanPin ? store.rooms?.[cleanPin] : null;
         if (existingRoom && (existingRoom.roomMode !== 'friend_vip' || existingRoom.hostUsername !== viewer.username)) {
           return { allowed: false, status: 403, error: 'Mã phòng này đang thuộc về Giáo viên hoặc chủ phòng khác.' };
+        }
+        if (!existingRoom && !canCreateFriendRoomNow(viewerRecord)) {
+          return { allowed: false, status: 403, error: 'Cần mua 1 Lượt Tạo Phòng (5.000đ) hoặc đăng ký Gói Ai eo VIP (80.000đ/1 tháng) để tạo phòng đấu bạn bè!' };
         }
         const oldPin = payload?.oldPin ? String(payload.oldPin).trim() : '';
         if (oldPin && oldPin !== cleanPin) {
@@ -2252,19 +2269,31 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       paidTitleRequested: prevUser.paidTitleRequested || null,
       skillPracticeExpiresAt: Number(prevUser.skillPracticeExpiresAt) || 0,
       aieoVipExpiresAt: Number(prevUser.aieoVipExpiresAt) || 0,
+      roomCreateCredits: getFriendRoomTicketCredits(prevUser),
       subscriptionRequested: prevUser.subscriptionRequested || null,
-      vipRedNameEnabled:
-        rawUser.vipRedNameEnabled !== undefined
-          ? Boolean(rawUser.vipRedNameEnabled)
-          : (prevUser.vipRedNameEnabled !== undefined ? Boolean(prevUser.vipRedNameEnabled) : Number(prevUser.aieoVipExpiresAt) > Date.now()),
-      vipTagEnabled:
-        rawUser.vipTagEnabled !== undefined
-          ? Boolean(rawUser.vipTagEnabled)
-          : (prevUser.vipTagEnabled !== undefined ? Boolean(prevUser.vipTagEnabled) : Number(prevUser.aieoVipExpiresAt) > Date.now()),
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
       emailVerifiedAt: prevUser.emailVerifiedAt || null
     };
+    if (Number(prevUser.aieoVipExpiresAt) > Date.now()) {
+      cleanSelf.vipRedNameEnabled =
+        rawUser.vipRedNameEnabled !== undefined
+          ? Boolean(rawUser.vipRedNameEnabled)
+          : (prevUser.vipRedNameEnabled !== undefined ? Boolean(prevUser.vipRedNameEnabled) : true);
+      cleanSelf.vipTagEnabled =
+        rawUser.vipTagEnabled !== undefined
+          ? Boolean(rawUser.vipTagEnabled)
+          : (prevUser.vipTagEnabled !== undefined ? Boolean(prevUser.vipTagEnabled) : true);
+      if (rawUser.vipRedNameEnabled !== undefined || rawUser.vipTagEnabled !== undefined) {
+        cleanSelf.vipEffectsCustomizedAt = Number(rawUser.vipEffectsCustomizedAt) || Date.now();
+      } else if (prevUser.vipEffectsCustomizedAt) {
+        cleanSelf.vipEffectsCustomizedAt = Number(prevUser.vipEffectsCustomizedAt) || 0;
+      }
+    } else {
+      delete cleanSelf.vipRedNameEnabled;
+      delete cleanSelf.vipTagEnabled;
+      delete cleanSelf.vipEffectsCustomizedAt;
+    }
     if (mergedAckSelf !== undefined) cleanSelf.acknowledgedTitleIds = mergedAckSelf;
     store.users[uname] = cleanSelf;
   } else {
@@ -2282,6 +2311,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       incoming.customCoverExpiresAt = Number(prevUser?.customCoverExpiresAt) || 0;
       incoming.skillPracticeExpiresAt = Number(prevUser?.skillPracticeExpiresAt) || 0;
       incoming.aieoVipExpiresAt = Number(prevUser?.aieoVipExpiresAt) || 0;
+      incoming.roomCreateCredits = getFriendRoomTicketCredits(prevUser);
     } else {
       if (incoming.grantedTitleIds !== undefined) {
         incoming.grantedTitleIds = Array.isArray(incoming.grantedTitleIds)
@@ -2317,17 +2347,39 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
         incoming.aieoVipExpiresAt !== undefined
           ? Math.max(0, Number(incoming.aieoVipExpiresAt) || 0)
           : (Number(prevUser?.aieoVipExpiresAt) || 0);
+      incoming.roomCreateCredits =
+        incoming.roomCreateCredits !== undefined
+          ? Math.max(0, Math.floor(Number(incoming.roomCreateCredits) || 0))
+          : getFriendRoomTicketCredits(prevUser);
     }
     incoming.subscriptionRequested = prevUser?.subscriptionRequested || null;
-    if (incoming.vipRedNameEnabled !== undefined) {
-      incoming.vipRedNameEnabled = Boolean(incoming.vipRedNameEnabled);
-    } else if (prevUser?.vipRedNameEnabled !== undefined) {
-      incoming.vipRedNameEnabled = Boolean(prevUser.vipRedNameEnabled);
-    }
-    if (incoming.vipTagEnabled !== undefined) {
-      incoming.vipTagEnabled = Boolean(incoming.vipTagEnabled);
-    } else if (prevUser?.vipTagEnabled !== undefined) {
-      incoming.vipTagEnabled = Boolean(prevUser.vipTagEnabled);
+    const isTargetVipOrSa =
+      Number(incoming.aieoVipExpiresAt) > Date.now() ||
+      Boolean(prevUser?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME);
+    if (isTargetVipOrSa) {
+      if (incoming.vipRedNameEnabled !== undefined) {
+        incoming.vipRedNameEnabled = Boolean(incoming.vipRedNameEnabled);
+      } else if (prevUser?.vipRedNameEnabled !== undefined) {
+        incoming.vipRedNameEnabled = Boolean(prevUser.vipRedNameEnabled);
+      } else {
+        incoming.vipRedNameEnabled = true;
+      }
+      if (incoming.vipTagEnabled !== undefined) {
+        incoming.vipTagEnabled = Boolean(incoming.vipTagEnabled);
+      } else if (prevUser?.vipTagEnabled !== undefined) {
+        incoming.vipTagEnabled = Boolean(prevUser.vipTagEnabled);
+      } else {
+        incoming.vipTagEnabled = true;
+      }
+      if (rawUser.vipRedNameEnabled !== undefined || rawUser.vipTagEnabled !== undefined) {
+        incoming.vipEffectsCustomizedAt = Number(rawUser.vipEffectsCustomizedAt) || Date.now();
+      } else if (prevUser?.vipEffectsCustomizedAt) {
+        incoming.vipEffectsCustomizedAt = Number(prevUser.vipEffectsCustomizedAt) || 0;
+      }
+    } else {
+      delete incoming.vipRedNameEnabled;
+      delete incoming.vipTagEnabled;
+      delete incoming.vipEffectsCustomizedAt;
     }
     incoming.customCoverUnlockedAt = incoming.customCoverUnlocked
       ? (Number(prevUser?.customCoverUnlockedAt) || Date.now())
@@ -2569,6 +2621,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const sourceRoom = oldPin && oldPin !== cleanPin && store.rooms[oldPin]
         ? store.rooms[oldPin]
         : store.rooms[cleanPin];
+      const isCreatingNewRoom = !sourceRoom;
 
       const base = normalizeServerRoom(sourceRoom || {}, cleanPin);
       const isTeacherActor = viewer?.role === 'teacher';
@@ -2611,6 +2664,16 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           }
         });
         merged.lobbyPlayers = balancedLobby;
+      }
+      if (isCreatingNewRoom && !isTeacherActor && viewer?.username) {
+        const creatorKey = findUserKeyInStore(store, viewer.username) || viewer.username;
+        const creatorUser = store.users?.[creatorKey];
+        if (creatorUser && !hasVipFriendRoomAccess(creatorUser) && getFriendRoomTicketCredits(creatorUser) > 0) {
+          store.users[creatorKey] = {
+            ...creatorUser,
+            roomCreateCredits: Math.max(0, getFriendRoomTicketCredits(creatorUser) - 1)
+          };
+        }
       }
       store.rooms[cleanPin] = merged;
       store.seeded = true;
@@ -3386,17 +3449,46 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           }
           changed = true;
         }
+      } else if (kind === 'room_ticket') {
+        const nextCredits = active ? getFriendRoomTicketCredits(targetUser) + 1 : 0;
+        store.users[targetKey] = {
+          ...targetUser,
+          roomCreateCredits: nextCredits,
+          ...(active && targetUser.subscriptionRequested?.itemType === 'room_ticket' ? { subscriptionRequested: null } : {})
+        };
+        if (active && targetUser.role !== 'teacher') {
+          appendStoreNotification(
+            store,
+            {
+              title: '🎫 Đã cộng +1 lượt Tạo Phòng Đấu Riêng!',
+              message: `Quản Trị Hệ Thống đã cấp +1 vé tạo Phòng Đấu Trường Bạn Bè (hiện có ${nextCredits} lượt).`,
+              type: 'announcement',
+              targetUsernames: [targetKey],
+              createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+              createdByName: viewer?.name || 'Quản Trị Hệ Thống'
+            },
+            viewer
+          );
+        }
+        changed = true;
       } else if (kind === 'aieo_vip') {
+        const wasVipActive = Number(targetUser.aieoVipExpiresAt) > nowMs;
         const nextVipExp = extendFrom(targetUser.aieoVipExpiresAt);
         const nextSkillExp = active
           ? Math.max(Number(targetUser.skillPracticeExpiresAt) || 0, nextVipExp)
           : (Number(targetUser.skillPracticeExpiresAt) || 0);
+        const keepCustomRed = Boolean(wasVipActive && targetUser.vipEffectsCustomizedAt);
         store.users[targetKey] = {
           ...targetUser,
           aieoVipExpiresAt: nextVipExp,
           skillPracticeExpiresAt: nextSkillExp,
-          vipRedNameEnabled: active ? (targetUser.vipRedNameEnabled ?? true) : false,
-          vipTagEnabled: active ? (targetUser.vipTagEnabled ?? true) : false,
+          vipRedNameEnabled: active ? (keepCustomRed ? (targetUser.vipRedNameEnabled ?? true) : true) : false,
+          vipTagEnabled: active ? (keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true) : false,
+          ...(active && !wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
+          ...(!active ? { vipEffectsCustomizedAt: 0 } : {}),
+          ...(active && (!targetUser.equippedTitleId || targetUser.equippedTitleId === 'newbie')
+            ? { equippedTitleId: 'aieo_vip', showTitleBadge: true }
+            : {}),
           ...(active && targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})
         };
         if (active && targetUser.role !== 'teacher') {
@@ -3452,12 +3544,17 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         changed = true;
         break;
       }
-      if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip') {
+      if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip' || payload?.itemType === 'room_ticket') {
         store.users[uname] = {
           ...targetUser,
           subscriptionRequested: {
             itemType: payload.itemType,
-            itemLabel: payload.itemType === 'aieo_vip' ? 'Gói Ai eo VIP (1 Tháng)' : 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
+            itemLabel:
+              payload.itemType === 'aieo_vip'
+                ? 'Gói Ai eo VIP (1 Tháng)'
+                : payload.itemType === 'room_ticket'
+                ? 'Vé Tạo 1 Phòng Đấu Riêng (5k)'
+                : 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
             requestedAt: Date.now()
           }
         };
@@ -4844,7 +4941,18 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const isTestOrder = rawType === 'test';
         const isSkillPassOrder = rawType === 'skill_pass';
         const isAieoVipOrder = rawType === 'aieo_vip';
-        const itemType = isTitleOrder ? 'title' : isTestOrder ? 'test' : isSkillPassOrder ? 'skill_pass' : isAieoVipOrder ? 'aieo_vip' : 'cover';
+        const isRoomTicketOrder = rawType === 'room_ticket';
+        const itemType = isTitleOrder
+          ? 'title'
+          : isTestOrder
+          ? 'test'
+          : isSkillPassOrder
+          ? 'skill_pass'
+          : isAieoVipOrder
+          ? 'aieo_vip'
+          : isRoomTicketOrder
+          ? 'room_ticket'
+          : 'cover';
         const renewFlag = Boolean(body?.renew);
         let itemId = '';
         let itemLabel = 'Ảnh Nền Riêng (1 Tháng)';
@@ -4891,6 +4999,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           itemLabel = 'Gói Ai eo VIP (1 Tháng Full Quyền)';
           amount = Number(cfg.aieoVipPrice) >= 0 ? cfg.aieoVipPrice : AIEO_VIP_PRICE_VND;
           alreadyUnlocked = !renewFlag && Number(viewerUser?.aieoVipExpiresAt) > Date.now();
+        } else if (isRoomTicketOrder) {
+          itemLabel = 'Vé Tạo 1 Phòng Đấu Riêng';
+          amount = Number(cfg.friendRoomTicketPrice) >= 0 ? cfg.friendRoomTicketPrice : FRIEND_ROOM_TICKET_PRICE_VND;
+          alreadyUnlocked = false;
         }
 
         if (alreadyUnlocked) {
@@ -5016,6 +5128,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         ? hasSkillPracticeAccess(viewerUser)
         : matched?.itemType === 'aieo_vip'
         ? (isViewerSuperAdmin || Number(viewerUser?.aieoVipExpiresAt) > Date.now())
+        : matched?.itemType === 'room_ticket'
+        ? Boolean(matched?.status === 'paid')
         : hasCustomCoverPermission(viewerUser);
       sendJsonResponse(res, 200, {
         ok: true,
@@ -5199,16 +5313,19 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               null
             );
           } else if (matchedOrder.itemType === 'aieo_vip') {
+            const wasVipActive = Number(targetUser.aieoVipExpiresAt) > nowMs;
             const baseVipExp = Math.max(nowMs, Number(targetUser.aieoVipExpiresAt) || 0);
             const nextVipExp = baseVipExp + SUBSCRIPTION_DURATION_MS;
             const nextSkillExp = Math.max(Number(targetUser.skillPracticeExpiresAt) || 0, nextVipExp);
             const autoEquipVip = !targetUser.equippedTitleId || targetUser.equippedTitleId === 'newbie';
+            const keepCustomRed = Boolean(wasVipActive && targetUser.vipEffectsCustomizedAt);
             store.users[targetKey] = {
               ...targetUser,
               aieoVipExpiresAt: nextVipExp,
               skillPracticeExpiresAt: nextSkillExp,
-              vipRedNameEnabled: targetUser.vipRedNameEnabled !== undefined ? Boolean(targetUser.vipRedNameEnabled) : true,
-              vipTagEnabled: targetUser.vipTagEnabled !== undefined ? Boolean(targetUser.vipTagEnabled) : true,
+              vipRedNameEnabled: keepCustomRed ? (targetUser.vipRedNameEnabled ?? true) : true,
+              vipTagEnabled: keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true,
+              ...(!wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
               ...(autoEquipVip ? { equippedTitleId: 'aieo_vip', showTitleBadge: true } : {}),
               ...(targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})
             };
@@ -5217,6 +5334,25 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               {
                 title: '👑 Chào mừng thành viên Gói Ai eo VIP (1 Tháng)!',
                 message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Bài tập 4 Kỹ năng miễn phí, Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè & Chữ Đỏ + Nhãn AIEOVIP! Cảm ơn bạn đã ủng hộ Tuấn!`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+          } else if (matchedOrder.itemType === 'room_ticket') {
+            const nextCredits = getFriendRoomTicketCredits(targetUser) + 1;
+            store.users[targetKey] = {
+              ...targetUser,
+              roomCreateCredits: nextCredits,
+              ...(targetUser.subscriptionRequested?.itemType === 'room_ticket' ? { subscriptionRequested: null } : {})
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '🎫 Đã mở +1 Lượt Tạo Phòng Đấu Riêng!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và cộng +1 vé tạo Phòng Đấu Riêng cùng bạn bè (hiện có ${nextCredits} lượt)! Cảm ơn bạn đã ủng hộ Tuấn!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,

@@ -25,6 +25,7 @@ import { loadExamDraft } from '../utils/sessionPersistence';
 import BrandContactFooter from '../components/common/BrandContactFooter';
 import { Users as ClassMembersIcon } from 'lucide-react';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
+import VipMemberName from '../components/common/VipMemberName';
 import {
   formatVndCurrency,
   getTestPurchasePriceVnd,
@@ -197,8 +198,11 @@ export default function StudentHome({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-center">
             <div className="lg:col-span-8 space-y-5">
               <div className="inline-flex items-center gap-2 bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 px-3.5 py-1.5 rounded-full text-xs font-bold text-[#007A7A] dark:text-[#1EE1D6]">
-                <MonitorCheck className="w-4 h-4" />
-                <span>{BRAND_INFO.siteName} ({BRAND_INFO.teacherName}) • {currentUser?.name || 'Học viên'}</span>
+                <MonitorCheck className="w-4 h-4 shrink-0" />
+                <span className="inline-flex items-center gap-1.5 flex-wrap">
+                  <span>{BRAND_INFO.siteName} ({BRAND_INFO.teacherName}) •</span>
+                  <VipMemberName user={currentUser} fallbackName="Học viên" badgeSize="xs" />
+                </span>
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#0F172B] dark:text-white leading-[1.2]">

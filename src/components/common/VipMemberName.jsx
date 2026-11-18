@@ -22,7 +22,7 @@ export default function VipMemberName({
     <span className={`inline-flex items-center gap-1.5 flex-wrap min-w-0 ${className}`}>
       <span
         className={`${nameClassName} ${
-          showRedName ? '!text-red-600 dark:!text-red-400 font-black' : ''
+          showRedName ? 'vip-red-name-text !text-red-600 dark:!text-red-400 font-black' : ''
         }`}
       >
         {displayName}

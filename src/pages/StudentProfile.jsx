@@ -374,6 +374,7 @@ export default function StudentProfile({
             onClick={() =>
               handleUpdateUserProfileFields(student.username, {
                 vipRedNameEnabled: !redOn,
+                vipEffectsCustomizedAt: Date.now(),
                 customToast: !redOn
                   ? 'Đã BẬT màu chữ ĐỎ VIP cho tên hiển thị!'
                   : 'Đã TẮT màu chữ đỏ VIP.'
@@ -407,6 +408,7 @@ export default function StudentProfile({
             onClick={() =>
               handleUpdateUserProfileFields(student.username, {
                 vipTagEnabled: !tagOn,
+                vipEffectsCustomizedAt: Date.now(),
                 customToast: !tagOn
                   ? 'Đã BẬT huy hiệu AIEOVIP bên cạnh tên!'
                   : 'Đã TẮT huy hiệu AIEOVIP.'
@@ -714,6 +716,20 @@ export default function StudentProfile({
                     >
                       <Crown className="w-3.5 h-3.5" />
                       {studentHasAieoVip ? '✓ Đang mở Ai eo VIP (1T)' : '+ Cấp Ai eo VIP (1T)'}
+                    </button>
+                  )}
+                  {isViewerSuperAdmin && student.role !== 'teacher' && onToggleUserSubscription && (
+                    <button
+                      type="button"
+                      disabled={isTogglingSubscription}
+                      onClick={async () => {
+                        setIsTogglingSubscription(true);
+                        await onToggleUserSubscription(student.username, 'room_ticket', true);
+                        setIsTogglingSubscription(false);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 text-xs font-bold transition"
+                    >
+                      +1 Vé Phòng (5k){(student.roomCreateCredits || 0) > 0 ? ` · Đang có ${student.roomCreateCredits}` : ''}
                     </button>
                   )}
                   {isSelf && onOpenAccountSecurity && (
@@ -2521,7 +2537,9 @@ export default function StudentProfile({
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] uppercase tracking-wider text-[#007A7A] dark:text-[#1EE1D6] font-bold">Xem trước trực tiếp</p>
-                        <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{student.name}</p>
+                        <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                          <VipMemberName user={previewUser} fallbackName={student.name} badgeSize="xs" />
+                        </p>
                         <p className="text-xs text-slate-600 dark:text-slate-300 truncate">{customDraft.studyGoal || 'Mục tiêu chinh phục IELTS!'}</p>
                       </div>
                     </div>
@@ -2754,6 +2772,7 @@ export default function StudentProfile({
 
       {Boolean(checkoutModalState) && isSelf && (
         <CoverCheckoutModal
+          key={`${checkoutModalState.itemType || 'cover'}:${checkoutModalState.itemId || ''}:${checkoutModalState.renew ? 1 : 0}`}
           isOpen={true}
           itemType={checkoutModalState.itemType || 'cover'}
           itemId={checkoutModalState.itemId || ''}
