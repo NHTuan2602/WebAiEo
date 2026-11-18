@@ -514,7 +514,10 @@ export default function App() {
 
   // Update User Target Band / Display Name / Goal / Role / Avatar (Teacher or Student)
   const handleUpdateUserProfileFields = async (username, patch) => {
-    const targetUser = (username && usersDb[username]) || (username && currentUser?.username === username ? currentUser : null);
+    const targetUser =
+      (username && usersDb[username]) ||
+      (username && currentUser?.username === username ? currentUser : null) ||
+      (username && supportAdminProfile?.username === username ? supportAdminProfile : null);
     if (!username || !targetUser) return;
     const nextRole =
       patch.role && currentUser?.role === 'teacher' && username !== currentUser?.username && !targetUser.isSuperAdmin
@@ -542,9 +545,15 @@ export default function App() {
       ...(patch.avatarFrameId !== undefined ? { avatarFrameId: patch.avatarFrameId || 'none' } : {}),
       ...(patch.equippedTitleId !== undefined ? { equippedTitleId: patch.equippedTitleId || 'newbie' } : {}),
       ...(patch.showTitleBadge !== undefined ? { showTitleBadge: Boolean(patch.showTitleBadge) } : {}),
+      ...(patch.vipRedNameEnabled !== undefined ? { vipRedNameEnabled: Boolean(patch.vipRedNameEnabled) } : {}),
+      ...(patch.vipTagEnabled !== undefined ? { vipTagEnabled: Boolean(patch.vipTagEnabled) } : {}),
+      ...(patch.vipEffectsCustomizedAt !== undefined ? { vipEffectsCustomizedAt: Number(patch.vipEffectsCustomizedAt) || Date.now() } : {}),
       ...(Array.isArray(mergedAckIds) ? { acknowledgedTitleIds: mergedAckIds } : {})
     };
     setUsersDb(prev => ({ ...prev, [username]: updatedUser }));
+    if (supportAdminProfile?.username === username) {
+      setSupportAdminProfile(prev => (prev ? { ...prev, ...updatedUser } : prev));
+    }
     if (currentUser?.username === username) {
       currentUserRef.current = updatedUser;
       setCurrentUser(updatedUser);
@@ -563,7 +572,9 @@ export default function App() {
         patch.profileCoverUrl !== undefined ||
         patch.avatarFrameId !== undefined ||
         patch.equippedTitleId !== undefined ||
-        patch.showTitleBadge !== undefined;
+        patch.showTitleBadge !== undefined ||
+        patch.vipRedNameEnabled !== undefined ||
+        patch.vipTagEnabled !== undefined;
       showToast(
         patch.customToast
           ? patch.customToast
@@ -2470,6 +2481,12 @@ export default function App() {
     accessoryId: overrides.accessoryId ?? myAccessoryId,
     avatarUrl: overrides.avatarUrl ?? user.avatarUrl ?? '',
     ready: overrides.ready ?? (user.role === 'teacher'),
+    ...(overrides.approved !== undefined ? { approved: Boolean(overrides.approved) } : {}),
+    ...(overrides.teamId ? { teamId: overrides.teamId } : {}),
+    ...(Number(user.aieoVipExpiresAt) > 0 ? { aieoVipExpiresAt: Number(user.aieoVipExpiresAt) } : {}),
+    ...(user.vipRedNameEnabled !== undefined ? { vipRedNameEnabled: Boolean(user.vipRedNameEnabled) } : {}),
+    ...(user.vipTagEnabled !== undefined ? { vipTagEnabled: Boolean(user.vipTagEnabled) } : {}),
+    ...(user.isSuperAdmin ? { isSuperAdmin: true } : {}),
     chat: '',
     chatAt: 0,
     joinedAt: Date.now()

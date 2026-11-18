@@ -66,6 +66,7 @@ import {
   hasCustomCoverPermission,
   normalizePaymentConfig,
   resolveStudentTitleSummary,
+  resolveUserVipNameVisual,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 import CoverCheckoutModal from '../components/modals/CoverCheckoutModal';
@@ -353,8 +354,7 @@ export default function StudentProfile({
     if (!isSelf || (!studentHasAieoVip && !isTargetSystemAdmin) || !handleUpdateUserProfileFields) {
       return null;
     }
-    const redOn = student.vipRedNameEnabled !== false;
-    const tagOn = student.vipTagEnabled !== false;
+    const { showRedName: redOn, showVipTag: tagOn } = resolveUserVipNameVisual(student);
     return (
       <div className="mt-4 pt-4 border-t border-rose-200/80 dark:border-rose-500/30 space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">

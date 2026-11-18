@@ -18,7 +18,11 @@ import {
   X
 } from 'lucide-react';
 import { DEFAULT_VOCAB_TEXT, VOCAB_PRESETS } from '../../constants/seedData';
-import { hasVipFriendRoomAccess } from '../../constants/profileCustomization';
+import {
+  canCreateFriendRoomNow,
+  getFriendRoomTicketCredits,
+  hasVipFriendRoomAccess
+} from '../../constants/profileCustomization';
 import { normalizeRoomObject, parseBulkStudentsText, parseRawVocabText, readImageFileAsDataUrl } from '../../utils/examHelpers';
 import UserAvatarBadge from '../../components/common/UserAvatarBadge';
 import AnimalPilotAvatar from '../../components/common/AnimalPilotAvatar';
@@ -408,8 +412,8 @@ export default function GlobalModals({
       </div>
     )}
 
-    {/* Teacher or VIP Friend Room Creation Modal */}
-    {showCreateRoomModal && (currentUser?.role === 'teacher' || hasVipFriendRoomAccess(currentUser)) && (
+    {/* Teacher, VIP, or 5k Ticket Friend Room Creation Modal */}
+    {showCreateRoomModal && (currentUser?.role === 'teacher' || canCreateFriendRoomNow(currentUser)) && (
       <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <form onSubmit={handleCreateRoom} className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
@@ -417,12 +421,20 @@ export default function GlobalModals({
               <Rocket className="w-4 h-4 text-emerald-500" />
               {currentUser?.role === 'teacher'
                 ? 'Tạo Phòng Đấu Từ Vựng Mới'
-                : '👑 Tạo Phòng Chơi Cùng Bạn Bè (Ai eo VIP)'}
+                : hasVipFriendRoomAccess(currentUser)
+                ? '👑 Tạo Phòng Chơi Cùng Bạn Bè (Ai eo VIP)'
+                : `🎫 Tạo Phòng Đấu Bạn Bè (Còn ${getFriendRoomTicketCredits(currentUser)} vé)`}
             </h3>
             <button type="button" onClick={() => setShowCreateRoomModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {currentUser?.role !== 'teacher' && !hasVipFriendRoomAccess(currentUser) && (
+            <div className="mb-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-200 dark:border-amber-500/35 text-[11px] font-bold text-amber-800 dark:text-amber-200">
+              🎫 Bấm Tạo Phòng sẽ dùng 1 vé tạo phòng 5.000đ (bạn hiện còn {getFriendRoomTicketCredits(currentUser)} vé).
+            </div>
+          )}
 
           <div className="space-y-4">
             <div>
