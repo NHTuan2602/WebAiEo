@@ -147,6 +147,200 @@ export function computeLoginDayMetrics(loginDays = [], todayKey = getVietnamDate
   };
 }
 
+// Verified Vietnamese Lunar New Year (Giao thừa & Mùng 1–3 Tết Nguyên Đán) dates 2025–2030
+const TET_HOLIDAY_DATES = new Set([
+  '2025-01-28', '2025-01-29', '2025-01-30', '2025-01-31',
+  '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19',
+  '2027-02-05', '2027-02-06', '2027-02-07', '2027-02-08',
+  '2028-01-25', '2028-01-26', '2028-01-27', '2028-01-28',
+  '2029-02-12', '2029-02-13', '2029-02-14', '2029-02-15',
+  '2030-02-01', '2030-02-02', '2030-02-03', '2030-02-04'
+]);
+
+// Verified Vietnamese Mid-Autumn Festival (14–15/08 Âm Lịch) dates 2025–2030
+const MID_AUTUMN_DATES = new Set([
+  '2025-10-05', '2025-10-06',
+  '2026-09-24', '2026-09-25',
+  '2027-09-14', '2027-09-15',
+  '2028-10-02', '2028-10-03',
+  '2029-09-21', '2029-09-22',
+  '2030-09-11', '2030-09-12'
+]);
+
+function formatDateKeyVi(dateKey) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || '').trim());
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+function findMatchingHolidayLoginDate(loginDays = [], spec = {}) {
+  const days = (Array.isArray(loginDays) ? loginDays : []).map(d => String(d || '').trim()).sort();
+  for (let i = days.length - 1; i >= 0; i--) {
+    const dk = days[i];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) continue;
+    if (spec.exactDates && spec.exactDates.has(dk)) return dk;
+    if (Array.isArray(spec.monthDays) && spec.monthDays.includes(dk.slice(5))) return dk;
+  }
+  return '';
+}
+
+const HOLIDAY_TITLE_SPECS = [
+  {
+    id: 'holiday_new_year',
+    label: 'Khai Xuân Năm Mới',
+    icon: '🎆',
+    monthDays: ['01-01'],
+    dateHint: '01/01 (Tết Dương Lịch)',
+    conditionText: 'Sự kiện Năm Mới: Chỉ cần đăng nhập vào ngày 01/01 (Tết Dương Lịch) để nhận danh hiệu kỷ niệm.',
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-400/60',
+    heroBadgeClass: 'bg-sky-500/35 text-sky-100 border-sky-300/75',
+    gameBadgeClass: 'bg-sky-100 text-sky-900 border-sky-400 dark:bg-sky-500/25 dark:text-sky-200 dark:border-sky-400/60'
+  },
+  {
+    id: 'holiday_tet_nguyen_dan',
+    label: 'Lộc Xuân Tết Cổ Truyền',
+    icon: '🧧',
+    exactDates: TET_HOLIDAY_DATES,
+    dateHint: 'Giao Thừa & Mùng 1–3 Tết Âm Lịch',
+    conditionText: 'Sự kiện Tết Nguyên Đán: Chỉ cần đăng nhập trong dịp Giao Thừa hoặc Mùng 1–3 Tết Âm Lịch hàng năm.',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/65',
+    heroBadgeClass: 'bg-gradient-to-r from-rose-500/45 to-amber-500/40 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-500/30 dark:text-rose-100 dark:border-rose-400/65'
+  },
+  {
+    id: 'holiday_valentine',
+    label: 'Trái Tim Yêu Thương',
+    icon: '💌',
+    monthDays: ['02-14'],
+    dateHint: '14/02 (Valentine)',
+    conditionText: 'Sự kiện Valentine 14/02: Chỉ cần đăng nhập vào ngày 14/02 để sở hữu huy hiệu ngọt ngào này.',
+    badgeClass: 'bg-pink-50 text-pink-800 border-pink-300 dark:bg-pink-500/20 dark:text-pink-200 dark:border-pink-400/60',
+    heroBadgeClass: 'bg-pink-500/35 text-pink-100 border-pink-300/75',
+    gameBadgeClass: 'bg-pink-100 text-pink-900 border-pink-300 dark:bg-pink-500/25 dark:text-pink-200 dark:border-pink-400/60'
+  },
+  {
+    id: 'holiday_women_83',
+    label: 'Bông Hồng Rạng Ngời 08/03',
+    icon: '🌷',
+    monthDays: ['03-08'],
+    dateHint: '08/03 (Quốc Tế Phụ Nữ)',
+    conditionText: 'Sự kiện Quốc Tế Phụ Nữ 08/03: Chỉ cần đăng nhập đúng ngày 08/03 hàng năm.',
+    badgeClass: 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-300 dark:bg-fuchsia-500/20 dark:text-fuchsia-200 dark:border-fuchsia-400/60',
+    heroBadgeClass: 'bg-fuchsia-500/35 text-fuchsia-100 border-fuchsia-300/75',
+    gameBadgeClass: 'bg-fuchsia-100 text-fuchsia-900 border-fuchsia-300 dark:bg-fuchsia-500/25 dark:text-fuchsia-200 dark:border-fuchsia-400/60'
+  },
+  {
+    id: 'holiday_reunification',
+    label: 'Hào Khí Đại Lễ 30/04',
+    icon: '🇻🇳',
+    monthDays: ['04-30', '05-01'],
+    dateHint: '30/04 & 01/05',
+    conditionText: 'Sự kiện Đại Lễ 30/04 – 01/05: Chỉ cần đăng nhập vào ngày 30/04 hoặc 01/05.',
+    badgeClass: 'bg-red-50 text-red-800 border-red-300 dark:bg-red-500/20 dark:text-red-200 dark:border-red-400/60',
+    heroBadgeClass: 'bg-red-500/35 text-red-100 border-red-300/75',
+    gameBadgeClass: 'bg-red-100 text-red-900 border-red-300 dark:bg-red-500/25 dark:text-red-200 dark:border-red-400/60'
+  },
+  {
+    id: 'holiday_national_day',
+    label: 'Tinh Thần Quốc Khánh 02/09',
+    icon: '⭐',
+    monthDays: ['09-02'],
+    dateHint: '02/09 (Quốc Khánh Việt Nam)',
+    conditionText: 'Sự kiện Quốc Khánh 02/09: Chỉ cần đăng nhập vào ngày 02/09 để tự động mở khóa.',
+    badgeClass: 'bg-amber-50 text-amber-900 border-amber-400 dark:bg-amber-500/25 dark:text-amber-200 dark:border-amber-400/65',
+    heroBadgeClass: 'bg-gradient-to-r from-red-500/40 to-amber-500/40 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-amber-100 text-amber-950 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/65'
+  },
+  {
+    id: 'holiday_mid_autumn',
+    label: 'Trăng Rằm Trung Thu',
+    icon: '🌕',
+    exactDates: MID_AUTUMN_DATES,
+    dateHint: '14–15/08 Âm Lịch (Trung Thu)',
+    conditionText: 'Sự kiện Tết Trung Thu: Chỉ cần đăng nhập vào dịp Rằm Tháng Tám (14 hoặc 15/08 Âm Lịch).',
+    badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-300 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-indigo-400/60',
+    heroBadgeClass: 'bg-indigo-500/35 text-amber-100 border-amber-300/75',
+    gameBadgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-400 dark:bg-indigo-500/25 dark:text-indigo-200 dark:border-indigo-400/60'
+  },
+  {
+    id: 'holiday_vn_women_2010',
+    label: 'Hương Sắc Việt Nam 20/10',
+    icon: '💐',
+    monthDays: ['10-20'],
+    dateHint: '20/10 (Phụ Nữ Việt Nam)',
+    conditionText: 'Sự kiện Ngày Phụ Nữ Việt Nam 20/10: Chỉ cần đăng nhập vào ngày 20/10 để nhận danh hiệu.',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-400/60',
+    heroBadgeClass: 'bg-rose-500/35 text-rose-100 border-rose-300/75',
+    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60'
+  },
+  {
+    id: 'holiday_halloween',
+    label: 'Kỵ Sĩ Đêm Halloween',
+    icon: '🎃',
+    monthDays: ['10-31'],
+    dateHint: '31/10 (Halloween)',
+    conditionText: 'Sự kiện Halloween 31/10: Chỉ cần đăng nhập trong ngày 31/10 để mở khóa danh hiệu lễ hội.',
+    badgeClass: 'bg-orange-50 text-orange-800 border-orange-400 dark:bg-orange-500/25 dark:text-orange-200 dark:border-orange-400/65',
+    heroBadgeClass: 'bg-gradient-to-r from-orange-500/40 to-purple-500/40 text-orange-100 border-orange-300/80',
+    gameBadgeClass: 'bg-orange-100 text-orange-950 border-orange-400 dark:bg-orange-500/30 dark:text-orange-100 dark:border-orange-400/65'
+  },
+  {
+    id: 'holiday_teachers_day',
+    label: 'Tri Ân Nhà Giáo 20/11',
+    icon: '🌺',
+    monthDays: ['11-20'],
+    dateHint: '20/11 (Ngày Nhà Giáo VN)',
+    conditionText: 'Sự kiện Hiến Chương Nhà Giáo 20/11: Chỉ cần đăng nhập vào ngày 20/11 hàng năm cùng cô Ms. Như.',
+    badgeClass: 'bg-teal-50 text-teal-800 border-teal-400 dark:bg-teal-500/25 dark:text-teal-200 dark:border-teal-400/65',
+    heroBadgeClass: 'bg-gradient-to-r from-teal-500/40 to-pink-500/40 text-teal-100 border-teal-300/80',
+    gameBadgeClass: 'bg-teal-100 text-teal-950 border-teal-400 dark:bg-teal-500/30 dark:text-teal-100 dark:border-teal-400/65'
+  },
+  {
+    id: 'holiday_christmas',
+    label: 'Chuông Vàng Giáng Sinh',
+    icon: '🎄',
+    monthDays: ['12-24', '12-25'],
+    dateHint: '24/12 & 25/12 (Noel)',
+    conditionText: 'Sự kiện Giáng Sinh An Lành: Chỉ cần đăng nhập vào đêm 24/12 hoặc ngày 25/12.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-400 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/65',
+    heroBadgeClass: 'bg-gradient-to-r from-emerald-500/40 to-rose-500/35 text-emerald-100 border-emerald-300/80',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-950 border-emerald-400 dark:bg-emerald-500/30 dark:text-emerald-100 dark:border-emerald-400/65'
+  },
+  {
+    id: 'holiday_year_end',
+    label: 'Khoảnh Khắc Giao Mùa',
+    icon: '🥂',
+    monthDays: ['12-31'],
+    dateHint: '31/12 (Tất Niên)',
+    conditionText: 'Sự kiện Đêm Giao Mùa 31/12: Chỉ cần đăng nhập vào ngày cuối cùng của năm 31/12.',
+    badgeClass: 'bg-violet-50 text-violet-800 border-violet-300 dark:bg-violet-500/20 dark:text-violet-200 dark:border-violet-400/60',
+    heroBadgeClass: 'bg-violet-500/35 text-violet-100 border-violet-300/75',
+    gameBadgeClass: 'bg-violet-100 text-violet-900 border-violet-400 dark:bg-violet-500/25 dark:text-violet-200 dark:border-violet-400/60'
+  }
+];
+
+function buildHolidayTitleEntry(spec) {
+  return {
+    id: spec.id,
+    label: spec.label,
+    icon: spec.icon,
+    tier: 'Ngày Đặc Biệt',
+    difficulty: 'Lễ Hội',
+    isHolidayTitle: true,
+    holidayDateHint: spec.dateHint,
+    conditionText: spec.conditionText,
+    badgeClass: spec.badgeClass,
+    heroBadgeClass: spec.heroBadgeClass,
+    gameBadgeClass: spec.gameBadgeClass,
+    isUnlocked: (_stats, userObj) => Boolean(findMatchingHolidayLoginDate(userObj?.loginDays, spec)),
+    getProgress: (_stats, userObj) => {
+      const matched = findMatchingHolidayLoginDate(userObj?.loginDays, spec);
+      return matched
+        ? { pct: 100, text: `🎉 Đã điểm danh ngày ${formatDateKeyVi(matched)}` }
+        : { pct: 0, text: `Đăng nhập vào ${spec.dateHint}` };
+    }
+  };
+}
+
 export const STUDENT_TITLES = [
   {
     id: 'newbie',
@@ -438,6 +632,7 @@ export const STUDENT_TITLES = [
       text: `${Math.min(stats.bestGameScore, 5000)}/5,000 điểm Game`
     })
   },
+  ...HOLIDAY_TITLE_SPECS.map(buildHolidayTitleEntry),
   {
     id: 'vip_thieu_gia',
     label: 'Thiếu Gia Luyện Đề',
@@ -738,6 +933,8 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       isCustomTitle: Boolean(t.isCustomTitle),
       isPaidTitle: Boolean(t.isPaidTitle),
       isStaffOnly: Boolean(t.isStaffOnly),
+      isHolidayTitle: Boolean(t.isHolidayTitle),
+      holidayDateHint: t.holidayDateHint || '',
       priceVnd,
       colorKey: t.colorKey || 'amber',
       unlocked,
@@ -750,6 +947,8 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
         ? '👑 Quản trị trao tặng'
         : unlockedByPurchase
         ? '💎 Đã mua mở khóa'
+        : unlocked && t.isHolidayTitle && progress?.text
+        ? progress.text
         : unlocked
         ? 'Đã mở khóa'
         : progress.text
@@ -837,6 +1036,7 @@ export const TITLE_DIFFICULTY_RANK = {
   'Phú Quý': 6,
   'Đặc Biệt': 6,
   'Cực Khó': 5,
+  'Lễ Hội': 4,
   'Khó': 4,
   'Thử Thách': 3,
   'Cơ Bản': 2,

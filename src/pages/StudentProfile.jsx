@@ -1730,10 +1730,12 @@ export default function StudentProfile({
       {showTitlesModal && titleSummary && (() => {
         const allTitleItems = titleSummary.itemsWithProgress || [];
         const hardTitleCount = allTitleItems.filter(i => i.difficulty === 'Khó' || i.difficulty === 'Cực Khó').length;
+        const holidayTitleCount = allTitleItems.filter(i => i.isHolidayTitle).length;
         const vipTitleCount = allTitleItems.filter(i => i.isPaidTitle).length;
         const filteredTitles = allTitleItems.filter(item => {
           if (titleFilter === 'unlocked') return item.unlocked;
           if (titleFilter === 'locked') return !item.unlocked;
+          if (titleFilter === 'holiday') return item.isHolidayTitle;
           if (titleFilter === 'vip') return item.isPaidTitle;
           if (titleFilter === 'hard') return item.difficulty === 'Khó' || item.difficulty === 'Cực Khó';
           return true;
@@ -1741,6 +1743,7 @@ export default function StudentProfile({
         const diffBadgeCls = (diff) => {
           if (diff === 'Độc Quyền') return 'bg-purple-100 text-purple-900 border-purple-400 dark:bg-purple-500/25 dark:text-purple-200 dark:border-purple-400/50';
           if (diff === 'Phú Quý') return 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 border-amber-400 dark:from-amber-500/25 dark:to-yellow-500/25 dark:text-amber-100 dark:border-amber-400/60';
+          if (diff === 'Lễ Hội') return 'bg-gradient-to-r from-pink-100 to-rose-100 text-rose-800 border-rose-300 dark:from-pink-500/25 dark:to-rose-500/25 dark:text-rose-200 dark:border-rose-400/50';
           if (diff === 'Cực Khó') return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/40';
           if (diff === 'Khó') return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/40';
           if (diff === 'Thử Thách') return 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/40';
@@ -1766,7 +1769,7 @@ export default function StudentProfile({
                     ? 'Đặc quyền Quản trị Hệ thống: Tự động mở khóa 100% tất cả danh hiệu hiện tại và mọi danh hiệu mới trong tương lai!'
                     : isTargetTeacher
                     ? 'Giảng viên & Học viên đều có thể cày mở khóa, trang bị hoặc bật/tắt Danh Hiệu trên hồ sơ và Đấu Trường.'
-                    : 'Hoàn thành bài thi, chơi Game & duy trì ngày đăng nhập (kể cả mốc 3 tháng, 6 tháng) để mở khóa toàn bộ!'}
+                    : 'Hoàn thành bài thi, chơi Game & đăng nhập đều đặn (kể cả các ngày Lễ đặc biệt trong năm) để mở khóa toàn bộ!'}
                 </p>
               </div>
               <button
@@ -1816,6 +1819,7 @@ export default function StudentProfile({
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { id: 'all', label: `Tất cả (${allTitleItems.length})` },
+                  { id: 'holiday', label: `🎉 Ngày Lễ (${holidayTitleCount})` },
                   { id: 'vip', label: `💎 Cửa Hàng VIP (${vipTitleCount})` },
                   { id: 'unlocked', label: `Đã mở (${titleSummary.unlockedIds?.length || 0})` },
                   { id: 'locked', label: `Chưa mở (${Math.max(0, allTitleItems.length - (titleSummary.unlockedIds?.length || 0))})` },
