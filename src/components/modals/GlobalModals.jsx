@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { DEFAULT_VOCAB_TEXT, VOCAB_PRESETS } from '../../constants/seedData';
+import { hasVipFriendRoomAccess } from '../../constants/profileCustomization';
 import { normalizeRoomObject, parseBulkStudentsText, parseRawVocabText, readImageFileAsDataUrl } from '../../utils/examHelpers';
 import UserAvatarBadge from '../../components/common/UserAvatarBadge';
 import AnimalPilotAvatar from '../../components/common/AnimalPilotAvatar';
@@ -27,6 +28,7 @@ import ImageCropperModal from './ImageCropperModal';
 export default function GlobalModals({
   addStudentMode,
   aiApiKey,
+  aiConfigured = false,
   aiGradingStep,
   apiTestState,
   bulkStudentsText,
@@ -110,12 +112,18 @@ export default function GlobalModals({
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Google Gemini API Key (Chỉ dành cho Giáo viên)
+                Google Gemini API Key (Dùng chung toàn hệ thống cho Giáo viên / Admin)
               </label>
+              {aiConfigured && !aiApiKey?.trim() && (
+                <div className="mb-2.5 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-[11px] font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Máy chủ đã đồng bộ sẵn Gemini Key — máy này có thể bấm Kiểm Tra Key hoặc dùng AI ngay mà không cần nhập lại!</span>
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="password"
-                  placeholder="AIzaSy..."
+                  placeholder={aiConfigured ? 'Đã đồng bộ trên máy chủ (nhập key mới nếu muốn thay thế)...' : 'AIzaSy...'}
                   value={aiApiKey}
                   onChange={e => {
                     setAiApiKey(e.target.value);
@@ -137,7 +145,7 @@ export default function GlobalModals({
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                Tạo Key miễn phí tại <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline font-semibold">Google AI Studio</a>. Hệ thống tự động dò model khả dụng mới nhất (Gemini 2.5 Flash / 2.0 Flash...) cho API Key của bạn.
+                Tạo Key miễn phí tại <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline font-semibold">Google AI Studio</a>. Hệ thống tự động thử lại nếu gặp lỗi 503 &amp; tự chuyển model dự phòng qua máy chủ.
               </p>
             </div>
 
@@ -169,12 +177,13 @@ export default function GlobalModals({
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   const trimmed = (aiApiKey || '').trim();
                   setAiApiKey(trimmed);
                   localStorage.setItem('ielts_ai_key', trimmed);
+                  await dispatchSyncAction?.('SET_AI_CONFIG', { geminiApiKey: trimmed });
                   setShowApiKeyModal(false);
-                  showToast(trimmed ? 'Đã lưu Google Gemini API Key!' : 'Đã xóa API Key (sẽ dùng bộ chấm tích hợp).');
+                  showToast(trimmed ? 'Đã lưu & đồng bộ Google Gemini API Key lên máy chủ!' : 'Đã xóa API Key (sẽ dùng bộ chấm tích hợp).');
                 }}
                 className="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm"
               >
@@ -399,13 +408,16 @@ export default function GlobalModals({
       </div>
     )}
 
-    {/* Teacher Create Game Room Modal */}
-    {showCreateRoomModal && currentUser?.role === 'teacher' && (
+    {/* Teacher or VIP Friend Room Creation Modal */}
+    {showCreateRoomModal && (currentUser?.role === 'teacher' || hasVipFriendRoomAccess(currentUser)) && (
       <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <form onSubmit={handleCreateRoom} className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
             <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Rocket className="w-4 h-4 text-emerald-500" /> Tạo Phòng Đấu Từ Vựng Mới
+              <Rocket className="w-4 h-4 text-emerald-500" />
+              {currentUser?.role === 'teacher'
+                ? 'Tạo Phòng Đấu Từ Vựng Mới'
+                : '👑 Tạo Phòng Chơi Cùng Bạn Bè (Ai eo VIP)'}
             </h3>
             <button type="button" onClick={() => setShowCreateRoomModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <X className="w-5 h-5" />
@@ -472,6 +484,23 @@ export default function GlobalModals({
                   <option value="turbo">Siêu tốc (-5 giây/từ)</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bộ Từ Vựng Sử Dụng Trong Phòng</label>
+              <select
+                value={newRoomForm.topicPreset || 'core'}
+                onChange={e => setNewRoomForm(prev => ({ ...prev, topicPreset: e.target.value }))}
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              >
+                <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
+                {Object.entries(VOCAB_PRESETS || {}).map(([key, preset]) => (
+                  <option key={key} value={key}>📚 {preset.label}</option>
+                ))}
+                {(customVocabTopics || []).map(t => (
+                  <option key={t.id} value={`custom:${t.id}`}>⭐ {t.label}</option>
+                ))}
+              </select>
             </div>
 
             <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 cursor-pointer">
@@ -567,7 +596,7 @@ export default function GlobalModals({
                   >
                     + {topic.label}
                   </button>
-                  {handleDeleteCustomVocabTopic && (
+                  {currentUser?.role === 'teacher' && handleDeleteCustomVocabTopic && (
                     <button
                       type="button"
                       onClick={() => handleDeleteCustomVocabTopic(topic)}
@@ -579,6 +608,7 @@ export default function GlobalModals({
                   )}
                 </div>
               ))}
+              {currentUser?.role === 'teacher' && (
               <button
                 type="button"
                 onClick={() => {
@@ -600,6 +630,7 @@ export default function GlobalModals({
               >
                 <Plus className="w-4 h-4" />
               </button>
+              )}
               <button
                 type="button"
                 onClick={() => {

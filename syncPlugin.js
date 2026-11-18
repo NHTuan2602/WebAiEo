@@ -33,11 +33,17 @@ import {
 } from './mailService.js';
 import {
   PAID_SHOP_TITLES,
+  SKILL_PASS_PRICE_VND,
+  AIEO_VIP_PRICE_VND,
+  SUBSCRIPTION_DURATION_MS,
   formatVndCurrency,
   getTitlePriceVnd,
   hasCustomCoverPermission,
+  hasSkillPracticeAccess,
+  hasVipFriendRoomAccess,
   normalizePaymentConfig
 } from './src/constants/profileCustomization.js';
+import { DEFAULT_TESTS } from './src/constants/seedData.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -259,9 +265,13 @@ const GEMINI_AUDIO_PREFERRED_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-2.5-flash-lite',
-  'gemini-2.5-pro',
-  'gemini-flash-latest'
+  'gemini-flash-latest',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-pro'
 ];
+
+const SERVER_TRANSIENT_GEMINI_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const sleepMsServer = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const LISTENING_40_THRESHOLDS = [
   [39, 9.0], [37, 8.5], [35, 8.0], [32, 7.5], [30, 7.0],
@@ -658,11 +668,28 @@ function sanitizeUserForViewer(user, viewer) {
     showTitleBadge: user.showTitleBadge !== false,
     grantedTitleIds: Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String).filter(Boolean) : [],
     purchasedTitleIds: Array.isArray(user.purchasedTitleIds) ? user.purchasedTitleIds.map(String).filter(Boolean) : [],
+    purchasedTitleExpiries:
+      user.purchasedTitleExpiries && typeof user.purchasedTitleExpiries === 'object'
+        ? user.purchasedTitleExpiries
+        : {},
     customCoverUnlocked: hasCustomCoverPermission(user),
     customCoverUnlockedAt: Number(user.customCoverUnlockedAt) || 0,
+    customCoverExpiresAt: Number(user.customCoverExpiresAt) || 0,
     customCoverUnlockedBy: typeof user.customCoverUnlockedBy === 'string' ? user.customCoverUnlockedBy : '',
     coverUnlockRequestedAt: Number(user.coverUnlockRequestedAt) || 0,
     paidTitleRequested: user.paidTitleRequested && typeof user.paidTitleRequested === 'object' ? user.paidTitleRequested : null,
+    skillPracticeExpiresAt: Number(user.skillPracticeExpiresAt) || 0,
+    aieoVipExpiresAt: Number(user.aieoVipExpiresAt) || 0,
+    vipRedNameEnabled:
+      user.vipRedNameEnabled !== undefined
+        ? Boolean(user.vipRedNameEnabled)
+        : Number(user.aieoVipExpiresAt) > Date.now(),
+    vipTagEnabled:
+      user.vipTagEnabled !== undefined
+        ? Boolean(user.vipTagEnabled)
+        : Number(user.aieoVipExpiresAt) > Date.now(),
+    subscriptionRequested:
+      user.subscriptionRequested && typeof user.subscriptionRequested === 'object' ? user.subscriptionRequested : null,
     loginDays: Array.isArray(user.loginDays) ? user.loginDays : [],
     emailVerified: Boolean(user.email && user.emailVerified),
     maskedEmail: user.email && user.emailVerified ? maskEmailAddress(user.email) : ''
@@ -877,6 +904,9 @@ export function normalizeServerRoom(raw = {}, pinKey = '', now = Date.now()) {
     name: raw?.name || `Phòng Từ Vựng #${pin || '686868'}`,
     pass: raw?.pass ?? 'ielts',
     teacher: raw?.teacher || 'teacher_ielts',
+    roomMode: raw?.roomMode === 'friend_vip' ? 'friend_vip' : 'teacher_live',
+    hostUsername: String(raw?.hostUsername || ''),
+    hostName: String(raw?.hostName || ''),
     status: raw?.status === 'PLAYING' || raw?.status === 'ENDED' ? raw.status : 'LOBBY',
     maxPlayers: Number(raw?.maxPlayers) || 30,
     roundSize: Number.isFinite(rawRoundSize) && rawRoundSize >= 2 ? Math.min(8, Math.round(rawRoundSize)) : 4,
@@ -1193,6 +1223,21 @@ export function createPersistentSyncStore(persistFile = '') {
     }
   }
   const protectedChanged = ensureProtectedAccounts(store);
+  let seedMergedOnBoot = false;
+  if (loadedFromDisk && store.seeded && Array.isArray(DEFAULT_TESTS)) {
+    const deletedSet = new Set(Array.isArray(store.deletedTestIds) ? store.deletedTestIds : []);
+    if (!store.seededTags || typeof store.seededTags !== 'object') store.seededTags = {};
+    if (!Array.isArray(store.tests)) store.tests = [];
+    DEFAULT_TESTS.forEach(dt => {
+      if (!dt?.id || !dt?.seedTag) return;
+      if (store.seededTags[dt.seedTag]) return;
+      store.seededTags[dt.seedTag] = true;
+      if (!deletedSet.has(dt.id) && !store.tests.some(t => t?.id === dt.id)) {
+        store.tests = [...store.tests, dt];
+      }
+      seedMergedOnBoot = true;
+    });
+  }
 
   let writeTimer = null;
   const writeStoreSync = () => {
@@ -1219,7 +1264,7 @@ export function createPersistentSyncStore(persistFile = '') {
   };
 
   // Persist protected default accounts & _authSecret immediately when initializing a fresh store file
-  if (persistFile && (!hadExistingFile || (loadedFromDisk && protectedChanged))) {
+  if (persistFile && (!hadExistingFile || (loadedFromDisk && (protectedChanged || seedMergedOnBoot)))) {
     writeStoreSync();
   }
 
@@ -1309,6 +1354,9 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     showTitleBadge: superAdmin.showTitleBadge !== false,
     grantedTitleIds: Array.isArray(superAdmin.grantedTitleIds) ? superAdmin.grantedTitleIds : [],
     purchasedTitleIds: Array.isArray(superAdmin.purchasedTitleIds) ? superAdmin.purchasedTitleIds : [],
+    vipRedNameEnabled: superAdmin.vipRedNameEnabled === true,
+    vipTagEnabled: superAdmin.vipTagEnabled === true,
+    aieoVipExpiresAt: Number(superAdmin.aieoVipExpiresAt) || 0,
     role: 'admin',
     isSystemAdmin: true,
     joinedDate: superAdmin.joinedDate || '2026-01-01',
@@ -1628,8 +1676,17 @@ function getSnapshotForViewer(store, viewer = null) {
   const studentRooms = {};
   Object.entries(store.rooms || {}).forEach(([pin, r]) => {
     if (!r) return;
-    const { pass: _hiddenPass, ...rest } = r;
-    studentRooms[pin] = { ...rest, hasPassword: Boolean(_hiddenPass) };
+    const isMyHostedFriendRoom = Boolean(
+      r.roomMode === 'friend_vip' &&
+      r.hostUsername &&
+      r.hostUsername === viewer.username
+    );
+    if (isMyHostedFriendRoom) {
+      studentRooms[pin] = r;
+    } else {
+      const { pass: _hiddenPass, ...rest } = r;
+      studentRooms[pin] = { ...rest, hasPassword: Boolean(_hiddenPass) };
+    }
   });
 
   const myNote = store.teacherNotes?.[viewer.username];
@@ -1675,13 +1732,6 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
   const isSuperAdmin = Boolean(viewer.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
 
   const teacherOnlyActions = new Set([
-    'UPSERT_ROOM',
-    'CLEAR_LOBBY_CHAT',
-    'START_GAME',
-    'FINISH_ROOM_MATCH',
-    'KICK_LOBBY_PLAYER',
-    'DELETE_ROOM',
-    'RESET_LOBBY',
     'UPSERT_TEST',
     'DELETE_TEST',
     'TOGGLE_TEST_ANSWERS',
@@ -1700,6 +1750,19 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'DELETE_NOTIFICATION'
   ]);
 
+  const canManageTargetRoom = (pin) => {
+    if (isTeacher) return true;
+    const viewerRecord = store.users?.[viewer.username] || viewer;
+    if (!hasVipFriendRoomAccess(viewerRecord)) return false;
+    const cleanPin = String(pin || '').trim();
+    if (!cleanPin) return false;
+    const existingRoom = store.rooms?.[cleanPin];
+    if (!existingRoom) {
+      return type === 'UPSERT_ROOM';
+    }
+    return existingRoom.roomMode === 'friend_vip' && existingRoom.hostUsername === viewer.username;
+  };
+
   if (teacherOnlyActions.has(type)) {
     if (!isTeacher) {
       return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới có quyền thực hiện thao tác này.' };
@@ -1708,6 +1771,44 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
   }
 
   switch (type) {
+    case 'UPSERT_ROOM': {
+      const cleanPin = String(payload?.pin || '').trim();
+      if (!isTeacher) {
+        const viewerRecord = store.users?.[viewer.username] || viewer;
+        if (!hasVipFriendRoomAccess(viewerRecord)) {
+          return { allowed: false, status: 403, error: 'Cần Gói Ai eo VIP (80k/1 tháng) hoặc tài khoản Giáo viên để tạo phòng đấu bạn bè!' };
+        }
+        if (cleanPin === '686868') {
+          return { allowed: false, status: 403, error: 'Mã phòng 686868 dành riêng cho Giáo viên.' };
+        }
+        const existingRoom = cleanPin ? store.rooms?.[cleanPin] : null;
+        if (existingRoom && (existingRoom.roomMode !== 'friend_vip' || existingRoom.hostUsername !== viewer.username)) {
+          return { allowed: false, status: 403, error: 'Mã phòng này đang thuộc về Giáo viên hoặc chủ phòng khác.' };
+        }
+        const oldPin = payload?.oldPin ? String(payload.oldPin).trim() : '';
+        if (oldPin && oldPin !== cleanPin) {
+          const oldRoom = store.rooms?.[oldPin];
+          if (!oldRoom || oldRoom.roomMode !== 'friend_vip' || oldRoom.hostUsername !== viewer.username) {
+            return { allowed: false, status: 403, error: 'Không có quyền đổi mã phòng của người khác.' };
+          }
+        }
+      }
+      return { allowed: true };
+    }
+
+    case 'CLEAR_LOBBY_CHAT':
+    case 'START_GAME':
+    case 'FINISH_ROOM_MATCH':
+    case 'KICK_LOBBY_PLAYER':
+    case 'DELETE_ROOM':
+    case 'RESET_LOBBY':
+    case 'APPROVE_LOBBY_PLAYER': {
+      const cleanPin = String(payload?.pin || '').trim();
+      if (!canManageTargetRoom(cleanPin)) {
+        return { allowed: false, status: 403, error: 'Chỉ Giáo viên hoặc Chủ phòng Gói Ai eo VIP mới được điều khiển phòng đấu này.' };
+      }
+      return { allowed: true };
+    }
     case 'RESET_USER_PASSWORD': {
       const targetKey = findUserKeyInStore(store, payload?.username);
       const targetUser = targetKey ? store.users?.[targetKey] : null;
@@ -1838,7 +1939,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: true };
     }
 
-    case 'TOGGLE_USER_COVER_UNLOCK': {
+    case 'TOGGLE_USER_COVER_UNLOCK':
+    case 'TOGGLE_USER_SUBSCRIPTION': {
       if (!isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Chỉ Quản Trị Hệ Thống mới có quyền mở khóa / khóa quyền thu phí của học viên!' };
       }
@@ -1858,16 +1960,12 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         if (!paidTitle) {
           return { allowed: false, status: 400, error: 'Danh hiệu không hợp lệ.' };
         }
-        const alreadyOwned =
-          isSuperAdmin ||
-          (Array.isArray(me.purchasedTitleIds) && me.purchasedTitleIds.includes(titleId)) ||
-          (Array.isArray(me.grantedTitleIds) && me.grantedTitleIds.includes(titleId));
-        if (alreadyOwned) {
-          return { allowed: false, status: 400, error: 'Tài khoản của bạn đã sở hữu danh hiệu này rồi!' };
-        }
         return { allowed: true };
       }
-      if (hasCustomCoverPermission(me)) {
+      if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip') {
+        return { allowed: true };
+      }
+      if (hasCustomCoverPermission(me) && !payload?.renew) {
         return { allowed: false, status: 400, error: 'Tài khoản của bạn đã mở khóa quyền Ảnh Nền Riêng rồi!' };
       }
       return { allowed: true };
@@ -1885,6 +1983,15 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
           return { allowed: false, status: 403, error: 'Bài đã chấm điểm không thể tự ý chỉnh sửa.' };
         }
         const test = (store.tests || []).find(t => t.id === att.testId);
+        const viewerRecord = store.users?.[viewer.username] || viewer;
+        const resolvedTestMode = test?.testMode || att?.testMode;
+        if (!existingAtt && resolvedTestMode === 'single_skill' && !hasSkillPracticeAccess(viewerRecord)) {
+          return {
+            allowed: false,
+            status: 403,
+            error: 'Bạn cần đăng ký Gói Bài Tập 4 Kỹ Năng (20.000đ/tháng) hoặc Gói Ai eo VIP (80.000đ/tháng) để vào làm & nộp bài tập kỹ năng.'
+          };
+        }
         if (test && !existingAtt) {
           const assigned = normalizeClassIdList(test.assignedClassIds);
           if (assigned.length > 0) {
@@ -1944,7 +2051,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
           return { allowed: false, status: 403, error: 'Không thể vào phòng dưới tên người khác.' };
         }
         const alreadyIn = Boolean(room.lobbyPlayers?.[viewer.username]);
-        if (!alreadyIn && room.pass && String(payload?.roomPass || '').trim() !== String(room.pass).trim()) {
+        const isVipSelfHost = room.roomMode === 'friend_vip' && room.hostUsername === viewer.username;
+        if (!alreadyIn && !isVipSelfHost && room.pass && String(payload?.roomPass || '').trim() !== String(room.pass).trim()) {
           return { allowed: false, status: 403, error: 'Mật khẩu phòng không chính xác.' };
         }
       }
@@ -2011,13 +2119,6 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: true };
     }
 
-    case 'APPROVE_LOBBY_PLAYER': {
-      if (!isTeacher) {
-        return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới có quyền duyệt học viên vào phòng Thực Chiến Live.' };
-      }
-      return { allowed: true };
-    }
-
     case 'SUBMIT_PRACTICE_GAME_SCORE': {
       const targetUname = payload?.username;
       if (!isTeacher && targetUname && targetUname !== viewer.username) {
@@ -2075,11 +2176,27 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
       grantedTitleIds: Array.isArray(prevUser.grantedTitleIds) ? prevUser.grantedTitleIds : [],
       purchasedTitleIds: Array.isArray(prevUser.purchasedTitleIds) ? prevUser.purchasedTitleIds : [],
+      purchasedTitleExpiries:
+        prevUser.purchasedTitleExpiries && typeof prevUser.purchasedTitleExpiries === 'object'
+          ? prevUser.purchasedTitleExpiries
+          : {},
       customCoverUnlocked: Boolean(prevUser.customCoverUnlocked),
       customCoverUnlockedAt: Number(prevUser.customCoverUnlockedAt) || 0,
+      customCoverExpiresAt: Number(prevUser.customCoverExpiresAt) || 0,
       customCoverUnlockedBy: typeof prevUser.customCoverUnlockedBy === 'string' ? prevUser.customCoverUnlockedBy : '',
       coverUnlockRequestedAt: Number(prevUser.coverUnlockRequestedAt) || 0,
       paidTitleRequested: prevUser.paidTitleRequested || null,
+      skillPracticeExpiresAt: Number(prevUser.skillPracticeExpiresAt) || 0,
+      aieoVipExpiresAt: Number(prevUser.aieoVipExpiresAt) || 0,
+      subscriptionRequested: prevUser.subscriptionRequested || null,
+      vipRedNameEnabled:
+        rawUser.vipRedNameEnabled !== undefined
+          ? Boolean(rawUser.vipRedNameEnabled)
+          : (prevUser.vipRedNameEnabled !== undefined ? Boolean(prevUser.vipRedNameEnabled) : Number(prevUser.aieoVipExpiresAt) > Date.now()),
+      vipTagEnabled:
+        rawUser.vipTagEnabled !== undefined
+          ? Boolean(rawUser.vipTagEnabled)
+          : (prevUser.vipTagEnabled !== undefined ? Boolean(prevUser.vipTagEnabled) : Number(prevUser.aieoVipExpiresAt) > Date.now()),
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
       emailVerifiedAt: prevUser.emailVerifiedAt || null
@@ -2092,7 +2209,14 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     if (!isSuperAdmin) {
       incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
       incoming.purchasedTitleIds = Array.isArray(prevUser?.purchasedTitleIds) ? prevUser.purchasedTitleIds : [];
+      incoming.purchasedTitleExpiries =
+        prevUser?.purchasedTitleExpiries && typeof prevUser.purchasedTitleExpiries === 'object'
+          ? prevUser.purchasedTitleExpiries
+          : {};
       incoming.customCoverUnlocked = Boolean(prevUser?.customCoverUnlocked);
+      incoming.customCoverExpiresAt = Number(prevUser?.customCoverExpiresAt) || 0;
+      incoming.skillPracticeExpiresAt = Number(prevUser?.skillPracticeExpiresAt) || 0;
+      incoming.aieoVipExpiresAt = Number(prevUser?.aieoVipExpiresAt) || 0;
     } else {
       if (incoming.grantedTitleIds !== undefined) {
         incoming.grantedTitleIds = Array.isArray(incoming.grantedTitleIds)
@@ -2108,10 +2232,37 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       } else {
         incoming.purchasedTitleIds = Array.isArray(prevUser?.purchasedTitleIds) ? prevUser.purchasedTitleIds : [];
       }
+      incoming.purchasedTitleExpiries =
+        incoming.purchasedTitleExpiries && typeof incoming.purchasedTitleExpiries === 'object'
+          ? incoming.purchasedTitleExpiries
+          : (prevUser?.purchasedTitleExpiries && typeof prevUser.purchasedTitleExpiries === 'object' ? prevUser.purchasedTitleExpiries : {});
       incoming.customCoverUnlocked =
         incoming.customCoverUnlocked !== undefined
           ? Boolean(incoming.customCoverUnlocked)
           : Boolean(prevUser?.customCoverUnlocked);
+      incoming.customCoverExpiresAt =
+        incoming.customCoverExpiresAt !== undefined
+          ? Math.max(0, Number(incoming.customCoverExpiresAt) || 0)
+          : (Number(prevUser?.customCoverExpiresAt) || 0);
+      incoming.skillPracticeExpiresAt =
+        incoming.skillPracticeExpiresAt !== undefined
+          ? Math.max(0, Number(incoming.skillPracticeExpiresAt) || 0)
+          : (Number(prevUser?.skillPracticeExpiresAt) || 0);
+      incoming.aieoVipExpiresAt =
+        incoming.aieoVipExpiresAt !== undefined
+          ? Math.max(0, Number(incoming.aieoVipExpiresAt) || 0)
+          : (Number(prevUser?.aieoVipExpiresAt) || 0);
+    }
+    incoming.subscriptionRequested = prevUser?.subscriptionRequested || null;
+    if (incoming.vipRedNameEnabled !== undefined) {
+      incoming.vipRedNameEnabled = Boolean(incoming.vipRedNameEnabled);
+    } else if (prevUser?.vipRedNameEnabled !== undefined) {
+      incoming.vipRedNameEnabled = Boolean(prevUser.vipRedNameEnabled);
+    }
+    if (incoming.vipTagEnabled !== undefined) {
+      incoming.vipTagEnabled = Boolean(incoming.vipTagEnabled);
+    } else if (prevUser?.vipTagEnabled !== undefined) {
+      incoming.vipTagEnabled = Boolean(prevUser.vipTagEnabled);
     }
     incoming.customCoverUnlockedAt = incoming.customCoverUnlocked
       ? (Number(prevUser?.customCoverUnlockedAt) || Date.now())
@@ -2336,7 +2487,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             if (store.seededTags[dt.seedTag]) return;
             store.seededTags[dt.seedTag] = true;
             if (!store.deletedTestIds.includes(dt.id) && !store.tests.some(t => t.id === dt.id)) {
-              store.tests = [dt, ...store.tests];
+              store.tests = [...store.tests, dt];
             }
             changed = true;
           });
@@ -2355,15 +2506,24 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         : store.rooms[cleanPin];
 
       const base = normalizeServerRoom(sourceRoom || {}, cleanPin);
+      const isTeacherActor = viewer?.role === 'teacher';
+      const forcedUpdates = isTeacherActor
+        ? (payload.updates || {})
+        : {
+            ...(payload.updates || {}),
+            roomMode: 'friend_vip',
+            hostUsername: viewer?.username || base.hostUsername || '',
+            hostName: viewer?.name || base.hostName || viewer?.username || ''
+          };
       const merged = normalizeServerRoom(
         {
           ...base,
-          ...(payload.updates || {}),
+          ...forcedUpdates,
           pin: cleanPin,
-          lobbyPlayers: { ...base.lobbyPlayers, ...(payload.updates?.lobbyPlayers || {}) },
-          liveMatch: { ...base.liveMatch, ...(payload.updates?.liveMatch || {}) },
-          players: { ...base.players, ...(payload.updates?.players || {}) },
-          chatMessages: Array.isArray(payload.updates?.chatMessages) ? payload.updates.chatMessages : base.chatMessages
+          lobbyPlayers: { ...base.lobbyPlayers, ...(forcedUpdates.lobbyPlayers || {}) },
+          liveMatch: { ...base.liveMatch, ...(forcedUpdates.liveMatch || {}) },
+          players: { ...base.players, ...(forcedUpdates.players || {}) },
+          chatMessages: Array.isArray(forcedUpdates.chatMessages) ? forcedUpdates.chatMessages : base.chatMessages
         },
         cleanPin
       );
@@ -2383,9 +2543,16 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       if (!cleanPin || !player?.username) break;
       const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin);
       const existingPlayer = base.lobbyPlayers[player.username];
+      const isFriendAutoApprove = base.roomMode === 'friend_vip';
+      const approved = isFriendAutoApprove
+        ? true
+        : viewer?.role === 'teacher'
+        ? Boolean(player.approved ?? existingPlayer?.approved)
+        : Boolean(existingPlayer?.approved);
       base.lobbyPlayers[player.username] = {
         ...(existingPlayer || {}),
-        ...player
+        ...player,
+        approved
       };
       store.rooms[cleanPin] = base;
       changed = true;
@@ -2501,8 +2668,9 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         base.shufflePerPlayer = Boolean(payload.shufflePerPlayer);
       }
       const freshLive = {};
+      const isFriendVipMatch = base.roomMode === 'friend_vip';
       Object.values(base.lobbyPlayers || {}).forEach(lp => {
-        if (lp && lp.role !== 'teacher') {
+        if (lp && (isFriendVipMatch || lp.role !== 'teacher')) {
           freshLive[lp.username] = {
             username: lp.username,
             name: lp.name || lp.username,
@@ -2985,10 +3153,13 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const targetUser = targetKey ? store.users?.[targetKey] : null;
       if (!targetKey || !targetUser) break;
       const unlocked = payload?.unlocked !== false;
+      const nowMs = Date.now();
+      const nextExp = unlocked ? nowMs + SUBSCRIPTION_DURATION_MS : 0;
       store.users[targetKey] = {
         ...targetUser,
         customCoverUnlocked: unlocked,
-        customCoverUnlockedAt: unlocked ? Date.now() : 0,
+        customCoverUnlockedAt: unlocked ? nowMs : 0,
+        customCoverExpiresAt: nextExp,
         customCoverUnlockedBy: unlocked ? (viewer?.username || '') : '',
         coverUnlockRequestedAt: 0,
         profileCoverUrl: unlocked ? (targetUser.profileCoverUrl || '') : ''
@@ -2998,8 +3169,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         appendStoreNotification(
           store,
           {
-            title: '🖼️ Đã mở khóa Ảnh Nền Riêng!',
-            message: `Quản Trị Hệ Thống đã xác nhận thanh toán ${priceLabel} và mở khóa quyền tải Ảnh Nền / Ảnh Bìa riêng cho hồ sơ của bạn.`,
+            title: '🖼️ Đã mở khóa Ảnh Nền Riêng (1 Tháng)!',
+            message: `Quản Trị Hệ Thống đã xác nhận thanh toán ${priceLabel} và mở khóa quyền tải Ảnh Nền / Ảnh Bìa riêng trong 30 ngày cho hồ sơ của bạn.`,
             type: 'announcement',
             targetUsernames: [targetKey],
             createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
@@ -3009,6 +3180,72 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         );
       }
       changed = true;
+      break;
+    }
+
+    case 'TOGGLE_USER_SUBSCRIPTION': {
+      const targetKey = findUserKeyInStore(store, payload?.username);
+      const targetUser = targetKey ? store.users?.[targetKey] : null;
+      if (!targetKey || !targetUser) break;
+      const kind = String(payload?.kind || payload?.planType || '').trim();
+      const active =
+        payload?.active !== undefined
+          ? payload.active !== false
+          : payload?.unlocked !== false;
+      const nowMs = Date.now();
+      const extendFrom = (prevExp) => (active ? Math.max(nowMs, Number(prevExp) || 0) + SUBSCRIPTION_DURATION_MS : 0);
+
+      if (kind === 'skill_pass') {
+        const nextSkillExp = extendFrom(targetUser.skillPracticeExpiresAt);
+        store.users[targetKey] = {
+          ...targetUser,
+          skillPracticeExpiresAt: nextSkillExp,
+          ...(active && targetUser.subscriptionRequested?.itemType === 'skill_pass' ? { subscriptionRequested: null } : {})
+        };
+        if (active && targetUser.role !== 'teacher') {
+          appendStoreNotification(
+            store,
+            {
+              title: '🎓 Đã kích hoạt Gói Bài Tập 4 Kỹ Năng (1 Tháng)!',
+              message: `Quản Trị Hệ Thống đã mở khóa 30 ngày truy cập toàn bộ Bài Tập 4 Kỹ Năng & Đề Lẻ cho tài khoản của bạn.`,
+              type: 'announcement',
+              targetUsernames: [targetKey],
+              createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+              createdByName: viewer?.name || 'Quản Trị Hệ Thống'
+            },
+            viewer
+          );
+        }
+        changed = true;
+      } else if (kind === 'aieo_vip') {
+        const nextVipExp = extendFrom(targetUser.aieoVipExpiresAt);
+        const nextSkillExp = active
+          ? Math.max(Number(targetUser.skillPracticeExpiresAt) || 0, nextVipExp)
+          : (Number(targetUser.skillPracticeExpiresAt) || 0);
+        store.users[targetKey] = {
+          ...targetUser,
+          aieoVipExpiresAt: nextVipExp,
+          skillPracticeExpiresAt: nextSkillExp,
+          vipRedNameEnabled: active ? (targetUser.vipRedNameEnabled ?? true) : false,
+          vipTagEnabled: active ? (targetUser.vipTagEnabled ?? true) : false,
+          ...(active && targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})
+        };
+        if (active && targetUser.role !== 'teacher') {
+          appendStoreNotification(
+            store,
+            {
+              title: '👑 Đã kích hoạt Gói Ai eo VIP (1 Tháng)!',
+              message: `Quản Trị Hệ Thống đã kích hoạt 30 ngày Gói Ai eo VIP: Mở miễn phí Bài tập 4 Kỹ năng, Danh hiệu Ai eo VIP, Tạo phòng Game Bạn Bè & Tên Đỏ + Nhãn AIEOVIP.`,
+              type: 'announcement',
+              targetUsernames: [targetKey],
+              createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+              createdByName: viewer?.name || 'Quản Trị Hệ Thống'
+            },
+            viewer
+          );
+        }
+        changed = true;
+      }
       break;
     }
 
@@ -3030,7 +3267,19 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         changed = true;
         break;
       }
-      if (hasCustomCoverPermission(targetUser)) break;
+      if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip') {
+        store.users[uname] = {
+          ...targetUser,
+          subscriptionRequested: {
+            itemType: payload.itemType,
+            itemLabel: payload.itemType === 'aieo_vip' ? 'Gói Ai eo VIP (1 Tháng)' : 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
+            requestedAt: Date.now()
+          }
+        };
+        changed = true;
+        break;
+      }
+      if (hasCustomCoverPermission(targetUser) && !payload?.renew) break;
       store.users[uname] = {
         ...targetUser,
         coverUnlockRequestedAt: Date.now()
@@ -3463,6 +3712,73 @@ async function discoverServerGeminiModels(cleanKey) {
   return ordered;
 }
 
+async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 }) {
+  const cleanKey = String(apiKey || '').trim().replace(/^['"]|['"]$/g, '');
+  if (!cleanKey) {
+    throw new Error('Chưa cấu hình Google Gemini API Key trên máy chủ.');
+  }
+  const models = await discoverServerGeminiModels(cleanKey);
+  let lastErr = null;
+
+  for (const modelId of models) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+    const doFetch = async (useJsonMime = true) => {
+      const generationConfig = { temperature };
+      if (useJsonMime) generationConfig.responseMimeType = 'application/json';
+      return fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: requestParts }],
+          generationConfig
+        })
+      });
+    };
+
+    let response = null;
+    try {
+      response = await doFetch(true);
+      if (response.status === 400) {
+        const preview = await response.clone().text();
+        if (/mime|json/i.test(preview)) {
+          response = await doFetch(false);
+        }
+      }
+      if (SERVER_TRANSIENT_GEMINI_STATUSES.has(response.status)) {
+        await sleepMsServer(600);
+        response = await doFetch(true);
+      }
+    } catch (netErr) {
+      lastErr = netErr;
+      continue;
+    }
+
+    if (response.ok) {
+      const data = await response.json();
+      const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        lastErr = new Error('AI không trả về JSON hợp lệ.');
+        continue;
+      }
+      return { parsed: JSON.parse(jsonMatch[0]), usedModel: modelId };
+    }
+
+    const errText = await response.text();
+    if (response.status === 404 || /not found|not supported/i.test(errText)) {
+      lastErr = new Error(errText);
+      continue;
+    }
+    if (SERVER_TRANSIENT_GEMINI_STATUSES.has(response.status)) {
+      lastErr = new Error(`Máy chủ Gemini tạm quá tải (${response.status}), đã thử model ${modelId}.`);
+      continue;
+    }
+    throw new Error(`Gemini API lỗi (${response.status}): ${errText.slice(0, 220)}`);
+  }
+
+  throw lastErr || new Error('Không tìm thấy model Gemini khả dụng hoặc máy chủ AI tạm quá tải (503).');
+}
+
 async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMode, recordings }) {
   const parts = [];
   const preparedRecordings = recordings.map(rec => {
@@ -3506,46 +3822,13 @@ async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMod
     recordings: preparedRecordings
   });
   const requestParts = [{ text: promptText }, ...parts];
-  const models = await discoverServerGeminiModels(apiKey);
-  let lastErr = null;
-
-  for (const modelId of models) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: requestParts }],
-        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
-      })
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        lastErr = new Error('AI không trả về JSON hợp lệ.');
-        continue;
-      }
-      const parsed = JSON.parse(jsonMatch[0]);
-      return normalizeSpeakingEvaluation({
-        parsed,
-        recordings: preparedRecordings,
-        usedModel: modelId,
-        gradedMode: 'gemini_audio'
-      });
-    }
-
-    const errText = await response.text();
-    if (response.status === 404 || /not found|not supported/i.test(errText)) {
-      lastErr = new Error(errText);
-      continue;
-    }
-    throw new Error(`Gemini API lỗi (${response.status}): ${errText.slice(0, 220)}`);
-  }
-
-  throw lastErr || new Error('Không tìm thấy model Gemini hỗ trợ chấm Speaking audio.');
+  const { parsed, usedModel } = await callGeminiServerJson({ apiKey, requestParts, temperature: 0.2 });
+  return normalizeSpeakingEvaluation({
+    parsed,
+    recordings: preparedRecordings,
+    usedModel,
+    gradedMode: 'gemini_audio'
+  });
 }
 
 const IMMEDIATE_PERSIST_ACTIONS = new Set([
@@ -3562,6 +3845,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'DELETE_CUSTOM_TITLE',
   'GRANT_USER_TITLES',
   'TOGGLE_USER_COVER_UNLOCK',
+  'TOGGLE_USER_SUBSCRIPTION',
   'REQUEST_COVER_UNLOCK',
   'UPDATE_PAYMENT_CONFIG',
   'SEED_DEFAULTS'
@@ -4323,6 +4607,44 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       return;
     }
 
+    if (req.method === 'POST' && reqUrl === '/ai/generate') {
+      if (!viewer || viewer.role !== 'teacher') {
+        sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên hoặc Quản trị mới được dùng công cụ tạo/kiểm tra đề AI.' });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const promptText = String(body?.promptText || body?.prompt || '');
+        if (!promptText) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Thiếu promptText cho AI.' });
+          return;
+        }
+        const effectiveKey = getEffectiveGeminiKey(store, String(body?.clientApiKey || ''));
+        if (!effectiveKey) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Chưa cấu hình Google Gemini API Key trên máy chủ.' });
+          return;
+        }
+        const requestParts = [{ text: promptText }];
+        const images = Array.isArray(body?.images) ? body.images.slice(0, 10) : [];
+        images.forEach(img => {
+          if (typeof img === 'object' && img?.inlineData?.data) {
+            requestParts.push(img);
+          } else if (typeof img === 'string') {
+            const match = img.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+            if (match) {
+              requestParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+            }
+          }
+        });
+        const temperature = Number.isFinite(Number(body?.temperature)) ? Number(body.temperature) : 0.2;
+        const { parsed, usedModel } = await callGeminiServerJson({ apiKey: effectiveKey, requestParts, temperature });
+        sendJsonResponse(res, 200, { ok: true, parsed, usedModel });
+      } catch (err) {
+        sendJsonResponse(res, 502, { ok: false, error: err?.message || 'Gọi Gemini AI qua máy chủ thất bại.' });
+      }
+      return;
+    }
+
     if (req.method === 'POST' && reqUrl === '/payment/create-order') {
       if (!viewer) {
         sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để tạo mã thanh toán.' });
@@ -4332,12 +4654,16 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const body = await readJsonBody(req);
         const viewerUser = store.users?.[viewer.username] || viewer;
         const cfg = getPublicPaymentConfigSummary(store);
-        const isTitleOrder = body?.itemType === 'title';
-        const itemType = isTitleOrder ? 'title' : 'cover';
+        const rawType = String(body?.itemType || 'cover').trim();
+        const isTitleOrder = rawType === 'title';
+        const isSkillPassOrder = rawType === 'skill_pass';
+        const isAieoVipOrder = rawType === 'aieo_vip';
+        const itemType = isTitleOrder ? 'title' : isSkillPassOrder ? 'skill_pass' : isAieoVipOrder ? 'aieo_vip' : 'cover';
+        const renewFlag = Boolean(body?.renew);
         let itemId = '';
-        let itemLabel = 'Mở khóa Ảnh Nền Riêng';
+        let itemLabel = 'Ảnh Nền Riêng (1 Tháng)';
         let amount = cfg.coverUnlockPrice;
-        let alreadyUnlocked = hasCustomCoverPermission(viewerUser);
+        let alreadyUnlocked = !renewFlag && hasCustomCoverPermission(viewerUser);
 
         if (isTitleOrder) {
           itemId = String(body?.itemId || '').trim();
@@ -4346,14 +4672,28 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             sendJsonResponse(res, 400, { ok: false, error: 'Danh hiệu không hợp lệ hoặc không bán trong cửa hàng.' });
             return;
           }
-          itemLabel = `${paidTitle.icon} ${paidTitle.label}`;
+          itemLabel = `${paidTitle.icon} ${paidTitle.label} (1 Tháng)`;
           amount = getTitlePriceVnd(paidTitle, cfg);
-          alreadyUnlocked = Boolean(
+          const purchasedActive = Boolean(
+            Array.isArray(viewerUser?.purchasedTitleIds) &&
+            viewerUser.purchasedTitleIds.includes(itemId) &&
+            ((Number(viewerUser?.purchasedTitleExpiries?.[itemId]) || 0) === 0 ||
+              Number(viewerUser.purchasedTitleExpiries[itemId]) > Date.now())
+          );
+          alreadyUnlocked = !renewFlag && Boolean(
             viewerUser?.isSuperAdmin ||
             viewerUser?.username === SUPER_ADMIN_USERNAME ||
-            (Array.isArray(viewerUser?.purchasedTitleIds) && viewerUser.purchasedTitleIds.includes(itemId)) ||
+            purchasedActive ||
             (Array.isArray(viewerUser?.grantedTitleIds) && viewerUser.grantedTitleIds.includes(itemId))
           );
+        } else if (isSkillPassOrder) {
+          itemLabel = 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)';
+          amount = Number(cfg.skillPassPrice) >= 0 ? cfg.skillPassPrice : SKILL_PASS_PRICE_VND;
+          alreadyUnlocked = !renewFlag && hasSkillPracticeAccess(viewerUser);
+        } else if (isAieoVipOrder) {
+          itemLabel = 'Gói Ai eo VIP (1 Tháng Full Quyền)';
+          amount = Number(cfg.aieoVipPrice) >= 0 ? cfg.aieoVipPrice : AIEO_VIP_PRICE_VND;
+          alreadyUnlocked = !renewFlag && Number(viewerUser?.aieoVipExpiresAt) > Date.now();
         }
 
         if (alreadyUnlocked) {
@@ -4464,9 +4804,16 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       const itemUnlocked = matched?.itemType === 'title'
         ? Boolean(
             isViewerSuperAdmin ||
-            (Array.isArray(viewerUser?.purchasedTitleIds) && viewerUser.purchasedTitleIds.includes(matched.itemId)) ||
+            (Array.isArray(viewerUser?.purchasedTitleIds) &&
+              viewerUser.purchasedTitleIds.includes(matched.itemId) &&
+              ((Number(viewerUser?.purchasedTitleExpiries?.[matched.itemId]) || 0) === 0 ||
+                Number(viewerUser.purchasedTitleExpiries[matched.itemId]) > Date.now())) ||
             (Array.isArray(viewerUser?.grantedTitleIds) && viewerUser.grantedTitleIds.includes(matched.itemId))
           )
+        : matched?.itemType === 'skill_pass'
+        ? hasSkillPracticeAccess(viewerUser)
+        : matched?.itemType === 'aieo_vip'
+        ? (isViewerSuperAdmin || Number(viewerUser?.aieoVipExpiresAt) > Date.now())
         : hasCustomCoverPermission(viewerUser);
       sendJsonResponse(res, 200, {
         ok: true,
@@ -4583,19 +4930,71 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         matchedOrder.gateway = gateway;
 
         if (targetKey && targetUser) {
+          const nowMs = Date.now();
           if (matchedOrder.itemType === 'title' && matchedOrder.itemId) {
             const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds : [];
             const nextPurchased = Array.from(new Set([...prevPurchased, matchedOrder.itemId]));
+            const prevExpiries = targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
+              ? targetUser.purchasedTitleExpiries
+              : {};
+            const baseExp = Math.max(nowMs, Number(prevExpiries[matchedOrder.itemId]) || 0);
+            const nextExp = baseExp + SUBSCRIPTION_DURATION_MS;
             store.users[targetKey] = {
               ...targetUser,
               purchasedTitleIds: nextPurchased,
+              purchasedTitleExpiries: { ...prevExpiries, [matchedOrder.itemId]: nextExp },
               ...(targetUser.paidTitleRequested?.titleId === matchedOrder.itemId ? { paidTitleRequested: null } : {})
             };
             appendStoreNotification(
               store,
               {
-                title: '🎉 Đã mở khóa Danh Hiệu VIP tự động!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId}. Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web & server học tập!`,
+                title: '🎉 Đã mở khóa Danh Hiệu VIP (1 Tháng)!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và kích hoạt danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId} trong 30 ngày. Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web & server học tập!`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+          } else if (matchedOrder.itemType === 'skill_pass') {
+            const baseExp = Math.max(nowMs, Number(targetUser.skillPracticeExpiresAt) || 0);
+            store.users[targetKey] = {
+              ...targetUser,
+              skillPracticeExpiresAt: baseExp + SUBSCRIPTION_DURATION_MS,
+              ...(targetUser.subscriptionRequested?.itemType === 'skill_pass' ? { subscriptionRequested: null } : {})
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '🎉 Đã kích hoạt Gói Bài Tập 4 Kỹ Năng (1 Tháng)!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa 30 ngày sử dụng đầy đủ Khu Bài Tập 4 Kỹ Năng & Đề Lẻ! Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+          } else if (matchedOrder.itemType === 'aieo_vip') {
+            const baseVipExp = Math.max(nowMs, Number(targetUser.aieoVipExpiresAt) || 0);
+            const nextVipExp = baseVipExp + SUBSCRIPTION_DURATION_MS;
+            const nextSkillExp = Math.max(Number(targetUser.skillPracticeExpiresAt) || 0, nextVipExp);
+            const autoEquipVip = !targetUser.equippedTitleId || targetUser.equippedTitleId === 'newbie';
+            store.users[targetKey] = {
+              ...targetUser,
+              aieoVipExpiresAt: nextVipExp,
+              skillPracticeExpiresAt: nextSkillExp,
+              vipRedNameEnabled: targetUser.vipRedNameEnabled !== undefined ? Boolean(targetUser.vipRedNameEnabled) : true,
+              vipTagEnabled: targetUser.vipTagEnabled !== undefined ? Boolean(targetUser.vipTagEnabled) : true,
+              ...(autoEquipVip ? { equippedTitleId: 'aieo_vip', showTitleBadge: true } : {}),
+              ...(targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '👑 Chào mừng thành viên Gói Ai eo VIP (1 Tháng)!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Bài tập 4 Kỹ năng miễn phí, Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè & Chữ Đỏ + Nhãn AIEOVIP! Cảm ơn bạn đã ủng hộ Tuấn!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -4604,18 +5003,20 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               null
             );
           } else {
+            const baseCoverExp = Math.max(nowMs, Number(targetUser.customCoverExpiresAt) || 0);
             store.users[targetKey] = {
               ...targetUser,
               customCoverUnlocked: true,
-              customCoverUnlockedAt: Date.now(),
+              customCoverUnlockedAt: nowMs,
+              customCoverExpiresAt: baseCoverExp + SUBSCRIPTION_DURATION_MS,
               customCoverUnlockedBy: `auto_${gateway}`,
               coverUnlockRequestedAt: 0
             };
             appendStoreNotification(
               store,
               {
-                title: '🎉 Đã mở khóa Ảnh Nền Riêng tự động!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ ngay bây giờ! Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
+                title: '🎉 Đã mở khóa Ảnh Nền Riêng (1 Tháng)!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ trong 30 ngày! Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -4733,14 +5134,15 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           res.end(JSON.stringify({ ok: false, error: 'Phòng đấu này đã kết thúc. Vui lòng xin mã phòng mới.' }));
           return;
         }
-        if (viewer.role !== 'teacher' && normRoom.pass && String(normRoom.pass).trim() !== cleanPass) {
+        const isRoomHostJoin = Boolean(normRoom.roomMode === 'friend_vip' && normRoom.hostUsername === viewer.username);
+        if (viewer.role !== 'teacher' && !isRoomHostJoin && normRoom.pass && String(normRoom.pass).trim() !== cleanPass) {
           res.statusCode = 403;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ ok: false, error: 'Mật khẩu phòng không chính xác. Vui lòng thử lại.' }));
           return;
         }
         const alreadyJoined = Boolean(normRoom.lobbyPlayers?.[viewer.username]);
-        if (normRoom.status === 'PLAYING' && !alreadyJoined && viewer.role !== 'teacher') {
+        if (normRoom.status === 'PLAYING' && !alreadyJoined && viewer.role !== 'teacher' && !isRoomHostJoin) {
           res.statusCode = 403;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ ok: false, error: 'Trận đấu đang diễn ra! Hãy bảo Giáo viên bấm Mở Sảnh Mới.' }));
@@ -4754,11 +5156,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           username: viewer.username,
           name: viewer.name || viewer.username,
           role: viewer.role,
+          isHost: isRoomHostJoin || viewer.role === 'teacher',
           colorId: pilot.colorId || existingPlayer?.colorId || 'cyan',
           animalId: pilot.animalId || existingPlayer?.animalId || 'cat',
           accessoryId: pilot.accessoryId || existingPlayer?.accessoryId || 'crown',
           avatarUrl: viewer.avatarUrl || '',
-          ready: viewer.role === 'teacher' ? true : Boolean(existingPlayer?.ready),
+          approved: normRoom.roomMode === 'friend_vip' ? true : Boolean(existingPlayer?.approved),
+          ready: (viewer.role === 'teacher' || isRoomHostJoin) ? true : Boolean(existingPlayer?.ready),
           chat: existingPlayer?.chat || '',
           chatAt: existingPlayer?.chatAt || 0,
           joinedAt: existingPlayer?.joinedAt || Date.now()

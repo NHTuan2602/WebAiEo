@@ -21,12 +21,15 @@ import {
 import { formatDurationVi } from '../constants/seedData';
 import { getWordCount, isObjectiveAnswerCorrect } from '../utils/examHelpers';
 import SpeakingQuestionLuyennoiCard from '../components/speaking/SpeakingQuestionLuyennoiCard';
+import VipMemberName from '../components/common/VipMemberName';
 
 export default function ResultView({
   aiApiKey,
+  aiConfigured = false,
   aiGradingStep,
   attempts,
   currentUser,
+  usersDb = {},
   handleGradeSpeakingWithAI,
   handleGradeWritingWithAI,
   isGradingAI,
@@ -590,8 +593,14 @@ export default function ResultView({
                     }`}
                   >
                     <div className="min-w-0">
-                      <p className="font-extrabold text-slate-900 dark:text-white truncate">
-                        #{idx + 1} {row.studentName} {row.isCurrentUser ? '(Bạn)' : ''}
+                      <p className="font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1 flex-wrap">
+                        <span>#{idx + 1}</span>
+                        <VipMemberName
+                          user={usersDb?.[row.studentId] || (row.studentId === currentUser?.username ? currentUser : null)}
+                          fallbackName={row.studentName}
+                          badgeSize="xs"
+                        />
+                        {row.isCurrentUser && <span className="text-[10px] text-[#007A7A] dark:text-[#1EE1D6]">(Bạn)</span>}
                       </p>
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">
                         {row.durationSeconds > 0 ? formatDurationVi(row.durationSeconds) : row.submittedAt}
@@ -721,7 +730,7 @@ export default function ResultView({
                   title="Cài đặt API Key (Gemini)"
                 >
                   <Key className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{aiApiKey ? 'API Key (Đã lưu)' : 'Cấu hình API Key'}</span>
+                  <span>{aiApiKey ? 'API Key (Đã lưu)' : aiConfigured ? 'API Key (Đồng bộ Server)' : 'Cấu hình API Key'}</span>
                 </button>
 
                 <button

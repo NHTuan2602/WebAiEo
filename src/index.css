@@ -90,7 +90,10 @@ html.dark .lexi-card:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .lexi-card,
-  .animate-crewmate-bob {
+  .animate-crewmate-bob,
+  .vip-shimmer-badge,
+  .vip-shimmer-badge::after,
+  .vip-avatar-aura {
     transition: none !important;
     animation: none !important;
   }
@@ -106,6 +109,37 @@ html.dark .lexi-card:hover {
 
 .animate-crewmate-bob {
   animation: crewmateBob 2.2s ease-in-out infinite;
+}
+
+@keyframes vipSheenSweep {
+  0% { transform: translateX(-140%) skewX(-18deg); }
+  55%, 100% { transform: translateX(220%) skewX(-18deg); }
+}
+
+@keyframes vipAuraPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55), 0 0 14px rgba(239, 68, 68, 0.28); }
+  50% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9), 0 0 22px rgba(239, 68, 68, 0.45); }
+}
+
+.vip-shimmer-badge {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.vip-shimmer-badge::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.52), transparent);
+  animation: vipSheenSweep 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.vip-avatar-aura {
+  animation: vipAuraPulse 2.8s ease-in-out infinite;
 }
 
 html.dark {

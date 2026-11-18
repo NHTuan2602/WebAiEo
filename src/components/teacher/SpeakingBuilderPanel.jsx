@@ -25,6 +25,7 @@ import { pickSupportedAudioMimeType, uploadSpeakingRecording } from '../../utils
 
 export default function SpeakingBuilderPanel({
   aiApiKey,
+  aiConfigured = false,
   onChangeSpeaking,
   setApiTestState,
   setShowApiKeyModal,
@@ -275,9 +276,11 @@ export default function SpeakingBuilderPanel({
     showToast?.('Đã nạp bộ câu hỏi mẫu IELTS Speaking (Part 1, Part 2 & Part 3)!');
   };
 
+  const hasGeminiAccess = Boolean((aiApiKey || '').trim() || aiConfigured);
+
   const handleAiGenerateSpeaking = async () => {
     const cleanKey = (aiApiKey || '').trim();
-    if (!cleanKey) {
+    if (!hasGeminiAccess) {
       showToast?.('Vui lòng cấu hình Google Gemini API Key trước để dùng AI tạo bộ câu hỏi.', 'info');
       setApiTestState?.({ testing: false, ok: null, message: '', model: '' });
       setShowApiKeyModal?.(true);
@@ -357,7 +360,7 @@ export default function SpeakingBuilderPanel({
             />
           </div>
           <div className="flex items-center gap-2">
-            {!aiApiKey?.trim() && (
+            {!hasGeminiAccess && (
               <button
                 type="button"
                 onClick={() => {

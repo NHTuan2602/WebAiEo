@@ -55,18 +55,24 @@ import { canViewerSeeMember, formatDurationVi, normalizeExamConfig } from '../co
 import { countExtensionCheatSignals, getRiskAssessment, readImageFileAsDataUrl } from '../utils/examHelpers';
 import ImageCropperModal from '../components/modals/ImageCropperModal';
 import {
+  AIEO_VIP_PRICE_VND,
   AVATAR_FRAMES,
   PROFILE_BANNERS,
+  SKILL_PASS_PRICE_VND,
   buildVietQrImageUrl,
+  formatRemainingSubscriptionText,
   formatVndCurrency,
   getProfileBannerById,
+  hasActiveAieoVip,
   hasCustomCoverPermission,
+  hasSkillPracticeAccess,
   normalizePaymentConfig,
   resolveStudentTitleSummary,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 import CoverCheckoutModal from '../components/modals/CoverCheckoutModal';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
+import VipMemberName from '../components/common/VipMemberName';
 
 export default function StudentProfile({
   adminFeedbacks = [],
@@ -79,11 +85,13 @@ export default function StudentProfile({
   handleTeacherOpenLobby,
   handleUpdateUserProfileFields,
   onGrantUserTitles,
+  onNavigateAfterPurchase = null,
   onOpenAccountSecurity,
   onOpenAdminTitleManager,
   onPullSync = null,
   onRequestCoverUnlock = null,
   onToggleUserCoverUnlock = null,
+  onToggleUserSubscription = null,
   openStudentGamePortal,
   paymentConfig = null,
   previousView,
@@ -120,6 +128,7 @@ export default function StudentProfile({
   const [checkoutModalState, setCheckoutModalState] = useState(null);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
   const [isTogglingCoverUnlock, setIsTogglingCoverUnlock] = useState(false);
+  const [isTogglingSubscription, setIsTogglingSubscription] = useState(false);
   const [coverCropSource, setCoverCropSource] = useState('');
   const [customDraft, setCustomDraft] = useState({
     profileBannerId: 'ocean',
@@ -163,9 +172,22 @@ export default function StudentProfile({
   const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles, paymentConfig);
   const heroBanner = getProfileBannerById(student.profileBannerId);
   const studentHasCoverPermission = hasCustomCoverPermission(student);
+  const studentHasSkillPass = hasSkillPracticeAccess(student);
+  const studentHasAieoVip = hasActiveAieoVip(student);
   const canUseCustomCover = canEditTargetInfo && (isTeacherViewer || studentHasCoverPermission);
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
   const unlockPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
+  const skillPassPriceLabel = formatVndCurrency(normalizedPayCfg.skillPassPrice ?? SKILL_PASS_PRICE_VND);
+  const aieoVipPriceLabel = formatVndCurrency(normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
+  const coverRemainingText = student.customCoverExpiresAt > Date.now()
+    ? formatRemainingSubscriptionText(student.customCoverExpiresAt)
+    : '';
+  const skillPassRemainingText = student.skillPracticeExpiresAt > Date.now()
+    ? formatRemainingSubscriptionText(student.skillPracticeExpiresAt)
+    : '';
+  const aieoVipRemainingText = student.aieoVipExpiresAt > Date.now()
+    ? formatRemainingSubscriptionText(student.aieoVipExpiresAt)
+    : '';
   const hasCustomCover = Boolean(
     studentHasCoverPermission &&
     student.profileCoverUrl &&
@@ -334,6 +356,94 @@ export default function StudentProfile({
     }
   }
 
+  const renderVipAppearanceSwitches = () => {
+    if (!isSelf || (!studentHasAieoVip && !isTargetSystemAdmin) || !handleUpdateUserProfileFields) {
+      return null;
+    }
+    const redOn = student.vipRedNameEnabled !== false;
+    const tagOn = student.vipTagEnabled !== false;
+    return (
+      <div className="mt-4 pt-4 border-t border-rose-200/80 dark:border-rose-500/30 space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-extrabold text-rose-800 dark:text-rose-200 flex items-center gap-1.5">
+            <Crown className="w-4 h-4 text-amber-500" />
+            Tùy Chỉnh Hiển Thị Ai eo VIP (Bật / Tắt Độc Lập)
+          </p>
+          <span className="text-[11px] bg-white/90 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-rose-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            Xem trước: <VipMemberName user={student} fallbackName={student.name} badgeSize="xs" />
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={redOn}
+            onClick={() =>
+              handleUpdateUserProfileFields(student.username, {
+                vipRedNameEnabled: !redOn,
+                customToast: !redOn
+                  ? 'Đã BẬT màu chữ ĐỎ VIP cho tên hiển thị!'
+                  : 'Đã TẮT màu chữ đỏ VIP.'
+              })
+            }
+            className={`p-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition ${
+              redOn
+                ? 'bg-red-50/90 dark:bg-red-500/15 border-red-300 dark:border-red-500/40'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <div>
+              <p className="text-xs font-extrabold text-slate-900 dark:text-white">Màu Chữ Đỏ VIP</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Hiện tên màu đỏ nổi bật trên Navbar, Hồ sơ &amp; BXH
+              </p>
+            </div>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                redOn ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              {redOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={tagOn}
+            onClick={() =>
+              handleUpdateUserProfileFields(student.username, {
+                vipTagEnabled: !tagOn,
+                customToast: !tagOn
+                  ? 'Đã BẬT huy hiệu AIEOVIP bên cạnh tên!'
+                  : 'Đã TẮT huy hiệu AIEOVIP.'
+              })
+            }
+            className={`p-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition ${
+              tagOn
+                ? 'bg-amber-50/90 dark:bg-amber-500/15 border-amber-300 dark:border-amber-500/40'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <div>
+              <p className="text-xs font-extrabold text-slate-900 dark:text-white">Nhãn AIEOVIP Cạnh Tên</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Hiện huy hiệu AIEOVIP ánh kim bên cạnh tên của bạn
+              </p>
+            </div>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                tagOn ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              {tagOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Navigation & Header Controls */}
@@ -382,11 +492,22 @@ export default function StudentProfile({
               {isSelf && !studentHasCoverPermission && (
                 <button
                   type="button"
-                  onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Ảnh Nền Riêng', itemPrice: normalizedPayCfg.coverUnlockPrice })}
+                  onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Ảnh Nền Riêng (1 Tháng)', itemPrice: normalizedPayCfg.coverUnlockPrice })}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold shadow-md transition"
                 >
                   <Lock className="w-3.5 h-3.5" />
-                  <span>Mở Ảnh Nền ({unlockPriceLabel})</span>
+                  <span>Mở Ảnh Nền ({unlockPriceLabel}/1T)</span>
+                </button>
+              )}
+              {isSelf && studentHasCoverPermission && !isTargetTeacher && !isTargetSystemAdmin && student.customCoverExpiresAt > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Gia Hạn Ảnh Nền Riêng (+1 Tháng)', itemPrice: normalizedPayCfg.coverUnlockPrice, renew: true })}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/90 hover:bg-amber-600 text-white text-xs font-extrabold shadow-md transition"
+                  title="Gia hạn thêm 30 ngày quyền Ảnh Nền Riêng"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Gia hạn ({coverRemainingText || '30 ngày'})</span>
                 </button>
               )}
               <button
@@ -445,11 +566,11 @@ export default function StudentProfile({
               <div className="space-y-2 min-w-0 sm:pb-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0F172B] dark:text-white leading-tight">
-                    {student.name}
+                    <VipMemberName user={student} fallbackName={student.name} nameClassName="text-[#0F172B] dark:text-white" />
                   </h1>
                   {isTargetSystemAdmin ? (
                     <span className="text-xs bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                      <ShieldAlert className="w-3 h-3" /> Quản Trị Hệ Thống &bull; Góp Ý Tính Năng
+                      <ShieldAlert className="w-3 h-3" /> ADMIN &bull; Quản Trị Hệ Thống
                     </span>
                   ) : isTargetTeacher ? (
                     <span className="text-xs bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
@@ -580,6 +701,50 @@ export default function StudentProfile({
                       )}
                     </button>
                   )}
+                  {isViewerSuperAdmin && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserSubscription && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isTogglingSubscription}
+                        onClick={async () => {
+                          if (student.skillPracticeExpiresAt > Date.now() && !window.confirm(`Thu hồi gói Bài Tập 4 Kỹ Năng của ${student.name || student.username}?`)) {
+                            return;
+                          }
+                          setIsTogglingSubscription(true);
+                          await onToggleUserSubscription(student.username, 'skill_pass', !(student.skillPracticeExpiresAt > Date.now()));
+                          setIsTogglingSubscription(false);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
+                          student.skillPracticeExpiresAt > Date.now()
+                            ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-white hover:bg-sky-50 dark:bg-slate-800 border-sky-300 dark:border-sky-500/40 text-sky-700 dark:text-sky-300'
+                        }`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        {student.skillPracticeExpiresAt > Date.now() ? '✓ Đang mở 4 Kỹ Năng (1T)' : '+ Mở 4 Kỹ Năng (1T)'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isTogglingSubscription}
+                        onClick={async () => {
+                          if (studentHasAieoVip && !window.confirm(`Thu hồi gói Ai eo VIP của ${student.name || student.username}?`)) {
+                            return;
+                          }
+                          setIsTogglingSubscription(true);
+                          await onToggleUserSubscription(student.username, 'aieo_vip', !studentHasAieoVip);
+                          setIsTogglingSubscription(false);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
+                          studentHasAieoVip
+                            ? 'bg-gradient-to-r from-red-500 to-amber-500 text-white border-amber-300 shadow-xs'
+                            : 'bg-white hover:bg-rose-50 dark:bg-slate-800 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300'
+                        }`}
+                      >
+                        <Crown className="w-3.5 h-3.5" />
+                        {studentHasAieoVip ? '✓ Đang mở Ai eo VIP (1T)' : '+ Cấp Ai eo VIP (1T)'}
+                      </button>
+                    </>
+                  )}
                   {isSelf && onOpenAccountSecurity && (
                     <>
                       <button
@@ -680,6 +845,22 @@ export default function StudentProfile({
 
         return (
         <div className="space-y-6">
+          {isSelf && (
+            <div className="bg-gradient-to-r from-rose-50 via-white to-amber-50 dark:from-rose-950/30 dark:via-slate-900 dark:to-amber-950/25 rounded-3xl border border-rose-200 dark:border-rose-500/35 p-5 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Crown className="w-4 h-4 text-amber-500" /> Đặc Quyền Hiển Thị ADMIN / Ai eo VIP
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Quản trị viên có thể bật/tắt nhanh chữ màu đỏ VIP và nhãn AIEOVIP cạnh tên hiển thị.
+                  </p>
+                </div>
+              </div>
+              {renderVipAppearanceSwitches()}
+            </div>
+          )}
+
           {/* Dedicated Admin Donate / Web Maintenance QR Card */}
           <div className="bg-gradient-to-br from-amber-50 via-white to-rose-50/70 dark:from-amber-950/30 dark:via-slate-900 dark:to-rose-950/25 rounded-3xl border border-amber-300/80 dark:border-amber-500/35 shadow-sm p-5 sm:p-6">
             <div className="flex flex-col md:flex-row items-center gap-5">
@@ -1260,6 +1441,172 @@ export default function StudentProfile({
             )}
           </div>
 
+      {/* Gói Thành Viên 1 Tháng & Tùy Chỉnh Ai eo VIP */}
+      {(isSelf || isViewerSuperAdmin) && (
+        <div className="bg-gradient-to-br from-rose-50/90 via-white to-amber-50/80 dark:from-rose-950/25 dark:via-slate-900 dark:to-amber-950/20 rounded-3xl border border-rose-200/90 dark:border-rose-500/35 shadow-sm p-5 sm:p-6 mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-rose-200/70 dark:border-slate-800">
+            <div>
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <Crown className="w-5 h-5 text-amber-500" />
+                Gói Thành Viên 1 Tháng &amp; Đặc Quyền Ai eo VIP
+              </h2>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                Mở khóa 30 ngày luyện Bài Tập 4 Kỹ Năng, Ảnh Bìa Riêng hoặc nâng cấp trọn bộ Ai eo VIP cùng bạn bè.
+              </p>
+            </div>
+            {studentHasAieoVip && (
+              <span className="vip-shimmer-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white text-xs font-black shadow-sm">
+                <Crown className="w-3.5 h-3.5 text-amber-200" />
+                AIEOVIP Active {aieoVipRemainingText ? `• ${aieoVipRemainingText}` : ''}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4">
+            {/* Card 1: Gói 4 Kỹ Năng (20k / 1 tháng) */}
+            <div className={`rounded-2xl border p-4 flex flex-col justify-between gap-3 ${
+              studentHasSkillPass
+                ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+            }`}>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-sky-700 dark:text-sky-300 flex items-center gap-1">
+                    <BookOpen className="w-4 h-4" /> Bài Tập 4 Kỹ Năng
+                  </span>
+                  <span className="text-[11px] font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                    {skillPassPriceLabel}/1T
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Mở toàn bộ bài tập Đọc, Nghe, Viết, Nói &amp; Phòng thi Speaking chấm AI trong 1 tháng.
+                </p>
+                <p className={`text-[11px] font-bold ${studentHasSkillPass ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                  {studentHasAieoVip && !(student.skillPracticeExpiresAt > Date.now())
+                    ? '✓ Đang mở miễn phí kèm Ai eo VIP'
+                    : skillPassRemainingText
+                    ? `✓ Đang hoạt động (${skillPassRemainingText})`
+                    : 'Chưa kích hoạt'}
+                </p>
+              </div>
+              {isSelf && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCheckoutModalState({
+                      itemType: 'skill_pass',
+                      itemId: '',
+                      itemLabel: 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
+                      itemPrice: normalizedPayCfg.skillPassPrice ?? SKILL_PASS_PRICE_VND,
+                      renew: student.skillPracticeExpiresAt > Date.now()
+                    })
+                  }
+                  className="w-full py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold transition"
+                >
+                  {student.skillPracticeExpiresAt > Date.now()
+                    ? `Gia hạn +30N (${skillPassPriceLabel})`
+                    : `Mở Gói 1 Tháng (${skillPassPriceLabel})`}
+                </button>
+              )}
+            </div>
+
+            {/* Card 2: Gói Ai eo VIP (80k / 1 tháng) */}
+            <div className={`rounded-2xl border p-4 flex flex-col justify-between gap-3 relative overflow-hidden ${
+              studentHasAieoVip
+                ? 'bg-gradient-to-br from-rose-50 via-amber-50 to-white dark:from-rose-950/35 dark:via-amber-950/20 dark:to-slate-900 border-amber-400 dark:border-amber-500/60 shadow-sm'
+                : 'bg-gradient-to-br from-amber-50/70 via-white to-rose-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-rose-950/20 border-rose-300 dark:border-rose-500/40'
+            }`}>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-red-600 dark:text-rose-300 flex items-center gap-1">
+                    <Crown className="w-4 h-4 text-amber-500" /> Gói Ai eo VIP
+                  </span>
+                  <span className="text-[11px] font-black text-white bg-gradient-to-r from-red-600 to-amber-500 px-2 py-0.5 rounded-full">
+                    {aieoVipPriceLabel}/1T
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                  • Free 4 Kỹ Năng (1T) • Danh hiệu <b>👑 Ai eo VIP</b> • Tạo phòng Đấu Trường cùng bạn bè • Tên Đỏ + Nhãn <b>AIEOVIP</b>.
+                </p>
+                <p className={`text-[11px] font-bold ${studentHasAieoVip ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                  {studentHasAieoVip
+                    ? `✓ Đang mở VIP (${aieoVipRemainingText || '30 ngày'})`
+                    : 'Gói quyền lực nhất tháng'}
+                </p>
+              </div>
+              {isSelf && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCheckoutModalState({
+                      itemType: 'aieo_vip',
+                      itemId: '',
+                      itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                      itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND,
+                      renew: studentHasAieoVip
+                    })
+                  }
+                  className="vip-shimmer-badge w-full py-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black transition shadow-sm"
+                >
+                  {studentHasAieoVip
+                    ? `Gia hạn VIP +30N (${aieoVipPriceLabel})`
+                    : `Đăng Ký Ai eo VIP (${aieoVipPriceLabel})`}
+                </button>
+              )}
+            </div>
+
+            {/* Card 3: Ảnh Nền Riêng (5k / 1 tháng) */}
+            <div className={`rounded-2xl border p-4 flex flex-col justify-between gap-3 ${
+              studentHasCoverPermission
+                ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+            }`}>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                    <Camera className="w-4 h-4" /> Ảnh Nền Cá Nhân
+                  </span>
+                  <span className="text-[11px] font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                    {unlockPriceLabel}/1T
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Tải &amp; cắt ảnh bìa cá nhân tùy thích cho hồ sơ (gói 1 tháng).
+                </p>
+                <p className={`text-[11px] font-bold ${studentHasCoverPermission ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                  {studentHasCoverPermission
+                    ? coverRemainingText
+                      ? `✓ Đang mở (${coverRemainingText})`
+                      : '✓ Đang mở khóa'
+                    : 'Chưa mở khóa'}
+                </p>
+              </div>
+              {isSelf && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCheckoutModalState({
+                      itemType: 'cover',
+                      itemId: '',
+                      itemLabel: studentHasCoverPermission ? 'Gia Hạn Ảnh Nền Riêng (+1 Tháng)' : 'Ảnh Nền Riêng (1 Tháng)',
+                      itemPrice: normalizedPayCfg.coverUnlockPrice,
+                      renew: studentHasCoverPermission && student.customCoverExpiresAt > 0
+                    })
+                  }
+                  className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold transition"
+                >
+                  {studentHasCoverPermission && student.customCoverExpiresAt > 0
+                    ? `Gia hạn +30N (${unlockPriceLabel})`
+                    : `Mở Ảnh Nền (${unlockPriceLabel})`}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {renderVipAppearanceSwitches()}
+        </div>
+      )}
+
       {/* SECTION 1: TIẾN TRÌNH & ĐỘT PHÁ ĐIỂM SỐ QUA CÁC LẦN THI (SCORE PROGRESSION TIMELINE) */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 mb-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -1773,9 +2120,12 @@ export default function StudentProfile({
                       <UserAvatarBadge user={member} sizeClass="w-10 h-10" textClass="text-xs" rounded="rounded-xl" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {member.name || member.username}
-                          </span>
+                          <VipMemberName
+                            user={member}
+                            fallbackName={member.name || member.username}
+                            className="text-xs font-bold text-slate-900 dark:text-white truncate"
+                            badgeSize="xs"
+                          />
                           {isMeChip && (
                             <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 shrink-0">
                               Bạn
@@ -1784,12 +2134,12 @@ export default function StudentProfile({
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 flex-wrap mt-0.5">
                           {(() => {
-                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles);
+                            const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles, paymentConfig);
                             if (isMemberAdmin) {
                               return (
                                 <>
                                   <span className="text-purple-700 dark:text-purple-300 font-bold inline-flex items-center gap-1">
-                                    Quản trị &bull; Góp ý
+                                    ADMIN &bull; Góp ý
                                     {newFeedbacksCount > 0 && (
                                       <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
                                         {newFeedbacksCount} mới
@@ -1850,7 +2200,7 @@ export default function StudentProfile({
         const checkinTitleCount = allTitleItems.filter(i => i.difficulty === 'Điểm Danh').length;
         const secretTitleCount = allTitleItems.filter(i => i.isSecretTitle || i.difficulty === 'Bí Ẩn').length;
         const holidayTitleCount = allTitleItems.filter(i => i.isHolidayTitle).length;
-        const vipTitleCount = allTitleItems.filter(i => i.isPaidTitle).length;
+        const vipTitleCount = allTitleItems.filter(i => i.isPaidTitle || i.isVipBundleTitle).length;
         const filteredTitles = allTitleItems.filter(item => {
           if (titleFilter === 'unlocked') return item.unlocked;
           if (titleFilter === 'locked') return !item.unlocked;
@@ -1860,12 +2210,13 @@ export default function StudentProfile({
           if (titleFilter === 'checkin') return item.difficulty === 'Điểm Danh';
           if (titleFilter === 'secret') return item.isSecretTitle || item.difficulty === 'Bí Ẩn';
           if (titleFilter === 'holiday') return item.isHolidayTitle;
-          if (titleFilter === 'vip') return item.isPaidTitle;
+          if (titleFilter === 'vip') return item.isPaidTitle || item.isVipBundleTitle;
           return true;
         });
         const diffBadgeCls = (diff) => {
+          if (diff === 'VIP Độc Quyền') return 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-amber-300 shadow-xs';
           if (diff === 'Độc Quyền') return 'bg-purple-100 text-purple-900 border-purple-400 dark:bg-purple-500/25 dark:text-purple-200 dark:border-purple-400/50';
-          if (diff === 'Phú Quý') return 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 border-amber-400 dark:from-amber-500/25 dark:to-yellow-500/25 dark:text-amber-100 dark:border-amber-400/60';
+          if (diff === 'Phú Quý') return 'vip-shimmer-badge bg-gradient-to-r from-amber-200 via-yellow-200 to-amber-300 text-amber-950 border-amber-400 shadow-xs';
           if (diff === 'Bí Ẩn') return 'bg-slate-900 text-amber-200 border-amber-400/70 dark:bg-slate-800 dark:text-amber-200 dark:border-amber-400/70';
           if (diff === 'Lễ Hội') return 'bg-gradient-to-r from-pink-100 to-rose-100 text-rose-800 border-rose-300 dark:from-pink-500/25 dark:to-rose-500/25 dark:text-rose-200 dark:border-rose-400/50';
           if (diff === 'Điểm Danh') return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50';
@@ -1979,11 +2330,16 @@ export default function StudentProfile({
                 {filteredTitles.map(item => {
                   const isEquipped = titleSummary.title?.id === item.id;
                   const maskSecret = Boolean(item.isSecretTitle && !item.unlocked && !isViewerSuperAdmin);
+                  const isLuxuryVipCard = Boolean(item.isPaidTitle || item.isVipBundleTitle);
                   return (
                     <div
                       key={item.id}
                       className={`p-4 rounded-2xl border transition flex flex-col justify-between gap-3 ${
-                        item.unlocked
+                        isLuxuryVipCard
+                          ? isEquipped
+                            ? 'bg-gradient-to-br from-amber-50 via-rose-50 to-white dark:from-amber-950/40 dark:via-rose-950/30 dark:to-slate-900 border-amber-400 ring-2 ring-amber-400/35 shadow-md'
+                            : 'bg-gradient-to-br from-amber-50/75 via-white to-rose-50/60 dark:from-amber-950/25 dark:via-slate-900 dark:to-rose-950/20 border-amber-300/80 dark:border-amber-500/40 shadow-sm'
+                          : item.unlocked
                           ? isEquipped
                             ? 'bg-[#EDFFFD]/90 dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/15'
                             : 'bg-white dark:bg-slate-800/80 border-emerald-200 dark:border-emerald-500/30 shadow-xs'
@@ -2069,6 +2425,24 @@ export default function StudentProfile({
                             )}
                           </button>
                         )}
+                        {isSelf && item.unlocked && item.isPaidTitle && item.unlockedByPurchase && item.expiresAt > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowTitlesModal(false);
+                              setCheckoutModalState({
+                                itemType: 'title',
+                                itemId: item.id,
+                                itemLabel: `${item.icon} ${item.label} (+1 Tháng)`,
+                                itemPrice: item.priceVnd,
+                                renew: true
+                              });
+                            }}
+                            className="w-full py-1.5 rounded-xl text-[11px] font-extrabold transition flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40"
+                          >
+                            <Clock className="w-3 h-3" /> Gia hạn +30N ({formatVndCurrency(item.priceVnd)})
+                          </button>
+                        )}
                         {isSelf && !item.unlocked && item.isPaidTitle && (
                           <button
                             type="button"
@@ -2077,13 +2451,30 @@ export default function StudentProfile({
                               setCheckoutModalState({
                                 itemType: 'title',
                                 itemId: item.id,
-                                itemLabel: `${item.icon} ${item.label}`,
+                                itemLabel: `${item.icon} ${item.label} (1 Tháng)`,
                                 itemPrice: item.priceVnd
                               });
                             }}
-                            className="w-full py-2 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs"
+                            className="vip-shimmer-badge w-full py-2 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xs"
                           >
-                            <Sparkles className="w-3.5 h-3.5" /> Mua Mở Khóa ({formatVndCurrency(item.priceVnd)})
+                            <Sparkles className="w-3.5 h-3.5" /> Mua 1 Tháng ({formatVndCurrency(item.priceVnd)})
+                          </button>
+                        )}
+                        {isSelf && !item.unlocked && item.isVipBundleTitle && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowTitlesModal(false);
+                              setCheckoutModalState({
+                                itemType: 'aieo_vip',
+                                itemId: '',
+                                itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                                itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                              });
+                            }}
+                            className="vip-shimmer-badge w-full py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white shadow-xs"
+                          >
+                            <Crown className="w-3.5 h-3.5" /> Đăng Ký Gói Ai eo VIP ({aieoVipPriceLabel}/1T)
                           </button>
                         )}
                         {isViewerSuperAdmin && !isTargetSystemAdmin && onGrantUserTitles && !item.isRoleBuiltIn && item.id !== 'newbie' && (() => {
@@ -2415,10 +2806,12 @@ export default function StudentProfile({
           itemId={checkoutModalState.itemId || ''}
           itemLabel={checkoutModalState.itemLabel || ''}
           itemPrice={checkoutModalState.itemPrice}
+          renew={Boolean(checkoutModalState.renew)}
           currentUser={student}
           paymentConfig={paymentConfig}
           onClose={() => setCheckoutModalState(null)}
           onUnlockedReady={() => openCustomizeModal()}
+          onNavigateAfterPurchase={onNavigateAfterPurchase}
           onEquipPurchasedTitle={tid => {
             if (!tid || !handleUpdateUserProfileFields) return;
             handleUpdateUserProfileFields(student.username, {

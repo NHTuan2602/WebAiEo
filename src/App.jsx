@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { normalizeBrandTeacherUser } from './constants/brandInfo';
 import {
-  resolveStudentTitleSummary,
-  evaluateTitleUnlockNotification
+  AIEO_VIP_PRICE_VND,
+  SKILL_PASS_PRICE_VND,
+  evaluateTitleUnlockNotification,
+  hasSkillPracticeAccess,
+  normalizePaymentConfig,
+  resolveStudentTitleSummary
 } from './constants/profileCustomization';
 import {
   DEFAULT_VOCAB_TEXT,
+  VOCAB_PRESETS,
   GAME_ROUND_TIME_LIMITS,
   DEFAULT_SECTION_ORDER,
   DEFAULT_SECTION_DURATIONS,
@@ -78,6 +83,7 @@ import MailConfigModal from './components/modals/MailConfigModal';
 import PaymentConfigModal from './components/modals/PaymentConfigModal';
 import AdminTitleManagerModal from './components/modals/AdminTitleManagerModal';
 import TitleUnlockedCelebrationModal from './components/modals/TitleUnlockedCelebrationModal';
+import CoverCheckoutModal from './components/modals/CoverCheckoutModal';
 import AuthScreen from './pages/AuthScreen';
 import StudentHome from './pages/StudentHome';
 import SkillPracticeHub from './pages/SkillPracticeHub';
@@ -208,7 +214,7 @@ export default function App() {
             d => !injectedTags.includes(d.seedTag) && !existingIds.has(d.id)
           );
           markAllTagged();
-          return pendingNewSeeds.length > 0 ? [...pendingNewSeeds, ...normalizedSaved] : normalizedSaved;
+          return pendingNewSeeds.length > 0 ? [...normalizedSaved, ...pendingNewSeeds] : normalizedSaved;
         }
       } catch (_e) {}
     }
@@ -290,8 +296,9 @@ export default function App() {
   const avatarImageRef = useRef(null);
   const [lobbyCountdown, setLobbyCountdown] = useState(null);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
-  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
+  const [newRoomForm, setNewRoomForm] = useState({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core' });
   const [hostRoomDraft, setHostRoomDraft] = useState({ pin: '686868', name: 'Phòng Từ Vựng Academic IELTS #1', pass: 'ielts', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
+  const [globalCheckoutState, setGlobalCheckoutState] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [sentNotifications, setSentNotifications] = useState([]);
   const [classesDb, setClassesDb] = useState({});
@@ -607,11 +614,57 @@ export default function App() {
     return true;
   };
 
+  const handleToggleUserSubscription = async (targetUsername, planType = 'skill_pass', unlocked = true) => {
+    if (!currentUser?.isSuperAdmin || !targetUsername) return false;
+    const snap = await dispatchSyncAction('TOGGLE_USER_SUBSCRIPTION', {
+      username: targetUsername,
+      kind: planType,
+      active: Boolean(unlocked)
+    });
+    if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
+    const targetName = usersDb[targetUsername]?.name || targetUsername;
+    const planLabel = planType === 'aieo_vip' ? 'Gói Ai eo VIP (1 Tháng)' : 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)';
+    showToast(
+      unlocked
+        ? `Đã kích hoạt ${planLabel} cho ${targetName}!`
+        : `Đã thu hồi ${planLabel} của ${targetName}.`,
+      unlocked ? 'success' : 'info'
+    );
+    return true;
+  };
+
+  const openGlobalCheckoutModal = (opts = {}) => {
+    const cfgPay = normalizePaymentConfig(paymentConfig || {});
+    const itemType = opts.itemType || 'skill_pass';
+    const defaultLabel =
+      itemType === 'aieo_vip'
+        ? 'Gói Ai eo VIP Full Quyền (1 Tháng)'
+        : itemType === 'skill_pass'
+        ? 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)'
+        : 'Ảnh Nền Riêng (1 Tháng)';
+    const defaultPrice =
+      itemType === 'aieo_vip'
+        ? (cfgPay.aieoVipPrice ?? AIEO_VIP_PRICE_VND)
+        : itemType === 'skill_pass'
+        ? (cfgPay.skillPassPrice ?? SKILL_PASS_PRICE_VND)
+        : cfgPay.coverUnlockPrice;
+    setGlobalCheckoutState({
+      itemType,
+      itemId: opts.itemId || '',
+      itemLabel: opts.itemLabel || defaultLabel,
+      itemPrice: opts.itemPrice !== undefined ? opts.itemPrice : defaultPrice,
+      renew: Boolean(opts.renew)
+    });
+  };
+
   const handleRequestCoverUnlock = async (reqOpts = {}) => {
     if (!currentUser?.username) return false;
-    const payload = reqOpts?.itemType === 'title' && reqOpts?.itemId
-      ? { itemType: 'title', itemId: reqOpts.itemId }
-      : {};
+    const payload =
+      reqOpts?.itemType === 'title' && reqOpts?.itemId
+        ? { itemType: 'title', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
+        : reqOpts?.itemType === 'skill_pass' || reqOpts?.itemType === 'aieo_vip'
+        ? { itemType: reqOpts.itemType, renew: Boolean(reqOpts.renew) }
+        : { itemType: 'cover', renew: Boolean(reqOpts.renew) };
     const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', payload);
     if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
     showToast('Đã gửi yêu cầu xác nhận thanh toán tới Quản Trị Hệ Thống (SĐT/Zalo: 0367073526)!');
@@ -2463,6 +2516,7 @@ export default function App() {
       }
       const joinedRoom = data?.room ? normalizeRoomObject(data.room, cleanPin) : null;
       setRoomJoinError('');
+      setCurrentRoomPin(cleanPin);
       setJoinedRoomPin(cleanPin);
       lastLaunchedAtRef.current = joinedRoom?.startedAt || null;
       justJoinedLobbyAtRef.current = Date.now();
@@ -2497,10 +2551,14 @@ export default function App() {
     }
 
     setRoomJoinError('');
+    setCurrentRoomPin(cleanPin);
     setJoinedRoomPin(cleanPin);
     lastLaunchedAtRef.current = targetRoom.startedAt || null;
 
-    const studentEntry = buildLobbyPlayerEntry(currentUser, { ready: false });
+    const studentEntry = buildLobbyPlayerEntry(currentUser, {
+      ready: false,
+      approved: targetRoom.roomMode === 'friend_vip'
+    });
     setRoomsDb(prev => {
       const r = normalizeRoomObject(prev[cleanPin] || targetRoom, cleanPin);
       return {
@@ -2547,10 +2605,12 @@ export default function App() {
       speedMode: baseRoom.speedMode || 'normal'
     });
 
+    const isTeacherHost = currentUser?.role === 'teacher';
     const teacherEntry = buildLobbyPlayerEntry(currentUser, {
-      name: currentUser?.name || 'Giáo viên',
-      role: 'teacher',
-      ready: true
+      name: currentUser?.name || (isTeacherHost ? 'Giáo viên' : currentUser?.username),
+      role: isTeacherHost ? 'teacher' : 'student',
+      ready: true,
+      approved: true
     });
 
     setRoomsDb(prev => {
@@ -2994,8 +3054,19 @@ export default function App() {
       return;
     }
 
+    const isTeacherCreator = currentUser?.role === 'teacher';
+    const selectedPresetVocab =
+      newRoomForm.topicPreset && newRoomForm.topicPreset !== 'core' && VOCAB_PRESETS?.[newRoomForm.topicPreset]?.text
+        ? VOCAB_PRESETS[newRoomForm.topicPreset].text
+        : DEFAULT_VOCAB_TEXT;
+
     const teacherEntry = currentUser
-      ? buildLobbyPlayerEntry(currentUser, { name: currentUser.name || 'Giáo viên', role: 'teacher', ready: true })
+      ? buildLobbyPlayerEntry(currentUser, {
+          name: currentUser.name || (isTeacherCreator ? 'Giáo viên' : currentUser.username),
+          role: isTeacherCreator ? 'teacher' : 'student',
+          ready: true,
+          approved: true
+        })
       : null;
 
     const newRoomObj = {
@@ -3003,6 +3074,9 @@ export default function App() {
       name: cleanName,
       pass: cleanPass,
       teacher: currentUser?.username || 'teacher_ielts',
+      roomMode: isTeacherCreator ? 'teacher_live' : 'friend_vip',
+      hostUsername: currentUser?.username || '',
+      hostName: currentUser?.name || currentUser?.username || '',
       status: 'LOBBY',
       maxPlayers: 30,
       roundSize: Math.max(2, Math.min(8, Number(newRoomForm.roundSize) || 4)),
@@ -3012,7 +3086,7 @@ export default function App() {
       lobbyPlayers: teacherEntry ? { [currentUser.username]: teacherEntry } : {},
       questionSolves: {},
       chatMessages: [],
-      rawVocab: DEFAULT_VOCAB_TEXT,
+      rawVocab: selectedPresetVocab,
       players: {}
     };
 
@@ -3031,12 +3105,12 @@ export default function App() {
       shufflePerPlayer: newRoomObj.shufflePerPlayer
     });
     setShowCreateRoomModal(false);
-    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false });
+    setNewRoomForm({ pin: '', pass: 'ielts', name: 'Phòng Đấu Từ Vựng Mới', roundSize: 4, speedMode: 'normal', shufflePerPlayer: false, topicPreset: 'core' });
 
     dispatchSyncAction('UPSERT_ROOM', { pin: generatedPin, updates: newRoomObj });
     showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} • Pass: ${cleanPass})!`);
 
-    if (currentUser?.role === 'teacher') {
+    if (isTeacherCreator || newRoomObj.roomMode === 'friend_vip') {
       setGameSubState('LOBBY');
       gameRuntimeRef.current.subState = 'LOBBY';
       setView('GAME_ARENA');
@@ -3388,6 +3462,18 @@ export default function App() {
       return;
     }
 
+    if (currentUser?.role !== 'teacher' && cfg.testMode === 'single_skill' && !hasSkillPracticeAccess(currentUser)) {
+      const cfgPay = normalizePaymentConfig(paymentConfig || {});
+      showToast('Chức năng Bài Tập 4 Kỹ Năng yêu cầu gói tháng (20k/1T) hoặc Gói Ai eo VIP (80k/1T)!', 'info');
+      setGlobalCheckoutState({
+        itemType: 'skill_pass',
+        itemId: '',
+        itemLabel: 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
+        itemPrice: cfgPay.skillPassPrice ?? SKILL_PASS_PRICE_VND
+      });
+      return;
+    }
+
     if (currentUser?.role !== 'teacher' && cfg.maxAttempts > 0) {
       const usedCount = attempts.filter(
         a => (a.studentId === currentUser?.username || a.studentUsername === currentUser?.username) && a.testId === testId
@@ -3724,21 +3810,30 @@ export default function App() {
 
   const handleTestGeminiKey = async (keyOverride = aiApiKey) => {
     const cleanKey = (keyOverride || '').trim();
-    if (!cleanKey) {
+    if (!cleanKey && !aiConfigured) {
       setApiTestState({ testing: false, ok: false, message: 'Vui lòng nhập API Key trước khi kiểm tra.', model: '' });
       return;
     }
-    setApiTestState({ testing: true, ok: null, message: 'Đang kết nối Google Gemini API...', model: '' });
+    setApiTestState({
+      testing: true,
+      ok: null,
+      message: cleanKey ? 'Đang kết nối Google Gemini API...' : 'Đang kiểm tra Gemini API Key đang lưu trên máy chủ...',
+      model: ''
+    });
     try {
       const usedModel = await testGeminiApiConnection(cleanKey);
-      setAiApiKey(cleanKey);
-      localStorage.setItem('ielts_ai_key', cleanKey);
-      await dispatchSyncAction('SET_AI_CONFIG', { geminiApiKey: cleanKey });
+      if (cleanKey) {
+        setAiApiKey(cleanKey);
+        localStorage.setItem('ielts_ai_key', cleanKey);
+        await dispatchSyncAction('SET_AI_CONFIG', { geminiApiKey: cleanKey });
+      }
       setApiTestState({
         testing: false,
         ok: true,
         model: usedModel,
-        message: `Kết nối thành công! Hệ thống đang dùng model "${usedModel}" và đã đồng bộ API Key cho máy chủ (dùng để AI chấm Speaking & Writing).`
+        message: cleanKey
+          ? `Kết nối thành công! Hệ thống đang dùng model "${usedModel}" và đã đồng bộ API Key cho máy chủ (dùng trên mọi máy).`
+          : `Kết nối thành công qua máy chủ! Server đang dùng model "${usedModel}".`
       });
     } catch (err) {
       setApiTestState({
@@ -6206,7 +6301,7 @@ export default function App() {
       {view === 'SKILL_HUB' && (
         <SkillPracticeHub
           activeTab={skillHubTab}
-          aiConfigured={aiConfigured}
+          aiConfigured={Boolean(aiApiKey?.trim() || aiConfigured)}
           attempts={attempts}
           classesDb={classesDb}
           currentUser={currentUser}
@@ -6217,6 +6312,7 @@ export default function App() {
           }}
           onClearFocusedTest={() => setFocusedTestId(null)}
           onNotifyMissingDaily={handleNotifyMissingDaily}
+          onOpenCheckoutModal={openGlobalCheckoutModal}
           onOpenFullExamCatalog={() => {
             setFocusedTestId(null);
             setView('HOME');
@@ -6231,6 +6327,7 @@ export default function App() {
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}
           onStartSpeakingExam={(testId, partMode = 'full') => startExam(testId, partMode)}
+          paymentConfig={paymentConfig}
           serverClockOffsetMs={serverClockOffsetMs}
           showToast={showToast}
           speakingUnlockTokens={speakingUnlockTokens}
@@ -6280,6 +6377,11 @@ export default function App() {
           onPullSync={() => pullServerSyncState(true)}
           onRequestCoverUnlock={handleRequestCoverUnlock}
           onToggleUserCoverUnlock={currentUser?.isSuperAdmin ? handleToggleUserCoverUnlock : undefined}
+          onToggleUserSubscription={currentUser?.isSuperAdmin ? handleToggleUserSubscription : undefined}
+          onNavigateAfterPurchase={(nextView, tab) => {
+            if (tab) setSkillHubTab(tab);
+            setView(nextView);
+          }}
           openStudentGamePortal={openStudentGamePortal}
           paymentConfig={paymentConfig}
           previousView={previousView}
@@ -6375,7 +6477,9 @@ export default function App() {
           myAccessoryId={myAccessoryId}
           myAnimalId={myAnimalId}
           myCrewColor={myCrewColor}
+          onOpenCheckoutModal={openGlobalCheckoutModal}
           openMemberProfile={openMemberProfile}
+          paymentConfig={paymentConfig}
           roomJoinError={roomJoinError}
           roomJoinForm={roomJoinForm}
           roomsDb={roomsDb}
@@ -6444,6 +6548,7 @@ export default function App() {
       {view === 'RESULT_VIEW' && (
         <ResultView
           aiApiKey={aiApiKey}
+          aiConfigured={Boolean(aiApiKey?.trim() || aiConfigured)}
           aiGradingStep={aiGradingStep}
           attempts={attempts}
           currentUser={currentUser}
@@ -6460,6 +6565,7 @@ export default function App() {
           setView={setView}
           tests={tests}
           toggleTestAllowViewAnswers={toggleTestAllowViewAnswers}
+          usersDb={usersDb}
         />
       )}
 
@@ -6525,6 +6631,7 @@ export default function App() {
           onOpenMailConfig={() => setShowMailConfigModal(true)}
           onOpenPaymentConfig={currentUser?.isSuperAdmin ? () => setShowPaymentConfigModal(true) : undefined}
           onToggleUserCoverUnlock={currentUser?.isSuperAdmin ? handleToggleUserCoverUnlock : undefined}
+          onToggleUserSubscription={currentUser?.isSuperAdmin ? handleToggleUserSubscription : undefined}
           paymentConfig={paymentConfig}
           setStudentSearchQuery={setStudentSearchQuery}
           setTeacherHubTab={setTeacherHubTab}
@@ -6548,6 +6655,7 @@ export default function App() {
         <ExamBuilder
           addQuestionToSkill={addQuestionToSkill}
           aiApiKey={aiApiKey}
+          aiConfigured={Boolean(aiApiKey?.trim() || aiConfigured)}
           builderListeningIdx={builderListeningIdx}
           builderReadingIdx={builderReadingIdx}
           builderTab={builderTab}
@@ -6581,10 +6689,11 @@ export default function App() {
       <GlobalModals
         addStudentMode={addStudentMode}
         aiApiKey={aiApiKey}
+        aiConfigured={Boolean(aiApiKey?.trim() || aiConfigured)}
         aiGradingStep={aiGradingStep}
         apiTestState={apiTestState}
         bulkStudentsText={bulkStudentsText}
-        currentRoomPin={currentRoomPin}
+        currentRoomPin={joinedRoomPin || currentRoomPin}
         currentUser={currentUser}
         customVocabInput={customVocabInput}
         customVocabTopics={customVocabTopics}
@@ -6700,6 +6809,27 @@ export default function App() {
           onEquipTitle={item => handleAcknowledgeTitles({ equipTitle: item })}
           onOpenProfile={() => handleAcknowledgeTitles({ openProfile: true })}
           onDismiss={() => handleAcknowledgeTitles()}
+        />
+      )}
+
+      {Boolean(globalCheckoutState && currentUser) && (
+        <CoverCheckoutModal
+          isOpen={true}
+          itemType={globalCheckoutState.itemType || 'skill_pass'}
+          itemId={globalCheckoutState.itemId || ''}
+          itemLabel={globalCheckoutState.itemLabel || ''}
+          itemPrice={globalCheckoutState.itemPrice}
+          renew={Boolean(globalCheckoutState.renew)}
+          currentUser={currentUser}
+          paymentConfig={paymentConfig}
+          onClose={() => setGlobalCheckoutState(null)}
+          onNavigateAfterPurchase={(nextView, tab) => {
+            if (tab) setSkillHubTab(tab);
+            setView(nextView);
+          }}
+          onRequestUnlock={handleRequestCoverUnlock}
+          onPullSync={() => pullServerSyncState(true)}
+          showToast={showToast}
         />
       )}
     </div>

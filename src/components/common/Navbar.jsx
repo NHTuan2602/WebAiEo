@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { BRAND_INFO } from '../../constants/brandInfo';
 import UserAvatarBadge from './UserAvatarBadge';
+import VipMemberName from './VipMemberName';
 
 export default function Navbar({
   currentUser,
@@ -56,6 +57,7 @@ export default function Navbar({
 
   if (view === 'AUTH') return null;
   const isTeacher = currentUser?.role === 'teacher';
+  const isSuperAdmin = Boolean(currentUser?.isSuperAdmin || currentUser?.username === 'tuanpro123s');
   const notifList = Array.isArray(notifications) ? notifications : [];
   const unreadNotifCount = notifList.filter(n => !n?.isRead).length;
   const readNotifCount = notifList.filter(n => Boolean(n?.isRead)).length;
@@ -201,11 +203,15 @@ export default function Navbar({
             >
               <UserAvatarBadge user={currentUser} sizeClass="w-8 h-8" textClass="text-xs" rounded="rounded-lg" />
               <div className="text-left text-xs hidden sm:block min-w-0">
-                <p className="font-bold text-[#0F172B] dark:text-slate-100 leading-tight truncate max-w-[115px] xl:max-w-[140px]">
-                  {currentUser?.name}
+                <p className="font-bold text-[#0F172B] dark:text-slate-100 leading-tight truncate max-w-[140px] xl:max-w-[175px]">
+                  <VipMemberName user={currentUser} badgeSize="xs" />
                 </p>
-                <p className="text-[10px] font-semibold text-[#007A7A] dark:text-[#1EE1D6] leading-tight">
-                  {isTeacher ? 'Giáo viên' : 'Học viên'}
+                <p className={`text-[10px] leading-tight ${
+                  isSuperAdmin
+                    ? 'font-black text-purple-700 dark:text-purple-300 tracking-wide'
+                    : 'font-semibold text-[#007A7A] dark:text-[#1EE1D6]'
+                }`}>
+                  {isSuperAdmin ? 'ADMIN' : isTeacher ? 'Giáo viên' : 'Học viên'}
                 </p>
               </div>
             </button>

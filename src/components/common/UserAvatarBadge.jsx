@@ -1,5 +1,5 @@
 import React from 'react';
-import { getAvatarFrameById } from '../../constants/profileCustomization';
+import { getAvatarFrameById, hasPaidTitleVisualPerk } from '../../constants/profileCustomization';
 
 export default function UserAvatarBadge({
   user,
@@ -11,12 +11,14 @@ export default function UserAvatarBadge({
 }) {
   const initial = user?.name ? user.name[0] : (user?.username ? user.username[0] : 'U');
   const frameClass = showFrame ? (getAvatarFrameById(user?.avatarFrameId)?.ringClass || '') : '';
+  const hasVipAura = showFrame && hasPaidTitleVisualPerk(user);
+  const auraCls = hasVipAura ? 'vip-avatar-aura ring-2 ring-amber-400 dark:ring-amber-300' : '';
   if (user?.avatarUrl) {
     return (
       <img
         src={user.avatarUrl}
         alt={user?.name || 'Avatar'}
-        className={`${sizeClass} ${rounded} object-cover bg-white border border-pink-200/80 dark:border-slate-700 shadow-sm shrink-0 ${frameClass} ${className}`}
+        className={`${sizeClass} ${rounded} object-cover bg-white border border-pink-200/80 dark:border-slate-700 shadow-sm shrink-0 ${frameClass} ${auraCls} ${className}`}
       />
     );
   }
@@ -26,7 +28,7 @@ export default function UserAvatarBadge({
     ? 'bg-gradient-to-tr from-amber-500 to-orange-500'
     : 'bg-gradient-to-tr from-[#007A7A] to-teal-500';
   return (
-    <div className={`${sizeClass} ${rounded} ${fallbackGradient} flex items-center justify-center font-black ${textClass} text-white uppercase shadow-sm shrink-0 ${frameClass} ${className}`}>
+    <div className={`${sizeClass} ${rounded} ${fallbackGradient} flex items-center justify-center font-black ${textClass} text-white uppercase shadow-sm shrink-0 ${frameClass} ${auraCls} ${className}`}>
       {initial}
     </div>
   );

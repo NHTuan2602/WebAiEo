@@ -19,8 +19,10 @@ import {
 } from 'lucide-react';
 import { ADMIN_PAYMENT_CONTACT } from '../../constants/brandInfo';
 import {
+  AIEO_VIP_PRICE_VND,
   CUSTOM_COVER_UNLOCK_PRICE_VND,
   PAID_SHOP_TITLES,
+  SKILL_PASS_PRICE_VND,
   VIETQR_BANK_OPTIONS,
   formatVndCurrency,
   normalizePaymentConfig
@@ -437,11 +439,54 @@ export default function PaymentConfigModal({
                 </div>
               </div>
 
-              {/* Editable Prices for VIP Paid Titles */}
+              {/* Editable Prices for 1-Month Memberships & VIP Paid Titles */}
+              <div className="p-3.5 rounded-2xl bg-red-50/70 dark:bg-red-950/20 border border-red-200 dark:border-red-500/35 space-y-2.5">
+                <p className="text-[11px] font-extrabold text-red-900 dark:text-red-200 flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                  Bảng Giá Gói Hội Viên 1 Tháng (30 Ngày)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      🎓 Gói Bài Tập 4 Kỹ Năng (1 Tháng)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.skillPassPrice ?? SKILL_PASS_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        skillPassPrice: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      👑 Gói Ai eo VIP Full Quyền (1 Tháng)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.aieoVipPrice ?? AIEO_VIP_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        aieoVipPrice: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/35 space-y-2.5">
                 <p className="text-[11px] font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                   <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  Bảng Giá Danh Hiệu VIP (VNĐ)
+                  Bảng Giá Danh Hiệu VIP (VNĐ) — Gói 1 Tháng
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {PAID_SHOP_TITLES.map(t => (

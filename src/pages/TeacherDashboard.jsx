@@ -70,13 +70,16 @@ import {
 } from '../constants/seedData';
 import {
   formatVndCurrency,
+  hasActiveAieoVip,
   hasCustomCoverPermission,
+  hasSkillPracticeAccess,
   normalizePaymentConfig,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
+import VipMemberName from '../components/common/VipMemberName';
 import ClassManagerTab from '../components/teacher/ClassManagerTab';
 
 export default function TeacherDashboard({
@@ -115,6 +118,7 @@ export default function TeacherDashboard({
   onOpenMailConfig,
   onOpenPaymentConfig = null,
   onToggleUserCoverUnlock = null,
+  onToggleUserSubscription = null,
   onUpdateClassMembers,
   onUpsertClass,
   openExamBuilder,
@@ -967,8 +971,11 @@ export default function TeacherDashboard({
               Quản Lý &amp; Giảng Dạy
             </h1>
             {isViewerSuperAdmin && (
-              <span className="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold">
-                <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
+              <span
+                title="Super Admin"
+                className="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" /> ADMIN
               </span>
             )}
           </div>
@@ -2211,10 +2218,12 @@ export default function TeacherDashboard({
                                       title="Mở trang hồ sơ chi tiết"
                                       className="font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 hover:underline leading-tight text-left transition"
                                     >
-                                      {account.name}
+                                      <VipMemberName user={account} fallbackName={account.name} badgeSize="xs" />
                                     </button>
                                   ) : (
-                                    <p className="font-bold text-slate-900 dark:text-white leading-tight">{account.name}</p>
+                                    <p className="font-bold text-slate-900 dark:text-white leading-tight">
+                                      <VipMemberName user={account} fallbackName={account.name} badgeSize="xs" />
+                                    </p>
                                   )}
                                   {isSelfAccount && (
                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
@@ -2264,6 +2273,38 @@ export default function TeacherDashboard({
                                           </>
                                         )}
                                       </button>
+                                      {onToggleUserSubscription && (() => {
+                                        const hasSkill = hasSkillPracticeAccess(account);
+                                        const hasVip = hasActiveAieoVip(account);
+                                        return (
+                                          <span className="inline-flex flex-wrap items-center gap-1 ml-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => onToggleUserSubscription(account.username, 'skill_pass', !(account.skillPracticeExpiresAt > Date.now()))}
+                                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition ${
+                                                hasSkill
+                                                  ? 'bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/35'
+                                                  : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-sky-400'
+                                              }`}
+                                              title="Bật/Tắt gói Bài Tập 4 Kỹ Năng 1 tháng"
+                                            >
+                                              {hasSkill ? '✓ 4 Kỹ Năng' : '+ 4 Kỹ Năng'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => onToggleUserSubscription(account.username, 'aieo_vip', !hasVip)}
+                                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border transition ${
+                                                hasVip
+                                                  ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white border-amber-300'
+                                                  : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-rose-400'
+                                              }`}
+                                              title="Bật/Tắt gói Ai eo VIP 1 tháng"
+                                            >
+                                              {hasVip ? '👑 Ai eo VIP' : '+ Ai eo VIP'}
+                                            </button>
+                                          </span>
+                                        );
+                                      })()}
                                     </div>
                                   );
                                 })()}
@@ -2289,8 +2330,11 @@ export default function TeacherDashboard({
                           </td>
                           <td className="px-4 py-4 text-center whitespace-nowrap">
                             {isSuperAdminAccount ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 whitespace-nowrap">
-                                <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> Super Admin
+                              <span
+                                title="Super Admin"
+                                className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 whitespace-nowrap"
+                              >
+                                <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> ADMIN
                               </span>
                             ) : isTeacherAccount ? (
                               <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 whitespace-nowrap">

@@ -46,6 +46,7 @@ import SpeakingBuilderPanel from '../components/teacher/SpeakingBuilderPanel';
 export default function ExamBuilder({
   addQuestionToSkill,
   aiApiKey,
+  aiConfigured = false,
   builderListeningIdx,
   builderReadingIdx,
   builderTab,
@@ -1580,6 +1581,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onChangeClozeText={val => updateListeningTrackField(activeIdx, { clozeText: val })}
             onSyncCloze={() => handleSyncClozeQuestions('listening', 'trackIdx', activeIdx, activeTrack?.clozeText || '')}
             aiApiKey={aiApiKey}
+            aiConfigured={aiConfigured}
             setApiTestState={setApiTestState}
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
@@ -1837,6 +1839,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onChangeClozeText={val => updateReadingPassageField(activeIdx, { clozeText: val })}
             onSyncCloze={() => handleSyncClozeQuestions('reading', 'passageIdx', activeIdx, activePassage?.clozeText || '')}
             aiApiKey={aiApiKey}
+            aiConfigured={aiConfigured}
             setApiTestState={setApiTestState}
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
@@ -1982,6 +1985,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
       {builderTab === 'speaking' && (
         <SpeakingBuilderPanel
           aiApiKey={aiApiKey}
+          aiConfigured={aiConfigured}
           onChangeSpeaking={nextSp => setTestForm(prev => ({ ...prev, speaking: nextSp }))}
           setApiTestState={setApiTestState}
           setShowApiKeyModal={setShowApiKeyModal}

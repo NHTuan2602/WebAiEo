@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Award, CheckCircle2, ImagePlus, Loader2, QrCode, RefreshCw, Sparkles, X } from 'lucide-react';
 import {
+  formatRemainingSubscriptionText,
   formatVndCurrency,
   getTitlePriceVnd,
+  hasActiveAieoVip,
+  hasActivePaidTitlePermission,
   hasCustomCoverPermission,
+  hasSkillPracticeAccess,
   normalizePaymentConfig
 } from '../../constants/profileCustomization';
 import CoverUnlockQrCard from '../common/CoverUnlockQrCard';
@@ -14,11 +18,13 @@ export default function CoverCheckoutModal({
   itemId = '',
   itemLabel = '',
   itemPrice = null,
+  renew = false,
   currentUser = null,
   paymentConfig = null,
   onClose,
   onUnlockedReady = null,
   onEquipPurchasedTitle = null,
+  onNavigateAfterPurchase = null,
   onRequestUnlock = null,
   onPullSync = null,
   showToast = null
@@ -30,14 +36,18 @@ export default function CoverCheckoutModal({
   const [error, setError] = useState('');
 
   const isTitleOrder = itemType === 'title' && Boolean(itemId);
-  const isUnlocked = isTitleOrder
-    ? Boolean(
-        currentUser?.isSuperAdmin ||
-        currentUser?.username === 'tuanpro123s' ||
-        (Array.isArray(currentUser?.purchasedTitleIds) && currentUser.purchasedTitleIds.includes(itemId)) ||
-        (Array.isArray(currentUser?.grantedTitleIds) && currentUser.grantedTitleIds.includes(itemId))
-      )
-    : hasCustomCoverPermission(currentUser);
+  const isSkillPassOrder = itemType === 'skill_pass';
+  const isAieoVipOrder = itemType === 'aieo_vip';
+  const [orderPaidConfirmed, setOrderPaidConfirmed] = useState(false);
+  const isUnlocked = orderPaidConfirmed || (!renew && (
+    isTitleOrder
+      ? hasActivePaidTitlePermission(currentUser, itemId)
+      : isSkillPassOrder
+      ? hasSkillPracticeAccess(currentUser)
+      : isAieoVipOrder
+      ? (Boolean(currentUser?.isSuperAdmin || currentUser?.username === 'tuanpro123s') || hasActiveAieoVip(currentUser))
+      : hasCustomCoverPermission(currentUser)
+  ));
 
   const activePayCfg = livePayCfg || paymentConfig;
   const effectiveCfg = normalizePaymentConfig(activePayCfg || {});
@@ -48,11 +58,17 @@ export default function CoverCheckoutModal({
       ? itemPrice
       : isTitleOrder
       ? getTitlePriceVnd(itemId, effectiveCfg)
+      : isSkillPassOrder
+      ? effectiveCfg.skillPassPrice
+      : isAieoVipOrder
+      ? effectiveCfg.aieoVipPrice
       : effectiveCfg.coverUnlockPrice;
   const priceLabel = formatVndCurrency(resolvedAmount);
   const creating = isOpen && !isUnlocked && !order && !error;
   const pendingRequestedAt = isTitleOrder
     ? (currentUser?.paidTitleRequested?.titleId === itemId ? currentUser.paidTitleRequested.requestedAt : 0)
+    : (isSkillPassOrder || isAieoVipOrder)
+    ? (currentUser?.subscriptionRequested?.itemType === itemType ? currentUser.subscriptionRequested.requestedAt : 0)
     : (currentUser?.coverUnlockRequestedAt || 0);
 
   useEffect(() => {
@@ -61,7 +77,11 @@ export default function CoverCheckoutModal({
     fetch('/api/sync/payment/create-order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemType: isTitleOrder ? 'title' : 'cover', itemId: isTitleOrder ? itemId : '' })
+      body: JSON.stringify({
+        itemType,
+        itemId: isTitleOrder ? itemId : '',
+        renew: Boolean(renew)
+      })
     })
       .then(r => r.json())
       .then(data => {
@@ -84,7 +104,7 @@ export default function CoverCheckoutModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isUnlocked, isTitleOrder, itemId, onPullSync]);
+  }, [isOpen, isUnlocked, itemType, isTitleOrder, itemId, renew, onPullSync]);
 
   // Poll order status every 3s while checkout modal stays open (backup alongside instant SSE)
   useEffect(() => {
@@ -95,6 +115,7 @@ export default function CoverCheckoutModal({
         if (!res.ok) return;
         const data = await res.json();
         if (data?.unlocked || data?.order?.status === 'paid') {
+          if (data?.order?.status === 'paid') setOrderPaidConfirmed(true);
           await onPullSync?.();
         }
       } catch {}
@@ -111,8 +132,9 @@ export default function CoverCheckoutModal({
       const res = await fetch(`/api/sync/payment/order?code=${encodeURIComponent(order.orderCode)}`, { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (data?.unlocked || data?.order?.status === 'paid') {
+        if (data?.order?.status === 'paid') setOrderPaidConfirmed(true);
         await onPullSync?.();
-        showToast?.(isTitleOrder ? `🎉 Đã mở khóa danh hiệu ${itemLabel}!` : '🎉 Đã xác nhận thanh toán & mở khóa Ảnh Nền Riêng!');
+        showToast?.(`🎉 Đã xác nhận thanh toán & mở khóa ${itemLabel || 'gói 1 tháng'} thành công!`);
       } else {
         showToast?.('Hệ thống chưa nhận được giao dịch khớp mã đơn. Nếu vừa chuyển, đợi 3–5 giây hoặc liên hệ Zalo 0367073526!', 'info');
       }
@@ -122,6 +144,14 @@ export default function CoverCheckoutModal({
       setCheckingNow(false);
     }
   };
+
+  const expiryPreview = isAieoVipOrder
+    ? formatRemainingSubscriptionText(currentUser?.aieoVipExpiresAt)
+    : isSkillPassOrder
+    ? formatRemainingSubscriptionText(currentUser?.skillPracticeExpiresAt)
+    : isTitleOrder
+    ? formatRemainingSubscriptionText(currentUser?.purchasedTitleExpiries?.[itemId])
+    : formatRemainingSubscriptionText(currentUser?.customCoverExpiresAt);
 
   return (
     <div
@@ -140,13 +170,21 @@ export default function CoverCheckoutModal({
             <QrCode className="w-5 h-5 text-[#1EE1D6]" />
             <div>
               <h3 id="cover-checkout-title" className="text-sm sm:text-base font-extrabold flex items-center gap-2 flex-wrap">
-                <span>{isTitleOrder ? `Mua Danh Hiệu ${itemLabel || 'VIP'}` : 'Mở Khóa Ảnh Nền Riêng'}</span>
+                <span>
+                  {isTitleOrder
+                    ? `Mua Danh Hiệu ${itemLabel || 'VIP'} (1 Tháng)`
+                    : isSkillPassOrder
+                    ? 'Mở Khóa Bài Tập 4 Kỹ Năng (1 Tháng)'
+                    : isAieoVipOrder
+                    ? 'Đăng Ký Gói Ai eo VIP (1 Tháng)'
+                    : 'Mở Khóa Ảnh Nền Riêng (1 Tháng)'}
+                </span>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-black tabular-nums">
                   {priceLabel}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-300">
-                {order?.orderCode ? `Mã đơn thanh toán: #${order.orderCode}` : 'Quét mã VietQR để mở khóa tự động trên hệ thống'}
+                {order?.orderCode ? `Mã đơn thanh toán: #${order.orderCode}` : 'Quét mã VietQR để mở khóa tự động trên hệ thống (Thời hạn 30 ngày)'}
               </p>
             </div>
           </div>
@@ -169,38 +207,60 @@ export default function CoverCheckoutModal({
               <h4 className="text-base font-extrabold text-emerald-900 dark:text-emerald-200">
                 {isTitleOrder
                   ? `Thanh toán thành công — Đã sở hữu ${itemLabel || 'Danh Hiệu VIP'}!`
+                  : isSkillPassOrder
+                  ? 'Thanh toán thành công — Đã kích hoạt Bài Tập 4 Kỹ Năng!'
+                  : isAieoVipOrder
+                  ? 'Thanh toán thành công — Chào mừng thành viên Ai eo VIP!'
                   : 'Thanh toán thành công — Đã mở khóa Ảnh Nền Riêng!'}
               </h4>
               <p className="text-xs text-emerald-800/90 dark:text-emerald-300 leading-relaxed">
                 {isTitleOrder
-                  ? `Tài khoản @${currentUser?.username} đã mở khóa vĩnh viễn danh hiệu ${itemLabel}.`
-                  : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng vĩnh viễn.`}
+                  ? `Tài khoản @${currentUser?.username} đã mở khóa danh hiệu ${itemLabel} (thời hạn 1 tháng${expiryPreview ? ` • ${expiryPreview}` : ''}).`
+                  : isSkillPassOrder
+                  ? `Tài khoản @${currentUser?.username} đã mở khóa toàn bộ Khu Bài Tập 4 Kỹ Năng & Đề Lẻ trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`
+                  : isAieoVipOrder
+                  ? `Tài khoản @${currentUser?.username} đã sở hữu Gói Ai eo VIP 1 tháng: Bài tập 4 Kỹ năng miễn phí, Danh hiệu 👑 Ai eo VIP, Tạo phòng Game cùng bạn bè & Màu Chữ Đỏ + Nhãn AIEOVIP!`
+                  : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`}
               </p>
               <p className="text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100/75 dark:bg-amber-500/15 border border-amber-300/70 dark:border-amber-500/30 rounded-xl px-3.5 py-2 leading-relaxed">
                 💛 Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web, server &amp; hạ tầng luyện thi IELTS! Chúc bạn học tập thật bứt phá.
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose?.();
-                  if (isTitleOrder) {
-                    onEquipPurchasedTitle?.(itemId);
-                  } else {
-                    onUnlockedReady?.();
-                  }
-                }}
-                className="px-5 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow inline-flex items-center gap-2"
-              >
-                {isTitleOrder ? (
-                  <>
-                    <Award className="w-4 h-4" /> Đeo Danh Hiệu Ngay
-                  </>
-                ) : (
-                  <>
-                    <ImagePlus className="w-4 h-4" /> Tải &amp; Cắt Ảnh Nền Ngay
-                  </>
-                )}
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose?.();
+                    if (isTitleOrder) {
+                      onEquipPurchasedTitle?.(itemId);
+                    } else if (isSkillPassOrder) {
+                      onNavigateAfterPurchase?.('SKILL_HUB');
+                    } else if (isAieoVipOrder) {
+                      onNavigateAfterPurchase?.('STUDENT_PROFILE');
+                    } else {
+                      onUnlockedReady?.();
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition shadow inline-flex items-center gap-2"
+                >
+                  {isTitleOrder ? (
+                    <>
+                      <Award className="w-4 h-4" /> Đeo Danh Hiệu Ngay
+                    </>
+                  ) : isSkillPassOrder ? (
+                    <>
+                      <Sparkles className="w-4 h-4" /> Vào Bài Tập 4 Kỹ Năng Ngay
+                    </>
+                  ) : isAieoVipOrder ? (
+                    <>
+                      <Sparkles className="w-4 h-4" /> Bật/Tắt Tên Đỏ &amp; AIEOVIP Ở Hồ Sơ
+                    </>
+                  ) : (
+                    <>
+                      <ImagePlus className="w-4 h-4" /> Tải &amp; Cắt Ảnh Nền Ngay
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           ) : creating && !order ? (
             <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
@@ -217,7 +277,7 @@ export default function CoverCheckoutModal({
                 username={currentUser?.username || ''}
                 orderCode={order?.orderCode || ''}
                 order={order}
-                itemType={isTitleOrder ? 'title' : 'cover'}
+                itemType={itemType}
                 itemId={itemId}
                 itemTitle={itemLabel}
                 itemPrice={resolvedAmount}
@@ -226,7 +286,7 @@ export default function CoverCheckoutModal({
                 requesting={requestingManual}
                 onRequestUnlock={onRequestUnlock ? async () => {
                   setRequestingManual(true);
-                  await onRequestUnlock(isTitleOrder ? { itemType: 'title', itemId } : {});
+                  await onRequestUnlock(isTitleOrder ? { itemType: 'title', itemId } : { itemType });
                   setRequestingManual(false);
                 } : null}
                 showToast={showToast}

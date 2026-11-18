@@ -34,6 +34,10 @@ export default function CoverUnlockQrCard({
       ? Math.max(0, Number(itemPrice) || 0)
       : itemType === 'title'
       ? getTitlePriceVnd(itemId, cfg)
+      : itemType === 'skill_pass'
+      ? cfg.skillPassPrice
+      : itemType === 'aieo_vip'
+      ? cfg.aieoVipPrice
       : cfg.coverUnlockPrice;
   const priceLabel = formatVndCurrency(resolvedAmount);
   const transferNote = buildCoverUnlockTransferNote(username, orderCode);
@@ -58,13 +62,21 @@ export default function CoverUnlockQrCard({
   const activeQrUrl = cfg.customQrUrl || payosQrDataUrl || vietQrUrl;
   const hasBankDetails = Boolean(displayAccountNumber && (cfg.bankCode || cfg.bankName || payosQrDataUrl));
   const headingText = itemType === 'title' && itemTitle
-    ? `Mua Danh Hiệu VIP: ${itemTitle}`
-    : 'Mở Khóa Tải Ảnh Nền Riêng';
+    ? `Mua Danh Hiệu VIP (1 Tháng): ${itemTitle}`
+    : itemType === 'skill_pass'
+    ? 'Mở Khóa Gói Bài Tập 4 Kỹ Năng (1 Tháng)'
+    : itemType === 'aieo_vip'
+    ? 'Đăng Ký Gói Ai eo VIP Full Quyền (1 Tháng)'
+    : 'Mở Khóa Tải Ảnh Nền Riêng (1 Tháng)';
   const subText = itemType === 'title'
-    ? 'Quét mã VietQR để sở hữu vĩnh viễn danh hiệu Phú Quý nổi bật trên Hồ sơ & Đấu Trường Từ Vựng!'
+    ? 'Quét mã VietQR để sở hữu danh hiệu Phú Quý ánh kim + hào quang Avatar nổi bật suốt 30 ngày!'
+    : itemType === 'skill_pass'
+    ? 'Quét mã VietQR để luyện tập & nộp toàn bộ Đề Lẻ Reading, Listening, Writing & Speaking AI suốt 30 ngày!'
+    : itemType === 'aieo_vip'
+    ? 'Đặc quyền 30 ngày: Miễn phí Bài Tập 4 Kỹ Năng + Danh Hiệu Ai eo VIP + Tạo Phòng Đấu Bạn Bè + Chữ Tên Đỏ & Nhãn AIEOVIP!'
     : autoVerifyEnabled
-    ? 'Quét mã QR bằng app Ngân hàng bất kỳ — hệ thống sẽ tự động mở khóa ngay sau khi nhận đủ tiền!'
-    : 'Quét mã QR chuyển khoản 1 lần để sử dụng tính năng tải & cắt ảnh nền riêng vĩnh viễn.';
+    ? 'Quét mã QR bằng app Ngân hàng bất kỳ — hệ thống tự mở khóa quyền tải & cắt ảnh bìa trong 30 ngày ngay khi nhận đủ tiền!'
+    : 'Quét mã QR chuyển khoản 1 lần để sử dụng tính năng tải & cắt ảnh nền riêng trong 1 tháng (30 ngày).';
 
   const copyText = async (value, fieldKey, label) => {
     if (!value) return;

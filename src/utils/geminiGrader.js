@@ -9,13 +9,16 @@ import {
 
 export const GEMINI_PREFERRED_MODELS = [
   'gemini-2.5-flash',
-  'gemini-3.8-flash',
   'gemini-2.0-flash',
   'gemini-2.5-flash-lite',
-  'gemini-4-hydrogen',
-  'gemini-2.5-pro',
-  'gemini-flash-latest'
+  'gemini-flash-latest',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-pro'
 ];
+
+const TRANSIENT_GEMINI_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+const delayMs = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function formatGeminiErrorMessage(status, rawText = '') {
   let parsedMsg = rawText;
@@ -33,6 +36,9 @@ export function formatGeminiErrorMessage(status, rawText = '') {
   }
   if (status === 429) {
     return 'API Key đã vượt giới hạn lượt gọi (Quota). Vui lòng thử lại sau ít phút.';
+  }
+  if (status === 503 || status === 502 || status === 504) {
+    return 'Máy chủ Google Gemini đang tạm quá tải (503) sau khi đã thử tự động chuyển model dự phòng. Vui lòng thử lại sau vài giây.';
   }
   if (status === 404) {
     return `Model AI không tồn tại hoặc đã ngừng hỗ trợ (${parsedMsg}).`;
@@ -107,9 +113,48 @@ function dataUrlToGeminiPart(input) {
   };
 }
 
-export async function callGeminiGenerateJson({ apiKey, promptText, images = [], temperature = 0.2 }) {
+async function callServerAiProxy({ promptText, images = [], temperature = 0.2, clientApiKey = '' }) {
+  if (typeof window === 'undefined' || typeof fetch !== 'function') {
+    throw new Error('Server AI proxy only available in browser context.');
+  }
+  const res = await fetch('/api/sync/ai/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      promptText,
+      images,
+      temperature,
+      clientApiKey
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok || !data?.parsed) {
+    throw new Error(data?.error || `Máy chủ AI proxy lỗi (${res.status}).`);
+  }
+  return {
+    parsed: data.parsed,
+    usedModel: data.usedModel || 'server-gemini'
+  };
+}
+
+export async function callGeminiGenerateJson({
+  apiKey,
+  promptText,
+  images = [],
+  temperature = 0.2,
+  _disableServerProxy = false
+}) {
   const cleanKey = (apiKey || '').trim().replace(/^['"]|['"]$/g, '');
+  const canTryServerProxy =
+    !_disableServerProxy &&
+    typeof window !== 'undefined' &&
+    typeof window.location?.origin === 'string' &&
+    /^https?:/i.test(window.location.origin);
+
   if (!cleanKey) {
+    if (canTryServerProxy) {
+      return callServerAiProxy({ promptText, images, temperature, clientApiKey: '' });
+    }
     throw new Error('Chưa nhập Google Gemini API Key.');
   }
 
@@ -119,8 +164,24 @@ export async function callGeminiGenerateJson({ apiKey, promptText, images = [], 
     if (part) parts.push(part);
   });
 
-  const candidates = await discoverGeminiModels(cleanKey);
+  let candidates = [];
+  let discoverFatalError = null;
+  try {
+    candidates = await discoverGeminiModels(cleanKey);
+  } catch (err) {
+    discoverFatalError = err;
+  }
+  if (discoverFatalError && (!candidates || candidates.length === 0)) {
+    if (canTryServerProxy) {
+      try {
+        return await callServerAiProxy({ promptText, images, temperature, clientApiKey: cleanKey });
+      } catch (_proxyErr) {}
+    }
+    throw discoverFatalError;
+  }
+
   let lastError = null;
+  let sawTransientOrNetwork = false;
 
   for (const modelId of candidates) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(cleanKey)}`;
@@ -138,12 +199,24 @@ export async function callGeminiGenerateJson({ apiKey, promptText, images = [], 
       });
     };
 
-    let response = await attemptRequest(true);
-    if (response.status === 400) {
-      const errPreview = await response.clone().text();
-      if (/mime|json/i.test(errPreview)) {
-        response = await attemptRequest(false);
+    let response = null;
+    try {
+      response = await attemptRequest(true);
+      if (response.status === 400) {
+        const errPreview = await response.clone().text();
+        if (/mime|json/i.test(errPreview)) {
+          response = await attemptRequest(false);
+        }
       }
+      if (TRANSIENT_GEMINI_STATUSES.has(response.status)) {
+        // Brief backoff retry on overloaded/503 before switching fallback model
+        await delayMs(600);
+        response = await attemptRequest(true);
+      }
+    } catch (netErr) {
+      sawTransientOrNetwork = true;
+      lastError = netErr;
+      continue;
     }
 
     if (response.ok) {
@@ -170,17 +243,29 @@ export async function callGeminiGenerateJson({ apiKey, promptText, images = [], 
       lastError = new Error(formatted);
       continue;
     }
+    if (TRANSIENT_GEMINI_STATUSES.has(response.status)) {
+      sawTransientOrNetwork = true;
+      lastError = new Error(formatted);
+      continue;
+    }
     throw new Error(formatted);
+  }
+
+  if (canTryServerProxy && sawTransientOrNetwork) {
+    try {
+      return await callServerAiProxy({ promptText, images, temperature, clientApiKey: cleanKey });
+    } catch (_proxyErr) {}
   }
 
   throw lastError || new Error('Không tìm thấy model Gemini phù hợp cho API Key này.');
 }
 
-export async function testGeminiApiConnection(apiKey) {
+export async function testGeminiApiConnection(apiKey, options = {}) {
   const result = await callGeminiGenerateJson({
-    apiKey,
+    apiKey: apiKey || '',
     promptText: 'Return strictly valid JSON: {"status":"ok"}',
-    temperature: 0
+    temperature: 0,
+    ...(options && typeof options === 'object' ? options : {})
   });
   return result.usedModel;
 }

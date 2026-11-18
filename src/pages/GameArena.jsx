@@ -54,7 +54,14 @@ import {
 import { speakWord } from '../utils/mediaHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
-import { resolveVisibleTitleBadge } from '../constants/profileCustomization';
+import VipMemberName from '../components/common/VipMemberName';
+import {
+  AIEO_VIP_PRICE_VND,
+  formatVndCurrency,
+  hasVipFriendRoomAccess,
+  normalizePaymentConfig,
+  resolveVisibleTitleBadge
+} from '../constants/profileCustomization';
 
 export default function GameArena({
   activeQuestion,
@@ -126,7 +133,9 @@ export default function GameArena({
   myAccessoryId = 'crown',
   myAnimalId = 'cat',
   myCrewColor,
+  onOpenCheckoutModal = null,
   openMemberProfile,
+  paymentConfig = null,
   roomJoinError,
   roomJoinForm,
   roomsDb,
@@ -162,6 +171,12 @@ export default function GameArena({
   const isTeacher = currentUser?.role === 'teacher';
   const activePin = joinedRoomPin || currentRoomPin;
   const room = normalizeRoomObject(roomsDb[activePin], activePin, lobbyNowTick);
+  const isFriendVipRoom = room.roomMode === 'friend_vip';
+  const isFriendVipHost = Boolean(isFriendVipRoom && currentUser?.username && room.hostUsername === currentUser.username);
+  const isRoomHost = isTeacher || isFriendVipHost;
+  const canCreateFriendVipRoom = isTeacher || hasVipFriendRoomAccess(currentUser);
+  const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
+  const aieoVipPriceLabel = formatVndCurrency(normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
   const allRoomsList = Object.values(roomsDb || {}).map(r => normalizeRoomObject(r, r.pin, lobbyNowTick));
   const roomChatMessages = Array.isArray(room.chatMessages) ? room.chatMessages : [];
   const chatRemainingMs =
@@ -534,10 +549,10 @@ export default function GameArena({
                   4 Vòng Chuẩn IELTS: V1 Bắn Nghĩa • V2 Gõ Full • V3 Đồng/Trái/Định Nghĩa • V4 Collocation
                 </span>
                 <h1 className="text-2xl font-extrabold text-[#0F172B] dark:text-white pt-1">
-                  Khu Tự Luyện Tập Từ Vựng &amp; BXH
+                  Tập Luyện 1 Mình (Miễn Phí) &amp; BXH Lớp
                 </h1>
                 <p className="text-xs text-[#62748E] dark:text-slate-400 max-w-lg mx-auto">
-                  Vào luyện tự do không cần chờ giáo viên mở phòng — chinh phục đủ 4 vòng hoặc chọn từng vòng để cày kỷ lục trên Bảng Xếp Hạng lớp!
+                  Học viên tự do luyện tập 1 mình miễn phí bất cứ lúc nào — hoặc đăng ký <b>Gói Ai eo VIP</b> để tự tạo phòng riêng đua Top trực tiếp cùng bạn bè!
                 </p>
               </div>
 
@@ -680,8 +695,10 @@ export default function GameArena({
                           }`}
                         >
                           <div className="min-w-0">
-                            <p className="font-extrabold text-slate-900 dark:text-white truncate">
-                              #{idx + 1} {row.name || row.username} {isMe ? '(Bạn)' : ''}
+                            <p className="font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1">
+                              <span>#{idx + 1}</span>
+                              <VipMemberName user={usersDb[row.username] || row} fallbackName={row.name || row.username} badgeSize="xs" />
+                              {isMe && <span className="text-[10px] font-bold text-[#007A7A] dark:text-cyan-300">(Bạn)</span>}
                             </p>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                               {row.topicLabel} • {row.accuracyPct ?? 100}% đúng
@@ -735,8 +752,51 @@ export default function GameArena({
             </div>
 
             {/* Pick Animal + Accessory + Ship Color before entering */}
-            <div className="mb-5 bg-white/80 dark:bg-slate-950/60 border border-pink-200/80 dark:border-slate-800/90 rounded-2xl p-4">
+            <div className="mb-4 bg-white/80 dark:bg-slate-950/60 border border-pink-200/80 dark:border-slate-800/90 rounded-2xl p-4">
               {renderPilotCustomizer(false)}
+            </div>
+
+            {/* VIP Friend Room Creation Banner (Ai eo VIP 80k/1T) */}
+            <div className={`mb-5 rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              canCreateFriendVipRoom
+                ? 'bg-gradient-to-r from-amber-50 via-rose-50 to-white dark:from-amber-950/30 dark:via-rose-950/20 dark:to-slate-900 border-amber-300 dark:border-amber-500/40'
+                : 'bg-gradient-to-r from-rose-50/90 via-white to-amber-50/80 dark:from-rose-950/25 dark:via-slate-900 dark:to-amber-950/20 border-rose-200 dark:border-rose-500/30'
+            }`}>
+              <div className="space-y-0.5 text-left">
+                <p className="text-xs font-extrabold text-rose-800 dark:text-rose-200 flex items-center gap-1.5">
+                  <Crown className="w-4 h-4 text-amber-500 shrink-0" />
+                  Phòng Đấu Riêng Chơi Cùng Bạn Bè (Gói Ai eo VIP)
+                </p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {canCreateFriendVipRoom
+                    ? 'Tài khoản của bạn đã mở quyền tạo phòng — tự chọn chủ đề từ vựng, chia sẻ mã PIN/Pass và đua cùng bạn bè ngay!'
+                    : 'Chỉ chủ phòng cần Gói Ai eo VIP để mở phòng riêng chơi cùng bạn bè (bạn bè vào phòng miễn phí). Bạn vẫn có thể Tập luyện 1 mình miễn phí!'}
+                </p>
+              </div>
+              {canCreateFriendVipRoom ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCreateRoomModal(true)}
+                  className="vip-shimmer-badge shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                >
+                  <Plus className="w-4 h-4" /> Tạo Phòng Bạn Bè
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenCheckoutModal?.({
+                      itemType: 'aieo_vip',
+                      itemId: '',
+                      itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                      itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                    })
+                  }
+                  className="vip-shimmer-badge shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                >
+                  <Crown className="w-4 h-4 text-amber-200" /> Mở Ai eo VIP ({aieoVipPriceLabel}/1T)
+                </button>
+              )}
             </div>
 
             {roomJoinError && (
@@ -805,6 +865,11 @@ export default function GameArena({
                     >
                       <span className="font-mono text-amber-600 dark:text-amber-300">#{r.pin}</span>
                       <span className="truncate max-w-[140px]">{r.name}</span>
+                      {r.roomMode === 'friend_vip' && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-white text-[9px] font-black">
+                          VIP
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -823,8 +888,11 @@ export default function GameArena({
 
   // 2. AMONG US DROPSHIP WAITING LOBBY + LAUNCH COUNTDOWN
   if (gameSubState === 'LOBBY' || gameSubState === 'COUNTDOWN') {
-    const canHostLaunch = isTeacher && gameSubState === 'LOBBY' && hasStudentsInLobby;
-    const isRoomAlreadyPlayingWithoutLaunch = !isTeacher && room.status === 'PLAYING' && gameSubState === 'LOBBY';
+    const canHostLaunch = isRoomHost && gameSubState === 'LOBBY' && (isFriendVipRoom ? lobbyPlayersList.length >= 1 : hasStudentsInLobby);
+    const isRoomAlreadyPlayingWithoutLaunch = !isRoomHost && room.status === 'PLAYING' && gameSubState === 'LOBBY';
+    const manageableRooms = isTeacher
+      ? allRoomsList
+      : allRoomsList.filter(r => r.hostUsername && r.hostUsername === currentUser?.username);
 
     return (
       <div className="h-[100dvh] w-full overflow-hidden bg-[#FDECF2] dark:bg-[#070b15] text-[#0F172B] dark:text-white flex flex-col select-none relative transition-colors duration-200">
@@ -848,7 +916,7 @@ export default function GameArena({
             }`}>
               <Wifi className="w-3 h-3" /> {serverSyncConnected ? 'Live' : 'Local'}
             </span>
-            {isTeacher && (
+            {isRoomHost && (
               <div className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs">
                 <span className="text-[#334155] dark:text-slate-300">PIN: <b className="font-mono text-amber-700 dark:text-amber-300">{room.pin}</b></span>
                 <span className="text-slate-400 dark:text-slate-500">•</span>
@@ -882,7 +950,7 @@ export default function GameArena({
             <span className="bg-white dark:bg-slate-800 border border-pink-200 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-[#007A7A] dark:text-cyan-300">
               <Users className="w-3.5 h-3.5" /> {lobbyPlayersList.length}/{room.maxPlayers}
             </span>
-            {isTeacher && (
+            {isRoomHost && (
               <>
                 <button
                   onClick={() => setShowCreateRoomModal(true)}
@@ -899,25 +967,27 @@ export default function GameArena({
                 >
                   Kho Từ ({roomVocabCount})
                 </button>
-                {!hasStudentsInLobby ? (
-                  <button
-                    onClick={() => jumpToGameSandboxRound(1)}
-                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-pink-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-xs font-bold text-[#334155] dark:text-slate-300 transition hidden sm:inline-flex items-center gap-1"
-                    title="Chỉ khả dụng khi phòng chưa có học sinh"
-                  >
-                    Chơi Thử GV
-                  </button>
-                ) : room.status === 'PLAYING' ? (
-                  <button
-                    onClick={() => setGameSubState('HOST_SPECTATE')}
-                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 border border-amber-300 dark:border-amber-400/40 text-xs font-bold text-amber-800 dark:text-amber-300 transition inline-flex items-center gap-1"
-                  >
-                    <Trophy className="w-3.5 h-3.5" /> Bảng Đua Top
-                  </button>
-                ) : (
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#EDFFFD] dark:bg-cyan-500/10 border border-[#B5F5F1] dark:border-cyan-500/30 text-[11px] font-bold text-[#007A7A] dark:text-cyan-300">
-                    <Trophy className="w-3.5 h-3.5" /> Giám Sát Đua Top
-                  </span>
+                {isTeacher && (
+                  !hasStudentsInLobby ? (
+                    <button
+                      onClick={() => jumpToGameSandboxRound(1)}
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-pink-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-700 text-xs font-bold text-[#334155] dark:text-slate-300 transition hidden sm:inline-flex items-center gap-1"
+                      title="Chỉ khả dụng khi phòng chưa có học sinh"
+                    >
+                      Chơi Thử GV
+                    </button>
+                  ) : room.status === 'PLAYING' ? (
+                    <button
+                      onClick={() => setGameSubState('HOST_SPECTATE')}
+                      className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 border border-amber-300 dark:border-amber-400/40 text-xs font-bold text-amber-800 dark:text-amber-300 transition inline-flex items-center gap-1"
+                    >
+                      <Trophy className="w-3.5 h-3.5" /> Bảng Đua Top
+                    </button>
+                  ) : (
+                    <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#EDFFFD] dark:bg-cyan-500/10 border border-[#B5F5F1] dark:border-cyan-500/30 text-[11px] font-bold text-[#007A7A] dark:text-cyan-300">
+                      <Trophy className="w-3.5 h-3.5" /> Giám Sát Đua Top
+                    </span>
+                  )
                 )}
               </>
             )}
@@ -927,13 +997,13 @@ export default function GameArena({
         {/* Main Lobby Content Area */}
         <div className="flex-1 min-h-0 flex flex-col justify-between gap-3 p-3 sm:p-5 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_rgba(255,255,255,0.85),_rgba(253,236,242,1)_75%)] dark:bg-[radial-gradient(ellipse_at_top,_rgba(30,58,138,0.28),_rgba(7,11,21,1)_70%)]">
           <div className="max-w-6xl w-full mx-auto space-y-3">
-            {/* TEACHER INLINE ROOM NAME / PIN / PASSWORD EDITOR */}
-            {isTeacher && (
+            {/* HOST INLINE ROOM NAME / PIN / PASSWORD EDITOR */}
+            {isRoomHost && (
               <div className="bg-[#FFF5F8] dark:bg-slate-900/90 border border-pink-200/90 dark:border-indigo-500/30 rounded-2xl p-3.5 backdrop-blur-md shadow-lg space-y-3">
-                {allRoomsList.length > 1 && (
+                {manageableRooms.length > 1 && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] font-bold text-[#62748E] dark:text-slate-400">Chuyển phòng:</span>
-                    {allRoomsList.map(r => (
+                    {manageableRooms.map(r => (
                       <div key={r.pin} className="inline-flex items-center rounded-lg overflow-hidden border border-pink-200 dark:border-slate-700">
                         <button
                           type="button"
@@ -1076,8 +1146,12 @@ export default function GameArena({
                   <p className="text-[11px] text-[#62748E] dark:text-slate-400">
                     {isTeacher
                       ? 'Học sinh nhập Mã PIN & Mật khẩu để vào khoang. Nhấn Bắt Đầu Trận Đấu để tất cả cùng vào game.'
+                      : isFriendVipHost
+                      ? 'Bạn là Chủ Phòng Bạn Bè (Ai eo VIP) — chia sẻ Mã PIN & Pass để bạn bè vào tự động và bấm Bắt Đầu để cùng đua!'
                       : isRoomAlreadyPlayingWithoutLaunch
-                      ? 'Lượt chơi trước đang chạy hoặc đã xong — chờ Giáo viên bấm Bắt Đầu / Mở Sảnh Mới để cùng khởi hành.'
+                      ? 'Lượt chơi trước đang chạy hoặc đã xong — chờ Chủ phòng bấm Bắt Đầu / Mở Sảnh Mới để cùng khởi hành.'
+                      : isFriendVipRoom
+                      ? 'Bạn đã vào Phòng Bạn Bè (VIP)! Bấm Sẵn Sàng và chờ Chủ phòng bấm khởi hành để cùng đua.'
                       : 'Bạn đã ở trong Sảnh Chờ! Bấm Sẵn Sàng và chờ Chủ phòng (Giáo viên) bấm khởi hành.'}
                   </p>
                 </div>
@@ -1104,7 +1178,7 @@ export default function GameArena({
                   </div>
                 ) : (
                   lobbyPlayersList.map((player, idx) => {
-                    const isHost = player.role === 'teacher';
+                    const isHost = player.role === 'teacher' || (isFriendVipRoom && player.username === room.hostUsername);
                     const isSelf = player.username === currentUser?.username;
                     const showBubble = Boolean(player.chat && player.chatAt && Math.abs(lobbyNowTick - player.chatAt) < 5500);
 
@@ -1117,8 +1191,8 @@ export default function GameArena({
                           </div>
                         )}
 
-                        {/* Kick Button for Teacher */}
-                        {isTeacher && !isHost && (
+                        {/* Kick Button for Room Host */}
+                        {isRoomHost && !isHost && (
                           <button
                             type="button"
                             onClick={() => handleKickLobbyPlayer(activePin, player.username, player.name)}
@@ -1132,14 +1206,16 @@ export default function GameArena({
                         {/* Host Crown / Teacher Approval Status */}
                         {isHost ? (
                           <div className="mb-0.5 text-amber-600 dark:text-amber-400 flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider">
-                            <Crown className="w-3.5 h-3.5" /> Chủ Phòng
+                            <Crown className="w-3.5 h-3.5" /> {isFriendVipRoom ? 'Chủ Phòng VIP' : 'Chủ Phòng'}
                           </div>
                         ) : (
                           <div className="mb-0.5 flex flex-col items-center gap-0.5">
-                            <div className={`text-[10px] font-bold uppercase tracking-wider ${player.approved || player.ready ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                              {player.approved ? '✓ GV Đã Duyệt' : player.ready ? 'Sẵn sàng (Chờ GV duyệt)' : 'Chờ GV duyệt'}
+                            <div className={`text-[10px] font-bold uppercase tracking-wider ${player.approved || player.ready || isFriendVipRoom ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                              {isFriendVipRoom
+                                ? (player.ready ? '✓ Sẵn sàng' : '✓ Bạn bè đã vào')
+                                : (player.approved ? '✓ GV Đã Duyệt' : player.ready ? 'Sẵn sàng (Chờ GV duyệt)' : 'Chờ GV duyệt')}
                             </div>
-                            {isTeacher && (
+                            {isTeacher && !isFriendVipRoom && (
                               <button
                                 type="button"
                                 onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, player.username, false)}
@@ -1183,10 +1259,12 @@ export default function GameArena({
                           <span className={`w-2 h-2 rounded-full ${
                             player.ready || isHost ? 'bg-emerald-500' : 'bg-amber-400'
                           }`} />
-                          <span className="truncate max-w-[105px]">{player.name}</span>
+                          <span className="truncate max-w-[140px]">
+                            <VipMemberName user={usersDb[player.username] || player} fallbackName={player.name} badgeSize="xs" />
+                          </span>
                         </button>
                         {(() => {
-                          const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb, customTitles);
+                          const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb, customTitles, paymentConfig);
                           if (!pTitle) return null;
                           return (
                             <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${pTitle.gameBadgeClass}`}>
@@ -1246,7 +1324,7 @@ export default function GameArena({
               </div>
 
             <div className="flex items-center gap-2.5 flex-wrap justify-center shrink-0">
-              {!isTeacher ? (
+              {!isRoomHost ? (
                 <button
                   type="button"
                   onClick={handleToggleLobbyReady}
@@ -1257,15 +1335,17 @@ export default function GameArena({
                   }`}
                 >
                   <CheckCircle className="w-4 h-4" />
-                  {myLobbyEntry?.approved
-                    ? 'GV Đã Duyệt — Chờ Khởi Hành!'
-                    : myLobbyEntry?.ready
-                    ? 'Đã Sẵn Sàng (Chờ GV Duyệt)'
-                    : 'Xin Duyệt & Sẵn Sàng'}
+                  {isFriendVipRoom
+                    ? (myLobbyEntry?.ready ? 'Đã Sẵn Sàng — Chờ Chủ Phòng' : 'Bấm Sẵn Sàng Đua Cùng Bạn')
+                    : (myLobbyEntry?.approved
+                      ? 'GV Đã Duyệt — Chờ Khởi Hành!'
+                      : myLobbyEntry?.ready
+                      ? 'Đã Sẵn Sàng (Chờ GV Duyệt)'
+                      : 'Xin Duyệt & Sẵn Sàng')}
                 </button>
               ) : (
                 <>
-                  {hasStudentsInLobby && (
+                  {!isFriendVipRoom && hasStudentsInLobby && (
                     <button
                       type="button"
                       onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, '', true)}
@@ -1280,14 +1360,14 @@ export default function GameArena({
                       onClick={() => handleTeacherResetLobby(activePin)}
                       className="px-4 py-2.5 rounded-xl bg-white hover:bg-pink-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-pink-200 dark:border-slate-600 text-xs font-bold text-[#0F172B] dark:text-slate-200 flex items-center gap-1.5 transition"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" /> Mở Lại Sảnh (Cho HS Vào)
+                      <RefreshCw className="w-3.5 h-3.5" /> Mở Lại Sảnh (Cho Bạn Vào)
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={() => handleTeacherStartLobbyGame(activePin)}
                     disabled={!canHostLaunch}
-                    title={hasStudentsInLobby ? 'Khởi động trận đấu & mở bảng Đua Top cho Giáo viên' : 'Cần ít nhất 1 học sinh vào sảnh mới có thể bắt đầu'}
+                    title={canHostLaunch ? 'Khởi động trận đấu Đua Top ngay' : 'Cần ít nhất 1 thành viên vào sảnh mới có thể bắt đầu'}
                     className={`px-6 py-2.5 rounded-xl font-extrabold text-sm transition flex items-center gap-2 shadow-xl ${
                       canHostLaunch
                         ? 'bg-gradient-to-r from-[#007A7A] to-emerald-600 hover:from-[#065B5B] hover:to-emerald-500 dark:from-emerald-500 dark:to-cyan-500 text-white dark:text-slate-950 shadow-teal-900/15 dark:shadow-emerald-500/25'
@@ -1295,7 +1375,9 @@ export default function GameArena({
                     }`}
                   >
                     <Rocket className="w-4 h-4" />
-                    {hasStudentsInLobby
+                    {isFriendVipRoom
+                      ? `BẮT ĐẦU ĐUA CÙNG BẠN (${lobbyPlayersList.length} người)`
+                      : hasStudentsInLobby
                       ? `BẮT ĐẦU ĐUA TOP (${studentLobbyPlayers.length} HS)`
                       : 'CHỜ HỌC SINH VÀO SẢNH (0 HS)'}
                   </button>
@@ -1584,9 +1666,11 @@ export default function GameArena({
                           animate={!p.finished && (p.lives ?? 3) > 0}
                           onShip={true}
                         />
-                        <p className="font-extrabold text-sm text-[#0F172B] dark:text-white mt-1.5 truncate max-w-full">{p.name}</p>
+                        <p className="font-extrabold text-sm text-[#0F172B] dark:text-white mt-1.5 truncate max-w-full">
+                          <VipMemberName user={usersDb[p.username] || p} fallbackName={p.name} badgeSize="xs" />
+                        </p>
                         {(() => {
-                          const podTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles);
+                          const podTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles, paymentConfig);
                           if (!podTitle) return null;
                           return (
                             <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border mt-0.5 ${podTitle.gameBadgeClass}`}>
@@ -1679,11 +1763,11 @@ export default function GameArena({
                         {/* Name, Progress Bar, Hearts & Combo */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-extrabold text-sm text-[#0F172B] dark:text-white truncate max-w-[150px] sm:max-w-[210px]">
-                              {p.name}
+                            <span className="font-extrabold text-sm text-[#0F172B] dark:text-white truncate max-w-[190px] sm:max-w-[260px]">
+                              <VipMemberName user={usersDb[p.username] || p} fallbackName={p.name} badgeSize="xs" />
                             </span>
                             {(() => {
-                              const rowTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles);
+                              const rowTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles, paymentConfig);
                               if (!rowTitle) return null;
                               return (
                                 <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${rowTitle.gameBadgeClass}`}>
@@ -2193,7 +2277,11 @@ export default function GameArena({
                                 : 'bg-[#FFF5F8] dark:bg-slate-950/70 border-pink-200/80 dark:border-slate-800 text-[#0F172B] dark:text-slate-200'
                             }`}
                           >
-                            <span className="truncate font-semibold">#{sIdx + 1} {st.name || st.username} ({st.topicLabel})</span>
+                            <span className="truncate font-semibold flex items-center gap-1 min-w-0">
+                              <span>#{sIdx + 1}</span>
+                              <VipMemberName user={usersDb[st.username] || st} fallbackName={st.name || st.username} badgeSize="xs" />
+                              <span className="text-[10px] text-slate-400">({st.topicLabel})</span>
+                            </span>
                             <span className="font-mono font-extrabold text-amber-600 dark:text-amber-300 ml-2 shrink-0">{st.score}đ</span>
                           </div>
                         );
@@ -2217,7 +2305,7 @@ export default function GameArena({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {topStandings.map((st, sIdx) => {
                         const isMe = st.username === currentUser?.username || st.name === currentUser?.name;
-                        const stTitle = st.username ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb, customTitles) : null;
+                        const stTitle = st.username ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb, customTitles, paymentConfig) : null;
                         return (
                           <div
                             key={st.username || st.name || sIdx}
@@ -2228,7 +2316,9 @@ export default function GameArena({
                             }`}
                           >
                             <span className="truncate font-semibold flex items-center gap-1.5 min-w-0">
-                              <span className="truncate">#{sIdx + 1} {st.name || st.username} {isMe ? '(Bạn)' : ''}</span>
+                              <span className="shrink-0">#{sIdx + 1}</span>
+                              <VipMemberName user={usersDb[st.username] || st} fallbackName={st.name || st.username} badgeSize="xs" />
+                              {isMe && <span className="text-[10px] font-bold shrink-0">(Bạn)</span>}
                               {stTitle && (
                                 <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border shrink-0 ${stTitle.gameBadgeClass}`}>
                                   {stTitle.icon} {stTitle.label}
@@ -2292,7 +2382,7 @@ export default function GameArena({
                       <RefreshCw className="w-4 h-4" /> Về Khu Luyện Tập &amp; Xem BXH
                     </button>
                   </>
-                ) : isTeacher ? (
+                ) : isRoomHost ? (
                   <>
                     <button
                       onClick={() => handleTeacherResetLobby(activePin)}
@@ -2300,12 +2390,14 @@ export default function GameArena({
                     >
                       <RefreshCw className="w-4 h-4" /> Mở Sảnh Chờ Ván Mới
                     </button>
-                    <button
-                      onClick={() => initGameCampaign(activePin, currentUser)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow"
-                    >
-                      Chơi Thử Lại (GV)
-                    </button>
+                    {isTeacher && (
+                      <button
+                        onClick={() => initGameCampaign(activePin, currentUser)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow"
+                      >
+                        Chơi Thử Lại (GV)
+                      </button>
+                    )}
                   </>
                 ) : (
                   <button

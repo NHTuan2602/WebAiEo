@@ -1387,6 +1387,401 @@ However, energy storage remains a critical bottleneck. Solar power output fluctu
         ]
       }
     }
+  },
+  {
+    id: 'test-single-reading-alltypes-01',
+    seedTag: 'single_r_all_v1',
+    title: 'Reading Lẻ Full 11 Dạng — Ocean Kelp Forests & Urban Microgrids',
+    description:
+      'Đề Reading lẻ chuẩn IELTSMate tổng hợp đủ 11 dạng bài Reading: Multiple Choice, TRUE/FALSE/NOT GIVEN, YES/NO/NOT GIVEN, Matching Headings, Matching Information, Matching Features, Summary Box, Summary No Box, Correct Ending, Fill in the Blank (đục lỗ), Diagram Label & Short Answer.',
+    createdAt: '2026-11-18',
+    visibility: 'public',
+    testMode: 'single_skill',
+    focusSkill: 'reading',
+    maxAttempts: 0,
+    antiCheatEnabled: false,
+    allowViewAnswers: true,
+    sectionOrder: ['reading'],
+    sectionDurations: { listening: 10, reading: 25, writing: 20 },
+    reading: {
+      passageTitle: 'Passage 1: Giant Kelp Forests — Underwater Climate Engineers',
+      passageText: `A Along rocky temperate coastlines from California to Tasmania, towering brown macroalgae known as giant kelp form dense underwater canopies growing up to half a metre per day. Far from being passive seaweed, these three-dimensional forests shelter over 800 marine species, buffer coastlines against storm surges, and capture dissolved carbon at rates rivaling tropical rainforests.
+
+B Rather than drawing nutrients through underground roots like terrestrial trees, kelp anchors itself onto bedrock with a tough root-like structure called a holdfast. Gas-filled bladders known as pneumatocysts buoy each textured blade upward toward sunlit surface waters, allowing fronds to photosynthesise efficiently across towering 30-metre columns.
+
+C Marine ecologist Dr. Hannah Sato emphasizes that healthy kelp ecosystems depend strictly on trophic balance involving sea otters. Dr. Lucas Meyer similarly demonstrated in Oregon reefs that unchecked purple sea urchin swarms can strip vibrant kelp beds down to barren stone within months, whereas predatory lobsters and otters restore kelp density naturally without chemical intervention.`,
+      clozeText: `Complete the labelled diagram note below:
+• Gas-filled sacs called {{10}} lift blades toward sunlit waters.
+• At the ocean floor, a tough {{11}} grips rocky reefs without absorbing soil minerals.`,
+      passages: [
+        {
+          id: 'pass_sr_1',
+          title: 'Passage 1: Giant Kelp Forests — Underwater Climate Engineers',
+          passageText: `A Along rocky temperate coastlines from California to Tasmania, towering brown macroalgae known as giant kelp form dense underwater canopies growing up to half a metre per day. Far from being passive seaweed, these three-dimensional forests shelter over 800 marine species, buffer coastlines against storm surges, and capture dissolved carbon at rates rivaling tropical rainforests.
+
+B Rather than drawing nutrients through underground roots like terrestrial trees, kelp anchors itself onto bedrock with a tough root-like structure called a holdfast. Gas-filled bladders known as pneumatocysts buoy each textured blade upward toward sunlit surface waters, allowing fronds to photosynthesise efficiently across towering 30-metre columns.
+
+C Marine ecologist Dr. Hannah Sato emphasizes that healthy kelp ecosystems depend strictly on trophic balance involving sea otters. Dr. Lucas Meyer similarly demonstrated in Oregon reefs that unchecked purple sea urchin swarms can strip vibrant kelp beds down to barren stone within months, whereas predatory lobsters and otters restore kelp density naturally without chemical intervention.`,
+          clozeText: `Questions 10-11: Fill in the blanks from the passage.
+• Gas-filled sacs called {{10}} lift blades toward sunlit waters.
+• At the ocean floor, a tough {{11}} grips rocky reefs.`
+        },
+        {
+          id: 'pass_sr_2',
+          title: 'Passage 2: Resilient Neighbourhood Microgrids',
+          passageText: `A Unlike centralised fossil-fuel power stations transmitting voltage across hundreds of kilometres, modern neighbourhood microgrids combine rooftop solar arrays, vanadium-flow batteries, and automated controllers to serve clustered blocks locally.
+
+B Engineer Priya Nair argues in a 2025 IEEE report that islandable microgrids eliminate catastrophic blackouts during typhoons: once main transmission lines trip, an automated gateway isolates the district grid in under twenty milliseconds so hospitals and water pumps continue running uninterrupted.`,
+          clozeText: ''
+        }
+      ],
+      questions: [
+        {
+          id: 'sr_q1',
+          type: 'mcq',
+          passageIdx: 0,
+          question: '1. [MCQ] According to Paragraph A, giant kelp forests contribute to coastal resilience by:',
+          options: [
+            'A. warming polar ocean currents during winter months',
+            'B. absorbing wave energy during severe coastal storms',
+            'C. replacing deep-sea coral reefs along equatorial beaches',
+            'D. filtering plastic waste out of commercial shipping lanes'
+          ],
+          correctAnswer: 'B. absorbing wave energy during severe coastal storms'
+        },
+        {
+          id: 'sr_q2',
+          type: 'tfng',
+          passageIdx: 0,
+          question: '2. [TRUE / FALSE / NOT GIVEN] Giant kelp absorbs most of its mineral nutrients through its holdfast like land trees.',
+          options: ['TRUE', 'FALSE', 'NOT GIVEN'],
+          correctAnswer: 'FALSE'
+        },
+        {
+          id: 'sr_q3',
+          type: 'matching_headings',
+          passageIdx: 0,
+          question: '3. [Matching Headings] Choose the best heading for Paragraph B.',
+          options: [
+            'i. Anatomy that maximises sunlight capture',
+            'ii. Economic subsidies for offshore harvesting',
+            'iii. Reasons sea otters migrate inland',
+            'iv. How ocean acidification dissolves limestone'
+          ],
+          correctAnswer: 'i. Anatomy that maximises sunlight capture'
+        },
+        {
+          id: 'sr_q4',
+          type: 'matching_information',
+          passageIdx: 0,
+          question: '4. [Matching Information] Which paragraph mentions the maximum daily vertical growth rate of giant kelp?',
+          options: ['Paragraph A', 'Paragraph B', 'Paragraph C'],
+          correctAnswer: 'Paragraph A'
+        },
+        {
+          id: 'sr_q5',
+          type: 'matching_features',
+          passageIdx: 0,
+          question: '5. [Matching Features] Researcher who documented Oregon reefs stripped bare by purple sea urchins:',
+          options: ['A. Dr. Hannah Sato', 'B. Dr. Lucas Meyer', 'C. Priya Nair'],
+          correctAnswer: 'B. Dr. Lucas Meyer'
+        },
+        {
+          id: 'sr_q6',
+          type: 'summary_box',
+          passageIdx: 0,
+          question: '6. [Summary Completion — Box] Predatory ______ help protect kelp beds from overgrazing urchins.',
+          options: ['A. lobsters', 'B. sharks', 'C. penguins', 'D. corals'],
+          correctAnswer: 'A. lobsters'
+        },
+        {
+          id: 'sr_q7',
+          type: 'summary_nobox',
+          passageIdx: 0,
+          wordLimit: 'ONE WORD',
+          question: '7. [Summary Completion — No Box] Dense kelp beds provide shelter for more than 800 ______ species.',
+          options: [],
+          correctAnswer: 'marine'
+        },
+        {
+          id: 'sr_q8',
+          type: 'correct_ending',
+          passageIdx: 1,
+          question: '8. [Correct Ending] An islandable neighbourhood microgrid protects hospital electricity because:',
+          options: [
+            'A. its automated gateway disconnects faulted main lines in milliseconds.',
+            'B. rooftop panels double sunlight output at night.',
+            'C. residents manually restart diesel turbines after sunrise.',
+            'D. coastal humidity prevents lightning strikes on transformers.'
+          ],
+          correctAnswer: 'A. its automated gateway disconnects faulted main lines in milliseconds.'
+        },
+        {
+          id: 'sr_q9',
+          type: 'ynng',
+          passageIdx: 1,
+          question: '9. [YES / NO / NOT GIVEN] Does Engineer Priya Nair agree that decentralised microgrids improve typhoon blackout resilience?',
+          options: ['YES', 'NO', 'NOT GIVEN'],
+          correctAnswer: 'YES'
+        },
+        {
+          id: 'sr_q10',
+          type: 'fill',
+          blankNum: 10,
+          passageIdx: 0,
+          wordLimit: 'ONE WORD',
+          question: '10. [Fill in the Blank / Đục lỗ] Gas-filled sacs lifting kelp fronds are termed ______.',
+          options: [],
+          correctAnswer: 'pneumatocysts'
+        },
+        {
+          id: 'sr_q11',
+          type: 'diagram_label',
+          blankNum: 11,
+          passageIdx: 0,
+          wordLimit: 'ONE WORD',
+          question: '11. [Diagram Label Completion] Structure anchoring kelp onto bedrock at the seabed: ______.',
+          options: [],
+          correctAnswer: 'holdfast'
+        },
+        {
+          id: 'sr_q12',
+          type: 'short_answer',
+          passageIdx: 1,
+          wordLimit: 'NO MORE THAN THREE WORDS',
+          question: '12. [Short Answer Question] Which type of battery is paired with rooftop solar panels in Paragraph A?',
+          options: [],
+          correctAnswer: 'vanadium-flow batteries|vanadium flow batteries'
+        }
+      ]
+    }
+  },
+  {
+    id: 'test-single-listening-alltypes-01',
+    seedTag: 'single_l_all_v1',
+    title: 'Listening Lẻ Full 6 Dạng — Botanical Garden Tour & Eco-Packaging Lab',
+    description:
+      'Đề Listening lẻ tổng hợp đủ 6 dạng bài IELTS Listening: Form Completion (đục lỗ), Flow-chart Completion, Multiple Choice, Matching, Map/Plan/Diagram Labelling & Short Answer Questions — tích hợp giọng đọc AI tiếng Anh sẵn.',
+    createdAt: '2026-11-18',
+    visibility: 'public',
+    testMode: 'single_skill',
+    focusSkill: 'listening',
+    maxAttempts: 0,
+    antiCheatEnabled: false,
+    allowViewAnswers: true,
+    maxAudioPlays: 3,
+    sectionOrder: ['listening'],
+    sectionDurations: { listening: 20, reading: 20, writing: 20 },
+    listening: {
+      audioUrl: '',
+      transcript: `Welcome to the Nha Trang Botanical Volunteer Orientation and Eco-Packaging Workshop.`,
+      tracks: [
+        {
+          id: 'sl_track_1',
+          title: 'Part 1: Botanical Volunteer Registration & Map (Q1–6)',
+          audioUrl: '',
+          transcript: `Coordinator: Hello! Thanks for signing up for our Botanical Garden Volunteer Programme. Can I take your surname for the badge? Volunteer: Yes, it is Bellamy, spelt B-E-L-L-A-M-Y. Coordinator: Great. And for the morning shift you will help water herbs starting at nine fifteen, so 9:15 a.m. Note that volunteers get free entry to the Glasshouse Cafe, and your team supervisor is Dr. Carter. Before heading out, look at our garden map: directly opposite the Main Gate is the Orchid Pavilion on Zone B, while the Seed Vault sits in Zone C beside the Pond. If you have allergies, inform Nurse Kim at reception by twelve pounds fee waiver—wait, there is no fee, just bring sturdy boots!`,
+          clozeText: `Questions 1-2: Complete the Volunteer Form below.
+Write **ONE WORD AND/OR A NUMBER** for each answer.
+
+**BOTANICAL VOLUNTEER REGISTRATION**
+• Volunteer Surname: Mr. {{1}}
+• Morning Shift Starts: {{2}} a.m.
+• Team Supervisor: Dr. Carter`
+        },
+        {
+          id: 'sl_track_2',
+          title: 'Part 2: Eco-Packaging Lab Flow-Chart & Q7–10',
+          audioUrl: '',
+          transcript: `Lecturer: Today in the Eco-Packaging Lab we turn dried rice husks into compostable food trays. Follow our three-stage flow-chart: First, raw husks are washed and milled into fine powder. Second, natural cassava starch is blended in during the mixing stage before high-temperature pressing. Third, finished trays undergo waterproofing with beeswax. Remember in Question 8 that heat-pressed trays withstand ninety seconds in microwaves, so option C. Let's match our researchers: Sarah leads fibre strength testing, while Tom focuses on mould design. Finally, what local marine crop is being trialled next semester for edible films? Seaweed!`,
+          clozeText: `Questions 7: Complete the Flow-chart step below.
+Write **ONE WORD** for the answer.
+1. Wash & mill rice powder -> 2. Mix with {{7}} starch -> 3. Waterproof coat`
+        }
+      ],
+      questions: [
+        {
+          id: 'sl_q1',
+          type: 'form_completion',
+          blankNum: 1,
+          trackIdx: 0,
+          wordLimit: 'ONE WORD',
+          question: '1. [Form Completion] Volunteer Surname: Mr. ______.',
+          options: [],
+          correctAnswer: 'Bellamy|bellamy'
+        },
+        {
+          id: 'sl_q2',
+          type: 'form_completion',
+          blankNum: 2,
+          trackIdx: 0,
+          wordLimit: 'A TIME',
+          question: '2. [Form Completion] Morning shift begins at ______ a.m.',
+          options: [],
+          correctAnswer: '9:15|9.15'
+        },
+        {
+          id: 'sl_q3',
+          type: 'mcq',
+          trackIdx: 0,
+          question: '3. [Multiple Choice] Which cafe offers complimentary entry/discounts for registered volunteers?',
+          options: [
+            'A. Palm Courtyard Cafe',
+            'B. Glasshouse Cafe',
+            'C. Pier Terrace Cafe',
+            'D. Riverbank Bistro'
+          ],
+          correctAnswer: 'B. Glasshouse Cafe'
+        },
+        {
+          id: 'sl_q4',
+          type: 'map_diagram',
+          trackIdx: 0,
+          question: '4. [Map / Plan Labelling] Where is the Orchid Pavilion located relative to the Main Gate?',
+          options: ['A. Zone A (West Gate)', 'B. Zone B (Opposite Main Gate)', 'C. Zone C (Beside Pond)'],
+          correctAnswer: 'B. Zone B (Opposite Main Gate)'
+        },
+        {
+          id: 'sl_q5',
+          type: 'map_diagram',
+          trackIdx: 0,
+          question: '5. [Map / Plan Labelling] Which zone houses the Seed Vault beside the Pond?',
+          options: ['A. Zone A (West Gate)', 'B. Zone B (Opposite Main Gate)', 'C. Zone C (Beside Pond)'],
+          correctAnswer: 'C. Zone C (Beside Pond)'
+        },
+        {
+          id: 'sl_q6',
+          type: 'short_answer',
+          trackIdx: 0,
+          wordLimit: 'NO MORE THAN TWO WORDS',
+          question: '6. [Short Answer] What footwear should volunteers bring on orientation day?',
+          options: [],
+          correctAnswer: 'sturdy boots|boots'
+        },
+        {
+          id: 'sl_q7',
+          type: 'flowchart_completion',
+          blankNum: 7,
+          trackIdx: 1,
+          wordLimit: 'ONE WORD',
+          question: '7. [Flow-chart Completion] Stage 2 mixes rice husk powder with natural ______ starch.',
+          options: [],
+          correctAnswer: 'cassava'
+        },
+        {
+          id: 'sl_q8',
+          type: 'mcq',
+          trackIdx: 1,
+          question: '8. [Multiple Choice] How long do the pressed eco-trays safely withstand microwave heating?',
+          options: ['A. 30 seconds', 'B. 60 seconds', 'C. 90 seconds', 'D. 120 seconds'],
+          correctAnswer: 'C. 90 seconds'
+        },
+        {
+          id: 'sl_q9',
+          type: 'matching',
+          trackIdx: 1,
+          question: '9. [Matching] Which researcher is responsible for fibre strength testing?',
+          options: ['A. Sarah', 'B. Tom', 'C. Dr. Carter'],
+          correctAnswer: 'A. Sarah'
+        },
+        {
+          id: 'sl_q10',
+          type: 'short_answer',
+          trackIdx: 1,
+          wordLimit: 'ONE WORD',
+          question: '10. [Short Answer] Which marine crop will be trialled next semester for edible packaging films?',
+          options: [],
+          correctAnswer: 'seaweed|Seaweed'
+        }
+      ]
+    }
+  },
+  {
+    id: 'test-single-writing-academic-01',
+    seedTag: 'single_w_acad_v1',
+    title: 'Writing Lẻ Chuẩn Giám Khảo — Clean Energy Transition & AI in Education',
+    description:
+      'Đề Writing Task 1 + Task 2 chuẩn để test bộ chấm khắt khe IELTS Examiner: điểm thành phần nguyên 1–9, công thức làm tròn xuống (T2×2+T1)/3, phát hiện lỗi ngữ pháp/chính tả, bảng phân tích từng câu, lỗi tư duy đề & nâng cấp Collocation.',
+    createdAt: '2026-11-18',
+    visibility: 'public',
+    testMode: 'single_skill',
+    focusSkill: 'writing',
+    maxAttempts: 0,
+    antiCheatEnabled: false,
+    allowViewAnswers: true,
+    sectionOrder: ['writing'],
+    sectionDurations: { listening: 10, reading: 20, writing: 60 },
+    writing: {
+      task1: {
+        prompt:
+          'Task 1: The bar chart illustrates electricity generation by source in Northland (in TWh) in 2005, 2015, and 2025. Summarise the key trends and make comparisons where relevant.',
+        minWords: 150,
+        imageUrl: CAMBRIDGE_TASK1_CHART_SVG_URL,
+        modelAnswer:
+          'The bar chart illustrates electricity output in Northland across coal, natural gas, hydroelectricity, and wind and solar power in 2005, 2015, and 2025. Overall, total coal generation fell steeply over the period, while wind and solar power surged more than thirteenfold to become the largest electricity source by 2025. Coal initially dominated supply at 140 TWh in 2005 before receding to 115 TWh in 2015 and dropping sharply to 45 TWh in 2025. Meanwhile, wind and solar expanded rapidly from 10 TWh to 42 TWh in 2015 and peaked at 135 TWh in 2025.'
+      },
+      task2: {
+        prompt:
+          'Task 2: Artificial intelligence tools are increasingly replacing conventional homework and writing exercises in schools and universities. Do the advantages of this development outweigh the disadvantages?',
+        minWords: 250,
+        modelAnswer:
+          'Although automated writing and tutoring tools deliver instantaneous grammatical feedback and personalised study schedules, excessive reliance risks undermining independent critical reasoning if schools fail to integrate structured human supervision. On balance, I contend that thoughtful guided adoption offers greater long-term educational value when paired with rigorous classroom assessment.'
+      }
+    }
+  },
+  {
+    id: 'test-single-speaking-examroom-01',
+    seedTag: 'single_s_room_v1',
+    title: 'Phòng Thi Speaking Thực Chiến 01 — AI Tự Ghi 3s (Pass: 1234)',
+    description:
+      'Đề Speaking Phòng Thi Thực Chiến mẫu để kiểm tra giọng AI đọc toàn bộ câu hỏi và chế độ đếm ngược 3 giây tự động bật Micro ghi âm xuyên suốt Part 1 · Part 2 · Part 3. Mật khẩu test: 1234',
+    createdAt: '2026-11-18',
+    visibility: 'public',
+    testMode: 'single_skill',
+    focusSkill: 'speaking',
+    maxAttempts: 0,
+    antiCheatEnabled: false,
+    allowViewAnswers: true,
+    sectionOrder: ['speaking'],
+    sectionDurations: { listening: 10, reading: 10, writing: 10, speaking: 12 },
+    speaking: {
+      speakingTrack: 'exam_room',
+      roomPassword: '1234',
+      part1DurationSec: 35,
+      part2PrepSec: 20,
+      part2SpeakSec: 90,
+      part3DurationSec: 45,
+      isForecast: false,
+      autoAiGrade: true,
+      part1: {
+        enabled: true,
+        topic: 'Hometown & Daily Study',
+        questions: [
+          { id: 'sp_er_p1_1', prompt: 'Where is your hometown located, and what do you like most about living there?' },
+          { id: 'sp_er_p1_2', prompt: 'How do you usually organise your daily English or IELTS study routine?' }
+        ]
+      },
+      part2: {
+        enabled: true,
+        title: 'Describe a goal you worked hard to achieve',
+        cueCardPrompt: 'Describe an academic or personal goal that you worked hard to achieve.',
+        bullets: [
+          'what the goal was',
+          'when you decided to pursue it',
+          'what challenges you had to overcome',
+          'and explain how achieving it made you feel'
+        ],
+        followUpQuestion: 'Do you find it easier to stay motivated when studying alone or with friends?'
+      },
+      part3: {
+        enabled: true,
+        topic: 'Technology & Independent Learning',
+        questions: [
+          { id: 'sp_er_p3_1', prompt: 'Do you think young people today rely too heavily on digital tools when studying?' },
+          { id: 'sp_er_p3_2', prompt: 'How can teachers balance automated feedback with genuine personal mentorship?' }
+        ]
+      }
+    }
   }
 ];
 

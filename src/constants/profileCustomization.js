@@ -819,73 +819,104 @@ export const STUDENT_TITLES = [
     id: 'vip_thieu_gia',
     label: 'Thiếu Gia Luyện Đề',
     icon: '💰',
-    tier: 'Cửa Hàng VIP',
+    tier: 'Cửa Hàng VIP (1 Tháng)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 10000,
-    conditionText: 'Danh hiệu Phú Quý: Sở hữu qua thanh toán QR ủng hộ hoặc Quản Trị Hệ Thống trao tặng.',
-    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-400 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/60',
-    heroBadgeClass: 'bg-emerald-500/35 text-emerald-100 border-emerald-300/75',
-    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/60',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-emerald-400',
+    conditionText: 'Danh hiệu Phú Quý (1 tháng): Sở hữu vòng hào quang Lục Bảo & nổi bật trên Hồ sơ + BXH suốt 30 ngày.',
+    badgeClass: 'vip-shimmer-badge bg-gradient-to-r from-emerald-100 via-teal-50 to-amber-100 text-emerald-950 border-emerald-400 ring-1 ring-emerald-400/70 shadow-sm dark:from-emerald-600/40 dark:via-teal-500/30 dark:to-amber-500/30 dark:text-emerald-100 dark:border-emerald-300/80',
+    heroBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-emerald-500/80 via-teal-500/80 to-amber-500/70 text-white border-emerald-300 shadow-md',
+    gameBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-300 shadow-sm',
     isUnlocked: () => false,
     getProgress: (_stats, _user, priceVnd = 10000) => ({
       pct: 0,
-      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
     })
   },
   {
     id: 'vip_manh_thuong_quan',
     label: 'Mạnh Thường Quân',
     icon: '🥂',
-    tier: 'Cửa Hàng VIP',
+    tier: 'Cửa Hàng VIP (1 Tháng)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 15000,
-    conditionText: 'Danh hiệu Phú Quý: Nhà tài trợ nhiệt huyết đồng hành cùng hệ thống IELTS.',
-    badgeClass: 'bg-rose-50 text-rose-800 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60',
-    heroBadgeClass: 'bg-rose-500/35 text-rose-100 border-rose-300/75',
-    gameBadgeClass: 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/60',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-rose-400',
+    conditionText: 'Danh hiệu Phú Quý (1 tháng): Hiệu ứng ánh kim Hồng Ngọc + hào quang Avatar khi đồng hành duy trì server.',
+    badgeClass: 'vip-shimmer-badge bg-gradient-to-r from-rose-100 via-pink-50 to-amber-100 text-rose-950 border-rose-400 ring-1 ring-rose-400/70 shadow-sm dark:from-rose-600/40 dark:via-pink-500/30 dark:to-amber-500/30 dark:text-rose-100 dark:border-rose-300/80',
+    heroBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-rose-500/85 via-pink-500/85 to-amber-500/75 text-white border-rose-300 shadow-md',
+    gameBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-rose-500 to-amber-500 text-white border-rose-300 shadow-sm',
     isUnlocked: () => false,
     getProgress: (_stats, _user, priceVnd = 15000) => ({
       pct: 0,
-      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
     })
   },
   {
     id: 'vip_dai_gia',
     label: 'Đại Gia IELTS',
     icon: '💸',
-    tier: 'Cửa Hàng VIP',
+    tier: 'Cửa Hàng VIP (1 Tháng)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 20000,
-    conditionText: 'Danh hiệu Phú Quý: Đẳng cấp Đại Gia nổi bật rực rỡ trên Hồ sơ & Đấu Trường Từ Vựng.',
-    badgeClass: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
-    heroBadgeClass: 'bg-amber-500/40 text-amber-100 border-amber-300/80',
-    gameBadgeClass: 'bg-amber-100 text-amber-950 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-amber-400',
+    conditionText: 'Danh hiệu Phú Quý (1 tháng): Ánh vàng Hoàng Kim rực sáng kèm hào quang Avatar & huy hiệu ưu tiên trên BXH 30 ngày.',
+    badgeClass: 'vip-shimmer-badge bg-gradient-to-r from-amber-200 via-yellow-100 to-orange-200 text-amber-950 border-amber-500 ring-1 ring-amber-400 shadow-sm dark:from-amber-600/50 dark:via-yellow-500/40 dark:to-orange-500/45 dark:text-amber-50 dark:border-amber-300',
+    heroBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 text-white border-amber-200 shadow-md',
+    gameBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-200 shadow-sm',
     isUnlocked: () => false,
     getProgress: (_stats, _user, priceVnd = 20000) => ({
       pct: 0,
-      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
     })
   },
   {
     id: 'vip_ty_phu',
     label: 'Tỷ Phú Tri Thức',
     icon: '⚜️',
-    tier: 'Cửa Hàng VIP',
+    tier: 'Cửa Hàng VIP (1 Tháng)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
     defaultPriceVnd: 50000,
-    conditionText: 'Danh hiệu Phú Quý Đỉnh Cao: Biểu tượng Tỷ Phú sang trọng bậc nhất trên toàn hệ thống.',
-    badgeClass: 'bg-gradient-to-r from-amber-100 via-yellow-100 to-rose-100 text-amber-950 border-amber-400 dark:from-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/70',
-    heroBadgeClass: 'bg-gradient-to-r from-amber-500/45 to-rose-500/40 text-amber-100 border-amber-300/80',
-    gameBadgeClass: 'bg-gradient-to-r from-amber-100 to-rose-100 text-amber-950 border-amber-400 dark:from-amber-500/30 dark:to-rose-500/30 dark:text-amber-100 dark:border-amber-400/70',
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-amber-400',
+    conditionText: 'Danh hiệu Phú Quý Đỉnh Cao (1 tháng): Ánh kim Vàng Đỏ phát sáng độc tôn + hào quang Avatar & vinh danh VIP trên BXH.',
+    badgeClass: 'vip-shimmer-badge bg-gradient-to-r from-amber-400 via-yellow-300 to-rose-400 text-slate-950 border-amber-500 ring-1 ring-amber-300 shadow-md dark:from-amber-500 dark:via-orange-500 dark:to-rose-500 dark:text-white dark:border-amber-300',
+    heroBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white border-amber-200 shadow-lg',
+    gameBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white border-amber-200 shadow-md',
     isUnlocked: () => false,
     getProgress: (_stats, _user, priceVnd = 50000) => ({
       pct: 0,
-      text: `Mở khóa bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
     })
+  },
+  {
+    id: 'aieo_vip',
+    label: 'Ai eo VIP',
+    icon: '👑',
+    tier: 'Gói Ai eo VIP (1 Tháng)',
+    difficulty: 'VIP Độc Quyền',
+    isVipBundleTitle: true,
+    defaultPriceVnd: 80000,
+    vipHaloClass: 'vip-avatar-aura ring-2 ring-red-500',
+    conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Mở khóa Bài Tập 4 Kỹ Năng, Tạo Phòng Game Bạn Bè, Danh hiệu Ai eo VIP & Màu Chữ Đỏ + Nhãn AIEOVIP.',
+    badgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-amber-300 ring-1 ring-amber-300 shadow-md',
+    heroBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white border-amber-200 shadow-lg',
+    gameBadgeClass: 'vip-shimmer-badge bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white border-amber-200 shadow-md',
+    isUnlocked: (_stats, userObj) => Number(userObj?.aieoVipExpiresAt) > Date.now(),
+    getProgress: (_stats, userObj, priceVnd = 80000) => {
+      const exp = Number(userObj?.aieoVipExpiresAt) || 0;
+      const now = Date.now();
+      if (exp > now) {
+        const days = Math.max(1, Math.ceil((exp - now) / 86400000));
+        return { pct: 100, text: `👑 Đang bật VIP (còn ${days} ngày)` };
+      }
+      return {
+        pct: 0,
+        text: `Gói Ai eo VIP 1 tháng: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+      };
+    }
   },
   {
     id: 'staff_ielts_10',
@@ -1107,6 +1138,8 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
 
   const hasSupporterPerk = Boolean(
     user?.customCoverUnlocked ||
+    Number(user?.skillPracticeExpiresAt) > 0 ||
+    Number(user?.aieoVipExpiresAt) > 0 ||
     (Array.isArray(user?.purchasedTitleIds) && user.purchasedTitleIds.length > 0)
   );
 
@@ -1127,26 +1160,128 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
   };
 }
 
+export const SUBSCRIPTION_DURATION_DAYS = 30;
+export const SUBSCRIPTION_DURATION_MS = SUBSCRIPTION_DURATION_DAYS * 24 * 60 * 60 * 1000;
+export const SKILL_PASS_PRICE_VND = 20000;
+export const AIEO_VIP_PRICE_VND = 80000;
+
+export function formatRemainingSubscriptionText(expiresAt, nowMs = Date.now()) {
+  const exp = Number(expiresAt) || 0;
+  if (!exp) return '';
+  if (exp <= nowMs) return 'Đã hết hạn';
+  const days = Math.max(1, Math.ceil((exp - nowMs) / 86400000));
+  const dateStr = new Date(exp + 7 * 3600 * 1000).toISOString().slice(0, 10).split('-').reverse().join('/');
+  return `Còn ${days} ngày (đến ${dateStr})`;
+}
+
+export function hasActiveAieoVip(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') return false;
+  return Number(user.aieoVipExpiresAt) > nowMs;
+}
+
+export function hasSkillPracticeAccess(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') return false;
+  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
+  if (user.role === 'teacher') return true;
+  if (Number(user.skillPracticeExpiresAt) > nowMs) return true;
+  if (Number(user.aieoVipExpiresAt) > nowMs) return true;
+  return false;
+}
+
+export function hasVipFriendRoomAccess(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') return false;
+  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
+  if (user.role === 'teacher') return true;
+  return Number(user.aieoVipExpiresAt) > nowMs;
+}
+
+export function hasActivePaidTitlePermission(user, titleId, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object' || !titleId) return false;
+  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
+  const grantedArr = Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String) : [];
+  if (grantedArr.includes(String(titleId))) return true;
+  if (titleId === 'aieo_vip') {
+    return Number(user.aieoVipExpiresAt) > nowMs;
+  }
+  const purchasedArr = Array.isArray(user.purchasedTitleIds) ? user.purchasedTitleIds.map(String) : [];
+  if (!purchasedArr.includes(String(titleId))) return false;
+  const exp = Number(user.purchasedTitleExpiries?.[titleId]) || 0;
+  return exp > 0 ? exp > nowMs : true;
+}
+
+export function hasPaidTitleVisualPerk(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') return false;
+  const eqId = String(user.equippedTitleId || '').trim();
+  const paidIds = new Set(['vip_thieu_gia', 'vip_manh_thuong_quan', 'vip_dai_gia', 'vip_ty_phu', 'aieo_vip']);
+  if (paidIds.has(eqId) && hasActivePaidTitlePermission(user, eqId, nowMs)) return true;
+  if (Number(user.aieoVipExpiresAt) > nowMs && eqId !== 'newbie' && user.showTitleBadge !== false) return eqId === 'aieo_vip';
+  return false;
+}
+
+export function resolveUserVipNameVisual(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') {
+    return {
+      isSuperAdmin: false,
+      hasAieoVip: false,
+      canToggleEffects: false,
+      showRedName: false,
+      showVipTag: false,
+      vipExpiresAt: 0
+    };
+  }
+  const isSuperAdmin = Boolean(user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s');
+  const vipExpiresAt = Number(user.aieoVipExpiresAt) || 0;
+  const hasAieoVip = vipExpiresAt > nowMs;
+  const canToggleEffects = hasAieoVip || isSuperAdmin;
+  const defaultWhenActive = hasAieoVip;
+  const showRedName = canToggleEffects && (user.vipRedNameEnabled !== undefined ? Boolean(user.vipRedNameEnabled) : defaultWhenActive);
+  const showVipTag = canToggleEffects && (user.vipTagEnabled !== undefined ? Boolean(user.vipTagEnabled) : defaultWhenActive);
+  return {
+    isSuperAdmin,
+    hasAieoVip,
+    canToggleEffects,
+    showRedName,
+    showVipTag,
+    vipExpiresAt
+  };
+}
+
 export function computeStudentTitleProgress(username, attempts = [], roomsDb = {}, options = {}) {
   const opts = options && typeof options === 'object' ? options : {};
+  const nowMs = Number(opts.nowMs) || Date.now();
   const userObj = 'loginDays' in opts || 'username' in opts ? opts : (opts.user || null);
   const customTitles = Array.isArray(opts.customTitles) ? opts.customTitles : [];
   const paymentConfig = opts.paymentConfig || null;
   const unlockAll = Boolean(opts.unlockAll || userObj?.isSuperAdmin || userObj?.isSystemAdmin || username === 'tuanpro123s');
   const grantedSet = new Set(Array.isArray(userObj?.grantedTitleIds) ? userObj.grantedTitleIds.map(String) : []);
   const purchasedSet = new Set(Array.isArray(userObj?.purchasedTitleIds) ? userObj.purchasedTitleIds.map(String) : []);
+  const purchasedExpiries = userObj?.purchasedTitleExpiries && typeof userObj.purchasedTitleExpiries === 'object'
+    ? userObj.purchasedTitleExpiries
+    : {};
   const stats = computeStudentStats(username, attempts, roomsDb, userObj);
   const catalog = getAllCatalogTitles(customTitles);
 
   const itemsWithProgress = catalog.map(t => {
     const unlockedByGrant = grantedSet.has(t.id);
-    const unlockedByPurchase = purchasedSet.has(t.id);
+    const hasPurchasedEntry = purchasedSet.has(t.id);
+    const purchaseExp = Number(purchasedExpiries[t.id]) || (t.isVipBundleTitle ? Number(userObj?.aieoVipExpiresAt) || 0 : 0);
+    const unlockedByPurchase = t.isVipBundleTitle
+      ? (Number(userObj?.aieoVipExpiresAt) > nowMs)
+      : hasPurchasedEntry && (purchaseExp > 0 ? purchaseExp > nowMs : true);
+    const purchaseExpired = Boolean(
+      !unlockedByPurchase &&
+      !unlockedByGrant &&
+      ((hasPurchasedEntry && purchaseExp > 0 && purchaseExp <= nowMs) || (t.isVipBundleTitle && Number(userObj?.aieoVipExpiresAt) > 0 && Number(userObj?.aieoVipExpiresAt) <= nowMs))
+    );
     const unlockedByMetric = typeof t.isUnlocked === 'function' ? Boolean(t.isUnlocked(stats, userObj)) : false;
     const unlocked = unlockAll || unlockedByGrant || unlockedByPurchase || unlockedByMetric;
-    const priceVnd = t.isPaidTitle ? getTitlePriceVnd(t, paymentConfig) : 0;
+    const priceVnd = (t.isPaidTitle || t.isVipBundleTitle)
+      ? (t.isVipBundleTitle ? (Number(paymentConfig?.aieoVipPrice) || AIEO_VIP_PRICE_VND) : getTitlePriceVnd(t, paymentConfig))
+      : 0;
     const progress = typeof t.getProgress === 'function'
       ? t.getProgress(stats, userObj, priceVnd)
       : { pct: unlocked ? 100 : 0, text: unlocked ? 'Quản trị trao tặng' : 'Chờ Quản trị trao tặng' };
+    const subLeftLabel = purchaseExp > nowMs ? formatRemainingSubscriptionText(purchaseExp, nowMs) : '';
     return {
       id: t.id,
       label: t.label,
@@ -1157,13 +1292,17 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       badgeClass: t.badgeClass,
       heroBadgeClass: t.heroBadgeClass,
       gameBadgeClass: t.gameBadgeClass,
+      vipHaloClass: t.vipHaloClass || '',
       isCustomTitle: Boolean(t.isCustomTitle),
       isPaidTitle: Boolean(t.isPaidTitle),
+      isVipBundleTitle: Boolean(t.isVipBundleTitle),
       isStaffOnly: Boolean(t.isStaffOnly),
       isHolidayTitle: Boolean(t.isHolidayTitle),
       isSecretTitle: Boolean(t.isSecretTitle),
       holidayDateHint: t.holidayDateHint || '',
       priceVnd,
+      expiresAt: purchaseExp,
+      purchaseExpired,
       colorKey: t.colorKey || 'amber',
       unlocked,
       unlockedByGrant,
@@ -1174,7 +1313,9 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
         : unlockedByGrant
         ? '👑 Quản trị trao tặng'
         : unlockedByPurchase
-        ? '💎 Đã mua mở khóa'
+        ? (subLeftLabel ? `💎 Gói 1 tháng (${subLeftLabel})` : '💎 Đã mua mở khóa')
+        : purchaseExpired
+        ? '⌛ Hết hạn 1 tháng — Bấm gia hạn để đeo tiếp'
         : unlocked && t.isHolidayTitle && progress?.text
         ? progress.text
         : unlocked
@@ -1260,6 +1401,7 @@ export function resolveVisibleTitleBadge(user, attempts = [], roomsDb = {}, cust
 }
 
 export const TITLE_DIFFICULTY_RANK = {
+  'VIP Độc Quyền': 9,
   'Độc Quyền': 8,
   'Phú Quý': 7,
   'Đặc Biệt': 7,
@@ -1345,10 +1487,12 @@ export const VIETQR_BANK_OPTIONS = [
   { code: 'TIMO', name: 'Timo (BVBank)' }
 ];
 
-export function hasCustomCoverPermission(user) {
+export function hasCustomCoverPermission(user, nowMs = Date.now()) {
   if (!user || typeof user !== 'object') return false;
   if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
   if (user.role === 'teacher') return true;
+  const coverExp = Number(user.customCoverExpiresAt) || 0;
+  if (coverExp > 0) return coverExp > nowMs;
   return Boolean(user.customCoverUnlocked);
 }
 
@@ -1375,11 +1519,13 @@ export function buildCoverUnlockTransferNote(username = '', orderCode = '') {
 
 export function normalizePaymentConfig(raw = {}) {
   const obj = raw && typeof raw === 'object' ? raw : {};
-  const rawPrice = Number(obj.coverUnlockPrice);
-  const coverUnlockPrice =
-    Number.isFinite(rawPrice) && rawPrice >= 0
-      ? Math.min(10_000_000, Math.round(rawPrice))
-      : CUSTOM_COVER_UNLOCK_PRICE_VND;
+  const clampVnd = (val, fallback) => {
+    const n = Number(val);
+    return Number.isFinite(n) && n >= 0 ? Math.min(10_000_000, Math.round(n)) : fallback;
+  };
+  const coverUnlockPrice = clampVnd(obj.coverUnlockPrice, CUSTOM_COVER_UNLOCK_PRICE_VND);
+  const skillPassPrice = clampVnd(obj.skillPassPrice, SKILL_PASS_PRICE_VND);
+  const aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
 
   const bankCode = String(obj.bankCode || '')
     .trim()
@@ -1420,6 +1566,8 @@ export function normalizePaymentConfig(raw = {}) {
 
   return {
     coverUnlockPrice,
+    skillPassPrice,
+    aieoVipPrice,
     bankCode,
     bankName,
     accountNumber,

@@ -53,6 +53,7 @@ function compressImageToDataUrl(file) {
 
 export default function AiExamExtractorPanel({
   aiApiKey,
+  aiConfigured = false,
   existingMediaImageUrl,
   onApplyExtraction,
   onApplyQuickAnswerText,
@@ -107,11 +108,13 @@ export default function AiExamExtractorPanel({
     }
   };
 
+  const hasGeminiAccess = Boolean(aiApiKey?.trim() || aiConfigured);
+
   const handleRunAiExtract = async () => {
     setErrorMsg('');
     setLastResultInfo(null);
 
-    if (!aiApiKey?.trim()) {
+    if (!hasGeminiAccess) {
       setErrorMsg('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước để dùng AI đọc ảnh.');
       return;
     }
@@ -173,8 +176,8 @@ export default function AiExamExtractorPanel({
           className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-[#314158] dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:border-[#007A7A] transition shadow-xs"
         >
           <Key className="w-3.5 h-3.5 text-[#E17100]" />
-          <span>{aiApiKey?.trim() ? 'Gemini Key: Đã lưu' : 'Cấu hình Gemini Key'}</span>
-          <span className={`w-2 h-2 rounded-full ${aiApiKey?.trim() ? 'bg-[#059271]' : 'bg-rose-500'}`} />
+          <span>{aiApiKey?.trim() ? 'Gemini Key: Đã lưu' : aiConfigured ? 'Gemini Key: Đồng bộ Server' : 'Cấu hình Gemini Key'}</span>
+          <span className={`w-2 h-2 rounded-full ${hasGeminiAccess ? 'bg-[#059271]' : 'bg-rose-500'}`} />
         </button>
       </div>
 
@@ -404,7 +407,7 @@ export default function AiExamExtractorPanel({
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
-          {!aiApiKey?.trim() && (
+          {!hasGeminiAccess && (
             <button
               type="button"
               onClick={() => {

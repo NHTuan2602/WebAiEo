@@ -6,6 +6,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Crown,
   Edit,
   EyeOff,
   FileAudio,
@@ -28,7 +29,15 @@ import { BRAND_INFO } from '../constants/brandInfo';
 import { formatDurationVi, getAssignedClassNames, getListeningTracks, getReadingPassages, getSpeakingQuestionItems, getVietnamTodayDateKey, canUserAccessTest, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
 import { getQuestionTypeMeta } from '../utils/examHelpers';
 import { verifySpeakingRoomPassword } from '../utils/speakingApi';
+import {
+  formatRemainingSubscriptionText,
+  formatVndCurrency,
+  hasActiveAieoVip,
+  hasSkillPracticeAccess,
+  normalizePaymentConfig
+} from '../constants/profileCustomization';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
+import VipMemberName from '../components/common/VipMemberName';
 
 export default function SkillPracticeHub({
   activeTab = 'speaking',
@@ -40,12 +49,14 @@ export default function SkillPracticeHub({
   onChangeTab,
   onClearFocusedTest,
   onNotifyMissingDaily,
+  onOpenCheckoutModal = null,
   onOpenFullExamCatalog,
   onOpenResult,
   onOpenSkillBuilder,
   onSpeakingRoomUnlocked,
   onStartSingleSkillExam,
   onStartSpeakingExam,
+  paymentConfig = null,
   serverClockOffsetMs = 0,
   showToast,
   speakingUnlockTokens = {},
@@ -64,7 +75,34 @@ export default function SkillPracticeHub({
     return () => clearInterval(id);
   }, []);
   const isTeacher = currentUser?.role === 'teacher';
+  const payCfg = normalizePaymentConfig(paymentConfig || {});
   const serverNowMs = nowMs + serverClockOffsetMs;
+  const studentHasSkillAccess = isTeacher || hasSkillPracticeAccess(currentUser, serverNowMs);
+  const studentHasVip = hasActiveAieoVip(currentUser, serverNowMs);
+  const activeAccessExpiryText = studentHasVip
+    ? formatRemainingSubscriptionText(currentUser?.aieoVipExpiresAt, serverNowMs)
+    : formatRemainingSubscriptionText(currentUser?.skillPracticeExpiresAt, serverNowMs);
+
+  const openSkillPassCheckout = (type = 'skill_pass') => {
+    if (onOpenCheckoutModal) {
+      onOpenCheckoutModal({
+        itemType: type,
+        itemId: '',
+        itemLabel: type === 'aieo_vip' ? 'Gói Ai eo VIP (1 Tháng Full Quyền)' : 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
+        itemPrice: type === 'aieo_vip' ? payCfg.aieoVipPrice : payCfg.skillPassPrice
+      });
+    } else {
+      showToast?.(`Cần kích hoạt Gói Bài Tập 4 Kỹ Năng (${formatVndCurrency(payCfg.skillPassPrice)}/tháng) để làm bài tập.`, 'info');
+    }
+  };
+
+  const guardSingleSkillStart = (testId) => {
+    if (!studentHasSkillAccess) {
+      openSkillPassCheckout('skill_pass');
+      return;
+    }
+    onStartSingleSkillExam?.(testId);
+  };
   const todayKey = getVietnamTodayDateKey(serverNowMs);
 
   const singleSkillTests = tests.filter(t => {
@@ -111,6 +149,10 @@ export default function SkillPracticeHub({
 
   const handleTriggerSpeakingStart = (test, partMode = 'full') => {
     if (!test) return;
+    if (!studentHasSkillAccess) {
+      openSkillPassCheckout('skill_pass');
+      return;
+    }
     const sp = normalizeSpeakingSection(test.speaking);
     const needsRoomPass =
       sp.speakingTrack === 'exam_room' &&
@@ -168,9 +210,13 @@ export default function SkillPracticeHub({
       icon: Layers,
       badge: readingTests.length + listeningTests.length + writingTests.length
     },
-    { id: 'reading', label: 'Đọc (Reading Lẻ)', icon: BookOpen, badge: readingTests.length },
-    { id: 'listening', label: 'Nghe (Listening Lẻ)', icon: Headphones, badge: listeningTests.length },
-    { id: 'writing', label: 'Viết (Writing Lẻ)', icon: PenTool, badge: writingTests.length }
+    ...(!isTeacher
+      ? [
+          { id: 'reading', label: 'Đọc (Reading Lẻ)', icon: BookOpen, badge: readingTests.length },
+          { id: 'listening', label: 'Nghe (Listening Lẻ)', icon: Headphones, badge: listeningTests.length },
+          { id: 'writing', label: 'Viết (Writing Lẻ)', icon: PenTool, badge: writingTests.length }
+        ]
+      : [])
   ];
 
   const renderSingleSkillLeaderboard = (skillFilter = 'all') => {
@@ -245,8 +291,14 @@ export default function SkillPracticeHub({
                   }`}
                 >
                   <div className="min-w-0">
-                    <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
-                      #{idx + 1} {row.name} {isMe ? '(Bạn)' : ''}
+                    <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1 flex-wrap">
+                      <span>#{idx + 1}</span>
+                      <VipMemberName
+                        user={usersDb?.[row.username] || (row.username === currentUser?.username ? currentUser : null)}
+                        fallbackName={row.name}
+                        badgeSize="xs"
+                      />
+                      {isMe && <span className="text-[10px] text-[#007A7A] dark:text-[#1EE1D6]">(Bạn)</span>}
                     </p>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                       {row.count} bài • TB {avgBand.toFixed(1)} • {row.bestTestTitle}
@@ -409,15 +461,23 @@ export default function SkillPracticeHub({
                     <button
                       type="button"
                       disabled={isLocked}
-                      onClick={() => onStartSingleSkillExam?.(test.id)}
+                      onClick={() => guardSingleSkillStart(test.id)}
                       className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
                         isLocked
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                          : !studentHasSkillAccess
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm'
                           : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
                       }`}
                     >
-                      {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                      <span>{isLocked ? 'Đang khóa / Hết lượt' : `Làm Đề ${sk.toUpperCase()}`}</span>
+                      {isLocked || !studentHasSkillAccess ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                      <span>
+                        {isLocked
+                          ? 'Đang khóa / Hết lượt'
+                          : !studentHasSkillAccess
+                          ? `Mở Khóa (${formatVndCurrency(payCfg.skillPassPrice)}/tháng)`
+                          : `Làm Đề ${sk.toUpperCase()}`}
+                      </span>
                     </button>
                     {isTeacher && (
                       <button
@@ -598,15 +658,23 @@ export default function SkillPracticeHub({
                     <button
                       type="button"
                       disabled={isLocked}
-                      onClick={() => onStartSingleSkillExam?.(test.id)}
+                      onClick={() => guardSingleSkillStart(test.id)}
                       className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${
                         isLocked
                           ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                          : !studentHasSkillAccess
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm'
                           : 'bg-[#570DF8] hover:bg-[#490AD2] text-white shadow-sm'
                       }`}
                     >
-                      {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                      <span>{isLocked ? lockText : `Bắt đầu làm ${skillId.toUpperCase()}`}</span>
+                      {isLocked || !studentHasSkillAccess ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                      <span>
+                        {isLocked
+                          ? lockText
+                          : !studentHasSkillAccess
+                          ? `Mở Khóa 4 Kỹ Năng (${formatVndCurrency(payCfg.skillPassPrice)}/tháng)`
+                          : `Bắt đầu làm ${skillId.toUpperCase()}`}
+                      </span>
                     </button>
                     {isTeacher && (
                       <button
@@ -743,6 +811,65 @@ export default function SkillPracticeHub({
 
         {/* MAIN LUYENNOI-STYLE WORKSPACE */}
         <main className="flex-1 min-w-0 space-y-8">
+          {!isTeacher && (
+            studentHasSkillAccess ? (
+              <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/35 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-extrabold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>
+                    {studentHasVip
+                      ? `👑 Đặc quyền Gói Ai eo VIP đang kích hoạt (Miễn phí full Bài Tập 4 Kỹ Năng) • ${activeAccessExpiryText}`
+                      : `✅ Đã kích hoạt Gói Bài Tập 4 Kỹ Năng (1 Tháng) • ${activeAccessExpiryText}`}
+                  </span>
+                </span>
+                {!studentHasVip && (
+                  <button
+                    type="button"
+                    onClick={() => openSkillPassCheckout('aieo_vip')}
+                    className="px-3 py-1 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 text-white text-[11px] font-black shadow-xs hover:opacity-95 transition"
+                  >
+                    👑 Nâng cấp Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)})
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-3xl bg-gradient-to-r from-amber-50 via-white to-rose-50 dark:from-amber-950/30 dark:via-[#191820] dark:to-rose-950/25 border border-amber-300 dark:border-amber-500/40 p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black uppercase">
+                      <Lock className="w-3 h-3" /> Gói 1 Tháng Học Viên
+                    </span>
+                    <span className="text-[11px] font-bold text-rose-600 dark:text-rose-300">
+                      Mở khóa toàn bộ Speaking AI + Đọc · Nghe · Viết Lẻ
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                    Đăng ký Gói 4 Kỹ Năng ({formatVndCurrency(payCfg.skillPassPrice)}/tháng) hoặc Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/tháng)
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Gói <b>Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)})</b> bao gồm miễn phí Bài tập 4 Kỹ năng + Danh hiệu <b>👑 Ai eo VIP</b> + Tạo phòng Game cùng bạn bè + Chữ Tên Đỏ &amp; nhãn <b>AIEOVIP</b> suốt 30 ngày!
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openSkillPassCheckout('skill_pass')}
+                    className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold shadow-xs transition"
+                  >
+                    Mua 4 Kỹ Năng ({formatVndCurrency(payCfg.skillPassPrice)}/1T)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openSkillPassCheckout('aieo_vip')}
+                    className="vip-shimmer-badge px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white text-xs font-black shadow-md transition inline-flex items-center gap-1.5"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-amber-200" />
+                    <span>Gói Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1T)</span>
+                  </button>
+                </div>
+              </div>
+            )
+          )}
           {['speaking', 'speaking_daily', 'speaking_exam_room', 'forecast'].includes(activeTab) ? (() => {
             const activeSpeakingList =
               activeTab === 'speaking_daily'

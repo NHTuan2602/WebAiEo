@@ -368,6 +368,7 @@ export default function SkillQuestionWorkspace({
   activeIdx,
   activeTab = 'all',
   aiApiKey,
+  aiConfigured = false,
   filterByGroup,
   groups = [],
   onAddQuestion,
@@ -719,6 +720,7 @@ export default function SkillQuestionWorkspace({
         <div className="space-y-6">
           <AiExamExtractorPanel
             aiApiKey={aiApiKey}
+            aiConfigured={aiConfigured}
             existingMediaImageUrl={activeGroup?.imageUrl}
             scopeLabel={`${meta.title} • ${scopeLabel}`}
             skill={skill}
