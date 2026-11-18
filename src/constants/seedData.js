@@ -133,12 +133,13 @@ export const DEFAULT_SECTION_ORDER = ['listening', 'reading', 'writing'];
 export const ALL_SKILL_OPTIONS = ['listening', 'reading', 'writing', 'speaking'];
 export const DEFAULT_SECTION_DURATIONS = { listening: 15, reading: 20, writing: 25, speaking: 14 };
 
-export const createDefaultSpeakingSection = () => ({
+export const createDefaultSpeakingSection = (overrides = {}) => ({
   speakingTrack: 'general', // 'daily' | 'exam_room' | 'general'
   dailyDate: '',
   dailyMandatory: true,
   roomPassword: '',
   hasRoomPassword: false,
+  hashtags: [],
   disableAiTts: false,
   hidePromptTextWhenAudio: false,
   isForecast: false,
@@ -200,8 +201,52 @@ export const createDefaultSpeakingSection = () => ({
         hint: 'Thảo luận tính tiện lợi và trải nghiệm thực tế không thể thay thế.'
       }
     ]
-  }
+  },
+  ...(overrides && typeof overrides === 'object' ? overrides : {})
 });
+
+export const PRESET_TEST_HASHTAGS = [
+  { tag: '#ThiThật', label: '#ThiThật (Đề thi chính thức)', kind: 'real_exam' },
+  { tag: '#CóPass', label: '#CóPass (Cần mật khẩu)', kind: 'password' },
+  { tag: '#TeamSắpThi', label: '#TeamSắpThi', kind: 'real_exam' },
+  { tag: '#SpeakingDaily', label: '#SpeakingDaily (Mỗi ngày)', kind: 'daily' },
+  { tag: '#Forecast', label: '#Forecast (Đề dự đoán)', kind: 'forecast' },
+  { tag: '#LuyệnTậpTựDo', label: '#LuyệnTậpTựDo (Miễn phí)', kind: 'practice' },
+  { tag: '#MockTest', label: '#MockTest', kind: 'custom' },
+  { tag: '#KiểmTraĐịnhKỳ', label: '#KiểmTraĐịnhKỳ', kind: 'custom' },
+  { tag: '#Full3Parts', label: '#Full3Parts', kind: 'custom' },
+  { tag: '#Part1', label: '#Part1', kind: 'custom' },
+  { tag: '#Part2', label: '#Part2', kind: 'custom' },
+  { tag: '#Part3', label: '#Part3', kind: 'custom' }
+];
+
+export const normalizeSingleHashtag = (rawTag = '') => {
+  const trimmed = String(rawTag || '')
+    .trim()
+    .replace(/^#+/, '')
+    .replace(/\s+/g, '');
+  if (!trimmed) return '';
+  return `#${trimmed.slice(0, 32)}`;
+};
+
+export const normalizeTestHashtags = (rawHashtags) => {
+  const list = Array.isArray(rawHashtags)
+    ? rawHashtags
+    : typeof rawHashtags === 'string'
+    ? rawHashtags.split(/[,;\s]+/)
+    : [];
+  const seen = new Set();
+  const result = [];
+  list.forEach(item => {
+    const clean = normalizeSingleHashtag(item);
+    if (!clean) return;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(clean);
+  });
+  return result.slice(0, 12);
+};
 
 export const normalizeSpeakingSection = (rawSpeaking = {}) => {
   const def = createDefaultSpeakingSection();
@@ -210,17 +255,21 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
   const p2 = s.part2 && typeof s.part2 === 'object' ? s.part2 : {};
   const p3 = s.part3 && typeof s.part3 === 'object' ? s.part3 : {};
 
+  const cleanRoomPassword = String(s.roomPassword || '');
+  const hasRoomPassword = Boolean(s.hasRoomPassword || cleanRoomPassword.trim().length > 0);
   const speakingTrack = ['daily', 'exam_room', 'general'].includes(s.speakingTrack)
     ? s.speakingTrack
+    : hasRoomPassword
+    ? 'exam_room'
     : 'general';
-  const cleanRoomPassword = String(s.roomPassword || '');
 
   return {
     speakingTrack,
     dailyDate: String(s.dailyDate || '').trim().slice(0, 10),
     dailyMandatory: speakingTrack === 'daily' ? s.dailyMandatory !== false : Boolean(s.dailyMandatory),
     roomPassword: cleanRoomPassword,
-    hasRoomPassword: Boolean(s.hasRoomPassword || cleanRoomPassword.trim().length > 0),
+    hasRoomPassword,
+    hashtags: normalizeTestHashtags(s.hashtags),
     disableAiTts: Boolean(s.disableAiTts),
     hidePromptTextWhenAudio: Boolean(s.hidePromptTextWhenAudio),
     isForecast: Boolean(s.isForecast),
@@ -389,20 +438,30 @@ export const normalizeExamConfig = (test) => {
   const sequentialMode = testMode === 'single_skill' ? false : test?.sequentialMode !== false;
   const allowEarlyNextSection = testMode === 'single_skill' ? true : !!test?.allowEarlyNextSection;
   const priceVnd = testMode === 'single_skill' ? 0 : Math.max(0, Math.min(10_000_000, Math.round(Number(test?.priceVnd) || 0)));
-  const examPassword = testMode === 'single_skill' ? '' : String(test?.examPassword || '').trim();
-  const hasExamPassword = testMode === 'single_skill' ? false : Boolean(test?.hasExamPassword || examPassword.length > 0);
+  const spRoomPass = focusSkill === 'speaking' ? String(test?.speaking?.roomPassword || '').trim() : '';
+  const spHasRoomPass = focusSkill === 'speaking' ? Boolean(test?.speaking?.hasRoomPassword || spRoomPass.length > 0) : false;
+  const examPassword = String(test?.examPassword || spRoomPass || '').trim();
+  const hasExamPassword = Boolean(test?.hasExamPassword || spHasRoomPass || examPassword.length > 0);
+  const isSpeakingExamRoom = focusSkill === 'speaking' && (test?.speaking?.speakingTrack === 'exam_room' || spHasRoomPass);
   const explicitPurpose = ['real_exam', 'paid_practice', 'free_practice', 'draft'].includes(test?.examPurpose)
     ? test.examPurpose
     : '';
-  const examPurpose = explicitPurpose || (
+  const examPurpose =
     visibility === 'private'
       ? 'draft'
-      : priceVnd > 0
-      ? 'paid_practice'
-      : (hasExamPassword || (maxAttempts === 1 && sequentialMode))
+      : isSpeakingExamRoom || hasExamPassword
       ? 'real_exam'
-      : 'free_practice'
-  );
+      : explicitPurpose || (
+          priceVnd > 0
+            ? 'paid_practice'
+            : (maxAttempts === 1 && (sequentialMode || testMode === 'single_skill'))
+            ? 'real_exam'
+            : 'free_practice'
+        );
+  const hashtags = normalizeTestHashtags([
+    ...(Array.isArray(test?.hashtags) ? test.hashtags : typeof test?.hashtags === 'string' ? [test.hashtags] : []),
+    ...(Array.isArray(test?.speaking?.hashtags) ? test.speaking.hashtags : [])
+  ]);
 
   return {
     testMode,
@@ -415,6 +474,7 @@ export const normalizeExamConfig = (test) => {
     examPassword,
     hasExamPassword,
     examPurpose,
+    hashtags,
     antiCheatEnabled: test?.antiCheatEnabled !== false,
     allowInternalCopyPaste: test?.allowInternalCopyPaste !== false,
     assignedClassIds,
@@ -424,6 +484,67 @@ export const normalizeExamConfig = (test) => {
     order,
     durations
   };
+};
+
+export const getEffectiveTestHashtags = (test) => {
+  if (!test || typeof test !== 'object') return [];
+  const cfg = normalizeExamConfig(test);
+  const isSpeaking = cfg.testMode === 'single_skill' && cfg.focusSkill === 'speaking';
+  const sp = isSpeaking ? normalizeSpeakingSection(test.speaking) : null;
+  const hasPass = Boolean(cfg.hasExamPassword || cfg.examPassword || sp?.hasRoomPassword || sp?.roomPassword);
+  const isRealExam =
+    cfg.examPurpose === 'real_exam' ||
+    hasPass ||
+    sp?.speakingTrack === 'exam_room' ||
+    cfg.maxAttempts === 1;
+  const isDaily = Boolean(isSpeaking && sp?.speakingTrack === 'daily');
+  const isForecast = Boolean(isSpeaking && sp?.isForecast);
+
+  const items = [];
+  const seen = new Set();
+  const pushTag = (rawTag, kind = 'custom') => {
+    const clean = normalizeSingleHashtag(rawTag);
+    if (!clean) return;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    items.push({ tag: clean, kind });
+  };
+
+  if (isRealExam) {
+    pushTag('#ThiThật', 'real_exam');
+  }
+  if (hasPass) {
+    pushTag('#CóPass', 'password');
+  }
+  if (isDaily) {
+    pushTag('#SpeakingDaily', 'daily');
+  }
+  if (isForecast) {
+    pushTag('#Forecast', 'forecast');
+  }
+  if (!isRealExam && !isDaily) {
+    pushTag('#LuyệnTậpTựDo', 'practice');
+  }
+
+  (cfg.hashtags || []).forEach(t => {
+    const lower = t.toLowerCase();
+    const inferredKind =
+      lower === '#thithật' || lower === '#teamsắpthi'
+        ? 'real_exam'
+        : lower === '#cópass'
+        ? 'password'
+        : lower === '#speakingdaily'
+        ? 'daily'
+        : lower === '#forecast'
+        ? 'forecast'
+        : lower === '#luyệntậptựdo'
+        ? 'practice'
+        : 'custom';
+    pushTag(t, inferredKind);
+  });
+
+  return items;
 };
 
 export const getUserClassIds = (classesDb, username) => {

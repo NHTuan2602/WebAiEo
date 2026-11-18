@@ -3731,7 +3731,7 @@ export default function App() {
     const activeUnlockToken = unlockTokenOverride || examUnlockTokens[testId] || '';
     if (
       currentUser?.role !== 'teacher' &&
-      cfg.testMode !== 'single_skill' &&
+      cfg.focusSkill !== 'speaking' &&
       (cfg.hasExamPassword || cfg.examPassword) &&
       !activeUnlockToken
     ) {
@@ -4633,6 +4633,10 @@ export default function App() {
       setTestForm({
         ...cloned,
         visibility: cfg.visibility,
+        examPurpose: cfg.examPurpose,
+        examPassword: cfg.examPassword,
+        hasExamPassword: cfg.hasExamPassword,
+        hashtags: cfg.hashtags,
         maxAttempts: cfg.maxAttempts,
         sequentialMode: cfg.sequentialMode,
         allowEarlyNextSection: cfg.allowEarlyNextSection,
@@ -4767,21 +4771,36 @@ export default function App() {
     const cleanClassIds = Array.isArray(initialClassIds) ? Array.from(new Set(initialClassIds.filter(Boolean))) : [];
     const baseSingleForm = createEmptySingleSkillTestForm(skill);
     let nextSpeaking = baseSingleForm.speaking;
+    let extraSingleFields = {};
     if (skill === 'speaking' && view === 'SKILL_HUB') {
       if (skillHubTab === 'speaking_daily') {
         nextSpeaking = createDefaultSpeakingSection({
           speakingTrack: 'daily',
           dailyDate: getVietnamTodayDateKey(Date.now() + serverClockOffsetMsRef.current),
-          dailyMandatory: true
+          dailyMandatory: true,
+          hashtags: ['#SpeakingDaily']
         });
+        extraSingleFields = { hashtags: ['#SpeakingDaily'] };
       } else if (skillHubTab === 'speaking_exam_room') {
+        const autoPass = `SPK${Math.floor(1000 + Math.random() * 9000)}`;
         nextSpeaking = createDefaultSpeakingSection({
-          speakingTrack: 'exam_room'
+          speakingTrack: 'exam_room',
+          roomPassword: autoPass,
+          hasRoomPassword: true,
+          hashtags: ['#ThiThật', '#CóPass', '#TeamSắpThi']
         });
+        extraSingleFields = {
+          examPurpose: 'real_exam',
+          examPassword: autoPass,
+          hasExamPassword: true,
+          maxAttempts: 1,
+          hashtags: ['#ThiThật', '#CóPass', '#TeamSắpThi']
+        };
       }
     }
     setTestForm({
       ...baseSingleForm,
+      ...extraSingleFields,
       speaking: nextSpeaking,
       assignedClassIds: cleanClassIds
     });
@@ -5012,18 +5031,44 @@ export default function App() {
       }
     });
 
+    const rawSp = normalizeSpeakingSection(testForm.speaking);
+    const mergedSpeakingPass =
+      cfg.focusSkill === 'speaking'
+        ? String(rawSp.roomPassword || cfg.examPassword || '').trim()
+        : rawSp.roomPassword;
+    const mergedSpeakingHasPass =
+      cfg.focusSkill === 'speaking'
+        ? Boolean(mergedSpeakingPass || rawSp.hasRoomPassword || testForm.hasExamPassword)
+        : rawSp.hasRoomPassword;
+    const syncedSpeaking =
+      cfg.focusSkill === 'speaking'
+        ? {
+            ...rawSp,
+            speakingTrack:
+              rawSp.speakingTrack === 'daily'
+                ? 'daily'
+                : mergedSpeakingHasPass || cfg.examPurpose === 'real_exam'
+                ? 'exam_room'
+                : rawSp.speakingTrack,
+            roomPassword: mergedSpeakingPass,
+            hasRoomPassword: mergedSpeakingHasPass,
+            hashtags: cfg.hashtags
+          }
+        : rawSp;
+
     const normalizedTest = {
       ...testForm,
       testMode: cfg.testMode,
       focusSkill: cfg.focusSkill,
       visibility: cfg.visibility,
-      examPurpose: cfg.testMode === 'single_skill' ? 'free_practice' : cfg.examPurpose,
+      examPurpose: cfg.examPurpose,
       priceVnd: cfg.testMode === 'single_skill' ? 0 : cfg.priceVnd,
-      examPassword: cfg.testMode === 'single_skill' ? '' : cfg.examPassword,
+      examPassword: cfg.focusSkill === 'speaking' ? mergedSpeakingPass : cfg.examPassword,
       hasExamPassword:
-        cfg.testMode === 'single_skill'
-          ? false
+        cfg.focusSkill === 'speaking'
+          ? mergedSpeakingHasPass
           : Boolean(cfg.examPassword || testForm.hasExamPassword),
+      hashtags: cfg.hashtags,
       maxAttempts: cfg.maxAttempts,
       sequentialMode: cfg.sequentialMode,
       allowEarlyNextSection: cfg.allowEarlyNextSection,
@@ -5035,7 +5080,7 @@ export default function App() {
       dueAt: cfg.dueAt,
       sectionOrder: cfg.order,
       sectionDurations: cfg.durations,
-      speaking: normalizeSpeakingSection(testForm.speaking),
+      speaking: syncedSpeaking,
       listening: {
         ...testForm.listening,
         tracks,

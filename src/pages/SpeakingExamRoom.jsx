@@ -47,7 +47,8 @@ export default function SpeakingExamRoom({
   const cfg = normalizeExamConfig(activeTest);
   const spMeta = normalizeSpeakingSection(activeTest?.speaking);
   const isTeacher = currentUser?.role === 'teacher';
-  const isExamRoomMode = spMeta.speakingTrack === 'exam_room';
+  const hasAnyRoomPass = Boolean(spMeta.hasRoomPassword || spMeta.roomPassword || cfg.hasExamPassword || cfg.examPassword);
+  const isExamRoomMode = spMeta.speakingTrack === 'exam_room' || cfg.examPurpose === 'real_exam' || hasAnyRoomPass;
   const isDailyMode = spMeta.speakingTrack === 'daily';
   const isRealExamLocked = (cfg.maxAttempts > 0 || isExamRoomMode) && !isTeacher;
   const existingUnlockToken = activeTest ? (speakingUnlockTokens?.[activeTest.id] || '') : '';
@@ -58,9 +59,8 @@ export default function SpeakingExamRoom({
 
   const effectiveUnlockToken = localUnlockToken || existingUnlockToken;
   const requiresRoomPassword =
-    isExamRoomMode &&
     !isTeacher &&
-    Boolean(spMeta.hasRoomPassword || spMeta.roomPassword) &&
+    hasAnyRoomPass &&
     !effectiveUnlockToken;
 
   const partFilterMap = {

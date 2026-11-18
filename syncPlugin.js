@@ -2072,7 +2072,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
             error: `Đề thi 3 kỹ năng này có giá ${priceLabel}. Vui lòng mở khóa trước khi làm & nộp bài!`
           };
         }
-        const examPass = test?.testMode !== 'single_skill' ? String(test?.examPassword || '').trim() : '';
+        const examPass = test?.focusSkill !== 'speaking' ? String(test?.examPassword || '').trim() : '';
         if (test && !existingAtt && examPass) {
           const unlockedExamMem = Boolean(store._unlockedExamRooms?.has(`${viewer.username}::${test.id}`));
           const examUnlockPayload = att.examUnlockToken ? verifyToken(att.examUnlockToken, store._authSecret) : null;
@@ -2098,11 +2098,11 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
               return { allowed: false, status: 403, error: 'Đề / bài tập này chỉ giao riêng cho các lớp học được chỉ định.' };
             }
           }
+          const spRoomPass = String(test.speaking?.roomPassword || test.examPassword || '').trim();
           const isSpExamRoom =
             test.testMode === 'single_skill' &&
             test.focusSkill === 'speaking' &&
-            test.speaking?.speakingTrack === 'exam_room';
-          const spRoomPass = String(test.speaking?.roomPassword || '').trim();
+            (test.speaking?.speakingTrack === 'exam_room' || Boolean(spRoomPass));
           if (isSpExamRoom && spRoomPass) {
             const unlockedMem = Boolean(store._unlockedSpeakingRooms?.has(`${viewer.username}::${test.id}`));
             const unlockPayload = att.speakingUnlockToken ? verifyToken(att.speakingUnlockToken, store._authSecret) : null;
@@ -5528,7 +5528,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               return;
             }
           }
-          const expectedPass = String(targetTest.speaking?.roomPassword || '').trim();
+          const expectedPass = String(targetTest.speaking?.roomPassword || targetTest.examPassword || '').trim();
           if (expectedPass && expectedPass !== password) {
             sendJsonResponse(res, 403, { ok: false, error: 'Mật khẩu Phòng Thi Thực Chiến chưa chính xác!' });
             return;
@@ -5589,7 +5589,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             sendJsonResponse(res, 403, { ok: false, error: 'Bạn cần mở khóa đề thi trước khi nhập mật khẩu phòng thi.' });
             return;
           }
-          const expectedPass = String(targetTest.examPassword || '').trim();
+          const expectedPass = String(targetTest.examPassword || targetTest.speaking?.roomPassword || '').trim();
           if (expectedPass && expectedPass !== password) {
             sendJsonResponse(res, 403, { ok: false, error: 'Mật khẩu Phòng Thi Thực Chiến chưa chính xác!' });
             return;

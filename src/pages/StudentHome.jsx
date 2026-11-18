@@ -16,7 +16,7 @@ import {
   Sparkles,
   TrendingUp
 } from 'lucide-react';
-import { canUserAccessTest, canViewerSeeMember, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, getAssignedClassNames, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
+import { canUserAccessTest, canViewerSeeMember, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, getAssignedClassNames, getEffectiveTestHashtags, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
 import { BRAND_INFO } from '../constants/brandInfo';
 import { loadExamDraft } from '../utils/sessionPersistence';
 import { Users as ClassMembersIcon } from 'lucide-react';
@@ -473,6 +473,28 @@ export default function StudentHome({
                       <h3 className="font-extrabold text-[#0F172B] dark:text-[#F4F4F5] text-base mb-1.5 leading-snug">
                         {test.title}
                       </h3>
+                      {(() => {
+                        const cardHashtags = getEffectiveTestHashtags(test);
+                        if (!cardHashtags.length) return null;
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                            {cardHashtags.map(item => (
+                              <span
+                                key={item.tag}
+                                className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
+                                  item.kind === 'real_exam'
+                                    ? 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444]'
+                                    : item.kind === 'password'
+                                    ? 'bg-indigo-700 text-[#FFFFFF] border-indigo-500'
+                                    : 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700'
+                                }`}
+                              >
+                                {item.tag}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       <p className="text-[#475569] dark:text-zinc-400 text-sm mb-3.5 line-clamp-2 leading-relaxed">
                         {test.description}
                       </p>

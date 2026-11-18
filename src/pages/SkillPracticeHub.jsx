@@ -11,7 +11,9 @@ import {
   EyeOff,
   FileAudio,
   Flame,
+  Hash,
   Headphones,
+  KeyRound,
   Layers,
   Lock,
   Mic,
@@ -26,7 +28,7 @@ import {
   X
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import { getAssignedClassNames, getListeningTracks, getReadingPassages, getSpeakingQuestionItems, getVietnamTodayDateKey, canUserAccessTest, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
+import { getAssignedClassNames, getEffectiveTestHashtags, getListeningTracks, getReadingPassages, getSpeakingQuestionItems, getVietnamTodayDateKey, canUserAccessTest, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
 import { getQuestionTypeMeta } from '../utils/examHelpers';
 import { verifySpeakingRoomPassword } from '../utils/speakingApi';
 import {
@@ -65,6 +67,7 @@ export default function SkillPracticeHub({
 }) {
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
   const [singleHubSkill, setSingleHubSkill] = useState('all'); // 'all' | 'reading' | 'listening' | 'writing'
+  const [selectedSpeakingHashtag, setSelectedSpeakingHashtag] = useState('all');
   const [passwordPromptTarget, setPasswordPromptTarget] = useState(null);
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
@@ -108,9 +111,15 @@ export default function SkillPracticeHub({
   const dailySpeakingTests = speakingTests.filter(
     t => normalizeSpeakingSection(t.speaking).speakingTrack === 'daily'
   );
-  const examRoomSpeakingTests = speakingTests.filter(
-    t => normalizeSpeakingSection(t.speaking).speakingTrack === 'exam_room'
-  );
+  const examRoomSpeakingTests = speakingTests.filter(t => {
+    const sp = normalizeSpeakingSection(t.speaking);
+    const cfg = normalizeExamConfig(t);
+    return (
+      sp.speakingTrack === 'exam_room' ||
+      cfg.examPurpose === 'real_exam' ||
+      Boolean(sp.hasRoomPassword || sp.roomPassword || cfg.hasExamPassword || cfg.examPassword)
+    );
+  });
   const listeningTests = singleSkillTests.filter(t => t.focusSkill === 'listening');
   const readingTests = singleSkillTests.filter(t => t.focusSkill === 'reading');
   const writingTests = singleSkillTests.filter(t => t.focusSkill === 'writing');
@@ -142,11 +151,11 @@ export default function SkillPracticeHub({
 
   const handleTriggerSpeakingStart = (test, partMode = 'full') => {
     if (!test) return;
+    const cfg = normalizeExamConfig(test);
     const sp = normalizeSpeakingSection(test.speaking);
     const needsRoomPass =
-      sp.speakingTrack === 'exam_room' &&
       !isTeacher &&
-      Boolean(sp.hasRoomPassword || sp.roomPassword) &&
+      Boolean(sp.hasRoomPassword || sp.roomPassword || cfg.hasExamPassword || cfg.examPassword) &&
       !speakingUnlockTokens?.[test.id];
     if (needsRoomPass) {
       setPasswordPromptTarget({ test, partMode });
@@ -155,6 +164,57 @@ export default function SkillPracticeHub({
       return;
     }
     onStartSpeakingExam?.(test.id, partMode);
+  };
+
+  const renderTestHashtagPills = (test, { onSelectTag = null } = {}) => {
+    const tags = getEffectiveTestHashtags(test);
+    if (!tags.length) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {tags.map(item => {
+          const isActiveFilter =
+            onSelectTag &&
+            selectedSpeakingHashtag !== 'all' &&
+            selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase();
+          const pillCls =
+            item.kind === 'real_exam'
+              ? 'bg-[#991B1B] text-white border-[#EF4444]'
+              : item.kind === 'password'
+              ? 'bg-indigo-700 text-white border-indigo-500'
+              : item.kind === 'daily'
+              ? 'bg-[#C2410C] text-white border-orange-500'
+              : item.kind === 'forecast'
+              ? 'bg-[#FEF3C7] text-[#92400E] border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
+              : item.kind === 'practice'
+              ? 'bg-[#EDFFFD] text-[#0F766E] border-[#B5F5F1] dark:bg-teal-500/15 dark:text-[#1EE1D6] dark:border-teal-500/30'
+              : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#1E293B] dark:text-slate-200 border-slate-300 dark:border-slate-700';
+
+          return onSelectTag ? (
+            <button
+              key={item.tag}
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                onSelectTag(item.tag);
+              }}
+              title={`Lọc theo ${item.tag}`}
+              className={`text-xs font-bold px-2.5 py-0.5 rounded-full border transition inline-flex items-center gap-1 ${pillCls} ${
+                isActiveFilter ? 'ring-2 ring-offset-1 ring-[#007A7A]' : 'hover:opacity-90'
+              }`}
+            >
+              <span>{item.tag}</span>
+            </button>
+          ) : (
+            <span
+              key={item.tag}
+              className={`text-xs font-bold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1 ${pillCls}`}
+            >
+              <span>{item.tag}</span>
+            </span>
+          );
+        })}
+      </div>
+    );
   };
 
   const handleSubmitRoomPassword = async (e) => {
@@ -437,6 +497,7 @@ export default function SkillPracticeHub({
                     <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                       {test.title}
                     </h2>
+                    {renderTestHashtagPills(test)}
                     {test.description && (
                       <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
                     )}
@@ -619,6 +680,7 @@ export default function SkillPracticeHub({
                     <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                       {test.title}
                     </h2>
+                    {renderTestHashtagPills(test)}
                     {test.description && (
                       <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
                     )}
@@ -1139,29 +1201,104 @@ export default function SkillPracticeHub({
 
               {/* Kho Bài Tập Speaking Của Lớp */}
               <section className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172B] dark:text-white">
-                      {activeTab === 'speaking_daily'
-                        ? 'Danh Sách Bài Speaking Daily'
-                        : activeTab === 'speaking_exam_room'
-                        ? 'Phòng Thi Thực Chiến (Team Sắp Thi)'
-                        : activeTab === 'forecast'
-                        ? 'Danh Sách Bài Tập Forecast Speaking'
-                        : 'Danh Sách Bài Tập Speaking Do Giáo Viên Tạo'}
-                    </h2>
-                    <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
-                      Chọn làm trọn bộ 3 Part hoặc chọn thi nhanh 1 Part tùy thích
-                    </p>
-                  </div>
-                </div>
+                {(() => {
+                  const tagCountsMap = new Map();
+                  activeSpeakingList.forEach(t => {
+                    getEffectiveTestHashtags(t).forEach(h => {
+                      const prev = tagCountsMap.get(h.tag.toLowerCase());
+                      tagCountsMap.set(h.tag.toLowerCase(), {
+                        tag: prev?.tag || h.tag,
+                        kind: prev?.kind || h.kind,
+                        count: (prev?.count || 0) + 1
+                      });
+                    });
+                  });
+                  const availableHashtagFilters = Array.from(tagCountsMap.values());
+                  const finalSpeakingList =
+                    selectedSpeakingHashtag === 'all' || Boolean(focusedSpeakingMatch)
+                      ? displayedSpeakingList
+                      : displayedSpeakingList.filter(t =>
+                          getEffectiveTestHashtags(t).some(
+                            h => h.tag.toLowerCase() === selectedSpeakingHashtag.toLowerCase()
+                          )
+                        );
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {displayedSpeakingList.map(test => {
-                    const cfg = normalizeExamConfig(test);
-                    const schedule = evaluateTestSchedule(cfg, serverNowMs);
-                    const sp = normalizeSpeakingSection(test.speaking);
-                    const totalItems = getSpeakingQuestionItems(sp, 'all').length;
+                  return (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172B] dark:text-white">
+                            {activeTab === 'speaking_daily'
+                              ? 'Danh Sách Bài Speaking Daily'
+                              : activeTab === 'speaking_exam_room'
+                              ? 'Phòng Thi Thực Chiến (Team Sắp Thi)'
+                              : activeTab === 'forecast'
+                              ? 'Danh Sách Bài Tập Forecast Speaking'
+                              : 'Danh Sách Bài Tập Speaking Do Giáo Viên Tạo'}
+                          </h2>
+                          <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
+                            Mỗi đề đều có nhãn <b>#Hashtag</b> rõ ràng (<b>#ThiThật #CóPass</b> cho đề thi chính thức có mật khẩu, <b>#SpeakingDaily</b> cho bài hàng ngày, <b>#LuyệnTậpTựDo</b> cho bài luyện miễn phí) để học viên không bấm nhầm.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 1-Click Hashtag Filter Bar for Students */}
+                      {availableHashtagFilters.length > 0 && !focusedSpeakingMatch && (
+                        <div className="p-3 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-extrabold text-[#334155] dark:text-slate-300 flex items-center gap-1 mr-1">
+                            <Hash className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
+                            Lọc theo Hashtag:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSpeakingHashtag('all')}
+                            className={`px-3 py-1 rounded-full text-xs font-bold border transition ${
+                              selectedSpeakingHashtag === 'all'
+                                ? 'bg-[#0F172B] text-white border-[#0F172B] dark:bg-white dark:text-slate-950'
+                                : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                            }`}
+                          >
+                            Tất cả ({activeSpeakingList.length})
+                          </button>
+                          {availableHashtagFilters.map(hf => {
+                            const isSel = selectedSpeakingHashtag.toLowerCase() === hf.tag.toLowerCase();
+                            return (
+                              <button
+                                key={hf.tag}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedSpeakingHashtag(prev =>
+                                    prev.toLowerCase() === hf.tag.toLowerCase() ? 'all' : hf.tag
+                                  )
+                                }
+                                className={`px-3 py-1 rounded-full text-xs font-bold border transition ${
+                                  isSel
+                                    ? 'bg-[#007A7A] text-white border-[#007A7A] ring-2 ring-[#007A7A]/25'
+                                    : hf.kind === 'real_exam'
+                                    ? 'bg-rose-50 dark:bg-rose-950/50 text-[#991B1B] dark:text-rose-200 border-rose-300 dark:border-rose-700 hover:bg-rose-100'
+                                    : hf.kind === 'password'
+                                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-100'
+                                    : hf.kind === 'daily'
+                                    ? 'bg-orange-50 dark:bg-orange-950/50 text-[#C2410C] dark:text-orange-200 border-orange-300 dark:border-orange-700'
+                                    : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                                }`}
+                              >
+                                {hf.tag} ({hf.count})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {finalSpeakingList.map(test => {
+                          const cfg = normalizeExamConfig(test);
+                          const schedule = evaluateTestSchedule(cfg, serverNowMs);
+                          const sp = normalizeSpeakingSection(test.speaking);
+                          const hasPass = Boolean(sp.hasRoomPassword || sp.roomPassword || cfg.hasExamPassword || cfg.examPassword);
+                          const isRealExamCard = sp.speakingTrack === 'exam_room' || cfg.examPurpose === 'real_exam' || hasPass || cfg.maxAttempts === 1;
+                          const visibleTeacherPass = isTeacher ? String(sp.roomPassword || cfg.examPassword || '').trim() : '';
+                          const totalItems = getSpeakingQuestionItems(sp, 'all').length;
                     const p1Count = sp.part1.enabled ? (sp.part1.questions?.length || 0) : 0;
                     const p2Count = sp.part2.enabled ? 1 : 0;
                     const p3Count = sp.part3.enabled ? (sp.part3.questions?.length || 0) : 0;
@@ -1180,12 +1317,26 @@ export default function SkillPracticeHub({
                         className={`bg-white dark:bg-[#0F172B] border rounded-lg p-5 flex flex-col justify-between gap-4 transition ${
                           focusedSpeakingMatch?.id === test.id
                             ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                            : isRealExamCard
+                            ? 'border-rose-300 dark:border-rose-700/70 hover:border-rose-500'
                             : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                         }`}
                       >
                         <div className="space-y-2.5">
+                          {renderTestHashtagPills(test, {
+                            onSelectTag: tag =>
+                              setSelectedSpeakingHashtag(prev =>
+                                prev.toLowerCase() === tag.toLowerCase() ? 'all' : tag
+                              )
+                          })}
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
+                              {isTeacher && hasPass && (
+                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 dark:bg-indigo-500/20 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-500/40 inline-flex items-center gap-1">
+                                  <KeyRound className="w-3 h-3" />
+                                  <span>{visibleTeacherPass ? `Pass: ${visibleTeacherPass}` : 'Có mật khẩu'}</span>
+                                </span>
+                              )}
                               {sp.speakingTrack === 'daily' && (
                                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#C2410C] text-white">
                                   Daily {sp.dailyDate || ''}
@@ -1281,13 +1432,13 @@ export default function SkillPracticeHub({
                                 : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
                             }`}
                           >
-                            {isLocked || (!isTeacher && sp.speakingTrack === 'exam_room' && sp.hasRoomPassword && !speakingUnlockTokens?.[test.id])
+                            {isLocked || (!isTeacher && hasPass && !speakingUnlockTokens?.[test.id])
                               ? <Lock className="w-3.5 h-3.5" />
                               : <Play className="w-3.5 h-3.5 fill-current" />}
                             <span>
                               {isLocked
                                 ? lockText
-                                : !isTeacher && sp.speakingTrack === 'exam_room' && sp.hasRoomPassword && !speakingUnlockTokens?.[test.id]
+                                : !isTeacher && hasPass && !speakingUnlockTokens?.[test.id]
                                 ? 'Mật Khẩu · Vào Thi'
                                 : 'Full Test'}
                             </span>
@@ -1335,6 +1486,9 @@ export default function SkillPracticeHub({
                     );
                   })}
                 </div>
+                    </>
+                  );
+                })()}
               </section>
 
               {/* LỊCH SỬ THI SPEAKING */}
