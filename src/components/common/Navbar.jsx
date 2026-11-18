@@ -73,15 +73,15 @@ export default function Navbar({
   const navTabCls = isActive =>
     `px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 border ${
       isActive
-        ? 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700 font-bold'
+        ? 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700 font-bold'
         : 'text-[#314158] dark:text-zinc-200 hover:text-[#0F172B] dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-zinc-800/60 border-transparent'
     }`;
 
   const mobileTabCls = isActive =>
     `px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition flex items-center gap-1.5 border ${
       isActive
-        ? 'bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 border-slate-300 dark:border-zinc-700 font-bold'
-        : 'bg-white dark:bg-zinc-900 text-[#314158] dark:text-zinc-200 border-slate-200 dark:border-zinc-800'
+        ? 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700 font-bold'
+        : 'bg-white dark:bg-[#18181B] text-[#314158] dark:text-zinc-200 border-slate-200 dark:border-zinc-800'
     }`;
 
   return (
@@ -173,19 +173,19 @@ export default function Navbar({
           <a
             href={BRAND_INFO.phoneHref}
             title={`Liên hệ ${BRAND_INFO.teacherName}: ${BRAND_INFO.phoneDisplay} • ${BRAND_INFO.address}`}
-            className="hidden sm:inline-flex items-center gap-1.5 p-2 2xl:px-2.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition shrink-0"
+            className="hidden sm:inline-flex items-center gap-1.5 p-2 2xl:px-2.5 rounded-lg text-xs font-bold bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border border-[#E2E8F0] dark:border-zinc-700 hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition shrink-0"
           >
-            <Phone className="w-4 h-4 shrink-0 text-slate-600 dark:text-zinc-300" />
+            <Phone className="w-4 h-4 shrink-0 text-[#1E293B] dark:text-[#E4E4E7]" />
             <span className="hidden 2xl:inline whitespace-nowrap">{BRAND_INFO.phoneDisplay}</span>
           </a>
           <button
             type="button"
             onClick={() => setDarkMode(d => !d)}
-            className="p-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:text-[#0F172B] dark:hover:text-white hover:border-slate-300 dark:hover:border-zinc-600 transition border border-slate-200 dark:border-zinc-700 shrink-0"
+            className="p-2 rounded-lg text-xs font-semibold bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] hover:text-[#0F172B] dark:hover:text-white hover:border-slate-300 dark:hover:border-zinc-600 transition border border-[#E2E8F0] dark:border-zinc-700 shrink-0"
             title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
             aria-label={darkMode ? 'Chế độ sáng' : 'Chế độ tối'}
           >
-            {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#1E293B]" />}
           </button>
 
           <div className="flex items-center gap-1 shrink-0">

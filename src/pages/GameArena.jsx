@@ -802,7 +802,7 @@ export default function GameArena({
                     <button
                       type="button"
                       onClick={() => setShowCreateRoomModal(true)}
-                      className="vip-shimmer-badge px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                      className="px-4 py-2.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#09090B] text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                     >
                       <Plus className="w-4 h-4" />
                       <span>
@@ -843,7 +843,7 @@ export default function GameArena({
                         itemPrice: normalizedPayCfg.friendRoomTicketPrice ?? FRIEND_ROOM_TICKET_PRICE_VND
                       })
                     }
-                    className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                    className="px-4 py-2.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#09090B] text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                   >
                     <Zap className="w-4 h-4" /> Mua 1 Lượt Tạo Phòng ({roomTicketPriceLabel}/lần)
                   </button>
@@ -857,7 +857,7 @@ export default function GameArena({
                         itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
                       })
                     }
-                    className="vip-shimmer-badge px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition"
+                    className="px-4 py-2.5 rounded-xl bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                   >
                     <Crown className="w-4 h-4 text-amber-200" /> Mở Ai eo VIP ({aieoVipPriceLabel}/1T - Vô hạn)
                   </button>

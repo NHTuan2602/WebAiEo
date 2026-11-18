@@ -1,0 +1,106 @@
+/* ==========================================================================
+   ANTI-AI DESIGN SYSTEM OVERRIDE (Chuẩn hóa Impeccable UI & WCAG AA)
+   Ghi đè triệt để: AI Color Palette, Glowing Shadows, Nested Cards, Low Contrast
+   ========================================================================== */
+
+:root {
+  /* 1. Khóa bảng màu Light Mode chuẩn SaaS (Xóa bỏ hoàn toàn nền hồng #fff0f6) */
+  --ltt-bg-page: #F8FAFC !important;
+  --ltt-bg-surface: #FFFFFF !important;
+  --ltt-bg-muted: #F1F5F9 !important;
+  --ltt-hero-surface: #FFFFFF !important;
+  --ltt-border: #E2E8F0 !important;
+  --ltt-text-primary: #0F172A !important;
+  --ltt-text-secondary: #334155 !important; /* Tương phản > 7:1, xóa lỗi LOW CONTRAST */
+  --ltt-text-muted: #475569 !important;     /* Tương phản > 5.5:1 */
+  --ltt-primary: #18181B !important;        /* Đen than sang trọng chuẩn Linear/Vercel */
+  --ltt-accent: #0F766E !important;         /* Xanh Teal đậm đạt chuẩn WCAG */
+}
+
+/* 2. Khóa bảng màu Dark Mode sang Neutral Zinc (Xóa bỏ màu Slate xanh đen #0f172a bị gắn cờ AI COLOR PALETTE) */
+html.dark,
+.dark,
+[data-theme="dark"],
+body.dark {
+  --ltt-bg-page: #09090B !important;        /* Zinc 950 - Xám than thuần không pha xanh */
+  --ltt-bg-surface: #18181B !important;     /* Zinc 900 */
+  --ltt-bg-muted: #27272A !important;       /* Zinc 800 */
+  --ltt-hero-surface: #18181B !important;
+  --ltt-border: #27272A !important;
+  --ltt-text-primary: #FAFAFA !important;   /* Zinc 50 */
+  --ltt-text-secondary: #D4D4D8 !important; /* Zinc 300 - Tương phản cao trên nền tối */
+  --ltt-text-muted: #A1A1AA !important;     /* Zinc 400 */
+}
+
+body {
+  background-color: var(--ltt-bg-page) !important;
+  color: var(--ltt-text-primary) !important;
+}
+
+.lexi-hero-surface {
+  background-color: var(--ltt-bg-page) !important;
+  background-image: none !important;
+}
+
+/* 3. Xóa sạch 100% hiệu ứng Radial/Linear Gradient nền & Marquee chạy vô hạn */
+.vip-shimmer-badge::after,
+[class*="shimmer"]::after,
+[class*="marquee"] {
+  animation: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+/* 4. Xóa sạch lỗi IMAGE HOVER TRANSFORM trên toàn bộ thẻ ảnh */
+img,
+img:hover {
+  transform: none !important;
+  scale: 1 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+/* 5. Xóa sạch lỗi GLOWING SHADOW ACCENTS (Tắt mọi đèn LED neon phát sáng quanh Avatar, Navbar, VIP Card) */
+*,
+*::before,
+*::after {
+  text-shadow: none !important;
+}
+
+[class*="shadow-"]:not(.shadow-none),
+[style*="box-shadow"]:not(.shadow-none) {
+  /* Chỉ cho phép bóng đổ đen cực nhẹ dưới đáy, cấm bóng phát sáng màu cyan/amber/pink */
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.shadow-none {
+  box-shadow: none !important;
+}
+
+/* 6. Xóa sạch lỗi UNDERSIZED FUNCTIONAL TEXT & TINY BODY TEXT (Không cho phép chữ nào nhỏ hơn 12px) */
+[class*="text-[9px]"],
+[class*="text-[10px]"],
+[class*="text-[11px]"],
+small,
+.badge,
+[class*="badge"] {
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+/* Giới hạn chiều dài dòng văn bản mô tả để xóa lỗi LINE LENGTH TOO LONG */
+p {
+  max-width: 65ch;
+}
+
+p.text-center {
+  margin-inline: auto;
+}
+
+/* 7. Tự động triệt tiêu lỗi NESTED CARDS (Thẻ có viền/nền nằm bên trong một thẻ khác) */
+[class*="rounded-"][class*="border"] [class*="rounded-"][class*="border"]:not(button):not(input):not(select):not(textarea):not(span):not(a) {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid var(--ltt-border) !important;
+}

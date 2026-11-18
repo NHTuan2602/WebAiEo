@@ -66,7 +66,7 @@ html.dark .lexi-underlined::after {
 }
 
 html.dark .lexi-hero-surface {
-  background-color: #121214;
+  background-color: #09090B;
 }
 
 .lexi-card {
@@ -181,8 +181,8 @@ body {
 }
 
 html.dark body {
-  background-color: #121214;
-  color: #f4f4f5;
+  background-color: #09090B;
+  color: #FAFAFA;
 }
 
 html.dark input,

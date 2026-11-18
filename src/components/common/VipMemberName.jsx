@@ -30,7 +30,7 @@ export default function VipMemberName({
       </span>
       {showVipBadge && showVipTag && (
         <span
-          className={`inline-flex items-center font-semibold uppercase tracking-wider bg-[#991B1B] text-[#F4F4F5] border border-[#EF4444] shadow-none shrink-0 ${badgeCls}`}
+          className={`inline-flex items-center font-semibold uppercase tracking-wider bg-[#991B1B] text-[#FFFFFF] border border-[#EF4444] shadow-none shrink-0 ${badgeCls}`}
           title="Thành viên Gói Ai eo VIP"
         >
           <Crown className={badgeSize === 'xs' ? 'w-2.5 h-2.5 text-amber-300' : 'w-3 h-3 text-amber-300'} />

@@ -115,19 +115,19 @@ export default function StudentHome({
       {/* Daily Speaking Mandatory Alert Banner */}
       {!matchedFocusedTest && !isTeacher && dailyCompliance.myPendingDailyTests.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
-          <div className="rounded-2xl bg-gradient-to-r from-rose-500/15 via-orange-500/15 to-amber-500/10 border-2 border-orange-400/70 dark:border-orange-500/50 p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="rounded-2xl bg-amber-50/70 dark:bg-[#18181B] border border-amber-300 dark:border-zinc-800 p-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <p className="text-xs sm:text-sm font-extrabold text-rose-800 dark:text-rose-200">
+              <p className="text-xs sm:text-sm font-extrabold text-rose-800 dark:text-rose-300">
                 🔥 Nhắc Nhở Speaking Daily Hôm Nay: Bạn còn {dailyCompliance.myPendingDailyTests.length} bài bắt buộc chưa hoàn thành!
               </p>
-              <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+              <p className="text-xs text-slate-700 dark:text-zinc-300 mt-0.5">
                 Bài chờ làm: <strong>{dailyCompliance.myPendingDailyTests.map(d => d.title).join(', ')}</strong>
               </p>
             </div>
             <button
               type="button"
               onClick={() => (openSpeakingDaily ? openSpeakingDaily() : openSkillPracticeHub?.())}
-              className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-extrabold shrink-0 shadow-xs transition"
+              className="px-4 py-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-[#09090B] text-xs font-semibold shrink-0 transition"
             >
               Vào Luyện Speaking Daily Ngay →
             </button>
@@ -141,32 +141,32 @@ export default function StudentHome({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-11">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-center">
             <div className="lg:col-span-8 space-y-5">
-              <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-200">
-                <MonitorCheck className="w-4 h-4 shrink-0 text-slate-600 dark:text-zinc-300" />
-                <span className="inline-flex items-center gap-1.5 flex-wrap">
-                  <span>{BRAND_INFO.siteName} ({BRAND_INFO.teacherName}) •</span>
-                  <VipMemberName user={currentUser} fallbackName="Học viên" badgeSize="xs" />
+              <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold">
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
+                  <MonitorCheck className="w-4 h-4 shrink-0 text-[#1E293B] dark:text-[#E4E4E7]" />
+                  <span>{BRAND_INFO.siteName} ({BRAND_INFO.teacherName})</span>
                 </span>
+                <VipMemberName user={currentUser} fallbackName="Học viên" badgeSize="xs" />
               </div>
 
-              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#0F172B] dark:text-[#F4F4F5] leading-[1.2]">
+              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#0F172B] dark:text-[#FAFAFA] leading-[1.2]">
                 Chinh phục Band Điểm IELTS với Giao Diện Thi Máy Chuẩn Quốc Tế
               </h1>
 
-              <p className="text-sm sm:text-base text-[#334155] dark:text-zinc-300 leading-relaxed max-w-2xl">
+              <p className="text-sm sm:text-base text-[#334155] dark:text-[#D4D4D8] leading-relaxed max-w-2xl">
                 Làm bài thi thử 3 kỹ năng liên hoàn, tự động lưu bài làm ngay khi tải lại trang và theo dõi báo cáo tiến trình chi tiết cùng <strong>{BRAND_INFO.teacherName}</strong>.
               </p>
 
               {/* Inline Feature Checks */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm font-semibold text-[#334155] dark:text-zinc-300">
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-slate-600 dark:text-zinc-300" /> Highlight &amp; Notes trên bài đọc
+              <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm font-semibold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
+                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Highlight &amp; Notes trên bài đọc
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-slate-600 dark:text-zinc-300" /> Lưu tiến trình tự động (F5 an toàn)
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
+                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Lưu tiến trình tự động (F5 an toàn)
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-slate-600 dark:text-zinc-300" /> Xem đáp án &amp; giải thích chi tiết
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
+                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Xem đáp án &amp; giải thích chi tiết
                 </span>
               </div>
 
@@ -184,16 +184,16 @@ export default function StudentHome({
                 <button
                   type="button"
                   onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('speaking') : setView('SKILL_HUB'))}
-                  className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-zinc-100 font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
+                  className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
                 >
-                  <Mic className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
+                  <Mic className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
                   <span>Bài Tập 4 Kỹ Năng &amp; Speaking AI ({singleSkillCount})</span>
                 </button>
                 <button
                   onClick={openStudentGamePortal}
-                  className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-zinc-100 font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
+                  className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
                 >
-                  <Gamepad2 className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
+                  <Gamepad2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
                   <span>Đấu Trường Từ Vựng</span>
                 </button>
               </div>
@@ -204,7 +204,7 @@ export default function StudentHome({
               <div className="bg-white dark:bg-[#18181B] rounded-lg p-5 sm:p-6 border border-slate-200 dark:border-zinc-800 space-y-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-[#F4F4F5]">
+                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-[#FAFAFA]">
                       Mục Tiêu &amp; Lộ Trình Cá Nhân
                     </h2>
                     <p className="text-sm text-[#475569] dark:text-zinc-400 mt-0.5">
@@ -225,23 +225,23 @@ export default function StudentHome({
                       }
                       aria-label="Chỉnh sửa mục tiêu Band"
                       title="Chỉnh sửa mục tiêu Band"
-                      className="p-2.5 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 transition border border-slate-200 dark:border-zinc-700 shrink-0"
+                      className="p-2.5 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] hover:bg-slate-200 dark:hover:bg-zinc-700 text-[#1E293B] dark:text-[#E4E4E7] transition border border-slate-200 dark:border-zinc-700 shrink-0"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-b border-slate-200 dark:border-zinc-800 pb-4">
-                  <div>
-                    <p className="text-xs font-semibold text-[#475569] dark:text-zinc-400">Band Cao Nhất</p>
-                    <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#F4F4F5] tabular-nums mt-1">
+                <div className="grid grid-cols-2 border-b border-slate-200 dark:border-zinc-800 pb-4">
+                  <div className="bg-transparent rounded-none pr-4 border-r border-slate-200 dark:border-zinc-800">
+                    <p className="text-xs font-semibold text-[#1E293B] dark:text-[#E4E4E7]">Band Cao Nhất</p>
+                    <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums mt-1">
                       {bestOverallBand !== null ? bestOverallBand : '--'}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[#475569] dark:text-zinc-400">Mục Tiêu Band</p>
-                    <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#F4F4F5] tabular-nums mt-1">
+                  <div className="bg-transparent border-0 rounded-none pl-4">
+                    <p className="text-xs font-semibold text-[#1E293B] dark:text-[#E4E4E7]">Mục Tiêu Band</p>
+                    <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums mt-1">
                       {currentUser?.targetBand || '8.0'}
                     </p>
                   </div>
@@ -272,9 +272,9 @@ export default function StudentHome({
                         setView('STUDENT_PROFILE');
                       }
                     }}
-                    className="w-full py-2.5 px-4 rounded-lg text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-[#0F172A] dark:text-zinc-100 border border-slate-200 dark:border-zinc-700 transition flex items-center justify-center gap-2"
+                    className="w-full py-2.5 px-4 rounded-lg text-xs sm:text-sm font-bold bg-[#F1F5F9] hover:bg-slate-200 dark:bg-[#27272A] dark:hover:bg-zinc-700 text-[#1E293B] dark:text-[#E4E4E7] border border-slate-200 dark:border-zinc-700 transition flex items-center justify-center gap-2"
                   >
-                    <TrendingUp className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
+                    <TrendingUp className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
                     <span>Xem Biểu Đồ Tiến Độ</span>
                   </button>
                 )}
@@ -290,32 +290,32 @@ export default function StudentHome({
         {!matchedFocusedTest && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-[#27272A] text-slate-700 dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
+            <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
               <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Đề thi trọn bộ</p>
-              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#F4F4F5] tabular-nums">{fullExamTests.length}</p>
+              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{fullExamTests.length}</p>
             </div>
           </div>
 
           <div className="bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-[#27272A] text-slate-700 dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
+            <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Bài tập 4 kỹ năng</p>
-              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#F4F4F5] tabular-nums">{singleSkillCount}</p>
+              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{singleSkillCount}</p>
             </div>
           </div>
 
           <div className="bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-[#27272A] text-slate-700 dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
+            <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
               <FileText className="w-5 h-5" />
             </div>
             <div>
               <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Lượt bài đã nộp</p>
-              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#F4F4F5] tabular-nums">{studentAttempts.length}</p>
+              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{studentAttempts.length}</p>
             </div>
           </div>
 
@@ -325,12 +325,12 @@ export default function StudentHome({
             className="text-left bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-zinc-600 transition"
           >
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-11 h-11 rounded-lg bg-slate-100 dark:bg-[#27272A] text-slate-700 dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
+              <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
                 <Gamepad2 className="w-5 h-5" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Kỷ lục Game lớp</p>
-                <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#F4F4F5] tabular-nums truncate">
+                <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums truncate">
                   {bestGameScore > 0 ? `${bestGameScore}đ` : 'Chơi ngay'}
                 </p>
               </div>
@@ -437,15 +437,15 @@ export default function StudentHome({
                   >
                     <div className="flex-1 flex flex-col">
                       <div className="flex flex-wrap justify-between items-center gap-2 mb-3.5">
-                        <span className="bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-medium px-2.5 py-1 rounded-md inline-flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> IELTS Academic • {totalMins}p
+                        <span className="bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border border-[#E2E8F0] dark:border-zinc-700 text-xs font-medium px-2.5 py-1 rounded-md inline-flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> IELTS Academic • {totalMins}p
                         </span>
                         {testPrice > 0 ? (
                           <span
                             className={`border text-xs font-medium px-2.5 py-1 rounded-md inline-flex items-center gap-1 ${
                               isPurchasedTest || isTeacher
-                                ? 'bg-[#D1FAE5] dark:bg-emerald-950/60 text-[#065F46] dark:text-emerald-200 border-emerald-300 dark:border-emerald-700'
-                                : 'bg-[#FEF3C7] dark:bg-amber-950/60 text-[#92400E] dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                                ? 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700'
+                                : 'bg-[#FEF3C7] dark:bg-[#F59E0B] text-[#09090B] border-amber-400 font-semibold'
                             }`}
                           >
                             <ShoppingBag className="w-3.5 h-3.5" />
@@ -460,7 +460,7 @@ export default function StudentHome({
                             className={`border text-xs font-medium px-2.5 py-1 rounded-md ${
                               isExhausted
                                 ? 'bg-rose-100 dark:bg-rose-950/60 text-[#991B1B] dark:text-rose-200 border-rose-300 dark:border-rose-700'
-                                : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700'
+                                : 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700'
                             }`}
                           >
                             {attemptSummaryText}
@@ -518,8 +518,8 @@ export default function StudentHome({
                             </span>
                           )}
                           {cfg.antiCheatEnabled && (
-                            <span className="inline-flex items-center gap-1" title="Chế độ giám sát thi cử được bật">
-                              <ShieldCheck className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Bảo mật
+                            <span className="inline-flex items-center gap-1 text-[#1E293B] dark:text-[#E4E4E7]" title="Chế độ giám sát thi cử được bật">
+                              <ShieldCheck className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Bảo mật
                             </span>
                           )}
                         </div>
@@ -811,7 +811,7 @@ export default function StudentHome({
                                   Giáo viên IELTS
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md bg-[#D1FAE5] text-[#065F46] border border-emerald-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700">
+                                <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-[#1E293B] border border-[#E2E8F0] dark:bg-[#27272A] dark:text-[#E4E4E7] dark:border-zinc-700">
                                   Học viên
                                 </span>
                               )}

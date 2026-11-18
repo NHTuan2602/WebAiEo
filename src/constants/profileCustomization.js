@@ -932,9 +932,9 @@ export const STUDENT_TITLES = [
     defaultPriceVnd: 80000,
     vipHaloClass: 'border-2 border-red-500 shadow-none',
     conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu Ai eo VIP.',
-    badgeClass: 'bg-[#991B1B] text-[#F4F4F5] border-[#EF4444] font-semibold',
-    heroBadgeClass: 'bg-[#991B1B] text-[#F4F4F5] border-[#EF4444] font-semibold',
-    gameBadgeClass: 'bg-[#991B1B] text-[#F4F4F5] border-[#EF4444] font-semibold',
+    badgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
+    heroBadgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
+    gameBadgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
     isUnlocked: (_stats, userObj) => Number(userObj?.aieoVipExpiresAt) > Date.now(),
     getProgress: (_stats, userObj, priceVnd = 80000) => {
       const exp = Number(userObj?.aieoVipExpiresAt) || 0;
