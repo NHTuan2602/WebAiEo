@@ -61,6 +61,7 @@ import {
   formatDurationVi,
   formatViDateTime,
   getAssignedClassNames,
+  getEffectiveTestHashtags,
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
@@ -435,14 +436,26 @@ export default function TeacherDashboard({
                         </span>
                       );
                     }
-                    if (spMeta.speakingTrack === 'exam_room') {
+                    if (spMeta.speakingTrack === 'exam_room' || cfg.examPurpose === 'real_exam') {
                       return (
                         <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border-rose-200 dark:border-rose-500/30 shrink-0">
-                          PHÒNG THI {spMeta.hasRoomPassword || spMeta.roomPassword ? '(Có Pass)' : ''}
+                          THI THẬT {spMeta.hasRoomPassword || spMeta.roomPassword || cfg.hasExamPassword || cfg.examPassword ? '(Có Pass)' : ''}
                         </span>
                       );
                     }
                     return null;
+                  })()}
+                  {(() => {
+                    const spMeta = cfg.focusSkill === 'speaking' ? normalizeSpeakingSection(t.speaking) : null;
+                    const activePass = String(spMeta?.roomPassword || cfg.examPassword || '').trim();
+                    const hasPassFlag = Boolean(activePass || spMeta?.hasRoomPassword || cfg.hasExamPassword);
+                    if (!hasPassFlag) return null;
+                    return (
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md border bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30 inline-flex items-center gap-1 shrink-0">
+                        <Key className="w-3 h-3" />
+                        Pass: {activePass || 'Đã bật'}
+                      </span>
+                    );
                   })()}
                   <h2 className="font-bold text-[#0F172B] dark:text-white text-sm sm:text-base leading-snug">
                     {t.title}
@@ -619,6 +632,32 @@ export default function TeacherDashboard({
                     </span>
                   )}
                 </div>
+                {(() => {
+                  const tags = getEffectiveTestHashtags(t);
+                  if (!tags.length) return null;
+                  return (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {tags.map(item => (
+                        <span
+                          key={item.tag}
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                            item.kind === 'real_exam'
+                              ? 'bg-[#991B1B] text-white border-[#EF4444]'
+                              : item.kind === 'password'
+                              ? 'bg-indigo-700 text-white border-indigo-500'
+                              : item.kind === 'daily'
+                              ? 'bg-[#C2410C] text-white border-orange-500'
+                              : item.kind === 'forecast'
+                              ? 'bg-[#FEF3C7] text-[#92400E] border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40'
+                              : 'bg-[#EDFFFD] text-[#0F766E] border-[#B5F5F1] dark:bg-teal-500/15 dark:text-[#1EE1D6] dark:border-teal-500/30'
+                          }`}
+                        >
+                          {item.tag}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
                 {t.description && (
                   <p className="text-sm text-[#475569] dark:text-slate-400 leading-relaxed max-w-2xl">{t.description}</p>
                 )}

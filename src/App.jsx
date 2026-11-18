@@ -317,8 +317,32 @@ export default function App() {
   const [sentNotifications, setSentNotifications] = useState([]);
   const [classesDb, setClassesDb] = useState({});
   const [customTitles, setCustomTitles] = useState([]);
-  const [speakingUnlockTokens, setSpeakingUnlockTokens] = useState({});
-  const [examUnlockTokens, setExamUnlockTokens] = useState({});
+  const [speakingUnlockTokens, setSpeakingUnlockTokens] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('ielts_speaking_unlock_tokens_v1');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [examUnlockTokens, setExamUnlockTokens] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('ielts_exam_unlock_tokens_v1');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('ielts_speaking_unlock_tokens_v1', JSON.stringify(speakingUnlockTokens || {}));
+    } catch {}
+  }, [speakingUnlockTokens]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('ielts_exam_unlock_tokens_v1', JSON.stringify(examUnlockTokens || {}));
+    } catch {}
+  }, [examUnlockTokens]);
   const [examPasswordModal, setExamPasswordModal] = useState(null);
   const [adminTitleModalState, setAdminTitleModalState] = useState({ isOpen: false, targetUsername: null });
   const [focusedTestId, setFocusedTestId] = useState(null);
@@ -457,9 +481,41 @@ export default function App() {
     if (!target) return;
     const cfg = normalizeExamConfig(target);
     const nextMaxAttempts = cfg.maxAttempts === 1 ? 0 : 1;
+    const nextPurpose = nextMaxAttempts === 1 ? 'real_exam' : 'practice';
     updateTestQuickConfig(
       testId,
-      t => ({ ...t, maxAttempts: nextMaxAttempts }),
+      t => {
+        const prevTags = Array.isArray(t.hashtags) ? t.hashtags : [];
+        const cleanedTags = prevTags.filter(
+          tag => !['#thithật', '#luyệntậptựdo'].includes(String(tag || '').toLowerCase())
+        );
+        const nextTags =
+          nextMaxAttempts === 1
+            ? ['#ThiThật', ...cleanedTags]
+            : ['#LuyệnTậpTựDo', ...cleanedTags];
+        const isSpeaking = normalizeExamConfig(t).focusSkill === 'speaking';
+        const spMeta = isSpeaking ? normalizeSpeakingSection(t.speaking) : null;
+        return {
+          ...t,
+          maxAttempts: nextMaxAttempts,
+          examPurpose: nextPurpose,
+          hashtags: nextTags,
+          ...(isSpeaking && spMeta
+            ? {
+                speaking: {
+                  ...spMeta,
+                  speakingTrack:
+                    spMeta.speakingTrack === 'daily'
+                      ? 'daily'
+                      : nextMaxAttempts === 1
+                      ? 'exam_room'
+                      : 'standard',
+                  hashtags: nextTags
+                }
+              }
+            : {})
+        };
+      },
       nextMaxAttempts === 1
         ? `Đã bật THI THẬT cho "${target.title}" - Học sinh chỉ được làm 1 lần!`
         : `Đã bật THI THỬ cho "${target.title}" - Học sinh được làm nhiều lần để ôn thi!`
@@ -3996,8 +4052,14 @@ export default function App() {
     setSelectedAttemptId(newAttempt.id);
     if (cfg.testMode === 'single_skill' && cfg.focusSkill) {
       setResultReviewTab(cfg.focusSkill);
+      if (currentUser?.role !== 'teacher') {
+        setPreviousView('SKILL_HUB');
+      }
     } else {
       setResultReviewTab('listening');
+      if (currentUser?.role !== 'teacher') {
+        setPreviousView('HOME');
+      }
     }
     setView('RESULT_VIEW');
 
@@ -4406,7 +4468,13 @@ export default function App() {
       readingRaw: cleanRRaw,
       readingBand: nextRBand
     }));
-    showToast(`Đã quy đổi chuẩn IELTS: Listening ${nextLBand} (${cleanLRaw}/${lTotal}) • Reading ${nextRBand} (${cleanRRaw}/${rTotal})`);
+    if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'listening') {
+      showToast(`Đã quy đổi chuẩn IELTS: Listening ${nextLBand} (${cleanLRaw}/${lTotal})`);
+    } else if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'reading') {
+      showToast(`Đã quy đổi chuẩn IELTS: Reading ${nextRBand} (${cleanRRaw}/${rTotal})`);
+    } else {
+      showToast(`Đã quy đổi chuẩn IELTS: Listening ${nextLBand} (${cleanLRaw}/${lTotal}) • Reading ${nextRBand} (${cleanRRaw}/${rTotal})`);
+    }
   };
 
   // Teacher AI grading assist in grading modal
@@ -4541,11 +4609,26 @@ export default function App() {
     setAttempts(updatedAttempts);
     dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAttemptObj });
     setGradingAttempt(null);
-    showToast(
-      includeWriting
-        ? `Đã lưu điểm: Listening ${lBand} · Reading ${rBand} · Overall ${updatedAttemptObj.overallBand}`
-        : `Đã cập nhật điểm Listening ${lBand} & Reading ${rBand}!`
-    );
+    if (isSpeakingAttempt) {
+      const crit = updatedAttemptObj.scores?.speaking?.criteria || {};
+      showToast(
+        `Đã lưu điểm Speaking: Band ${updatedAttemptObj.overallBand} (FC ${crit.fc ?? '-'} · LR ${crit.lr ?? '-'} · GRA ${crit.gra ?? '-'} · PR ${crit.pr ?? '-'})!`
+      );
+    } else if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'listening') {
+      showToast(`Đã lưu điểm Bài tập Listening: Band ${updatedAttemptObj.overallBand} (${cleanLRaw}/${lTotal} câu)!`);
+    } else if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'reading') {
+      showToast(`Đã lưu điểm Bài tập Reading: Band ${updatedAttemptObj.overallBand} (${cleanRRaw}/${rTotal} câu)!`);
+    } else if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'writing') {
+      showToast(
+        `Đã lưu điểm Bài tập Writing: Band ${updatedAttemptObj.overallBand} (Task 1: ${updatedAttemptObj.scores?.writing?.task1Band ?? '-'} · Task 2: ${updatedAttemptObj.scores?.writing?.task2Band ?? '-'})!`
+      );
+    } else {
+      showToast(
+        includeWriting
+          ? `Đã lưu điểm: Listening ${lBand} · Reading ${rBand} · Writing ${updatedAttemptObj.scores?.writing?.overallBand ?? '-'} · Overall ${updatedAttemptObj.overallBand}`
+          : `Đã cập nhật điểm Listening ${lBand} & Reading ${rBand}!`
+      );
+    }
   };
 
   // Highlighter and Notes
@@ -6722,6 +6805,7 @@ export default function App() {
           paymentConfig={paymentConfig}
           serverClockOffsetMs={serverClockOffsetMs}
           showToast={showToast}
+          examUnlockTokens={examUnlockTokens}
           speakingUnlockTokens={speakingUnlockTokens}
           tests={tests}
           usersDb={usersDb}

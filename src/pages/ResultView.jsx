@@ -312,13 +312,15 @@ export default function ResultView({
               setView('STUDENT_PROFILE');
             } else if (previousView === 'TEACHER_DASHBOARD') {
               setView('TEACHER_DASHBOARD');
+            } else if (previousView === 'SKILL_HUB') {
+              setView('SKILL_HUB');
             } else {
               setView(currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME');
             }
           }}
           className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm"
         >
-          <ChevronLeft className="w-4 h-4" /> Quay Lại {previousView === 'STUDENT_PROFILE' ? 'Hồ Sơ Thành Viên' : previousView === 'TEACHER_DASHBOARD' ? 'Bảng Quản Lý Giáo Viên' : 'Trang Chủ'}
+          <ChevronLeft className="w-4 h-4" /> Quay Lại {previousView === 'STUDENT_PROFILE' ? 'Hồ Sơ Thành Viên' : previousView === 'TEACHER_DASHBOARD' ? 'Bảng Quản Lý Giáo Viên' : previousView === 'SKILL_HUB' ? 'Kho Bài Tập 4 Kỹ Năng' : 'Trang Chủ'}
         </button>
 
         {/* Teacher Quick Toggle for Answer Visibility */}

@@ -196,7 +196,11 @@ export default function TeacherGradingModal({
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
               <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                Chỉnh Sửa Điểm Listening & Reading (Band 0.0 – 9.0)
+                {showListeningBlock && showReadingBlock
+                  ? 'Chỉnh Sửa Điểm Listening & Reading (Band 0.0 - 9.0)'
+                  : showListeningBlock
+                  ? 'Chỉnh Sửa Điểm Bài Tập Listening (Band 0.0 - 9.0)'
+                  : 'Chỉnh Sửa Điểm Bài Tập Reading (Band 0.0 - 9.0)'}
               </h4>
               <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                 Đổi số câu đúng sẽ tự quy đổi Band chuẩn IELTS, hoặc giáo viên có thể nhập Band trực tiếp (`0` = bỏ trống / 0 câu đúng).
@@ -206,9 +210,9 @@ export default function TeacherGradingModal({
               type="button"
               onClick={recalculateObjectiveScores}
               className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/40 flex items-center gap-1.5 transition shadow-sm shrink-0"
-              title="Chấm lại số câu đúng từ đáp án đã nộp và áp dụng bảng quy đổi IELTS 0.0–9.0"
+              title="Chấm lại số câu đúng từ đáp án đã nộp và áp dụng bảng quy đổi IELTS 0.0-9.0"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Quy Đổi Chuẩn IELTS (L/R)
+              <RefreshCw className="w-3.5 h-3.5" /> Quy Đổi Chuẩn IELTS ({showListeningBlock && showReadingBlock ? 'L/R' : showListeningBlock ? 'Listening' : 'Reading'})
             </button>
           </div>
 
@@ -216,13 +220,27 @@ export default function TeacherGradingModal({
             <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
               <span>
-                Điểm Band L/R đang nhập (<strong>{previewLBand}</strong> / <strong>{previewRBand}</strong>) đang khác mức quy đổi chuẩn từ số câu đúng (<strong>{expectedLBand}</strong> cho {lRawClean}/{lTotal} câu L · <strong>{expectedRBand}</strong> cho {rRawClean}/{rTotal} câu R). Bạn có thể bấm <b>Quy Đổi Chuẩn IELTS (L/R)</b> để cập nhật ngay hoặc giữ nguyên điểm chỉnh tay.
+                {showListeningBlock && showReadingBlock ? (
+                  <>
+                    Điểm Band L/R đang nhập (<strong>{previewLBand}</strong> / <strong>{previewRBand}</strong>) đang khác mức quy đổi chuẩn từ số câu đúng (<strong>{expectedLBand}</strong> cho {lRawClean}/{lTotal} câu L · <strong>{expectedRBand}</strong> cho {rRawClean}/{rTotal} câu R).
+                  </>
+                ) : showListeningBlock ? (
+                  <>
+                    Điểm Band Listening đang nhập (<strong>{previewLBand}</strong>) đang khác mức quy đổi chuẩn từ số câu đúng (<strong>{expectedLBand}</strong> cho {lRawClean}/{lTotal} câu Listening).
+                  </>
+                ) : (
+                  <>
+                    Điểm Band Reading đang nhập (<strong>{previewRBand}</strong>) đang khác mức quy đổi chuẩn từ số câu đúng (<strong>{expectedRBand}</strong> cho {rRawClean}/{rTotal} câu Reading).
+                  </>
+                )}{' '}
+                Bạn có thể bấm <b>Quy Đổi Chuẩn IELTS</b> để cập nhật ngay hoặc giữ nguyên điểm chỉnh tay.
               </span>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`grid grid-cols-1 ${showListeningBlock && showReadingBlock ? 'md:grid-cols-2' : 'max-w-lg'} gap-4`}>
             {/* Listening Card */}
+            {showListeningBlock && (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
@@ -250,7 +268,7 @@ export default function TeacherGradingModal({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Listening Band (0 – 9.0)
+                    Listening Band (0 - 9.0)
                   </label>
                   <input
                     type="number"
@@ -265,8 +283,10 @@ export default function TeacherGradingModal({
                 </div>
               </div>
             </div>
+            )}
 
             {/* Reading Card */}
+            {showReadingBlock && (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
@@ -294,7 +314,7 @@ export default function TeacherGradingModal({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Reading Band (0 – 9.0)
+                    Reading Band (0 - 9.0)
                   </label>
                   <input
                     type="number"
@@ -309,6 +329,7 @@ export default function TeacherGradingModal({
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
         )}

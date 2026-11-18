@@ -61,13 +61,23 @@ export default function SkillPracticeHub({
   paymentConfig = null,
   serverClockOffsetMs = 0,
   showToast,
+  examUnlockTokens = {},
   speakingUnlockTokens = {},
   tests = [],
   usersDb = {}
 }) {
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
   const [singleHubSkill, setSingleHubSkill] = useState('all'); // 'all' | 'reading' | 'listening' | 'writing'
-  const [selectedSpeakingHashtag, setSelectedSpeakingHashtag] = useState('all');
+  const hashtagScopeKey = `${activeTab}:${singleHubSkill}`;
+  const [hashtagFilterState, setHashtagFilterState] = useState({ scopeKey: hashtagScopeKey, tag: 'all' });
+  const selectedSpeakingHashtag = hashtagFilterState.scopeKey === hashtagScopeKey ? hashtagFilterState.tag : 'all';
+  const setSelectedSpeakingHashtag = (nextOrUpdater) => {
+    setHashtagFilterState(prev => {
+      const currentTag = prev.scopeKey === hashtagScopeKey ? prev.tag : 'all';
+      const nextTag = typeof nextOrUpdater === 'function' ? nextOrUpdater(currentTag) : nextOrUpdater;
+      return { scopeKey: hashtagScopeKey, tag: nextTag || 'all' };
+    });
+  };
   const [passwordPromptTarget, setPasswordPromptTarget] = useState(null);
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
@@ -444,110 +454,231 @@ export default function SkillPracticeHub({
           ))}
         </div>
 
-        {filteredList.length === 0 ? (
-          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-2">
-            <Layers className="w-10 h-10 mx-auto text-[#475569] dark:text-slate-400" />
-            <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
-              Chưa có đề thi lẻ nào trong mục này
-            </h2>
-            <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
-              Giáo viên có thể tạo nhanh Đề Lẻ Đọc, Nghe hoặc Viết bằng nút phía trên.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredList.map(test => {
-              const sk = test._resolvedSkill;
-              const sMeta = skillMetaMap[sk] || skillMetaMap.reading;
-              const cfg = normalizeExamConfig(test);
-              const schedule = evaluateTestSchedule(cfg, serverNowMs);
-              const myTestAttempts = myAttempts.filter(a => a.testId === test.id);
-              const usedCount = myTestAttempts.length;
-              const myBest = myTestAttempts
-                .map(a => a.overallBand)
-                .filter(b => typeof b === 'number')
-                .reduce((max, b) => Math.max(max, b), 0);
-              const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
-              const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
-              const qList = sk === 'listening' ? (test.listening?.questions || []) : sk === 'reading' ? (test.reading?.questions || []) : [];
-              const typeTags = Array.from(new Set(qList.map(q => getQuestionTypeMeta(q.type, sk).shortLabel))).slice(0, 3);
+        {(() => {
+          const tagCountsMap = new Map();
+          filteredList.forEach(t => {
+            getEffectiveTestHashtags(t).forEach(h => {
+              const prev = tagCountsMap.get(h.tag.toLowerCase());
+              tagCountsMap.set(h.tag.toLowerCase(), {
+                tag: prev?.tag || h.tag,
+                kind: prev?.kind || h.kind,
+                count: (prev?.count || 0) + 1
+              });
+            });
+          });
+          const availableHashtagFilters = Array.from(tagCountsMap.values());
+          const finalSingleList =
+            selectedSpeakingHashtag === 'all'
+              ? filteredList
+              : filteredList.filter(t =>
+                  getEffectiveTestHashtags(t).some(
+                    h => h.tag.toLowerCase() === selectedSpeakingHashtag.toLowerCase()
+                  )
+                );
 
-              return (
-                <div
-                  key={test.id}
-                  className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 hover:border-[#007A7A] rounded-lg p-5 flex flex-col justify-between gap-4 transition"
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sMeta.cls}`}>
-                        {sMeta.label} • {cfg.durations[sk]} phút
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        {myBest > 0 && (
-                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
-                            Kỷ lục: Band {myBest}
-                          </span>
-                        )}
-                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
-                          {cfg.maxAttempts === 0 ? `${usedCount} lượt` : `${usedCount}/${cfg.maxAttempts} lượt`}
-                        </span>
-                      </div>
-                    </div>
-
-                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
-                      {test.title}
-                    </h2>
-                    {renderTestHashtagPills(test)}
-                    {test.description && (
-                      <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      {qList.length > 0 && (
-                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#334155] dark:text-slate-200">
-                          {qList.length} câu
-                        </span>
-                      )}
-                      {typeTags.map(tag => (
-                        <span key={tag} className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => guardSingleSkillStart(test.id)}
-                      className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
-                        isLocked
-                          ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
-                          : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
-                      }`}
-                    >
-                      {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                      <span>
-                        {isLocked ? 'Đang khóa / Hết lượt' : `Làm Đề ${sk.toUpperCase()}`}
-                      </span>
-                    </button>
-                    {isTeacher && (
+          return (
+            <>
+              {availableHashtagFilters.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-extrabold text-[#334155] dark:text-slate-300 inline-flex items-center gap-1 px-1.5">
+                    <Hash className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
+                    Lọc theo Hashtag:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSpeakingHashtag('all')}
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                      selectedSpeakingHashtag === 'all'
+                        ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                    }`}
+                  >
+                    Tất cả ({filteredList.length})
+                  </button>
+                  {availableHashtagFilters.map(item => {
+                    const isSelected = selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase();
+                    return (
                       <button
+                        key={item.tag}
                         type="button"
-                        onClick={() => onOpenSkillBuilder?.(sk, test)}
-                        className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
-                        title="Chỉnh sửa bài này"
+                        onClick={() =>
+                          setSelectedSpeakingHashtag(prev =>
+                            prev.toLowerCase() === item.tag.toLowerCase() ? 'all' : item.tag
+                          )
+                        }
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                          isSelected
+                            ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                            : item.kind === 'real_exam'
+                            ? 'bg-rose-50 dark:bg-rose-500/15 text-[#991B1B] dark:text-rose-300 border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
+                            : item.kind === 'password'
+                            ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40 hover:border-indigo-500'
+                            : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                        }`}
                       >
-                        <Edit className="w-4 h-4" />
+                        {item.tag} ({item.count})
                       </button>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+
+              {finalSingleList.length === 0 ? (
+                <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-2">
+                  <Layers className="w-10 h-10 mx-auto text-[#475569] dark:text-slate-400" />
+                  <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
+                    {selectedSpeakingHashtag !== 'all'
+                      ? `Chưa có đề nào gắn nhãn ${selectedSpeakingHashtag}`
+                      : 'Chưa có đề thi lẻ nào trong mục này'}
+                  </h2>
+                  <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
+                    {selectedSpeakingHashtag !== 'all'
+                      ? 'Hãy bấm "Tất cả" để xem toàn bộ danh sách đề thi lẻ.'
+                      : 'Giáo viên có thể tạo nhanh Đề Lẻ Đọc, Nghe hoặc Viết bằng nút phía trên.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {finalSingleList.map(test => {
+                    const sk = test._resolvedSkill;
+                    const sMeta = skillMetaMap[sk] || skillMetaMap.reading;
+                    const cfg = normalizeExamConfig(test);
+                    const schedule = evaluateTestSchedule(cfg, serverNowMs);
+                    const myTestAttempts = myAttempts.filter(a => a.testId === test.id);
+                    const usedCount = myTestAttempts.length;
+                    const myBest = myTestAttempts
+                      .map(a => a.overallBand)
+                      .filter(b => typeof b === 'number')
+                      .reduce((max, b) => Math.max(max, b), 0);
+                    const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
+                    const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
+                    const hasExamPass = Boolean(cfg.hasExamPassword || cfg.examPassword);
+                    const isRealExamCard = cfg.examPurpose === 'real_exam' || cfg.maxAttempts === 1 || hasExamPass;
+                    const isPassUnlocked = isTeacher || !hasExamPass || Boolean(examUnlockTokens?.[test.id]);
+                    const qList = sk === 'listening' ? (test.listening?.questions || []) : sk === 'reading' ? (test.reading?.questions || []) : [];
+                    const typeTags = Array.from(new Set(qList.map(q => getQuestionTypeMeta(q.type, sk).shortLabel))).slice(0, 3);
+
+                    return (
+                      <div
+                        key={test.id}
+                        className={`bg-white dark:bg-[#0F172B] border rounded-lg p-5 flex flex-col justify-between gap-4 transition ${
+                          isRealExamCard
+                            ? 'border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
+                        }`}
+                      >
+                        <div className="space-y-2.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sMeta.cls}`}>
+                                {sMeta.label} • {cfg.durations[sk]} phút
+                              </span>
+                              {isRealExamCard && (
+                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-[#991B1B] text-white inline-flex items-center gap-1">
+                                  🏛️ Đề Thi Thật
+                                </span>
+                              )}
+                              {hasExamPass && (
+                                <span
+                                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border ${
+                                    isPassUnlocked
+                                      ? 'bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                                      : 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
+                                  }`}
+                                >
+                                  <KeyRound className="w-3 h-3" />
+                                  {isTeacher
+                                    ? `Pass: ${cfg.examPassword || 'Đã bật'}`
+                                    : isPassUnlocked
+                                    ? 'Đã mở khóa'
+                                    : 'Có Mật Khẩu'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {myBest > 0 && (
+                                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
+                                  Kỷ lục: Band {myBest}
+                                </span>
+                              )}
+                              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
+                                {cfg.maxAttempts === 0 ? `${usedCount} lượt` : `${usedCount}/${cfg.maxAttempts} lượt`}
+                              </span>
+                            </div>
+                          </div>
+
+                          <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
+                            {test.title}
+                          </h2>
+                          {renderTestHashtagPills(test, {
+                            onSelectTag: nextTag =>
+                              setSelectedSpeakingHashtag(prev =>
+                                prev.toLowerCase() === nextTag.toLowerCase() ? 'all' : nextTag
+                              )
+                          })}
+                          {test.description && (
+                            <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            {qList.length > 0 && (
+                              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#334155] dark:text-slate-200">
+                                {qList.length} câu
+                              </span>
+                            )}
+                            {typeTags.map(tag => (
+                              <span key={tag} className="text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isLocked}
+                            onClick={() => guardSingleSkillStart(test.id)}
+                            className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                              isLocked
+                                ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
+                                : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
+                            }`}
+                          >
+                            {isLocked ? (
+                              <Lock className="w-3.5 h-3.5" />
+                            ) : !isPassUnlocked ? (
+                              <KeyRound className="w-3.5 h-3.5" />
+                            ) : (
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                            )}
+                            <span>
+                              {isLocked
+                                ? 'Đang khóa / Hết lượt'
+                                : !isPassUnlocked
+                                ? `Nhập Mật Khẩu · Làm Đề ${sk.toUpperCase()}`
+                                : `Làm Đề ${sk.toUpperCase()}`}
+                            </span>
+                          </button>
+                          {isTeacher && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenSkillBuilder?.(sk, test)}
+                              className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
+                              title="Chỉnh sửa bài này"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {renderSingleSkillLeaderboard(singleHubSkill)}
       </div>
@@ -605,141 +736,260 @@ export default function SkillPracticeHub({
           </div>
         )}
 
-        {displayedList.length === 0 ? (
-          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-3">
-            <IconComp className="w-10 h-10 mx-auto text-[#475569] dark:text-slate-400" />
-            <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
-              Chưa có bài tập {skillId.toUpperCase()} nào
-            </h2>
-            <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
-              {isTeacher
-                ? `Hãy bấm "Tạo Bài Tập ${skillId.toUpperCase()}" để tạo nhanh một bài tập luyện riêng kỹ năng ${skillId.toUpperCase()}.`
-                : 'Giáo viên sẽ đăng tải các bài tập luyện tập chuyên sâu theo từng kỹ năng tại đây.'}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {displayedList.map(test => {
-              const cfg = normalizeExamConfig(test);
-              const schedule = evaluateTestSchedule(cfg, serverNowMs);
-              const usedCount = myAttempts.filter(a => a.testId === test.id).length;
-              const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
-              const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
-              const lockText = isExhausted
-                ? 'Đã hết lượt'
-                : schedule.notYetOpen
-                ? `Mở lúc ${formatViDateTime(schedule.openAt)}`
-                : 'Đã hết hạn nộp';
-              const qCount =
-                skillId === 'listening'
-                  ? (test.listening?.questions?.length || 0)
-                  : skillId === 'reading'
-                  ? (test.reading?.questions?.length || 0)
-                  : 2;
-              const subCountLabel =
-                skillId === 'listening'
-                  ? `${getListeningTracks(test.listening).length} Part • ${qCount} câu`
-                  : skillId === 'reading'
-                  ? `${getReadingPassages(test.reading).length} Passage • ${qCount} câu`
-                  : 'Task 1 & Task 2';
+        {(() => {
+          const tagCountsMap = new Map();
+          list.forEach(t => {
+            getEffectiveTestHashtags(t).forEach(h => {
+              const prev = tagCountsMap.get(h.tag.toLowerCase());
+              tagCountsMap.set(h.tag.toLowerCase(), {
+                tag: prev?.tag || h.tag,
+                kind: prev?.kind || h.kind,
+                count: (prev?.count || 0) + 1
+              });
+            });
+          });
+          const availableHashtagFilters = Array.from(tagCountsMap.values());
+          const finalSkillList =
+            selectedSpeakingHashtag === 'all' || Boolean(focusedMatch)
+              ? displayedList
+              : displayedList.filter(t =>
+                  getEffectiveTestHashtags(t).some(
+                    h => h.tag.toLowerCase() === selectedSpeakingHashtag.toLowerCase()
+                  )
+                );
 
-              return (
-                <div
-                  key={test.id}
-                  className={`bg-white dark:bg-[#0F172B] border rounded-lg p-5 flex flex-col justify-between gap-4 transition ${
-                    focusedMatch?.id === test.id
-                      ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
-                  }`}
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${meta.bg} ${meta.color}`}>
-                        {skillId.toUpperCase()} ONLY • {cfg.durations[skillId]} phút
-                      </span>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
-                          <span
-                            key={cls.id}
-                            className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                          >
-                            Lớp {cls.name}
-                          </span>
-                        ))}
-                        {isTeacher && cfg.visibility === 'private' && (
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 flex items-center gap-1">
-                            <EyeOff className="w-3 h-3" /> Đang ẩn
-                          </span>
-                        )}
-                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
-                          {cfg.maxAttempts === 0 ? `Tự do (${usedCount})` : `${usedCount}/${cfg.maxAttempts} lượt`}
-                        </span>
-                      </div>
-                    </div>
-
-                    <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
-                      {test.title}
-                    </h2>
-                    {renderTestHashtagPills(test)}
-                    {test.description && (
-                      <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
-                    )}
-                    <p className="text-xs font-semibold text-[#334155] dark:text-slate-300">
-                      Nội dung: {subCountLabel}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-                      {cfg.scheduleMode === 'flexible' ? (
-                        <span className="px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
-                        </span>
-                      ) : schedule.lockedBySchedule ? (
-                        <span className="px-2.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
-                          <Lock className="w-3 h-3" /> {schedule.notYetOpen ? `Mở lúc ${formatViDateTime(schedule.openAt)}` : `Đã hết hạn (${formatViDateTime(schedule.dueAt)})`}
-                        </span>
-                      ) : schedule.isLateWindow ? (
-                        <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn cho làm (báo trễ)
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => guardSingleSkillStart(test.id)}
-                      className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
-                        isLocked
-                          ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
-                          : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
-                      }`}
-                    >
-                      {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                      <span>
-                        {isLocked ? lockText : `Bắt đầu làm ${skillId.toUpperCase()}`}
-                      </span>
-                    </button>
-                    {isTeacher && (
+          return (
+            <>
+              {availableHashtagFilters.length > 0 && !focusedMatch && (
+                <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-extrabold text-[#334155] dark:text-slate-300 inline-flex items-center gap-1 px-1.5">
+                    <Hash className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
+                    Lọc theo Hashtag:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSpeakingHashtag('all')}
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                      selectedSpeakingHashtag === 'all'
+                        ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                    }`}
+                  >
+                    Tất cả ({list.length})
+                  </button>
+                  {availableHashtagFilters.map(item => {
+                    const isSelected = selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase();
+                    return (
                       <button
+                        key={item.tag}
                         type="button"
-                        onClick={() => onOpenSkillBuilder?.(skillId, test)}
-                        className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
-                        title="Chỉnh sửa bài tập này"
+                        onClick={() =>
+                          setSelectedSpeakingHashtag(prev =>
+                            prev.toLowerCase() === item.tag.toLowerCase() ? 'all' : item.tag
+                          )
+                        }
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                          isSelected
+                            ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                            : item.kind === 'real_exam'
+                            ? 'bg-rose-50 dark:bg-rose-500/15 text-[#991B1B] dark:text-rose-300 border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
+                            : item.kind === 'password'
+                            ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40 hover:border-indigo-500'
+                            : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                        }`}
                       >
-                        <Edit className="w-4 h-4" />
+                        {item.tag} ({item.count})
                       </button>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+
+              {finalSkillList.length === 0 ? (
+                <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-10 text-center space-y-3">
+                  <IconComp className="w-10 h-10 mx-auto text-[#475569] dark:text-slate-400" />
+                  <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
+                    {selectedSpeakingHashtag !== 'all'
+                      ? `Chưa có bài ${skillId.toUpperCase()} nào gắn nhãn ${selectedSpeakingHashtag}`
+                      : `Chưa có bài tập ${skillId.toUpperCase()} nào`}
+                  </h2>
+                  <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
+                    {selectedSpeakingHashtag !== 'all'
+                      ? 'Hãy bấm "Tất cả" để xem toàn bộ danh sách bài tập.'
+                      : isTeacher
+                      ? `Hãy bấm "Tạo Bài Tập ${skillId.toUpperCase()}" để tạo nhanh một bài tập luyện riêng kỹ năng ${skillId.toUpperCase()}.`
+                      : 'Giáo viên sẽ đăng tải các bài tập luyện tập chuyên sâu theo từng kỹ năng tại đây.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {finalSkillList.map(test => {
+                    const cfg = normalizeExamConfig(test);
+                    const schedule = evaluateTestSchedule(cfg, serverNowMs);
+                    const usedCount = myAttempts.filter(a => a.testId === test.id).length;
+                    const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
+                    const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
+                    const hasExamPass = Boolean(cfg.hasExamPassword || cfg.examPassword);
+                    const isRealExamCard = cfg.examPurpose === 'real_exam' || cfg.maxAttempts === 1 || hasExamPass;
+                    const isPassUnlocked = isTeacher || !hasExamPass || Boolean(examUnlockTokens?.[test.id]);
+                    const lockText = isExhausted
+                      ? 'Đã hết lượt'
+                      : schedule.notYetOpen
+                      ? `Mở lúc ${formatViDateTime(schedule.openAt)}`
+                      : 'Đã hết hạn nộp';
+                    const qCount =
+                      skillId === 'listening'
+                        ? (test.listening?.questions?.length || 0)
+                        : skillId === 'reading'
+                        ? (test.reading?.questions?.length || 0)
+                        : 2;
+                    const subCountLabel =
+                      skillId === 'listening'
+                        ? `${getListeningTracks(test.listening).length} Part • ${qCount} câu`
+                        : skillId === 'reading'
+                        ? `${getReadingPassages(test.reading).length} Passage • ${qCount} câu`
+                        : 'Task 1 & Task 2';
+
+                    return (
+                      <div
+                        key={test.id}
+                        className={`bg-white dark:bg-[#0F172B] border rounded-lg p-5 flex flex-col justify-between gap-4 transition ${
+                          focusedMatch?.id === test.id
+                            ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
+                            : isRealExamCard
+                            ? 'border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
+                        }`}
+                      >
+                        <div className="space-y-2.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${meta.bg} ${meta.color}`}>
+                                {skillId.toUpperCase()} ONLY • {cfg.durations[skillId]} phút
+                              </span>
+                              {isRealExamCard && (
+                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-[#991B1B] text-white inline-flex items-center gap-1">
+                                  🏛️ Đề Thi Thật
+                                </span>
+                              )}
+                              {hasExamPass && (
+                                <span
+                                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border ${
+                                    isPassUnlocked
+                                      ? 'bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                                      : 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30'
+                                  }`}
+                                >
+                                  <KeyRound className="w-3 h-3" />
+                                  {isTeacher
+                                    ? `Pass: ${cfg.examPassword || 'Đã bật'}`
+                                    : isPassUnlocked
+                                    ? 'Đã mở khóa'
+                                    : 'Có Mật Khẩu'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
+                                <span
+                                  key={cls.id}
+                                  className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                                >
+                                  Lớp {cls.name}
+                                </span>
+                              ))}
+                              {isTeacher && cfg.visibility === 'private' && (
+                                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 flex items-center gap-1">
+                                  <EyeOff className="w-3 h-3" /> Đang ẩn
+                                </span>
+                              )}
+                              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
+                                {cfg.maxAttempts === 0 ? `Tự do (${usedCount})` : `${usedCount}/${cfg.maxAttempts} lượt`}
+                              </span>
+                            </div>
+                          </div>
+
+                          <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
+                            {test.title}
+                          </h2>
+                          {renderTestHashtagPills(test, {
+                            onSelectTag: nextTag =>
+                              setSelectedSpeakingHashtag(prev =>
+                                prev.toLowerCase() === nextTag.toLowerCase() ? 'all' : nextTag
+                              )
+                          })}
+                          {test.description && (
+                            <p className="text-sm text-[#475569] dark:text-slate-400 line-clamp-2">{test.description}</p>
+                          )}
+                          <p className="text-xs font-semibold text-[#334155] dark:text-slate-300">
+                            Nội dung: {subCountLabel}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                            {cfg.scheduleMode === 'flexible' ? (
+                              <span className="px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
+                              </span>
+                            ) : schedule.lockedBySchedule ? (
+                              <span className="px-2.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> {schedule.notYetOpen ? `Mở lúc ${formatViDateTime(schedule.openAt)}` : `Đã hết hạn (${formatViDateTime(schedule.dueAt)})`}
+                              </span>
+                            ) : schedule.isLateWindow ? (
+                              <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn cho làm (báo trễ)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isLocked}
+                            onClick={() => guardSingleSkillStart(test.id)}
+                            className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                              isLocked
+                                ? 'bg-slate-200 dark:bg-slate-800 text-[#475569] cursor-not-allowed'
+                                : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
+                            }`}
+                          >
+                            {isLocked ? (
+                              <Lock className="w-3.5 h-3.5" />
+                            ) : !isPassUnlocked ? (
+                              <KeyRound className="w-3.5 h-3.5" />
+                            ) : (
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                            )}
+                            <span>
+                              {isLocked
+                                ? lockText
+                                : !isPassUnlocked
+                                ? `Nhập Mật Khẩu · Làm Đề ${skillId.toUpperCase()}`
+                                : `Bắt đầu làm ${skillId.toUpperCase()}`}
+                            </span>
+                          </button>
+                          {isTeacher && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenSkillBuilder?.(skillId, test)}
+                              className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
+                              title="Chỉnh sửa bài tập này"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
         {renderSingleSkillLeaderboard(skillId)}
       </div>
     );
