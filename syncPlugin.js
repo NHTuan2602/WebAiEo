@@ -720,9 +720,10 @@ function sanitizeUserForViewer(user, viewer) {
       const isVip = Number(user.aieoVipExpiresAt) > Date.now();
       const isSa = Boolean(user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME);
       if (isVip && !user.vipEffectsCustomizedAt) return true;
-      return (isVip || isSa) && user.vipNeonCoverEnabled !== undefined ? Boolean(user.vipNeonCoverEnabled) : isVip;
+      if (user.vipNeonCoverEnabled !== undefined) return (isVip || isSa) && Boolean(user.vipNeonCoverEnabled);
+      return isVip || (isSa && Boolean(user.vipRedNameEnabled || user.vipTagEnabled));
     })(),
-    vipNeonCoverColor: normalizeVipNeonCoverColor(user.vipNeonCoverColor || 'cyber_cyan'),
+    vipNeonCoverColor: normalizeVipNeonCoverColor(user.vipNeonCoverColor || 'aurora_rgb'),
     ...(user.vipEffectsCustomizedAt ? { vipEffectsCustomizedAt: Number(user.vipEffectsCustomizedAt) || 0 } : {}),
     subscriptionRequested:
       user.subscriptionRequested && typeof user.subscriptionRequested === 'object' ? user.subscriptionRequested : null,
@@ -1401,8 +1402,11 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     vipRedNameEnabled: superAdmin.vipRedNameEnabled === true,
     vipNameColor: normalizeVipNameColor(superAdmin.vipNameColor || 'crimson'),
     vipTagEnabled: superAdmin.vipTagEnabled === true,
-    vipNeonCoverEnabled: superAdmin.vipNeonCoverEnabled === true,
-    vipNeonCoverColor: normalizeVipNeonCoverColor(superAdmin.vipNeonCoverColor || 'cyber_cyan'),
+    vipNeonCoverEnabled:
+      superAdmin.vipNeonCoverEnabled !== undefined
+        ? superAdmin.vipNeonCoverEnabled === true
+        : (superAdmin.vipRedNameEnabled === true || superAdmin.vipTagEnabled === true),
+    vipNeonCoverColor: normalizeVipNeonCoverColor(superAdmin.vipNeonCoverColor || 'aurora_rgb'),
     aieoVipExpiresAt: Number(superAdmin.aieoVipExpiresAt) || 0,
     role: 'admin',
     isSystemAdmin: true,
@@ -2310,7 +2314,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
           ? Boolean(rawUser.vipNeonCoverEnabled)
           : (prevUser.vipNeonCoverEnabled !== undefined ? Boolean(prevUser.vipNeonCoverEnabled) : true);
       cleanSelf.vipNeonCoverColor = normalizeVipNeonCoverColor(
-        rawUser.vipNeonCoverColor !== undefined ? rawUser.vipNeonCoverColor : (prevUser.vipNeonCoverColor || 'cyber_cyan')
+        rawUser.vipNeonCoverColor !== undefined ? rawUser.vipNeonCoverColor : (prevUser.vipNeonCoverColor || 'aurora_rgb')
       );
       if (
         rawUser.vipRedNameEnabled !== undefined ||
@@ -2419,7 +2423,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
         incoming.vipNeonCoverEnabled = true;
       }
       incoming.vipNeonCoverColor = normalizeVipNeonCoverColor(
-        rawUser.vipNeonCoverColor !== undefined ? rawUser.vipNeonCoverColor : (prevUser?.vipNeonCoverColor || 'cyber_cyan')
+        rawUser.vipNeonCoverColor !== undefined ? rawUser.vipNeonCoverColor : (prevUser?.vipNeonCoverColor || 'aurora_rgb')
       );
       if (
         rawUser.vipRedNameEnabled !== undefined ||
@@ -3545,7 +3549,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           vipNameColor: normalizeVipNameColor(targetUser.vipNameColor || 'crimson'),
           vipTagEnabled: active ? (keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true) : false,
           vipNeonCoverEnabled: active ? (keepCustomRed ? (targetUser.vipNeonCoverEnabled ?? true) : true) : false,
-          vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'cyber_cyan'),
+          vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'aurora_rgb'),
           ...(active && !wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
           ...(!active ? { vipEffectsCustomizedAt: 0 } : {}),
           ...(active && (!targetUser.equippedTitleId || targetUser.equippedTitleId === 'newbie')
@@ -5389,7 +5393,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               vipNameColor: normalizeVipNameColor(targetUser.vipNameColor || 'crimson'),
               vipTagEnabled: keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true,
               vipNeonCoverEnabled: keepCustomRed ? (targetUser.vipNeonCoverEnabled ?? true) : true,
-              vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'cyber_cyan'),
+              vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'aurora_rgb'),
               ...(!wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
               ...(autoEquipVip ? { equippedTitleId: 'aieo_vip', showTitleBadge: true } : {}),
               ...(targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})

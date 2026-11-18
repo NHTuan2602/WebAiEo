@@ -272,15 +272,15 @@ export default function SkillPracticeHub({
               const avgBand = Math.round(((row.totalBand / row.count) + 1e-9) * 2) / 2;
               const rowUserObj = usersDb?.[row.username] || (row.username === currentUser?.username ? currentUser : null);
               const rowVipVisual = resolveUserVipNameVisual(rowUserObj);
-              return (
+              const rankCard = (
                 <div
-                  key={row.username}
-                  className={`flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition ${
+                  key={rowVipVisual.showNeonCover ? undefined : row.username}
+                  className={`flex items-center justify-between gap-3 p-3.5 transition ${
                     rowVipVisual.showNeonCover
-                      ? `bg-white dark:bg-[#23222B] ${rowVipVisual.neonCoverMeta.cardAccentClass}`
+                      ? 'rounded-[14px] bg-white dark:bg-[#23222B]'
                       : isMe
-                      ? 'bg-[#EDFFFD] dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6]'
-                      : 'bg-white dark:bg-[#23222B] border-pink-200/80 dark:border-[#34323F]'
+                      ? 'rounded-2xl border bg-[#EDFFFD] dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6]'
+                      : 'rounded-2xl border bg-white dark:bg-[#23222B] border-pink-200/80 dark:border-[#34323F]'
                   }`}
                 >
                   <div className="min-w-0">
@@ -304,6 +304,11 @@ export default function SkillPracticeHub({
                   </div>
                 </div>
               );
+              return rowVipVisual.showNeonCover ? (
+                <div key={row.username} className={`rounded-2xl p-[2px] transition-all ${rowVipVisual.neonCoverMeta.cardRimWrapClass}`}>
+                  {rankCard}
+                </div>
+              ) : rankCard;
             })}
           </div>
         )}

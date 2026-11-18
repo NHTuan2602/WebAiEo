@@ -384,9 +384,8 @@ export default function StudentProfile({
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             {neonOn && (
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-cyan-200 dark:border-cyan-500/40 shadow-xs">
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${neonCoverMeta.swatchClass}`} />
-                <span>Viền Bìa: {neonCoverMeta.name}</span>
+              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full text-slate-900 ${neonCoverMeta.swatchClass} shadow-xs`}>
+                Viền Bìa: {neonCoverMeta.name}
               </span>
             )}
             <span className="text-[11px] bg-white/90 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-rose-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
@@ -538,15 +537,14 @@ export default function StudentProfile({
                         customToast: `Đã bật viền bìa ${theme.name}!`
                       })
                     }
-                    className={`h-7 px-2.5 rounded-full text-[10px] font-extrabold transition inline-flex items-center gap-1.5 border ${
+                    className={`h-6 px-2 rounded-full text-[10px] font-black text-slate-950 transition flex items-center gap-1 ${theme.swatchClass} ${
                       selected
-                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white shadow-xs'
-                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                        ? 'ring-2 ring-slate-900 dark:ring-white ring-offset-1 scale-105'
+                        : 'opacity-85 hover:opacity-100'
                     }`}
                   >
-                    <span className={`w-3 h-3 rounded-full shrink-0 ${theme.swatchClass}`} />
+                    {selected && <Check className="w-2.5 h-2.5" />}
                     <span>{theme.name.replace('Neon ', '')}</span>
-                    {selected && <Check className="w-2.5 h-2.5 shrink-0" />}
                   </button>
                 );
               })}
@@ -625,7 +623,7 @@ export default function StudentProfile({
       <div
         className={
           vipVisual.showNeonCover
-            ? `rounded-3xl p-[3px] mb-7 transition-all ${vipVisual.neonCoverMeta.frameWrapClass}`
+            ? `rounded-3xl p-[3.5px] mb-7 transition-all ${vipVisual.neonCoverMeta.frameWrapClass}`
             : 'bg-white dark:bg-slate-900 rounded-3xl border border-rose-200/85 dark:border-slate-800 shadow-lg overflow-hidden mb-7'
         }
       >
@@ -633,7 +631,7 @@ export default function StudentProfile({
         <div
           className={`relative w-full h-52 sm:h-64 lg:h-72 overflow-hidden ${
             vipVisual.showNeonCover
-              ? 'rounded-t-[21px]'
+              ? 'rounded-t-[20px]'
               : 'border-b border-slate-200/75 dark:border-slate-800'
           } ${
             hasCustomCover ? 'bg-slate-100 dark:bg-slate-800' : heroBanner.heroClass
@@ -647,8 +645,15 @@ export default function StudentProfile({
             />
           )}
 
+          {vipVisual.showNeonCover && (
+            <div
+              aria-hidden="true"
+              className={`absolute inset-[6px] sm:inset-[8px] rounded-[15px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
+            />
+          )}
+
           {canEditTargetInfo && (
-            <div className="absolute bottom-3.5 right-3.5 sm:bottom-4 sm:right-5 flex flex-wrap items-center justify-end gap-2">
+            <div className="absolute bottom-3.5 right-3.5 sm:bottom-4 sm:right-5 z-10 flex flex-wrap items-center justify-end gap-2">
               {isSelf && !studentHasCoverPermission && (
                 <button
                   type="button"
@@ -681,12 +686,12 @@ export default function StudentProfile({
             </div>
           )}
           {vipVisual.showNeonCover && (
-            <div className={`absolute bottom-0 inset-x-0 h-[3px] pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
+            <div className={`absolute bottom-0 inset-x-0 h-1 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
           )}
         </div>
 
         {/* 2. Separate Profile Info & Controls Section Below Cover */}
-        <div className={`px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[21px]' : ''}`}>
+        <div className={`px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[20px]' : ''}`}>
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 min-w-0">
               {/* Overlapping Large Avatar */}
@@ -2146,7 +2151,7 @@ export default function StudentProfile({
               <Gamepad2 className="w-5 h-5 text-pink-400" />
               Thành Tích Đấu Trường Game Từ Vựng (IELTS Chicken Invaders)
             </h2>
-            <p className="text-xs text-purple-200 mt-0.5">Kết quả rèn luyện phản xạ từ vựng, ngữ nghĩa và chính tả qua game 3 vòng.</p>
+            <p className="text-xs text-purple-200 mt-0.5">Kết quả rèn luyện phản xạ từ vựng, ngữ nghĩa và chính tả qua game 4 vòng.</p>
           </div>
           <button
             onClick={() => {
@@ -2248,24 +2253,26 @@ export default function StudentProfile({
                   const mBest = bestBandByStudent.get(member.username) ?? null;
                   const memberVipVisual = resolveUserVipNameVisual(member);
 
-                  return (
+                  const memberCardBtn = (
                     <button
-                      key={member.username}
+                      key={memberVipVisual.showNeonCover ? undefined : member.username}
                       type="button"
                       onClick={() => {
                         setSelectedProfileStudent(member.username);
                         setTempNoteText('');
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl border text-left transition ${
-                        isSelected
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition ${
+                        memberVipVisual.showNeonCover
+                          ? isSelected
+                            ? 'rounded-[14px] bg-[#EDFFFD] dark:bg-slate-900/95 ring-1 ring-[#007A7A]/35 dark:ring-white/25'
+                            : 'rounded-[14px] bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/95'
+                          : isSelected
                           ? isMemberAdmin
-                            ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-2 ring-purple-500/20'
-                            : 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
-                          : memberVipVisual.showNeonCover
-                          ? `bg-white dark:bg-slate-900 ${memberVipVisual.neonCoverMeta.cardAccentClass}`
+                            ? 'rounded-2xl border bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-2 ring-purple-500/20'
+                            : 'rounded-2xl border bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
                           : isMemberAdmin
-                          ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-200 dark:border-purple-500/30 hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800'
-                          : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]/50 hover:bg-white dark:hover:bg-slate-800'
+                          ? 'rounded-2xl border bg-purple-50/40 dark:bg-purple-950/20 border-purple-200 dark:border-purple-500/30 hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800'
+                          : 'rounded-2xl border bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]/50 hover:bg-white dark:hover:bg-slate-800'
                       }`}
                     >
                       <UserAvatarBadge user={member} sizeClass="w-10 h-10" textClass="text-xs" rounded="rounded-xl" />
@@ -2335,6 +2342,15 @@ export default function StudentProfile({
                       </div>
                     </button>
                   );
+
+                  return memberVipVisual.showNeonCover ? (
+                    <div
+                      key={member.username}
+                      className={`rounded-2xl p-[2px] transition-all ${memberVipVisual.neonCoverMeta.cardRimWrapClass}`}
+                    >
+                      {memberCardBtn}
+                    </div>
+                  ) : memberCardBtn;
                 })
               )}
             </div>
@@ -2723,7 +2739,13 @@ export default function StudentProfile({
                         />
                       )}
                       {vipVisual.showNeonCover && (
-                        <div className={`absolute bottom-0 inset-x-0 h-[2.5px] ${vipVisual.neonCoverMeta.seamBarClass}`} />
+                        <>
+                          <div
+                            aria-hidden="true"
+                            className={`absolute inset-[4px] rounded-[10px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
+                          />
+                          <div className={`absolute bottom-0 inset-x-0 h-[3px] pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
+                        </>
                       )}
                     </div>
                     <div className={`px-4 pb-3.5 pt-2 flex items-end gap-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[13px]' : ''}`}>

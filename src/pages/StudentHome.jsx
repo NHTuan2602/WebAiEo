@@ -781,9 +781,9 @@ export default function StudentHome({
                       const memberIsTeacher = !memberIsAdmin && u?.role === 'teacher';
                       const memberAttCount = (attempts || []).filter(att => att.studentId === uname).length;
                       const memberVip = resolveUserVipNameVisual(memberObj);
-                      return (
+                      const cardBtn = (
                         <button
-                          key={uname}
+                          key={memberVip.showNeonCover ? undefined : uname}
                           type="button"
                           onClick={() => {
                             if (openMemberProfile) {
@@ -794,12 +794,12 @@ export default function StudentHome({
                               setView('STUDENT_PROFILE');
                             }
                           }}
-                          className={`flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl border transition text-left group ${
+                          className={`w-full h-full flex items-center gap-3.5 p-3.5 sm:p-4 transition text-left group ${
                             memberVip.showNeonCover
-                              ? `bg-white dark:bg-slate-900 ${memberVip.neonCoverMeta.cardAccentClass}`
+                              ? 'rounded-[10px] bg-white dark:bg-slate-900 hover:bg-[#EDFFFD]/95 dark:hover:bg-slate-800/95'
                               : memberIsAdmin
-                              ? 'border-purple-200/90 dark:border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20 hover:border-purple-500'
-                              : 'border-pink-200/90 dark:border-slate-800 bg-rose-50/55 dark:bg-slate-900/60 hover:border-[#007A7A] dark:hover:border-teal-500 hover:bg-[#EDFFFD]/70 dark:hover:bg-teal-950/30'
+                              ? 'rounded-xl border border-purple-200/90 dark:border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20 hover:border-purple-500'
+                              : 'rounded-xl border border-pink-200/90 dark:border-slate-800 bg-rose-50/55 dark:bg-slate-900/60 hover:border-[#007A7A] dark:hover:border-teal-500 hover:bg-[#EDFFFD]/70 dark:hover:bg-teal-950/30'
                           }`}
                         >
                           <UserAvatarBadge user={memberObj} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" />
@@ -863,6 +863,11 @@ export default function StudentHome({
                           </div>
                         </button>
                       );
+                      return memberVip.showNeonCover ? (
+                        <div key={uname} className={`rounded-xl p-[2px] transition-all ${memberVip.neonCoverMeta.cardRimWrapClass}`}>
+                          {cardBtn}
+                        </div>
+                      ) : cardBtn;
                     });
                 })()}
               </div>

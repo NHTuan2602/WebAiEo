@@ -95,7 +95,8 @@ html.dark .lexi-card:hover {
   .vip-shimmer-badge::after,
   .vip-avatar-aura,
   .vip-neon-aurora-frame,
-  .vip-neon-aurora-seam {
+  .vip-neon-aurora-seam,
+  .vip-cover-led-aurora {
     transition: none !important;
     animation: none !important;
   }
@@ -185,11 +186,30 @@ html.dark .vip-color-pink { color: #f472b6 !important; }
   100% { background-position: 0% 50%; }
 }
 
+@keyframes vipLedAuroraPulse {
+  0%, 100% {
+    box-shadow: inset 0 0 18px rgba(0, 245, 212, 0.72), 0 0 16px rgba(236, 72, 153, 0.72);
+    border-color: rgba(34, 211, 238, 0.92);
+  }
+  33% {
+    box-shadow: inset 0 0 20px rgba(236, 72, 153, 0.75), 0 0 18px rgba(168, 85, 247, 0.8);
+    border-color: rgba(244, 114, 182, 0.95);
+  }
+  66% {
+    box-shadow: inset 0 0 18px rgba(251, 191, 36, 0.72), 0 0 16px rgba(16, 185, 129, 0.78);
+    border-color: rgba(251, 191, 36, 0.95);
+  }
+}
+
 .vip-neon-aurora-frame,
 .vip-neon-aurora-seam {
-  background-image: linear-gradient(90deg, #00f5d4, #22d3ee, #818cf8, #ec4899, #fbbf24, #00f5d4);
-  background-size: 240% 240%;
-  animation: vipNeonShift 6s ease infinite;
+  background-image: linear-gradient(90deg, #ff2e93, #fbbf24, #10b981, #00f5d4, #38bdf8, #a855f7, #ff2e93);
+  background-size: 280% 280%;
+  animation: vipNeonShift 5s linear infinite;
+}
+
+.vip-cover-led-aurora {
+  animation: vipLedAuroraPulse 4.5s ease-in-out infinite;
 }
 
 html.dark {
