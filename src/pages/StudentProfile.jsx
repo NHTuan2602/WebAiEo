@@ -592,14 +592,20 @@ export default function StudentProfile({
     );
   };
 
+  const profileCardCls =
+    'bg-white dark:bg-[#0F172B] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]';
+  const profileActionBtnCls =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#F8FAFC] hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-[#CBD5E1] dark:border-[#334155] text-[#334155] dark:text-slate-200 text-xs font-semibold transition';
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="min-h-[calc(100vh-4rem)] bg-[#F8FAFC] dark:bg-[#020618] transition-colors">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Navigation & Header Controls */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-5">
         <button
           type="button"
           onClick={handleBackNavigation}
-          className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition"
+          className="flex items-center gap-2 text-xs font-semibold text-[#334155] dark:text-slate-200 bg-white dark:bg-[#0F172B] hover:bg-slate-50 dark:hover:bg-slate-800 px-3.5 py-2 rounded-[6px] border border-[#CBD5E1] dark:border-[#334155] transition"
         >
           <ChevronLeft className="w-4 h-4" />
           {isTeacherViewer ? 'Quay Lại Quản Trị Giáo Viên' : 'Quay Lại Phòng Luyện Đề'}
@@ -612,28 +618,18 @@ export default function StudentProfile({
               setSelectedProfileStudent(currentUser.username);
               setTempNoteText('');
             }}
-            className="flex items-center gap-1.5 text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6] bg-[#EDFFFD] dark:bg-teal-500/15 hover:bg-[#B5F5F1]/60 px-4 py-2.5 rounded-xl border border-[#B5F5F1] dark:border-teal-500/30 shadow-sm transition"
+            className={profileActionBtnCls}
           >
-            <UserCheck className="w-4 h-4" /> Quay về Hồ Sơ Của Tôi ({currentUser.name})
+            <UserCheck className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Quay về Hồ Sơ Của Tôi ({currentUser.name})
           </button>
         )}
       </div>
 
-      {/* Facebook-Style Profile Header: Wide Bright Cover Banner Above + Separate Clean Info Section Below */}
-      <div
-        className={
-          vipVisual.showNeonCover
-            ? `rounded-3xl p-[3px] mb-7 transition-all ${vipVisual.neonCoverMeta.frameWrapClass}`
-            : 'bg-white dark:bg-slate-900 rounded-3xl border border-rose-200/85 dark:border-slate-800 shadow-lg overflow-hidden mb-7'
-        }
-      >
-        {/* 1. Large Cover Photo / Banner Stage (zero dark fog so bright wallpapers stay crisp & vivid) */}
+      {/* Clean SaaS Profile Header: Compact 160-180px Cover Banner + Flat 1px Border + Unified Action Buttons */}
+      <div className={`${profileCardCls} overflow-hidden mb-7`}>
+        {/* 1. Compact Cover Photo / Banner Stage */}
         <div
-          className={`relative w-full h-52 sm:h-64 lg:h-72 overflow-hidden ${
-            vipVisual.showNeonCover
-              ? 'rounded-t-[21px]'
-              : 'border-b border-slate-200/75 dark:border-slate-800'
-          } ${
+          className={`relative w-full h-[160px] sm:h-[180px] overflow-hidden border-b border-[#E2E8F0] dark:border-[#334155] ${
             hasCustomCover ? 'bg-slate-100 dark:bg-slate-800' : heroBanner.heroClass
           }`}
         >
@@ -645,22 +641,15 @@ export default function StudentProfile({
             />
           )}
 
-          {vipVisual.showNeonCover && (
-            <div
-              aria-hidden="true"
-              className={`absolute inset-0 rounded-t-[21px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
-            />
-          )}
-
           {canEditTargetInfo && (
-            <div className="absolute bottom-3.5 right-3.5 sm:bottom-4 sm:right-5 z-10 flex flex-wrap items-center justify-end gap-2">
+            <div className="absolute bottom-3 right-3 sm:bottom-3.5 sm:right-4 z-10 flex flex-wrap items-center justify-end gap-2">
               {isSelf && !studentHasCoverPermission && (
                 <button
                   type="button"
                   onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Ảnh Nền Riêng (1 Tháng)', itemPrice: normalizedPayCfg.coverUnlockPrice })}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold shadow-md transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-white/95 hover:bg-white dark:bg-slate-900/95 dark:hover:bg-slate-900 border border-[#CBD5E1] dark:border-[#334155] text-[#334155] dark:text-slate-200 text-xs font-semibold shadow-xs transition"
                 >
-                  <Lock className="w-3.5 h-3.5" />
+                  <Lock className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
                   <span>Mở Ảnh Nền ({unlockPriceLabel}/1T)</span>
                 </button>
               )}
@@ -668,39 +657,36 @@ export default function StudentProfile({
                 <button
                   type="button"
                   onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Gia Hạn Ảnh Nền Riêng (+1 Tháng)', itemPrice: normalizedPayCfg.coverUnlockPrice, renew: true })}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/90 hover:bg-amber-600 text-white text-xs font-extrabold shadow-md transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-white/95 hover:bg-white dark:bg-slate-900/95 dark:hover:bg-slate-900 border border-[#CBD5E1] dark:border-[#334155] text-[#334155] dark:text-slate-200 text-xs font-semibold shadow-xs transition"
                   title="Gia hạn thêm 30 ngày quyền Ảnh Nền Riêng"
                 >
-                  <Clock className="w-3.5 h-3.5" />
+                  <Clock className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
                   <span>Gia hạn ({coverRemainingText || '30 ngày'})</span>
                 </button>
               )}
               <button
                 type="button"
                 onClick={openCustomizeModal}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-900 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-white border border-slate-200/90 dark:border-slate-700 text-xs font-extrabold shadow-md backdrop-blur-xs transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-white/95 hover:bg-white text-[#334155] dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-slate-200 border border-[#CBD5E1] dark:border-[#334155] text-xs font-semibold shadow-xs backdrop-blur-xs transition"
               >
-                <Camera className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                <Camera className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
                 <span>Đổi Ảnh Bìa</span>
               </button>
             </div>
           )}
-          {vipVisual.showNeonCover && (
-            <div className={`absolute bottom-0 inset-x-0 h-1 z-10 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
-          )}
         </div>
 
         {/* 2. Separate Profile Info & Controls Section Below Cover */}
-        <div className={`px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[21px]' : ''}`}>
+        <div className="px-5 sm:px-8 pb-6 pt-3 bg-white dark:bg-[#0F172B]">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5 min-w-0">
-              {/* Overlapping Large Avatar */}
-              <div className="-mt-16 sm:-mt-20 relative z-20 shrink-0 w-fit">
-                <div className="p-1.5 rounded-full bg-white dark:bg-slate-900 shadow-xl flex items-center justify-center">
+              {/* Proportional Overlapping Avatar */}
+              <div className="-mt-12 sm:-mt-14 relative z-20 shrink-0 w-fit">
+                <div className="p-1 rounded-full bg-white dark:bg-[#0F172B] border border-[#E2E8F0] dark:border-[#334155] shadow-sm flex items-center justify-center">
                   <UserAvatarBadge
                     user={student}
-                    sizeClass="w-28 h-28 sm:w-36 sm:h-36"
-                    textClass="text-4xl sm:text-5xl"
+                    sizeClass="w-24 h-24 sm:w-28 sm:h-28"
+                    textClass="text-3xl sm:text-4xl"
                     rounded="rounded-full"
                   />
                 </div>
@@ -723,29 +709,29 @@ export default function StudentProfile({
                     }}
                     title="Đổi Avatar"
                     aria-label="Đổi Avatar"
-                    className="absolute bottom-2 right-1.5 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white border-2 border-white dark:border-slate-900 shadow-md flex items-center justify-center transition"
+                    className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-[#F8FAFC] hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#334155] dark:text-slate-200 border border-[#CBD5E1] dark:border-[#334155] shadow-xs flex items-center justify-center transition"
                   >
-                    <Camera className="w-4 h-4" />
+                    <Camera className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Clean High-Contrast Profile Identity & Action Buttons */}
+              {/* Clean High-Contrast Profile Identity & Unified Action Buttons */}
               <div className="space-y-2 min-w-0 sm:pb-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0F172B] dark:text-white leading-tight">
                     <VipMemberName user={student} fallbackName={student.name} nameClassName="text-[#0F172B] dark:text-white" />
                   </h1>
                   {isTargetSystemAdmin ? (
-                    <span className="text-xs bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 border border-purple-200 dark:border-purple-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                      <ShieldAlert className="w-3 h-3" /> ADMIN &bull; Quản Trị Hệ Thống
+                    <span className="text-xs bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border border-[#CBD5E1] dark:border-[#334155] px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                      <ShieldAlert className="w-3 h-3 text-[#0F766E] dark:text-[#1EE1D6]" /> ADMIN &bull; Quản Trị Hệ Thống
                     </span>
                   ) : isTargetTeacher ? (
-                    <span className="text-xs bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-400/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Giáo Viên IELTS
+                    <span className="text-xs bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border border-[#CBD5E1] dark:border-[#334155] px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-[#0F766E] dark:text-[#1EE1D6]" /> Giáo Viên IELTS
                     </span>
                   ) : (
-                    <span className="text-xs bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <span className="text-xs bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#CCFBF1] dark:border-teal-500/30 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" /> Học Viên Chính Thức
                     </span>
                   )}
@@ -764,7 +750,7 @@ export default function StudentProfile({
                     <button
                       type="button"
                       onClick={() => setShowTitlesModal(true)}
-                      className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 transition"
+                      className="text-[11px] bg-[#F8FAFC] hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#334155] dark:text-slate-300 border border-[#CBD5E1] dark:border-[#334155] px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1 transition"
                     >
                       <EyeOff className="w-3 h-3" /> Đang tắt danh hiệu
                     </button>
@@ -773,20 +759,20 @@ export default function StudentProfile({
 
                 <div className="flex items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300 flex-wrap">
                   <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> Gia nhập: <b className="text-slate-900 dark:text-white tabular-nums">{student.joinedDate || '01/02/2026'}</b>
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" /> Gia nhập: <b className="text-[#0F172B] dark:text-white tabular-nums">{student.joinedDate || '01/02/2026'}</b>
                   </span>
                   {!isTargetTeacher && !isTargetSystemAdmin && (
-                    <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-semibold">
-                      <Target className="w-3.5 h-3.5 text-amber-500" /> Mục tiêu Target: <b>Band {student.targetBand || '8.0'}</b>
+                    <span className="flex items-center gap-1.5 text-[#0F766E] dark:text-[#1EE1D6] font-semibold">
+                      <Target className="w-3.5 h-3.5" /> Mục tiêu Target: <b>Band {student.targetBand || '8.0'}</b>
                     </span>
                   )}
                   {(student.studyGoal || isTargetTeacher || isTargetSystemAdmin) && (
-                    <span className="text-xs text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                    <span className="text-xs text-[#334155] dark:text-slate-200 bg-[#F8FAFC] dark:bg-slate-800 px-2.5 py-0.5 rounded-md border border-[#E2E8F0] dark:border-[#334155]">
                       {isTargetSystemAdmin
-                        ? `🛠️ ${student.studyGoal || 'Tiếp nhận góp ý & phát triển tính năng mới cho trung tâm'}`
+                        ? `${student.studyGoal || 'Tiếp nhận góp ý & phát triển tính năng mới cho trung tâm'}`
                         : isTargetTeacher
-                        ? `✨ ${student.studyGoal || BRAND_INFO.motto}`
-                        : `🎯 ${student.studyGoal}`}
+                        ? `${student.studyGoal || BRAND_INFO.motto}`
+                        : `${student.studyGoal}`}
                     </span>
                   )}
                 </div>
@@ -806,33 +792,33 @@ export default function StudentProfile({
                             avatarUrl: student.avatarUrl || ''
                           })
                         }
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border border-amber-200 dark:border-amber-400/40 text-amber-800 dark:text-amber-200 text-xs font-bold transition"
+                        className={profileActionBtnCls}
                       >
-                        <Edit className="w-3.5 h-3.5" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
+                        <Edit className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
                       </button>
                       <button
                         type="button"
                         onClick={openCustomizeModal}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 dark:bg-pink-500/15 dark:hover:bg-pink-500/25 border border-pink-200 dark:border-pink-400/40 text-pink-800 dark:text-pink-200 text-xs font-bold transition"
+                        className={profileActionBtnCls}
                       >
-                        <Palette className="w-3.5 h-3.5" /> Tùy Chỉnh Hình Nền &amp; Khung
+                        <Palette className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400" /> Tùy Chỉnh Hình Nền &amp; Khung
                       </button>
                     </>
                   )}
                   <button
                     type="button"
                     onClick={() => setShowTitlesModal(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDFFFD] hover:bg-[#B5F5F1]/50 dark:bg-teal-500/15 dark:hover:bg-teal-500/25 border border-[#B5F5F1] dark:border-teal-400/40 text-[#007A7A] dark:text-[#1EE1D6] text-xs font-bold transition"
+                    className={profileActionBtnCls}
                   >
-                    <Trophy className="w-3.5 h-3.5" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
+                    <Trophy className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
                   </button>
                   {isViewerSuperAdmin && !isTargetSystemAdmin && onOpenAdminTitleManager && (
                     <button
                       type="button"
                       onClick={() => onOpenAdminTitleManager(student.username)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-200 text-xs font-bold transition"
+                      className={profileActionBtnCls}
                     >
-                      <Crown className="w-3.5 h-3.5" /> Tặng Danh Hiệu
+                      <Crown className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400" /> Tặng Danh Hiệu
                     </button>
                   )}
                   {isViewerSuperAdmin && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserCoverUnlock && (
@@ -847,21 +833,15 @@ export default function StudentProfile({
                         await onToggleUserCoverUnlock(student.username, !studentHasCoverPermission);
                         setIsTogglingCoverUnlock(false);
                       }}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-                        studentHasCoverPermission
-                          ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-emerald-200 dark:border-emerald-500/35 text-emerald-700 dark:text-emerald-300'
-                          : student.coverUnlockRequestedAt > 0
-                          ? 'bg-amber-500 hover:bg-amber-600 border-amber-600 text-white shadow-xs'
-                          : 'bg-white hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-amber-500/15 border-amber-300 dark:border-amber-500/40 text-amber-800 dark:text-amber-200'
-                      }`}
+                      className={profileActionBtnCls}
                     >
                       {studentHasCoverPermission ? (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Đã Mở Ảnh Nền
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" /> Đã Mở Ảnh Nền
                         </>
                       ) : (
                         <>
-                          <Unlock className="w-3.5 h-3.5" />{' '}
+                          <Unlock className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400" />{' '}
                           {student.coverUnlockRequestedAt > 0
                             ? `Duyệt Mở Ảnh Nền (${unlockPriceLabel})`
                             : `Mở Khóa Ảnh Nền (${unlockPriceLabel})`}
@@ -881,13 +861,9 @@ export default function StudentProfile({
                         await onToggleUserSubscription(student.username, 'aieo_vip', !studentHasAieoVip);
                         setIsTogglingSubscription(false);
                       }}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-                        studentHasAieoVip
-                          ? 'bg-gradient-to-r from-red-500 to-amber-500 text-white border-amber-300 shadow-xs'
-                          : 'bg-white hover:bg-rose-50 dark:bg-slate-800 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300'
-                      }`}
+                      className={profileActionBtnCls}
                     >
-                      <Crown className="w-3.5 h-3.5" />
+                      <Crown className={`w-3.5 h-3.5 ${studentHasAieoVip ? 'text-[#0F766E] dark:text-[#1EE1D6]' : 'text-[#475569] dark:text-slate-400'}`} />
                       {studentHasAieoVip ? '✓ Đang mở Ai eo VIP (1T)' : '+ Cấp Ai eo VIP (1T)'}
                     </button>
                   )}
@@ -900,7 +876,7 @@ export default function StudentProfile({
                         await onToggleUserSubscription(student.username, 'room_ticket', true);
                         setIsTogglingSubscription(false);
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 text-xs font-bold transition"
+                      className={profileActionBtnCls}
                     >
                       +1 Vé Phòng (5k){(student.roomCreateCredits || 0) > 0 ? ` · Đang có ${student.roomCreateCredits}` : ''}
                     </button>
@@ -910,20 +886,16 @@ export default function StudentProfile({
                       <button
                         type="button"
                         onClick={() => onOpenAccountSecurity('password')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold transition"
+                        className={profileActionBtnCls}
                       >
-                        <Key className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Đổi Mật Khẩu
+                        <Key className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400" /> Đổi Mật Khẩu
                       </button>
                       <button
                         type="button"
                         onClick={() => onOpenAccountSecurity('email')}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-                          student.emailVerified
-                            ? 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-emerald-200 dark:border-emerald-500/35 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border-amber-200 dark:border-amber-500/35 text-amber-800 dark:text-amber-200'
-                        }`}
+                        className={profileActionBtnCls}
                       >
-                        <Mail className="w-3.5 h-3.5" />
+                        <Mail className={`w-3.5 h-3.5 ${student.emailVerified ? 'text-[#0F766E] dark:text-[#1EE1D6]' : 'text-[#475569] dark:text-slate-400'}`} />
                         {student.emailVerified ? `Email OTP ✓ (${student.maskedEmail || student.email})` : 'Liên Kết Email OTP'}
                       </button>
                     </>
@@ -932,46 +904,46 @@ export default function StudentProfile({
 
                 {!isSelf && !isTeacherViewer && !isTargetSystemAdmin && (
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-0.5">
-                    <Lock className="w-3 h-3 text-[#007A7A] dark:text-[#1EE1D6]" /> Đang xem hồ sơ thành viên khác (chế độ chỉ xem; bài viết chi tiết &amp; nhận xét riêng được bảo mật).
+                    <Lock className="w-3 h-3 text-[#0F766E] dark:text-[#1EE1D6]" /> Đang xem hồ sơ thành viên khác (chế độ chỉ xem; bài viết chi tiết &amp; nhận xét riêng được bảo mật).
                   </p>
                 )}
               </div>
             </div>
 
             {/* Right Progress / Summary Card (on crisp neutral surface below cover) */}
-            <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-700 lg:text-right sm:min-w-[235px] shrink-0">
+            <div className="bg-[#F8FAFC] dark:bg-slate-800/80 rounded-xl p-4 border border-[#E2E8F0] dark:border-[#334155] lg:text-right sm:min-w-[235px] shrink-0">
               {isTargetSystemAdmin ? (
                 <div>
-                  <p className="text-[11px] uppercase tracking-wider text-purple-600 dark:text-purple-300 font-bold mb-1">
+                  <p className="text-[11px] uppercase tracking-wider text-[#0F766E] dark:text-[#1EE1D6] font-bold mb-1">
                     Hòm Thư Góp Ý Web
                   </p>
-                  <p className="text-base font-black text-slate-900 dark:text-white">{adminFeedbacks.length} góp ý đã tiếp nhận</p>
-                  <p className="text-xs text-[#007A7A] dark:text-[#1EE1D6] font-semibold mt-1">
+                  <p className="text-base font-black text-[#0F172B] dark:text-white">{adminFeedbacks.length} góp ý đã tiếp nhận</p>
+                  <p className="text-xs text-[#64748B] dark:text-slate-300 font-semibold mt-1">
                     {adminFeedbacks.filter(f => f.status === 'done').length} đã thêm • {newFeedbacksCount} chờ đọc
                   </p>
                 </div>
               ) : isTargetTeacher ? (
                 <div>
-                  <p className="text-[11px] uppercase tracking-wider text-amber-600 dark:text-amber-300 font-bold mb-1">
+                  <p className="text-[11px] uppercase tracking-wider text-[#0F766E] dark:text-[#1EE1D6] font-bold mb-1">
                     Hồ Sơ Giáo Viên
                   </p>
-                  <p className="text-base font-black text-slate-900 dark:text-white">{BRAND_INFO.siteName}</p>
-                  <p className="text-xs text-[#007A7A] dark:text-[#1EE1D6] font-semibold mt-1">
+                  <p className="text-base font-black text-[#0F172B] dark:text-white">{BRAND_INFO.siteName}</p>
+                  <p className="text-xs text-[#64748B] dark:text-slate-300 font-semibold mt-1">
                     {tests.length} đề thi • {totalGradedByTeacher} bài đã chấm
                   </p>
                 </div>
               ) : (
                 <div>
-                  <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold mb-1">Đánh Giá Tiến Độ</p>
+                  <p className="text-[11px] uppercase tracking-wider text-[#64748B] dark:text-slate-400 font-bold mb-1">Đánh Giá Tiến Độ</p>
                   {highestBand ? (
                     <div>
-                      <p className="text-2xl font-black text-[#007A7A] dark:text-[#1EE1D6] tabular-nums">
+                      <p className="text-2xl font-black text-[#0F766E] dark:text-[#1EE1D6] tabular-nums">
                         Band {highestBand} <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">/ {student.targetBand || 8.0}</span>
                       </p>
-                      <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mt-1">
+                      <p className="text-xs text-slate-600 dark:text-slate-300 font-semibold mt-1">
                         {highestBand >= (student.targetBand || 8.0)
-                          ? '🎉 Đã đạt mục tiêu đề ra!'
-                          : `⚡ Còn ${((student.targetBand || 8.0) - highestBand).toFixed(1)} Band nữa để đạt mục tiêu`}
+                          ? 'Đã đạt mục tiêu đề ra!'
+                          : `Còn ${((student.targetBand || 8.0) - highestBand).toFixed(1)} Band nữa để đạt mục tiêu`}
                       </p>
                     </div>
                   ) : (
@@ -1006,11 +978,11 @@ export default function StudentProfile({
         return (
         <div className="space-y-6">
           {isSelf && (
-            <div className="bg-gradient-to-r from-rose-50 via-white to-amber-50 dark:from-rose-950/30 dark:via-slate-900 dark:to-amber-950/25 rounded-3xl border border-rose-200 dark:border-rose-500/35 p-5 shadow-xs">
+            <div className={`${profileCardCls} p-5`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <Crown className="w-4 h-4 text-amber-500" /> Đặc Quyền Hiển Thị ADMIN / Ai eo VIP
+                  <h2 className="text-sm font-extrabold text-[#0F172B] dark:text-white flex items-center gap-1.5">
+                    <Crown className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Đặc Quyền Hiển Thị ADMIN / Ai eo VIP
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     Quản trị viên có thể bật/tắt nhanh chữ màu đỏ VIP và nhãn AIEOVIP cạnh tên hiển thị.
@@ -1021,40 +993,40 @@ export default function StudentProfile({
             </div>
           )}
 
-          {/* Dedicated Admin Donate / Web Maintenance QR Card */}
-          <div className="bg-gradient-to-br from-amber-50 via-white to-rose-50/70 dark:from-amber-950/30 dark:via-slate-900 dark:to-rose-950/25 rounded-3xl border border-amber-300/80 dark:border-amber-500/35 shadow-sm p-5 sm:p-6">
+          {/* Dedicated Admin Donate / Web Maintenance QR Card (Neutral & Teal Palette) */}
+          <div className={`${profileCardCls} p-5 sm:p-6`}>
             <div className="flex flex-col md:flex-row items-center gap-5">
-              <div className="shrink-0 bg-white p-3 rounded-2xl border border-amber-200 shadow-sm flex flex-col items-center gap-1.5">
+              <div className="shrink-0 bg-[#F8FAFC] dark:bg-slate-900 p-3 rounded-xl border border-[#E2E8F0] dark:border-[#334155] flex flex-col items-center gap-1.5">
                 {adminDonateQrSrc ? (
                   <img
                     src={adminDonateQrSrc}
                     alt="Mã QR Ủng Hộ Admin Tuấn"
-                    className="w-48 h-48 sm:w-52 sm:h-52 object-contain rounded-xl"
+                    className="w-48 h-48 sm:w-52 sm:h-52 object-contain rounded-lg"
                   />
                 ) : (
-                  <div className="w-48 h-48 flex items-center justify-center bg-slate-100 rounded-xl text-xs text-slate-500 text-center p-4">
+                  <div className="w-48 h-48 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg text-xs text-slate-500 text-center p-4">
                     Chưa cấu hình QR ủng hộ
                   </div>
                 )}
-                <span className="text-[11px] font-extrabold text-amber-800 flex items-center gap-1">
-                  <QrCode className="w-3.5 h-3.5 text-amber-600" /> VietQR Ủng Hộ Riêng Admin Tuấn
+                <span className="text-[11px] font-bold text-[#0F766E] dark:text-[#1EE1D6] flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5" /> VietQR Ủng Hộ Riêng Admin Tuấn
                 </span>
               </div>
 
               <div className="flex-1 space-y-3 text-left">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-white text-[11px] font-black shadow-xs">
-                    <Heart className="w-3.5 h-3.5 fill-current" /> Quỹ Duy Trì Website &amp; Server
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#CCFBF1] dark:border-teal-500/30 text-[11px] font-bold">
+                    <Heart className="w-3.5 h-3.5" /> Quỹ Duy Trì Website &amp; Server
                   </span>
                   {donateAmount > 0 && (
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 text-xs font-extrabold">
+                    <span className="px-2.5 py-1 rounded-full bg-[#F8FAFC] dark:bg-slate-800 border border-[#E2E8F0] dark:border-[#334155] text-[#0F766E] dark:text-[#1EE1D6] text-xs font-bold">
                       Mức gợi ý: {formatVndCurrency(donateAmount)}
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
+                  <h2 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white">
                     Ủng Hộ Admin Tuấn Chi Phí Duy Trì Trang Web &amp; Server
                   </h2>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
@@ -1076,10 +1048,10 @@ export default function StudentProfile({
                         key={opt.val}
                         type="button"
                         onClick={() => setDonateAmount(opt.val)}
-                        className={`px-3 py-1 rounded-xl text-xs font-extrabold border transition ${
+                        className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold border transition ${
                           donateAmount === opt.val
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-amber-200 dark:border-slate-700 hover:border-amber-500'
+                            ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                            : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-[#CBD5E1] dark:border-[#334155] hover:border-[#0F766E]'
                         }`}
                       >
                         {opt.label}
@@ -1089,8 +1061,8 @@ export default function StudentProfile({
                 )}
 
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-100">
-                    <span className="text-slate-400">Ngân hàng:</span> <b>{normalizedPayCfg.bankName || donateBankCode}</b>
+                  <div className="px-3 py-1.5 rounded-[6px] bg-[#F8FAFC] dark:bg-slate-800 border border-[#E2E8F0] dark:border-[#334155] font-semibold text-[#0F172B] dark:text-slate-100">
+                    <span className="text-slate-500 dark:text-slate-400">Ngân hàng:</span> <b>{normalizedPayCfg.bankName || donateBankCode}</b>
                   </div>
                   <button
                     type="button"
@@ -1098,36 +1070,36 @@ export default function StudentProfile({
                       navigator.clipboard?.writeText(donateAccountNumber);
                       showToast?.(`Đã sao chép STK ${donateAccountNumber}!`);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-slate-700 hover:border-amber-500 font-bold text-slate-800 dark:text-slate-100 inline-flex items-center gap-1.5 transition"
+                    className="px-3 py-1.5 rounded-[6px] bg-[#F8FAFC] dark:bg-slate-800 border border-[#CBD5E1] dark:border-[#334155] hover:border-[#0F766E] font-bold text-[#0F172B] dark:text-slate-100 inline-flex items-center gap-1.5 transition"
                   >
-                    <span className="text-slate-400 font-normal">STK:</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-normal">STK:</span>
                     <span className="font-mono">{donateAccountNumber}</span>
-                    <Copy className="w-3.5 h-3.5 text-amber-600" />
+                    <Copy className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
                   </button>
-                  <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-100">
+                  <div className="px-3 py-1.5 rounded-[6px] bg-[#F8FAFC] dark:bg-slate-800 border border-[#E2E8F0] dark:border-[#334155] font-semibold text-[#0F172B] dark:text-slate-100">
                     <b>{donateAccountName}</b>
                   </div>
                 </div>
 
-                <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                  💛 Cảm ơn bạn đã ủng hộ &amp; tin tưởng đồng hành cùng website Luyện Thi IELTS Nha Trang!
+                <p className="text-[11px] font-semibold text-[#0F766E] dark:text-[#1EE1D6]">
+                  Cảm ơn bạn đã ủng hộ &amp; tin tưởng đồng hành cùng website Luyện Thi IELTS Nha Trang!
                 </p>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-            {/* Submit New Feedback Card (for Students & Teachers & Admin) */}
+            {/* Submit New Feedback Card (Unified Primary Teal) */}
             <form
               onSubmit={handleSendAdminFeedback}
-              className="xl:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-purple-200/80 dark:border-purple-500/30 shadow-sm p-6 space-y-4 h-fit"
+              className={`xl:col-span-5 ${profileCardCls} p-6 space-y-4 h-fit`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-[#F0FDFA] dark:bg-teal-500/15 border border-[#CCFBF1] dark:border-teal-500/30 text-[#0F766E] dark:text-[#1EE1D6] flex items-center justify-center">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white">
                     Gửi Góp Ý &amp; Yêu Cầu Tính Năng
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1137,7 +1109,7 @@ export default function StudentProfile({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-2">
                   Phân loại góp ý
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1151,10 +1123,10 @@ export default function StudentProfile({
                       key={cat.id}
                       type="button"
                       onClick={() => setFbCategory(cat.id)}
-                      className={`px-3 py-2 rounded-xl border text-xs font-bold text-left transition ${
+                      className={`px-3 py-2 rounded-[6px] border text-xs font-semibold text-left transition ${
                         fbCategory === cat.id
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                          ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                          : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-[#CBD5E1] dark:border-[#334155] hover:border-[#0F766E]'
                       }`}
                     >
                       {cat.label}
@@ -1164,7 +1136,7 @@ export default function StudentProfile({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1.5">
                   Nội dung chi tiết
                 </label>
                 <textarea
@@ -1173,7 +1145,7 @@ export default function StudentProfile({
                   value={fbContent}
                   onChange={e => setFbContent(e.target.value)}
                   placeholder="Ví dụ: Em muốn có thêm phần luyện phát âm từng từ vựng, hoặc giáo viên muốn lọc điểm theo từng tuần..."
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:outline-none resize-y"
+                  className="w-full px-3.5 py-2.5 text-sm bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-100 border border-[#CBD5E1] dark:border-[#334155] rounded-xl focus:ring-2 focus:ring-[#0F766E] focus:outline-none resize-y"
                 />
                 <p className="text-[11px] text-slate-400 mt-1 text-right">{fbContent.length}/2000 ký tự</p>
               </div>
@@ -1183,25 +1155,25 @@ export default function StudentProfile({
                   type="checkbox"
                   checked={fbPrivate}
                   onChange={e => setFbPrivate(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                  className="w-4 h-4 rounded border-slate-300 text-[#0F766E] accent-[#0F766E] focus:ring-[#0F766E]"
                 />
                 <span>Gửi riêng tư (chỉ bạn và Quản trị hệ thống đọc được)</span>
               </label>
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-extrabold transition shadow-md flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2"
               >
                 <Send className="w-4 h-4" /> Gửi Góp Ý Đến Quản Trị
               </button>
             </form>
 
             {/* Feedback List & Admin Triage Board */}
-            <div className="xl:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className={`xl:col-span-7 ${profileCardCls} p-6 space-y-4`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E2E8F0] dark:border-slate-800">
                 <div>
-                  <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
                     Bảng Góp Ý &amp; Tiến Độ Cập Nhật ({filteredFeedbacks.length})
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1211,7 +1183,7 @@ export default function StudentProfile({
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+                <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold">
                   {[
                     { id: 'all', label: `Tất cả (${adminFeedbacks.length})` },
                     { id: 'new', label: `Mới (${adminFeedbacks.filter(f => f.status === 'new').length})` },
@@ -1222,10 +1194,10 @@ export default function StudentProfile({
                       key={st.id}
                       type="button"
                       onClick={() => setFbStatusFilter(st.id)}
-                      className={`px-2.5 py-1.5 rounded-xl border transition ${
+                      className={`px-2.5 py-1.5 rounded-[6px] border transition ${
                         fbStatusFilter === st.id
-                          ? 'bg-purple-600 text-white border-purple-600'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                          ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                          : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-[#CBD5E1] dark:border-[#334155] hover:bg-slate-100'
                       }`}
                     >
                       {st.label}
@@ -1269,24 +1241,24 @@ export default function StudentProfile({
                     return (
                       <div
                         key={fb.id}
-                        className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-4 space-y-3"
+                        className="rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-slate-800/40 p-4 space-y-3"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                            <span className="text-xs font-extrabold text-[#0F172B] dark:text-white">
                               {fb.authorName || fb.authorUsername}
                             </span>
                             <span className="text-[10px] font-mono text-slate-400">@{fb.authorUsername}</span>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               fb.authorRole === 'teacher'
-                                ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                ? 'bg-slate-100 dark:bg-slate-800 text-[#334155] dark:text-slate-200'
                                 : fb.authorRole === 'superadmin'
-                                ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
-                                : 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300'
+                                ? 'bg-slate-200/80 dark:bg-slate-700 text-[#0F172B] dark:text-white'
+                                : 'bg-[#F0FDFA] dark:bg-teal-500/20 text-[#0F766E] dark:text-[#1EE1D6]'
                             }`}>
                               {fb.authorRole === 'teacher' ? 'Giáo viên' : fb.authorRole === 'superadmin' ? 'Quản trị' : 'Học viên'}
                             </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-[#E2E8F0] dark:border-[#334155] text-[#334155] dark:text-slate-300">
                               {catLabel}
                             </span>
                             {fb.isPrivate && (
@@ -1313,7 +1285,7 @@ export default function StudentProfile({
                           </div>
                         </div>
 
-                        <p className="text-sm text-slate-800 dark:text-slate-100 whitespace-pre-wrap leading-relaxed">
+                        <p className="text-sm text-[#0F172B] dark:text-slate-100 whitespace-pre-wrap leading-relaxed">
                           {fb.content}
                         </p>
 
@@ -1322,24 +1294,24 @@ export default function StudentProfile({
                         </div>
 
                         {fb.adminReply && !isViewerSuperAdmin && (
-                          <div className="p-3 rounded-xl bg-purple-50/90 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 space-y-1">
-                            <p className="text-[11px] font-extrabold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                          <div className="p-3 rounded-xl bg-[#F0FDFA] dark:bg-teal-950/30 border border-[#CCFBF1] dark:border-teal-500/30 space-y-1">
+                            <p className="text-[11px] font-extrabold text-[#0F766E] dark:text-[#1EE1D6] flex items-center gap-1">
                               <ShieldAlert className="w-3.5 h-3.5" /> Phản hồi từ Quản Trị Hệ Thống {fb.repliedAt ? `(${fb.repliedAt})` : ''}
                             </p>
-                            <p className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
+                            <p className="text-xs text-[#334155] dark:text-slate-200 whitespace-pre-wrap">
                               {fb.adminReply}
                             </p>
                           </div>
                         )}
 
                         {isViewerSuperAdmin && (
-                          <div className="pt-3 border-t border-slate-200 dark:border-slate-700/70 space-y-2.5">
+                          <div className="pt-3 border-t border-[#E2E8F0] dark:border-slate-700/70 space-y-2.5">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Trạng thái xử lý:</span>
                               <select
                                 value={draftStatus}
                                 onChange={e => setStatusDrafts(prev => ({ ...prev, [fb.id]: e.target.value }))}
-                                className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100"
+                                className="px-2.5 py-1 rounded-[6px] bg-white dark:bg-slate-900 border border-[#CBD5E1] dark:border-[#334155] text-xs font-bold text-[#0F172B] dark:text-slate-100"
                               >
                                 <option value="new">Mới gửi</option>
                                 <option value="planned">Đang triển khai</option>
@@ -1352,12 +1324,12 @@ export default function StudentProfile({
                                 value={draftReply}
                                 onChange={e => setReplyDrafts(prev => ({ ...prev, [fb.id]: e.target.value }))}
                                 placeholder="Nhập phản hồi của Quản trị gửi học viên / giáo viên..."
-                                className="flex-1 px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                className="flex-1 px-3 py-2 text-xs bg-white dark:bg-slate-900 text-[#0F172B] dark:text-slate-100 border border-[#CBD5E1] dark:border-[#334155] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
                               />
                               <button
                                 type="button"
                                 onClick={() => handleUpdateFeedbackByAdmin(fb)}
-                                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition"
+                                className="px-3.5 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition"
                               >
                                 <Save className="w-3.5 h-3.5" /> Lưu phản hồi
                               </button>
@@ -1376,43 +1348,43 @@ export default function StudentProfile({
       })() : isTargetTeacher ? (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-8">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] rounded-xl">
+            <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+              <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                 <BookOpen className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400 font-bold uppercase">Kho Đề Thi</p>
-                <p className="text-2xl font-black text-slate-900 dark:text-white">{tests.length}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Kho Đề Thi</p>
+                <p className="text-2xl font-black text-[#0F172B] dark:text-white">{tests.length}</p>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">{publicTests.length} đề công khai</span>
               </div>
             </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl">
+            <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+              <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                 <CheckCircle className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400 font-bold uppercase">Bài Đã Chấm</p>
-                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{totalGradedByTeacher}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Bài Đã Chấm</p>
+                <p className="text-2xl font-black text-[#0F172B] dark:text-white">{totalGradedByTeacher}</p>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">Writing &amp; Nhận xét</span>
               </div>
             </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 rounded-xl">
+            <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+              <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                 <Gamepad2 className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400 font-bold uppercase">Phòng Đấu Game</p>
-                <p className="text-2xl font-black text-rose-600 dark:text-rose-400">{totalActiveRooms}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Phòng Đấu Game</p>
+                <p className="text-2xl font-black text-[#0F172B] dark:text-white">{totalActiveRooms}</p>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">PIN hiện tại: {currentRoomPin}</span>
               </div>
             </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-xl">
+            <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+              <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                 <GraduationCap className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400 font-bold uppercase">Thành Viên Lớp</p>
-                <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Thành Viên Lớp</p>
+                <p className="text-2xl font-black text-[#0F172B] dark:text-white">
                   {allMembers.filter(m => m.role !== 'teacher').length}
                 </p>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">Học viên đang theo học</span>
@@ -1421,39 +1393,39 @@ export default function StudentProfile({
           </div>
 
           {/* Contact & Support Info */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 mb-8">
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
-              <Phone className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
+          <div className={`${profileCardCls} p-6 sm:p-8 mb-8`}>
+            <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2 mb-4">
+              <Phone className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
               Thông Tin Liên Hệ &amp; Hỗ Trợ Học Viên
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <a
                 href={BRAND_INFO.phoneHref}
-                className="p-4 rounded-2xl bg-[#EDFFFD] dark:bg-teal-500/10 border border-[#B5F5F1] dark:border-teal-500/30 hover:border-[#007A7A] transition flex items-start gap-3"
+                className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/70 border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0F766E] transition flex items-start gap-3"
               >
-                <Phone className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0 mt-0.5" />
+                <Phone className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px]">Hotline / Zalo</p>
-                  <p className="font-extrabold text-slate-900 dark:text-white text-sm mt-0.5">{BRAND_INFO.phoneDisplay}</p>
+                  <p className="font-extrabold text-[#0F172B] dark:text-white text-sm mt-0.5">{BRAND_INFO.phoneDisplay}</p>
                 </div>
               </a>
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-[#F25220] shrink-0 mt-0.5" />
+              <div className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/70 border border-[#E2E8F0] dark:border-[#334155] flex items-start gap-3">
+                <MapPin className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px]">Cơ Sở Giảng Dạy</p>
-                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 leading-snug">{BRAND_INFO.address}</p>
+                  <p className="font-bold text-[#0F172B] dark:text-slate-200 mt-0.5 leading-snug">{BRAND_INFO.address}</p>
                 </div>
               </div>
               <a
                 href={BRAND_INFO.facebookUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 hover:border-blue-500 transition flex items-start gap-3"
+                className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/70 border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0F766E] transition flex items-start gap-3"
               >
-                <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <Globe className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px]">Facebook Fanpage</p>
-                  <p className="font-bold text-blue-700 dark:text-blue-300 mt-0.5 truncate flex items-center gap-1">
+                  <p className="font-bold text-[#0F766E] dark:text-[#1EE1D6] mt-0.5 truncate flex items-center gap-1">
                     {BRAND_INFO.facebookHandle} <ExternalLink className="w-3 h-3 shrink-0" />
                   </p>
                 </div>
@@ -1462,12 +1434,12 @@ export default function StudentProfile({
                 href={BRAND_INFO.blogUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 hover:border-amber-500 transition flex items-start gap-3"
+                className="p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/70 border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0F766E] transition flex items-start gap-3"
               >
-                <BookOpen className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <BookOpen className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="font-bold text-slate-500 dark:text-slate-400 uppercase text-[10px]">Blog Tài Liệu IELTS</p>
-                  <p className="font-bold text-amber-700 dark:text-amber-300 mt-0.5 truncate flex items-center gap-1">
+                  <p className="font-bold text-[#0F766E] dark:text-[#1EE1D6] mt-0.5 truncate flex items-center gap-1">
                     luyenthiieltsnhatrang <ExternalLink className="w-3 h-3 shrink-0" />
                   </p>
                 </div>
@@ -1476,11 +1448,11 @@ export default function StudentProfile({
           </div>
 
           {/* Public Exams Showcase */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 mb-8">
-            <div className="flex flex-wrap justify-between items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800 mb-4">
+          <div className={`${profileCardCls} p-6 sm:p-8 mb-8`}>
+            <div className="flex flex-wrap justify-between items-center gap-3 pb-4 border-b border-[#E2E8F0] dark:border-slate-800 mb-4">
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
                   Đề Thi Thử IELTS Đang Phát Hành ({publicTests.length})
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1491,7 +1463,7 @@ export default function StudentProfile({
                 <button
                   type="button"
                   onClick={() => setView('TEACHER_DASHBOARD')}
-                  className="px-4 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold transition"
+                  className="px-4 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
                 >
                   Quản Lý Kho Đề →
                 </button>
@@ -1504,10 +1476,10 @@ export default function StudentProfile({
                 {publicTests.map(t => (
                   <div
                     key={t.id}
-                    className="rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/50 p-4 flex flex-col justify-between gap-3"
+                    className="rounded-xl border border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-slate-800/50 p-4 flex flex-col justify-between gap-3"
                   >
                     <div>
-                      <p className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-2">{t.title}</p>
+                      <p className="text-sm font-extrabold text-[#0F172B] dark:text-white line-clamp-2">{t.title}</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                         {t.description || 'Đề thi thử IELTS 3 kỹ năng chuẩn quốc tế.'}
                       </p>
@@ -1516,7 +1488,7 @@ export default function StudentProfile({
                       <button
                         type="button"
                         onClick={() => startExam(t.id)}
-                        className="w-full py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold transition flex items-center justify-center gap-1.5"
+                        className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition flex items-center justify-center gap-1.5"
                       >
                         <Play className="w-3.5 h-3.5 fill-white" /> Làm Đề Này
                       </button>
@@ -1531,33 +1503,33 @@ export default function StudentProfile({
         <>
           {/* 4 Summary Metric Cards (Student Profile) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-8">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-xl">
+            <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+              <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                 <History className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400 dark:text-slate-400 font-bold uppercase">Tổng Số Lần Thi</p>
-                <p className="text-2xl font-black text-slate-900 dark:text-white">{totalAttempts} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">lần</span></p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Tổng Số Lần Thi</p>
+                <p className="text-2xl font-black text-[#0F172B] dark:text-white">{totalAttempts} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">lần</span></p>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl">
+            <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+              <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                 <Award className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400 dark:text-slate-400 font-bold uppercase">Band Cao Nhất</p>
-                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{highestBand ?? '-'}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Band Cao Nhất</p>
+                <p className="text-2xl font-black text-[#0F766E] dark:text-[#1EE1D6]">{highestBand ?? '-'}</p>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-              <div className="p-3 bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] rounded-xl">
+            <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+              <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                 <BarChart2 className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-400 dark:text-slate-400 font-bold uppercase">Điểm Overall Trung Bình</p>
-                <p className="text-2xl font-black text-[#007A7A] dark:text-[#1EE1D6]">{overallAvg ?? '-'}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Điểm Overall Trung Bình</p>
+                <p className="text-2xl font-black text-[#0F766E] dark:text-[#1EE1D6]">{overallAvg ?? '-'}</p>
                 {totalAttempts > 0 && (
                   <span className="text-[11px] block font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
                     L: {avgListening ?? '-'} • R: {avgReading ?? '-'} • W: {avgWriting ?? 'Chờ'}
@@ -1567,26 +1539,26 @@ export default function StudentProfile({
             </div>
 
             {isTeacherViewer ? (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-                <div className="p-3 bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 rounded-xl">
+              <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+                <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                   <ShieldAlert className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-400 font-bold uppercase">Chống Gian Lận (Tab)</p>
-                  <p className={`text-xl font-black ${avgTabSwitches <= 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Chống Gian Lận (Tab)</p>
+                  <p className={`text-xl font-black ${avgTabSwitches <= 1 ? 'text-[#0F766E] dark:text-[#1EE1D6]' : 'text-amber-600 dark:text-amber-400'}`}>
                     {avgTabSwitches <= 1 ? 'An toàn' : 'Cần chú ý'}
                     <span className="text-xs block font-normal text-slate-500 dark:text-slate-400">TB {avgTabSwitches} lần/bài</span>
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-                <div className="p-3 bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 rounded-xl">
+              <div className={`${profileCardCls} p-5 flex items-center gap-3.5`}>
+                <div className="p-3 bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] rounded-xl">
                   <Target className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-400 font-bold uppercase">Mục Tiêu Band</p>
-                  <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Mục Tiêu Band</p>
+                  <p className="text-2xl font-black text-[#0F172B] dark:text-white">
                     Band {student.targetBand || '8.0'}
                   </p>
                   <span className="text-[11px] block font-normal text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1603,11 +1575,11 @@ export default function StudentProfile({
 
       {/* Gói Thành Viên 1 Tháng & Tùy Chỉnh Ai eo VIP */}
       {(isSelf || isViewerSuperAdmin) && (
-        <div className="bg-gradient-to-br from-rose-50/90 via-white to-amber-50/80 dark:from-rose-950/25 dark:via-slate-900 dark:to-amber-950/20 rounded-3xl border border-rose-200/90 dark:border-rose-500/35 shadow-sm p-5 sm:p-6 mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-rose-200/70 dark:border-slate-800">
+        <div className={`${profileCardCls} p-5 sm:p-6 mb-8`}>
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E2E8F0] dark:border-slate-800">
             <div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <Crown className="w-5 h-5 text-amber-500" />
+              <h2 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+                <Crown className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
                 Gói Thành Viên 1 Tháng &amp; Đặc Quyền Ai eo VIP
               </h2>
               <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
@@ -1624,20 +1596,20 @@ export default function StudentProfile({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4">
             {/* Card 1: Bài Tập 4 Kỹ Năng (Miễn phí) & Đề 3 Kỹ Năng Đã Mua */}
-            <div className="rounded-2xl border p-4 flex flex-col justify-between gap-3 bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40">
+            <div className="rounded-xl border p-4 flex flex-col justify-between gap-3 bg-[#F8FAFC] dark:bg-slate-800/50 border-[#E2E8F0] dark:border-[#334155]">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                    <BookOpen className="w-4 h-4" /> Bài Tập 4 Kỹ Năng
+                  <span className="text-xs font-extrabold text-[#0F172B] dark:text-white flex items-center gap-1">
+                    <BookOpen className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Bài Tập 4 Kỹ Năng
                   </span>
-                  <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-bold text-[#0F766E] dark:text-[#1EE1D6] bg-[#F0FDFA] dark:bg-teal-500/20 border border-[#CCFBF1] dark:border-teal-500/30 px-2 py-0.5 rounded-full">
                     Miễn Phí
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
                   Luyện Đọc, Nghe, Viết &amp; Speaking AI miễn phí 100%. Bộ Đề Thi 3 Kỹ Năng nâng cao có giá riêng theo từng đề ({(student.purchasedTestIds || []).length} đề đã mua).
                 </p>
-                <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                <p className="text-[11px] font-bold text-[#0F766E] dark:text-[#1EE1D6]">
                   ✓ Sẵn sàng mở không giới hạn
                 </p>
               </div>
@@ -1645,7 +1617,7 @@ export default function StudentProfile({
                 <button
                   type="button"
                   onClick={() => setView('HOME')}
-                  className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition"
+                  className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
                 >
                   Xem Kho Đề Thi 3 Kỹ Năng
                 </button>
@@ -1653,27 +1625,27 @@ export default function StudentProfile({
             </div>
 
             {/* Card 2: Gói Ai eo VIP (80k / 1 tháng) */}
-            <div className={`rounded-2xl border p-4 flex flex-col justify-between gap-3 relative overflow-hidden ${
+            <div className={`rounded-xl border p-4 flex flex-col justify-between gap-3 relative overflow-hidden ${
               studentHasAieoVip
-                ? 'bg-gradient-to-br from-rose-50 via-amber-50 to-white dark:from-rose-950/35 dark:via-amber-950/20 dark:to-slate-900 border-amber-400 dark:border-amber-500/60 shadow-sm'
-                : 'bg-gradient-to-br from-amber-50/70 via-white to-rose-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-rose-950/20 border-rose-300 dark:border-rose-500/40'
+                ? 'bg-[#F0FDFA] dark:bg-teal-950/20 border-[#0F766E]/40 dark:border-teal-500/50'
+                : 'bg-[#F8FAFC] dark:bg-slate-800/50 border-[#E2E8F0] dark:border-[#334155]'
             }`}>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-black text-red-600 dark:text-rose-300 flex items-center gap-1">
+                  <span className="text-xs font-black text-[#0F172B] dark:text-white flex items-center gap-1">
                     <Crown className="w-4 h-4 text-amber-500" /> Gói Ai eo VIP
                   </span>
                   <span className="text-[11px] font-black text-white bg-gradient-to-r from-red-600 to-amber-500 px-2 py-0.5 rounded-full">
                     {aieoVipPriceLabel}/1T
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
                   • <b>Ảnh Avatar Động (.GIF/.WebP)</b> • Đổi <b>Màu Chữ Tên</b> &amp; Nhãn <b>AIEOVIP</b> • <b>Viền Bìa &amp; Thẻ LED Neon</b> + Miễn phí <b>Ảnh Nền Cá Nhân</b> • <b>3 Khung Avatar Neon VIP</b> • Tạo phòng Game bạn bè vô hạn • Danh hiệu <b>👑 Ai eo VIP</b>.
                 </p>
-                <p className={`text-[11px] font-bold ${studentHasAieoVip ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                <p className={`text-[11px] font-bold ${studentHasAieoVip ? 'text-[#0F766E] dark:text-[#1EE1D6]' : 'text-slate-600 dark:text-slate-300'}`}>
                   {studentHasAieoVip
                     ? `✓ Đang mở VIP (${aieoVipRemainingText || '30 ngày'})`
-                    : 'Gói quyền lực nhất tháng'}
+                    : 'Gói đầy đủ đặc quyền tháng'}
                 </p>
               </div>
               {isSelf && (
@@ -1688,7 +1660,7 @@ export default function StudentProfile({
                       renew: studentHasAieoVip
                     })
                   }
-                  className="vip-shimmer-badge w-full py-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black transition shadow-sm"
+                  className="vip-shimmer-badge w-full py-2 rounded-lg bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-bold transition"
                 >
                   {studentHasAieoVip
                     ? `Gia hạn VIP +30N (${aieoVipPriceLabel})`
@@ -1698,24 +1670,20 @@ export default function StudentProfile({
             </div>
 
             {/* Card 3: Ảnh Nền Riêng (5k / 1 tháng) */}
-            <div className={`rounded-2xl border p-4 flex flex-col justify-between gap-3 ${
-              studentHasCoverPermission
-                ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/40'
-                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-            }`}>
+            <div className="rounded-xl border p-4 flex flex-col justify-between gap-3 bg-[#F8FAFC] dark:bg-slate-800/50 border-[#E2E8F0] dark:border-[#334155]">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                    <Camera className="w-4 h-4" /> Ảnh Nền Cá Nhân
+                  <span className="text-xs font-extrabold text-[#0F172B] dark:text-white flex items-center gap-1">
+                    <Camera className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Ảnh Nền Cá Nhân
                   </span>
-                  <span className="text-[11px] font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-bold text-[#334155] dark:text-slate-200 bg-white dark:bg-slate-900 border border-[#E2E8F0] dark:border-[#334155] px-2 py-0.5 rounded-full">
                     {unlockPriceLabel}/1T
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
                   Tải &amp; cắt ảnh bìa cá nhân tùy thích cho hồ sơ (gói 1 tháng).
                 </p>
-                <p className={`text-[11px] font-bold ${studentHasCoverPermission ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                <p className={`text-[11px] font-bold ${studentHasCoverPermission ? 'text-[#0F766E] dark:text-[#1EE1D6]' : 'text-slate-500 dark:text-slate-400'}`}>
                   {studentHasCoverPermission
                     ? coverRemainingText
                       ? `✓ Đang mở (${coverRemainingText})`
@@ -1737,7 +1705,7 @@ export default function StudentProfile({
                       renew: studentHasCoverPermission && student.customCoverExpiresAt > 0
                     })
                   }
-                  className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold transition"
+                  className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
                 >
                   {studentHasCoverPermission && student.customCoverExpiresAt > 0
                     ? `Gia hạn +30N (${unlockPriceLabel})`
@@ -1748,7 +1716,7 @@ export default function StudentProfile({
                 <button
                   type="button"
                   onClick={openCustomizeModal}
-                  className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition"
+                  className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
                 >
                   Đổi Ảnh Bìa Ngay
                 </button>
@@ -1761,11 +1729,11 @@ export default function StudentProfile({
       )}
 
       {/* SECTION 1: TIẾN TRÌNH & ĐỘT PHÁ ĐIỂM SỐ QUA CÁC LẦN THI (SCORE PROGRESSION TIMELINE) */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 mb-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+      <div className={`${profileCardCls} p-6 sm:p-8 mb-8`}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-[#E2E8F0] dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
+            <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
               Tiến Trình & Đột Phá Điểm Số Qua Các Lần Thi
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1774,9 +1742,9 @@ export default function StudentProfile({
           </div>
 
           {bandGrowth && Number(bandGrowth) > 0 && (
-            <span className="bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
-              <Sparkles className="w-4 h-4 text-emerald-500" />
-              Tăng trưởng: +{bandGrowth} Band Overall! 🚀
+            <span className="bg-[#F0FDFA] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#CCFBF1] dark:border-teal-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4" />
+              Tăng trưởng: +{bandGrowth} Band Overall!
             </span>
           )}
         </div>
@@ -1792,36 +1760,36 @@ export default function StudentProfile({
               {chronologicalAttempts.map((att, idx) => (
                 <div
                   key={att.id}
-                  className={`rounded-2xl p-5 border transition ${
+                  className={`rounded-xl p-5 border transition ${
                     idx === chronologicalAttempts.length - 1
-                      ? 'bg-gradient-to-b from-[#EDFFFD]/70 to-white dark:from-[#003538]/40 dark:to-slate-900 border-[#B5F5F1] dark:border-teal-500/40 shadow-md ring-2 ring-[#007A7A]/20'
-                      : 'bg-slate-50/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/80 shadow-sm'
+                      ? 'bg-[#F0FDFA]/60 dark:bg-teal-950/20 border-[#0F766E]/40 dark:border-teal-500/40'
+                      : 'bg-[#F8FAFC] dark:bg-slate-800/50 border-[#E2E8F0] dark:border-[#334155]'
                   }`}
                 >
                   <div className="flex justify-between items-start gap-2 mb-3">
-                    <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg ${
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${
                       idx === chronologicalAttempts.length - 1
-                        ? 'bg-[#007A7A] text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
+                        ? 'bg-[#0F766E] text-white'
+                        : 'bg-white dark:bg-slate-700 text-[#334155] dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155]'
                     }`}>
                       Lần thi #{idx + 1} {idx === chronologicalAttempts.length - 1 ? '(Gần nhất)' : ''}
                     </span>
                     <div className="text-right">
                       <span className="text-xs text-slate-400 dark:text-slate-400 font-medium block">{att.submittedAt}</span>
                       {Number(att.durationSeconds) > 0 && (
-                        <span className="text-[10px] font-bold text-[#007A7A] dark:text-[#1EE1D6] block">
-                          ⏱️ {formatDurationVi(att.durationSeconds)}
+                        <span className="text-[10px] font-bold text-[#0F766E] dark:text-[#1EE1D6] block">
+                          {formatDurationVi(att.durationSeconds)}
                           {att.timelinessStatus === 'late' ? ` • Trễ ${att.lateByMinutes || 1}p` : ''}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <p className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-3 line-clamp-1">{att.testTitle}</p>
+                  <p className="font-bold text-[#0F172B] dark:text-slate-100 text-sm mb-3 line-clamp-1">{att.testTitle}</p>
 
-                  <div className="flex items-center justify-between py-2 border-y border-slate-200/60 dark:border-slate-700/70 mb-3">
+                  <div className="flex items-center justify-between py-2 border-y border-[#E2E8F0] dark:border-slate-700/70 mb-3">
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Band Overall:</span>
-                    <span className="text-xl font-black text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-2.5 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-500/30">
+                    <span className="text-xl font-black text-[#0F766E] dark:text-[#1EE1D6] bg-[#F0FDFA] dark:bg-teal-500/15 px-2.5 py-0.5 rounded-lg border border-[#CCFBF1] dark:border-teal-500/30">
                       {att.overallBand ?? 'Chờ'}
                     </span>
                   </div>
@@ -1962,16 +1930,16 @@ export default function StudentProfile({
       </div>
 
       {/* SECTION 2: BẢNG LỊCH SỬ CHI TIẾT TẤT CẢ CÁC LẦN THI */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden mb-8">
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+      <div className={`${profileCardCls} overflow-hidden mb-8`}>
+        <div className="p-6 border-b border-[#E2E8F0] dark:border-slate-800 flex justify-between items-center gap-3 flex-wrap">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
               Lịch Sử Chi Tiết Từng Lần Thi
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Danh sách các bài thi đã hoàn thành của học viên {student.name}.</p>
           </div>
-          <span className="text-xs font-bold text-slate-400">Tổng cộng: {studentAttempts.length} bài thi</span>
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Tổng cộng: {studentAttempts.length} bài thi</span>
         </div>
 
         {studentAttempts.length === 0 ? (
@@ -1981,7 +1949,7 @@ export default function StudentProfile({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
+              <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 border-b border-[#E2E8F0] dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
                 <tr>
                   <th className="px-6 py-3.5">Đề Thi</th>
                   <th className="px-6 py-3.5">Thời Gian Nộp</th>
@@ -1993,25 +1961,25 @@ export default function StudentProfile({
                     <th className="px-6 py-3.5 text-center">Gian Lận (Tab)</th>
                   )}
                   {canInspectAttemptDetails && (
-                    <th className="px-6 py-3.5 text-right">Chi Tiết</th>
+                    <th className="px-6 py-3.5 text-right whitespace-nowrap">Chi Tiết</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-[#E2E8F0]/70 dark:divide-slate-800">
                 {studentAttempts.map((att, idx) => {
                   const risk = isTeacherViewer ? getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs) : null;
                   const extSignals = isTeacherViewer ? countExtensionCheatSignals(att.antiCheatLogs) : 0;
                   const RiskIcon = risk?.icon;
 
                   return (
-                    <tr key={att.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                    <tr key={att.id} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
                       <td className="px-6 py-4">
-                        <p className="font-bold text-slate-900 dark:text-white">{att.testTitle}</p>
-                        <span className="text-[10px] text-slate-400 font-mono">ID: {att.id} • Lần thi #{studentAttempts.length - idx}</span>
+                        <p className="font-bold text-[#0F172B] dark:text-white">{att.testTitle}</p>
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Lần thi #{studentAttempts.length - idx}</span>
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
                         <div className="space-y-0.5">
-                          <span className="font-semibold text-slate-700 dark:text-slate-200 block">{att.submittedAt}</span>
+                          <span className="font-semibold text-[#0F172B] dark:text-slate-200 block">{att.submittedAt}</span>
                           {Number(att.durationSeconds) > 0 && (
                             <span className="text-[11px] text-slate-400 block">
                               Làm trong {formatDurationVi(att.durationSeconds)}
@@ -2029,28 +1997,28 @@ export default function StudentProfile({
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores?.listening?.band ?? '-'}</span>
+                        <span className="font-bold text-[#0F172B] dark:text-slate-100">{att.scores?.listening?.band ?? '-'}</span>
                         <span className="text-[11px] text-slate-400 block font-normal">({att.scores?.listening?.raw || 0}/{att.scores?.listening?.total || 0} câu)</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores?.reading?.band ?? '-'}</span>
+                        <span className="font-bold text-[#0F172B] dark:text-slate-100">{att.scores?.reading?.band ?? '-'}</span>
                         <span className="text-[11px] text-slate-400 block font-normal">({att.scores?.reading?.raw || 0}/{att.scores?.reading?.total || 0} câu)</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         {att.scores?.speaking ? (
                           <>
-                            <span className="font-bold text-[#570DF8] dark:text-[#C4B5FD]">Spk {att.scores.speaking.band ?? '-'}</span>
+                            <span className="font-bold text-[#0F766E] dark:text-[#1EE1D6]">Spk {att.scores.speaking.band ?? '-'}</span>
                             <span className="text-[11px] text-slate-400 block font-normal">Speaking AI</span>
                           </>
                         ) : (
                           <>
-                            <span className="font-bold text-slate-800 dark:text-slate-100">{att.scores?.writing?.overallBand ?? (att.testMode === 'single_skill' ? '-' : 'Chờ chấm')}</span>
+                            <span className="font-bold text-[#0F172B] dark:text-slate-100">{att.scores?.writing?.overallBand ?? (att.testMode === 'single_skill' ? '-' : 'Chờ chấm')}</span>
                             <span className="text-[11px] text-slate-400 block font-normal">T1: {att.scores?.writing?.task1Band ?? '-'} | T2: {att.scores?.writing?.task2Band ?? '-'}</span>
                           </>
                         )}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="text-base font-black text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 rounded-xl border border-indigo-100 dark:border-indigo-500/30">
+                        <span className="text-base font-black text-[#0F766E] dark:text-[#1EE1D6] bg-[#F0FDFA] dark:bg-teal-500/15 px-3 py-1 rounded-lg border border-[#CCFBF1] dark:border-teal-500/30">
                           {att.overallBand ?? 'Chờ'}
                         </span>
                       </td>
@@ -2070,14 +2038,14 @@ export default function StudentProfile({
                         </td>
                       )}
                       {canInspectAttemptDetails && (
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
                           <button
                             onClick={() => {
                               setSelectedAttemptId(att.id);
                               setPreviousView('STUDENT_PROFILE');
                               setView('RESULT_VIEW');
                             }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold transition shadow-sm"
+                            className="whitespace-nowrap inline-flex items-center justify-center bg-[#F8FAFC] dark:bg-slate-800 hover:bg-[#0F766E] text-[#0F766E] dark:text-[#1EE1D6] hover:text-white dark:hover:bg-[#0D9488] dark:hover:text-white border border-[#CBD5E1] dark:border-[#334155] hover:border-[#0F766E] text-xs px-3.5 py-1.5 rounded-[6px] font-semibold transition"
                           >
                             Xem Chi Tiết
                           </button>
@@ -2094,16 +2062,16 @@ export default function StudentProfile({
 
       {/* SECTION 3: NHẬN XÉT & ĐÁNH GIÁ CỦA GIÁO VIÊN (Bảo mật riêng giữa GV & HS) */}
       {canSeeTeacherNotes && (
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-8 mb-8">
-        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800 mb-4">
+      <div className={`${profileCardCls} p-6 sm:p-8 mb-8`}>
+        <div className="flex justify-between items-center pb-4 border-b border-[#E2E8F0] dark:border-slate-800 mb-4 gap-2 flex-wrap">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-amber-500" />
+            <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
               Đánh Giá & Nhận Xét Của Giáo Viên Quản Nhiệm
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Lời khuyên, phân tích điểm yếu và lộ trình rèn luyện cá nhân hóa.</p>
           </div>
-          <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-3 py-1 rounded-full font-bold">
+          <span className="text-xs bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155] px-3 py-1 rounded-full font-semibold">
             Ms. Như (Giáo Viên Phụ Trách)
           </span>
         </div>
@@ -2115,7 +2083,7 @@ export default function StudentProfile({
               value={tempNoteText !== '' ? tempNoteText : (teacherNotes[activeUsername] || '')}
               onChange={e => setTempNoteText(e.target.value)}
               placeholder="Nhập nhận xét chi tiết về quá trình học tập, các điểm cần khắc phục và định hướng cho học viên này..."
-              className="w-full p-4 text-xs leading-relaxed bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-sans"
+              className="w-full p-4 text-xs leading-relaxed bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-100 border border-[#CBD5E1] dark:border-[#334155] rounded-xl focus:ring-2 focus:ring-[#0F766E] focus:outline-none font-sans"
             />
             <div className="flex justify-end">
               <button
@@ -2125,15 +2093,15 @@ export default function StudentProfile({
                   dispatchSyncAction('UPSERT_NOTE', { username: activeUsername, text: textToSave });
                   showToast('Đã lưu nhận xét hồ sơ học viên thành công!');
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow flex items-center gap-2"
+                className="bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold px-5 py-2.5 rounded-lg transition flex items-center gap-2"
               >
                 <Save className="w-4 h-4" /> Lưu Nhận Xét Hồ Sơ
               </button>
             </div>
           </div>
         ) : (
-          <div className="bg-amber-50/70 dark:bg-amber-500/10 rounded-2xl p-6 border border-amber-200/80 dark:border-amber-500/30">
-            <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line">
+          <div className="bg-[#F8FAFC] dark:bg-slate-800/60 rounded-xl p-6 border border-[#E2E8F0] dark:border-[#334155]">
+            <p className="text-xs text-[#334155] dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line">
               {teacherNotes[activeUsername] || 'Chưa có ghi chú nhận xét nào từ giáo viên. Hãy làm thêm các bài thi thử để giáo viên đánh giá năng lực.'}
             </p>
           </div>
@@ -2143,15 +2111,15 @@ export default function StudentProfile({
         </>
       )}
 
-      {/* SECTION 4: THÀNH TÍCH ĐẤU TRƯỜNG TỪ VỰNG CHICKEN INVADERS */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white border border-purple-800 shadow-xl">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-purple-800/80">
+      {/* SECTION 4: THÀNH TÍCH ĐẤU TRƯỜNG TỪ VỰNG CHICKEN INVADERS (Clean Light/Dark Unified Surface) */}
+      <div className={`${profileCardCls} p-6 sm:p-8`}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-[#E2E8F0] dark:border-slate-800">
           <div>
-            <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-              <Gamepad2 className="w-5 h-5 text-pink-400" />
+            <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+              <Gamepad2 className="w-5 h-5 text-[#0F766E] dark:text-[#1EE1D6]" />
               Thành Tích Đấu Trường Game Từ Vựng (IELTS Chicken Invaders)
             </h2>
-            <p className="text-xs text-purple-200 mt-0.5">Kết quả rèn luyện phản xạ từ vựng, ngữ nghĩa và chính tả qua game 4 vòng.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kết quả rèn luyện phản xạ từ vựng, ngữ nghĩa và chính tả qua game 4 vòng.</p>
           </div>
           <button
             onClick={() => {
@@ -2161,30 +2129,30 @@ export default function StudentProfile({
                 openStudentGamePortal();
               }
             }}
-            className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow flex items-center gap-1.5"
+            className="bg-[#0F766E] hover:bg-[#0D9488] text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap"
           >
             <Play className="w-3.5 h-3.5 fill-white" /> Vào Sảnh Chờ Đấu Trường
           </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-purple-950/60 rounded-2xl p-4 border border-purple-700/50">
-            <p className="text-[11px] text-purple-300 font-bold uppercase">Điểm Kỷ Lục Phòng Game</p>
-            <p className="text-2xl font-black text-amber-300 font-mono mt-1">
+          <div className="bg-[#F8FAFC] dark:bg-slate-800/70 rounded-xl p-4 border border-[#E2E8F0] dark:border-[#334155]">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Điểm Kỷ Lục Phòng Game</p>
+            <p className="text-2xl font-black text-[#0F766E] dark:text-[#1EE1D6] font-mono mt-1">
               {playerGameRecord ? `${playerGameRecord.score} pts` : '0 pts'}
             </p>
           </div>
 
-          <div className="bg-purple-950/60 rounded-2xl p-4 border border-purple-700/50">
-            <p className="text-[11px] text-purple-300 font-bold uppercase">Cấp Độ Cao Nhất Đạt Được</p>
-            <p className="text-sm font-extrabold text-cyan-300 mt-1">
+          <div className="bg-[#F8FAFC] dark:bg-slate-800/70 rounded-xl p-4 border border-[#E2E8F0] dark:border-[#334155]">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Cấp Độ Cao Nhất Đạt Được</p>
+            <p className="text-sm font-extrabold text-[#0F172B] dark:text-white mt-1">
               {playerGameRecord?.status || 'Chưa tham gia trận đấu nào'}
             </p>
           </div>
 
-          <div className="bg-purple-950/60 rounded-2xl p-4 border border-purple-700/50">
-            <p className="text-[11px] text-purple-300 font-bold uppercase">Chuỗi Combo Từ Đúng</p>
-            <p className="text-2xl font-black text-pink-400 font-mono mt-1">
+          <div className="bg-[#F8FAFC] dark:bg-slate-800/70 rounded-xl p-4 border border-[#E2E8F0] dark:border-[#334155]">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Chuỗi Combo Từ Đúng</p>
+            <p className="text-2xl font-black text-[#0F766E] dark:text-[#1EE1D6] font-mono mt-1">
               {playerGameRecord ? `${playerGameRecord.streak}x Combo` : '0x Combo'}
             </p>
           </div>
@@ -2192,12 +2160,12 @@ export default function StudentProfile({
       </div>
         </div>
 
-        {/* Right Sticky Sidebar: Member Directory (Góc phải như danh bạ thành viên / bạn bè) */}
+        {/* Right Sticky Sidebar: Member Directory */}
         <aside className="lg:col-span-4 lg:sticky lg:top-20 space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/85 dark:border-slate-800 shadow-sm p-4 sm:p-5 space-y-3.5">
+          <div className={`${profileCardCls} p-4 sm:p-5 space-y-3.5`}>
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
+              <h2 className="text-sm font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" />
                 Danh Bạ Hồ Sơ Thành Viên ({filteredMembers.length}/{allMembers.length})
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
@@ -2213,11 +2181,11 @@ export default function StudentProfile({
                 onChange={e => setMemberSearch(e.target.value)}
                 placeholder="Tìm tên hoặc @username..."
                 aria-label="Tìm thành viên theo tên hoặc username"
-                className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                className="w-full pl-8 pr-3 py-2 text-xs bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-100 border border-[#CBD5E1] dark:border-[#334155] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
               {[
                 { id: 'all', label: `Tất cả (${allMembers.length})` },
                 ...(adminCardMember ? [{ id: 'admin', label: 'Quản trị (1)' }] : []),
@@ -2228,10 +2196,10 @@ export default function StudentProfile({
                   key={f.id}
                   type="button"
                   onClick={() => setMemberRoleFilter(f.id)}
-                  className={`px-2.5 py-1 rounded-lg border transition ${
+                  className={`px-2.5 py-1 rounded-[6px] border transition ${
                     memberRoleFilter === f.id
-                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-[#CBD5E1] dark:border-[#334155] hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
                   {f.label}
@@ -2251,41 +2219,32 @@ export default function StudentProfile({
                   const isMemberTeacher = !isMemberAdmin && member.role === 'teacher';
                   const isMeChip = member.username === currentUser?.username;
                   const mBest = bestBandByStudent.get(member.username) ?? null;
-                  const memberVipVisual = resolveUserVipNameVisual(member);
 
-                  const memberCardBtn = (
+                  return (
                     <button
-                      key={memberVipVisual.showNeonCover ? undefined : member.username}
+                      key={member.username}
                       type="button"
                       onClick={() => {
                         setSelectedProfileStudent(member.username);
                         setTempNoteText('');
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition ${
-                        memberVipVisual.showNeonCover
-                          ? isSelected
-                            ? 'rounded-[14px] bg-[#EDFFFD] dark:bg-slate-900/95 ring-1 ring-[#007A7A]/35 dark:ring-white/25'
-                            : 'rounded-[14px] bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/95'
-                          : isSelected
-                          ? isMemberAdmin
-                            ? 'rounded-2xl border bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-2 ring-purple-500/20'
-                            : 'rounded-2xl border bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
-                          : isMemberAdmin
-                          ? 'rounded-2xl border bg-purple-50/40 dark:bg-purple-950/20 border-purple-200 dark:border-purple-500/30 hover:border-purple-500 hover:bg-white dark:hover:bg-slate-800'
-                          : 'rounded-2xl border bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]/50 hover:bg-white dark:hover:bg-slate-800'
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-xl border transition ${
+                        isSelected
+                          ? 'bg-[#F0FDFA] dark:bg-teal-950/30 border-[#0F766E] dark:border-[#1EE1D6]'
+                          : 'bg-[#F8FAFC] dark:bg-slate-800/60 border-[#E2E8F0] dark:border-[#334155] hover:border-[#0F766E]/60 hover:bg-white dark:hover:bg-slate-800'
                       }`}
                     >
-                      <UserAvatarBadge user={member} sizeClass="w-10 h-10" textClass="text-xs" rounded="rounded-xl" />
+                      <UserAvatarBadge user={member} sizeClass="w-10 h-10" textClass="text-xs" rounded="rounded-xl" showFrame={false} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <VipMemberName
                             user={member}
                             fallbackName={member.name || member.username}
-                            className="text-xs font-bold text-slate-900 dark:text-white truncate"
+                            className="text-xs font-bold text-[#0F172B] dark:text-white truncate"
                             badgeSize="xs"
                           />
                           {isMeChip && (
-                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 shrink-0">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700 text-[#334155] dark:text-slate-200 shrink-0">
                               Bạn
                             </span>
                           )}
@@ -2296,10 +2255,10 @@ export default function StudentProfile({
                             if (isMemberAdmin) {
                               return (
                                 <>
-                                  <span className="text-purple-700 dark:text-purple-300 font-bold inline-flex items-center gap-1">
+                                  <span className="text-[#0F766E] dark:text-[#1EE1D6] font-bold inline-flex items-center gap-1">
                                     ADMIN &bull; Góp ý
                                     {newFeedbacksCount > 0 && (
-                                      <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
+                                      <span className="px-1.5 py-0.2 rounded-full bg-[#0F766E] text-white text-[9px] font-bold">
                                         {newFeedbacksCount} mới
                                       </span>
                                     )}
@@ -2315,7 +2274,7 @@ export default function StudentProfile({
                             if (isMemberTeacher) {
                               return (
                                 <>
-                                  <span className="text-amber-600 dark:text-amber-300 font-bold">Giáo viên</span>
+                                  <span className="text-[#334155] dark:text-slate-200 font-bold">Giáo viên</span>
                                   {mTitle && !mTitle.isRoleBuiltIn && (
                                     <span className={`px-1.5 py-0.2 rounded-full border font-extrabold text-[9px] ${mTitle.badgeClass}`}>
                                       {mTitle.icon} {mTitle.label}
@@ -2342,15 +2301,6 @@ export default function StudentProfile({
                       </div>
                     </button>
                   );
-
-                  return memberVipVisual.showNeonCover ? (
-                    <div
-                      key={member.username}
-                      className={`rounded-2xl p-[2px] transition-all ${memberVipVisual.neonCoverMeta.cardRimWrapClass}`}
-                    >
-                      {memberCardBtn}
-                    </div>
-                  ) : memberCardBtn;
                 })
               )}
             </div>
@@ -2400,7 +2350,7 @@ export default function StudentProfile({
           onClick={() => setShowTitlesModal(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-pink-200 dark:border-slate-700 shadow-2xl overflow-hidden"
+            className="bg-white dark:bg-[#0F172B] rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-[#E2E8F0] dark:border-[#334155] shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <div className="px-6 py-4 bg-gradient-to-r from-[#0F172B] via-[#003538] to-[#065B5B] text-white flex items-center justify-between gap-3">
@@ -2419,7 +2369,7 @@ export default function StudentProfile({
               <button
                 type="button"
                 onClick={() => setShowTitlesModal(false)}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2427,7 +2377,7 @@ export default function StudentProfile({
 
             <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
               {/* Metrics Summary + Visibility Switch */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#FDF2F6] dark:bg-slate-800/70 border border-pink-200/80 dark:border-slate-700">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/70 border border-[#E2E8F0] dark:border-[#334155]">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
                   <span>📝 Số bài làm: <b className="text-slate-900 dark:text-white">{titleSummary.stats?.examCount || 0} bài</b></span>
                   <span>🎯 Band cao nhất: <b className="text-[#007A7A] dark:text-[#1EE1D6]">{titleSummary.stats?.highestBand ? titleSummary.stats.highestBand.toFixed(1) : '0.0'}</b></span>
@@ -2680,13 +2630,13 @@ export default function StudentProfile({
           onClick={() => setShowCustomizeModal(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-pink-200 dark:border-slate-700 shadow-2xl overflow-hidden"
+            className="bg-white dark:bg-[#0F172B] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-[#E2E8F0] dark:border-[#334155] shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-6 py-4 bg-[#FDF2F6] dark:bg-slate-800/80 border-b border-pink-200/80 dark:border-slate-700 flex items-center justify-between gap-3">
+            <div className="px-6 py-4 bg-[#F8FAFC] dark:bg-slate-800/80 border-b border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-pink-500" /> Tùy Chỉnh Hồ Sơ Cá Nhân
+                <h3 className="text-base font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Tùy Chỉnh Hồ Sơ Cá Nhân
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Cá nhân hóa hình nền Profile, khung viền Avatar và danh hiệu để mọi người trong lớp nhìn thấy phong cách riêng của bạn!
@@ -2695,7 +2645,7 @@ export default function StudentProfile({
               <button
                 type="button"
                 onClick={() => setShowCustomizeModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-pink-100 dark:hover:bg-slate-800"
+                className="p-2 rounded-lg text-slate-400 hover:text-[#0F172B] dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2715,19 +2665,9 @@ export default function StudentProfile({
                   avatarFrameId: customDraft.avatarFrameId
                 };
                 return (
-                  <div
-                    className={
-                      vipVisual.showNeonCover
-                        ? `rounded-2xl p-[3px] ${vipVisual.neonCoverMeta.frameWrapClass}`
-                        : 'rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm'
-                    }
-                  >
+                  <div className="rounded-xl overflow-hidden border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#0F172B]">
                     <div
-                      className={`relative h-24 w-full overflow-hidden ${
-                        vipVisual.showNeonCover
-                          ? 'rounded-t-[13px]'
-                          : 'border-b border-slate-200/80 dark:border-slate-700'
-                      } ${
+                      className={`relative h-24 w-full overflow-hidden border-b border-[#E2E8F0] dark:border-[#334155] ${
                         previewCoverOk ? 'bg-slate-100 dark:bg-slate-800' : previewBanner.heroClass
                       }`}
                     >
@@ -2738,23 +2678,14 @@ export default function StudentProfile({
                           className="w-full h-full object-cover object-center"
                         />
                       )}
-                      {vipVisual.showNeonCover && (
-                        <>
-                          <div
-                            aria-hidden="true"
-                            className={`absolute inset-0 rounded-t-[13px] pointer-events-none ${vipVisual.neonCoverMeta.coverLedInnerClass}`}
-                          />
-                          <div className={`absolute bottom-0 inset-x-0 h-[3px] z-10 pointer-events-none ${vipVisual.neonCoverMeta.seamBarClass}`} />
-                        </>
-                      )}
                     </div>
-                    <div className={`px-4 pb-3.5 pt-2 flex items-end gap-3 bg-white dark:bg-slate-900 ${vipVisual.showNeonCover ? 'rounded-b-[13px]' : ''}`}>
-                      <div className="-mt-8 relative z-20 p-1 rounded-full bg-white dark:bg-slate-900 shadow-md flex items-center justify-center shrink-0">
+                    <div className="px-4 pb-3.5 pt-2 flex items-end gap-3 bg-white dark:bg-[#0F172B]">
+                      <div className="-mt-8 relative z-20 p-1 rounded-full bg-white dark:bg-[#0F172B] border border-[#E2E8F0] dark:border-[#334155] shadow-xs flex items-center justify-center shrink-0">
                         <UserAvatarBadge user={previewUser} sizeClass="w-14 h-14" textClass="text-xl" rounded="rounded-full" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-wider text-[#007A7A] dark:text-[#1EE1D6] font-bold">Xem trước trực tiếp</p>
-                        <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                        <p className="text-[10px] uppercase tracking-wider text-[#0F766E] dark:text-[#1EE1D6] font-bold">Xem trước trực tiếp</p>
+                        <p className="text-sm font-extrabold text-[#0F172B] dark:text-white truncate">
                           <VipMemberName user={previewUser} fallbackName={student.name} badgeSize="xs" />
                         </p>
                         <p className="text-xs text-slate-600 dark:text-slate-300 truncate">{customDraft.studyGoal || 'Mục tiêu chinh phục IELTS!'}</p>
@@ -3028,6 +2959,7 @@ export default function StudentProfile({
           showToast={showToast}
         />
       )}
+      </div>
     </div>
   );
 }

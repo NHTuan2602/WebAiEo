@@ -97,24 +97,24 @@ export default function CoverUnlockQrCard({
   };
 
   return (
-    <div className="rounded-2xl border border-amber-300/90 dark:border-amber-500/40 bg-gradient-to-br from-amber-50/90 via-white to-teal-50/70 dark:from-amber-950/25 dark:via-slate-900 dark:to-teal-950/20 p-4 space-y-3.5">
+    <div className="rounded-2xl border border-[#E2E8F0] dark:border-[#334155] bg-white dark:bg-[#0F172B] p-4 space-y-3.5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-0.5 min-w-0">
-          <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-xs font-extrabold text-[#0F172B] dark:text-white flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6] shrink-0" />
             <span>{headingText}</span>
           </p>
           <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
             {subText}
           </p>
         </div>
-        <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white text-xs font-black shadow-xs tabular-nums">
+        <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0F766E] text-white text-xs font-bold tabular-nums">
           <Sparkles className="w-3 h-3" /> {priceLabel}
         </span>
       </div>
 
       {/* Pre-payment Donate & Web Maintenance Support Message */}
-      <div className="px-3 py-2 rounded-xl bg-amber-100/80 dark:bg-amber-500/15 border border-amber-300/80 dark:border-amber-500/35 text-[11px] text-amber-950 dark:text-amber-100 font-semibold leading-relaxed">
+      <div className="px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/70 border border-[#E2E8F0] dark:border-[#334155] text-[11px] text-[#334155] dark:text-slate-200 font-semibold leading-relaxed">
         ☕ {cfg.donateMessage || 'Donate để ủng hộ Tuấn chi phí duy trì trang web, tên miền, máy chủ & hệ thống AI phục vụ học tập miễn phí cho lớp. Xin trân trọng cảm ơn!'}
       </div>
 

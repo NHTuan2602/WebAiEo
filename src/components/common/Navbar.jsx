@@ -308,7 +308,7 @@ export default function Navbar({
                           notif.type === 'exam'
                             ? 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-teal-300'
                             : notif.type === 'exercise'
-                            ? 'bg-violet-50 dark:bg-violet-500/15 text-[#570DF8] dark:text-violet-300'
+                            ? 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6]'
                             : notif.type === 'game'
                             ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300'
                             : 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-300';

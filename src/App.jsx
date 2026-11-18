@@ -6565,7 +6565,7 @@ export default function App() {
   // MAIN VIEW ROUTER
   // ==========================================
   return (
-    <div className="min-h-screen bg-[#FDECF2] dark:bg-[#020618] font-sans text-[#0F172B] dark:text-white antialiased selection:bg-[#007A7A]/20 dark:selection:bg-teal-700 transition-colors duration-200">
+    <div className={`min-h-screen ${view === 'STUDENT_PROFILE' ? 'bg-[#F8FAFC]' : 'bg-[#FDECF2]'} dark:bg-[#020618] font-sans text-[#0F172B] dark:text-white antialiased selection:bg-[#007A7A]/20 dark:selection:bg-teal-700 transition-colors duration-200`}>
       {/* Navbar rendered when not on Auth, Full Exam, Speaking Room, or Game Arena */}
       {view !== 'AUTH' && view !== 'EXAM_MODE' && view !== 'SPEAKING_MODE' && view !== 'GAME_ARENA' && (
         <Navbar

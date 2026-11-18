@@ -429,13 +429,13 @@ export default function StudentHome({
                 return (
                   <div
                     key={test.id}
-                    className={`lexi-card bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border p-6 flex flex-col justify-between ${
+                    className={`lexi-card bg-[#FFF5F8] dark:bg-[#0F172B] rounded-2xl border p-6 flex flex-col h-full ${
                       matchedFocusedTest?.id === test.id
                         ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
                         : 'border-pink-200/90 dark:border-slate-800 hover:border-[#007A7A]/60 dark:hover:border-teal-500/50'
                     }`}
                   >
-                    <div>
+                    <div className="flex-1 flex flex-col">
                       <div className="flex flex-wrap justify-between items-center gap-2 mb-3.5">
                         <span className="bg-slate-100/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold px-2.5 py-0.5 rounded-md inline-flex items-center gap-1">
                           <Clock className="w-3 h-3 text-[#007A7A] dark:text-[#1EE1D6]" /> IELTS Academic • {totalMins}p
@@ -475,9 +475,9 @@ export default function StudentHome({
                         {test.description}
                       </p>
 
-                      {(testPrice > 0 || hasExamPassword || (isTeacher && cfg.visibility === 'private') || assignedClassNames.length > 0 || (hasDraft && !isExhausted)) && (
+                      {((testPrice > 0 && cfg.maxAttempts > 0) || hasExamPassword || (isTeacher && cfg.visibility === 'private') || assignedClassNames.length > 0 || (hasDraft && !isExhausted)) && (
                         <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-[#62748E] dark:text-slate-400">
-                          {testPrice > 0 && <span>{attemptSummaryText}</span>}
+                          {testPrice > 0 && cfg.maxAttempts > 0 && <span>{attemptSummaryText}</span>}
                           {hasExamPassword && (
                             <span className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 font-semibold">
                               <KeyRound className="w-3 h-3 text-[#007A7A] dark:text-[#1EE1D6]" /> Thi Thực Chiến • Nhập Pass Lớp
@@ -500,8 +500,10 @@ export default function StudentHome({
                           )}
                         </div>
                       )}
+                    </div>
 
-                      <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 mb-4 space-y-1.5">
+                    <div className="mt-auto pt-3 border-t border-slate-200/80 dark:border-slate-800 space-y-3">
+                      <div className="space-y-1.5">
                         <p className="text-xs font-semibold text-[#0F172B] dark:text-slate-200">
                           Listening ({cfg.durations.listening}p) • Reading ({cfg.durations.reading}p) • Writing ({cfg.durations.writing}p)
                         </p>
@@ -525,60 +527,60 @@ export default function StudentHome({
                           {scheduleSummaryText}
                         </p>
                       </div>
-                    </div>
 
-                    <button
-                      onClick={() => {
-                        if (isPaidLocked && onOpenCheckoutModal) {
-                          onOpenCheckoutModal({
-                            itemType: 'test',
-                            itemId: test.id,
-                            itemLabel: test.title,
-                            itemPrice: testPrice
-                          });
-                          return;
-                        }
-                        startExam(test.id);
-                      }}
-                      disabled={isButtonDisabled}
-                      className={`w-full font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-2 ${
-                        isButtonDisabled
-                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                          : isPaidLocked
-                          ? 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900'
-                          : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
-                      }`}
-                    >
-                      {isButtonDisabled ? (
-                        <>
-                          <Lock className="w-3.5 h-3.5" />
-                          <span>
-                            {isExhausted
-                              ? `Đã hết lượt làm bài (${myUsedCount}/${cfg.maxAttempts})`
-                              : schedule.notYetOpen
-                              ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
-                              : 'Đã hết hạn nộp bài'}
-                          </span>
-                        </>
-                      ) : isPaidLocked ? (
-                        <>
-                          <ShoppingBag className="w-3.5 h-3.5" />
-                          <span>Mua Đề Thi ({formatVndCurrency(testPrice)})</span>
-                        </>
-                      ) : requiresPasswordPrompt ? (
-                        <>
-                          <KeyRound className="w-3.5 h-3.5" />
-                          <span>{hasDraft ? 'Nhập Pass · Tiếp Tục Bài' : 'Nhập Mật Khẩu Thi Thật'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-3.5 h-3.5 fill-white" />
-                          <span>
-                            {hasDraft ? 'Tiếp Tục Bài Đang Làm' : myUsedCount > 0 ? 'Làm Lại Đề Thi' : 'Bắt Đầu Làm Bài'}
-                          </span>
-                        </>
-                      )}
-                    </button>
+                      <button
+                        onClick={() => {
+                          if (isPaidLocked && onOpenCheckoutModal) {
+                            onOpenCheckoutModal({
+                              itemType: 'test',
+                              itemId: test.id,
+                              itemLabel: test.title,
+                              itemPrice: testPrice
+                            });
+                            return;
+                          }
+                          startExam(test.id);
+                        }}
+                        disabled={isButtonDisabled}
+                        className={`w-full font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-2 ${
+                          isButtonDisabled
+                            ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                            : isPaidLocked
+                            ? 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900'
+                            : 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
+                        }`}
+                      >
+                        {isButtonDisabled ? (
+                          <>
+                            <Lock className="w-3.5 h-3.5" />
+                            <span>
+                              {isExhausted
+                                ? `Đã hết lượt làm bài (${myUsedCount}/${cfg.maxAttempts})`
+                                : schedule.notYetOpen
+                                ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
+                                : 'Đã hết hạn nộp bài'}
+                            </span>
+                          </>
+                        ) : isPaidLocked ? (
+                          <>
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            <span>Mua Đề Thi ({formatVndCurrency(testPrice)})</span>
+                          </>
+                        ) : requiresPasswordPrompt ? (
+                          <>
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>{hasDraft ? 'Nhập Pass · Tiếp Tục Bài' : 'Nhập Mật Khẩu Thi Thật'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3.5 h-3.5 fill-white" />
+                            <span>
+                              {hasDraft ? 'Tiếp Tục Bài Đang Làm' : myUsedCount > 0 ? 'Làm Lại Đề Thi' : 'Bắt Đầu Làm Bài'}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -783,7 +785,7 @@ export default function StudentHome({
                           }}
                           className="w-full h-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-[#007A7A]/70 dark:hover:border-teal-500/60 transition text-left group"
                         >
-                          <UserAvatarBadge user={memberObj} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" showVipEffects={false} />
+                          <UserAvatarBadge user={memberObj} sizeClass="w-12 h-12" textClass="text-base" rounded="rounded-xl" showFrame={false} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm font-bold text-[#0F172B] dark:text-white truncate group-hover:text-[#007A7A] dark:group-hover:text-[#1EE1D6]">
