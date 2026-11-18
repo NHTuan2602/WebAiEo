@@ -958,7 +958,7 @@ export default function TeacherDashboard({
   const allNavItems = navSections.flatMap(sec => sec.items);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
       {/* Compact Workspace Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/90 dark:border-slate-800">
         <div>
@@ -1132,7 +1132,7 @@ export default function TeacherDashboard({
       </div>
 
       {/* Main 2-Column Workspace (Desktop Sidebar + Content Area) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)] gap-5 xl:gap-6 items-start">
         <aside className="hidden lg:block bg-white/95 dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3 space-y-5 sticky top-20">
           {navSections.map(section => (
             <div key={section.title} className="space-y-1">
@@ -1148,15 +1148,15 @@ export default function TeacherDashboard({
                     key={tab.id}
                     type="button"
                     onClick={() => setTeacherHubTab(tab.id)}
-                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-2 ${
+                    className={`w-full px-2.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-1.5 ${
                       isActive
                         ? 'bg-[#007A7A] text-white'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    <span className="flex items-center gap-2.5 min-w-0 truncate">
+                    <span className="flex items-center gap-2 min-w-0">
                       <IconComp className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{tab.label}</span>
+                      <span className="whitespace-nowrap">{tab.label}</span>
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-black tabular-nums shrink-0 ${
@@ -1184,53 +1184,43 @@ export default function TeacherDashboard({
                 <button
                   type="button"
                   onClick={onOpenMailConfig}
-                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2"
+                  className="w-full px-2.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-1.5"
                 >
-                  <span className="flex items-center gap-2.5 min-w-0 truncate">
+                  <span className="flex items-center gap-2 min-w-0">
                     <Mail className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
-                    <span className="truncate">{mailConfigured ? 'Email OTP: Đang bật' : 'Cấu hình Email OTP'}</span>
+                    <span className="whitespace-nowrap">{mailConfigured ? 'Email OTP: Đang bật' : 'Cấu hình Email OTP'}</span>
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
-                      mailConfigured
-                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200'
-                    }`}
-                  >
-                    {mailConfigured ? 'Bật' : 'Cài đặt'}
-                  </span>
+                    className={`w-2 h-2 rounded-full shrink-0 ${mailConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                    title={mailConfigured ? 'Đã bật' : 'Chưa cài'}
+                  />
                 </button>
               )}
               {isViewerSuperAdmin && onOpenPaymentConfig && (
                 <button
                   type="button"
                   onClick={onOpenPaymentConfig}
-                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2"
+                  className="w-full px-2.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-1.5"
                 >
-                  <span className="flex items-center gap-2.5 min-w-0 truncate">
+                  <span className="flex items-center gap-2 min-w-0">
                     <QrCode className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
-                    <span className="truncate">QR &amp; Giá Tiền ({coverPriceLabel})</span>
+                    <span className="whitespace-nowrap">QR &amp; Giá Tiền ({coverPriceLabel})</span>
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
-                      qrConfigured
-                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200'
-                    }`}
-                  >
-                    {qrConfigured ? 'Đã cài' : 'Cài đặt'}
-                  </span>
+                    className={`w-2 h-2 rounded-full shrink-0 ${qrConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                    title={qrConfigured ? 'Đã cài' : 'Chưa cài'}
+                  />
                 </button>
               )}
               {onOpenApiKeyModal && (
                 <button
                   type="button"
                   onClick={onOpenApiKeyModal}
-                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-2"
+                  className="w-full px-2.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center justify-between gap-1.5"
                 >
-                  <span className="flex items-center gap-2.5 min-w-0 truncate">
+                  <span className="flex items-center gap-2 min-w-0">
                     <Key className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span className="truncate">Gemini AI Key</span>
+                    <span className="whitespace-nowrap">Gemini AI Key</span>
                   </span>
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${aiConfigured ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
@@ -1241,7 +1231,7 @@ export default function TeacherDashboard({
                 <button
                   type="button"
                   onClick={() => onOpenAdminTitleManager(null)}
-                  className="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-50/80 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-200/80 dark:border-amber-500/30 transition flex items-center gap-2.5"
+                  className="w-full px-2.5 py-2.5 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-50/80 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-200/80 dark:border-amber-500/30 transition flex items-center gap-2"
                 >
                   <Crown className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0" />
                   <span className="truncate">Quản Lý &amp; Tạo Danh Hiệu</span>
@@ -1448,16 +1438,16 @@ export default function TeacherDashboard({
           </div>
 
           {/* Filter & CSV Export Bar */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2 flex-1">
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 mr-1">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 shadow-sm flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 min-w-0">
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">
                 <Filter className="w-3.5 h-3.5" /> Lọc:
               </span>
               <select
                 aria-label="Lọc theo đề thi hoặc bài tập"
                 value={gradingFilters.testId}
                 onChange={e => setGradingFilters(prev => ({ ...prev, testId: e.target.value }))}
-                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 max-w-[200px]"
+                className="px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 min-w-0 max-w-[180px]"
               >
                 <option value="all">Tất cả đề thi &amp; bài tập</option>
                 {uniqueAttemptTests.map(([tid, title]) => (
@@ -1468,7 +1458,7 @@ export default function TeacherDashboard({
                 aria-label="Lọc theo trạng thái chấm"
                 value={gradingFilters.status}
                 onChange={e => setGradingFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                className="px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 shrink-0"
               >
                 <option value="all">Tất cả trạng thái</option>
                 <option value="pending">Chờ chấm Writing</option>
@@ -1478,20 +1468,20 @@ export default function TeacherDashboard({
                 aria-label="Lọc theo mức cảnh báo chuyển tab"
                 value={gradingFilters.risk}
                 onChange={e => setGradingFilters(prev => ({ ...prev, risk: e.target.value }))}
-                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100"
+                className="px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 shrink-0"
               >
                 <option value="all">Mọi mức độ tab</option>
                 <option value="risk">Nghi gian lận (≥3 tab)</option>
               </select>
-              <div className="relative w-44 sm:w-52">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="relative flex-1 min-w-[140px] max-w-[220px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   aria-label="Tìm theo tên học viên"
                   placeholder="Tên học viên..."
                   value={gradingFilters.search}
                   onChange={e => setGradingFilters(prev => ({ ...prev, search: e.target.value }))}
-                  className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100"
+                  className="w-full pl-8 pr-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100"
                 />
               </div>
             </div>
@@ -1501,7 +1491,7 @@ export default function TeacherDashboard({
                   type="button"
                   onClick={handlePurgeOrphanAttempts}
                   title="Dọn sạch các bài làm thuộc những tài khoản đã bị xóa"
-                  className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition"
+                  className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Dọn {orphanAttemptsCount} bài TK đã xóa
                 </button>
@@ -1512,7 +1502,7 @@ export default function TeacherDashboard({
                   exportAttemptsToCsv(filteredAttempts);
                   showToast(`Đã xuất file CSV bảng điểm (${filteredAttempts.length} dòng)!`);
                 }}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0 whitespace-nowrap"
               >
                 <Download className="w-3.5 h-3.5" /> Xuất CSV Excel ({filteredAttempts.length})
               </button>
@@ -1522,15 +1512,15 @@ export default function TeacherDashboard({
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
+              <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold tracking-wider text-slate-500 dark:text-slate-400 uppercase whitespace-nowrap">
                 <tr>
-                  <th className="px-6 py-3.5">Học Sinh</th>
-                  <th className="px-6 py-3.5">Đề Thi</th>
-                  <th className="px-6 py-3.5">Thời Gian Nộp</th>
-                  <th className="px-6 py-3.5 text-center">Chống Gian Lận (Tab Switch)</th>
-                  <th className="px-6 py-3.5 text-center">Trạng Thái Chấm</th>
-                  <th className="px-6 py-3.5 text-center">Overall</th>
-                  <th className="px-6 py-3.5 text-right">Thao Tác</th>
+                  <th className="px-4 py-3.5">Học Sinh</th>
+                  <th className="px-4 py-3.5">Đề Thi</th>
+                  <th className="px-4 py-3.5">Thời Gian Nộp</th>
+                  <th className="px-3.5 py-3.5 text-center">Chống Gian Lận</th>
+                  <th className="px-3.5 py-3.5 text-center">Trạng Thái</th>
+                  <th className="px-3.5 py-3.5 text-center">Overall</th>
+                  <th className="px-4 py-3.5 text-right">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1554,7 +1544,7 @@ export default function TeacherDashboard({
 
                   return (
                     <tr key={att.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">
+                      <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
                           <UserAvatarBadge
                             user={usersDb?.[att.studentId] || { username: att.studentId, name: att.studentName }}
@@ -1567,20 +1557,20 @@ export default function TeacherDashboard({
                               type="button"
                               onClick={() => openMemberProfile(att.studentId, 'TEACHER_DASHBOARD')}
                               title="Xem hồ sơ thành viên"
-                              className="inline-flex items-center gap-1.5 text-left hover:text-teal-600 dark:hover:text-teal-400 hover:underline transition"
+                              className="inline-flex items-center gap-1.5 text-left hover:text-teal-600 dark:hover:text-teal-400 hover:underline transition whitespace-nowrap"
                             >
                               <span>{att.studentName}</span>
                               <Eye className="w-3.5 h-3.5 opacity-60 shrink-0" />
                             </button>
                           ) : (
-                            <span>{att.studentName}</span>
+                            <span className="whitespace-nowrap">{att.studentName}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300">
-                        <div className="flex flex-wrap items-center gap-1.5">
+                      <td className="px-4 py-3.5 text-xs text-slate-600 dark:text-slate-300 min-w-[200px] max-w-[270px]">
+                        <div className="space-y-1">
                           <span
-                            className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                            className={`inline-block text-[10px] font-black uppercase px-1.5 py-0.5 rounded border whitespace-nowrap ${
                               att.testMode === 'single_skill'
                                 ? 'bg-[#570DF8]/10 text-[#570DF8] dark:text-[#C4B5FD] border-[#570DF8]/25'
                                 : 'bg-teal-50 dark:bg-teal-500/15 text-[#007A7A] dark:text-[#1EE1D6] border-teal-200 dark:border-teal-500/30'
@@ -1590,60 +1580,64 @@ export default function TeacherDashboard({
                               ? `BÀI TẬP • ${(att.focusSkill || 'SK').toUpperCase()}`
                               : 'ĐỀ THI'}
                           </span>
-                          <span>{att.testTitle}</span>
+                          <p className="font-semibold text-slate-800 dark:text-slate-100 leading-snug line-clamp-2" title={att.testTitle}>
+                            {att.testTitle}
+                          </p>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
-                        <div className="space-y-0.5">
-                          <p className="font-semibold text-slate-700 dark:text-slate-200">{att.submittedAt}</p>
+                      <td className="px-4 py-3.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{att.submittedAt}</span>
+                            {att.timelinessStatus === 'late' ? (
+                              <span className="inline-block text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 whitespace-nowrap">
+                                Muộn{att.lateByMinutes ? ` ${att.lateByMinutes}p` : ''}
+                              </span>
+                            ) : att.timelinessStatus === 'on_time' ? (
+                              <span className="inline-block text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                                Đúng hạn
+                              </span>
+                            ) : null}
+                          </div>
                           {(att.startedAt || Number(att.durationSeconds) > 0) && (
-                            <p className="text-[11px] text-slate-400">
-                              {att.startedAt ? `Bắt đầu: ${att.startedAt}` : ''}
-                              {att.startedAt && Number(att.durationSeconds) > 0 ? ' • ' : ''}
+                            <p className="text-[11px] text-slate-400 tabular-nums">
                               {Number(att.durationSeconds) > 0 ? `Thời lượng: ${formatDurationVi(att.durationSeconds)}` : ''}
+                              {Number(att.durationSeconds) > 0 && att.startedAt ? ' · ' : ''}
+                              {att.startedAt ? `Mở: ${att.startedAt}` : ''}
                             </p>
                           )}
-                          {att.timelinessStatus === 'late' ? (
-                            <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300">
-                              Nộp muộn{att.lateByMinutes ? ` ${att.lateByMinutes}p` : ''}
-                            </span>
-                          ) : att.timelinessStatus === 'on_time' ? (
-                            <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                              Đúng hạn
-                            </span>
-                          ) : null}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
                         <div className="inline-flex flex-col items-center gap-1">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${risk.color}`}>
-                            <RiskIcon className="w-3.5 h-3.5" />
-                            {risk.label} ({att.tabSwitchCount} lần)
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap shrink-0 ${risk.color}`}>
+                            <RiskIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span>{risk.label} ({att.tabSwitchCount} lần)</span>
                           </span>
                           {extSignals > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 whitespace-nowrap">
                               Extension / Bypass: {extSignals}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
                         {att.teacherGraded ? (
-                          <span className="text-xs bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded-md font-bold border border-emerald-200 dark:border-emerald-500/30 inline-flex items-center gap-1">
-                            {att.aiGraded && <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />}
+                          <span className="text-[11px] bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-200 dark:border-emerald-500/30 inline-flex items-center gap-1 whitespace-nowrap">
+                            {att.aiGraded && <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />}
                             {att.aiGraded ? 'AI Đã Chấm' : 'Đã Chấm'}
                           </span>
                         ) : (
-                          <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2.5 py-1 rounded-md font-bold border border-amber-200 dark:border-amber-500/30">
+                          <span className="inline-block text-[11px] bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2.5 py-1 rounded-lg font-bold border border-amber-200 dark:border-amber-500/30 whitespace-nowrap">
                             Cần Chấm Writing
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="font-extrabold text-blue-600 dark:text-blue-400">
+                      <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
+                        <div className="text-base font-black text-blue-600 dark:text-blue-400 tabular-nums leading-tight">
                           {att.overallBand ?? '-'}
                         </div>
-                        <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
+                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums whitespace-nowrap">
                           {att.focusSkill === 'speaking' || att.scores?.speaking
                             ? `Speaking ${att.scores?.speaking?.band ?? att.overallBand ?? '-'}`
                             : att.testMode === 'single_skill'
@@ -1651,14 +1645,14 @@ export default function TeacherDashboard({
                             : `L ${att.scores?.listening?.band ?? '-'} · R ${att.scores?.reading?.band ?? '-'} · W ${att.scores?.writing?.overallBand ?? '-'}`}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => openTeacherGradingModal(att)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm whitespace-nowrap shrink-0"
                           >
-                            {att.testMode === 'single_skill' ? 'Chấm & Xem Chi Tiết' : 'Chấm & Sửa Điểm (L/R/W)'}
+                            {att.testMode === 'single_skill' ? 'Chấm & Xem' : 'Chấm Điểm (L/R/W)'}
                           </button>
                           <button
                             type="button"
