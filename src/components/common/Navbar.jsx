@@ -123,7 +123,7 @@ export default function Navbar({
             className={navTabCls(view === 'SKILL_HUB' || view === 'SPEAKING_MODE')}
           >
             <Mic className="w-3.5 h-3.5 shrink-0" />
-            <span>Bài Tập <span className="hidden xl:inline">4 Kỹ Năng</span></span>
+            <span>Daily Zone</span>
             {!isTeacher && dailySpeakingPendingCount > 0 && (
               <span
                 onClick={e => {
@@ -425,7 +425,7 @@ export default function Navbar({
           onClick={() => setView('SKILL_HUB')}
           className={mobileTabCls(view === 'SKILL_HUB' || view === 'SPEAKING_MODE')}
         >
-          <Mic className="w-3.5 h-3.5" /> Bài Tập 4 Kỹ Năng
+          <Mic className="w-3.5 h-3.5" /> Daily Zone
         </button>
         <button
           type="button"

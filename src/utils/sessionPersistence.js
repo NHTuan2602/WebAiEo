@@ -42,7 +42,7 @@ export function buildInitialExamState(test = null) {
     showAllListeningQs: false,
     readingPassageIdx: 0,
     showAllReadingQs: false,
-    writingTaskIdx: 0,
+    writingTaskIdx: cfg.writingTaskScope === 'task2' ? 1 : 0,
     startedAt: '',
     startedAtMs: null,
     accumulatedSeconds: 0

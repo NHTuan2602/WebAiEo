@@ -3,6 +3,8 @@ import { Award, CheckCircle2, ImagePlus, Loader2, QrCode, RefreshCw, Sparkles, X
 import {
   formatRemainingSubscriptionText,
   formatVndCurrency,
+  getRealExamComboMeta,
+  getRealExamCredits,
   getTitlePriceVnd,
   hasActiveAieoVip,
   hasActivePaidTitlePermission,
@@ -35,15 +37,22 @@ export default function CoverCheckoutModal({
   const [checkingNow, setCheckingNow] = useState(false);
   const [error, setError] = useState('');
 
+  const activePayCfg = livePayCfg || paymentConfig;
+  const effectiveCfg = normalizePaymentConfig(activePayCfg || {});
   const isTitleOrder = itemType === 'title' && Boolean(itemId);
   const isTestOrder = itemType === 'test' && Boolean(itemId);
   const isSkillPassOrder = itemType === 'skill_pass';
   const isAieoVipOrder = itemType === 'aieo_vip';
   const isRoomTicketOrder = itemType === 'room_ticket';
+  const comboMeta = getRealExamComboMeta(itemType, effectiveCfg);
+  const isComboOrder = Boolean(comboMeta);
   const [baselineCredits] = useState(() => Math.max(0, Math.floor(Number(currentUser?.roomCreateCredits) || 0)));
+  const [baselineRealExamCredits] = useState(() => getRealExamCredits(currentUser));
   const [orderPaidConfirmed, setOrderPaidConfirmed] = useState(false);
   const isUnlocked = orderPaidConfirmed || (
     isRoomTicketOrder && (Number(currentUser?.roomCreateCredits) || 0) > baselineCredits
+  ) || (
+    isComboOrder && getRealExamCredits(currentUser) > baselineRealExamCredits
   ) || (!renew && (
     isTitleOrder
       ? hasActivePaidTitlePermission(currentUser, itemId)
@@ -54,13 +63,11 @@ export default function CoverCheckoutModal({
       ? hasSkillPracticeAccess(currentUser)
       : isAieoVipOrder
       ? (Boolean(currentUser?.isSuperAdmin || currentUser?.username === 'tuanpro123s') || hasActiveAieoVip(currentUser))
-      : isRoomTicketOrder
+      : (isRoomTicketOrder || isComboOrder)
       ? false
       : hasCustomCoverPermission(currentUser)
   ));
 
-  const activePayCfg = livePayCfg || paymentConfig;
-  const effectiveCfg = normalizePaymentConfig(activePayCfg || {});
   const resolvedAmount =
     order?.amount !== undefined
       ? order.amount
@@ -70,6 +77,8 @@ export default function CoverCheckoutModal({
       ? getTitlePriceVnd(itemId, effectiveCfg)
       : isTestOrder
       ? effectiveCfg.defaultExamPriceVnd
+      : isComboOrder
+      ? comboMeta.price
       : isRoomTicketOrder
       ? effectiveCfg.friendRoomTicketPrice
       : isSkillPassOrder
@@ -83,7 +92,7 @@ export default function CoverCheckoutModal({
     ? (currentUser?.paidTitleRequested?.titleId === itemId ? currentUser.paidTitleRequested.requestedAt : 0)
     : isTestOrder
     ? (currentUser?.subscriptionRequested?.itemId === itemId ? currentUser.subscriptionRequested.requestedAt : 0)
-    : (isSkillPassOrder || isAieoVipOrder || isRoomTicketOrder)
+    : (isSkillPassOrder || isAieoVipOrder || isRoomTicketOrder || isComboOrder)
     ? (currentUser?.subscriptionRequested?.itemType === itemType ? currentUser.subscriptionRequested.requestedAt : 0)
     : (currentUser?.coverUnlockRequestedAt || 0);
 
@@ -190,11 +199,13 @@ export default function CoverCheckoutModal({
                   {isTitleOrder
                     ? `Mua Danh Hiệu ${itemLabel || 'VIP'} (1 Tháng)`
                     : isTestOrder
-                    ? `Mua Đề Thi: ${itemLabel || 'IELTS 3 Kỹ Năng'}`
+                    ? `Chi Phí Test: ${itemLabel || 'Thực Chiến IELTS 4 Kỹ Năng'}`
+                    : isComboOrder
+                    ? `${comboMeta.label} · Thực Chiến 4 Kỹ Năng`
                     : isRoomTicketOrder
                     ? 'Mua 1 Lượt Tạo Phòng Đấu Riêng'
                     : isAieoVipOrder
-                    ? 'Đăng Ký Gói Ai eo VIP (1 Tháng)'
+                    ? 'Đăng Ký Gói IELTS VIP (1 Tháng)'
                     : 'Mở Khóa Ảnh Nền Riêng (1 Tháng)'}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-black tabular-nums">
@@ -204,6 +215,10 @@ export default function CoverCheckoutModal({
               <p className="text-xs text-slate-300">
                 {order?.orderCode
                   ? `Mã đơn thanh toán: #${order.orderCode}`
+                  : isComboOrder
+                  ? `Quét mã VietQR để cộng ngay +${comboMeta.credits} lượt mở đề Thực Chiến 4 Kỹ Năng!`
+                  : isTestOrder
+                  ? 'Quét mã VietQR để mở 1 lượt thi thật đủ 4 kỹ năng L·R·W·S (chờ Ms. Như duyệt điểm)!'
                   : isRoomTicketOrder
                   ? 'Quét mã VietQR để cộng ngay +1 lượt tạo Phòng Đấu Trường Bạn Bè!'
                   : 'Quét mã VietQR để mở khóa tự động trên hệ thống (Thời hạn 30 ngày)'}
@@ -230,26 +245,30 @@ export default function CoverCheckoutModal({
                 {isTitleOrder
                   ? `Thanh toán thành công - Đã sở hữu ${itemLabel || 'Danh Hiệu VIP'}!`
                   : isTestOrder
-                  ? `Thanh toán thành công - Đã mở khóa Đề Thi!`
+                  ? `Thanh toán thành công - Đã mở khóa Đề Thực Chiến!`
+                  : isComboOrder
+                  ? `Thanh toán thành công - Đã cộng +${comboMeta.credits} lượt Thực Chiến!`
                   : isRoomTicketOrder
                   ? 'Thanh toán thành công - Đã cộng +1 Lượt Tạo Phòng!'
                   : isAieoVipOrder
-                  ? 'Thanh toán thành công - Chào mừng thành viên Ai eo VIP!'
+                  ? 'Thanh toán thành công - Chào mừng thành viên IELTS VIP!'
                   : 'Thanh toán thành công - Đã mở khóa Ảnh Nền Riêng!'}
               </h4>
               <p className="text-xs text-emerald-800/90 dark:text-emerald-300 leading-relaxed">
                 {isTitleOrder
                   ? `Tài khoản @${currentUser?.username} đã mở khóa danh hiệu ${itemLabel} (thời hạn 1 tháng${expiryPreview ? ` • ${expiryPreview}` : ''}).`
                   : isTestOrder
-                  ? `Tài khoản @${currentUser?.username} đã mở khóa đề thi "${itemLabel}" - được làm lại nhiều lần không giới hạn!`
+                  ? `Tài khoản @${currentUser?.username} đã mở khóa 1 lượt thi thật đủ 4 kỹ năng L·R·W·S cho "${itemLabel}". Sau khi nộp bài, Ms. Như sẽ trực tiếp duyệt & trả điểm!`
+                  : isComboOrder
+                  ? `Tài khoản @${currentUser?.username} đã nhận +${comboMeta.credits} lượt Combo Thực Chiến 4 Kỹ Năng (hiện có ${Math.max(comboMeta.credits, getRealExamCredits(currentUser))} lượt). Bấm "Dùng 1 Lượt Combo" ngay tại Trang Chủ để vào thi!`
                   : isRoomTicketOrder
                   ? `Tài khoản @${currentUser?.username} đã nhận +1 lượt tạo Phòng Đấu Trường Bạn Bè (hiện có ${Math.max(1, Number(currentUser?.roomCreateCredits) || 1)} lượt).`
                   : isAieoVipOrder
-                  ? `Tài khoản @${currentUser?.username} đã sở hữu Gói Ai eo VIP 1 tháng: Ảnh Avatar Động (.GIF/.WebP), Đổi Màu Chữ Tên + Nhãn AIEOVIP, Viền Bìa & Thẻ LED Neon, Ảnh Bìa Cá Nhân miễn phí, 3 Khung Avatar Neon, Danh hiệu 👑 Ai eo VIP & Tạo phòng Game Team!`
+                  ? `Tài khoản @${currentUser?.username} đã sở hữu Gói IELTS VIP 1 tháng: Ảnh Avatar Động (.GIF/.WebP), Đổi Màu Chữ Tên + Nhãn IELTS VIP, Viền Bìa & Thẻ LED Neon, Ảnh Bìa Cá Nhân miễn phí, 3 Khung Avatar Neon, Danh hiệu 👑 IELTS VIP & Tạo phòng Game Team!`
                   : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`}
               </p>
               <p className="text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100/75 dark:bg-amber-500/15 border border-amber-300/70 dark:border-amber-500/30 rounded-xl px-3.5 py-2 leading-relaxed">
-                💛 Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web, server &amp; hạ tầng luyện thi IELTS! Chúc bạn học tập thật bứt phá.
+                💛 Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web, server &amp; hệ thống luyện thi IELTS! Chúc bạn học tập thật bứt phá.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
@@ -260,6 +279,8 @@ export default function CoverCheckoutModal({
                       onEquipPurchasedTitle?.(itemId);
                     } else if (isTestOrder) {
                       onNavigateAfterPurchase?.('EXAM_START', itemId);
+                    } else if (isComboOrder) {
+                      onNavigateAfterPurchase?.('HOME');
                     } else if (isRoomTicketOrder) {
                       onNavigateAfterPurchase?.('CREATE_FRIEND_ROOM');
                     } else if (isAieoVipOrder) {
@@ -276,7 +297,11 @@ export default function CoverCheckoutModal({
                     </>
                   ) : isTestOrder ? (
                     <>
-                      <Sparkles className="w-4 h-4" /> Vào Làm Đề Thi Ngay
+                      <Sparkles className="w-4 h-4" /> Vào Thi 4 Kỹ Năng Ngay
+                    </>
+                  ) : isComboOrder ? (
+                    <>
+                      <Sparkles className="w-4 h-4" /> Chọn Đề Thực Chiến Ngay
                     </>
                   ) : isRoomTicketOrder ? (
                     <>
@@ -284,7 +309,7 @@ export default function CoverCheckoutModal({
                     </>
                   ) : isAieoVipOrder ? (
                     <>
-                      <Sparkles className="w-4 h-4" /> Bật/Tắt Tên Đỏ &amp; AIEOVIP Ở Hồ Sơ
+                      <Sparkles className="w-4 h-4" /> Tùy Chỉnh Hiệu Ứng IELTS VIP Ở Hồ Sơ
                     </>
                   ) : (
                     <>

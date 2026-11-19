@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Mic,
   Moon,
   PenTool,
   Play,
@@ -42,6 +43,7 @@ import {
 } from '../utils/examUiHelpers';
 import ClozeNoteSheet from '../components/exam/ClozeNoteSheet';
 import ExamQuestionList from '../components/exam/ExamQuestionList';
+import IntegratedSpeakingSection from '../components/exam/IntegratedSpeakingSection';
 import SplitResizableWorkspace from '../components/exam/SplitResizableWorkspace';
 
 const FONT_SIZE_CLASSES = {
@@ -96,6 +98,9 @@ export default function ExamMode({
   const [showSubmitLockedModal, setShowSubmitLockedModal] = useState(false);
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [earlyNextConfirmOpen, setEarlyNextConfirmOpen] = useState(false);
+  const [speakingRecordingsMap, setSpeakingRecordingsMap] = useState({});
+  const [speakingNotes, setSpeakingNotes] = useState({});
+  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
 
   const blankInputRefs = useRef({});
   const questionCardRefs = useRef({});
@@ -139,12 +144,25 @@ export default function ExamMode({
   const skillMeta = {
     listening: { label: 'Listening', icon: Headphones },
     reading: { label: 'Reading', icon: BookOpen },
-    writing: { label: 'Writing', icon: PenTool }
+    writing: { label: 'Writing', icon: PenTool },
+    speaking: { label: 'Speaking', icon: Mic }
   };
 
   const fontSizeClass = FONT_SIZE_CLASSES[fontSizeMode] || FONT_SIZE_CLASSES.regular;
   const bookmarkedQuestions = examState.bookmarkedQuestions || {};
-  const activeWritingTask = Number(examState.writingTaskIdx) === 1 ? 1 : 0;
+  const writingTaskScope = cfg.writingTaskScope || 'both';
+  const activeWritingTask =
+    writingTaskScope === 'task2'
+      ? 1
+      : writingTaskScope === 'task1'
+      ? 0
+      : Number(examState.writingTaskIdx) === 1
+      ? 1
+      : 0;
+  const speakingRecordedCount = Object.values(speakingRecordingsMap).filter(
+    r => Boolean(r?.blob || r?.audioUrl)
+  ).length;
+  const hasSpeakingSection = cfg.order.includes('speaking');
 
   const readingPassages = getReadingPassages(activeTest.reading);
   const safePassageIdx = Math.min(Math.max(0, examState.readingPassageIdx || 0), readingPassages.length - 1);
@@ -252,7 +270,7 @@ export default function ExamMode({
     }
   };
 
-  // Bottom navigator dataset across Parts / Passages / Writing Tasks
+  // Bottom navigator dataset across Parts / Passages / Writing Tasks / Speaking
   const navParts =
     examState.skill === 'listening'
       ? buildScopedNavParts({
@@ -272,6 +290,19 @@ export default function ExamMode({
           multiLabelPrefix: 'PASSAGE',
           singleLabel: 'READING'
         })
+      : examState.skill === 'speaking'
+      ? [
+          {
+            idx: 0,
+            offset: 0,
+            label: 'SPEAKING',
+            questions: [{ id: 'sp_all', num: 'SP', answered: speakingRecordedCount > 0 }]
+          }
+        ]
+      : writingTaskScope === 'task1'
+      ? [{ idx: 0, offset: 0, label: 'TASK 1', questions: [{ id: 'w1', num: 1, answered: w1Words > 0 }] }]
+      : writingTaskScope === 'task2'
+      ? [{ idx: 1, offset: 0, label: 'TASK 2', questions: [{ id: 'w2', num: 2, answered: w2Words > 0 }] }]
       : [
           { idx: 0, offset: 0, label: 'TASK 1', questions: [{ id: 'w1', num: 1, answered: w1Words > 0 }] },
           { idx: 1, offset: 1, label: 'TASK 2', questions: [{ id: 'w2', num: 2, answered: w2Words > 0 }] }
@@ -282,13 +313,17 @@ export default function ExamMode({
       ? safeTrackIdx
       : examState.skill === 'reading'
       ? safePassageIdx
+      : examState.skill === 'speaking'
+      ? 0
       : activeWritingTask;
 
-  const activePartObj = navParts[activePartIdx] || navParts[0];
+  const activePartObj = navParts.find(p => p.idx === activePartIdx) || navParts[0];
   const activePartQs = activePartObj?.questions || [];
   const activePartRange =
     examState.skill === 'writing'
       ? `${activeWritingTask + 1}–${activeWritingTask + 1}`
+      : examState.skill === 'speaking'
+      ? 'Part 1–3'
       : getQuestionRangeText(activePartQs, activePartObj?.offset || 0);
 
   const readingBaseOffset = examState.showAllReadingQs ? 0 : activePartObj?.offset || 0;
@@ -465,7 +500,7 @@ export default function ExamMode({
         </div>
 
         {/* Center: Compact Skill Tabs */}
-        <div className="hidden md:flex items-center bg-rose-100/75 dark:bg-[#222222] p-1 rounded-lg text-xs gap-1 border border-[#D5D9E0] dark:border-[#343434] shrink-0">
+        <div className="hidden md:flex items-center bg-slate-100 dark:bg-[#222222] p-1 rounded-lg text-xs gap-1 border border-[#D5D9E0] dark:border-[#343434] shrink-0">
           {cfg.order.map((sId, idx) => {
             const meta = skillMeta[sId] || { label: sId, icon: BookOpen };
             const IconComp = meta.icon;
@@ -756,6 +791,8 @@ export default function ExamMode({
                 `Listen and answer questions ${activePartRange || `1–${displayedListeningQs.length || 1}`}`}
               {examState.skill === 'writing' &&
                 `Read the prompt and answer questions ${activePartRange}`}
+              {examState.skill === 'speaking' &&
+                `Ghi âm trả lời Speaking Part 1–3 trực tiếp (nộp cùng bài thi 4 kỹ năng cho Ms. Như duyệt điểm)`}
             </p>
           </div>
 
@@ -1260,6 +1297,29 @@ export default function ExamMode({
           />
         )}
 
+        {/* ============================================================
+            4. SPEAKING WORKSPACE (Integrated Section 4 after Writing)
+           ============================================================ */}
+        {examState.skill === 'speaking' && (
+          <IntegratedSpeakingSection
+            test={activeTest}
+            recordingsMap={speakingRecordingsMap}
+            speakingNotes={speakingNotes}
+            onUpdateRecording={(qId, recData) =>
+              setSpeakingRecordingsMap(prev => ({
+                ...prev,
+                [qId]: recData
+              }))
+            }
+            onSpeakingNotesChange={(qId, text) =>
+              setSpeakingNotes(prev => ({
+                ...prev,
+                [qId]: text
+              }))
+            }
+          />
+        )}
+
         {/* Floating Bottom-Right Question / Task Stepper Arrows (matching Screenshots 1–5) */}
         <div className="fixed bottom-16 right-4 sm:right-6 z-40 flex items-center gap-1.5">
           <button
@@ -1371,7 +1431,7 @@ export default function ExamMode({
             className={`shrink-0 w-9 h-9 rounded-md border flex items-center justify-center transition ${
               allSkillsVisited
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm'
-                : 'bg-rose-100/75 dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-500 dark:text-neutral-300 border-[#CBD5E1] dark:border-[#3A3A3A]'
+                : 'bg-slate-100 dark:bg-[#242424] hover:bg-slate-200 dark:hover:bg-[#323232] text-slate-500 dark:text-neutral-300 border-[#CBD5E1] dark:border-[#3A3A3A]'
             }`}
           >
             {allSkillsVisited ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Lock className="w-3.5 h-3.5" />}
@@ -1639,7 +1699,7 @@ export default function ExamMode({
                     Chưa thể nộp toàn bài ({visitedInOrderCount}/{cfg.order.length} kỹ năng)
                   </h3>
                   <p className="text-xs text-slate-600 dark:text-neutral-400 mt-1">
-                    Để hoàn tất bài thi chuẩn 3 kỹ năng, bạn cần đi qua hết tất cả các phần theo thứ tự:
+                    Để hoàn tất bài thi chuẩn {cfg.order.length} kỹ năng, bạn cần đi qua hết tất cả các phần theo thứ tự:
                   </p>
                 </div>
               </div>
@@ -1827,36 +1887,59 @@ export default function ExamMode({
 
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Listening</p>
-                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
-                    {answeredListeningCount}/{allListeningQs.length} câu
-                  </p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Reading</p>
-                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
-                    {answeredReadingCount}/{allReadingQs.length} câu
-                  </p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 1</p>
-                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w1Words} từ</p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 2</p>
-                  <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w2Words} từ</p>
-                </div>
+                {cfg.order.includes('listening') && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Listening</p>
+                    <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
+                      {answeredListeningCount}/{allListeningQs.length} câu
+                    </p>
+                  </div>
+                )}
+                {cfg.order.includes('reading') && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Reading</p>
+                    <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
+                      {answeredReadingCount}/{allReadingQs.length} câu
+                    </p>
+                  </div>
+                )}
+                {cfg.order.includes('writing') && writingTaskScope !== 'task2' && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 1</p>
+                    <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w1Words} từ</p>
+                  </div>
+                )}
+                {cfg.order.includes('writing') && writingTaskScope !== 'task1' && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333]">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Writing Task 2</p>
+                    <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">{w2Words} từ</p>
+                  </div>
+                )}
+                {hasSpeakingSection && (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#222222] border border-[#E5E7EB] dark:border-[#333333] col-span-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Speaking (Ghi âm)</p>
+                    <p className="text-base font-extrabold text-[#111827] dark:text-white mt-0.5">
+                      {speakingRecordedCount} câu đã ghi âm
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {(answeredListeningCount < allListeningQs.length ||
-                answeredReadingCount < allReadingQs.length ||
-                w1Words === 0 ||
-                w2Words === 0) && (
+              {(cfg.testMode !== 'single_skill' || cfg.focusSkill === 'writing') && (
+                <div className="p-3.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-200 text-xs leading-relaxed">
+                  <strong>Quy trình duyệt bài:</strong> Sau khi nộp, bài làm sẽ chuyển sang trạng thái <strong>Ms. Như đang check</strong>. Điểm chính thức &amp; nhận xét sẽ hiển thị ngay sau khi Ms. Như duyệt và trả bài!
+                </div>
+              )}
+
+              {((cfg.order.includes('listening') && answeredListeningCount < allListeningQs.length) ||
+                (cfg.order.includes('reading') && answeredReadingCount < allReadingQs.length) ||
+                (cfg.order.includes('writing') && writingTaskScope !== 'task2' && w1Words === 0) ||
+                (cfg.order.includes('writing') && writingTaskScope !== 'task1' && w2Words === 0) ||
+                (hasSpeakingSection && speakingRecordedCount === 0)) && (
                 <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                   <span>
-                    Một số câu hỏi hoặc phần Writing hiện vẫn còn trống. Bạn có thể bấm <strong>Quay lại làm tiếp</strong> để rà soát trước khi nộp bài.
+                    Một số câu hỏi, bài Writing hoặc phần ghi âm Speaking hiện vẫn còn trống. Bạn có thể bấm <strong>Quay lại làm tiếp</strong> để rà soát trước khi nộp bài.
                   </span>
                 </div>
               )}
@@ -1865,17 +1948,27 @@ export default function ExamMode({
             <div className="px-6 py-4 bg-slate-50 dark:bg-[#141414] border-t border-[#E5E7EB] dark:border-[#2C2C2C] flex items-center justify-end gap-3">
               <button
                 type="button"
+                disabled={isSubmittingExam}
                 onClick={() => setShowSubmitConfirmModal(false)}
-                className="px-4 py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-700 dark:text-neutral-200 bg-white dark:bg-[#262626] border border-[#CBD5E1] dark:border-[#3A3A3A] hover:bg-slate-100 dark:hover:bg-[#323232] transition"
+                className="px-4 py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-700 dark:text-neutral-200 bg-white dark:bg-[#262626] border border-[#CBD5E1] dark:border-[#3A3A3A] hover:bg-slate-100 dark:hover:bg-[#323232] disabled:opacity-50 transition"
               >
                 Quay lại làm tiếp
               </button>
               <button
                 type="button"
-                onClick={handleFinalExamSubmit}
-                className="px-5 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition"
+                disabled={isSubmittingExam}
+                onClick={async () => {
+                  setIsSubmittingExam(true);
+                  try {
+                    await handleFinalExamSubmit(speakingRecordingsMap);
+                  } finally {
+                    setIsSubmittingExam(false);
+                  }
+                }}
+                className="px-5 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition"
               >
-                <Check className="w-4 h-4" /> Xác nhận Nộp Bài
+                <Check className="w-4 h-4" />
+                <span>{isSubmittingExam ? 'Đang gửi bài cho Ms. Như...' : 'Xác nhận Nộp Bài'}</span>
               </button>
             </div>
           </div>

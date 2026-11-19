@@ -36,7 +36,10 @@ import {
 } from 'lucide-react';
 import { formatVndCurrency } from '../constants/profileCustomization';
 import {
-  ALL_SKILL_OPTIONS,
+  DAILY_LISTENING_SUBCATEGORIES,
+  DAILY_READING_SUBCATEGORIES,
+  DAILY_WRITING_T1_SUBCATEGORIES,
+  DAILY_WRITING_T2_SUBCATEGORIES,
   PRESET_TEST_HASHTAGS,
   formatViDateTime,
   getEffectiveTestHashtags,
@@ -66,7 +69,7 @@ export default function ExamBuilder({
   builderTab,
   classesDb = {},
   currentUser,
-  defaultExamPriceVnd = 15000,
+  defaultExamPriceVnd = 20000,
   editingTest,
   handleAudioFileUpload,
   handleListeningImageUpload,
@@ -327,59 +330,26 @@ Write ONE WORD AND/OR A NUMBER for each answer.
   };
 
   const applyQuickPreset = (presetType) => {
-    const defaultPrice = Math.max(1000, Number(defaultExamPriceVnd) || 15000);
+    const defaultPrice = Math.max(1000, Number(defaultExamPriceVnd) || 20000);
     const currentCfg = normalizeExamConfig(testForm);
     const isSingle = currentCfg.testMode === 'single_skill' && Boolean(currentCfg.focusSkill);
     const isSpeakingSingle = isSingle && currentCfg.focusSkill === 'speaking';
 
     if (presetType === 'real_exam' || presetType === 'official') {
-      const prefix = isSpeakingSingle ? 'SPK' : 'THI';
-      const generatedPass = `${prefix}${Math.floor(1000 + Math.random() * 9000)}`;
       setTestForm(prev => {
-        const sp = normalizeSpeakingSection(prev.speaking);
-        const existingPass = String(prev.examPassword || (isSpeakingSingle ? sp.roomPassword : '') || '').trim();
-        const nextPass = existingPass || generatedPass;
-        const baseTags = normalizeTestHashtags(prev.hashtags || sp.hashtags || []).filter(
-          t => !['#luyệntậptựdo', '#speakingdaily'].includes(t.toLowerCase())
+        const baseTags = normalizeTestHashtags(prev.hashtags || []).filter(
+          t => !['#luyệntậptựdo', '#speakingdaily', '#mocktestđịnhkỳ'].includes(t.toLowerCase())
         );
-        const nextTags = normalizeTestHashtags(['#ThiThật', '#CóPass', '#TeamSắpThi', ...baseTags]);
-
-        if (isSingle) {
-          return {
-            ...prev,
-            visibility: 'public',
-            examPurpose: 'real_exam',
-            priceVnd: 0,
-            examPassword: nextPass,
-            hasExamPassword: true,
-            hashtags: nextTags,
-            maxAttempts: 1,
-            antiCheatEnabled: true,
-            allowViewAnswers: false,
-            ...(isSpeakingSingle
-              ? {
-                  speaking: {
-                    ...sp,
-                    speakingTrack: 'exam_room',
-                    roomPassword: nextPass,
-                    hasRoomPassword: true,
-                    hashtags: nextTags
-                  }
-                }
-              : {})
-          };
-        }
-
+        const nextTags = normalizeTestHashtags(['#ThựcChiến4KỹNăng', '#ThiThật', ...baseTags]);
         return {
           ...prev,
           testMode: 'full_exam',
           focusSkill: null,
-          sectionOrder: prev.sectionOrder?.length === 3 ? prev.sectionOrder : ['listening', 'reading', 'writing'],
+          examCategory: 'real_exam',
+          sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
           visibility: 'public',
           examPurpose: 'real_exam',
-          priceVnd: 0,
-          examPassword: nextPass,
-          hasExamPassword: true,
+          priceVnd: Number(prev.priceVnd) > 0 && Number(prev.priceVnd) < 300000 ? Number(prev.priceVnd) : defaultPrice,
           hashtags: nextTags,
           maxAttempts: 1,
           sequentialMode: true,
@@ -388,32 +358,55 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           allowInternalCopyPaste: false,
           allowViewAnswers: false,
           maxAudioPlays: 1,
-          sectionDurations: { listening: 30, reading: 60, writing: 60 }
+          sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 }
         };
       });
-      showToast?.(
-        isSpeakingSingle
-          ? 'Đã bật chế độ: Đề Thi Thật Speaking (Có mật khẩu phòng thi · Gắn #ThiThật #CóPass · 1 lượt)!'
-          : 'Đã áp dụng chế độ: Thi Thực Chiến (Cấp mật khẩu lớp · Gắn #ThiThật #CóPass · 1 lượt).'
-      );
+      showToast?.('Đã áp dụng: Thực Chiến Thi Thật 4 Kỹ Năng (L·R·W·S · 20.000đ hoặc Combo · 1 lượt · Chờ Ms. Như duyệt điểm).');
+    } else if (presetType === 'periodic_mock') {
+      setTestForm(prev => {
+        const baseTags = normalizeTestHashtags(prev.hashtags || []).filter(
+          t => !['#luyệntậptựdo', '#speakingdaily', '#thựcchiến4kỹnăng'].includes(t.toLowerCase())
+        );
+        const nextTags = normalizeTestHashtags(['#MockTestĐịnhKỳ', '#ThiThật', ...baseTags]);
+        return {
+          ...prev,
+          testMode: 'full_exam',
+          focusSkill: null,
+          examCategory: 'periodic_mock',
+          sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
+          visibility: 'public',
+          examPurpose: 'real_exam',
+          priceVnd: 300000,
+          hashtags: nextTags,
+          maxAttempts: 1,
+          sequentialMode: true,
+          allowEarlyNextSection: true,
+          antiCheatEnabled: true,
+          allowInternalCopyPaste: false,
+          allowViewAnswers: false,
+          maxAudioPlays: 1,
+          sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 }
+        };
+      });
+      showToast?.('Đã áp dụng: Mock Test Định Kỳ Ms. Như (300.000đ · 3 tháng/lần · Full 4 kỹ năng · 1 lượt).');
     } else if (presetType === 'speaking_daily') {
       const todayKey = getVietnamTodayDateKey();
       setTestForm(prev => {
         const sp = normalizeSpeakingSection(prev.speaking);
         const baseTags = normalizeTestHashtags(prev.hashtags || sp.hashtags || []).filter(
-          t => !['#thithật', '#cópass', '#teamsắpthi', '#luyệntậptựdo'].includes(t.toLowerCase())
+          t => !['#thithật', '#cópass', '#teamsắpthi', '#luyệntậptựdo', '#forecast'].includes(t.toLowerCase())
         );
-        const nextTags = normalizeTestHashtags(['#SpeakingDaily', ...baseTags]);
+        const nextTags = normalizeTestHashtags(['#DailySpeaking', ...baseTags]);
         return {
           ...prev,
           testMode: 'single_skill',
           focusSkill: 'speaking',
+          examCategory: 'daily_zone',
+          dailySubCategory: 'speaking_daily',
           sectionOrder: ['speaking'],
           visibility: 'public',
           examPurpose: 'free_practice',
           priceVnd: 0,
-          examPassword: '',
-          hasExamPassword: false,
           hashtags: nextTags,
           maxAttempts: 0,
           antiCheatEnabled: false,
@@ -421,59 +414,86 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           speaking: {
             ...sp,
             speakingTrack: 'daily',
+            isForecast: false,
             dailyDate: sp.dailyDate || todayKey,
             dailyMandatory: true,
-            roomPassword: '',
-            hasRoomPassword: false,
             hashtags: nextTags
           }
         };
       });
-      showToast?.('Đã áp dụng chế độ: Speaking Daily (Bắt buộc mỗi ngày · Gắn #SpeakingDaily · Báo ai chưa làm).');
+      showToast?.('Đã áp dụng: Daily Speaking (Bài nói hàng ngày trong Daily Zone).');
+    } else if (presetType === 'speaking_forecast') {
+      setTestForm(prev => {
+        const sp = normalizeSpeakingSection(prev.speaking);
+        const baseTags = normalizeTestHashtags(prev.hashtags || sp.hashtags || []).filter(
+          t => !['#speakingdaily', '#dailyspeaking'].includes(t.toLowerCase())
+        );
+        const nextTags = normalizeTestHashtags(['#Forecast', '#CayForecastMsNhu', ...baseTags]);
+        return {
+          ...prev,
+          testMode: 'single_skill',
+          focusSkill: 'speaking',
+          examCategory: 'daily_zone',
+          dailySubCategory: 'speaking_forecast',
+          sectionOrder: ['speaking'],
+          visibility: 'public',
+          examPurpose: 'free_practice',
+          priceVnd: 0,
+          hashtags: nextTags,
+          maxAttempts: 0,
+          antiCheatEnabled: false,
+          allowViewAnswers: true,
+          speaking: {
+            ...sp,
+            speakingTrack: 'general',
+            isForecast: true,
+            hashtags: nextTags
+          }
+        };
+      });
+      showToast?.('Đã áp dụng: Cày Forecast Cùng Ms. Như (Daily Zone).');
     } else if (presetType === 'paid_practice') {
       const chosenPrice = Number(testForm.priceVnd) > 0 ? Number(testForm.priceVnd) : defaultPrice;
       setTestForm(prev => ({
         ...prev,
         testMode: 'full_exam',
         focusSkill: null,
-        sectionOrder: prev.sectionOrder?.length === 3 ? prev.sectionOrder : ['listening', 'reading', 'writing'],
+        examCategory: chosenPrice >= 300000 ? 'periodic_mock' : 'real_exam',
+        sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
         visibility: 'public',
-        examPurpose: 'paid_practice',
-        priceVnd: Number(prev.priceVnd) > 0 ? Number(prev.priceVnd) : defaultPrice,
-        examPassword: '',
-        hasExamPassword: false,
-        maxAttempts: 0,
-        sequentialMode: false,
+        examPurpose: 'real_exam',
+        priceVnd: chosenPrice,
+        maxAttempts: 1,
+        sequentialMode: true,
         allowEarlyNextSection: true,
-        antiCheatEnabled: false,
-        allowInternalCopyPaste: true,
-        allowViewAnswers: true,
-        maxAudioPlays: 3,
-        sectionDurations: { listening: 30, reading: 60, writing: 60 }
+        antiCheatEnabled: true,
+        allowInternalCopyPaste: false,
+        allowViewAnswers: false,
+        maxAudioPlays: 1,
+        sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 }
       }));
-      showToast?.(`Đã áp dụng chế độ: Đề Đăng Bán (${formatVndCurrency(chosenPrice)} · Làm nhiều lần).`);
+      showToast?.(`Đã áp dụng: Chi phí test ${formatVndCurrency(chosenPrice)} · Full 4 kỹ năng · 1 lượt.`);
     } else if (presetType === 'free_practice' || presetType === 'practice') {
       setTestForm(prev => {
         const sp = normalizeSpeakingSection(prev.speaking);
         const baseTags = normalizeTestHashtags(prev.hashtags || sp.hashtags || []).filter(
           t => !['#thithật', '#cópass', '#teamsắpthi', '#speakingdaily'].includes(t.toLowerCase())
         );
-        const nextTags = normalizeTestHashtags(['#LuyệnTậpTựDo', ...baseTags]);
+        const nextTags = normalizeTestHashtags(['#DailyZone', ...baseTags]);
         return {
           ...prev,
           visibility: 'public',
+          examCategory: isSingle ? 'daily_zone' : 'real_exam',
           examPurpose: 'free_practice',
           priceVnd: 0,
-          examPassword: '',
-          hasExamPassword: false,
           hashtags: nextTags,
-          maxAttempts: 0,
-          sequentialMode: false,
+          maxAttempts: isSingle ? 0 : 1,
+          sequentialMode: !isSingle,
           allowEarlyNextSection: true,
           antiCheatEnabled: false,
           allowViewAnswers: true,
           maxAudioPlays: 3,
-          sectionDurations: { listening: 20, reading: 30, writing: 30 },
+          sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 },
           ...(isSpeakingSingle
             ? {
                 speaking: {
@@ -763,13 +783,23 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   >
                     <PenTool className="w-4 h-4" /> 4. Phần Writing &amp; Bài Mẫu
                   </button>
+                  <button
+                    onClick={() => setBuilderTab('speaking')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition ${
+                      builderTab === 'speaking'
+                        ? 'bg-rose-600 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Mic className="w-4 h-4" /> 5. Phần Speaking ({getSpeakingQuestionItems(testForm.speaking, 'all').length} câu)
+                  </button>
                 </>
               )}
             </div>
 
             {isSingleSkill && (
               <span className="px-3 py-1 rounded-xl bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] text-xs font-extrabold mr-1">
-                Chế độ: Bài Tập {currentCfg.focusSkill === 'speaking' ? 'Speaking AI' : currentCfg.focusSkill.toUpperCase()}
+                Daily Zone: {currentCfg.focusSkill === 'writing' ? (currentCfg.writingTaskScope === 'task1' ? 'WRITING TASK 1 (W1)' : currentCfg.writingTaskScope === 'task2' ? 'WRITING TASK 2 (W2)' : 'WRITING') : currentCfg.focusSkill.toUpperCase()}
               </span>
             )}
           </div>
@@ -795,15 +825,15 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 
         return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm">
-          {/* Exam Structure Mode Switcher: Full Mock Exam vs Single Skill Exercise */}
+          {/* Exam Structure Mode Switcher: Full 4-Skill Mock Exam vs Daily Zone Exercises */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#EDFFFD] dark:bg-indigo-950/25 border border-[#007A7A]/25 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-xs sm:text-sm font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
-                  Loại Nội Dung: Đề Thi IELTS (L·R·W) vs Bài Tập Từng Kỹ Năng Riêng
-                </h3>
+                <h2 className="text-xs sm:text-sm font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
+                  Loại Nội Dung: Đề Thi IELTS Full 4 Kỹ Năng (L·R·W·S) vs Bài Tập Daily Zone (Từng Team)
+                </h2>
                 <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                  Chọn <b>Đề Thi IELTS</b> để thi đủ Listening → Reading → Writing liên hoàn, hoặc chọn <b>Bài Tập Kỹ Năng</b> (Speaking AI / Listening / Reading / Writing) để xếp riêng vào Kho Bài Tập 4 Kỹ Năng.
+                  Chọn <b>Đề Thi Full 4 Kỹ Năng</b> cho Thực Chiến Thi Thật (20.000đ / Combo) &amp; Mock Test Định Kỳ (300.000đ), hoặc chọn từng kỹ năng (tách riêng <b>Writing Task 1</b> và <b>Writing Task 2</b>) cho <b>Daily Zone</b>.
                 </p>
               </div>
             </div>
@@ -815,7 +845,11 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     ...prev,
                     testMode: 'full_exam',
                     focusSkill: null,
-                    sectionOrder: ['listening', 'reading', 'writing'],
+                    examCategory: prev.examCategory === 'periodic_mock' ? 'periodic_mock' : 'real_exam',
+                    writingTaskScope: 'both',
+                    sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
+                    sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 },
+                    maxAttempts: 1,
                     sequentialMode: true
                   }))
                 }
@@ -825,27 +859,38 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                 }`}
               >
-                🎓 Đề Thi IELTS (L · R · W)
+                🏛️ Đề Thi IELTS Full 4 Kỹ Năng (L·R·W·S)
               </button>
-              {ALL_SKILL_OPTIONS.map(sk => {
-                const isActiveSk = cfg.testMode === 'single_skill' && cfg.focusSkill === sk;
-                const skLabel = { listening: '🎧 Bài Tập Listening', reading: '📖 Bài Tập Reading', writing: '✍️ Bài Tập Writing', speaking: '🎙️ Bài Tập Speaking AI' }[sk];
+              {[
+                { key: 'listening', skill: 'listening', scope: 'both', defaultSub: 'listening_shw', label: '🎧 Daily Listening' },
+                { key: 'reading', skill: 'reading', scope: 'both', defaultSub: 'shw_1', label: '📖 Daily Reading (SHW 1–14)' },
+                { key: 'writing_t1', skill: 'writing', scope: 'task1', defaultSub: 'w1_map', label: '✍️ Daily Writing Task 1 (W1)' },
+                { key: 'writing_t2', skill: 'writing', scope: 'task2', defaultSub: 'w2_essay', label: '📝 Daily Writing Task 2 (W2)' },
+                { key: 'speaking', skill: 'speaking', scope: 'both', defaultSub: 'speaking_daily', label: '🎙️ Daily Speaking / Forecast' }
+              ].map(item => {
+                const isActiveSk =
+                  cfg.testMode === 'single_skill' &&
+                  cfg.focusSkill === item.skill &&
+                  (item.skill !== 'writing' || cfg.writingTaskScope === item.scope);
                 return (
                   <button
-                    key={sk}
+                    key={item.key}
                     type="button"
-                      onClick={() =>
+                    onClick={() =>
                       setTestForm(prev => ({
                         ...prev,
                         testMode: 'single_skill',
-                        focusSkill: sk,
-                        sectionOrder: [sk],
+                        focusSkill: item.skill,
+                        examCategory: 'daily_zone',
+                        writingTaskScope: item.scope,
+                        dailySubCategory: item.defaultSub,
+                        sectionOrder: [item.skill],
                         sequentialMode: false,
                         examPurpose: 'free_practice',
                         priceVnd: 0,
-                        examPassword: '',
-                        autoAiGrade: sk === 'speaking' ? true : prev.autoAiGrade,
-                        ...(!editingTest ? { maxAttempts: 0, allowViewAnswers: true, antiCheatEnabled: false } : {})
+                        maxAttempts: 0,
+                        allowViewAnswers: true,
+                        antiCheatEnabled: false
                       }))
                     }
                     className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition ${
@@ -854,25 +899,124 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
                     }`}
                   >
-                    {skLabel}
+                    {item.label}
                   </button>
                 );
               })}
             </div>
+
+            {/* Daily Zone Sub-Category Selector (Reading SHW 1-14 / Listening 3 mục / Writing W1 4 dạng / W2 / Speaking 2 mục) */}
+            {cfg.testMode === 'single_skill' && (
+              <div className="pt-3 border-t border-[#007A7A]/20 space-y-2">
+                <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200">
+                  Phân Mục Hiển Thị Trong Daily Zone:
+                </p>
+                {cfg.focusSkill === 'reading' && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {DAILY_READING_SUBCATEGORIES.map(sub => (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setTestForm(prev => ({ ...prev, dailySubCategory: sub.id }))}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+                          cfg.dailySubCategory === sub.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {cfg.focusSkill === 'listening' && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {DAILY_LISTENING_SUBCATEGORIES.map(sub => (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setTestForm(prev => ({ ...prev, dailySubCategory: sub.id }))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                          cfg.dailySubCategory === sub.id
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {cfg.focusSkill === 'writing' && cfg.writingTaskScope === 'task1' && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {DAILY_WRITING_T1_SUBCATEGORIES.map(sub => (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setTestForm(prev => ({ ...prev, dailySubCategory: sub.id, writingTaskScope: 'task1' }))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                          cfg.dailySubCategory === sub.id
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        W1 · {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {cfg.focusSkill === 'writing' && cfg.writingTaskScope === 'task2' && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {DAILY_WRITING_T2_SUBCATEGORIES.map(sub => (
+                      <span
+                        key={sub.id}
+                        className="px-3 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-600 text-white"
+                      >
+                        {sub.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {cfg.focusSkill === 'speaking' && (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyQuickPreset('speaking_daily')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition ${
+                        !normalizeSpeakingSection(testForm.speaking).isForecast
+                          ? 'bg-orange-600 text-white border-orange-600'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      🔥 1. Daily Speaking
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyQuickPreset('speaking_forecast')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition ${
+                        normalizeSpeakingSection(testForm.speaking).isForecast
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      🌟 2. Cày Forecast Cùng Ms. Như
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {/* 1-Click Quick Configuration Presets for Non-Tech Users */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#EDFFFD]/80 dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-500/30 space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-xs sm:text-sm font-extrabold text-[#007A7A] dark:text-[#1EE1D6] flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4" /> Chia Sẵn Chế Độ Đề Thi (1 Chạm - Đỡ Rối Khi Tạo)
-                </h3>
+                <h2 className="text-xs sm:text-sm font-extrabold text-[#007A7A] dark:text-[#1EE1D6] flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" /> Chia Sẵn Chế Độ Đề Thi (1 Chạm)
+                </h2>
                 <p className="text-xs text-[#314158] dark:text-slate-300 mt-0.5">
-                  {cfg.testMode === 'single_skill' && cfg.focusSkill === 'speaking'
-                    ? 'Chọn nhanh Đề Thi Thật Speaking (có mật khẩu & hashtag #ThiThật #CóPass), Speaking Daily mỗi ngày hoặc Luyện Tập Tự Do:'
-                    : cfg.testMode === 'single_skill'
-                    ? 'Chọn Đề Thi Thật (có mật khẩu & giới hạn 1 lượt), Mở Luyện Tập Tự Do (miễn phí) hoặc Lưu Nháp:'
-                    : 'Chỉ cần nhấn 1 nút phù hợp: Thi Thực Chiến (có pass lớp, không quay lại kỹ năng cũ) hoặc Đề Đăng Bán (làm nhiều lần):'}
+                  {cfg.testMode === 'single_skill'
+                    ? 'Bài tập Daily Zone luôn cho làm lại nhiều lần, miễn phí và có thể đặt Mật khẩu Team riêng cho từng lớp:'
+                    : 'Chọn Thực Chiến Thi Thật (Full 4 kỹ năng · 20.000đ hoặc Combo · 1 lượt) hoặc Mock Test Định Kỳ (300.000đ · 3 tháng/lần · 1 lượt):'}
                 </p>
               </div>
             </div>
@@ -892,17 +1036,15 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               const activePurpose =
                 testForm.visibility === 'private'
                   ? 'draft'
-                  : isSpeakingSingle && sp.speakingTrack === 'daily'
-                  ? 'speaking_daily'
-                  : isSpeakingSingle && (sp.speakingTrack === 'exam_room' || hasPass || testForm.examPurpose === 'real_exam')
+                  : !isSingle && (cfg.examCategory === 'periodic_mock' || Number(testForm.priceVnd || 0) >= 300000)
+                  ? 'periodic_mock'
+                  : !isSingle
                   ? 'real_exam'
-                  : testForm.examPurpose ||
-                    (Number(testForm.priceVnd || 0) > 0 && !isSingle
-                      ? 'paid_practice'
-                      : hasPass || (cfg.maxAttempts === 1 && (cfg.sequentialMode || isSingle))
-                      ? 'real_exam'
-                      : 'free_practice');
-              const suggestedSalePrice = Number(testForm.priceVnd) > 0 ? Number(testForm.priceVnd) : (Number(defaultExamPriceVnd) || 15000);
+                  : isSpeakingSingle && sp.isForecast
+                  ? 'speaking_forecast'
+                  : isSpeakingSingle
+                  ? 'speaking_daily'
+                  : 'free_practice';
               const effectiveTags = getEffectiveTestHashtags(testForm);
               const rawTagsList = normalizeTestHashtags(testForm.hashtags || sp.hashtags || []);
 
@@ -912,14 +1054,12 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   const prevSp = normalizeSpeakingSection(prev.speaking);
                   return {
                     ...prev,
-                    examPurpose: 'real_exam',
                     examPassword: cleanVal,
                     hasExamPassword: Boolean(cleanVal.trim()),
                     ...(isSpeakingSingle
                       ? {
                           speaking: {
                             ...prevSp,
-                            speakingTrack: 'exam_room',
                             roomPassword: cleanVal,
                             hasRoomPassword: Boolean(cleanVal.trim())
                           }
@@ -952,59 +1092,42 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               return (
                 <>
                   {isSingle ? (
-                    <div className={`grid grid-cols-1 sm:grid-cols-2 ${isSpeakingSingle ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2.5`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                       <button
                         type="button"
-                        onClick={() => applyQuickPreset('real_exam')}
+                        onClick={() => applyQuickPreset(isSpeakingSingle ? 'speaking_daily' : 'free_practice')}
                         className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
-                          activePurpose === 'real_exam'
-                            ? 'border-indigo-500 ring-2 ring-indigo-500/25'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-indigo-500'
+                          activePurpose !== 'draft' && activePurpose !== 'speaking_forecast'
+                            ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-emerald-500'
                         }`}
                       >
-                        <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
-                          🏛️ {isSpeakingSingle ? 'Đề Thi Thật Speaking (Có Pass)' : 'Đề Thi Thật (Có Pass · 1 Lượt)'}
+                        <div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                          🌐 {isSpeakingSingle ? 'Daily Speaking (Mở Daily Zone)' : 'Mở Công Khai Daily Zone (Làm Nhiều Lần)'}
                         </div>
                         <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
-                          Cấp mật khẩu phòng thi · Tự gắn <b>#ThiThật #CóPass</b> bên học sinh · 1 lượt làm
+                          Miễn phí · Làm lại không giới hạn · Có thể đặt mật khẩu riêng cho từng Team bên dưới
                         </p>
                       </button>
 
                       {isSpeakingSingle && (
                         <button
                           type="button"
-                          onClick={() => applyQuickPreset('speaking_daily')}
+                          onClick={() => applyQuickPreset('speaking_forecast')}
                           className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
-                            activePurpose === 'speaking_daily'
-                              ? 'border-orange-500 ring-2 ring-orange-500/25'
-                              : 'border-slate-200 dark:border-slate-700 hover:border-orange-500'
+                            activePurpose === 'speaking_forecast'
+                              ? 'border-teal-500 ring-2 ring-teal-500/25'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-teal-500'
                           }`}
                         >
-                          <div className="text-xs font-extrabold text-orange-600 dark:text-orange-400">
-                            🔥 Speaking Daily (Mỗi Ngày)
+                          <div className="text-xs font-extrabold text-teal-700 dark:text-teal-300">
+                            🌟 Cày Forecast Cùng Ms. Như
                           </div>
                           <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
-                            Bài nói bắt buộc hàng ngày · Gắn <b>#SpeakingDaily</b> · Báo ai chưa làm
+                            Xếp vào kho Forecast Speaking của Ms. Như trong Daily Zone
                           </p>
                         </button>
                       )}
-
-                      <button
-                        type="button"
-                        onClick={() => applyQuickPreset('free_practice')}
-                        className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
-                          activePurpose === 'free_practice'
-                            ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-emerald-500'
-                        }`}
-                      >
-                        <div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
-                          🌐 {isSpeakingSingle ? 'Luyện Tập Tự Do / Forecast' : 'Mở Công Khai (Luyện Tự Do)'}
-                        </div>
-                        <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
-                          Không khóa mật khẩu · Gắn <b>#LuyệnTậpTựDo</b> · Làm miễn phí nhiều lần
-                        </p>
-                      </button>
 
                       <button
                         type="button"
@@ -1022,51 +1145,38 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       </button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       <button
                         type="button"
                         onClick={() => applyQuickPreset('real_exam')}
                         className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
                           activePurpose === 'real_exam'
-                            ? 'border-indigo-500 ring-2 ring-indigo-500/25'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-indigo-500'
-                        }`}
-                      >
-                        <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">🏛️ Thi Thực Chiến (Thi Thật)</div>
-                        <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
-                          Tạo mật khẩu gửi lớp · 1 lượt · Tuần tự &amp; không quay lại kỹ năng cũ
-                        </p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => applyQuickPreset('paid_practice')}
-                        className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
-                          activePurpose === 'paid_practice'
-                            ? 'border-amber-500 ring-2 ring-amber-500/25'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-amber-500'
-                        }`}
-                      >
-                        <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                          <ShoppingBag className="w-3.5 h-3.5" /> Đề Đăng Bán ({formatVndCurrency(suggestedSalePrice)})
-                        </div>
-                        <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
-                          Mở bán đề 3 kỹ năng · Học sinh mua xong được làm lại nhiều lần
-                        </p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => applyQuickPreset('free_practice')}
-                        className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
-                          activePurpose === 'free_practice'
                             ? 'border-[#007A7A] ring-2 ring-teal-500/25'
                             : 'border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
                         }`}
                       >
-                        <div className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">📖 Luyện Tập Miễn Phí</div>
+                        <div className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
+                          🏛️ Thực Chiến Thi Thật (20.000đ · 1 Lượt)
+                        </div>
                         <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
-                          Công khai 0đ · Làm nhiều lần · Tự do đổi phần &amp; xem đáp án
+                          Full 4 kỹ năng L·R·W·S liên hoàn · Áp dụng Combo 3/5/10 đề · Chờ Ms. Như duyệt điểm
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applyQuickPreset('periodic_mock')}
+                        className={`text-left p-3 rounded-xl bg-white dark:bg-slate-900 border transition shadow-xs ${
+                          activePurpose === 'periodic_mock'
+                            ? 'border-amber-500 ring-2 ring-amber-500/25'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-amber-500'
+                        }`}
+                      >
+                        <div className="text-xs font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                          <ShoppingBag className="w-3.5 h-3.5" /> Mock Test Định Kỳ (300.000đ)
+                        </div>
+                        <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
+                          Kỳ thi định kỳ 3 tháng/lần của Ms. Như · Full 4 kỹ năng · 1 lượt duy nhất
                         </p>
                       </button>
 
@@ -1087,72 +1197,65 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     </div>
                   )}
 
-                  {/* Contextual Inline Strip for Real Exam Password (works for Full Exam, Speaking AI & Single-Skill) */}
-                  {(activePurpose === 'real_exam' || hasPass) && (
-                    <div className="p-3.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/35 border border-indigo-200 dark:border-indigo-700/50 space-y-2.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
-                            {isSpeakingSingle
-                              ? 'Mật Khẩu Phòng Thi Thực Chiến Speaking (Gửi Cho Học Sinh Trước Khi Thi)'
-                              : 'Mật Khẩu Phòng Thi Thực Chiến (Gửi cho lớp trước khi thi)'}
-                          </span>
-                        </div>
-                        {hasPass && (
-                          <button
-                            type="button"
-                            onClick={handleClearUnifiedPassword}
-                            className="text-xs font-bold text-slate-500 hover:text-rose-600 underline"
-                          >
-                            Bỏ mật khẩu
-                          </button>
-                        )}
+                  {/* Unified Password Strip (Team Pass for Daily Zone OR Class Pass for Full Exam) */}
+                  <div className="p-3.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/35 border border-indigo-200 dark:border-indigo-700/50 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
+                          {isSingle
+                            ? 'Mật Khẩu Team / Lớp (Tùy chọn - Để trống nếu mở chung)'
+                            : 'Mật Khẩu Phòng Thi Thực Chiến (Tùy chọn - Gửi cho lớp trước khi thi)'}
+                        </span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="text"
-                          value={currentPass}
-                          onChange={e => handleChangeUnifiedPassword(e.target.value)}
-                          placeholder={
-                            hasPass && !currentPass
-                              ? 'Đang có mật khẩu cũ - nhập mã mới nếu muốn đổi'
-                              : isSpeakingSingle
-                              ? 'VD: SPK2026 hoặc SPEAKING80'
-                              : 'VD: THI2026 hoặc IELTS80'
-                          }
-                          className="flex-1 min-w-[200px] px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-xs font-extrabold tracking-wider text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                        />
+                      {hasPass && (
+                        <button
+                          type="button"
+                          onClick={handleClearUnifiedPassword}
+                          className="text-xs font-bold text-slate-500 hover:text-rose-600 underline"
+                        >
+                          Bỏ mật khẩu
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={currentPass}
+                        onChange={e => handleChangeUnifiedPassword(e.target.value)}
+                        placeholder={
+                          hasPass && !currentPass
+                            ? 'Đang có mật khẩu cũ - nhập mã mới nếu muốn đổi'
+                            : isSingle
+                            ? 'VD: TEAM65, TEAM70 hoặc để trống'
+                            : 'VD: THI2026 hoặc để trống'
+                        }
+                        className="flex-1 min-w-[200px] px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-xs font-extrabold tracking-wider text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prefix = isSingle ? 'TEAM' : 'THI';
+                          handleChangeUnifiedPassword(`${prefix}${Math.floor(1000 + Math.random() * 9000)}`);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Tạo Pass Mới
+                      </button>
+                      {Boolean(currentPass) && (
                         <button
                           type="button"
                           onClick={() => {
-                            const prefix = isSpeakingSingle ? 'SPK' : 'THI';
-                            handleChangeUnifiedPassword(`${prefix}${Math.floor(1000 + Math.random() * 9000)}`);
+                            navigator.clipboard?.writeText(currentPass);
+                            showToast?.(`Đã sao chép mật khẩu: ${currentPass}`);
                           }}
-                          className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition"
+                          className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-50 transition"
                         >
-                          <RefreshCw className="w-3.5 h-3.5" /> Tạo Pass Mới
+                          <Copy className="w-3.5 h-3.5" /> Copy Pass
                         </button>
-                        {Boolean(currentPass) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard?.writeText(currentPass);
-                              showToast?.(`Đã sao chép mật khẩu phòng thi: ${currentPass}`);
-                            }}
-                            className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-50 transition"
-                          >
-                            <Copy className="w-3.5 h-3.5" /> Copy Pass
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-xs text-indigo-800/80 dark:text-indigo-300/80">
-                        {isSpeakingSingle
-                          ? 'Học sinh sẽ thấy rõ nhãn #ThiThật #CóPass bên ngoài thẻ đề và bắt buộc nhập đúng mật khẩu này mới vào được Phòng Thi Thực Chiến Speaking.'
-                          : 'Học sinh phải nhập đúng mật khẩu này mới vào phòng thi thật; khi thi tuần tự đã kích hoạt, chuyển sang kỹ năng mới sẽ không quay lại kỹ năng cũ được.'}
-                      </p>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Contextual Inline Strip for Speaking Daily */}
                   {isSpeakingSingle && activePurpose === 'speaking_daily' && (
@@ -1200,13 +1303,13 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     </div>
                   )}
 
-                  {!isSingle && (activePurpose === 'paid_practice' || Number(testForm.priceVnd || 0) > 0) && (
+                  {!isSingle && (
                     <div className="p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 space-y-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <ShoppingBag className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                           <span className="text-xs font-extrabold text-amber-900 dark:text-amber-200">
-                            Giá Bán Đề Thi Luyện 3 Kỹ Năng (Học viên mua xong làm nhiều lần)
+                            Chi Phí Test Full 4 Kỹ Năng (Mỗi Đề Chỉ Làm 1 Lượt Duy Nhất)
                           </span>
                         </div>
                         <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
@@ -1214,18 +1317,23 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        {[15000, 20000, 30000, 50000, 0].map(presetPrice => {
-                          const isSelected = Number(testForm.priceVnd || 0) === presetPrice;
+                        {[
+                          { v: 20000, label: 'Thực chiến (20.000đ)' },
+                          { v: 300000, label: 'Mock Test Định Kỳ (300.000đ)' },
+                          { v: 0, label: 'Miễn phí (0đ)' }
+                        ].map(preset => {
+                          const isSelected = Number(testForm.priceVnd || 0) === preset.v;
                           return (
                             <button
-                              key={presetPrice}
+                              key={preset.v}
                               type="button"
                               onClick={() =>
                                 setTestForm(prev => ({
                                   ...prev,
-                                  priceVnd: presetPrice,
-                                  examPurpose: presetPrice > 0 ? 'paid_practice' : 'free_practice',
-                                  maxAttempts: 0
+                                  priceVnd: preset.v,
+                                  examCategory: preset.v >= 300000 ? 'periodic_mock' : 'real_exam',
+                                  examPurpose: 'real_exam',
+                                  maxAttempts: 1
                                 }))
                               }
                               className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition ${
@@ -1234,7 +1342,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                                   : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-amber-200 dark:border-amber-700/50 hover:border-amber-500'
                               }`}
                             >
-                              {presetPrice === 0 ? 'Miễn phí 0đ' : formatVndCurrency(presetPrice)}
+                              {preset.label}
                             </button>
                           );
                         })}
@@ -2513,10 +2621,14 @@ Write ONE WORD AND/OR A NUMBER for each answer.
       })()}
 
       {/* TAB 4: WRITING BUILDER (PROMPTS, CHART IMAGE & MODEL ANSWERS) */}
-      {builderTab === 'writing' && (
+      {builderTab === 'writing' && (() => {
+        const wCfg = normalizeExamConfig(testForm);
+        const wScope = wCfg.writingTaskScope || 'both';
+        return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-8 shadow-sm">
           {/* Task 1 */}
-          <div className="space-y-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+          {wScope !== 'task2' && (
+          <div className={`space-y-4 ${wScope === 'both' ? 'pb-6 border-b border-slate-200 dark:border-slate-800' : ''}`}>
             <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
               <PenTool className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Writing Academic Task 1 ( Tối thiểu 150 từ )
             </h3>
@@ -2599,8 +2711,10 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               />
             </div>
           </div>
+          )}
 
           {/* Task 2 */}
+          {wScope !== 'task1' && (
           <div className="space-y-4">
             <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
               <PenTool className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Writing Academic Task 2 ( Tối thiểu 250 từ )
@@ -2639,8 +2753,10 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               />
             </div>
           </div>
+          )}
         </div>
-      )}
+        );
+      })()}
       {/* TAB 5: SPEAKING AI BUILDER (PART 1, PART 2 CUE CARD, PART 3) */}
       {builderTab === 'speaking' && (
         <SpeakingBuilderPanel

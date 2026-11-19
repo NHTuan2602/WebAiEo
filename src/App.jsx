@@ -7,6 +7,7 @@ import {
   canCreateFriendRoomNow,
   evaluateTitleUnlockNotification,
   getFriendRoomTicketCredits,
+  getRealExamCredits,
   getTestPurchasePriceVnd,
   hasActiveAieoVip,
   hasTestPurchaseAccess,
@@ -70,7 +71,7 @@ import {
   callGeminiWritingGrader,
   simulateAIWritingGrading
 } from './utils/geminiGrader';
-import { requestAiSpeakingGrading, requestAiWritingGrading, verifyExamRoomPassword } from './utils/speakingApi';
+import { requestAiSpeakingGrading, requestAiWritingGrading, uploadSpeakingRecording, verifyExamRoomPassword } from './utils/speakingApi';
 import { KeyRound, Lock, X } from 'lucide-react';
 import { roundSpeakingBand } from './utils/speakingAiEngine';
 import { speakWord, playSound } from './utils/mediaHelpers';
@@ -715,11 +716,13 @@ export default function App() {
     const targetName = usersDb[targetUsername]?.name || targetUsername;
     const planLabel =
       planType === 'aieo_vip'
-        ? 'Gói Ai eo VIP (1 Tháng)'
+        ? 'Gói IELTS VIP (1 Tháng)'
+        : planType === 'real_exam_credit'
+        ? '+1 Lượt Thực Chiến Thi Thật'
         : planType === 'room_ticket'
         ? 'Vé Tạo 1 Phòng Đấu Riêng (5k)'
         : planType === 'test'
-        ? 'quyền làm Đề Thi 3 Kỹ Năng'
+        ? 'quyền thi Đề Thực Chiến 4 Kỹ Năng'
         : 'quyền mở gói tháng';
     showToast(
       unlocked
@@ -735,11 +738,11 @@ export default function App() {
     const itemType = opts.itemType || 'aieo_vip';
     const defaultLabel =
       itemType === 'aieo_vip'
-        ? 'Gói Ai eo VIP Full Quyền (1 Tháng)'
+        ? 'Gói IELTS VIP Full Quyền (1 Tháng)'
         : itemType === 'room_ticket'
         ? 'Vé Tạo 1 Phòng Đấu Riêng (5k/lần)'
         : itemType === 'test'
-        ? 'Mở Khóa Đề Thi IELTS (3 Kỹ Năng)'
+        ? 'Chi Phí Test Thực Chiến IELTS (4 Kỹ Năng)'
         : 'Ảnh Nền Riêng (1 Tháng)';
     const defaultPrice =
       itemType === 'aieo_vip'
@@ -3763,7 +3766,13 @@ export default function App() {
     if (currentUser?.role !== 'teacher' && cfg.testMode !== 'single_skill') {
       const testPrice = getTestPurchasePriceVnd(test, paymentConfig);
       if (testPrice > 0 && !hasTestPurchaseAccess(currentUser, test)) {
-        showToast(`Đề thi "${test.title}" cần mở khóa trước khi làm (mua 1 lần được làm lại nhiều lượt)!`, 'info');
+        const isPeriodicMock = cfg.examCategory === 'periodic_mock' || testPrice >= 300000;
+        showToast(
+          isPeriodicMock
+            ? `Mock Test Định Kỳ "${test.title}" có chi phí test ${testPrice.toLocaleString('vi-VN')}đ (1 lượt thi thật).`
+            : `Đề Thực Chiến "${test.title}" có chi phí test ${testPrice.toLocaleString('vi-VN')}đ (1 lượt thi thật 4 kỹ năng - hoặc mua Combo 3/5/10 đề tiết kiệm hơn!).`,
+          'info'
+        );
         openGlobalCheckoutModal({
           itemType: 'test',
           itemId: test.id,
@@ -3774,12 +3783,13 @@ export default function App() {
       }
     }
 
-    if (currentUser?.role !== 'teacher' && cfg.maxAttempts > 0) {
+    const effectiveMaxAttempts = cfg.testMode !== 'single_skill' ? (cfg.maxAttempts > 0 ? cfg.maxAttempts : 1) : cfg.maxAttempts;
+    if (currentUser?.role !== 'teacher' && effectiveMaxAttempts > 0) {
       const usedCount = attempts.filter(
         a => (a.studentId === currentUser?.username || a.studentUsername === currentUser?.username) && a.testId === testId
       ).length;
-      if (usedCount >= cfg.maxAttempts) {
-        showToast(`Bạn đã dùng hết ${cfg.maxAttempts} lượt làm đề thi này!`);
+      if (usedCount >= effectiveMaxAttempts) {
+        showToast(`Đề thi thật chỉ được làm tối đa ${effectiveMaxAttempts} lượt - bạn đã hoàn thành lượt thi này!`);
         return;
       }
     }
@@ -3963,7 +3973,7 @@ export default function App() {
     }
   };
 
-  const handleFinalExamSubmit = () => {
+  const handleFinalExamSubmit = async (speakingRecordingsMap = null) => {
     if (examSubmitLockRef.current) return;
     stopExamAudio();
     setShowSubmitConfirmModal(false);
@@ -4009,12 +4019,49 @@ export default function App() {
       ? Math.max(1, Math.round((submittedAtMs - dueAtMs) / 60_000))
       : 0;
 
+    const attemptId = createUniqueAttemptId('att', currentUser?.username);
+
+    // Upload any integrated Section 4 Speaking recordings cleanly before persisting attempt
+    const uploadedSpeakingRecordings = [];
+    if (speakingRecordingsMap && typeof speakingRecordingsMap === 'object') {
+      const entries = Object.values(speakingRecordingsMap).filter(Boolean);
+      for (const rec of entries) {
+        let finalAudioUrl = rec.audioUrl || '';
+        if (!finalAudioUrl && rec.blob) {
+          try {
+            const up = await uploadSpeakingRecording({
+              blob: rec.blob,
+              audioId: `sp4_${attemptId}_${rec.questionId || 'q'}`,
+              mimeType: rec.blob.type || 'audio/webm',
+              username: currentUser?.username || 'student',
+              attemptId,
+              questionId: rec.questionId || ''
+            });
+            if (up?.audioUrl) finalAudioUrl = up.audioUrl;
+          } catch (uploadErr) {
+            console.warn('Upload integrated speaking audio skipped:', uploadErr?.message || uploadErr);
+          }
+        }
+        uploadedSpeakingRecordings.push({
+          questionId: String(rec.questionId || ''),
+          part: Number(rec.part) || 1,
+          prompt: String(rec.prompt || ''),
+          audioUrl: finalAudioUrl,
+          transcript: String(rec.transcript || ''),
+          durationSec: Math.max(0, Math.round(Number(rec.durationSec) || 0))
+        });
+      }
+    }
+
     const newAttempt = {
-      id: createUniqueAttemptId('att', currentUser?.username),
+      id: attemptId,
       testId: activeTest.id,
       testTitle: activeTest.title,
       testMode: cfg.testMode,
       focusSkill: cfg.focusSkill,
+      examCategory: cfg.examCategory,
+      dailySubCategory: cfg.dailySubCategory,
+      writingTaskScope: cfg.writingTaskScope,
       examUnlockToken: examUnlockTokens[activeTest.id] || undefined,
       studentId: currentUser?.username || 'std_guest',
       studentName: currentUser?.name || 'Học sinh',
@@ -4026,6 +4073,7 @@ export default function App() {
       timelinessStatus,
       lateByMinutes,
       answers: examState.answers,
+      ...(uploadedSpeakingRecordings.length > 0 ? { speakingRecordings: uploadedSpeakingRecordings } : {}),
       antiCheatLogs: examState.antiCheatLogs,
       tabSwitchCount: examState.tabSwitchCount,
       teacherGraded: isSingleObjective,
@@ -4041,7 +4089,8 @@ export default function App() {
           total: rQuestions.length,
           band: cfg.testMode === 'single_skill' && cfg.focusSkill !== 'reading' ? null : rBand
         },
-        writing: { task1Band: null, task2Band: null, overallBand: null }
+        writing: { task1Band: null, task2Band: null, overallBand: null },
+        speaking: { band: null, criteria: {} }
       },
       overallBand: isSingleObjective ? singleObjectiveBand : null,
       teacherFeedback: ''
@@ -4063,52 +4112,52 @@ export default function App() {
     }
     setView('RESULT_VIEW');
 
-    const includesWriting = cfg.testMode !== 'single_skill' || cfg.focusSkill === 'writing';
-    const hasWrittenContent = getWordCount(examState.answers?.w1) > 0 || getWordCount(examState.answers?.w2) > 0;
-    if (includesWriting && hasWrittenContent) {
-      (async () => {
-        setIsGradingAI(true);
-        setAiGradingStep('AI Examiner đang bắt lỗi chính tả, ngữ pháp, tư duy đề & nâng cấp từ vựng Writing...');
-        try {
-          const { evaluation, attempt: serverUpdated } = await requestAiWritingGrading({
-            attemptId: newAttempt.id,
-            task1Prompt: activeTest?.writing?.task1?.prompt || '',
-            task1Text: newAttempt.answers?.w1 || '',
-            task2Prompt: activeTest?.writing?.task2?.prompt || '',
-            task2Text: newAttempt.answers?.w2 || '',
-            clientApiKey: currentUser?.role === 'teacher' ? (aiApiKey || '').trim() : ''
-          });
+    if (isSingleObjective) {
+      showToast('Đã nộp bài Daily Zone! Xem ngay số câu đúng, thời gian và số lần làm bài.');
+    } else {
+      showToast('Đã nộp bài thành công! Ms. Như đang check và sẽ duyệt trả điểm chính thức.');
+    }
+  };
 
-          if (serverUpdated && serverUpdated.id === newAttempt.id) {
-            setAttempts(prev => prev.map(att => (att.id === newAttempt.id ? serverUpdated : att)));
-          } else if (evaluation) {
-            const t1 = roundDownIeltsHalfBand(evaluation.task1Band ?? 0);
-            const t2 = roundDownIeltsHalfBand(evaluation.task2Band ?? 0);
-            const wtOverall = calculateWritingBand(t1, t2);
-            const finalOverall = computeAttemptFinalOverall(newAttempt.scores, wtOverall, newAttempt);
-            const enrichedAttempt = {
-              ...newAttempt,
-              aiGraded: true,
-              aiDetails: evaluation,
-              aiWritingTicket: evaluation.aiWritingTicket || undefined,
-              scores: {
-                ...newAttempt.scores,
-                writing: { task1Band: t1, task2Band: t2, overallBand: wtOverall }
-              },
-              overallBand: finalOverall,
-              teacherFeedback: evaluation.feedback || ''
-            };
-            setAttempts(prev => prev.map(att => (att.id === newAttempt.id ? enrichedAttempt : att)));
-            dispatchSyncAction('UPSERT_ATTEMPT', { attempt: enrichedAttempt });
+  const handleRedeemRealExamCredit = async (testId) => {
+    const cleanId = String(testId || '').trim();
+    if (!cleanId || !currentUser?.username) return false;
+    const credits = getRealExamCredits(currentUser);
+    if (credits < 1) {
+      showToast('Bạn chưa còn lượt Combo Thực Chiến nào. Hãy chọn mua Combo 3/5/10 đề nhé!', 'info');
+      return false;
+    }
+    const targetTest = tests.find(t => t.id === cleanId);
+    if (!targetTest) return false;
+    try {
+      await dispatchSyncAction('REDEEM_REAL_EXAM_CREDIT', { testId: cleanId });
+      setUsersDb(prev => {
+        const u = prev[currentUser.username];
+        if (!u) return prev;
+        const prevPurchased = Array.isArray(u.purchasedTestIds) ? u.purchasedTestIds : [];
+        return {
+          ...prev,
+          [currentUser.username]: {
+            ...u,
+            realExamCredits: Math.max(0, getRealExamCredits(u) - 1),
+            purchasedTestIds: Array.from(new Set([...prevPurchased, cleanId]))
           }
-          showToast('Đã hoàn tất bắt lỗi chính tả, ngữ pháp & gợi ý nâng band Writing!');
-        } catch (err) {
-          console.warn('Auto post-submit writing analysis skipped:', err?.message || err);
-        } finally {
-          setIsGradingAI(false);
-          setAiGradingStep('');
-        }
-      })();
+        };
+      });
+      setCurrentUser(prev => {
+        if (!prev) return prev;
+        const prevPurchased = Array.isArray(prev.purchasedTestIds) ? prev.purchasedTestIds : [];
+        return {
+          ...prev,
+          realExamCredits: Math.max(0, getRealExamCredits(prev) - 1),
+          purchasedTestIds: Array.from(new Set([...prevPurchased, cleanId]))
+        };
+      });
+      showToast(`Đã đổi 1 lượt Combo mở khóa "${targetTest.title}"! Sẵn sàng vào thi thật 4 kỹ năng.`);
+      return true;
+    } catch (err) {
+      showToast(err?.message || 'Không thể đổi lượt Combo lúc này.', 'error');
+      return false;
     }
   };
 
@@ -4126,7 +4175,7 @@ export default function App() {
 
     if (nextIdx >= cfg.order.length) {
       if (isAutoTimeout) {
-        showToast('Hết giờ kỹ năng cuối cùng! Hệ thống đã tự động nộp bài.');
+        showToast('Hết giờ kỹ năng cuối cùng! Hệ thống đã tự động nộp bài cho Ms. Như check.');
       }
       handleFinalExamSubmit();
       return;
@@ -4135,7 +4184,7 @@ export default function App() {
     const prevSkill = examState.skill || cfg.order[currentIdx];
     const nextSkill = cfg.order[nextIdx];
     const nextDurationSecs = (cfg.durations[nextSkill] || 15) * 60;
-    const skillNames = { listening: 'Listening', reading: 'Reading', writing: 'Writing' };
+    const skillNames = { listening: 'Listening', reading: 'Reading', writing: 'Writing', speaking: 'Speaking' };
     const safePrevRem = Math.max(0, Math.floor(Number(examState.timeRemaining) || 0));
     const remMin = Math.floor(safePrevRem / 60);
     const remSec = safePrevRem % 60;
@@ -4259,17 +4308,21 @@ export default function App() {
     if ((attemptScores?.reading?.total || 0) > 0) {
       activeSkillBands.push(Number(attemptScores.reading.band) || 0);
     }
-    activeSkillBands.push(writingOverall);
+    if (typeof writingOverall === 'number' && Number.isFinite(writingOverall)) {
+      activeSkillBands.push(writingOverall);
+    }
+    if (typeof attemptScores?.speaking?.band === 'number' && Number.isFinite(attemptScores.speaking.band)) {
+      activeSkillBands.push(Number(attemptScores.speaking.band));
+    }
     return calculateOverallIeltsBand(activeSkillBands);
   };
 
-  // AI Writing Grading Trigger (Teacher or student re-run for own ungraded Writing)
+  // AI Writing Grading Trigger (Teacher only — students wait for Ms. Nhu approval)
   const handleGradeWritingWithAI = async (targetAttempt) => {
     const isTeacherUser = currentUser?.role === 'teacher';
-    const isOwnAttempt = currentUser?.username && targetAttempt?.studentId === currentUser.username;
-    if (!targetAttempt || (!isTeacherUser && !isOwnAttempt)) return;
+    if (!targetAttempt || !isTeacherUser) return;
     setIsGradingAI(true);
-    setAiGradingStep('Khởi tạo AI IELTS Senior Examiner...');
+    setAiGradingStep('Đang hỗ trợ phân tích lỗi chính tả, ngữ pháp & gợi ý band Writing...');
 
     try {
       const aiResult = await runWritingGradingEngine(targetAttempt);
@@ -4533,9 +4586,19 @@ export default function App() {
       }
     };
 
-    const isSpeakingAttempt = gradingAttempt.focusSkill === 'speaking' || Boolean(gradingAttempt.scores?.speaking);
+    const isSingleSpeakingAttempt = gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'speaking';
+    const isFullExamAttempt = gradingAttempt.testMode !== 'single_skill';
+    const linkedTest = tests.find(t => t.id === gradingAttempt.testId);
+    const linkedCfg = linkedTest ? normalizeExamConfig(linkedTest) : null;
+    const writingScope = gradingAttempt.writingTaskScope || linkedCfg?.writingTaskScope || 'both';
+    const hasIntegratedSpeaking =
+      isFullExamAttempt &&
+      (Array.isArray(gradingAttempt.speakingRecordings) && gradingAttempt.speakingRecordings.length > 0 ||
+        Boolean(linkedCfg?.order?.includes('speaking')) ||
+        gradingAttempt.scores?.speaking !== undefined);
+
     let updatedAttemptObj;
-    if (isSpeakingAttempt) {
+    if (isSingleSpeakingAttempt) {
       const spFc = roundWholeBand(gradingScores.speakingFc);
       const spLr = roundWholeBand(gradingScores.speakingLr);
       const spGra = roundWholeBand(gradingScores.speakingGra);
@@ -4564,15 +4627,31 @@ export default function App() {
     } else if (includeWriting && !(gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill !== 'writing')) {
       const t1 = sanitizeBandScore(gradingScores.task1Band);
       const t2 = sanitizeBandScore(gradingScores.task2Band);
-      const writingOverall = calculateWritingBand(t1, t2);
+      const writingOverall =
+        writingScope === 'task1'
+          ? t1
+          : writingScope === 'task2'
+          ? t2
+          : calculateWritingBand(t1, t2);
       const nextScores = {
         ...baseScores,
         writing: {
-          task1Band: t1,
-          task2Band: t2,
+          task1Band: writingScope === 'task2' ? null : t1,
+          task2Band: writingScope === 'task1' ? null : t2,
           overallBand: writingOverall
         }
       };
+      if (hasIntegratedSpeaking) {
+        const spFc = roundWholeBand(gradingScores.speakingFc);
+        const spLr = roundWholeBand(gradingScores.speakingLr);
+        const spGra = roundWholeBand(gradingScores.speakingGra);
+        const spPr = roundWholeBand(gradingScores.speakingPr);
+        const spBand = roundWholeBand(gradingScores.speakingBand || (spFc + spLr + spGra + spPr) / 4);
+        nextScores.speaking = {
+          band: spBand,
+          criteria: { fc: spFc, lr: spLr, gra: spGra, pr: spPr }
+        };
+      }
       const finalOverall = computeAttemptFinalOverall(nextScores, writingOverall, gradingAttempt);
       updatedAttemptObj = {
         ...gradingAttempt,
@@ -4609,23 +4688,26 @@ export default function App() {
     setAttempts(updatedAttempts);
     dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAttemptObj });
     setGradingAttempt(null);
-    if (isSpeakingAttempt) {
+    if (isSingleSpeakingAttempt) {
       const crit = updatedAttemptObj.scores?.speaking?.criteria || {};
       showToast(
-        `Đã lưu điểm Speaking: Band ${updatedAttemptObj.overallBand} (FC ${crit.fc ?? '-'} · LR ${crit.lr ?? '-'} · GRA ${crit.gra ?? '-'} · PR ${crit.pr ?? '-'})!`
+        `Đã duyệt & trả điểm Speaking: Band ${updatedAttemptObj.overallBand} (FC ${crit.fc ?? '-'} · LR ${crit.lr ?? '-'} · GRA ${crit.gra ?? '-'} · PR ${crit.pr ?? '-'})!`
       );
     } else if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'listening') {
-      showToast(`Đã lưu điểm Bài tập Listening: Band ${updatedAttemptObj.overallBand} (${cleanLRaw}/${lTotal} câu)!`);
+      showToast(`Đã lưu điểm Daily Listening: Band ${updatedAttemptObj.overallBand} (${cleanLRaw}/${lTotal} câu)!`);
     } else if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'reading') {
-      showToast(`Đã lưu điểm Bài tập Reading: Band ${updatedAttemptObj.overallBand} (${cleanRRaw}/${rTotal} câu)!`);
+      showToast(`Đã lưu điểm Daily Reading: Band ${updatedAttemptObj.overallBand} (${cleanRRaw}/${rTotal} câu)!`);
     } else if (gradingAttempt.testMode === 'single_skill' && gradingAttempt.focusSkill === 'writing') {
       showToast(
-        `Đã lưu điểm Bài tập Writing: Band ${updatedAttemptObj.overallBand} (Task 1: ${updatedAttemptObj.scores?.writing?.task1Band ?? '-'} · Task 2: ${updatedAttemptObj.scores?.writing?.task2Band ?? '-'})!`
+        `Đã duyệt & trả điểm Daily Writing: Band ${updatedAttemptObj.overallBand}!`
       );
     } else {
+      const spSuffix = typeof updatedAttemptObj.scores?.speaking?.band === 'number'
+        ? ` · Speaking ${updatedAttemptObj.scores.speaking.band}`
+        : '';
       showToast(
         includeWriting
-          ? `Đã lưu điểm: Listening ${lBand} · Reading ${rBand} · Writing ${updatedAttemptObj.scores?.writing?.overallBand ?? '-'} · Overall ${updatedAttemptObj.overallBand}`
+          ? `Đã duyệt & trả điểm 4 kỹ năng: Listening ${lBand} · Reading ${rBand} · Writing ${updatedAttemptObj.scores?.writing?.overallBand ?? '-'}${spSuffix} · Overall ${updatedAttemptObj.overallBand}`
           : `Đã cập nhật điểm Listening ${lBand} & Reading ${rBand}!`
       );
     }
@@ -4716,6 +4798,9 @@ export default function App() {
       setTestForm({
         ...cloned,
         visibility: cfg.visibility,
+        examCategory: cfg.examCategory,
+        dailySubCategory: cfg.dailySubCategory,
+        writingTaskScope: cfg.writingTaskScope,
         examPurpose: cfg.examPurpose,
         examPassword: cfg.examPassword,
         hasExamPassword: cfg.hasExamPassword,
@@ -4760,8 +4845,8 @@ export default function App() {
         ...createEmptyTestForm(),
         id: 'test-' + Date.now(),
         assignedClassIds: Array.isArray(initialClassIds) ? Array.from(new Set(initialClassIds.filter(Boolean))) : [],
-        title: 'Đề Thi Thử IELTS Academic Mới',
-        description: 'Đề thi chuẩn cấu trúc 3 kỹ năng Listening, Reading, Writing.',
+        title: 'Đề Thực Chiến IELTS Full 4 Kỹ Năng Mới',
+        description: 'Đề thi thực chiến liên hoàn đủ 4 kỹ năng Listening, Reading, Writing và Speaking (1 lượt thi thật, chờ Ms. Như duyệt điểm).',
         createdAt: new Date().toISOString().split('T')[0],
         listening: {
           audioUrl: '',
@@ -4843,7 +4928,7 @@ export default function App() {
     setView('EXAM_BUILDER');
   };
 
-  const openSingleSkillBuilder = (skill = 'speaking', testToEdit = null, initialClassIds = []) => {
+  const openSingleSkillBuilder = (skill = 'speaking', testToEdit = null, initialClassIds = [], subOpts = {}) => {
     if (testToEdit) {
       openExamBuilder(testToEdit, skill || 'general');
       return;
@@ -4852,7 +4937,7 @@ export default function App() {
     setBuilderListeningIdx(0);
     setBuilderReadingIdx(0);
     const cleanClassIds = Array.isArray(initialClassIds) ? Array.from(new Set(initialClassIds.filter(Boolean))) : [];
-    const baseSingleForm = createEmptySingleSkillTestForm(skill);
+    const baseSingleForm = createEmptySingleSkillTestForm(skill, subOpts);
     let nextSpeaking = baseSingleForm.speaking;
     let extraSingleFields = {};
     if (skill === 'speaking' && view === 'SKILL_HUB') {
@@ -4861,24 +4946,16 @@ export default function App() {
           speakingTrack: 'daily',
           dailyDate: getVietnamTodayDateKey(Date.now() + serverClockOffsetMsRef.current),
           dailyMandatory: true,
-          hashtags: ['#SpeakingDaily']
+          hashtags: ['#DailySpeaking']
         });
-        extraSingleFields = { hashtags: ['#SpeakingDaily'] };
-      } else if (skillHubTab === 'speaking_exam_room') {
-        const autoPass = `SPK${Math.floor(1000 + Math.random() * 9000)}`;
+        extraSingleFields = { hashtags: ['#DailySpeaking'], dailySubCategory: 'speaking_daily' };
+      } else if (skillHubTab === 'forecast') {
         nextSpeaking = createDefaultSpeakingSection({
-          speakingTrack: 'exam_room',
-          roomPassword: autoPass,
-          hasRoomPassword: true,
-          hashtags: ['#ThiThật', '#CóPass', '#TeamSắpThi']
+          speakingTrack: 'general',
+          isForecast: true,
+          hashtags: ['#CayForecastMsNhu']
         });
-        extraSingleFields = {
-          examPurpose: 'real_exam',
-          examPassword: autoPass,
-          hasExamPassword: true,
-          maxAttempts: 1,
-          hashtags: ['#ThiThật', '#CóPass', '#TeamSắpThi']
-        };
+        extraSingleFields = { hashtags: ['#CayForecastMsNhu'], dailySubCategory: 'speaking_forecast' };
       }
     }
     setTestForm({
@@ -5143,6 +5220,9 @@ export default function App() {
       ...testForm,
       testMode: cfg.testMode,
       focusSkill: cfg.focusSkill,
+      examCategory: cfg.examCategory,
+      dailySubCategory: cfg.dailySubCategory,
+      writingTaskScope: cfg.writingTaskScope,
       visibility: cfg.visibility,
       examPurpose: cfg.examPurpose,
       priceVnd: cfg.testMode === 'single_skill' ? 0 : cfg.priceVnd,
@@ -5215,6 +5295,14 @@ export default function App() {
       idx++;
     }
     return idx;
+  };
+
+  const getGameTypingTarget = (questionObj, roundNum) => {
+    if (!questionObj) return '';
+    if (roundNum === 4) {
+      return String(questionObj.v4Target || questionObj.collocation || questionObj.word || '').trim().toUpperCase();
+    }
+    return String(questionObj.word || '').trim().toUpperCase();
   };
 
   // Sync mutable pilot prefs for Canvas spaceship rendering & persist locally
@@ -5369,7 +5457,7 @@ export default function App() {
     });
     const validRound = [1, 2, 3, 4].includes(Number(startRound)) ? Number(startRound) : 1;
     const firstQ = queues[validRound]?.[0] || null;
-    const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
+    const initialProgress = firstQ ? skipNonAlphaIndex(getGameTypingTarget(firstQ, validRound), 0) : 0;
 
     homingLasersRef.current = [];
     particlesRef.current = [];
@@ -5424,6 +5512,8 @@ export default function App() {
 
     if (validRound === 2 && firstQ) {
       speakWord(firstQ.word);
+    } else if (validRound === 4 && firstQ) {
+      speakWord(firstQ.v4Display || firstQ.collocation || firstQ.word);
     }
   };
 
@@ -5515,7 +5605,7 @@ export default function App() {
     const speedMode = activeRoom.speedMode || 'normal';
     const queue = queues[roundNum] || [];
     const firstQ = queue[0] || null;
-    const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
+    const initialProgress = firstQ ? skipNonAlphaIndex(getGameTypingTarget(firstQ, roundNum), 0) : 0;
 
     homingLasersRef.current = [];
     particlesRef.current = [];
@@ -5557,6 +5647,8 @@ export default function App() {
 
     if (roundNum === 2 && firstQ) {
       speakWord(firstQ.word);
+    } else if (roundNum === 4 && firstQ) {
+      speakWord(firstQ.v4Display || firstQ.collocation || firstQ.word);
     }
   };
 
@@ -5566,7 +5658,7 @@ export default function App() {
     const nextR = rt.round + 1;
     const queue = rt.queues[nextR] || [];
     const firstQ = queue[0] || null;
-    const initialProgress = firstQ ? skipNonAlphaIndex(firstQ.word, 0) : 0;
+    const initialProgress = firstQ ? skipNonAlphaIndex(getGameTypingTarget(firstQ, nextR), 0) : 0;
 
     homingLasersRef.current = [];
     rt.round = nextR;
@@ -5595,6 +5687,8 @@ export default function App() {
 
     if (firstQ && nextR === 2) {
       speakWord(firstQ.word);
+    } else if (firstQ && nextR === 4) {
+      speakWord(firstQ.v4Display || firstQ.collocation || firstQ.word);
     }
   };
 
@@ -5618,7 +5712,7 @@ export default function App() {
 
     if (nextIdx < currentQueue.length) {
       const nextQ = currentQueue[nextIdx];
-      const nextTyped = skipNonAlphaIndex(nextQ.word, 0);
+      const nextTyped = skipNonAlphaIndex(getGameTypingTarget(nextQ, currentRoundNum), 0);
       rt.wordIdx = nextIdx;
       rt.activeQuestion = nextQ;
       rt.typedProgress = nextTyped;
@@ -5642,6 +5736,8 @@ export default function App() {
 
       if (currentRoundNum === 2) {
         speakWord(nextQ.word);
+      } else if (currentRoundNum === 4) {
+        speakWord(nextQ.v4Display || nextQ.collocation || nextQ.word);
       }
     } else {
       clearInterval(wordTimerRef.current);
@@ -5776,12 +5872,12 @@ export default function App() {
     }
   };
 
-  // Unified choice / target resolution helper for V1 (Meaning), V3 (Syn/Ant/Def) & V4 (Collocation)
+  // Unified choice / target resolution helper for V1 (Meaning) & V3 (Syn/Ant/Def)
   const resolveGameChoiceAttempt = (choiceLabel, isCorrect, fxX = null, fxY = null) => {
     const rt = gameRuntimeRef.current;
     const q = rt.activeQuestion;
     if (!q || rt.subState !== 'PLAYING' || rt.questionResolved || rt.paused) return false;
-    if (rt.round !== 1 && rt.round !== 3 && rt.round !== 4) return false;
+    if (rt.round !== 1 && rt.round !== 3) return false;
 
     const canvas = canvasRef.current;
     const px = fxX ?? ((canvas?.width || 800) / 2);
@@ -5792,8 +5888,8 @@ export default function App() {
       const limitSec = Math.max(1, rt.timeLimit || 22);
       const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
       const reactionMs = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
-      const basePts = rt.round === 4 ? 220 : rt.round === 3 ? 180 : 120;
-      const speedBonus = Math.round(remainRatio * (rt.round === 4 ? 110 : 90));
+      const basePts = rt.round === 3 ? 180 : 120;
+      const speedBonus = Math.round(remainRatio * 90);
       const feverMult = rt.combo >= 3 ? 2 : 1;
       const gain = (basePts + rt.combo * 25 + speedBonus) * feverMult;
       const nextCombo = rt.combo + 1;
@@ -5806,7 +5902,7 @@ export default function App() {
       pushGameParticles(px, py, feverMult > 1 ? '#fbbf24' : '#22d3ee', 26);
       playSound('word_clear');
       speakWord(q.word);
-      const feedbackTag = rt.round === 4 ? q.v4Target : rt.round === 3 ? q.v3Target : `${q.word} (${q.ipa})`;
+      const feedbackTag = rt.round === 3 ? q.v3Target : `${q.word} (${q.ipa})`;
       triggerGameToast(
         `✅ Chính xác! ${feedbackTag} +${gain}đ${speedBonus > 0 ? ` (⚡+${speedBonus})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
         true
@@ -5820,9 +5916,7 @@ export default function App() {
     }
 
     pushGameParticles(px, py, '#fb7185', 16);
-    const roundHint = rt.round === 4
-      ? 'Hãy chọn đúng cụm Collocation tự nhiên với từ khóa!'
-      : rt.round === 3
+    const roundHint = rt.round === 3
       ? 'Hãy đọc kỹ yêu cầu Đồng nghĩa / Trái nghĩa / Định nghĩa!'
       : 'Hãy nhìn kỹ nghĩa tiếng Việt & bắn mục tiêu đúng!';
     handleGameLifeLoss(`❌ Chọn nhầm "${choiceLabel}"! ${roundHint}`, false);
@@ -5835,20 +5929,19 @@ export default function App() {
     const rt = gameRuntimeRef.current;
     const q = rt.activeQuestion;
     if (!q || rt.subState !== 'PLAYING' || rt.questionResolved) return;
-    const targetAnswer =
-      rt.round === 1 ? q.word : rt.round === 3 ? q.v3Target : rt.round === 4 ? q.v4Target : '';
+    const targetAnswer = rt.round === 1 ? q.word : rt.round === 3 ? q.v3Target : '';
     if (!targetAnswer) return;
     const isCorrect = String(choiceText || '').trim().toLowerCase() === String(targetAnswer).trim().toLowerCase();
     resolveGameChoiceAttempt(choiceText, isCorrect);
   };
 
-  // Handle typing input in Round 2 (Full Word Typing - V2)
+  // Handle continuous typing attack in Round 2 (Full Word Boss) & Round 4 (Collocation Boss)
   const handleGameTypingInput = (char) => {
     const rt = gameRuntimeRef.current;
-    if (rt.subState !== 'PLAYING' || rt.round !== 2 || !rt.activeQuestion || rt.questionResolved) return;
+    if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 4) || !rt.activeQuestion || rt.questionResolved) return;
 
     const q = rt.activeQuestion;
-    const target = q.word.toUpperCase();
+    const target = getGameTypingTarget(q, rt.round);
     const expected = target[rt.typedProgress];
 
     if (char === expected) {
@@ -5857,28 +5950,32 @@ export default function App() {
       rt.typedProgress = nextProgress;
       setGameTypedProgress(nextProgress);
 
-      // Visual laser hit toward boss
+      // Visual continuous laser attack & hit sparks toward boss monster
       const canvas = canvasRef.current;
       const w = canvas?.width || 800;
       const h = canvas?.height || 460;
+      const hitX = w / 2 + (Math.random() * 44 - 22);
+      const hitY = Math.max(60, h * 0.28);
       homingLasersRef.current.push({
         x: w / 2,
         y: h - 42,
-        targetX: w / 2 + (Math.random() * 44 - 22),
-        targetY: Math.max(60, h * 0.28),
+        targetX: hitX,
+        targetY: hitY,
+        color: rt.round === 4 ? '#f43f5e' : '#10b981',
         progress: 0
       });
+      pushGameParticles(hitX, hitY, rt.round === 4 ? '#fb7185' : '#34d399', 6);
 
       if (nextProgress >= target.length) {
         rt.questionResolved = true;
-        const limitSec = Math.max(1, rt.timeLimit || 25);
-        const remainRatioR2 = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
-        const reactionMsR2 = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
-        const speedBonusR2 = Math.round(remainRatioR2 * 120);
+        const limitSec = Math.max(1, rt.timeLimit || (rt.round === 4 ? 32 : 25));
+        const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
+        const reactionMs = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
+        const speedBonus = Math.round(remainRatio * (rt.round === 4 ? 140 : 120));
         const feverMult = rt.combo >= 3 ? 2 : 1;
-        const bonus = 200;
+        const bonus = rt.round === 4 ? 260 : 200;
         const streakBonus = rt.combo * 25;
-        const totalGain = (bonus + streakBonus + speedBonusR2) * feverMult;
+        const totalGain = (bonus + streakBonus + speedBonus) * feverMult;
         const nextScore = rt.score + totalGain;
         const nextCombo = rt.combo + 1;
 
@@ -5887,31 +5984,32 @@ export default function App() {
         setGameScore(nextScore);
         setGameCombo(nextCombo);
 
-        pushGameParticles(w / 2, Math.max(80, h * 0.3), feverMult > 1 ? '#fbbf24' : '#34d399', 26);
+        pushGameParticles(w / 2, Math.max(80, h * 0.3), feverMult > 1 ? '#fbbf24' : (rt.round === 4 ? '#f43f5e' : '#34d399'), rt.round === 4 ? 36 : 26);
         playSound('word_clear');
-        speakWord(q.word);
+        speakWord(rt.round === 4 ? (q.v4Display || q.collocation || q.word) : q.word);
+        const clearedLabel = rt.round === 4 ? `"${q.v4Display || q.collocation}"` : `${q.word} (${q.ipa})`;
         triggerGameToast(
-          `🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ${speedBonusR2 > 0 ? ` (⚡+${speedBonusR2})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+          `${rt.round === 4 ? '💥 HẠ GỤC BOSS COLLOCATION!' : '🎯 Chính xác!'} ${clearedLabel} +${totalGain}đ${speedBonus > 0 ? ` (⚡+${speedBonus})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
           true
         );
         handleWordCleared(true, nextScore, nextCombo, {
-          questionKey: `2:${q.word}`,
+          questionKey: `${rt.round}:${q.word}`,
           word: q.word,
-          reactionMs: reactionMsR2
+          reactionMs
         });
       }
     } else {
       playSound('wrong');
       rt.combo = 0;
       setGameCombo(0);
-      triggerGameToast(`❌ Sai chữ cái "${char}". Hãy thử lại!`, false);
+      triggerGameToast(`❌ Sai chữ cái "${char}". Gõ chính xác để tấn công Boss!`, false);
     }
   };
 
   const handleGameHint = () => {
     const rt = gameRuntimeRef.current;
-    if (rt.subState !== 'PLAYING' || rt.round !== 2 || !rt.activeQuestion || rt.paused) return;
-    const nextChar = rt.activeQuestion.word.toUpperCase()[rt.typedProgress];
+    if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 4) || !rt.activeQuestion || rt.paused) return;
+    const nextChar = getGameTypingTarget(rt.activeQuestion, rt.round)[rt.typedProgress];
     if (!nextChar) return;
     const nextScore = Math.max(0, rt.score - 15);
     rt.score = nextScore;
@@ -5994,8 +6092,10 @@ export default function App() {
       if (remaining <= 0 && !rt.questionResolved) {
         rt.questionResolved = true;
         clearInterval(wordTimerRef.current);
-        const currentWord = rt.activeQuestion?.word || '';
-        handleGameLifeLoss(`⏰ Hết thời gian! Từ đúng là "${currentWord}"`, true);
+        const currentAnswer = rt.round === 4
+          ? (rt.activeQuestion?.v4Display || getGameTypingTarget(rt.activeQuestion, 4))
+          : (rt.activeQuestion?.word || '');
+        handleGameLifeLoss(`⏰ Hết thời gian! Đáp án đúng là "${currentAnswer}"`, true);
       }
     }, 100);
 
@@ -6010,7 +6110,10 @@ export default function App() {
       const rt = gameRuntimeRef.current;
       if (e.code === 'Tab' && rt.activeQuestion) {
         e.preventDefault();
-        speakWord(rt.activeQuestion.word);
+        const phraseToSpeak = rt.round === 4
+          ? (rt.activeQuestion.v4Display || getGameTypingTarget(rt.activeQuestion, 4) || rt.activeQuestion.word)
+          : rt.activeQuestion.word;
+        speakWord(phraseToSpeak);
         return;
       }
       if (e.code === 'Digit2') {
@@ -6019,7 +6122,7 @@ export default function App() {
         return;
       }
       if (rt.paused) return;
-      if (rt.round === 2) {
+      if (rt.round === 2 || rt.round === 4) {
         if (e.code === 'Digit1') {
           e.preventDefault();
           handleGameHint();
@@ -6081,12 +6184,6 @@ export default function App() {
           const shortWord = c.length > 16 ? `${code}. ${c.slice(0, 14)}…` : `${code}. ${c}`;
           return { word: shortWord, fullValue: c, isCorrect: c === q.v3Target };
         });
-      } else if (roundNum === 4 && Array.isArray(q.v4Choices)) {
-        choices = q.v4Choices.map((c, cIdx) => {
-          const code = String.fromCharCode(65 + cIdx);
-          const shortWord = c.length > 18 ? `${code}. ${c.slice(0, 16)}…` : `${code}. ${c}`;
-          return { word: shortWord, fullValue: c, isCorrect: c === q.v4Target };
-        });
       }
 
       const twoRows = width < 620 && choices.length >= 4;
@@ -6119,7 +6216,7 @@ export default function App() {
       });
     };
 
-    if ((gameRound === 1 || gameRound === 3 || gameRound === 4) && activeQuestion && gameSubState === 'PLAYING') {
+    if ((gameRound === 1 || gameRound === 3) && activeQuestion && gameSubState === 'PLAYING') {
       spawnRoundChickens(activeQuestion, gameRound);
     }
 
@@ -6161,7 +6258,7 @@ export default function App() {
 
     const fireBullet = () => {
       const r = gameRuntimeRef.current.round;
-      if ((r === 1 || r === 3 || r === 4) && gameRuntimeRef.current.subState === 'PLAYING' && !gameRuntimeRef.current.paused) {
+      if ((r === 1 || r === 3) && gameRuntimeRef.current.subState === 'PLAYING' && !gameRuntimeRef.current.paused) {
         bullets.push({ x: playerX, y: height - 74, speed: 13 });
         playSound('shoot');
       }
@@ -6171,7 +6268,7 @@ export default function App() {
 
     const handleTouchMove = (e) => {
       const r = gameRuntimeRef.current.round;
-      if ((r !== 1 && r !== 3 && r !== 4) || gameRuntimeRef.current.subState !== 'PLAYING') return;
+      if ((r !== 1 && r !== 3) || gameRuntimeRef.current.subState !== 'PLAYING') return;
       if (!e.touches?.[0]) return;
       const rect = canvas.getBoundingClientRect();
       const scaleX = width / Math.max(1, rect.width);
@@ -6180,7 +6277,7 @@ export default function App() {
 
     const handleTouchStart = (e) => {
       const r = gameRuntimeRef.current.round;
-      if ((r !== 1 && r !== 3 && r !== 4) || gameRuntimeRef.current.subState !== 'PLAYING') return;
+      if ((r !== 1 && r !== 3) || gameRuntimeRef.current.subState !== 'PLAYING') return;
       handleTouchMove(e);
       fireBullet();
     };
@@ -6188,7 +6285,7 @@ export default function App() {
     const handleKeyDownCanvas = (e) => {
       pressedKeys[e.code] = true;
       const r = gameRuntimeRef.current.round;
-      if (e.code === 'Space' && (r === 1 || r === 3 || r === 4) && gameRuntimeRef.current.subState === 'PLAYING') {
+      if (e.code === 'Space' && (r === 1 || r === 3) && gameRuntimeRef.current.subState === 'PLAYING') {
         e.preventDefault();
         fireBullet();
       }
@@ -6213,8 +6310,8 @@ export default function App() {
       const isDark = rt.darkMode !== false;
       const isFrozen = Date.now() < freezeUntilRef.current;
 
-      // Keyboard ship steering for shooter rounds (1, 3, 4)
-      if ((rt.round === 1 || rt.round === 3 || rt.round === 4) && rt.subState === 'PLAYING' && !rt.paused) {
+      // Keyboard ship steering for shooter rounds (1, 3)
+      if ((rt.round === 1 || rt.round === 3) && rt.subState === 'PLAYING' && !rt.paused) {
         if (pressedKeys['ArrowLeft'] || pressedKeys['KeyA']) {
           playerX = Math.max(36, playerX - 7);
         }
@@ -6272,7 +6369,7 @@ export default function App() {
         ctx.fill();
 
         let bulletRemoved = false;
-        if ((rt.round === 1 || rt.round === 3 || rt.round === 4) && rt.subState === 'PLAYING' && !rt.questionResolved && !rt.paused) {
+        if ((rt.round === 1 || rt.round === 3) && rt.subState === 'PLAYING' && !rt.questionResolved && !rt.paused) {
           for (let j = chickens.length - 1; j >= 0; j--) {
             const c = chickens[j];
             if (
@@ -6297,13 +6394,13 @@ export default function App() {
         }
       }
 
-      // Homing Lasers (Round 2 & 3 typing hits)
+      // Homing Lasers (Round 2 & Round 4 typing hits)
       const lasers = homingLasersRef.current;
       for (let i = lasers.length - 1; i >= 0; i--) {
         const hl = lasers[i];
         if (!rt.paused) hl.progress += 0.22;
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = hl.color || '#10b981';
+        ctx.lineWidth = rt.round === 4 ? 4 : 3;
         ctx.beginPath();
         ctx.moveTo(hl.x, hl.y);
         const curX = hl.x + (hl.targetX - hl.x) * Math.min(1, hl.progress);
@@ -6337,8 +6434,8 @@ export default function App() {
         ctx.restore();
       }
 
-      // Draw Chickens (Round 1, 3, 4) - smoothly descend with timer
-      if ((rt.round === 1 || rt.round === 3 || rt.round === 4) && rt.subState === 'PLAYING') {
+      // Draw Chickens (Round 1, 3) - smoothly descend with timer
+      if ((rt.round === 1 || rt.round === 3) && rt.subState === 'PLAYING') {
         const topBaseY = Math.max(46, height * 0.14);
         const maxDescendY = Math.max(topBaseY + 20, height - 172);
         chickens.forEach(c => {
@@ -6411,13 +6508,26 @@ export default function App() {
         });
       }
 
-      // Draw Boss Chicken (Round 2: Gõ Từ Full) - descends toward player ship as time expires!
-      if (rt.round === 2 && rt.activeQuestion && rt.subState === 'PLAYING') {
-        const swayX = Math.sin(Date.now() * 0.0025) * Math.min(75, width * 0.14);
+      // Draw Giant Boss Monster (Round 2: Gõ Từ Full & Round 4: Gõ Collocation Diệt Boss)
+      if ((rt.round === 2 || rt.round === 4) && rt.activeQuestion && rt.subState === 'PLAYING') {
+        const isCollocationBoss = rt.round === 4;
+        const swayX = Math.sin(Date.now() * (isCollocationBoss ? 0.003 : 0.0025)) * Math.min(75, width * 0.14);
         const bossX = width / 2 + swayX;
-        const startBossY = Math.max(58, height * 0.2);
+        const startBossY = Math.max(66, height * 0.22);
         const endBossY = Math.max(startBossY + 35, height - 118);
         const bossY = startBossY + elapsedRatio * (endBossY - startBossY);
+
+        // Compute Boss HP based on remaining untyped letters
+        const targetPhrase = getGameTypingTarget(rt.activeQuestion, rt.round);
+        let totalAlpha = 0;
+        let typedAlpha = 0;
+        for (let k = 0; k < targetPhrase.length; k++) {
+          if (/^[A-Z]$/.test(targetPhrase[k])) {
+            totalAlpha += 1;
+            if (k < rt.typedProgress) typedAlpha += 1;
+          }
+        }
+        const hpRatio = totalAlpha > 0 ? Math.max(0, (totalAlpha - typedAlpha) / totalAlpha) : 1;
 
         // Update active homing laser targets
         lasers.forEach(hl => {
@@ -6433,91 +6543,110 @@ export default function App() {
           ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
           ctx.lineWidth = 3.5;
           ctx.beginPath();
-          ctx.arc(0, 0, 44 + Math.sin(Date.now() * 0.015) * 3, 0, Math.PI * 2);
+          ctx.arc(0, 0, (isCollocationBoss ? 48 : 44) + Math.sin(Date.now() * 0.015) * 3, 0, Math.PI * 2);
           ctx.stroke();
-        } else if (timeRemainingFloatRef.current <= 6) {
-          ctx.strokeStyle = 'rgba(244, 63, 94, 0.65)';
+        } else if (timeRemainingFloatRef.current <= 6 || isCollocationBoss) {
+          ctx.strokeStyle = isCollocationBoss ? 'rgba(244, 63, 94, 0.45)' : 'rgba(244, 63, 94, 0.65)';
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(0, 0, 42 + Math.sin(Date.now() * 0.02) * 4, 0, Math.PI * 2);
+          ctx.arc(0, 0, (isCollocationBoss ? 46 : 42) + Math.sin(Date.now() * 0.02) * 4, 0, Math.PI * 2);
           ctx.stroke();
         }
 
         // Boss Wings
-        const wingY = Math.sin(Date.now() * 0.01) * 7;
-        ctx.fillStyle = rt.round === 3 ? '#f472b6' : '#fcd34d';
+        const wingY = Math.sin(Date.now() * 0.011) * 8;
+        ctx.fillStyle = isCollocationBoss ? '#fb7185' : '#fcd34d';
         ctx.beginPath();
-        ctx.ellipse(-38, wingY, 16, 8, -0.3, 0, Math.PI * 2);
-        ctx.ellipse(38, wingY, 16, 8, 0.3, 0, Math.PI * 2);
+        ctx.ellipse(isCollocationBoss ? -44 : -38, wingY, isCollocationBoss ? 19 : 16, 9, -0.3, 0, Math.PI * 2);
+        ctx.ellipse(isCollocationBoss ? 44 : 38, wingY, isCollocationBoss ? 19 : 16, 9, 0.3, 0, Math.PI * 2);
         ctx.fill();
 
         // Giant Boss Body
-        ctx.fillStyle = rt.round === 3 ? '#ec4899' : '#f59e0b';
+        const bodyRadius = isCollocationBoss ? 34 : 30;
+        ctx.fillStyle = isCollocationBoss ? '#e11d48' : '#f59e0b';
         ctx.beginPath();
-        ctx.arc(0, 0, 30, 0, Math.PI * 2);
+        ctx.arc(0, 0, bodyRadius, 0, Math.PI * 2);
         ctx.fill();
 
+        // Eyes & angry brows in Round 4
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(-10, -5, 5, 0, Math.PI * 2);
-        ctx.arc(10, -5, 5, 0, Math.PI * 2);
+        ctx.arc(-11, -5, 5.5, 0, Math.PI * 2);
+        ctx.arc(11, -5, 5.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#0f172a';
         ctx.beginPath();
-        ctx.arc(-10, -5, 2.5, 0, Math.PI * 2);
-        ctx.arc(10, -5, 2.5, 0, Math.PI * 2);
+        ctx.arc(-11, -5, 2.7, 0, Math.PI * 2);
+        ctx.arc(11, -5, 2.7, 0, Math.PI * 2);
         ctx.fill();
+        if (isCollocationBoss) {
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(-18, -13);
+          ctx.lineTo(-6, -9);
+          ctx.moveTo(18, -13);
+          ctx.lineTo(6, -9);
+          ctx.stroke();
+        }
 
-        // Crown on Boss in Round 3
-        if (rt.round === 3) {
+        // Golden Crown on Final Collocation Boss in Round 4
+        if (isCollocationBoss) {
           ctx.fillStyle = '#fbbf24';
           ctx.beginPath();
-          ctx.moveTo(-18, -30);
-          ctx.lineTo(-9, -42);
-          ctx.lineTo(0, -30);
-          ctx.lineTo(9, -42);
-          ctx.lineTo(18, -30);
+          ctx.moveTo(-20, -33);
+          ctx.lineTo(-10, -47);
+          ctx.lineTo(0, -35);
+          ctx.lineTo(10, -47);
+          ctx.lineTo(20, -33);
           ctx.closePath();
           ctx.fill();
         }
 
-        // Boss Time / Shield Progress Bar above Boss
-        const barW = 96;
-        const barH = 6;
-        const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limit));
-        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(203, 213, 225, 0.95)';
-        ctx.fillRect(-barW / 2, -52, barW, barH);
-        ctx.fillStyle = remainRatio > 0.4 ? (isDark ? '#22d3ee' : '#007a7a') : remainRatio > 0.2 ? '#f59e0b' : '#f43f5e';
-        ctx.fillRect(-barW / 2, -52, barW * remainRatio, barH);
+        // Boss HP Bar (primary) + Time Bar above Boss
+        const barW = isCollocationBoss ? 124 : 96;
+        const barH = isCollocationBoss ? 8 : 6;
+        const hpBarY = isCollocationBoss ? -62 : -54;
+        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(203, 213, 225, 0.95)';
+        ctx.fillRect(-barW / 2, hpBarY, barW, barH);
+        ctx.fillStyle = hpRatio > 0.5 ? '#ef4444' : hpRatio > 0.25 ? '#f59e0b' : '#10b981';
+        ctx.fillRect(-barW / 2, hpBarY, barW * hpRatio, barH);
 
-        // Full-word masked target label below Boss (NO partial middle hints)
-        const wordUpper = rt.activeQuestion.word.toUpperCase();
+        const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limit));
+        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.7)' : 'rgba(226, 232, 240, 0.9)';
+        ctx.fillRect(-barW / 2, hpBarY + barH + 2, barW, 4);
+        ctx.fillStyle = remainRatio > 0.4 ? (isDark ? '#22d3ee' : '#007a7a') : '#f59e0b';
+        ctx.fillRect(-barW / 2, hpBarY + barH + 2, barW * remainRatio, 4);
+
+        // Full-phrase masked target label below Boss
         let masked = '';
-        for (let k = 0; k < wordUpper.length; k++) {
-          if (k < rt.typedProgress || !/^[A-Z]$/.test(wordUpper[k])) masked += wordUpper[k] + ' ';
+        for (let k = 0; k < targetPhrase.length; k++) {
+          const ch = targetPhrase[k];
+          if (ch === ' ') masked += '   ';
+          else if (k < rt.typedProgress || !/^[A-Z]$/.test(ch)) masked += ch + ' ';
           else masked += '_ ';
         }
         const label = masked.trim();
-        ctx.font = 'bold 13px "JetBrains Mono", monospace';
-        const lblW = Math.max(100, ctx.measureText(label).width + 20);
-        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.96)';
-        ctx.strokeStyle = rt.round === 3 ? '#ec4899' : '#d97706';
+        ctx.font = `bold ${label.length > 26 ? 11 : 13}px "JetBrains Mono", monospace`;
+        const lblW = Math.min(width - 24, Math.max(110, ctx.measureText(label).width + 22));
+        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.94)' : 'rgba(255, 255, 255, 0.97)';
+        ctx.strokeStyle = isCollocationBoss ? '#e11d48' : '#d97706';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(-lblW / 2, 36, lblW, 24, 6);
+        ctx.roundRect(-lblW / 2, bodyRadius + 8, lblW, 26, 6);
         ctx.fill();
         ctx.stroke();
 
         ctx.fillStyle = isDark ? '#ffffff' : '#0f172b';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(label, 0, 48);
+        ctx.fillText(label, 0, bodyRadius + 21);
 
         ctx.restore();
       }
 
       // Draw Player Spaceship with chosen Animal Pilot + Accessory inside Glass Cockpit (Rounds 1..4)
-      const shipX = (rt.round === 1 || rt.round === 3 || rt.round === 4) ? playerX : width / 2;
+      const shipX = (rt.round === 1 || rt.round === 3) ? playerX : width / 2;
       drawAnimalSpaceshipCanvas(ctx, {
         x: shipX,
         y: height - 48,
@@ -6750,6 +6879,7 @@ export default function App() {
           focusedTestId={focusedTestId}
           onClearFocusedTest={() => setFocusedTestId(null)}
           onOpenCheckoutModal={openGlobalCheckoutModal}
+          onRedeemRealExamCredit={handleRedeemRealExamCredit}
           openMemberProfile={openMemberProfile}
           openSkillPracticeHub={(tab = 'speaking_daily') => {
             setFocusedTestId(null);
@@ -6798,7 +6928,7 @@ export default function App() {
             setResultReviewTab('speaking');
             setView('RESULT_VIEW');
           }}
-          onOpenSkillBuilder={(skill, testToEdit = null) => openSingleSkillBuilder(skill, testToEdit)}
+          onOpenSkillBuilder={(skill, testToEdit = null, subOpts = {}) => openSingleSkillBuilder(skill, testToEdit, [], subOpts)}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}
           onStartSpeakingExam={(testId, partMode = 'full') => startExam(testId, partMode)}
@@ -7030,6 +7160,7 @@ export default function App() {
           handleGradeSpeakingWithAI={att => handleGradeSpeakingWithAI(att, false)}
           handleGradeWritingWithAI={handleGradeWritingWithAI}
           isGradingAI={isGradingAI}
+          onRetryTest={startExam}
           openTeacherGradingModal={openTeacherGradingModal}
           previousView={previousView}
           resultReviewTab={resultReviewTab}
@@ -7201,7 +7332,7 @@ export default function App() {
           setGlobalCheckoutState({
             itemType: 'aieo_vip',
             itemId: '',
-            itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+            itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
             itemPrice: normalizePaymentConfig(paymentConfig || {}).aieoVipPrice ?? AIEO_VIP_PRICE_VND
           });
         }}

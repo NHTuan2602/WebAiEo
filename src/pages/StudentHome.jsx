@@ -24,9 +24,14 @@ import BrandContactFooter from '../components/common/BrandContactFooter';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 import {
+  DEFAULT_EXAM_PRICE_VND,
+  PERIODIC_MOCK_PRICE_VND,
+  REAL_EXAM_COMBOS,
   formatVndCurrency,
+  getRealExamCredits,
   getTestPurchasePriceVnd,
   hasTestPurchaseAccess,
+  normalizePaymentConfig,
   resolveUserVipNameVisual,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
@@ -40,6 +45,7 @@ export default function StudentHome({
   focusedTestId = null,
   onClearFocusedTest,
   onOpenCheckoutModal = null,
+  onRedeemRealExamCredit = null,
   openMemberProfile,
   openSkillPracticeHub,
   openSpeakingDaily,
@@ -57,7 +63,8 @@ export default function StudentHome({
   tests,
   usersDb = {}
 }) {
-  const [testFilter, setTestFilter] = useState('all');
+  const [storefrontTab, setStorefrontTab] = useState('real_exam');
+  const [redeemingTestId, setRedeemingTestId] = useState('');
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 15_000);
@@ -65,24 +72,36 @@ export default function StudentHome({
   }, []);
   const isTeacher = currentUser?.role === 'teacher';
   const serverNowMs = nowMs + serverClockOffsetMs;
+  const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
+  const myRealExamCredits = getRealExamCredits(currentUser);
 
   const visibleTests = tests.filter(t => canUserAccessTest(t, classesDb, currentUser));
   const fullExamTests = visibleTests.filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
+  const realExamTests = fullExamTests.filter(t => {
+    const cfg = normalizeExamConfig(t);
+    const price = getTestPurchasePriceVnd(t, paymentConfig);
+    return cfg.examCategory !== 'periodic_mock' && price < PERIODIC_MOCK_PRICE_VND;
+  });
+  const periodicMockTests = fullExamTests.filter(t => {
+    const cfg = normalizeExamConfig(t);
+    const price = getTestPurchasePriceVnd(t, paymentConfig);
+    return cfg.examCategory === 'periodic_mock' || price >= PERIODIC_MOCK_PRICE_VND;
+  });
   const singleSkillCount = visibleTests.filter(t => normalizeExamConfig(t).testMode === 'single_skill').length;
   const matchedFocusedTest = focusedTestId ? fullExamTests.find(t => t.id === focusedTestId) : null;
   const filteredTests = matchedFocusedTest
     ? [matchedFocusedTest]
-    : fullExamTests.filter(t => {
-        const cfg = normalizeExamConfig(t);
-        if (testFilter === 'unlimited') return cfg.maxAttempts === 0;
-        if (testFilter === 'limited') return cfg.maxAttempts > 0;
-        return true;
-      });
+    : storefrontTab === 'periodic_mock'
+    ? periodicMockTests
+    : realExamTests;
 
   const studentAttempts = attempts.filter(
     a => a.studentId === currentUser?.username || a.studentUsername === currentUser?.username
   );
-  const gradedBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number' && b >= 0);
+  const gradedBands = studentAttempts
+    .filter(a => isTeacher || a.teacherGraded)
+    .map(a => a.overallBand)
+    .filter(b => typeof b === 'number' && b >= 0);
   const bestOverallBand = gradedBands.length > 0 ? Math.max(...gradedBands) : null;
   const bestGameScore = Object.values(roomsDb || {}).reduce((best, r) => {
     const uname = currentUser?.username;
@@ -156,19 +175,19 @@ export default function StudentHome({
               </h1>
 
               <p className="text-sm sm:text-base text-[#334155] dark:text-[#D4D4D8] leading-relaxed max-w-2xl">
-                Làm bài thi thử 3 kỹ năng liên hoàn, tự động lưu bài làm ngay khi tải lại trang và theo dõi báo cáo tiến trình chi tiết cùng <strong>{BRAND_INFO.teacherName}</strong>.
+                Làm bài thi thực chiến 4 kỹ năng liên hoàn (Listening, Reading, Writing &amp; Speaking), tự động lưu bài làm ngay khi tải lại trang và nhận nhận xét duyệt điểm trực tiếp từ <strong>{BRAND_INFO.teacherName}</strong>.
               </p>
 
               {/* Inline Feature Checks */}
               <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm font-semibold">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
-                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Highlight &amp; Notes trên bài đọc
+                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Full 4 kỹ năng L·R·W·S liên hoàn
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
                   <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Lưu tiến trình tự động (F5 an toàn)
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
-                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Xem đáp án &amp; giải thích chi tiết
+                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Ms. Như duyệt &amp; trả điểm chi tiết
                 </span>
               </div>
 
@@ -180,16 +199,16 @@ export default function StudentHome({
                     className="bg-[#0F766E] hover:bg-[#0D9488] text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-lg transition flex items-center gap-2"
                   >
                     <Play className="w-4 h-4 fill-white" />
-                    <span>{firstTestHasDraft ? 'Tiếp Tục Bài Đang Làm' : 'Thi Thử IELTS Ngay'}</span>
+                    <span>{firstTestHasDraft ? 'Tiếp Tục Bài Đang Làm' : 'Thi Thực Chiến Ngay'}</span>
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('speaking') : setView('SKILL_HUB'))}
+                  onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('speaking_daily') : setView('SKILL_HUB'))}
                   className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
                 >
                   <Mic className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
-                  <span>Bài Tập 4 Kỹ Năng &amp; Speaking AI ({singleSkillCount})</span>
+                  <span>Daily Zone ({singleSkillCount})</span>
                 </button>
                 <button
                   onClick={openStudentGamePortal}
@@ -296,8 +315,8 @@ export default function StudentHome({
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Đề thi trọn bộ</p>
-              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{fullExamTests.length}</p>
+              <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Đề Thực Chiến 4 Kỹ Năng</p>
+              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{realExamTests.length}</p>
             </div>
           </div>
 
@@ -306,7 +325,7 @@ export default function StudentHome({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Bài tập 4 kỹ năng</p>
+              <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Bài tập Daily Zone</p>
               <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{singleSkillCount}</p>
             </div>
           </div>
@@ -341,19 +360,27 @@ export default function StudentHome({
         </div>
         )}
 
-        {/* Section: Thi Thử Theo Bộ Đề */}
-        <section id="lexiprep-exam-catalog">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-5">
+        {/* Section: 3-Zone IELTS Storefront (Default: Thực Chiến Thi Thật) */}
+        <section id="lexiprep-exam-catalog" className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-[#F4F4F5] tracking-tight">
-                Thi Thử Theo Bộ Đề IELTS
+                {storefrontTab === 'periodic_mock'
+                  ? 'Mock Test Định Kỳ (Ms. Như · 3 Tháng/Lần)'
+                  : storefrontTab === 'daily_zone'
+                  ? 'Daily Zone (Bài Tập Theo Team)'
+                  : 'Thực Chiến Thi Thật IELTS (Full 4 Kỹ Năng)'}
               </h2>
               <p className="text-sm text-[#475569] dark:text-zinc-400 mt-1 max-w-[58ch]">
-                Chọn bộ đề phù hợp để luyện tập tự do hoặc thi thử đánh giá năng lực theo chuẩn thời gian từng kỹ năng
+                {storefrontTab === 'periodic_mock'
+                  ? 'Kỳ thi đánh giá tổng lực định kỳ 3 tháng 1 lần do Ms. Như trực tiếp duyệt chấm đủ 4 kỹ năng (1 lượt thi thật)'
+                  : storefrontTab === 'daily_zone'
+                  ? 'Kho bài tập luyện hàng ngày chia theo Team với mật khẩu riêng, cho phép làm lại nhiều lần và thống kê số câu đúng tức thì'
+                  : 'Thi liên hoàn đủ 4 kỹ năng Listening, Reading, Writing & Speaking (1 lượt thi thật mỗi đề, chờ Ms. Như duyệt điểm)'}
               </p>
             </div>
 
-            {/* Filter Pills or Focused Reset */}
+            {/* 3-Section Storefront Switcher or Focused Reset */}
             {matchedFocusedTest && onClearFocusedTest ? (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700">
@@ -364,62 +391,166 @@ export default function StudentHome({
                   onClick={onClearFocusedTest}
                   className="px-3.5 py-2 rounded-lg bg-white dark:bg-zinc-900 border border-[#CBD5E1] dark:border-zinc-700 hover:border-slate-400 text-sm font-semibold text-[#0F172A] dark:text-zinc-200 transition"
                 >
-                  ← Xem toàn bộ {fullExamTests.length} đề thi
+                  ← Xem toàn bộ {realExamTests.length} đề Thực Chiến
                 </button>
               </div>
             ) : (
               <div className="flex items-center flex-wrap gap-1.5 bg-white dark:bg-[#18181B] p-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-sm font-semibold self-start sm:self-auto">
-              {[
-                { id: 'all', label: `Tất cả đề thi (${fullExamTests.length})` },
-                { id: 'unlimited', label: 'Luyện tập tự do' },
-                { id: 'limited', label: 'Thi thật / Giới hạn lượt' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setTestFilter(tab.id)}
-                  className={`px-3.5 py-2 rounded-md transition whitespace-nowrap ${
-                    testFilter === tab.id
-                      ? 'bg-[#0F766E] text-white'
-                      : 'text-[#334155] dark:text-zinc-300 hover:text-[#0F172B] dark:hover:text-white'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+                {[
+                  { id: 'real_exam', label: `Thực Chiến Thi Thật (${realExamTests.length})` },
+                  { id: 'periodic_mock', label: `Mock Test Định Kỳ (${periodicMockTests.length})` },
+                  { id: 'daily_zone', label: `Daily Zone (${singleSkillCount})` }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setStorefrontTab(tab.id)}
+                    className={`px-3.5 py-2 rounded-md transition whitespace-nowrap ${
+                      storefrontTab === tab.id
+                        ? 'bg-[#0F766E] text-white'
+                        : 'text-[#334155] dark:text-zinc-300 hover:text-[#0F172B] dark:hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
-          {filteredTests.length === 0 ? (
+          {/* Combo Pricing Strip — ONLY inside Thực Chiến Thi Thật */}
+          {!matchedFocusedTest && storefrontTab === 'real_exam' && (
+            <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-lg p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-extrabold text-[#0F172B] dark:text-[#FAFAFA]">
+                    Chi Phí Test &amp; Combo Thực Chiến (Full 4 Kỹ Năng · 1 Lượt/Đề)
+                  </span>
+                  {myRealExamCredits > 0 && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-extrabold">
+                      Bạn đang có {myRealExamCredits} lượt Combo
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs sm:text-sm text-[#475569] dark:text-zinc-400">
+                  1 đề lẻ: <strong>{formatVndCurrency(normalizedPayCfg.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND)}</strong> • Mua Combo để dùng đổi lượt mở bất kỳ đề Thực Chiến 4 kỹ năng nào!
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {REAL_EXAM_COMBOS.map(combo => {
+                  const comboPrice = Number(normalizedPayCfg[combo.priceKey]) > 0
+                    ? Number(normalizedPayCfg[combo.priceKey])
+                    : combo.defaultPriceVnd;
+                  return (
+                    <button
+                      key={combo.id}
+                      type="button"
+                      onClick={() =>
+                        onOpenCheckoutModal?.({
+                          itemType: combo.id,
+                          itemId: combo.id,
+                          itemLabel: `${combo.label} - Thực Chiến Thi Thật 4 Kỹ Năng`,
+                          itemPrice: comboPrice
+                        })
+                      }
+                      className="px-3.5 py-2 rounded-lg bg-[#F8FAFC] hover:bg-slate-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-xs sm:text-sm font-bold text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1.5 transition"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5 text-[#0F766E] dark:text-teal-400" />
+                      <span>{combo.label}:</span>
+                      <span className="text-[#0F766E] dark:text-teal-300 font-extrabold">
+                        {formatVndCurrency(comboPrice)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: Daily Zone Gateway Cards */}
+          {!matchedFocusedTest && storefrontTab === 'daily_zone' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[
+                {
+                  tab: 'speaking_daily',
+                  title: '1. Daily Speaking & Cày Forecast',
+                  desc: 'Bài nói bắt buộc hàng ngày & kho đề Forecast Speaking chuẩn của Ms. Như.'
+                },
+                {
+                  tab: 'reading',
+                  title: '2. Reading (SuperHomework 1–14)',
+                  desc: 'Luyện đọc hiểu phân mục từ SuperHomework 1 đến SuperHomework 14, chấm số câu đúng ngay lập tức.'
+                },
+                {
+                  tab: 'listening',
+                  title: '3. Listening (3 Phân Mục Chuyên Sâu)',
+                  desc: 'SuperHomework Listening • Section 1 Spelling Names & Numbers • Map.'
+                },
+                {
+                  tab: 'writing_task1',
+                  title: '4. Writing Task 1 (Map · Process · Dynamic · Static)',
+                  desc: 'Kho tách lẻ riêng cho Writing Task 1 theo 4 dạng bài trọng tâm.'
+                },
+                {
+                  tab: 'writing_task2',
+                  title: '5. Writing Task 2 (Essay)',
+                  desc: 'Kho bài tập Writing Task 2 riêng biệt, nộp trực tiếp cho Ms. Như check & nhận xét.'
+                }
+              ].map(card => (
+                <div
+                  key={card.tab}
+                  className="bg-white dark:bg-[#18181B] rounded-lg border border-slate-200 dark:border-zinc-800 p-6 flex flex-col justify-between gap-4"
+                >
+                  <div>
+                    <h3 className="font-extrabold text-[#0F172B] dark:text-[#FAFAFA] text-base mb-1.5">
+                      {card.title}
+                    </h3>
+                    <p className="text-sm text-[#475569] dark:text-zinc-400 leading-relaxed">
+                      {card.desc}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => (openSkillPracticeHub ? openSkillPracticeHub(card.tab) : setView('SKILL_HUB'))}
+                    className="w-full py-2.5 px-4 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-sm font-bold transition"
+                  >
+                    Vào Daily Zone →
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : filteredTests.length === 0 ? (
             <div className="bg-white dark:bg-[#18181B] rounded-lg border border-dashed border-slate-300 dark:border-zinc-700 p-10 text-center text-[#475569] dark:text-zinc-400 text-sm">
-              {visibleTests.length === 0
-                ? 'Hiện chưa có đề thi công khai nào. Giáo viên sẽ mở đề khi bắt đầu buổi kiểm tra.'
-                : 'Không có bộ đề nào trong bộ lọc này. Hãy chuyển sang tab "Tất cả".'}
+              {storefrontTab === 'periodic_mock'
+                ? 'Hiện chưa có đề Mock Test Định Kỳ (300.000đ · 3 tháng/lần) đang mở. Ms. Như sẽ mở đề khi đến kỳ kiểm tra định kỳ.'
+                : 'Hiện chưa có đề Thực Chiến Thi Thật 4 Kỹ Năng nào đang mở. Giáo viên sẽ mở đề trong thời gian sớm nhất.'}
             </div>
           ) : (
             <div className={`grid gap-5 ${matchedFocusedTest ? 'grid-cols-1 max-w-xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
               {filteredTests.map(test => {
                 const cfg = normalizeExamConfig(test);
                 const schedule = evaluateTestSchedule(cfg, serverNowMs);
-                const myUsedCount = studentAttempts.filter(a => a.testId === test.id).length;
-                const isExhausted = cfg.maxAttempts > 0 && myUsedCount >= cfg.maxAttempts;
+                const myTestAttempts = studentAttempts.filter(a => a.testId === test.id);
+                const myUsedCount = myTestAttempts.length;
+                const latestAttempt = myTestAttempts[0] || null;
+                const effectiveMaxAttempts = cfg.maxAttempts > 0 ? cfg.maxAttempts : 1;
+                const isExhausted = !isTeacher && myUsedCount >= effectiveMaxAttempts;
                 const isLockedBySchedule = !isTeacher && schedule.lockedBySchedule;
                 const testPrice = getTestPurchasePriceVnd(test, paymentConfig);
+                const isPeriodicMockCard = cfg.examCategory === 'periodic_mock' || testPrice >= PERIODIC_MOCK_PRICE_VND;
                 const isPurchasedTest = hasTestPurchaseAccess(currentUser, test);
                 const isPaidLocked = !isTeacher && testPrice > 0 && !isPurchasedTest;
+                const canUseComboCredit = isPaidLocked && !isPeriodicMockCard && myRealExamCredits > 0;
                 const hasExamPassword = Boolean(cfg.hasExamPassword || cfg.examPassword);
                 const requiresPasswordPrompt = !isTeacher && hasExamPassword && !examUnlockTokens?.[test.id];
-                const isButtonDisabled = isExhausted || isLockedBySchedule;
-                const skillShort = { listening: 'L', reading: 'R', writing: 'W' };
+                const isButtonDisabled = isLockedBySchedule && !isExhausted;
+                const skillShort = { listening: 'L', reading: 'R', writing: 'W', speaking: 'S' };
                 const totalMins = cfg.order.reduce((sum, s) => sum + (cfg.durations[s] || 0), 0);
                 const hasDraft = Boolean(draftByTestId[test.id]);
                 const trackCount = getListeningTracks(test.listening).length;
                 const passageCount = getReadingPassages(test.reading).length;
                 const assignedClassNames = getAssignedClassNames(cfg.assignedClassIds, classesDb);
-                const attemptSummaryText = cfg.maxAttempts === 0
-                  ? `Tự do (${myUsedCount} lượt)`
-                  : `Thi thật ${myUsedCount}/${cfg.maxAttempts} lượt`;
+                const attemptSummaryText = `Thi thật ${myUsedCount}/${effectiveMaxAttempts} lượt`;
                 const scheduleSummaryText = cfg.scheduleMode === 'flexible'
                   ? 'Làm bất kỳ lúc nào'
                   : schedule.lockedBySchedule
@@ -440,7 +571,7 @@ export default function StudentHome({
                     <div className="flex-1 flex flex-col">
                       <div className="flex flex-wrap justify-between items-center gap-2 mb-3.5">
                         <span className="bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border border-[#E2E8F0] dark:border-zinc-700 text-xs font-medium px-2.5 py-1 rounded-md inline-flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> IELTS Academic • {totalMins}p
+                          <Clock className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> IELTS 4 Kỹ Năng • {totalMins}p
                         </span>
                         {testPrice > 0 ? (
                           <span
@@ -453,8 +584,8 @@ export default function StudentHome({
                             <ShoppingBag className="w-3.5 h-3.5" />
                             <span>
                               {isPurchasedTest || isTeacher
-                                ? `Đã Mở Đề (${formatVndCurrency(testPrice)}) · Làm nhiều lần`
-                                : `Đề Đăng Bán ${formatVndCurrency(testPrice)} · Làm nhiều lần`}
+                                ? `Đã mở (${formatVndCurrency(testPrice)}) · 1 lượt`
+                                : `Chi phí test: ${formatVndCurrency(testPrice)} · 1 lượt`}
                             </span>
                           </span>
                         ) : (
@@ -499,12 +630,12 @@ export default function StudentHome({
                         {test.description}
                       </p>
 
-                      {((testPrice > 0 && cfg.maxAttempts > 0) || hasExamPassword || (isTeacher && cfg.visibility === 'private') || assignedClassNames.length > 0 || (hasDraft && !isExhausted)) && (
+                      {((testPrice > 0) || hasExamPassword || (isTeacher && cfg.visibility === 'private') || assignedClassNames.length > 0 || (hasDraft && !isExhausted)) && (
                         <div className="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-[#475569] dark:text-zinc-400">
-                          {testPrice > 0 && cfg.maxAttempts > 0 && <span>{attemptSummaryText}</span>}
+                          {testPrice > 0 && <span>{attemptSummaryText}</span>}
                           {hasExamPassword && (
                             <span className="inline-flex items-center gap-1 text-[#0F172B] dark:text-zinc-200 font-semibold">
-                              <KeyRound className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Thi Thực Chiến • Nhập Pass Lớp
+                              <KeyRound className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Nhập Pass Lớp
                             </span>
                           )}
                           {isTeacher && cfg.visibility === 'private' && (
@@ -529,13 +660,13 @@ export default function StudentHome({
                     <div className="mt-auto pt-3 border-t border-slate-200 dark:border-zinc-800 space-y-3">
                       <div className="space-y-1.5">
                         <p className="text-sm font-semibold text-[#0F172B] dark:text-zinc-200">
-                          Listening ({cfg.durations.listening}p) • Reading ({cfg.durations.reading}p) • Writing ({cfg.durations.writing}p)
+                          Listening ({cfg.durations.listening}p) • Reading ({cfg.durations.reading}p) • Writing ({cfg.durations.writing}p){cfg.order.includes('speaking') ? ` • Speaking (${cfg.durations.speaking || 14}p)` : ''}
                         </p>
                         <div className="text-[13px] text-[#475569] dark:text-zinc-400 flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span>
-                            {test.listening?.questions?.length || 0} nghe{trackCount > 1 ? ` (${trackCount} bài)` : ''} • {test.reading?.questions?.length || 0} đọc{passageCount > 1 ? ` (${passageCount} bài)` : ''} • 2 Tasks viết
+                            {test.listening?.questions?.length || 0} nghe{trackCount > 1 ? ` (${trackCount} bài)` : ''} • {test.reading?.questions?.length || 0} đọc{passageCount > 1 ? ` (${passageCount} bài)` : ''} • 2 Tasks viết{cfg.order.includes('speaking') ? ' • Speaking P1–3' : ''}
                           </span>
-                          <span>• Thứ tự: {cfg.order.map(s => skillShort[s]).join(' → ')}</span>
+                          <span>• Thứ tự: {cfg.order.map(s => skillShort[s] || s).join(' → ')}</span>
                           {cfg.sequentialMode && (
                             <span className="inline-flex items-center gap-1">
                               <Lock className="w-3.5 h-3.5" /> Tuần tự
@@ -552,58 +683,113 @@ export default function StudentHome({
                         </p>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          if (isPaidLocked && onOpenCheckoutModal) {
-                            onOpenCheckoutModal({
-                              itemType: 'test',
-                              itemId: test.id,
-                              itemLabel: test.title,
-                              itemPrice: testPrice
-                            });
-                            return;
-                          }
-                          startExam(test.id);
-                        }}
-                        disabled={isButtonDisabled}
-                        className={`w-full font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 ${
-                          isButtonDisabled
-                            ? 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#475569] dark:text-zinc-400 cursor-not-allowed'
-                            : isPaidLocked
-                            ? 'bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950'
-                            : 'bg-[#0F766E] hover:bg-[#0D9488] text-white'
-                        }`}
-                      >
-                        {isButtonDisabled ? (
-                          <>
-                            <Lock className="w-3.5 h-3.5" />
+                      {isExhausted && latestAttempt ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedAttemptId?.(latestAttempt.id);
+                            setPreviousView?.('HOME');
+                            setView('RESULT_VIEW');
+                          }}
+                          className="w-full font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 bg-[#F1F5F9] hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-100 border border-slate-200 dark:border-zinc-700"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-[#0F766E] dark:text-teal-400" />
+                          <span>
+                            {latestAttempt.teacherGraded
+                              ? `Đã thi (1/1) · Xem Điểm (Band ${latestAttempt.overallBand})`
+                              : 'Đã nộp (1/1) · Ms. Như Đang Check'}
+                          </span>
+                        </button>
+                      ) : canUseComboCredit ? (
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            disabled={redeemingTestId === test.id}
+                            onClick={async () => {
+                              if (!onRedeemRealExamCredit) return;
+                              setRedeemingTestId(test.id);
+                              try {
+                                await onRedeemRealExamCredit(test.id);
+                              } finally {
+                                setRedeemingTestId('');
+                              }
+                            }}
+                            className="w-full font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 bg-[#0F766E] hover:bg-[#0D9488] text-white disabled:opacity-60"
+                          >
+                            <Sparkles className="w-4 h-4" />
                             <span>
-                              {isExhausted
-                                ? `Đã hết lượt làm bài (${myUsedCount}/${cfg.maxAttempts})`
-                                : schedule.notYetOpen
-                                ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
-                                : 'Đã hết hạn nộp bài'}
+                              {redeemingTestId === test.id
+                                ? 'Đang mở đề...'
+                                : `Dùng 1 Lượt Combo (Còn ${myRealExamCredits})`}
                             </span>
-                          </>
-                        ) : isPaidLocked ? (
-                          <>
-                            <ShoppingBag className="w-3.5 h-3.5" />
-                            <span>Mua Đề Thi ({formatVndCurrency(testPrice)})</span>
-                          </>
-                        ) : requiresPasswordPrompt ? (
-                          <>
-                            <KeyRound className="w-3.5 h-3.5" />
-                            <span>{hasDraft ? 'Nhập Pass · Tiếp Tục Bài' : 'Nhập Mật Khẩu Thi Thật'}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3.5 h-3.5 fill-white" />
-                            <span>
-                              {hasDraft ? 'Tiếp Tục Bài Đang Làm' : myUsedCount > 0 ? 'Làm Lại Đề Thi' : 'Bắt Đầu Làm Bài'}
-                            </span>
-                          </>
-                        )}
-                      </button>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onOpenCheckoutModal?.({
+                                itemType: 'test',
+                                itemId: test.id,
+                                itemLabel: test.title,
+                                itemPrice: testPrice
+                              })
+                            }
+                            className="w-full font-semibold py-2 rounded-lg text-xs transition bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-[#334155] dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800"
+                          >
+                            Hoặc đóng chi phí test lẻ ({formatVndCurrency(testPrice)})
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (isPaidLocked && onOpenCheckoutModal) {
+                              onOpenCheckoutModal({
+                                itemType: 'test',
+                                itemId: test.id,
+                                itemLabel: test.title,
+                                itemPrice: testPrice
+                              });
+                              return;
+                            }
+                            startExam(test.id);
+                          }}
+                          disabled={isButtonDisabled}
+                          className={`w-full font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 ${
+                            isButtonDisabled
+                              ? 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#475569] dark:text-zinc-400 cursor-not-allowed'
+                              : isPaidLocked
+                              ? 'bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950'
+                              : 'bg-[#0F766E] hover:bg-[#0D9488] text-white'
+                          }`}
+                        >
+                          {isButtonDisabled ? (
+                            <>
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>
+                                {schedule.notYetOpen
+                                  ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
+                                  : 'Đã hết hạn nộp bài'}
+                              </span>
+                            </>
+                          ) : isPaidLocked ? (
+                            <>
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              <span>Chi Phí Test: {formatVndCurrency(testPrice)} (1 Lượt)</span>
+                            </>
+                          ) : requiresPasswordPrompt ? (
+                            <>
+                              <KeyRound className="w-3.5 h-3.5" />
+                              <span>{hasDraft ? 'Nhập Pass · Tiếp Tục Bài' : 'Nhập Mật Khẩu Thi Thật'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3.5 h-3.5 fill-white" />
+                              <span>
+                                {hasDraft ? 'Tiếp Tục Bài Đang Làm' : 'Bắt Đầu Thi 4 Kỹ Năng'}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -655,13 +841,15 @@ export default function StudentHome({
                       <th className="px-4 py-3.5 text-center">Listening</th>
                       <th className="px-4 py-3.5 text-center">Reading</th>
                       <th className="px-4 py-3.5 text-center">Writing</th>
-                      <th className="px-4 py-3.5 text-center">Speaking AI</th>
+                      <th className="px-4 py-3.5 text-center">Speaking</th>
                       <th className="px-4 py-3.5 text-center">Overall</th>
                       <th className="px-4 py-3.5 text-right">Chi Tiết</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
-                    {studentAttempts.map(att => (
+                    {studentAttempts.map(att => {
+                      const canShowApprovedScore = isTeacher || Boolean(att.teacherGraded);
+                      return (
                       <tr key={att.id} className="hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40 transition">
                         <td className="px-4 py-4 font-bold text-[#0F172B] dark:text-[#F4F4F5]">
                           <div className="flex flex-wrap items-center gap-2">
@@ -673,21 +861,21 @@ export default function StudentHome({
                               }`}
                             >
                               {att.testMode === 'single_skill'
-                                ? `BÀI TẬP ${(att.focusSkill || '').toUpperCase()}`
-                                : 'ĐỀ THI'}
+                                ? `DAILY ${(att.focusSkill || '').toUpperCase()}`
+                                : 'THỰC CHIẾN 4KN'}
                             </span>
                             <span>{att.testTitle}</span>
                           </div>
                         </td>
                         <td className="px-4 py-4 text-sm text-[#475569] dark:text-zinc-400 whitespace-nowrap">{att.submittedAt}</td>
                         <td className="px-4 py-4 text-center font-bold text-[#0F172B] dark:text-zinc-100 tabular-nums">
-                          {att.scores?.listening?.band ?? '-'}
+                          {canShowApprovedScore ? (att.scores?.listening?.band ?? '-') : '-'}
                         </td>
                         <td className="px-4 py-4 text-center font-bold text-[#0F172B] dark:text-zinc-100 tabular-nums">
-                          {att.scores?.reading?.band ?? '-'}
+                          {canShowApprovedScore ? (att.scores?.reading?.band ?? '-') : '-'}
                         </td>
                         <td className="px-4 py-4 text-center">
-                          {att.scores?.writing?.overallBand !== null && att.scores?.writing?.overallBand !== undefined ? (
+                          {canShowApprovedScore && att.scores?.writing?.overallBand !== null && att.scores?.writing?.overallBand !== undefined ? (
                             <span className="font-bold text-[#0F172B] dark:text-zinc-100 tabular-nums">
                               {att.scores.writing.overallBand}
                             </span>
@@ -695,21 +883,29 @@ export default function StudentHome({
                             <span className="text-[#475569] dark:text-zinc-400">-</span>
                           ) : (
                             <span className="text-xs bg-[#FEF3C7] dark:bg-amber-950/60 text-[#92400E] dark:text-amber-200 border border-amber-300 dark:border-amber-700 px-2.5 py-0.5 rounded-full font-semibold whitespace-nowrap">
-                              Chờ chấm
+                              Ms. Như đang check
                             </span>
                           )}
                         </td>
                         <td className="px-4 py-4 text-center font-bold text-[#0F766E] dark:text-zinc-100 tabular-nums">
-                          {att.scores?.speaking?.band ?? '-'}
+                          {canShowApprovedScore && att.scores?.speaking?.band !== null && att.scores?.speaking?.band !== undefined
+                            ? att.scores.speaking.band
+                            : att.testMode === 'single_skill' && att.focusSkill !== 'speaking'
+                            ? '-'
+                            : (
+                              <span className="text-xs bg-[#FEF3C7] dark:bg-amber-950/60 text-[#92400E] dark:text-amber-200 border border-amber-300 dark:border-amber-700 px-2.5 py-0.5 rounded-full font-semibold whitespace-nowrap">
+                                Ms. Như đang check
+                              </span>
+                            )}
                         </td>
                         <td className="px-4 py-4 text-center">
-                          {att.overallBand !== null && att.overallBand !== undefined ? (
+                          {canShowApprovedScore && att.overallBand !== null && att.overallBand !== undefined ? (
                             <span className="text-sm font-extrabold text-[#0F766E] dark:text-[#F4F4F5] bg-[#EDFFFD] dark:bg-zinc-800 border border-[#B5F5F1] dark:border-zinc-700 px-2.5 py-1 rounded-lg tabular-nums">
                               {att.overallBand}
                             </span>
                           ) : (
                             <span className="text-xs font-medium text-[#92400E] dark:text-amber-200 bg-[#FEF3C7] dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded-full whitespace-nowrap">
-                              Chờ chấm
+                              Ms. Như đang check
                             </span>
                           )}
                         </td>
@@ -727,7 +923,8 @@ export default function StudentHome({
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

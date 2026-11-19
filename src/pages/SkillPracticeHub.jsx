@@ -28,7 +28,25 @@ import {
   X
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
-import { getAssignedClassNames, getEffectiveTestHashtags, getListeningTracks, getReadingPassages, getSpeakingQuestionItems, getVietnamTodayDateKey, canUserAccessTest, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
+import {
+  DAILY_LISTENING_SUBCATEGORIES,
+  DAILY_READING_SUBCATEGORIES,
+  DAILY_WRITING_T1_SUBCATEGORIES,
+  canUserAccessTest,
+  evaluateSpeakingDailyCompliance,
+  evaluateTestSchedule,
+  formatDurationVi,
+  formatViDateTime,
+  getAssignedClassNames,
+  getDailySubCategoryLabel,
+  getEffectiveTestHashtags,
+  getListeningTracks,
+  getReadingPassages,
+  getSpeakingQuestionItems,
+  getVietnamTodayDateKey,
+  normalizeExamConfig,
+  normalizeSpeakingSection
+} from '../constants/seedData';
 import { getQuestionTypeMeta } from '../utils/examHelpers';
 import { verifySpeakingRoomPassword } from '../utils/speakingApi';
 import {
@@ -68,7 +86,10 @@ export default function SkillPracticeHub({
 }) {
   const [sidebarOpenMobile, setSidebarOpenMobile] = useState(false);
   const [singleHubSkill, setSingleHubSkill] = useState('all'); // 'all' | 'reading' | 'listening' | 'writing'
-  const hashtagScopeKey = `${activeTab}:${singleHubSkill}`;
+  const [subCatFilterState, setSubCatFilterState] = useState({ tab: activeTab, sub: 'all' });
+  const activeSubCatFilter = subCatFilterState.tab === activeTab ? subCatFilterState.sub : 'all';
+  const setActiveSubCatFilter = (nextSub) => setSubCatFilterState({ tab: activeTab, sub: nextSub || 'all' });
+  const hashtagScopeKey = `${activeTab}:${singleHubSkill}:${activeSubCatFilter}`;
   const [hashtagFilterState, setHashtagFilterState] = useState({ scopeKey: hashtagScopeKey, tag: 'all' });
   const selectedSpeakingHashtag = hashtagFilterState.scopeKey === hashtagScopeKey ? hashtagFilterState.tag : 'all';
   const setSelectedSpeakingHashtag = (nextOrUpdater) => {
@@ -98,11 +119,11 @@ export default function SkillPracticeHub({
       onOpenCheckoutModal({
         itemType: type,
         itemId: '',
-        itemLabel: 'Gói Ai eo VIP (1 Tháng Full Quyền)',
+        itemLabel: 'Gói IELTS VIP (1 Tháng Full Quyền)',
         itemPrice: payCfg.aieoVipPrice
       });
     } else {
-      showToast?.('Mở Trang Cá Nhân để kích hoạt Gói Ai eo VIP.', 'info');
+      showToast?.('Mở Trang Cá Nhân để kích hoạt Gói IELTS VIP.', 'info');
     }
   };
 
@@ -119,24 +140,20 @@ export default function SkillPracticeHub({
 
   const speakingTests = singleSkillTests.filter(t => t.focusSkill === 'speaking');
   const dailySpeakingTests = speakingTests.filter(
-    t => normalizeSpeakingSection(t.speaking).speakingTrack === 'daily'
+    t => !normalizeSpeakingSection(t.speaking).isForecast && normalizeSpeakingSection(t.speaking).speakingTrack !== 'exam_room'
   );
-  const examRoomSpeakingTests = speakingTests.filter(t => {
-    const sp = normalizeSpeakingSection(t.speaking);
-    const cfg = normalizeExamConfig(t);
-    return (
-      sp.speakingTrack === 'exam_room' ||
-      cfg.examPurpose === 'real_exam' ||
-      Boolean(sp.hasRoomPassword || sp.roomPassword || cfg.hasExamPassword || cfg.examPassword)
-    );
-  });
   const listeningTests = singleSkillTests.filter(t => t.focusSkill === 'listening');
   const readingTests = singleSkillTests.filter(t => t.focusSkill === 'reading');
   const writingTests = singleSkillTests.filter(t => t.focusSkill === 'writing');
+  const writingTask1Tests = writingTests.filter(t => normalizeExamConfig(t).writingTaskScope !== 'task2');
+  const writingTask2Tests = writingTests.filter(t => {
+    const sc = normalizeExamConfig(t).writingTaskScope;
+    return sc === 'task2' || sc === 'both';
+  });
 
   const forecastTests = [
     ...speakingTests.filter(t => normalizeSpeakingSection(t.speaking).isForecast),
-    ...speakingTests.filter(t => !normalizeSpeakingSection(t.speaking).isForecast)
+    ...speakingTests.filter(t => !normalizeSpeakingSection(t.speaking).isForecast && normalizeSpeakingSection(t.speaking).speakingTrack === 'general')
   ];
 
   const myAttempts = attempts.filter(
@@ -254,28 +271,17 @@ export default function SkillPracticeHub({
   const navItems = [
     {
       id: 'speaking_daily',
-      label: '1. Speaking Daily',
+      label: '1. Daily Speaking',
       icon: Flame,
       badge: !isTeacher && dailyCompliance.myPendingDailyTests.length > 0
         ? `${dailyCompliance.myPendingDailyTests.length} mới`
         : dailySpeakingTests.length
     },
-    { id: 'speaking_exam_room', label: '2. Phòng Thi Thực Chiến', icon: Lock, badge: examRoomSpeakingTests.length },
-    { id: 'speaking', label: 'Kho Speaking AI', icon: Mic, badge: speakingTests.length },
-    { id: 'forecast', label: 'Bài Tập Forecast', icon: Sparkles, badge: forecastTests.length },
-    {
-      id: 'single_hub',
-      label: 'Zone Tổng Đề Thi Lẻ (Đ·N·V)',
-      icon: Layers,
-      badge: readingTests.length + listeningTests.length + writingTests.length
-    },
-    ...(!isTeacher
-      ? [
-          { id: 'reading', label: 'Đọc (Reading Lẻ)', icon: BookOpen, badge: readingTests.length },
-          { id: 'listening', label: 'Nghe (Listening Lẻ)', icon: Headphones, badge: listeningTests.length },
-          { id: 'writing', label: 'Viết (Writing Lẻ)', icon: PenTool, badge: writingTests.length }
-        ]
-      : [])
+    { id: 'forecast', label: '2. Cày Forecast Cùng Ms. Như', icon: Sparkles, badge: forecastTests.length },
+    { id: 'reading', label: '3. Đọc (SHW 1–14)', icon: BookOpen, badge: readingTests.length },
+    { id: 'listening', label: '4. Nghe (SHW · Sec1 · Map)', icon: Headphones, badge: listeningTests.length },
+    { id: 'writing_task1', label: '5. Viết Task 1 (W1)', icon: PenTool, badge: writingTask1Tests.length },
+    { id: 'writing_task2', label: '6. Viết Task 2 (W2)', icon: PenTool, badge: writingTask2Tests.length }
   ];
 
   const renderSingleSkillLeaderboard = (skillFilter = 'all') => {
@@ -685,16 +691,58 @@ export default function SkillPracticeHub({
     );
   };
 
-  const renderSkillTestCards = (skillId, list) => {
+  const renderSkillTestCards = (tabKey, list) => {
+    const actualSkill =
+      tabKey === 'writing_task1' || tabKey === 'writing_task2' || tabKey === 'writing'
+        ? 'writing'
+        : tabKey === 'listening'
+        ? 'listening'
+        : 'reading';
+    const writingScopeFilter = tabKey === 'writing_task1' ? 'task1' : tabKey === 'writing_task2' ? 'task2' : 'both';
+
     const metaMap = {
-      listening: { name: 'Listening', color: 'text-[#0F766E] dark:text-[#1EE1D6]', bg: 'bg-[#EDFFFD] dark:bg-teal-500/15', icon: Headphones },
-      reading: { name: 'Reading', color: 'text-[#1D4ED8] dark:text-blue-400', bg: 'bg-[#EFF6FF] dark:bg-blue-500/15', icon: BookOpen },
-      writing: { name: 'Writing', color: 'text-[#065F46] dark:text-emerald-400', bg: 'bg-[#D1FAE5] dark:bg-emerald-500/15', icon: PenTool }
+      listening: {
+        name: 'Daily Listening',
+        subtitle: 'Chia 3 phân mục: 1. SuperHomework Listening • 2. Section 1 Spelling Names & Numbers • 3. Map',
+        color: 'text-[#0F766E] dark:text-[#1EE1D6]',
+        bg: 'bg-[#EDFFFD] dark:bg-teal-500/15',
+        icon: Headphones,
+        subCategories: DAILY_LISTENING_SUBCATEGORIES
+      },
+      reading: {
+        name: 'Daily Reading (SuperHomework 1–14)',
+        subtitle: 'Luyện đọc chia theo từng SuperHomework từ 1 đến 14 · Làm lại nhiều lần · Hiện ngay số câu đúng & thời gian',
+        color: 'text-[#1D4ED8] dark:text-blue-400',
+        bg: 'bg-[#EFF6FF] dark:bg-blue-500/15',
+        icon: BookOpen,
+        subCategories: DAILY_READING_SUBCATEGORIES
+      },
+      writing_task1: {
+        name: 'Daily Writing Task 1 (W1)',
+        subtitle: 'Kho tách lẻ riêng cho Writing Task 1 gồm 4 dạng bài: Map • Process • Dynamic • Static',
+        color: 'text-[#065F46] dark:text-emerald-400',
+        bg: 'bg-[#D1FAE5] dark:bg-emerald-500/15',
+        icon: PenTool,
+        subCategories: DAILY_WRITING_T1_SUBCATEGORIES
+      },
+      writing_task2: {
+        name: 'Daily Writing Task 2 (W2)',
+        subtitle: 'Kho bài tập Writing Task 2 (Essay) tách lẻ · Nộp trực tiếp cho Ms. Như check & nhận xét chi tiết',
+        color: 'text-[#065F46] dark:text-emerald-400',
+        bg: 'bg-[#D1FAE5] dark:bg-emerald-500/15',
+        icon: PenTool,
+        subCategories: []
+      }
     };
-    const meta = metaMap[skillId] || metaMap.reading;
+    const meta = metaMap[tabKey] || metaMap[actualSkill] || metaMap.reading;
     const IconComp = meta.icon;
     const focusedMatch = focusedTestId ? list.find(t => t.id === focusedTestId) : null;
-    const displayedList = focusedMatch ? [focusedMatch] : list;
+    const subFilteredList = focusedMatch
+      ? [focusedMatch]
+      : activeSubCatFilter === 'all'
+      ? list
+      : list.filter(t => normalizeExamConfig(t).dailySubCategory === activeSubCatFilter);
+    const displayedList = subFilteredList;
 
     return (
       <div className="space-y-6">
@@ -704,22 +752,70 @@ export default function SkillPracticeHub({
               <span className={`w-10 h-10 rounded-lg ${meta.bg} ${meta.color} border border-slate-200 dark:border-slate-700 flex items-center justify-center`}>
                 <IconComp className="w-5 h-5" />
               </span>
-              <span>Bài Tập Kỹ Năng: {meta.name}</span>
+              <span>{meta.name}</span>
             </h1>
             <p className="text-sm text-[#475569] dark:text-slate-400 mt-1 max-w-2xl">
-              Bài tập thực hành chuyên sâu theo từng kỹ năng, tách biệt hoàn toàn khỏi bộ Đề Thi IELTS (L·R·W).
+              {meta.subtitle}
             </p>
           </div>
           {isTeacher && (
             <button
               type="button"
-              onClick={() => onOpenSkillBuilder?.(skillId)}
+              onClick={() =>
+                onOpenSkillBuilder?.(actualSkill, null, {
+                  writingTaskScope: writingScopeFilter,
+                  dailySubCategory:
+                    activeSubCatFilter !== 'all'
+                      ? activeSubCatFilter
+                      : meta.subCategories[0]?.id || (tabKey === 'writing_task2' ? 'w2_essay' : '')
+                })
+              }
               className="px-4 py-2.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-2 transition self-start sm:self-auto"
             >
-              <Plus className="w-4 h-4" /> Tạo Bài Tập {skillId.toUpperCase()}
+              <Plus className="w-4 h-4" /> Tạo Bài {tabKey === 'writing_task1' ? 'W1' : tabKey === 'writing_task2' ? 'W2' : actualSkill.toUpperCase()}
             </button>
           )}
         </div>
+
+        {/* Daily Zone Sub-Category Selector Pills (SHW 1-14 / Listening 3 mục / W1 4 dạng) */}
+        {meta.subCategories.length > 0 && !focusedMatch && (
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">
+              Chọn phân mục bài tập:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveSubCatFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                  activeSubCatFilter === 'all'
+                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                    : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                }`}
+              >
+                Tất cả ({list.length})
+              </button>
+              {meta.subCategories.map(sub => {
+                const subCount = list.filter(t => normalizeExamConfig(t).dailySubCategory === sub.id).length;
+                const isSelected = activeSubCatFilter === sub.id;
+                return (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => setActiveSubCatFilter(sub.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                      isSelected
+                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                    }`}
+                  >
+                    {sub.label}{subCount > 0 ? ` (${subCount})` : ''}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {focusedMatch && onClearFocusedTest && (
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-[#EDFFFD] dark:bg-teal-950/40 border border-[#007A7A]/40 dark:border-[#1EE1D6]/30">
@@ -810,15 +906,17 @@ export default function SkillPracticeHub({
                   <IconComp className="w-10 h-10 mx-auto text-[#475569] dark:text-slate-400" />
                   <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
                     {selectedSpeakingHashtag !== 'all'
-                      ? `Chưa có bài ${skillId.toUpperCase()} nào gắn nhãn ${selectedSpeakingHashtag}`
-                      : `Chưa có bài tập ${skillId.toUpperCase()} nào`}
+                      ? `Chưa có bài ${actualSkill.toUpperCase()} nào gắn nhãn ${selectedSpeakingHashtag}`
+                      : activeSubCatFilter !== 'all'
+                      ? `Chưa có bài tập nào trong mục ${getDailySubCategoryLabel(activeSubCatFilter)}`
+                      : `Chưa có bài tập ${meta.name} nào`}
                   </h2>
                   <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
-                    {selectedSpeakingHashtag !== 'all'
+                    {selectedSpeakingHashtag !== 'all' || activeSubCatFilter !== 'all'
                       ? 'Hãy bấm "Tất cả" để xem toàn bộ danh sách bài tập.'
                       : isTeacher
-                      ? `Hãy bấm "Tạo Bài Tập ${skillId.toUpperCase()}" để tạo nhanh một bài tập luyện riêng kỹ năng ${skillId.toUpperCase()}.`
-                      : 'Giáo viên sẽ đăng tải các bài tập luyện tập chuyên sâu theo từng kỹ năng tại đây.'}
+                      ? `Hãy bấm nút Tạo Bài ở góc trên phải để đăng tải bài tập mới vào phân mục này.`
+                      : 'Ms. Như sẽ đăng tải các bài tập Daily Zone cho Team tại đây.'}
                   </p>
                 </div>
               ) : (
@@ -826,29 +924,41 @@ export default function SkillPracticeHub({
                   {finalSkillList.map(test => {
                     const cfg = normalizeExamConfig(test);
                     const schedule = evaluateTestSchedule(cfg, serverNowMs);
-                    const usedCount = myAttempts.filter(a => a.testId === test.id).length;
+                    const myTestAttempts = myAttempts.filter(a => a.testId === test.id);
+                    const usedCount = myTestAttempts.length;
+                    const latestMyAttempt = myTestAttempts[0] || null;
                     const isExhausted = cfg.maxAttempts > 0 && usedCount >= cfg.maxAttempts;
                     const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
                     const hasExamPass = Boolean(cfg.hasExamPassword || cfg.examPassword);
-                    const isRealExamCard = cfg.examPurpose === 'real_exam' || cfg.maxAttempts === 1 || hasExamPass;
                     const isPassUnlocked = isTeacher || !hasExamPass || Boolean(examUnlockTokens?.[test.id]);
+                    const subCatLabel = getDailySubCategoryLabel(cfg.dailySubCategory);
                     const lockText = isExhausted
                       ? 'Đã hết lượt'
                       : schedule.notYetOpen
                       ? `Mở lúc ${formatViDateTime(schedule.openAt)}`
                       : 'Đã hết hạn nộp';
                     const qCount =
-                      skillId === 'listening'
+                      actualSkill === 'listening'
                         ? (test.listening?.questions?.length || 0)
-                        : skillId === 'reading'
+                        : actualSkill === 'reading'
                         ? (test.reading?.questions?.length || 0)
-                        : 2;
+                        : 1;
                     const subCountLabel =
-                      skillId === 'listening'
+                      actualSkill === 'listening'
                         ? `${getListeningTracks(test.listening).length} Part • ${qCount} câu`
-                        : skillId === 'reading'
+                        : actualSkill === 'reading'
                         ? `${getReadingPassages(test.reading).length} Passage • ${qCount} câu`
-                        : 'Task 1 & Task 2';
+                        : cfg.writingTaskScope === 'task1'
+                        ? 'Writing Task 1 (Tối thiểu 150 từ)'
+                        : cfg.writingTaskScope === 'task2'
+                        ? 'Writing Task 2 (Tối thiểu 250 từ)'
+                        : 'Writing Task 1 & Task 2';
+                    const latestScoreObj =
+                      actualSkill === 'listening'
+                        ? latestMyAttempt?.scores?.listening
+                        : actualSkill === 'reading'
+                        ? latestMyAttempt?.scores?.reading
+                        : null;
 
                     return (
                       <div
@@ -856,8 +966,6 @@ export default function SkillPracticeHub({
                         className={`bg-white dark:bg-[#0F172B] border rounded-lg p-5 flex flex-col justify-between gap-4 transition ${
                           focusedMatch?.id === test.id
                             ? 'border-[#007A7A] dark:border-[#1EE1D6] ring-2 ring-[#007A7A]/20'
-                            : isRealExamCard
-                            ? 'border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
                             : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                         }`}
                       >
@@ -865,13 +973,8 @@ export default function SkillPracticeHub({
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${meta.bg} ${meta.color}`}>
-                                {skillId.toUpperCase()} ONLY • {cfg.durations[skillId]} phút
+                                {subCatLabel || actualSkill.toUpperCase()} • {cfg.durations[actualSkill]}p
                               </span>
-                              {isRealExamCard && (
-                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-[#991B1B] text-white inline-flex items-center gap-1">
-                                  🏛️ Đề Thi Thật
-                                </span>
-                              )}
                               {hasExamPass && (
                                 <span
                                   className={`text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border ${
@@ -882,10 +985,10 @@ export default function SkillPracticeHub({
                                 >
                                   <KeyRound className="w-3 h-3" />
                                   {isTeacher
-                                    ? `Pass: ${cfg.examPassword || 'Đã bật'}`
+                                    ? `Pass Team: ${cfg.examPassword || 'Đã bật'}`
                                     : isPassUnlocked
-                                    ? 'Đã mở khóa'
-                                    : 'Có Mật Khẩu'}
+                                    ? 'Đã mở Team'
+                                    : 'Có Pass Team'}
                                 </span>
                               )}
                             </div>
@@ -895,7 +998,7 @@ export default function SkillPracticeHub({
                                   key={cls.id}
                                   className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                                 >
-                                  Lớp {cls.name}
+                                  Team {cls.name}
                                 </span>
                               ))}
                               {isTeacher && cfg.visibility === 'private' && (
@@ -904,7 +1007,7 @@ export default function SkillPracticeHub({
                                 </span>
                               )}
                               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
-                                {cfg.maxAttempts === 0 ? `Tự do (${usedCount})` : `${usedCount}/${cfg.maxAttempts} lượt`}
+                                Đã làm: {usedCount} lần
                               </span>
                             </div>
                           </div>
@@ -924,10 +1027,31 @@ export default function SkillPracticeHub({
                           <p className="text-xs font-semibold text-[#334155] dark:text-slate-300">
                             Nội dung: {subCountLabel}
                           </p>
+
+                          {/* Student's latest Daily attempt stats (Số câu đúng + Thời gian + Số lần làm) */}
+                          {latestMyAttempt && (
+                            <div className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-bold text-[#0F766E] dark:text-teal-300">
+                                {latestScoreObj && latestScoreObj.total > 0
+                                  ? `Lần #${usedCount}: Đúng ${latestScoreObj.raw}/${latestScoreObj.total} câu • ${formatDurationVi(latestMyAttempt.durationSeconds)}`
+                                  : latestMyAttempt.teacherGraded
+                                  ? `Lần #${usedCount}: Ms. Như đã duyệt (Band ${latestMyAttempt.overallBand}) • ${formatDurationVi(latestMyAttempt.durationSeconds)}`
+                                  : `Lần #${usedCount}: Ms. Như đang check • ${formatDurationVi(latestMyAttempt.durationSeconds)}`}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => onOpenResult?.(latestMyAttempt.id)}
+                                className="font-bold text-[#0F172B] dark:text-white underline"
+                              >
+                                Xem bài
+                              </button>
+                            </div>
+                          )}
+
                           <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
                             {cfg.scheduleMode === 'flexible' ? (
                               <span className="px-2.5 py-0.5 rounded-md bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 inline-flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> Làm bất kỳ lúc nào
+                                <Clock className="w-3 h-3" /> Làm lại nhiều lần
                               </span>
                             ) : schedule.lockedBySchedule ? (
                               <span className="px-2.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 inline-flex items-center gap-1">
@@ -935,11 +1059,11 @@ export default function SkillPracticeHub({
                               </span>
                             ) : schedule.isLateWindow ? (
                               <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn cho làm (báo trễ)
+                                <Clock className="w-3 h-3" /> Quá hạn ({formatViDateTime(schedule.dueAt)}) • Vẫn mở
                               </span>
                             ) : (
                               <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 inline-flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}{cfg.scheduleMode === 'deadline_lock' ? ' (Khóa sau hạn)' : ''}
+                                <Clock className="w-3 h-3" /> Hạn nộp: {formatViDateTime(schedule.dueAt)}
                               </span>
                             )}
                           </div>
@@ -967,14 +1091,16 @@ export default function SkillPracticeHub({
                               {isLocked
                                 ? lockText
                                 : !isPassUnlocked
-                                ? `Nhập Mật Khẩu · Làm Đề ${skillId.toUpperCase()}`
-                                : `Bắt đầu làm ${skillId.toUpperCase()}`}
+                                ? `Nhập Pass Team · Vào Làm`
+                                : usedCount > 0
+                                ? `Làm Lại (Lần #${usedCount + 1})`
+                                : `Bắt Đầu Làm Bài`}
                             </span>
                           </button>
                           {isTeacher && (
                             <button
                               type="button"
-                              onClick={() => onOpenSkillBuilder?.(skillId, test)}
+                              onClick={() => onOpenSkillBuilder?.(actualSkill, test)}
                               className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
                               title="Chỉnh sửa bài tập này"
                             >
@@ -990,7 +1116,7 @@ export default function SkillPracticeHub({
             </>
           );
         })()}
-        {renderSingleSkillLeaderboard(skillId)}
+        {renderSingleSkillLeaderboard(actualSkill)}
       </div>
     );
   };
@@ -1012,10 +1138,10 @@ export default function SkillPracticeHub({
                   />
                   <div>
                     <span className="block font-extrabold text-sm text-[#0F172B] dark:text-white leading-tight">
-                      Luyện Nói IELTS
+                      DAILY ZONE
                     </span>
                     <span className="block text-xs font-medium text-[#475569] dark:text-slate-400">
-                      Speaking AI · 4 Kỹ Năng
+                      Bài tập theo từng Team
                     </span>
                   </div>
                 </div>
@@ -1032,10 +1158,10 @@ export default function SkillPracticeHub({
                 <button
                   type="button"
                   onClick={onOpenFullExamCatalog}
-                  className="w-full px-3 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-slate-300 hover:bg-[#F1F5F9] dark:hover:bg-slate-800 flex items-center gap-2.5 transition"
+                  className="w-full px-3 py-2.5 rounded-lg text-xs font-bold text-[#0F766E] dark:text-teal-300 bg-[#EDFFFD] dark:bg-teal-950/30 hover:opacity-90 border border-[#B5F5F1] dark:border-teal-800 flex items-center gap-2.5 transition"
                 >
                   <ArrowLeft className="w-4 h-4 shrink-0" />
-                  <span>Kho Đề Thi IELTS (L·R·W)</span>
+                  <span>Thực Chiến Thi Thật 4KN</span>
                 </button>
 
                 <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
@@ -1089,7 +1215,7 @@ export default function SkillPracticeHub({
                   </p>
                   <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 flex items-center justify-center gap-1">
                     <Sparkles className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
-                    <span>{aiConfigured ? 'Gemini Audio AI Sẵn Sàng' : 'AI Chấm Tự Động Đang Bật'}</span>
+                    <span>Ms. Như trực tiếp duyệt &amp; chấm</span>
                   </p>
                 </div>
               </div>
@@ -1097,10 +1223,20 @@ export default function SkillPracticeHub({
               {isTeacher && (
                 <button
                   type="button"
-                  onClick={() => onOpenSkillBuilder?.(activeTab === 'listening' || activeTab === 'reading' || activeTab === 'writing' ? activeTab : 'speaking')}
+                  onClick={() => {
+                    if (activeTab === 'writing_task1') {
+                      onOpenSkillBuilder?.('writing', null, { writingTaskScope: 'task1', dailySubCategory: 'w1_map' });
+                    } else if (activeTab === 'writing_task2') {
+                      onOpenSkillBuilder?.('writing', null, { writingTaskScope: 'task2', dailySubCategory: 'w2_essay' });
+                    } else if (activeTab === 'listening' || activeTab === 'reading') {
+                      onOpenSkillBuilder?.(activeTab);
+                    } else {
+                      onOpenSkillBuilder?.('speaking');
+                    }
+                  }}
                   className="w-full py-2.5 px-3 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition"
                 >
-                  <Plus className="w-4 h-4" /> Tạo Bài Tập Kỹ Năng Mới
+                  <Plus className="w-4 h-4" /> Tạo Bài Daily Mới
                 </button>
               )}
             </div>
@@ -1115,8 +1251,8 @@ export default function SkillPracticeHub({
                 <CheckCircle2 className="w-4 h-4 text-[#047857] dark:text-emerald-400 shrink-0" />
                 <span>
                   {studentHasVip
-                    ? `Bài Tập 4 Kỹ Năng MIỄN PHÍ 100% • Đang bật Ai eo VIP (${activeAccessExpiryText})`
-                    : 'Khu Bài Tập 4 Kỹ Năng & Đề Lẻ đang mở MIỄN PHÍ 100% cho toàn bộ học viên!'}
+                    ? `DAILY ZONE MIỄN PHÍ 100% • Đang bật IELTS VIP (${activeAccessExpiryText})`
+                    : 'DAILY ZONE đang mở MIỄN PHÍ 100% cho toàn bộ học viên làm lại nhiều lần!'}
                 </span>
               </span>
               {!studentHasVip && (
@@ -1126,19 +1262,17 @@ export default function SkillPracticeHub({
                   className="px-3 py-1.5 rounded-lg bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-bold transition inline-flex items-center gap-1.5"
                 >
                   <Crown className="w-3.5 h-3.5 text-amber-200" />
-                  <span>Ai eo VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1 tháng) - Viền Neon, Màu Chữ &amp; Tạo Phòng</span>
+                  <span>IELTS VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1 tháng) - Viền Neon, Màu Chữ &amp; Tạo Phòng</span>
                 </button>
               )}
             </div>
           )}
           {['speaking', 'speaking_daily', 'speaking_exam_room', 'forecast'].includes(activeTab) ? (() => {
             const activeSpeakingList =
-              activeTab === 'speaking_daily'
-                ? dailySpeakingTests
-                : activeTab === 'speaking_exam_room'
-                ? examRoomSpeakingTests
-                : activeTab === 'forecast'
+              activeTab === 'forecast'
                 ? forecastTests
+                : dailySpeakingTests.length > 0
+                ? dailySpeakingTests
                 : speakingTests;
             const featuredSpeakingTest = activeSpeakingList[0] || null;
             const featuredSpMeta = featuredSpeakingTest ? normalizeSpeakingSection(featuredSpeakingTest.speaking) : null;
@@ -1152,66 +1286,46 @@ export default function SkillPracticeHub({
 
             return (
             <>
-              {/* 2 Core Speaking Mode Switcher: Daily vs Exam Room (Team Sắp Thi) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* 2 Core Speaking Sections in Daily Zone: Daily Speaking + Cày Forecast Cùng Ms. Như */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => onChangeTab?.('speaking_daily')}
                   className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
-                    activeTab === 'speaking_daily'
+                    activeTab !== 'forecast'
                       ? 'bg-[#C2410C] text-white border-[#C2410C]'
                       : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-[#C2410C]'
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'speaking_daily' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#C2410C] dark:bg-orange-500/20 dark:text-orange-300'}`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab !== 'forecast' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#C2410C] dark:bg-orange-500/20 dark:text-orange-300'}`}>
                     <Flame className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-extrabold flex items-center gap-1.5">
-                      <span>1. Speaking Daily ({dailySpeakingTests.length})</span>
+                      <span>1. Daily Speaking ({dailySpeakingTests.length})</span>
                     </p>
-                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'speaking_daily' ? 'text-orange-50' : 'text-[#475569] dark:text-slate-400'}`}>
-                      Bài nói bắt buộc mỗi ngày · Ai chưa xong sẽ báo
+                    <p className={`text-xs mt-0.5 leading-snug ${activeTab !== 'forecast' ? 'text-orange-50' : 'text-[#475569] dark:text-slate-400'}`}>
+                      Bài luyện nói hàng ngày cho Team · Nhắc người chưa hoàn thành
                     </p>
                   </div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => onChangeTab?.('speaking_exam_room')}
+                  onClick={() => onChangeTab?.('forecast')}
                   className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
-                    activeTab === 'speaking_exam_room'
+                    activeTab === 'forecast'
                       ? 'bg-[#007A7A] text-white border-[#007A7A]'
                       : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'speaking_exam_room' ? 'bg-white/20 text-white' : 'bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6]'}`}>
-                    <Lock className="w-5 h-5" />
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'forecast' ? 'bg-white/20 text-white' : 'bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6]'}`}>
+                    <Sparkles className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-extrabold">2. Thực Chiến Phòng Thi ({examRoomSpeakingTests.length})</p>
-                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'speaking_exam_room' ? 'text-teal-50' : 'text-[#475569] dark:text-slate-400'}`}>
-                      Team sắp thi thật · Yêu cầu nhập Password
-                    </p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onChangeTab?.('speaking')}
-                  className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
-                    activeTab === 'speaking' || activeTab === 'forecast'
-                      ? 'bg-[#0F172B] text-white dark:bg-white dark:text-slate-950 border-[#0F172B]'
-                      : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-slate-400'
-                  }`}
-                >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'speaking' || activeTab === 'forecast' ? 'bg-white/15 text-amber-300 dark:bg-slate-900/15 dark:text-amber-600' : 'bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300'}`}>
-                    <Mic className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-extrabold">Tất Cả &amp; Forecast ({speakingTests.length})</p>
-                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'speaking' || activeTab === 'forecast' ? 'opacity-85' : 'text-[#475569] dark:text-slate-400'}`}>
-                      Kho bài luyện Speaking &amp; Đề Forecast
+                    <p className="text-xs font-extrabold">2. Cày Forecast Cùng Ms. Như ({forecastTests.length})</p>
+                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'forecast' ? 'text-teal-50' : 'text-[#475569] dark:text-slate-400'}`}>
+                      Bộ đề Forecast Speaking cập nhật · Luyện ghi âm từng Part hoặc Full
                     </p>
                   </div>
                 </button>
@@ -1339,33 +1453,19 @@ export default function SkillPracticeHub({
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 text-[#0F766E] dark:text-[#1EE1D6] text-xs font-bold">
                     <Mic className="w-3.5 h-3.5" />
                     <span>
-                      {activeTab === 'speaking_daily'
-                        ? 'Mục 1: Speaking Daily - Hoàn Thành Mỗi Ngày · Nhắc Người Chưa Làm'
-                        : activeTab === 'speaking_exam_room'
-                        ? 'Mục 2: Phòng Thi Thực Chiến - Team Sắp Thi (Cần Password)'
-                        : activeTab === 'forecast'
-                        ? 'Kho Đề Dự Đoán Forecast IELTS Speaking Mới Nhất'
-                        : 'Phòng Thi IELTS Speaking AI • Ghi Âm & Chấm 4 Tiêu Chí'}
+                      {activeTab === 'forecast'
+                        ? 'Mục 2: Cày Forecast Cùng Ms. Như • Bộ Đề Speaking Mới Nhất'
+                        : 'Mục 1: Daily Speaking • Hoàn Thành Hàng Ngày Theo Team'}
                     </span>
                   </div>
 
                   <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0F172B] dark:text-white tracking-tight">
-                    {activeTab === 'speaking_daily'
-                      ? 'Speaking Daily'
-                      : activeTab === 'speaking_exam_room'
-                      ? 'Phòng Thi Thực Chiến'
-                      : activeTab === 'forecast'
-                      ? 'Luyện Forecast'
-                      : 'Thi thử'}
+                    {activeTab === 'forecast' ? 'Cày Forecast Cùng Ms. Như' : 'Daily Speaking'}
                   </h1>
                   <p className="text-sm text-[#475569] dark:text-slate-300 leading-relaxed max-w-2xl">
-                    {activeTab === 'speaking_daily'
-                      ? 'Bài luyện nói cập nhật hàng ngày cho cả lớp. Mọi học viên cần hoàn thành đúng ngày; hệ thống sẽ báo ngay những bạn chưa làm.'
-                      : activeTab === 'speaking_exam_room'
-                      ? 'Phòng luyện thực chiến mô phỏng áp lực phòng thi thật dành cho team sắp đi thi - yêu cầu mật khẩu giáo viên cấp mới vào thi được.'
-                      : activeTab === 'forecast'
-                      ? 'Luyện phản xạ từng Part 1, Cue Card Part 2 và Discussion Part 3 theo bộ câu hỏi Forecast giáo viên biên soạn.'
-                      : 'Nhận điểm sát thi thật, tự động lưu file ghi âm lên hệ thống để AI phân tích 4 tiêu chí (Fluency, Lexical, Grammar, Pronunciation) và góp ý nâng Band.'}
+                    {activeTab === 'forecast'
+                      ? 'Luyện phản xạ từng Part 1, Cue Card Part 2 và Discussion Part 3 theo bộ câu hỏi Forecast do Ms. Như biên soạn. File ghi âm được gửi thẳng tới Ms. Như kiểm tra & nhận xét.'
+                      : 'Bài luyện nói cập nhật hàng ngày cho các Team. Toàn bộ file ghi âm được lưu trữ và gửi về Ms. Như check & duyệt điểm.'}
                   </p>
 
                   {featuredSpeakingTest ? (
@@ -1478,16 +1578,12 @@ export default function SkillPracticeHub({
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172B] dark:text-white">
-                            {activeTab === 'speaking_daily'
-                              ? 'Danh Sách Bài Speaking Daily'
-                              : activeTab === 'speaking_exam_room'
-                              ? 'Phòng Thi Thực Chiến (Team Sắp Thi)'
-                              : activeTab === 'forecast'
-                              ? 'Danh Sách Bài Tập Forecast Speaking'
-                              : 'Danh Sách Bài Tập Speaking Do Giáo Viên Tạo'}
+                            {activeTab === 'forecast'
+                              ? 'Kho Đề Cày Forecast Cùng Ms. Như'
+                              : 'Danh Sách Bài Daily Speaking'}
                           </h2>
                           <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
-                            Mỗi đề đều có nhãn <b>#Hashtag</b> rõ ràng (<b>#ThiThật #CóPass</b> cho đề thi chính thức có mật khẩu, <b>#SpeakingDaily</b> cho bài hàng ngày, <b>#LuyệnTậpTựDo</b> cho bài luyện miễn phí) để học viên không bấm nhầm.
+                            Làm lại không giới hạn số lượt · Cần thi Thực Chiến full 4 kỹ năng (L·R·W·S)? Quay về trang chủ mục <b>Thực Chiến Thi Thật</b>!
                           </p>
                         </div>
                       </div>
@@ -1754,8 +1850,9 @@ export default function SkillPracticeHub({
                 ) : (
                   <div className="space-y-3">
                     {mySpeakingAttempts.map(att => {
-                      const band = att.scores?.speaking?.band ?? att.overallBand;
-                      const formattedBand = typeof band === 'number' ? String(Math.round(band)) : '--';
+                      const canShowApproved = isTeacher || Boolean(att.teacherGraded);
+                      const band = canShowApproved ? (att.scores?.speaking?.band ?? att.overallBand) : null;
+                      const formattedBand = typeof band === 'number' ? String(Math.round(band)) : '...';
                       const modeLabel =
                         att.speakingPartMode && att.speakingPartMode !== 'full'
                           ? `TEST ${att.speakingPartMode.toUpperCase()}`
@@ -1785,17 +1882,21 @@ export default function SkillPracticeHub({
                               <span className="inline-flex items-center gap-1 text-[#065F46] dark:text-emerald-400 font-semibold">
                                 <FileAudio className="w-3.5 h-3.5" /> {recCount} file ghi âm
                               </span>
-                              {att.aiGraded && (
+                              {att.teacherGraded ? (
                                 <span className="inline-flex items-center gap-1 text-[#0F766E] dark:text-[#1EE1D6] font-semibold">
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Đã chấm AI
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Ms. Như đã duyệt điểm
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300 font-semibold">
+                                  <Clock className="w-3.5 h-3.5" /> Ms. Như đang check
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          <div className="shrink-0 w-14 h-12 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 group-hover:border-[#007A7A] flex flex-col items-center justify-center transition">
-                            <span className="text-lg font-black text-[#0F172B] dark:text-white tabular-nums leading-none">
-                              {formattedBand}
+                          <div className="shrink-0 min-w-[60px] px-2 h-12 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 group-hover:border-[#007A7A] flex flex-col items-center justify-center transition">
+                            <span className="text-sm sm:text-base font-black text-[#0F172B] dark:text-white tabular-nums leading-none">
+                              {canShowApproved ? formattedBand : 'Check'}
                             </span>
                           </div>
                         </button>
@@ -1815,6 +1916,10 @@ export default function SkillPracticeHub({
                 ? listeningTests
                 : activeTab === 'reading'
                 ? readingTests
+                : activeTab === 'writing_task1'
+                ? writingTask1Tests
+                : activeTab === 'writing_task2'
+                ? writingTask2Tests
                 : writingTests
             )
           )}

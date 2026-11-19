@@ -37,8 +37,8 @@ export default function VipPromoPopupModal({
 
   const vipPerks = [
     {
-      title: 'Tự Do Đổi Màu Chữ Tên + Huy Hiệu AIEOVIP',
-      desc: 'Chọn màu chữ bất kỳ từ bảng màu VIP & mã Hex riêng + huy hiệu AIEOVIP nổi bật trên Navbar, Hồ sơ & BXH.'
+      title: 'Tự Do Đổi Màu Chữ Tên + Huy Hiệu IELTS VIP',
+      desc: 'Chọn màu chữ bất kỳ từ bảng màu VIP & mã Hex riêng + huy hiệu IELTS VIP nổi bật trên Navbar, Hồ sơ & BXH.'
     },
     {
       title: 'Viền Bìa & Thẻ LED Neon Nhiều Màu + Ảnh Avatar Động',
@@ -46,7 +46,7 @@ export default function VipPromoPopupModal({
     },
     {
       title: 'Tạo Phòng Đấu Trường Riêng Cùng Bạn Bè + Danh Hiệu VIP',
-      desc: 'Tùy chỉnh 2-30 người, chia 2-4 Team thi đấu không giới hạn suốt 1 tháng (30 ngày) & đeo danh hiệu 👑 Ai Eo VIP.'
+      desc: 'Tùy chỉnh 2-30 người, chia 2-4 Team thi đấu không giới hạn suốt 1 tháng (30 ngày) & đeo danh hiệu 👑 IELTS VIP.'
     }
   ];
 
@@ -90,8 +90,8 @@ export default function VipPromoPopupModal({
             type="button"
             onClick={handleReopenFromDock}
             className="vip-promo-dock vip-dock-pop-in inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] border-2 border-[#F59E0B] text-xs font-black shadow-lg transition"
-            title={`Mở ưu đãi Gói Ai Eo VIP (${vipPriceLabel}/1 tháng)`}
-            aria-label={`Mở ưu đãi Gói Ai Eo VIP (${vipPriceLabel}/1 tháng)`}
+            title={`Mở ưu đãi Gói IELTS VIP (${vipPriceLabel}/1 tháng)`}
+            aria-label={`Mở ưu đãi Gói IELTS VIP (${vipPriceLabel}/1 tháng)`}
           >
             <Crown className="w-4 h-4 text-[#FCD34D] shrink-0" />
             <span>VIP</span>
@@ -102,10 +102,10 @@ export default function VipPromoPopupModal({
               type="button"
               onClick={handleReopenFromDock}
               className="inline-flex items-center gap-2 pl-2.5 pr-2 py-1 rounded-full bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] text-xs font-extrabold transition"
-              title={`Bấm để xem ưu đãi Gói Ai Eo VIP (${vipPriceLabel}/1 tháng)`}
+              title={`Bấm để xem ưu đãi Gói IELTS VIP (${vipPriceLabel}/1 tháng)`}
             >
               <Crown className="w-3.5 h-3.5 text-[#FCD34D] shrink-0" />
-              <span>Ai Eo VIP</span>
+              <span>IELTS VIP</span>
               <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-[#F59E0B] text-[#09090B] text-xs font-black">
                 {vipPriceLabel}/1 tháng
               </span>
@@ -115,7 +115,7 @@ export default function VipPromoPopupModal({
               onClick={() => setIsCompactIcon(true)}
               className="w-6 h-6 rounded-full hover:bg-slate-200/80 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center transition"
               title="Thu gọn thành biểu tượng nhỏ góc phải"
-              aria-label="Thu gọn nút Ai Eo VIP"
+              aria-label="Thu gọn nút IELTS VIP"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -146,7 +146,7 @@ export default function VipPromoPopupModal({
             type="button"
             onClick={handleMinimizeToCorner}
             title="Thu nhỏ sang góc phải trên"
-            aria-label="Thu nhỏ quảng cáo Ai eo VIP về góc phải trên"
+            aria-label="Thu nhỏ quảng cáo IELTS VIP về góc phải trên"
             className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-black/25 hover:bg-black/40 flex items-center justify-center text-white transition"
           >
             <X className="w-4 h-4" />
@@ -156,7 +156,7 @@ export default function VipPromoPopupModal({
           </div>
           <h2 id="vip-promo-popup-title" className="text-lg sm:text-xl font-black leading-snug pr-8 flex items-center gap-2">
             <Crown className="w-6 h-6 text-amber-200 shrink-0" />
-            <span>Nâng Cấp Gói Ai Eo VIP - Chỉ {vipPriceLabel}/1 tháng</span>
+            <span>Nâng Cấp Gói IELTS VIP - Chỉ {vipPriceLabel}/1 tháng</span>
           </h2>
           <p className="text-xs text-rose-50/95 mt-1 leading-relaxed">
             Mở khóa toàn bộ đặc quyền nổi bật suốt 1 tháng cho tài khoản <strong>{currentUser.name || currentUser.username}</strong> ngay hôm nay!
@@ -186,7 +186,7 @@ export default function VipPromoPopupModal({
               className="vip-promo-cta w-full py-3 px-4 rounded-2xl bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] text-xs sm:text-sm font-black shadow-lg flex items-center justify-center gap-2 transition"
             >
               <Crown className="w-4 h-4 text-[#FCD34D]" />
-              <span>Đăng Ký Ai Eo VIP Ngay ({vipPriceLabel}/1 tháng)</span>
+              <span>Đăng Ký IELTS VIP Ngay ({vipPriceLabel}/1 tháng)</span>
             </button>
             <button
               type="button"

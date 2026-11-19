@@ -17,8 +17,8 @@ import {
 import { BRAND_INFO } from '../constants/brandInfo';
 import { formatViDateTime, getSpeakingQuestionItems, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
 import { createUniqueAttemptId } from '../utils/examHelpers';
-import { cleanAudioMimeType, roundSpeakingBand } from '../utils/speakingAiEngine';
-import { pickSupportedAudioMimeType, requestAiSpeakingGrading, uploadSpeakingRecording, verifySpeakingRoomPassword } from '../utils/speakingApi';
+import { cleanAudioMimeType } from '../utils/speakingAiEngine';
+import { pickSupportedAudioMimeType, uploadSpeakingRecording, verifySpeakingRoomPassword } from '../utils/speakingApi';
 import AudioLevelMeter from '../components/speaking/AudioLevelMeter';
 import SpeakingResultCelebrationModal from '../components/speaking/SpeakingResultCelebrationModal';
 
@@ -30,7 +30,6 @@ function formatSecs(totalSec) {
 }
 
 export default function SpeakingExamRoom({
-  aiApiKey = '',
   currentUser,
   dispatchSyncAction,
   onAttemptCreated,
@@ -690,32 +689,19 @@ export default function SpeakingExamRoom({
         }
       }
 
-      setGradingProgressText('Uốn lưỡi bảy lần trước khi nghe lại bài nói & AI đang chấm 4 tiêu chí IELTS Speaking...');
-      const evaluation = await requestAiSpeakingGrading({
-        testTitle: activeTest?.title || 'IELTS Speaking Test',
-        partMode,
-        recordings: savedRecordings,
-        clientApiKey: aiApiKey
-      });
+      setGradingProgressText('Đang hoàn tất gửi bài nói - Ms. Như đang check...');
 
-      const spBand = roundSpeakingBand(evaluation?.overallBand ?? 0);
-      const criteria = evaluation?.criteria || { fc: spBand, lr: spBand, gra: spBand, pr: spBand };
-      const evalByQid = new Map((evaluation?.questionEvaluations || []).map(ev => [String(ev.questionId), ev]));
-
-      const enrichedRecordings = savedRecordings.map(r => {
-        const ev = evalByQid.get(String(r.questionId));
-        return {
-          ...r,
-          transcript: ev?.transcript || r.clientTranscript || '',
-          band: ev?.band ?? 0,
-          criteria: ev?.criteria || null,
-          fluencyMetrics: ev?.fluencyMetrics || null,
-          feedback: ev?.feedback || '',
-          grammarVocabularyFixes: ev?.grammarVocabularyFixes || [],
-          vocabularyUpgrades: ev?.vocabularyUpgrades || [],
-          upgradedSample: ev?.upgradedSample || ''
-        };
-      });
+      const enrichedRecordings = savedRecordings.map(r => ({
+        ...r,
+        transcript: r.clientTranscript || '',
+        band: null,
+        criteria: null,
+        fluencyMetrics: null,
+        feedback: '',
+        grammarVocabularyFixes: [],
+        vocabularyUpgrades: [],
+        upgradedSample: ''
+      }));
 
       const submittedAtMs = Date.now();
       const startedAtMs = examStartedAtRef.current > 0 ? examStartedAtRef.current : submittedAtMs;
@@ -751,28 +737,19 @@ export default function SpeakingExamRoom({
           speakingRecordingsCount: enrichedRecordings.filter(r => r.durationSec > 0).length
         },
         speakingRecordings: enrichedRecordings,
-        speakingAiDetails: {
-          criteria,
-          strengths: evaluation?.strengths || [],
-          improvements: evaluation?.improvements || [],
-          _usedModel: evaluation?._usedModel || 'speaking-ai',
-          _gradedMode: evaluation?._gradedMode || 'fallback',
-          _fallbackReason: evaluation?._fallbackReason || ''
-        },
         antiCheatLogs: [],
         tabSwitchCount: 0,
-        teacherGraded: true,
-        aiGraded: true,
+        teacherGraded: false,
+        aiGraded: false,
         ...(effectiveUnlockToken ? { speakingUnlockToken: effectiveUnlockToken } : {}),
-        ...(evaluation?.aiGradingTicket ? { aiGradingTicket: evaluation.aiGradingTicket } : {}),
         scores: {
           listening: { raw: 0, total: 0, band: null },
           reading: { raw: 0, total: 0, band: null },
           writing: { task1Band: null, task2Band: null, overallBand: null },
-          speaking: { band: spBand, criteria }
+          speaking: { band: null, criteria: {} }
         },
-        overallBand: spBand,
-        teacherFeedback: evaluation?.overallFeedback || ''
+        overallBand: null,
+        teacherFeedback: ''
       };
 
       onAttemptCreated?.(newAttempt);
@@ -1091,10 +1068,10 @@ export default function SpeakingExamRoom({
                 <Volume2 className={`w-3.5 h-3.5 ${currentItem.audioUrl ? 'text-emerald-600 dark:text-emerald-300' : isSpeakingPrompt ? 'text-white' : 'text-[#0F766E] dark:text-[#1EE1D6]'}`} />
                 <span>
                   {currentItem.audioUrl
-                    ? 'Nghe Lại File Ghi Âm Giáo Viên'
+                    ? 'Nghe Lại File Ghi Âm Ms. Như'
                     : isSpeakingPrompt
-                    ? 'Giám Khảo AI Đang Đọc...'
-                    : 'Nghe Giám Khảo AI Đọc'}
+                    ? 'Đang Đọc Câu Hỏi...'
+                    : 'Nghe Đọc Câu Hỏi'}
                 </span>
               </button>
             </div>
@@ -1328,10 +1305,10 @@ export default function SpeakingExamRoom({
           />
           <div className="space-y-2 max-w-md">
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-              {gradingProgressText || 'Uốn lưỡi bảy lần trước khi chấm bài...'}
+              {gradingProgressText || 'Ms. Như đang check bài nói của bạn...'}
             </h2>
             <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-400">
-              Hệ thống đang lưu an toàn các file ghi âm lên máy chủ và AI Examiner đang chấm Band điểm 4 tiêu chí IELTS Speaking (FC, LR, GRA, PR).
+              Hệ thống đang lưu an toàn các file ghi âm lên máy chủ gửi tới Ms. Như duyệt và trả điểm chính thức.
             </p>
           </div>
         </main>
@@ -1352,7 +1329,7 @@ export default function SpeakingExamRoom({
         <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl">
             <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-              Xác nhận nộp bài Speaking cho AI chấm?
+              Xác nhận nộp bài Speaking cho Ms. Như check?
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               Bạn đã ghi âm <strong>{recordedCount}/{items.length} câu hỏi</strong>. Tất cả file ghi âm sẽ được lưu vĩnh viễn trên hệ thống và AI sẽ chấm Band điểm ngay lập tức.

@@ -562,13 +562,13 @@ export default function GameArena({
             <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5">
               <div className="text-center space-y-1.5">
                 <span className="text-xs font-bold uppercase tracking-widest text-[#0F766E] dark:text-[#1EE1D6] bg-indigo-50 dark:bg-teal-500/20 border border-indigo-200 dark:border-[#007A7A]/40 px-3 py-1 rounded-full">
-                  4 Vòng Chuẩn IELTS: V1 Bắn Nghĩa • V2 Gõ Full • V3 Đồng/Trái/Định Nghĩa • V4 Collocation
+                  4 Vòng Chuẩn IELTS: V1 Bắn Nghĩa • V2 Gõ Full • V3 Đồng/Trái/Định Nghĩa • V4 Gõ Collocation Diệt Boss
                 </span>
                 <h1 className="text-2xl font-extrabold text-[#0F172B] dark:text-white pt-1">
                   Tập Luyện 1 Mình (Miễn Phí) &amp; BXH Lớp
                 </h1>
                 <p className="text-xs text-[#475569] dark:text-slate-400 max-w-lg mx-auto">
-                  Học viên tự do luyện tập 1 mình miễn phí bất cứ lúc nào - hoặc đăng ký <b>Gói Ai eo VIP</b> để tự tạo phòng riêng đua Top trực tiếp cùng bạn bè!
+                  Học viên tự do luyện tập 1 mình miễn phí bất cứ lúc nào - hoặc đăng ký <b>Gói IELTS VIP</b> để tự tạo phòng riêng đua Top trực tiếp cùng bạn bè!
                 </p>
               </div>
 
@@ -655,7 +655,7 @@ export default function GameArena({
                         { r: 1, title: 'V1: Bắn Nghĩa', desc: 'Từ ↔ Nghĩa' },
                         { r: 2, title: 'V2: Gõ Từ Full', desc: 'Chính tả đầy đủ' },
                         { r: 3, title: 'V3: Đồng/Trái/ĐN', desc: 'Linh hoạt từ vựng' },
-                        { r: 4, title: 'V4: Collocation', desc: 'Cụm từ chuẩn Band 8' }
+                        { r: 4, title: 'V4: Gõ Collocation', desc: 'Gõ liên tục diệt Boss' }
                       ].map(item => (
                         <button
                           key={item.r}
@@ -763,7 +763,7 @@ export default function GameArena({
               </span>
               <h1 className="text-2xl font-extrabold text-[#0F172B] dark:text-white">Tham Gia Phòng Đấu Từ Vựng</h1>
               <p className="text-xs text-[#475569] dark:text-slate-400 mt-1 max-w-md leading-relaxed">
-                Chọn <b>Thú Cưng &amp; Phụ Kiện</b> để cùng bạn lái phi thuyền vượt qua <b>4 vòng đấu (Bắn nghĩa → Gõ Full → Đồng/Trái nghĩa → Collocation)</b>. Trận đấu bắt đầu khi giáo viên duyệt &amp; bấm khởi hành!
+                Chọn <b>Thú Cưng &amp; Phụ Kiện</b> để cùng bạn lái phi thuyền vượt qua <b>4 vòng đấu (Bắn nghĩa → Gõ Full → Đồng/Trái nghĩa → Gõ Collocation diệt Boss)</b>. Trận đấu bắt đầu khi giáo viên duyệt &amp; bấm khởi hành!
               </p>
             </div>
 
@@ -782,7 +782,7 @@ export default function GameArena({
                 <div className="space-y-0.5 text-left">
                   <p className="text-xs font-extrabold text-rose-800 dark:text-rose-200 flex items-center gap-1.5 flex-wrap">
                     <Crown className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span>Phòng Đấu Riêng Chơi Cùng Bạn Bè ({roomTicketPriceLabel}/lần hoặc Gói Ai eo VIP)</span>
+                    <span>Phòng Đấu Riêng Chơi Cùng Bạn Bè ({roomTicketPriceLabel}/lần hoặc Gói IELTS VIP)</span>
                     {!hasFullVipRoomAccess && roomTicketCredits > 0 && (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-black">
                         Còn {roomTicketCredits} lượt tạo
@@ -794,7 +794,7 @@ export default function GameArena({
                       ? 'Tài khoản của bạn đã mở quyền tạo phòng không giới hạn - tự chọn số người, chia Team và đua cùng bạn bè ngay!'
                       : roomTicketCredits > 0
                       ? `Bạn đang có ${roomTicketCredits} vé tạo phòng lẻ (${roomTicketPriceLabel}/lần). Bấm Tạo Phòng Bạn Bè để mở phòng riêng ngay!`
-                      : `Chọn mua vé lẻ ${roomTicketPriceLabel}/lần tạo phòng hoặc nâng cấp Gói Ai eo VIP (${aieoVipPriceLabel}/1 tháng) để tạo vô hạn, Đổi Màu Chữ & Viền Bìa Neon! Bạn bè vào phòng miễn phí - bạn vẫn có thể Tập luyện 1 mình miễn phí!`}
+                      : `Chọn mua vé lẻ ${roomTicketPriceLabel}/lần tạo phòng hoặc nâng cấp Gói IELTS VIP (${aieoVipPriceLabel}/1 tháng) để tạo vô hạn, Đổi Màu Chữ & Viền Bìa Neon! Bạn bè vào phòng miễn phí - bạn vẫn có thể Tập luyện 1 mình miễn phí!`}
                   </p>
                 </div>
                 {canCreateFriendVipRoom && (
@@ -818,7 +818,7 @@ export default function GameArena({
                           onOpenCheckoutModal?.({
                             itemType: 'aieo_vip',
                             itemId: '',
-                            itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                            itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
                             itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
                           })
                         }
@@ -853,13 +853,13 @@ export default function GameArena({
                       onOpenCheckoutModal?.({
                         itemType: 'aieo_vip',
                         itemId: '',
-                        itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                        itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
                         itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
                       })
                     }
                     className="px-4 py-2.5 rounded-xl bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                   >
-                    <Crown className="w-4 h-4 text-amber-200" /> Mở Ai eo VIP ({aieoVipPriceLabel}/1 tháng - Vô hạn)
+                    <Crown className="w-4 h-4 text-amber-200" /> Mở IELTS VIP ({aieoVipPriceLabel}/1 tháng - Vô hạn)
                   </button>
                 </div>
               )}
@@ -2231,7 +2231,7 @@ export default function GameArena({
             </button>
             <button
               onClick={() => jumpToGameSandboxRound(4)}
-              className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 4 ? 'bg-[#F8FAFC]0 text-white' : 'bg-white dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 border border-slate-200 dark:border-transparent'}`}
+              className={`px-2.5 py-1 rounded font-bold transition ${gameRound === 4 ? 'bg-rose-600 text-white' : 'bg-white dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 border border-slate-200 dark:border-transparent'}`}
             >
               Màn 4
             </button>
@@ -2265,7 +2265,7 @@ export default function GameArena({
                   ? 'VÒNG 2/4: GÕ TỪ FULL'
                   : gameRound === 3
                   ? 'VÒNG 3/4: ĐỒNG · TRÁI NGHĨA · ĐN'
-                  : 'VÒNG 4/4: COLLOCATION BOSS'}
+                  : 'VÒNG 4/4: GÕ COLLOCATION DIỆT BOSS'}
               </span>
               <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-transparent px-2 py-1 rounded-lg text-[#334155] dark:text-slate-300 text-xs">
                 Từ: {gameWordIdx + 1}/{gameQueues[gameRound]?.length || 1}
@@ -2329,10 +2329,16 @@ export default function GameArena({
                     ? `Nghe & gõ đủ từ đầy đủ (GÕ FULL - ${gameTimeLimit}s)`
                     : gameRound === 3
                     ? `${activeQuestion.v3Badge || 'ĐỒNG · TRÁI NGHĨA · ĐỊNH NGHĨA'} - Bắn hoặc bấm đáp án (${gameTimeLimit}s)`
-                    : `CỤM TỪ COLLOCATION - Bắn hoặc bấm đáp án (${gameTimeLimit}s)`}
+                    : `BOSS COLLOCATION - GÕ LIÊN TỤC TẤN CÔNG DIỆT YÊU QUÁI (${gameTimeLimit}s)`}
                 </span>
                 <button
-                  onClick={() => speakWord(activeQuestion.word)}
+                  onClick={() =>
+                    speakWord(
+                      gameRound === 4
+                        ? (activeQuestion.v4Display || activeQuestion.v4Target || activeQuestion.word)
+                        : activeQuestion.word
+                    )
+                  }
                   className="bg-[#EDFFFD] hover:bg-[#D5FBF7] dark:bg-cyan-500/20 dark:hover:bg-cyan-500/30 text-[#007A7A] dark:text-cyan-300 border border-[#B5F5F1] dark:border-transparent px-2.5 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition"
                 >
                   <Volume2 className="w-3.5 h-3.5" /> Nghe (TAB)
@@ -2350,7 +2356,7 @@ export default function GameArena({
                 >
                   <Snowflake className="w-3 h-3" /> Đóng băng +8s [2] ({freezeCharges})
                 </button>
-                {gameRound === 2 && (
+                {(gameRound === 2 || gameRound === 4) && (
                   <>
                     <button
                       onClick={handleGameHint}
@@ -2376,9 +2382,9 @@ export default function GameArena({
                   : activeQuestion.prompt}
               </p>
 
-              {/* Clickable Choice Cards for V3 (Syn/Ant/Def) & V4 (Collocation) synced seamlessly with Shooter */}
-              {(gameRound === 3 || gameRound === 4) && (() => {
-                const choices = gameRound === 3 ? (activeQuestion.v3Choices || []) : (activeQuestion.v4Choices || []);
+              {/* Clickable Choice Cards ONLY for V3 (Syn/Ant/Def) synced seamlessly with Shooter */}
+              {gameRound === 3 && (() => {
+                const choices = activeQuestion.v3Choices || [];
                 if (choices.length === 0) return null;
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2 text-left">
@@ -2432,8 +2438,88 @@ export default function GameArena({
                 </div>
               )}
 
-              {/* Optional On-Screen Keyboard */}
-              {gameRound === 2 && showMobileKeyboard && gameSubState === 'PLAYING' && (
+              {/* Continuous Typing Attack Boss HP Bar + Word-Grouped Collocation Boxes for Round 4 */}
+              {gameRound === 4 && (() => {
+                const rawTarget = String(activeQuestion.v4Target || activeQuestion.v4Display || activeQuestion.word || '')
+                  .trim()
+                  .replace(/\s+/g, ' ')
+                  .toUpperCase();
+                let totalAlpha = 0;
+                let typedAlpha = 0;
+                for (let k = 0; k < rawTarget.length; k++) {
+                  if (/^[A-Z]$/.test(rawTarget[k])) {
+                    totalAlpha += 1;
+                    if (k < gameTypedProgress) typedAlpha += 1;
+                  }
+                }
+                const hpPct = totalAlpha > 0 ? Math.max(0, Math.round(((totalAlpha - typedAlpha) / totalAlpha) * 100)) : 100;
+
+                // Group indices into words separated by spaces for readable wrapping
+                const wordGroups = [];
+                let currentGroup = [];
+                for (let k = 0; k < rawTarget.length; k++) {
+                  if (rawTarget[k] === ' ') {
+                    if (currentGroup.length > 0) wordGroups.push(currentGroup);
+                    currentGroup = [];
+                  } else {
+                    currentGroup.push({ char: rawTarget[k], idx: k });
+                  }
+                }
+                if (currentGroup.length > 0) wordGroups.push(currentGroup);
+
+                return (
+                  <div className="mt-2 space-y-2">
+                    <div className="max-w-md mx-auto">
+                      <div className="flex items-center justify-between text-xs font-extrabold mb-1">
+                        <span className="text-rose-600 dark:text-rose-400">
+                          ⚔️ Máu Boss Collocation: {hpPct}%
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400 font-mono">
+                          Đã bắn {typedAlpha}/{totalAlpha} ký tự • {wordGroups.length} từ
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-150 ${
+                            hpPct > 50 ? 'bg-rose-600' : hpPct > 25 ? 'bg-amber-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${hpPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-center items-center gap-x-3 gap-y-1.5 flex-wrap">
+                      {wordGroups.map((group, gIdx) => (
+                        <div key={gIdx} className="inline-flex items-center gap-0.5 sm:gap-1">
+                          {group.map(({ char, idx }) => {
+                            const isAlpha = /^[A-Z]$/.test(char);
+                            const isTyped = idx < gameTypedProgress || !isAlpha;
+                            const isCurrent = idx === gameTypedProgress;
+                            const displayChar = isTyped ? char : '_';
+                            return (
+                              <div
+                                key={idx}
+                                className={`w-6 h-7 sm:w-7 sm:h-8 rounded-md flex items-center justify-center font-mono font-bold text-xs sm:text-sm transition-all ${
+                                  isTyped
+                                    ? 'bg-rose-600 text-white border border-rose-500 scale-105'
+                                    : isCurrent
+                                    ? 'bg-amber-50 dark:bg-slate-800 text-[#0F172B] dark:text-white border-2 border-rose-500 dark:border-rose-400 shadow-sm'
+                                    : 'bg-[#F8FAFC]/70 dark:bg-slate-900 text-[#475569] dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                                }`}
+                              >
+                                {displayChar}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Optional On-Screen Keyboard (Round 2 & Round 4) */}
+              {(gameRound === 2 || gameRound === 4) && showMobileKeyboard && gameSubState === 'PLAYING' && (
                 <div className="mt-2.5 space-y-1">
                   {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map(rowStr => (
                     <div key={rowStr} className="flex justify-center gap-1">
@@ -2490,7 +2576,7 @@ export default function GameArena({
             <div className="absolute inset-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40">
               <h2 className="text-xl sm:text-2xl font-extrabold text-amber-600 dark:text-amber-400 mb-2">HOÀN THÀNH VÒNG {gameRound}/4!</h2>
               <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-md mb-3 leading-relaxed">
-                Chuẩn bị bước sang <b>Vòng {gameRound + 1}/4</b> ({gameRound + 1 === 2 ? 'Gõ Từ Full' : gameRound + 1 === 3 ? 'Đồng nghĩa / Trái nghĩa / Định nghĩa' : 'Cụm từ Collocation'}) - giới hạn {getSpeedAdjustedTimeLimit(gameRound + 1, room.speedMode || 'normal')} giây/từ!
+                Chuẩn bị bước sang <b>Vòng {gameRound + 1}/4</b> ({gameRound + 1 === 2 ? 'Gõ Từ Full' : gameRound + 1 === 3 ? 'Đồng nghĩa / Trái nghĩa / Định nghĩa' : 'Gõ Cụm Từ Collocation Diệt Boss'}) - giới hạn {getSpeedAdjustedTimeLimit(gameRound + 1, room.speedMode || 'normal')} giây/từ!
               </p>
               <p className="text-xs font-mono text-[#007A7A] dark:text-cyan-300 mb-5">
                 Tự động bắt đầu sau {transitionCountdown} giây...
@@ -2724,7 +2810,9 @@ export default function GameArena({
               : `Top: ${leaderboardPlayers.slice(0, 3).map((p, i) => `${i + 1}. ${p.name} (${p.score}đ)`).join(' • ') || 'Chưa có điểm'}`}
           </span>
           <span className="font-mono text-[#007A7A] dark:text-cyan-400">
-            {gameRound === 2
+            {gameRound === 4
+              ? '[TAB] Nghe cụm từ • [1] Gợi ý • Gõ bàn phím liên tục diệt Boss Collocation'
+              : gameRound === 2
               ? '[TAB] Nghe lại • [1] Gợi ý • Gõ bàn phím (Full từ)'
               : 'Chuột / ← → để lái • Click / Space để bắn hoặc Bấm chọn • [TAB] Nghe'}
           </span>

@@ -262,7 +262,7 @@ export default function GlobalModals({
                           const rawDataUrl = await readImageFileAsDataUrl(file);
                           if (animated) {
                             if (!canUseTargetAnimatedAvatar) {
-                              showToast('Ảnh Avatar Động (.GIF/.WebP) thuộc gói Ai eo VIP - ảnh sẽ được cắt tĩnh.', 'info');
+                              showToast('Ảnh Avatar Động (.GIF/.WebP) thuộc gói IELTS VIP - ảnh sẽ được cắt tĩnh.', 'info');
                               setAvatarCropState({ sourceUrl: rawDataUrl, target: 'editing_avatar' });
                               return;
                             }
@@ -452,7 +452,7 @@ export default function GlobalModals({
               {currentUser?.role === 'teacher'
                 ? 'Tạo Phòng Đấu Từ Vựng Mới'
                 : hasVipFriendRoomAccess(currentUser)
-                ? '👑 Tạo Phòng Chơi Cùng Bạn Bè (Ai eo VIP)'
+                ? '👑 Tạo Phòng Chơi Cùng Bạn Bè (IELTS VIP)'
                 : `🎫 Tạo Phòng Đấu Bạn Bè (Còn ${getFriendRoomTicketCredits(currentUser)} vé)`}
             </h3>
             <button type="button" onClick={() => setShowCreateRoomModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
@@ -1194,10 +1194,10 @@ export default function GlobalModals({
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                  <span>Avatar Động (.GIF / .WebP động) - Đặc quyền Ai eo VIP</span>
+                  <span>Avatar Động (.GIF / .WebP động) - Đặc quyền IELTS VIP</span>
                 </p>
                 <p className="text-xs text-[#475569] dark:text-slate-400">
-                  Mở Gói Ai eo VIP ({vipPriceLabel}/1 tháng) để đặt ảnh đại diện chuyển động &amp; LED Neon nhiều màu.
+                  Mở Gói IELTS VIP ({vipPriceLabel}/1 tháng) để đặt ảnh đại diện chuyển động &amp; LED Neon nhiều màu.
                 </p>
               </div>
               {onOpenVipCheckout && (
@@ -1233,7 +1233,7 @@ export default function GlobalModals({
                     const rawDataUrl = await readImageFileAsDataUrl(file);
                     if (animated) {
                       if (!canUseSelfAnimatedAvatar) {
-                        showToast(`Ảnh Avatar Động (.GIF/.WebP) chỉ dành cho Gói Ai eo VIP (${vipPriceLabel}/1 tháng) - ảnh sẽ được cắt thành ảnh tĩnh.`, 'info');
+                        showToast(`Ảnh Avatar Động (.GIF/.WebP) chỉ dành cho Gói IELTS VIP (${vipPriceLabel}/1 tháng) - ảnh sẽ được cắt thành ảnh tĩnh.`, 'info');
                         setAvatarCropState({ sourceUrl: rawDataUrl, target: 'self_avatar' });
                         return;
                       }

@@ -56,10 +56,13 @@ export default function TeacherGradingModal({
 
   const isSingleSkill = gradingAttempt.testMode === 'single_skill' && Boolean(gradingAttempt.focusSkill);
   const focusSkill = isSingleSkill ? gradingAttempt.focusSkill : null;
+  const writingTaskScope = gradingAttempt.writingTaskScope || 'both';
+  const isSingleSpeakingOnly = isSingleSkill && focusSkill === 'speaking';
   const isSpeakingAttempt =
-    focusSkill === 'speaking' ||
-    Boolean(gradingAttempt.scores?.speaking) ||
-    (Array.isArray(gradingAttempt.speakingRecordings) && gradingAttempt.speakingRecordings.length > 0);
+    isSingleSpeakingOnly ||
+    (!isSingleSkill &&
+      (Boolean(gradingAttempt.scores?.speaking) ||
+        (Array.isArray(gradingAttempt.speakingRecordings) && gradingAttempt.speakingRecordings.length > 0)));
   const showListeningBlock = !isSingleSkill || focusSkill === 'listening';
   const showReadingBlock = !isSingleSkill || focusSkill === 'reading';
   const showWritingBlock = !isSingleSkill || focusSkill === 'writing';
@@ -83,7 +86,12 @@ export default function TeacherGradingModal({
 
   const previewT1 = sanitizeBandInput(gradingScores.task1Band);
   const previewT2 = sanitizeBandInput(gradingScores.task2Band);
-  const previewWriting = calculateWritingBand(previewT1, previewT2);
+  const previewWriting =
+    writingTaskScope === 'task1'
+      ? previewT1
+      : writingTaskScope === 'task2'
+      ? previewT2
+      : calculateWritingBand(previewT1, previewT2);
   const previewSpeaking = sanitizeWholeBandInput(gradingScores.speakingBand);
 
   const previewSkills = [];
@@ -414,6 +422,7 @@ export default function TeacherGradingModal({
         <div className="space-y-4 mb-6">
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">Bài Viết Của Học Sinh</h4>
 
+          {writingTaskScope !== 'task2' && (
           <div className="bg-slate-50 dark:bg-slate-800/70 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
             <p className="font-bold text-xs text-slate-700 dark:text-slate-200 mb-2">
               Writing Task 1 ({getWordCount(gradingAttempt.answers?.w1)} từ)
@@ -422,7 +431,9 @@ export default function TeacherGradingModal({
               {gradingAttempt.answers?.w1 || 'Không có bài làm'}
             </div>
           </div>
+          )}
 
+          {writingTaskScope !== 'task1' && (
           <div className="bg-slate-50 dark:bg-slate-800/70 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
             <p className="font-bold text-xs text-slate-700 dark:text-slate-200 mb-2">
               Writing Task 2 ({getWordCount(gradingAttempt.answers?.w2)} từ)
@@ -431,6 +442,7 @@ export default function TeacherGradingModal({
               {gradingAttempt.answers?.w2 || 'Không có bài làm'}
             </div>
           </div>
+          )}
         </div>
         )}
 
@@ -476,6 +488,7 @@ export default function TeacherGradingModal({
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {writingTaskScope !== 'task2' && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Task 1 Band Score</label>
               <input
@@ -489,7 +502,9 @@ export default function TeacherGradingModal({
                 className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
+            )}
 
+            {writingTaskScope !== 'task1' && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Task 2 Band Score</label>
               <input
@@ -503,6 +518,7 @@ export default function TeacherGradingModal({
                 className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
+            )}
           </div>
           </>
           )}
@@ -559,22 +575,22 @@ export default function TeacherGradingModal({
           >
             Hủy
           </button>
-          {!gradingAttempt.teacherGraded && !isSpeakingAttempt && showListeningBlock && showReadingBlock && (
+          {!gradingAttempt.teacherGraded && !isSingleSpeakingOnly && showListeningBlock && showReadingBlock && (
             <button
               type="button"
               onClick={() => saveTeacherGrading({ includeWriting: false })}
               className="px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-600 rounded-xl transition flex items-center gap-1.5"
-              title="Lưu riêng điểm Listening & Reading đã sửa, giữ nguyên trạng thái Chờ Chấm Writing"
+              title="Lưu riêng điểm Listening & Reading đã sửa, giữ nguyên trạng thái Chờ Duyệt"
             >
-              <Save className="w-3.5 h-3.5" /> Chỉ Lưu L &amp; R (Chưa Chốt Writing)
+              <Save className="w-3.5 h-3.5" /> Chỉ Lưu L &amp; R (Chưa Duyệt Trả Điểm)
             </button>
           )}
           <button
             type="button"
-            onClick={() => saveTeacherGrading({ includeWriting: !isSpeakingAttempt })}
-            className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow flex items-center gap-2"
+            onClick={() => saveTeacherGrading({ includeWriting: showWritingBlock })}
+            className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition shadow flex items-center gap-2"
           >
-            <Save className="w-4 h-4" /> Lưu Kết Quả & Chấm Điểm
+            <Save className="w-4 h-4" /> Duyệt &amp; Trả Điểm Cho Học Sinh
           </button>
         </div>
       </div>

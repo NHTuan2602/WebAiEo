@@ -37,12 +37,15 @@ import {
   PAID_SHOP_TITLES,
   SKILL_PASS_PRICE_VND,
   DEFAULT_EXAM_PRICE_VND,
+  PERIODIC_MOCK_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
   AIEO_VIP_PRICE_VND,
   SUBSCRIPTION_DURATION_MS,
   canCreateFriendRoomNow,
   formatVndCurrency,
   getFriendRoomTicketCredits,
+  getRealExamComboMeta,
+  getRealExamCredits,
   getTestPurchasePriceVnd,
   getTitlePriceVnd,
   hasCustomCoverPermission,
@@ -707,6 +710,7 @@ function sanitizeUserForViewer(user, viewer) {
     skillPracticeExpiresAt: Number(user.skillPracticeExpiresAt) || 0,
     aieoVipExpiresAt: Number(user.aieoVipExpiresAt) || 0,
     roomCreateCredits: getFriendRoomTicketCredits(user),
+    realExamCredits: getRealExamCredits(user),
     vipRedNameEnabled: (() => {
       const isVip = Number(user.aieoVipExpiresAt) > Date.now();
       const isSa = Boolean(user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME);
@@ -1843,7 +1847,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
           return { allowed: false, status: 403, error: 'Mã phòng này đang thuộc về Giáo viên hoặc chủ phòng khác.' };
         }
         if (!existingRoom && !canCreateFriendRoomNow(viewerRecord)) {
-          return { allowed: false, status: 403, error: 'Cần mua 1 Lượt Tạo Phòng (5.000đ) hoặc đăng ký Gói Ai eo VIP (80.000đ/1 tháng) để tạo phòng đấu bạn bè!' };
+          return { allowed: false, status: 403, error: 'Cần mua 1 Lượt Tạo Phòng (5.000đ) hoặc đăng ký Gói IELTS VIP (80.000đ/1 tháng) để tạo phòng đấu bạn bè!' };
         }
         const oldPin = payload?.oldPin ? String(payload.oldPin).trim() : '';
         if (oldPin && oldPin !== cleanPin) {
@@ -1866,7 +1870,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     case 'SHUFFLE_ROOM_TEAMS': {
       const cleanPin = String(payload?.pin || '').trim();
       if (!canManageTargetRoom(cleanPin)) {
-        return { allowed: false, status: 403, error: 'Chỉ Giáo viên hoặc Chủ phòng Gói Ai eo VIP mới được điều khiển phòng đấu này.' };
+        return { allowed: false, status: 403, error: 'Chỉ Giáo viên hoặc Chủ phòng Gói IELTS VIP mới được điều khiển phòng đấu này.' };
       }
       return { allowed: true };
     }
@@ -2042,11 +2046,38 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         }
         return { allowed: true };
       }
-      if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip') {
+      if (
+        payload?.itemType === 'skill_pass' ||
+        payload?.itemType === 'aieo_vip' ||
+        payload?.itemType === 'room_ticket' ||
+        Boolean(getRealExamComboMeta(payload?.itemType, store.paymentConfig))
+      ) {
         return { allowed: true };
       }
       if (hasCustomCoverPermission(me) && !payload?.renew) {
         return { allowed: false, status: 400, error: 'Tài khoản của bạn đã mở khóa quyền Ảnh Nền Riêng rồi!' };
+      }
+      return { allowed: true };
+    }
+
+    case 'REDEEM_REAL_EXAM_CREDIT': {
+      const me = store.users?.[viewer.username] || viewer;
+      const tid = String(payload?.testId || '').trim();
+      const targetTest = (store.tests || []).find(t => t?.id === tid);
+      if (!targetTest) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy đề thi Thực Chiến.' };
+      }
+      if (targetTest.testMode === 'single_skill') {
+        return { allowed: false, status: 400, error: 'Bài tập Daily Zone luôn miễn phí, không cần dùng lượt Combo.' };
+      }
+      if (targetTest.examCategory === 'periodic_mock' || Number(targetTest.priceVnd) >= PERIODIC_MOCK_PRICE_VND) {
+        return { allowed: false, status: 400, error: 'Combo chỉ áp dụng cho đề Thực Chiến Thi Thật (20.000đ/đề), không áp dụng cho Mock Test Định Kỳ.' };
+      }
+      if (hasTestPurchaseAccess(me, targetTest)) {
+        return { allowed: false, status: 400, error: 'Bạn đã mở khóa đề thi này rồi!' };
+      }
+      if (getRealExamCredits(me) < 1) {
+        return { allowed: false, status: 403, error: 'Bạn chưa còn lượt Combo Thực Chiến nào. Vui lòng mua Combo 3/5/10 đề hoặc mở lẻ!' };
       }
       return { allowed: true };
     }
@@ -2069,7 +2100,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
           return {
             allowed: false,
             status: 403,
-            error: `Đề thi 3 kỹ năng này có giá ${priceLabel}. Vui lòng mở khóa trước khi làm & nộp bài!`
+            error: `Đề thi 4 kỹ năng này có chi phí test ${priceLabel} (1 lượt). Vui lòng mở khóa trước khi làm & nộp bài!`
           };
         }
         const examPass = test?.focusSkill !== 'speaking' ? String(test?.examPassword || '').trim() : '';
@@ -2086,7 +2117,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
             return {
               allowed: false,
               status: 403,
-              error: 'Đề thi Thực Chiến yêu cầu nhập đúng Mật khẩu lớp thi do giáo viên cấp trước khi nộp bài.'
+              error: 'Bài thi yêu cầu nhập đúng Mật khẩu lớp / Team do Ms. Như cấp trước khi nộp bài.'
             };
           }
         }
@@ -2113,7 +2144,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
               unlockPayload.testId === test.id
             );
             if (!unlockedMem && !unlockedTokenOk) {
-              return { allowed: false, status: 403, error: 'Phòng thi Speaking Thực Chiến yêu cầu nhập đúng mật khẩu trước khi vào thi/nộp bài.' };
+              return { allowed: false, status: 403, error: 'Bài Speaking này yêu cầu nhập đúng mật khẩu Team trước khi vào làm/nộp bài.' };
             }
           }
           const nowMs = Date.now();
@@ -2126,12 +2157,16 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
             return { allowed: false, status: 403, error: `Bài làm này đã hết hạn nộp lúc ${formatViDateTimeServer(dueAtMs)}.` };
           }
         }
-        if (test && Number(test.maxAttempts) > 0 && !existingAtt) {
+        const effectiveMaxAttempts =
+          test && test.testMode !== 'single_skill'
+            ? (Number(test.maxAttempts) > 0 ? Number(test.maxAttempts) : 1)
+            : (Number(test?.maxAttempts) || 0);
+        if (test && effectiveMaxAttempts > 0 && !existingAtt) {
           const prevCount = (store.attempts || []).filter(
             a => a.testId === test.id && (a.studentId === viewer.username || a.studentUsername === viewer.username)
           ).length;
-          if (prevCount >= Number(test.maxAttempts)) {
-            return { allowed: false, status: 403, error: `Bạn đã dùng hết ${test.maxAttempts} lượt làm bài thi này.` };
+          if (prevCount >= effectiveMaxAttempts) {
+            return { allowed: false, status: 403, error: `Đề thi thật chỉ được làm tối đa ${effectiveMaxAttempts} lượt - bạn đã hoàn thành lượt thi này.` };
           }
         }
       }
@@ -2309,6 +2344,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       skillPracticeExpiresAt: Number(prevUser.skillPracticeExpiresAt) || 0,
       aieoVipExpiresAt: Number(prevUser.aieoVipExpiresAt) || 0,
       roomCreateCredits: getFriendRoomTicketCredits(prevUser),
+      realExamCredits: getRealExamCredits(prevUser),
       subscriptionRequested: prevUser.subscriptionRequested || null,
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
@@ -2370,6 +2406,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       incoming.skillPracticeExpiresAt = Number(prevUser?.skillPracticeExpiresAt) || 0;
       incoming.aieoVipExpiresAt = Number(prevUser?.aieoVipExpiresAt) || 0;
       incoming.roomCreateCredits = getFriendRoomTicketCredits(prevUser);
+      incoming.realExamCredits = getRealExamCredits(prevUser);
     } else {
       if (incoming.grantedTitleIds !== undefined) {
         incoming.grantedTitleIds = Array.isArray(incoming.grantedTitleIds)
@@ -2409,6 +2446,10 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
         incoming.roomCreateCredits !== undefined
           ? Math.max(0, Math.floor(Number(incoming.roomCreateCredits) || 0))
           : getFriendRoomTicketCredits(prevUser);
+      incoming.realExamCredits =
+        incoming.realExamCredits !== undefined
+          ? Math.max(0, Math.floor(Number(incoming.realExamCredits) || 0))
+          : getRealExamCredits(prevUser);
     }
     incoming.subscriptionRequested = prevUser?.subscriptionRequested || null;
     const isTargetVipOrSa =
@@ -3523,8 +3564,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             appendStoreNotification(
               store,
               {
-                title: '🎉 Đã mở khóa Đề Thi 3 Kỹ Năng!',
-                message: `Quản Trị Hệ Thống đã mở khóa đề thi "${targetTestTitle}" — bạn có thể vào làm nhiều lần không giới hạn.`,
+                title: '🎉 Đã mở khóa Đề Thi Thực Chiến 4 Kỹ Năng!',
+                message: `Quản Trị Hệ Thống đã mở khóa đề thi "${targetTestTitle}" (1 lượt thi thật đủ 4 kỹ năng Listening, Reading, Writing & Speaking).`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
@@ -3535,6 +3576,34 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           }
           changed = true;
         }
+      } else if (kind === 'real_exam_credit' || Boolean(getRealExamComboMeta(kind, store.paymentConfig))) {
+        const comboMeta = getRealExamComboMeta(kind, store.paymentConfig);
+        const addCount = comboMeta ? comboMeta.credits : Math.max(1, Math.floor(Number(payload?.credits) || 1));
+        const nextCredits = active ? getRealExamCredits(targetUser) + addCount : 0;
+        store.users[targetKey] = {
+          ...targetUser,
+          realExamCredits: nextCredits,
+          ...(active &&
+          (targetUser.subscriptionRequested?.itemType === kind ||
+            Boolean(getRealExamComboMeta(targetUser.subscriptionRequested?.itemType, store.paymentConfig)))
+            ? { subscriptionRequested: null }
+            : {})
+        };
+        if (active && targetUser.role !== 'teacher') {
+          appendStoreNotification(
+            store,
+            {
+              title: `🎫 Đã cộng +${addCount} lượt Thực Chiến Thi Thật!`,
+              message: `Quản Trị Hệ Thống đã cấp +${addCount} lượt Combo Thực Chiến Thi Thật 4 Kỹ Năng (hiện có ${nextCredits} lượt). Bạn có thể vào Trang Chủ đổi 1 lượt để mở bất kỳ đề Thực Chiến 20.000đ nào!`,
+              type: 'announcement',
+              targetUsernames: [targetKey],
+              createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+              createdByName: viewer?.name || 'Quản Trị Hệ Thống'
+            },
+            viewer
+          );
+        }
+        changed = true;
       } else if (kind === 'room_ticket') {
         const nextCredits = active ? getFriendRoomTicketCredits(targetUser) + 1 : 0;
         store.users[targetKey] = {
@@ -3584,8 +3653,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           appendStoreNotification(
             store,
             {
-              title: '👑 Đã kích hoạt Gói Ai eo VIP (1 Tháng)!',
-              message: `Quản Trị Hệ Thống đã kích hoạt 30 ngày Gói Ai eo VIP: Mở khóa Ảnh Avatar Động (.GIF/.WebP), Ảnh Bìa Cá Nhân, Viền Bìa & Thẻ LED Neon Nhiều Màu, Đổi Màu Chữ Tên + Nhãn AIEOVIP, Danh hiệu Ai eo VIP & Tạo phòng Game Bạn Bè vô hạn.`,
+              title: '👑 Đã kích hoạt Gói IELTS VIP (1 Tháng)!',
+              message: `Quản Trị Hệ Thống đã kích hoạt 30 ngày Gói IELTS VIP: Mở khóa Ảnh Avatar Động (.GIF/.WebP), Ảnh Bìa Cá Nhân, Viền Bìa & Thẻ LED Neon Nhiều Màu, Đổi Màu Chữ Tên + Nhãn IELTS VIP, Danh hiệu IELTS VIP & Tạo phòng Game Bạn Bè vô hạn.`,
               type: 'announcement',
               targetUsernames: [targetKey],
               createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
@@ -3596,6 +3665,38 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         }
         changed = true;
       }
+      break;
+    }
+
+    case 'REDEEM_REAL_EXAM_CREDIT': {
+      const uname = viewer?.username ? findUserKeyInStore(store, viewer.username) || viewer.username : '';
+      const targetUser = uname ? store.users?.[uname] : null;
+      const tid = String(payload?.testId || '').trim();
+      const targetTest = (store.tests || []).find(t => t?.id === tid);
+      if (!uname || !targetUser || !targetTest) break;
+      const currentCredits = getRealExamCredits(targetUser);
+      if (currentCredits < 1) break;
+      const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
+      const nextTests = Array.from(new Set([...prevTests, tid]));
+      const nextCredits = Math.max(0, currentCredits - 1);
+      store.users[uname] = {
+        ...targetUser,
+        realExamCredits: nextCredits,
+        purchasedTestIds: nextTests
+      };
+      appendStoreNotification(
+        store,
+        {
+          title: '🎫 Đã đổi 1 lượt Combo Thi Thật thành công!',
+          message: `Bạn đã dùng 1 lượt Combo để mở khóa đề "${targetTest.title}" (1 lượt thi thật 4 kỹ năng). Số lượt Combo còn lại: ${nextCredits}.`,
+          type: 'announcement',
+          targetUsernames: [uname],
+          createdBy: SUPER_ADMIN_USERNAME,
+          createdByName: 'Hệ Thống Thực Chiến IELTS'
+        },
+        null
+      );
+      changed = true;
       break;
     }
 
@@ -3626,7 +3727,20 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           subscriptionRequested: {
             itemType: 'test',
             itemId: tid,
-            itemLabel: `Mua Đề Thi: ${targetTest.title}`,
+            itemLabel: `Chi phí test: ${targetTest.title}`,
+            requestedAt: Date.now()
+          }
+        };
+        changed = true;
+        break;
+      }
+      const comboMetaReq = getRealExamComboMeta(payload?.itemType, store.paymentConfig);
+      if (comboMetaReq) {
+        store.users[uname] = {
+          ...targetUser,
+          subscriptionRequested: {
+            itemType: comboMetaReq.itemType,
+            itemLabel: `${comboMetaReq.label} (${formatVndCurrency(comboMetaReq.price)})`,
             requestedAt: Date.now()
           }
         };
@@ -3640,10 +3754,10 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             itemType: payload.itemType,
             itemLabel:
               payload.itemType === 'aieo_vip'
-                ? 'Gói Ai eo VIP (1 Tháng)'
+                ? 'Gói IELTS VIP (1 Tháng)'
                 : payload.itemType === 'room_ticket'
                 ? 'Vé Tạo 1 Phòng Đấu Riêng (5k)'
-                : 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)',
+                : 'Gói Daily Zone (1 Tháng)',
             requestedAt: Date.now()
           }
         };
@@ -3673,6 +3787,10 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         const testObj = (store.tests || []).find(t => t.id === attempt.testId);
         const serverObjEval = evaluateObjectiveScoresForAttempt(testObj, attempt.answers || {});
         const isSpeakingMode = attempt.testMode === 'single_skill' && attempt.focusSkill === 'speaking';
+        const isSingleObjectiveMode =
+          attempt.testMode === 'single_skill' &&
+          (attempt.focusSkill === 'reading' || attempt.focusSkill === 'listening');
+
         const validTicket = isSpeakingMode && attempt.aiGradingTicket
           ? verifyToken(attempt.aiGradingTicket, store._authSecret)
           : null;
@@ -3701,7 +3819,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         let sanitizedScores = {
           listening: attempt.scores?.listening || { raw: 0, total: 0, band: null },
           reading: attempt.scores?.reading || { raw: 0, total: 0, band: null },
-          writing: { task1Band: null, task2Band: null, overallBand: null }
+          writing: { task1Band: null, task2Band: null, overallBand: null },
+          speaking: { band: null, criteria: {} }
         };
         let finalOverallBand = null;
         let finalTeacherGraded = false;
@@ -3711,47 +3830,55 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         if (serverObjEval) {
           if (serverObjEval.scores.listening) sanitizedScores.listening = serverObjEval.scores.listening;
           if (serverObjEval.scores.reading) sanitizedScores.reading = serverObjEval.scores.reading;
-          finalOverallBand = serverObjEval.overallBand;
-          finalTeacherGraded = serverObjEval.teacherGraded;
+          if (isSingleObjectiveMode) {
+            finalOverallBand = serverObjEval.overallBand;
+            finalTeacherGraded = true;
+          }
         }
 
+        // Hold final score release for Ms. Nhu approval on Full 4-Skill Exams, Writing, and Speaking.
+        // Any valid server-signed AI draft is preserved strictly as teacher reference (never auto-published as final student grade).
+        let aiDraftBand = null;
+        let aiDraftFeedback = '';
         if (isSpeakingMode && ticketOk && typeof validTicket.band === 'number') {
-          sanitizedScores = {
-            ...sanitizedScores,
-            speaking: { band: roundWholeBand(validTicket.band), criteria: validTicket.criteria || {} }
-          };
-          finalOverallBand = roundWholeBand(validTicket.band);
-          finalTeacherGraded = true;
-          finalAiGraded = true;
-          finalFeedback = typeof validTicket.overallFeedback === 'string' ? validTicket.overallFeedback : '';
-        } else if (!isSpeakingMode && writingTicketOk && typeof validWritingTicket.overallBand === 'number') {
+          aiDraftBand = roundWholeBand(validTicket.band);
+          aiDraftFeedback = typeof validTicket.overallFeedback === 'string' ? validTicket.overallFeedback : '';
+          finalAiGraded = false;
+          finalTeacherGraded = false;
+          finalOverallBand = null;
+        } else if (!isSpeakingMode && !isSingleObjectiveMode && writingTicketOk && typeof validWritingTicket.overallBand === 'number') {
           const wt1 = Number(validWritingTicket.task1Band) || 0;
           const wt2 = Number(validWritingTicket.task2Band) || 0;
-          const wtOverall = calculateWritingBand(wt1, wt2);
-          sanitizedScores = {
-            ...sanitizedScores,
-            writing: { task1Band: wt1, task2Band: wt2, overallBand: wtOverall }
-          };
-          const activeSkillBands = [];
-          if ((sanitizedScores.listening?.total || 0) > 0) activeSkillBands.push(Number(sanitizedScores.listening.band) || 0);
-          if ((sanitizedScores.reading?.total || 0) > 0) activeSkillBands.push(Number(sanitizedScores.reading.band) || 0);
-          activeSkillBands.push(wtOverall);
-          finalOverallBand = attempt.testMode === 'single_skill' && attempt.focusSkill === 'writing'
-            ? wtOverall
-            : calculateOverallIeltsBand(activeSkillBands);
-          finalAiGraded = true;
-          finalFeedback = typeof validWritingTicket.feedback === 'string' ? validWritingTicket.feedback : '';
+          aiDraftBand = calculateWritingBand(wt1, wt2);
+          aiDraftFeedback = typeof validWritingTicket.feedback === 'string' ? validWritingTicket.feedback : '';
+          finalAiGraded = false;
+          finalTeacherGraded = false;
+          finalOverallBand = null;
         }
 
         const submittedAtMs = Date.now();
         const timeliness = computeTestTimelinessServer(testObj, submittedAtMs);
         const rawDuration = Math.max(0, Math.round(Number(attempt.durationSeconds) || 0));
         const rawStartedAtMs = parseScheduleTimestampServer(attempt.startedAtMs);
+        const cleanSpeakingRecordings = Array.isArray(attempt.speakingRecordings)
+          ? attempt.speakingRecordings
+              .filter(r => r && typeof r === 'object')
+              .slice(0, 24)
+              .map(r => ({
+                questionId: String(r.questionId || ''),
+                part: Number(r.part) || 1,
+                prompt: String(r.prompt || '').slice(0, 600),
+                audioUrl: typeof r.audioUrl === 'string' ? r.audioUrl.slice(0, 300) : '',
+                transcript: String(r.transcript || '').slice(0, 4000),
+                durationSec: Math.max(0, Math.round(Number(r.durationSec) || 0))
+              }))
+          : undefined;
 
         attempt = {
           ...attempt,
           studentId: viewer.username,
           studentName: viewer.name || attempt.studentName,
+          ...(cleanSpeakingRecordings ? { speakingRecordings: cleanSpeakingRecordings } : {}),
           startedAtMs: rawStartedAtMs || Math.max(1, submittedAtMs - rawDuration * 1000),
           startedAt: typeof attempt.startedAt === 'string' && attempt.startedAt
             ? attempt.startedAt.slice(0, 60)
@@ -3766,7 +3893,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           overallBand: finalOverallBand,
           teacherGraded: finalTeacherGraded,
           aiGraded: finalAiGraded,
-          teacherFeedback: finalFeedback
+          teacherFeedback: finalFeedback,
+          ...(aiDraftBand !== null ? { aiDraftBand, aiDraftFeedback } : {})
         };
         delete attempt.aiGradingTicket;
         delete attempt.aiWritingTicket;
@@ -4217,6 +4345,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'GRANT_USER_TITLES',
   'TOGGLE_USER_COVER_UNLOCK',
   'TOGGLE_USER_SUBSCRIPTION',
+  'REDEEM_REAL_EXAM_CREDIT',
   'REQUEST_COVER_UNLOCK',
   'UPDATE_PAYMENT_CONFIG',
   'SEED_DEFAULTS'
@@ -5031,10 +5160,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const isSkillPassOrder = rawType === 'skill_pass';
         const isAieoVipOrder = rawType === 'aieo_vip';
         const isRoomTicketOrder = rawType === 'room_ticket';
+        const comboMeta = getRealExamComboMeta(rawType, cfg);
         const itemType = isTitleOrder
           ? 'title'
           : isTestOrder
           ? 'test'
+          : comboMeta
+          ? comboMeta.itemType
           : isSkillPassOrder
           ? 'skill_pass'
           : isAieoVipOrder
@@ -5077,15 +5209,21 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             sendJsonResponse(res, 400, { ok: false, error: 'Đề thi không tồn tại hoặc đang được mở miễn phí.' });
             return;
           }
-          itemLabel = `Đề Thi 3 Kỹ Năng: ${targetTest.title}`;
+          const isPeriodicMock = targetTest.examCategory === 'periodic_mock' || testPrice >= PERIODIC_MOCK_PRICE_VND;
+          itemLabel = `${isPeriodicMock ? 'Mock Test Định Kỳ' : 'Chi phí test Thực Chiến 4 Kỹ Năng'}: ${targetTest.title}`;
           amount = testPrice;
           alreadyUnlocked = hasTestPurchaseAccess(viewerUser, targetTest);
+        } else if (comboMeta) {
+          itemId = comboMeta.itemType;
+          itemLabel = `${comboMeta.label} - Thực Chiến Thi Thật 4 Kỹ Năng`;
+          amount = comboMeta.price;
+          alreadyUnlocked = false;
         } else if (isSkillPassOrder) {
-          itemLabel = 'Gói Bài Tập 4 Kỹ Năng (1 Tháng)';
+          itemLabel = 'Gói Daily Zone (1 Tháng)';
           amount = Number(cfg.skillPassPrice) >= 0 ? cfg.skillPassPrice : SKILL_PASS_PRICE_VND;
           alreadyUnlocked = !renewFlag && hasSkillPracticeAccess(viewerUser);
         } else if (isAieoVipOrder) {
-          itemLabel = 'Gói Ai eo VIP (1 Tháng Full Quyền)';
+          itemLabel = 'Gói IELTS VIP (1 Tháng Full Quyền)';
           amount = Number(cfg.aieoVipPrice) >= 0 ? cfg.aieoVipPrice : AIEO_VIP_PRICE_VND;
           alreadyUnlocked = !renewFlag && Number(viewerUser?.aieoVipExpiresAt) > Date.now();
         } else if (isRoomTicketOrder) {
@@ -5217,7 +5355,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         ? hasSkillPracticeAccess(viewerUser)
         : matched?.itemType === 'aieo_vip'
         ? (isViewerSuperAdmin || Number(viewerUser?.aieoVipExpiresAt) > Date.now())
-        : matched?.itemType === 'room_ticket'
+        : matched?.itemType === 'room_ticket' || Boolean(getRealExamComboMeta(matched?.itemType, store.paymentConfig))
         ? Boolean(matched?.status === 'paid')
         : hasCustomCoverPermission(viewerUser);
       sendJsonResponse(res, 200, {
@@ -5373,8 +5511,28 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             appendStoreNotification(
               store,
               {
-                title: '🎉 Đã mở khóa Đề Thi 3 Kỹ Năng!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa vĩnh viễn ${matchedOrder.itemLabel || matchedOrder.itemId} (làm không giới hạn số lượt). Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
+                title: '🎉 Đã mở khóa Đề Thi Thực Chiến 4 Kỹ Năng!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa ${matchedOrder.itemLabel || matchedOrder.itemId} (1 lượt thi thật đủ 4 kỹ năng L·R·W·S, chờ Ms. Như duyệt điểm sau khi nộp).`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+          } else if (Boolean(getRealExamComboMeta(matchedOrder.itemType, store.paymentConfig))) {
+            const comboFulfilled = getRealExamComboMeta(matchedOrder.itemType, store.paymentConfig);
+            const nextCredits = getRealExamCredits(targetUser) + comboFulfilled.credits;
+            store.users[targetKey] = {
+              ...targetUser,
+              realExamCredits: nextCredits,
+              ...(targetUser.subscriptionRequested?.itemType === matchedOrder.itemType ? { subscriptionRequested: null } : {})
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: `🎉 Đã kích hoạt ${comboFulfilled.label} (+${comboFulfilled.credits} lượt Thi Thật)!`,
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và cộng +${comboFulfilled.credits} lượt mở đề Thực Chiến Thi Thật 4 Kỹ Năng (hiện có ${nextCredits} lượt). Bạn có thể vào Trang Chủ bấm "Dùng 1 Lượt Combo" để vào thi ngay!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -5392,8 +5550,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             appendStoreNotification(
               store,
               {
-                title: '🎉 Đã kích hoạt Gói Bài Tập 4 Kỹ Năng (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa 30 ngày sử dụng đầy đủ Khu Bài Tập 4 Kỹ Năng & Đề Lẻ! Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
+                title: '🎉 Đã kích hoạt Gói Daily Zone (1 Tháng)!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa 30 ngày sử dụng đầy đủ Khu Daily Zone! Cảm ơn bạn đã ủng hộ!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -5424,8 +5582,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             appendStoreNotification(
               store,
               {
-                title: '👑 Chào mừng thành viên Gói Ai eo VIP (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Ảnh Avatar Động (.GIF/.WebP), Tùy chọn Màu Chữ Tên & Viền Bìa LED Neon Nhiều Màu, Ảnh Bìa Cá Nhân miễn phí, Khung Avatar VIP, Danh hiệu 👑 Ai eo VIP & Tạo phòng Game bạn bè! Cảm ơn bạn đã ủng hộ Tuấn!`,
+                title: '👑 Chào mừng thành viên Gói IELTS VIP (1 Tháng)!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Ảnh Avatar Động (.GIF/.WebP), Tùy chọn Màu Chữ Tên & Viền Bìa LED Neon Nhiều Màu, Ảnh Bìa Cá Nhân miễn phí, Khung Avatar VIP, Danh hiệu 👑 IELTS VIP & Tạo phòng Game bạn bè! Cảm ơn bạn đã ủng hộ!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,

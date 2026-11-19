@@ -863,16 +863,17 @@ function decorateV3Question(item, idx, seedStr) {
   };
 }
 
-function decorateV4Question(item, seedStr) {
-  const choices = shuffleArrayWithSeed(
-    [item.collocation, ...(item.collocationDistractors || []).slice(0, 3)],
-    `${seedStr}:v4c:${item.word}`
-  );
+export function decorateV4Question(item) {
+  const cleanColloc = String(item?.collocation || item?.answer || item?.word || '').trim();
+  const baseWord = String(item?.word || cleanColloc).trim();
+  const promptText = String(item?.prompt || '').trim();
   return {
     ...item,
-    v4Question: `Chọn cụm COLLOCATION chuẩn IELTS cho từ "${item.word}" (${item.prompt})`,
-    v4Target: item.collocation,
-    v4Choices: choices
+    v4Question: promptText
+      ? `Gõ cụm COLLOCATION chuẩn IELTS của từ "${baseWord}" (${promptText}) để bắn laser tiêu diệt Boss!`
+      : `Gõ cụm COLLOCATION chuẩn IELTS "${baseWord}" để bắn laser tiêu diệt Boss!`,
+    v4Target: cleanColloc.toUpperCase(),
+    v4Display: cleanColloc
   };
 }
 
@@ -901,7 +902,7 @@ export function buildSeededRoundQueues(roomInput, pinKey = '', username = '', fa
     1: pickRoundSlice(1),
     2: pickRoundSlice(2),
     3: pickRoundSlice(3).map((item, idx) => decorateV3Question(item, idx, seed)),
-    4: pickRoundSlice(4).map(item => decorateV4Question(item, seed))
+    4: pickRoundSlice(4).map(item => decorateV4Question(item))
   };
 }
 
@@ -925,6 +926,6 @@ export function buildPracticeRoundQueues({ rawVocab = DEFAULT_VOCAB_TEXT, roundS
     1: pickRoundSlice(1),
     2: pickRoundSlice(2),
     3: pickRoundSlice(3).map((item, idx) => decorateV3Question(item, idx, seed)),
-    4: pickRoundSlice(4).map(item => decorateV4Question(item, seed))
+    4: pickRoundSlice(4).map(item => decorateV4Question(item))
   };
 }

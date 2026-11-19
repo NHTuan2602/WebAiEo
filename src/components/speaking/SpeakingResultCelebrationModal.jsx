@@ -25,8 +25,12 @@ export default function SpeakingResultCelebrationModal({
   onBackToHub
 }) {
   if (!attempt) return null;
+  const isApproved = Boolean(attempt.teacherGraded && typeof attempt.overallBand === 'number');
   const overallBand = attempt.overallBand ?? attempt.scores?.speaking?.band ?? 0;
   const formattedBand = Number.isFinite(Number(overallBand)) ? Number(overallBand).toFixed(1) : '0.0';
+  const recordedCount = Array.isArray(attempt.speakingRecordings)
+    ? attempt.speakingRecordings.filter(r => Number(r?.durationSec) > 0 || Boolean(r?.audioUrl)).length
+    : 0;
   const isSinglePart = partMode && partMode !== 'full';
   const partLabelMap = { part1: 'Part 1', part2: 'Part 2', part3: 'Part 3' };
 
@@ -43,10 +47,12 @@ export default function SpeakingResultCelebrationModal({
 
         <div className="space-y-2.5">
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Hoàn thành rồi! Band {formattedBand}
+            {isApproved ? `Hoàn thành rồi! Band ${formattedBand}` : 'Đã nộp bài · Ms. Như đang check!'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            {getCelebrationCopy(overallBand)}
+            {isApproved
+              ? getCelebrationCopy(overallBand)
+              : `Hệ thống đã lưu an toàn ${recordedCount} file ghi âm của bạn và gửi trực tiếp cho Ms. Như duyệt & trả điểm chính thức!`}
           </p>
         </div>
 
@@ -54,7 +60,7 @@ export default function SpeakingResultCelebrationModal({
           <div className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-start gap-2.5 text-left text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
             <Info className="w-4 h-4 text-[#475569] dark:text-slate-400 shrink-0 mt-0.5" />
             <span>
-              Đây là bài thi nhanh một phần (<strong>{partLabelMap[partMode] || partMode}</strong>), điểm chỉ phản ánh một khía cạnh kỹ năng. Muốn biết band sát thực lực nhất, hãy làm <strong>Full Test</strong> đầy đủ nhé!
+              Bạn vừa hoàn thành phần <strong>{partLabelMap[partMode] || partMode}</strong>. Bạn có thể nghe lại bản ghi âm của mình hoặc luyện tiếp trong <strong>Daily Zone</strong>!
             </span>
           </div>
         )}
@@ -65,7 +71,7 @@ export default function SpeakingResultCelebrationModal({
             onClick={onViewScore}
             className="w-full py-3 px-5 rounded-2xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-sm font-extrabold shadow-lg shadow-indigo-900/25 transition active:scale-[0.99]"
           >
-            Xem điểm của tôi
+            {isApproved ? 'Xem điểm của tôi' : 'Xem bài đã nộp & nghe lại ghi âm'}
           </button>
           {onBackToHub && (
             <button
@@ -73,7 +79,7 @@ export default function SpeakingResultCelebrationModal({
               onClick={onBackToHub}
               className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-[#475569] dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
             >
-              Quay về Sảnh Luyện Speaking
+              Quay về Daily Zone
             </button>
           )}
         </div>

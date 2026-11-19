@@ -24,6 +24,10 @@ import {
   DEFAULT_EXAM_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
   PAID_SHOP_TITLES,
+  PERIODIC_MOCK_PRICE_VND,
+  REAL_EXAM_COMBO_3_PRICE_VND,
+  REAL_EXAM_COMBO_5_PRICE_VND,
+  REAL_EXAM_COMBO_10_PRICE_VND,
   VIETQR_BANK_OPTIONS,
   formatVndCurrency,
   normalizePaymentConfig
@@ -444,12 +448,12 @@ export default function PaymentConfigModal({
               <div className="p-3.5 rounded-2xl bg-red-50/70 dark:bg-red-950/20 border border-red-200 dark:border-red-500/35 space-y-2.5">
                 <p className="text-xs font-extrabold text-red-900 dark:text-red-200 flex items-center gap-1.5">
                   <Crown className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-                  Bảng Giá Đề Thi, Tạo Phòng Lẻ &amp; Gói Ai eo VIP
+                  Bảng Chi Phí Test, Combo Thực Chiến &amp; Gói IELTS VIP
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                      🛒 Giá Mặc Định Đề 3 Kỹ Năng
+                      📝 Chi Phí 1 Đề Thực Chiến
                     </label>
                     <input
                       type="number"
@@ -460,6 +464,91 @@ export default function PaymentConfigModal({
                       onChange={e => setDraft(prev => ({
                         ...prev,
                         defaultExamPriceVnd: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      🎓 Mock Test Định Kỳ (3T)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.periodicMockPrice ?? PERIODIC_MOCK_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        periodicMockPrice: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      👑 Gói IELTS VIP (1 Tháng)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.aieoVipPrice ?? AIEO_VIP_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        aieoVipPrice: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      📦 Combo 3 Đề Thực Chiến
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.realExamCombo3Price ?? REAL_EXAM_COMBO_3_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        realExamCombo3Price: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      📦 Combo 5 Đề Thực Chiến
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.realExamCombo5Price ?? REAL_EXAM_COMBO_5_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        realExamCombo5Price: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      📦 Combo 10 Đề Thực Chiến
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.realExamCombo10Price ?? REAL_EXAM_COMBO_10_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        realExamCombo10Price: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
                       }))}
                       className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
                     />
@@ -477,23 +566,6 @@ export default function PaymentConfigModal({
                       onChange={e => setDraft(prev => ({
                         ...prev,
                         friendRoomTicketPrice: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
-                      }))}
-                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                      👑 Gói Ai eo VIP (1 Tháng)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={10000000}
-                      step={1000}
-                      value={draft.aieoVipPrice ?? AIEO_VIP_PRICE_VND}
-                      onChange={e => setDraft(prev => ({
-                        ...prev,
-                        aieoVipPrice: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
                       }))}
                       className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
                     />

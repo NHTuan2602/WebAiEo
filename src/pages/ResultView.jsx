@@ -18,7 +18,7 @@ import {
   Unlock,
   XCircle
 } from 'lucide-react';
-import { formatDurationVi } from '../constants/seedData';
+import { formatDurationVi, normalizeExamConfig } from '../constants/seedData';
 import { getWordCount, isObjectiveAnswerCorrect } from '../utils/examHelpers';
 import SpeakingQuestionLuyennoiCard from '../components/speaking/SpeakingQuestionLuyennoiCard';
 import VipMemberName from '../components/common/VipMemberName';
@@ -33,6 +33,7 @@ export default function ResultView({
   handleGradeSpeakingWithAI,
   handleGradeWritingWithAI,
   isGradingAI,
+  onRetryTest = null,
   openTeacherGradingModal,
   previousView,
   resultReviewTab,
@@ -72,16 +73,30 @@ export default function ResultView({
   }
 
   const targetTest = tests.find(t => t.id === attempt.testId) || tests[0];
+  const targetTestCfg = targetTest ? normalizeExamConfig(targetTest) : null;
   const isTeacher = currentUser?.role === 'teacher';
+  const canShowApprovedScores = isTeacher || Boolean(attempt.teacherGraded);
   const isAllowedByTeacher = Boolean(targetTest?.allowViewAnswers);
   const canShowCorrectAnswers = isTeacher || isAllowedByTeacher;
 
   const isSingleSkill = attempt.testMode === 'single_skill' && Boolean(attempt.focusSkill);
   const focusSkill = isSingleSkill ? attempt.focusSkill : null;
+  const writingTaskScope = attempt.writingTaskScope || targetTestCfg?.writingTaskScope || 'both';
   const isSpeakingAttempt =
     focusSkill === 'speaking' ||
     Boolean(attempt.scores?.speaking) ||
     (Array.isArray(attempt.speakingRecordings) && attempt.speakingRecordings.length > 0);
+
+  const sameStudentSameTest = attempts
+    .filter(
+      a =>
+        a &&
+        a.testId === attempt.testId &&
+        (a.studentId || a.studentUsername) === (attempt.studentId || attempt.studentUsername)
+    )
+    .sort((a, b) => (Number(a.submittedAtMs) || 0) - (Number(b.submittedAtMs) || 0));
+  const totalAttemptsForThisTest = Math.max(1, sameStudentSameTest.length);
+  const thisAttemptOrderNum = Math.max(1, sameStudentSameTest.findIndex(a => a.id === attempt.id) + 1);
 
   const showListeningCard = !isSingleSkill || focusSkill === 'listening';
   const showReadingCard = !isSingleSkill || focusSkill === 'reading';
@@ -118,8 +133,7 @@ export default function ResultView({
     </div>
   );
 
-  const aiD = attempt.aiDetails || null;
-  const hasWritingEssays = getWordCount(attempt.answers?.w1) > 0 || getWordCount(attempt.answers?.w2) > 0;
+  const aiD = canShowApprovedScores ? (attempt.aiDetails || null) : null;
   const writingCriteriaGrid = aiD ? (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/35 border border-indigo-200 dark:border-indigo-500/30 text-xs text-indigo-900 dark:text-indigo-200 font-semibold">
@@ -320,7 +334,7 @@ export default function ResultView({
           }}
           className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm"
         >
-          <ChevronLeft className="w-4 h-4" /> Quay Lại {previousView === 'STUDENT_PROFILE' ? 'Hồ Sơ Thành Viên' : previousView === 'TEACHER_DASHBOARD' ? 'Bảng Quản Lý Giáo Viên' : previousView === 'SKILL_HUB' ? 'Kho Bài Tập 4 Kỹ Năng' : 'Trang Chủ'}
+          <ChevronLeft className="w-4 h-4" /> Quay Lại {previousView === 'STUDENT_PROFILE' ? 'Hồ Sơ Thành Viên' : previousView === 'TEACHER_DASHBOARD' ? 'Bảng Quản Lý Giáo Viên' : previousView === 'SKILL_HUB' ? 'Daily Zone' : 'Trang Chủ'}
         </button>
 
         {/* Teacher Quick Toggle for Answer Visibility */}
@@ -393,13 +407,66 @@ export default function ResultView({
             </p>
           </div>
 
-          <div className="bg-[#0F172B] dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[150px] shadow border border-slate-800 dark:border-slate-700">
+          <div className="bg-[#0F172B] dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[170px] shadow border border-slate-800 dark:border-slate-700">
             <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">BAND TỔNG OVERALL</p>
-            <p className="text-4xl font-extrabold text-[#1EE1D6] mt-1">
-              {attempt.overallBand !== null && attempt.overallBand !== undefined ? attempt.overallBand : 'Chờ Chấm'}
+            <p className={`font-extrabold mt-1 ${canShowApprovedScores && attempt.overallBand !== null && attempt.overallBand !== undefined ? 'text-4xl text-[#1EE1D6]' : 'text-base sm:text-lg text-amber-300'}`}>
+              {canShowApprovedScores && attempt.overallBand !== null && attempt.overallBand !== undefined
+                ? attempt.overallBand
+                : 'Ms. Như đang check'}
             </p>
           </div>
         </div>
+
+        {/* Daily Zone Post-Submission Summary Bar (Số câu đúng + Thời gian + Số lần làm + Làm Lại) */}
+        {isSingleSkill && (
+          <div className="mt-6 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-800 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="grid grid-cols-3 gap-4 flex-1">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  {focusSkill === 'reading' || focusSkill === 'listening'
+                    ? 'Số câu đúng'
+                    : focusSkill === 'speaking'
+                    ? 'Câu đã ghi âm'
+                    : 'Độ dài bài viết'}
+                </p>
+                <p className="text-lg sm:text-xl font-black text-[#0F766E] dark:text-[#1EE1D6] tabular-nums mt-0.5">
+                  {focusSkill === 'reading'
+                    ? `${attempt.scores?.reading?.raw || 0}/${attempt.scores?.reading?.total || 0} câu`
+                    : focusSkill === 'listening'
+                    ? `${attempt.scores?.listening?.raw || 0}/${attempt.scores?.listening?.total || 0} câu`
+                    : focusSkill === 'speaking'
+                    ? `${(attempt.speakingRecordings || []).filter(r => Number(r?.durationSec) > 0 || r?.audioUrl).length} câu`
+                    : `${getWordCount(attempt.answers?.w1) + getWordCount(attempt.answers?.w2)} từ`}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  Thời gian làm bài
+                </p>
+                <p className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tabular-nums mt-0.5">
+                  {formatDurationVi(attempt.durationSeconds)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  Số lần làm bài này
+                </p>
+                <p className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tabular-nums mt-0.5">
+                  Lần #{thisAttemptOrderNum}{totalAttemptsForThisTest > 1 ? ` / ${totalAttemptsForThisTest}` : ''}
+                </p>
+              </div>
+            </div>
+            {!isTeacher && onRetryTest && (
+              <button
+                type="button"
+                onClick={() => onRetryTest(attempt.testId)}
+                className="px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs sm:text-sm font-extrabold shrink-0 transition"
+              >
+                Làm Lại Bài Này (Lần #{totalAttemptsForThisTest + 1}) →
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Breakdown cards */}
         <div className={`grid grid-cols-1 ${
@@ -407,6 +474,8 @@ export default function ResultView({
             ? 'md:grid-cols-1 max-w-md'
             : [showListeningCard, showReadingCard, showWritingCard, showSpeakingCard].filter(Boolean).length === 2
             ? 'md:grid-cols-2'
+            : [showListeningCard, showReadingCard, showWritingCard, showSpeakingCard].filter(Boolean).length >= 4
+            ? 'md:grid-cols-2 lg:grid-cols-4'
             : 'md:grid-cols-3'
         } gap-6 my-8`}>
           {showListeningCard && (
@@ -416,7 +485,9 @@ export default function ResultView({
                   <Headphones className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Listening
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-[#007A7A] dark:text-[#1EE1D6]">{attempt.scores?.listening?.band ?? 0}</span>
+                  <span className="text-lg font-bold text-[#007A7A] dark:text-[#1EE1D6]">
+                    {canShowApprovedScores ? (attempt.scores?.listening?.band ?? 0) : 'Chờ duyệt'}
+                  </span>
                   {isTeacher && (
                     <button
                       type="button"
@@ -430,7 +501,9 @@ export default function ResultView({
                 </div>
               </div>
               <p className="text-xs text-[#475569] dark:text-slate-400">
-                Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.listening?.raw || 0}</span> / {attempt.scores?.listening?.total || 0} câu
+                {canShowApprovedScores
+                  ? <>Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.listening?.raw || 0}</span> / {attempt.scores?.listening?.total || 0} câu</>
+                  : 'Ms. Như đang check và sẽ trả kết quả'}
               </p>
             </div>
           )}
@@ -442,7 +515,9 @@ export default function ResultView({
                   <BookOpen className="w-4 h-4 text-[#1447E6] dark:text-blue-400" /> Reading
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-[#1447E6] dark:text-blue-400">{attempt.scores?.reading?.band ?? 0}</span>
+                  <span className="text-lg font-bold text-[#1447E6] dark:text-blue-400">
+                    {canShowApprovedScores ? (attempt.scores?.reading?.band ?? 0) : 'Chờ duyệt'}
+                  </span>
                   {isTeacher && (
                     <button
                       type="button"
@@ -456,7 +531,9 @@ export default function ResultView({
                 </div>
               </div>
               <p className="text-xs text-[#475569] dark:text-slate-400">
-                Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.reading?.raw || 0}</span> / {attempt.scores?.reading?.total || 0} câu
+                {canShowApprovedScores
+                  ? <>Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.reading?.raw || 0}</span> / {attempt.scores?.reading?.total || 0} câu</>
+                  : 'Ms. Như đang check và sẽ trả kết quả'}
               </p>
             </div>
           )}
@@ -468,8 +545,10 @@ export default function ResultView({
                   <PenTool className="w-4 h-4 text-[#059271] dark:text-emerald-400" /> Writing
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-[#059271] dark:text-emerald-400">
-                    {attempt.scores?.writing?.overallBand ?? 'Chờ Chấm'}
+                  <span className="text-base font-bold text-[#059271] dark:text-emerald-400">
+                    {canShowApprovedScores && attempt.scores?.writing?.overallBand !== null && attempt.scores?.writing?.overallBand !== undefined
+                      ? attempt.scores.writing.overallBand
+                      : 'Ms. Như đang check'}
                   </span>
                   {isTeacher && (
                     <button
@@ -484,7 +563,15 @@ export default function ResultView({
                 </div>
               </div>
               <p className="text-xs text-[#475569] dark:text-slate-400">
-                Task 1: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task1Band ?? '-'}</span> | Task 2: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task2Band ?? '-'}</span>
+                {canShowApprovedScores
+                  ? (
+                    writingTaskScope === 'task1'
+                      ? <>Task 1: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task1Band ?? '-'}</span></>
+                      : writingTaskScope === 'task2'
+                      ? <>Task 2: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task2Band ?? '-'}</span></>
+                      : <>Task 1: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task1Band ?? '-'}</span> | Task 2: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task2Band ?? '-'}</span></>
+                  )
+                  : 'Bài viết đã gửi - Chờ Ms. Như duyệt điểm'}
               </p>
             </div>
           )}
@@ -493,11 +580,13 @@ export default function ResultView({
             <div className="bg-indigo-50/75 dark:bg-[#0F172B] rounded-2xl p-5 border border-[#007A7A]/30">
               <div className="flex items-center justify-between mb-3">
                 <span className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
-                  <Mic className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Speaking AI
+                  <Mic className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Speaking
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-black text-[#0F766E] dark:text-[#1EE1D6]">
-                    {attempt.scores?.speaking?.band ?? attempt.overallBand ?? '0'}
+                  <span className="text-base font-black text-[#0F766E] dark:text-[#1EE1D6]">
+                    {canShowApprovedScores && typeof attempt.scores?.speaking?.band === 'number'
+                      ? attempt.scores.speaking.band
+                      : 'Ms. Như đang check'}
                   </span>
                   {isTeacher && (
                     <button
@@ -511,31 +600,39 @@ export default function ResultView({
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-1.5 text-center text-xs font-mono">
-                <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
-                  <span className="block text-xs text-slate-400 font-sans">FC</span>
-                  <strong>{attempt.scores?.speaking?.criteria?.fc ?? '-'}</strong>
+              {canShowApprovedScores ? (
+                <div className="grid grid-cols-4 gap-1.5 text-center text-xs font-mono">
+                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                    <span className="block text-xs text-slate-400 font-sans">FC</span>
+                    <strong>{attempt.scores?.speaking?.criteria?.fc ?? '-'}</strong>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                    <span className="block text-xs text-slate-400 font-sans">LR</span>
+                    <strong>{attempt.scores?.speaking?.criteria?.lr ?? '-'}</strong>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                    <span className="block text-xs text-slate-400 font-sans">GRA</span>
+                    <strong>{attempt.scores?.speaking?.criteria?.gra ?? '-'}</strong>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                    <span className="block text-xs text-slate-400 font-sans">PR</span>
+                    <strong>{attempt.scores?.speaking?.criteria?.pr ?? '-'}</strong>
+                  </div>
                 </div>
-                <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
-                  <span className="block text-xs text-slate-400 font-sans">LR</span>
-                  <strong>{attempt.scores?.speaking?.criteria?.lr ?? '-'}</strong>
-                </div>
-                <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
-                  <span className="block text-xs text-slate-400 font-sans">GRA</span>
-                  <strong>{attempt.scores?.speaking?.criteria?.gra ?? '-'}</strong>
-                </div>
-                <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
-                  <span className="block text-xs text-slate-400 font-sans">PR</span>
-                  <strong>{attempt.scores?.speaking?.criteria?.pr ?? '-'}</strong>
-                </div>
-              </div>
+              ) : (
+                <p className="text-xs text-[#475569] dark:text-slate-400">
+                  File ghi âm đã lưu an toàn - Ms. Như đang check &amp; chấm 4 tiêu chí.
+                </p>
+              )}
             </div>
           )}
         </div>
 
         {/* TEST RANKING LEADERBOARD (BXH ĐIỂM SAU KHI HOÀN THÀNH) */}
         {(() => {
-          const sameTestAttempts = attempts.filter(a => a && a.testId === attempt.testId);
+          const sameTestAttempts = attempts.filter(
+            a => a && a.testId === attempt.testId && (isTeacher || Boolean(a.teacherGraded))
+          );
           const bestByStudent = new Map();
           sameTestAttempts.forEach(a => {
             const stuKey = a.studentId || a.studentUsername || a.studentName;
@@ -574,10 +671,10 @@ export default function ResultView({
           return (
             <div className="bg-amber-50/75 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/30 rounded-2xl p-5 mb-8 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-extrabold text-amber-950 dark:text-amber-200 flex items-center gap-2">
+                <h2 className="text-sm font-extrabold text-amber-950 dark:text-amber-200 flex items-center gap-2">
                   <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   Bảng Xếp Hạng Điểm Bài Thi Này ({rankedList.length} thí sinh)
-                </h3>
+                </h2>
                 {myRank > 0 && (
                   <span className="px-3 py-1 rounded-full bg-amber-500 text-white text-xs font-black">
                     Hạng hiện tại: #{myRank} / {rankedList.length}
@@ -619,23 +716,18 @@ export default function ResultView({
         })()}
 
         {/* SPEAKING 4 CRITERIA & TEACHER RE-GRADE PANEL */}
-        {showSpeakingCard && (
+        {showSpeakingCard && canShowApprovedScores && (
           <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-[#007A7A]/30 p-5 sm:p-6 mb-8 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="bg-[#007A7A] text-white text-xs font-extrabold uppercase px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-300" /> AI Speaking Examiner
-                  </span>
-                  <span className="text-xs font-bold text-[#475569] dark:text-slate-400">
-                    {attempt.speakingAiDetails?._gradedMode === 'gemini_audio'
-                      ? `Đã phân tích trực tiếp từ file ghi âm (${attempt.speakingAiDetails?._usedModel || 'Gemini Audio'})`
-                      : 'Đánh giá tự động & Lưu file ghi âm trên hệ thống'}
+                    <Sparkles className="w-3 h-3 text-amber-300" /> {isTeacher ? 'Chấm Speaking (GV)' : 'Ms. Như Đã Duyệt Điểm'}
                   </span>
                 </div>
-                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">
+                <h2 className="font-extrabold text-slate-900 dark:text-white text-base">
                   Bảng Điểm Chi Tiết 4 Tiêu Chí IELTS Speaking
-                </h3>
+                </h2>
               </div>
 
               {isTeacher && (
@@ -709,7 +801,7 @@ export default function ResultView({
                   <span className="bg-[#007A7A] text-white text-xs font-extrabold uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                     <Sparkles className="w-3 h-3 text-amber-300" /> AI Examiner (GV)
                   </span>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Công Cụ Chấm & Chỉnh Sửa Điểm (L · R · W)</h3>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-base">Công Cụ Chấm & Chỉnh Sửa Điểm (L · R · W)</h2>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
                   Dành riêng cho Giáo viên: Chấm nhanh Writing qua Gemini API hoặc chỉnh sửa trực tiếp điểm Listening, Reading và Writing theo thang chuẩn IELTS 0.0 – 9.0.
@@ -784,44 +876,28 @@ export default function ResultView({
           </div>
         ) : (
           <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
-            {isGradingAI ? (
-              <div className="flex flex-col items-center justify-center py-6 space-y-2 text-center">
-                <Loader2 className="w-8 h-8 text-[#007A7A] dark:text-[#1EE1D6] animate-spin" />
-                <p className="text-xs font-extrabold text-slate-800 dark:text-white">
-                  {aiGradingStep || 'AI Examiner đang chấm lỗi chính tả, ngữ pháp & phân tích từng câu...'}
-                </p>
-              </div>
-            ) : !(attempt.teacherGraded || (attempt.scores.writing.overallBand !== null && attempt.scores.writing.overallBand !== undefined) || writingCriteriaGrid) ? (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Phần thi Writing đang chờ hoàn tất chấm điểm</h3>
-                    <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
-                      Bài viết Task 1 &amp; Task 2 đã lưu an toàn. Bạn có thể bấm chạy AI phân tích lỗi chính tả, ngữ pháp &amp; gợi ý nâng Band ngay!
-                    </p>
-                  </div>
+            {!attempt.teacherGraded ? (
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5" />
                 </div>
-                {hasWritingEssays && (
-                  <button
-                    type="button"
-                    onClick={() => handleGradeWritingWithAI?.(attempt)}
-                    className="px-4 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm shrink-0"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Bắt Lỗi &amp; Nâng Band Ngay
-                  </button>
-                )}
+                <div>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">
+                    Ms. Như đang check bài làm của bạn
+                  </h2>
+                  <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                    Bài viết và các phần làm bài đã được gửi an toàn tới Ms. Như. Điểm chính thức và nhận xét chi tiết sẽ hiển thị ngay sau khi Ms. Như duyệt và trả bài!
+                  </p>
+                </div>
               </div>
             ) : writingCriteriaGrid ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
-                    <PenTool className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Bảng Chấm Lỗi &amp; Nâng Band Writing Chi Tiết
-                  </h3>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                    <PenTool className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Bảng Điểm &amp; Chữa Bài Writing Chi Tiết
+                  </h2>
                   <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-500/30">
-                    {attempt.teacherGraded ? 'Giáo viên đã chốt điểm' : 'AI Examiner đã phân tích'}
+                    Ms. Như đã duyệt &amp; trả điểm
                   </span>
                 </div>
                 {writingCriteriaGrid}
@@ -830,7 +906,7 @@ export default function ResultView({
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Phần thi Writing đã được chấm: Overall Writing Band <strong>{attempt.scores.writing.overallBand}</strong>.
+                  Ms. Như đã duyệt phần Writing: Overall Writing Band <strong>{attempt.scores.writing.overallBand}</strong>.
                 </p>
               </div>
             )}
@@ -838,11 +914,11 @@ export default function ResultView({
         ))}
 
         {/* Feedback */}
-        {attempt.teacherFeedback && (
+        {attempt.teacherFeedback && canShowApprovedScores && (
           <div className="bg-amber-50 dark:bg-amber-500/10 rounded-2xl p-6 border border-amber-200 dark:border-amber-500/30 mb-8">
-            <h3 className="font-bold text-amber-900 dark:text-amber-300 text-sm mb-2 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" /> {isTeacher && attempt.aiGraded ? 'Nhận Xét Từ AI Examiner' : 'Nhận Xét Từ Giáo Viên'}
-            </h3>
+            <h2 className="font-bold text-amber-900 dark:text-amber-300 text-sm mb-2 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Nhận Xét Từ Ms. Như
+            </h2>
             <p className="text-xs text-amber-950 dark:text-amber-100 leading-relaxed whitespace-pre-line font-medium">
               {attempt.teacherFeedback}
             </p>
@@ -853,9 +929,9 @@ export default function ResultView({
         <div className="border-t border-slate-200 dark:border-slate-800 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>
-              <h3 className="font-extrabold text-slate-900 dark:text-white text-lg flex items-center gap-2">
+              <h2 className="font-extrabold text-slate-900 dark:text-white text-lg flex items-center gap-2">
                 <Eye className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" /> Xem Lại Bài Làm & Đáp Án Chi Tiết
-              </h3>
+              </h2>
               <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
                 Đối chiếu câu trả lời đã nộp của thí sinh với đáp án chuẩn của đề thi.
               </p>
@@ -1032,6 +1108,7 @@ export default function ResultView({
           {activeReviewTab === 'writing' && (
             <div className="space-y-6">
               {/* Task 1 */}
+              {writingTaskScope !== 'task2' && (
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 space-y-4">
                 <div>
                   <span className="text-xs font-extrabold uppercase text-blue-600 dark:text-blue-400">Writing Task 1</span>
@@ -1072,8 +1149,10 @@ export default function ResultView({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Task 2 */}
+              {writingTaskScope !== 'task1' && (
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 space-y-4">
                 <div>
                   <span className="text-xs font-extrabold uppercase text-indigo-600 dark:text-indigo-400">Writing Task 2</span>
@@ -1107,6 +1186,7 @@ export default function ResultView({
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
 

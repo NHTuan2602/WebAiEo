@@ -5,6 +5,7 @@ import {
   buildCoverUnlockTransferNote,
   buildVietQrImageUrl,
   formatVndCurrency,
+  getRealExamComboMeta,
   getTitlePriceVnd,
   normalizePaymentConfig
 } from '../../constants/profileCustomization';
@@ -29,6 +30,7 @@ export default function CoverUnlockQrCard({
 
   const cfg = normalizePaymentConfig(paymentConfig || {});
   const autoVerifyEnabled = Boolean(paymentConfig?.autoVerifyEnabled);
+  const comboMeta = getRealExamComboMeta(itemType, cfg);
   const resolvedAmount =
     itemPrice !== null && itemPrice !== undefined
       ? Math.max(0, Number(itemPrice) || 0)
@@ -36,6 +38,8 @@ export default function CoverUnlockQrCard({
       ? getTitlePriceVnd(itemId, cfg)
       : itemType === 'test'
       ? cfg.defaultExamPriceVnd
+      : comboMeta
+      ? comboMeta.price
       : itemType === 'room_ticket'
       ? cfg.friendRoomTicketPrice
       : itemType === 'aieo_vip'
@@ -66,20 +70,24 @@ export default function CoverUnlockQrCard({
   const headingText = itemType === 'title' && itemTitle
     ? `Mua Danh Hiệu VIP (1 Tháng): ${itemTitle}`
     : itemType === 'test'
-    ? `Mua Đề Thi 3 Kỹ Năng: ${itemTitle || 'IELTS Practice Exam'}`
+    ? `Chi Phí Test 4 Kỹ Năng: ${itemTitle || 'Thực Chiến IELTS'}`
+    : comboMeta
+    ? `${comboMeta.label} · Thực Chiến Thi Thật 4 Kỹ Năng`
     : itemType === 'room_ticket'
     ? 'Mua 1 Lượt Tạo Phòng Đấu Riêng (5k/lần)'
     : itemType === 'aieo_vip'
-    ? 'Đăng Ký Gói Ai eo VIP Full Quyền (1 Tháng)'
+    ? 'Đăng Ký Gói IELTS VIP Full Quyền (1 Tháng)'
     : 'Mở Khóa Tải Ảnh Nền Riêng (1 Tháng)';
   const subText = itemType === 'title'
     ? 'Quét mã VietQR để sở hữu danh hiệu Phú Quý ánh kim + hào quang Avatar nổi bật suốt 30 ngày!'
     : itemType === 'test'
-    ? 'Quét mã VietQR để mở khóa bộ Đề Thi 3 Kỹ Năng này và làm lại nhiều lần không giới hạn!'
+    ? 'Quét mã VietQR để mở 1 lượt thi thật đủ 4 kỹ năng L·R·W·S (nộp xong chờ Ms. Như duyệt & trả điểm)!'
+    : comboMeta
+    ? `Quét mã VietQR để nhận ngay +${comboMeta.credits} lượt mở đề Thực Chiến Thi Thật 4 Kỹ Năng (1 lượt/đề)!`
     : itemType === 'room_ticket'
     ? 'Quét mã VietQR để nhận ngay +1 lượt Tạo Phòng Đấu Trường Bạn Bè (tùy chỉnh số người & chia Team)!'
     : itemType === 'aieo_vip'
-    ? 'Đặc quyền 30 ngày: Danh Hiệu Ai eo VIP + Tạo Phòng Đấu Bạn Bè (tùy chỉnh số người & chia Team) + Chữ Tên Đỏ & Nhãn AIEOVIP!'
+    ? 'Đặc quyền 30 ngày: Danh Hiệu IELTS VIP + Tạo Phòng Đấu Bạn Bè (tùy chỉnh số người & chia Team) + Đổi Màu Chữ Tên & Nhãn IELTS VIP!'
     : autoVerifyEnabled
     ? 'Quét mã QR bằng app Ngân hàng bất kỳ - hệ thống tự mở khóa quyền tải & cắt ảnh bìa trong 30 ngày ngay khi nhận đủ tiền!'
     : 'Quét mã QR chuyển khoản 1 lần để sử dụng tính năng tải & cắt ảnh nền riêng trong 1 tháng (30 ngày).';

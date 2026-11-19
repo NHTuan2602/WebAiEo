@@ -924,14 +924,14 @@ export const STUDENT_TITLES = [
   },
   {
     id: 'aieo_vip',
-    label: 'Ai eo VIP',
+    label: 'IELTS VIP',
     icon: '👑',
-    tier: 'Gói Ai eo VIP (1 Tháng)',
+    tier: 'Gói IELTS VIP (1 Tháng)',
     difficulty: 'VIP Độc Quyền',
     isVipBundleTitle: true,
     defaultPriceVnd: 80000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-red-500',
-    conditionText: 'Đặc quyền Gói Ai eo VIP (80.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu Ai eo VIP.',
+    conditionText: 'Đặc quyền Gói IELTS VIP (80.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu IELTS VIP.',
     badgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
     heroBadgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
     gameBadgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
@@ -941,11 +941,11 @@ export const STUDENT_TITLES = [
       const now = Date.now();
       if (exp > now) {
         const days = Math.max(1, Math.ceil((exp - now) / 86400000));
-        return { pct: 100, text: `👑 Đang bật VIP (còn ${days} ngày)` };
+        return { pct: 100, text: `👑 Đang bật IELTS VIP (còn ${days} ngày)` };
       }
       return {
         pct: 0,
-        text: `Gói Ai eo VIP 1 tháng: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
+        text: `Gói IELTS VIP 1 tháng: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
       };
     }
   },
@@ -1193,10 +1193,69 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
 
 export const SUBSCRIPTION_DURATION_DAYS = 30;
 export const SUBSCRIPTION_DURATION_MS = SUBSCRIPTION_DURATION_DAYS * 24 * 60 * 60 * 1000;
-export const SKILL_PASS_PRICE_VND = 0; // Bài Tập 4 Kỹ Năng đã mở miễn phí cho mọi học viên
-export const DEFAULT_EXAM_PRICE_VND = 15000;
+export const SKILL_PASS_PRICE_VND = 0; // Daily Zone mở cho học viên theo Team/Pass lớp
+export const DEFAULT_EXAM_PRICE_VND = 20000; // 1 đề lẻ Thực Chiến Thi Thật: 20.000đ
+export const PERIODIC_MOCK_PRICE_VND = 300000; // Mock Test Định Kỳ (3 tháng/lần): 300.000đ
+export const REAL_EXAM_COMBO_3_PRICE_VND = 50000; // Combo 3 đề Thực Chiến: 50.000đ
+export const REAL_EXAM_COMBO_5_PRICE_VND = 70000; // Combo 5 đề Thực Chiến: 70.000đ
+export const REAL_EXAM_COMBO_10_PRICE_VND = 150000; // Combo 10 đề Thực Chiến: 150.000đ
 export const FRIEND_ROOM_TICKET_PRICE_VND = 5000;
 export const AIEO_VIP_PRICE_VND = 80000;
+
+export const REAL_EXAM_COMBOS = [
+  {
+    id: 'exam_combo_3',
+    itemType: 'exam_combo_3',
+    credits: 3,
+    defaultPrice: REAL_EXAM_COMBO_3_PRICE_VND,
+    defaultPriceVnd: REAL_EXAM_COMBO_3_PRICE_VND,
+    priceKey: 'realExamCombo3Price',
+    priceField: 'realExamCombo3Price',
+    label: 'Combo 3 Đề',
+    fullLabel: 'Combo 3 Đề Thực Chiến Thi Thật',
+    shortLabel: 'Combo 3 đề',
+    savingNote: 'Tiết kiệm 10.000đ'
+  },
+  {
+    id: 'exam_combo_5',
+    itemType: 'exam_combo_5',
+    credits: 5,
+    defaultPrice: REAL_EXAM_COMBO_5_PRICE_VND,
+    defaultPriceVnd: REAL_EXAM_COMBO_5_PRICE_VND,
+    priceKey: 'realExamCombo5Price',
+    priceField: 'realExamCombo5Price',
+    label: 'Combo 5 Đề',
+    fullLabel: 'Combo 5 Đề Thực Chiến Thi Thật',
+    shortLabel: 'Combo 5 đề',
+    savingNote: 'Tiết kiệm 30.000đ'
+  },
+  {
+    id: 'exam_combo_10',
+    itemType: 'exam_combo_10',
+    credits: 10,
+    defaultPrice: REAL_EXAM_COMBO_10_PRICE_VND,
+    defaultPriceVnd: REAL_EXAM_COMBO_10_PRICE_VND,
+    priceKey: 'realExamCombo10Price',
+    priceField: 'realExamCombo10Price',
+    label: 'Combo 10 Đề',
+    fullLabel: 'Combo 10 Đề Thực Chiến Thi Thật',
+    shortLabel: 'Combo 10 đề',
+    savingNote: 'Tiết kiệm 50.000đ'
+  }
+];
+
+export function getRealExamComboMeta(itemType, paymentConfig = null) {
+  const found = REAL_EXAM_COMBOS.find(c => c.id === String(itemType || '').trim());
+  if (!found) return null;
+  const cfg = normalizePaymentConfig(paymentConfig || {});
+  const priceVnd = Number(cfg[found.priceKey]) > 0 ? Number(cfg[found.priceKey]) : found.defaultPriceVnd;
+  return { ...found, itemType: found.id, price: priceVnd, priceVnd };
+}
+
+export function getRealExamCredits(user) {
+  if (!user || typeof user !== 'object') return 0;
+  return Math.max(0, Math.floor(Number(user.realExamCredits) || 0));
+}
 
 export function formatRemainingSubscriptionText(expiresAt, nowMs = Date.now()) {
   const exp = Number(expiresAt) || 0;
@@ -1807,6 +1866,10 @@ export function normalizePaymentConfig(raw = {}) {
   const coverUnlockPrice = clampVnd(obj.coverUnlockPrice, CUSTOM_COVER_UNLOCK_PRICE_VND);
   const skillPassPrice = clampVnd(obj.skillPassPrice, SKILL_PASS_PRICE_VND);
   const defaultExamPriceVnd = clampVnd(obj.defaultExamPriceVnd, DEFAULT_EXAM_PRICE_VND);
+  const periodicMockPrice = clampVnd(obj.periodicMockPrice ?? obj.periodicMockPriceVnd, PERIODIC_MOCK_PRICE_VND);
+  const realExamCombo3Price = clampVnd(obj.realExamCombo3Price ?? obj.combo3ExamPriceVnd, REAL_EXAM_COMBO_3_PRICE_VND);
+  const realExamCombo5Price = clampVnd(obj.realExamCombo5Price ?? obj.combo5ExamPriceVnd, REAL_EXAM_COMBO_5_PRICE_VND);
+  const realExamCombo10Price = clampVnd(obj.realExamCombo10Price ?? obj.combo10ExamPriceVnd, REAL_EXAM_COMBO_10_PRICE_VND);
   const friendRoomTicketPrice = clampVnd(obj.friendRoomTicketPrice, FRIEND_ROOM_TICKET_PRICE_VND);
   const aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
 
@@ -1851,6 +1914,10 @@ export function normalizePaymentConfig(raw = {}) {
     coverUnlockPrice,
     skillPassPrice,
     defaultExamPriceVnd,
+    periodicMockPrice,
+    realExamCombo3Price,
+    realExamCombo5Price,
+    realExamCombo10Price,
     friendRoomTicketPrice,
     aieoVipPrice,
     bankCode,

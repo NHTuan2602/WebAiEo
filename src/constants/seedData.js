@@ -12,7 +12,7 @@ AMBIGUOUS | Mơ hồ, nhập nhằng nhiều nghĩa | /æmˈbɪɡ.ju.əs/ | The 
 RESILIENT | Kiên cường, có khả năng phục hồi nhanh | /rɪˈzɪl.i.ənt/ | Local communities proved resilient in the face of natural disasters.`;
 
 export const FALLBACK_DISTRACTORS = ['ABUNDANT', 'OBSOLETE', 'FLOURISH', 'STAGNANT', 'CONDUCIVE', 'SPORADIC', 'EMPIRICAL', 'TRIVIAL'];
-export const GAME_ROUND_TIME_LIMITS = { 1: 20, 2: 25, 3: 22, 4: 22 };
+export const GAME_ROUND_TIME_LIMITS = { 1: 20, 2: 25, 3: 22, 4: 32 };
 export const GAME_SPEED_OFFSETS = { relaxed: 6, normal: 0, turbo: -5 };
 
 // Lexical relations for V3 (Synonym / Antonym / Definition) & V4 (Collocation)
@@ -129,9 +129,44 @@ SANITATION | Hệ thống vệ sinh công cộng | /ˌsæn.ɪˈteɪ.ʃən/ | Cle
   }
 };
 
-export const DEFAULT_SECTION_ORDER = ['listening', 'reading', 'writing'];
+export const DEFAULT_SECTION_ORDER = ['listening', 'reading', 'writing', 'speaking'];
 export const ALL_SKILL_OPTIONS = ['listening', 'reading', 'writing', 'speaking'];
-export const DEFAULT_SECTION_DURATIONS = { listening: 15, reading: 20, writing: 25, speaking: 14 };
+export const DEFAULT_SECTION_DURATIONS = { listening: 30, reading: 60, writing: 60, speaking: 14 };
+
+export const DAILY_READING_SUBCATEGORIES = Array.from({ length: 14 }, (_, idx) => ({
+  id: `shw_${idx + 1}`,
+  label: `SuperHomework ${idx + 1}`,
+  shortLabel: `SHW ${idx + 1}`
+}));
+
+export const DAILY_LISTENING_SUBCATEGORIES = [
+  { id: 'listening_shw', label: '1. SuperHomework Listening', shortLabel: 'SuperHomework L' },
+  { id: 'listening_sec1_spelling', label: '2. Section 1 • Spelling Names & Numbers', shortLabel: 'Sec 1 • Spelling/Numbers' },
+  { id: 'listening_map', label: '3. Map', shortLabel: 'Listening Map' }
+];
+
+export const DAILY_WRITING_T1_SUBCATEGORIES = [
+  { id: 'w1_map', label: 'Map', shortLabel: 'W1 • Map' },
+  { id: 'w1_process', label: 'Process', shortLabel: 'W1 • Process' },
+  { id: 'w1_dynamic', label: 'Dynamic', shortLabel: 'W1 • Dynamic' },
+  { id: 'w1_static', label: 'Static', shortLabel: 'W1 • Static' }
+];
+
+export const DAILY_WRITING_T2_SUBCATEGORIES = [
+  { id: 'w2_essay', label: 'Writing Task 2 (Essay)', shortLabel: 'W2 • Essay' }
+];
+
+export const getDailySubCategoryLabel = (subCatId = '') => {
+  const clean = String(subCatId || '').trim();
+  if (!clean) return '';
+  const all = [
+    ...DAILY_READING_SUBCATEGORIES,
+    ...DAILY_LISTENING_SUBCATEGORIES,
+    ...DAILY_WRITING_T1_SUBCATEGORIES,
+    ...DAILY_WRITING_T2_SUBCATEGORIES
+  ];
+  return all.find(item => item.id === clean)?.label || '';
+};
 
 export const createDefaultSpeakingSection = (overrides = {}) => ({
   speakingTrack: 'general', // 'daily' | 'exam_room' | 'general'
@@ -417,9 +452,9 @@ export const normalizeExamConfig = (test) => {
 
   const rawDurations = test?.sectionDurations || {};
   const durations = {
-    listening: Math.max(1, Number(rawDurations.listening ?? DEFAULT_SECTION_DURATIONS.listening) || 15),
-    reading: Math.max(1, Number(rawDurations.reading ?? DEFAULT_SECTION_DURATIONS.reading) || 20),
-    writing: Math.max(1, Number(rawDurations.writing ?? DEFAULT_SECTION_DURATIONS.writing) || 25),
+    listening: Math.max(1, Number(rawDurations.listening ?? DEFAULT_SECTION_DURATIONS.listening) || 30),
+    reading: Math.max(1, Number(rawDurations.reading ?? DEFAULT_SECTION_DURATIONS.reading) || 60),
+    writing: Math.max(1, Number(rawDurations.writing ?? DEFAULT_SECTION_DURATIONS.writing) || 60),
     speaking: Math.max(1, Number(rawDurations.speaking ?? DEFAULT_SECTION_DURATIONS.speaking) || 14)
   };
 
@@ -434,38 +469,59 @@ export const normalizeExamConfig = (test) => {
     : [];
 
   const visibility = test?.visibility === 'private' ? 'private' : 'public';
-  const maxAttempts = Math.max(0, Number(test?.maxAttempts ?? 0) || 0);
+  const priceVnd = testMode === 'single_skill' ? 0 : Math.max(0, Math.min(10_000_000, Math.round(Number(test?.priceVnd) || 0)));
+  const examCategory =
+    testMode === 'single_skill'
+      ? 'daily_zone'
+      : test?.examCategory === 'periodic_mock' || priceVnd >= 200000
+      ? 'periodic_mock'
+      : 'real_exam';
+
+  const rawMaxAttempts = Math.max(0, Number(test?.maxAttempts ?? 0) || 0);
+  // Thực Chiến Thi Thật & Mock Test Định Kỳ strictly 1 attempt; Daily Zone defaults to unlimited retries (0)
+  const maxAttempts =
+    testMode === 'full_exam'
+      ? 1
+      : rawMaxAttempts;
+
   const sequentialMode = testMode === 'single_skill' ? false : test?.sequentialMode !== false;
   const allowEarlyNextSection = testMode === 'single_skill' ? true : !!test?.allowEarlyNextSection;
-  const priceVnd = testMode === 'single_skill' ? 0 : Math.max(0, Math.min(10_000_000, Math.round(Number(test?.priceVnd) || 0)));
   const spRoomPass = focusSkill === 'speaking' ? String(test?.speaking?.roomPassword || '').trim() : '';
   const spHasRoomPass = focusSkill === 'speaking' ? Boolean(test?.speaking?.hasRoomPassword || spRoomPass.length > 0) : false;
   const examPassword = String(test?.examPassword || spRoomPass || '').trim();
   const hasExamPassword = Boolean(test?.hasExamPassword || spHasRoomPass || examPassword.length > 0);
   const isSpeakingExamRoom = focusSkill === 'speaking' && (test?.speaking?.speakingTrack === 'exam_room' || spHasRoomPass);
-  const explicitPurpose = ['real_exam', 'paid_practice', 'free_practice', 'draft'].includes(test?.examPurpose)
+  const explicitPurpose = ['real_exam', 'periodic_mock', 'paid_practice', 'free_practice', 'draft'].includes(test?.examPurpose)
     ? test.examPurpose
     : '';
   const examPurpose =
     visibility === 'private'
       ? 'draft'
-      : isSpeakingExamRoom || hasExamPassword
+      : examCategory === 'periodic_mock'
+      ? 'periodic_mock'
+      : testMode === 'full_exam' || isSpeakingExamRoom || hasExamPassword
       ? 'real_exam'
-      : explicitPurpose || (
-          priceVnd > 0
-            ? 'paid_practice'
-            : (maxAttempts === 1 && (sequentialMode || testMode === 'single_skill'))
-            ? 'real_exam'
-            : 'free_practice'
-        );
+      : explicitPurpose || (maxAttempts === 1 ? 'real_exam' : 'free_practice');
   const hashtags = normalizeTestHashtags([
     ...(Array.isArray(test?.hashtags) ? test.hashtags : typeof test?.hashtags === 'string' ? [test.hashtags] : []),
     ...(Array.isArray(test?.speaking?.hashtags) ? test.speaking.hashtags : [])
   ]);
 
+  const dailySubCategory = String(test?.dailySubCategory || '').trim();
+  const writingTaskScope = ['task1', 'task2', 'both'].includes(test?.writingTaskScope)
+    ? test.writingTaskScope
+    : dailySubCategory.startsWith('w1_')
+    ? 'task1'
+    : dailySubCategory === 'w2_essay'
+    ? 'task2'
+    : 'both';
+
   return {
     testMode,
     focusSkill,
+    examCategory,
+    dailySubCategory,
+    writingTaskScope,
     visibility,
     maxAttempts,
     sequentialMode,
@@ -815,12 +871,15 @@ export const createEmptyTestForm = () => ({
   description: '',
   testMode: 'full_exam',
   focusSkill: null,
-  autoAiGrade: true,
+  examCategory: 'real_exam',
+  dailySubCategory: '',
+  writingTaskScope: 'both',
+  autoAiGrade: false,
   visibility: 'private',
-  examPurpose: 'draft',
-  priceVnd: 0,
+  examPurpose: 'real_exam',
+  priceVnd: 20000,
   examPassword: '',
-  maxAttempts: 0,
+  maxAttempts: 1,
   sequentialMode: true,
   allowEarlyNextSection: false,
   antiCheatEnabled: true,
@@ -870,27 +929,47 @@ export const createEmptyTestForm = () => ({
   speaking: createDefaultSpeakingSection()
 });
 
-export const createEmptySingleSkillTestForm = (skill = 'speaking') => {
+export const createEmptySingleSkillTestForm = (skill = 'speaking', subOpts = {}) => {
   const safeSkill = ALL_SKILL_OPTIONS.includes(skill) ? skill : 'speaking';
+  const taskScope =
+    safeSkill === 'writing' && ['task1', 'task2', 'both'].includes(subOpts?.writingTaskScope)
+      ? subOpts.writingTaskScope
+      : safeSkill === 'writing'
+      ? 'task1'
+      : 'both';
+  const defaultSubCat =
+    subOpts?.dailySubCategory ||
+    (safeSkill === 'reading'
+      ? 'shw_1'
+      : safeSkill === 'listening'
+      ? 'listening_shw'
+      : safeSkill === 'writing'
+      ? (taskScope === 'task2' ? 'w2_essay' : 'w1_map')
+      : '');
   const skillNames = {
     listening: 'Listening',
     reading: 'Reading',
-    writing: 'Writing',
-    speaking: 'Speaking AI'
+    writing: taskScope === 'task1' ? 'Writing Task 1' : taskScope === 'task2' ? 'Writing Task 2' : 'Writing',
+    speaking: 'Speaking'
   };
   const base = createEmptyTestForm();
   return {
     ...base,
     id: 'test-skill-' + Date.now(),
-    title: `Bài Tập ${skillNames[safeSkill]} Mới`,
+    title: `Bài Tập Daily ${skillNames[safeSkill]} Mới`,
     description:
       safeSkill === 'speaking'
-        ? 'Bài tập luyện nói IELTS Speaking chấm tự động 4 tiêu chí bằng AI & lưu file ghi âm.'
-        : `Bài tập thực hành riêng kỹ năng ${skillNames[safeSkill]} (làm tự do không gộp kỹ năng khác).`,
+        ? 'Bài tập Daily Speaking / Cày Forecast cùng Ms. Như - lưu ghi âm & chờ Ms. Như duyệt điểm.'
+        : `Bài tập Daily Zone kỹ năng ${skillNames[safeSkill]} (làm lại nhiều lần • có Pass theo Team).`,
     createdAt: new Date().toISOString().split('T')[0],
     testMode: 'single_skill',
     focusSkill: safeSkill,
-    autoAiGrade: safeSkill === 'speaking',
+    examCategory: 'daily_zone',
+    dailySubCategory: defaultSubCat,
+    writingTaskScope: taskScope,
+    priceVnd: 0,
+    examPurpose: 'free_practice',
+    autoAiGrade: false,
     visibility: 'private',
     maxAttempts: 0,
     sequentialMode: false,

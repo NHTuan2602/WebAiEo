@@ -2316,9 +2316,9 @@ export default function TeacherDashboard({
                                                 ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
                                                 : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] border-[#CBD5E1] dark:border-slate-700 hover:border-rose-500'
                                             }`}
-                                            title="Bật/Tắt gói Ai eo VIP 1 tháng"
+                                            title="Bật/Tắt gói IELTS VIP 1 tháng"
                                           >
-                                            {hasVip ? 'Ai eo VIP' : '+ Ai eo VIP'}
+                                            {hasVip ? 'IELTS VIP' : '+ IELTS VIP'}
                                           </button>
                                         );
                                       })()}

@@ -66,6 +66,7 @@ import {
   formatRemainingSubscriptionText,
   formatVndCurrency,
   getProfileBannerById,
+  getRealExamCredits,
   hasActiveAieoVip,
   hasCustomCoverPermission,
   hasUnlockedAvatarFrame,
@@ -197,6 +198,7 @@ export default function StudentProfile({
   const heroBanner = getProfileBannerById(student.profileBannerId);
   const studentHasCoverPermission = hasCustomCoverPermission(student);
   const studentHasAieoVip = hasActiveAieoVip(student);
+  const studentRealExamCredits = getRealExamCredits(student);
   const vipVisual = resolveUserVipNameVisual(student);
   const canUseCustomCover = canEditTargetInfo && (isTeacherViewer || studentHasCoverPermission);
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
@@ -265,26 +267,34 @@ export default function StudentProfile({
     );
   });
 
+  const isAttemptApprovedForViewer = (att) => {
+    if (!att) return false;
+    if (isTeacherViewer) return true;
+    if (att.teacherGraded) return true;
+    return att.testMode === 'single_skill' && (att.singleSkill === 'listening' || att.singleSkill === 'reading');
+  };
+
   const studentAttempts = attempts.filter(a => a.studentId === activeUsername);
 
   // Sort chronologically ascending (oldest to newest) for progression calculations
   const chronologicalAttempts = [...studentAttempts].reverse();
   const totalAttempts = studentAttempts.length;
-  const gradedOverallBands = studentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
+  const approvedStudentAttempts = studentAttempts.filter(isAttemptApprovedForViewer);
+  const gradedOverallBands = approvedStudentAttempts.map(a => a.overallBand).filter(b => typeof b === 'number');
   const highestBand = gradedOverallBands.length > 0 ? Math.max(...gradedOverallBands) : null;
-  const latestAttempt = studentAttempts[0];
-  const firstAttempt = chronologicalAttempts[0];
-  const bandGrowth = (typeof latestAttempt?.overallBand === 'number' && typeof firstAttempt?.overallBand === 'number' && totalAttempts > 1)
+  const latestAttempt = approvedStudentAttempts[0] || studentAttempts[0];
+  const firstAttempt = [...approvedStudentAttempts].reverse()[0] || chronologicalAttempts[0];
+  const bandGrowth = (typeof latestAttempt?.overallBand === 'number' && typeof firstAttempt?.overallBand === 'number' && approvedStudentAttempts.length > 1)
     ? (latestAttempt.overallBand - firstAttempt.overallBand).toFixed(1)
     : null;
 
-  const avgListening = totalAttempts > 0
-    ? (studentAttempts.reduce((acc, a) => acc + (a.scores?.listening?.band || 0), 0) / totalAttempts).toFixed(1)
+  const avgListening = approvedStudentAttempts.length > 0
+    ? (approvedStudentAttempts.reduce((acc, a) => acc + (a.scores?.listening?.band || 0), 0) / approvedStudentAttempts.length).toFixed(1)
     : null;
-  const avgReading = totalAttempts > 0
-    ? (studentAttempts.reduce((acc, a) => acc + (a.scores?.reading?.band || 0), 0) / totalAttempts).toFixed(1)
+  const avgReading = approvedStudentAttempts.length > 0
+    ? (approvedStudentAttempts.reduce((acc, a) => acc + (a.scores?.reading?.band || 0), 0) / approvedStudentAttempts.length).toFixed(1)
     : null;
-  const gradedWritingAttempts = studentAttempts.filter(a => typeof a.scores?.writing?.overallBand === 'number');
+  const gradedWritingAttempts = approvedStudentAttempts.filter(a => typeof a.scores?.writing?.overallBand === 'number');
   const avgWriting = gradedWritingAttempts.length > 0
     ? (gradedWritingAttempts.reduce((acc, a) => acc + a.scores.writing.overallBand, 0) / gradedWritingAttempts.length).toFixed(1)
     : null;
@@ -402,7 +412,7 @@ export default function StudentProfile({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-1.5">
             <Crown className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
-            Tùy Chỉnh Hiển Thị Ai eo VIP (Màu Chữ Tên · Viền Bìa Neon · Nhãn AIEOVIP)
+            Tùy Chỉnh Hiển Thị IELTS VIP (Màu Chữ Tên · Viền Bìa Neon · Nhãn IELTS VIP)
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             {neonOn && (
@@ -568,7 +578,7 @@ export default function StudentProfile({
             </div>
           </div>
 
-          {/* 3. AIEOVIP Badge Toggle */}
+          {/* 3. IELTS VIP Badge Toggle */}
           <button
             type="button"
             role="switch"
@@ -577,8 +587,8 @@ export default function StudentProfile({
               saveVipPatch({
                 vipTagEnabled: !tagOn,
                 customToast: !tagOn
-                  ? 'Đã BẬT huy hiệu AIEOVIP bên cạnh tên!'
-                  : 'Đã TẮT huy hiệu AIEOVIP.'
+                  ? 'Đã BẬT huy hiệu IELTS VIP bên cạnh tên!'
+                  : 'Đã TẮT huy hiệu IELTS VIP.'
               })
             }
             className="bg-transparent border-0 rounded-none py-3 lg:py-1 lg:pl-5 text-left flex items-center justify-between gap-3 w-full"
@@ -586,10 +596,10 @@ export default function StudentProfile({
             <div>
               <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5] flex items-center gap-1.5">
                 <Crown className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
-                <span>Nhãn AIEOVIP Cạnh Tên</span>
+                <span>Nhãn IELTS VIP Cạnh Tên</span>
               </p>
               <p className="text-xs text-[#475569] dark:text-zinc-400">
-                Hiện huy hiệu AIEOVIP ánh kim bên cạnh tên của bạn
+                Hiện huy hiệu IELTS VIP ánh kim bên cạnh tên của bạn
               </p>
             </div>
             <span
@@ -1111,7 +1121,7 @@ export default function StudentProfile({
                       type="button"
                       disabled={isTogglingSubscription}
                       onClick={async () => {
-                        if (studentHasAieoVip && !window.confirm(`Thu hồi gói Ai eo VIP của ${student.name || student.username}?`)) {
+                        if (studentHasAieoVip && !window.confirm(`Thu hồi gói IELTS VIP của ${student.name || student.username}?`)) {
                           return;
                         }
                         setIsTogglingSubscription(true);
@@ -1121,22 +1131,36 @@ export default function StudentProfile({
                       className={profileActionBtnCls}
                     >
                       <Crown className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
-                      {studentHasAieoVip ? '✓ Đang mở Ai eo VIP (1T)' : '+ Cấp Ai eo VIP (1T)'}
+                      {studentHasAieoVip ? '✓ Đang mở IELTS VIP (1T)' : '+ Cấp IELTS VIP (1T)'}
                     </button>
                   )}
                   {isViewerSuperAdmin && student.role !== 'teacher' && onToggleUserSubscription && (
-                    <button
-                      type="button"
-                      disabled={isTogglingSubscription}
-                      onClick={async () => {
-                        setIsTogglingSubscription(true);
-                        await onToggleUserSubscription(student.username, 'room_ticket', true);
-                        setIsTogglingSubscription(false);
-                      }}
-                      className={profileActionBtnCls}
-                    >
-                      +1 Vé Phòng (5k){(student.roomCreateCredits || 0) > 0 ? ` · Đang có ${student.roomCreateCredits}` : ''}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        disabled={isTogglingSubscription}
+                        onClick={async () => {
+                          setIsTogglingSubscription(true);
+                          await onToggleUserSubscription(student.username, 'room_ticket', true);
+                          setIsTogglingSubscription(false);
+                        }}
+                        className={profileActionBtnCls}
+                      >
+                        +1 Vé Phòng (5k){(student.roomCreateCredits || 0) > 0 ? ` · Đang có ${student.roomCreateCredits}` : ''}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isTogglingSubscription}
+                        onClick={async () => {
+                          setIsTogglingSubscription(true);
+                          await onToggleUserSubscription(student.username, 'real_exam_credit', true);
+                          setIsTogglingSubscription(false);
+                        }}
+                        className={profileActionBtnCls}
+                      >
+                        +1 Lượt Thực Chiến{studentRealExamCredits > 0 ? ` · Đang có ${studentRealExamCredits}` : ''}
+                      </button>
+                    </>
                   )}
                   {isSelf && onOpenAccountSecurity && (
                     <>
@@ -1238,10 +1262,10 @@ export default function StudentProfile({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="text-sm font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-1.5">
-                    <Crown className="w-4 h-4 text-slate-700 dark:text-zinc-200" /> Đặc Quyền Hiển Thị ADMIN / Ai eo VIP
+                    <Crown className="w-4 h-4 text-slate-700 dark:text-zinc-200" /> Đặc Quyền Hiển Thị ADMIN / IELTS VIP
                   </h2>
                   <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
-                    Quản trị viên có thể bật/tắt nhanh chữ màu đỏ VIP và nhãn AIEOVIP cạnh tên hiển thị.
+                    Quản trị viên có thể bật/tắt nhanh chữ màu đỏ VIP và nhãn IELTS VIP cạnh tên hiển thị.
                   </p>
                 </div>
               </div>
@@ -1827,44 +1851,44 @@ export default function StudentProfile({
             )}
           </div>
 
-      {/* Gói Thành Viên 1 Tháng & Tùy Chỉnh Ai eo VIP */}
+      {/* Gói Thành Viên 1 Tháng & Tùy Chỉnh IELTS VIP */}
       {(isSelf || isViewerSuperAdmin) && (
         <div className={`${profileCardCls} p-5 sm:p-6 mb-8`}>
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E2E8F0] dark:border-zinc-800">
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
                 <Crown className="w-5 h-5 text-slate-700 dark:text-zinc-200" />
-                Gói Thành Viên 1 Tháng &amp; Đặc Quyền Ai eo VIP
+                Gói Thành Viên 1 Tháng &amp; Đặc Quyền IELTS VIP
               </h2>
               <p className="text-xs text-slate-600 dark:text-zinc-300 mt-0.5">
-                Mở khóa 30 ngày luyện Bài Tập 4 Kỹ Năng, Ảnh Bìa Riêng hoặc nâng cấp trọn bộ Ai eo VIP cùng bạn bè.
+                Mở khóa Daily Zone, lượt Combo Thực Chiến 4 Kỹ Năng, Ảnh Bìa Riêng hoặc nâng cấp trọn bộ IELTS VIP cùng bạn bè.
               </p>
             </div>
             {studentHasAieoVip && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#991B1B] text-[#FFFFFF] border border-[#EF4444] text-xs font-semibold">
                 <Crown className="w-3.5 h-3.5 text-amber-300" />
-                AIEOVIP Active {aieoVipRemainingText ? `• ${aieoVipRemainingText}` : ''}
+                IELTS VIP Active {aieoVipRemainingText ? `• ${aieoVipRemainingText}` : ''}
               </span>
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800 mt-4">
-            {/* Card 1: Bài Tập 4 Kỹ Năng (Miễn phí) & Đề 3 Kỹ Năng Đã Mua */}
+            {/* Card 1: Daily Zone & Thực Chiến 4 Kỹ Năng */}
             <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:pr-5 flex flex-col justify-between gap-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
-                    <BookOpen className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Bài Tập 4 Kỹ Năng
+                    <BookOpen className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Daily Zone &amp; Thực Chiến
                   </span>
                   <span className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7] bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 px-2 py-0.5 rounded-full">
-                    Miễn Phí
+                    {studentRealExamCredits > 0 ? `${studentRealExamCredits} lượt Combo` : 'Daily Miễn Phí'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  Luyện Đọc, Nghe, Viết &amp; Speaking AI miễn phí 100%. Bộ Đề Thi 3 Kỹ Năng nâng cao có giá riêng theo từng đề ({(student.purchasedTestIds || []).length} đề đã mua).
+                  Luyện Daily Zone không giới hạn lượt. Kho Thực Chiến Thi Thật 4 kỹ năng (L · R · W · S) tính chi phí theo đề lẻ hoặc Combo ({(student.purchasedTestIds || []).length} đề đã mở · {studentRealExamCredits} lượt Combo còn lại).
                 </p>
                 <p className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7]">
-                  ✓ Sẵn sàng mở không giới hạn
+                  ✓ {studentRealExamCredits > 0 ? `Sẵn sàng đổi ${studentRealExamCredits} đề Thực Chiến` : 'Sẵn sàng vào kho đề thi 4 kỹ năng'}
                 </p>
               </div>
               {isSelf && (
@@ -1873,24 +1897,24 @@ export default function StudentProfile({
                   onClick={() => setView('HOME')}
                   className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
                 >
-                  Xem Kho Đề Thi 3 Kỹ Năng
+                  Xem Kho Đề Thực Chiến 4 Kỹ Năng
                 </button>
               )}
             </div>
 
-            {/* Card 2: Gói Ai eo VIP (80k / 1 tháng) */}
+            {/* Card 2: Gói IELTS VIP (80k / 1 tháng) */}
             <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:px-5 flex flex-col justify-between gap-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-black text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
-                    <Crown className="w-4 h-4 text-amber-500" /> Gói Ai eo VIP
+                    <Crown className="w-4 h-4 text-amber-500" /> Gói IELTS VIP
                   </span>
                   <span className="text-xs font-semibold text-[#09090B] bg-[#F59E0B] px-2.5 py-0.5 rounded-full whitespace-nowrap">
                     {aieoVipPriceLabel}/1 tháng
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  • <b>Ảnh Avatar Động (.GIF/.WebP)</b> • Đổi <b>Màu Chữ Tên</b> &amp; Nhãn <b>AIEOVIP</b> • <b>Viền Bìa &amp; Thẻ LED Neon</b> + Miễn phí <b>Ảnh Nền Cá Nhân</b> • <b>3 Khung Avatar Neon VIP</b> • Tạo phòng Game bạn bè vô hạn • Danh hiệu <b>👑 Ai eo VIP</b>.
+                  • <b>Ảnh Avatar Động (.GIF/.WebP)</b> • Đổi <b>Màu Chữ Tên</b> &amp; Nhãn <b>IELTS VIP</b> • <b>Viền Bìa &amp; Thẻ LED Neon</b> + Miễn phí <b>Ảnh Nền Cá Nhân</b> • <b>3 Khung Avatar Neon VIP</b> • Tạo phòng Game bạn bè vô hạn • Danh hiệu <b>👑 IELTS VIP</b>.
                 </p>
                 <p className={`text-xs font-bold ${studentHasAieoVip ? 'text-[#0F172B] dark:text-[#FAFAFA]' : 'text-slate-600 dark:text-zinc-300'}`}>
                   {studentHasAieoVip
@@ -1905,7 +1929,7 @@ export default function StudentProfile({
                     setCheckoutModalState({
                       itemType: 'aieo_vip',
                       itemId: '',
-                      itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                      itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
                       itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND,
                       renew: studentHasAieoVip
                     })
@@ -1914,7 +1938,7 @@ export default function StudentProfile({
                 >
                   {studentHasAieoVip
                     ? `Gia hạn VIP +30N (${aieoVipPriceLabel})`
-                    : `Đăng Ký Ai eo VIP (${aieoVipPriceLabel})`}
+                    : `Đăng Ký IELTS VIP (${aieoVipPriceLabel})`}
                 </button>
               )}
             </div>
@@ -1938,7 +1962,7 @@ export default function StudentProfile({
                     ? coverRemainingText
                       ? `✓ Đang mở (${coverRemainingText})`
                       : studentHasAieoVip
-                      ? `✓ Đã gồm miễn phí trong Ai eo VIP (${aieoVipRemainingText || '30 ngày'})`
+                      ? `✓ Đã gồm miễn phí trong IELTS VIP (${aieoVipRemainingText || '30 ngày'})`
                       : '✓ Đang mở khóa'
                     : 'Chưa mở khóa'}
                 </p>
@@ -2007,7 +2031,9 @@ export default function StudentProfile({
           <div className="space-y-6">
             {/* Chronological Trajectory Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {chronologicalAttempts.map((att, idx) => (
+              {chronologicalAttempts.map((att, idx) => {
+                const showScores = isAttemptApprovedForViewer(att);
+                return (
                 <div
                   key={att.id}
                   className={`rounded-xl p-5 border transition ${
@@ -2039,8 +2065,8 @@ export default function StudentProfile({
 
                   <div className="flex items-center justify-between py-2 border-y border-[#E2E8F0] dark:border-zinc-800 mb-3">
                     <span className="text-xs text-[#475569] dark:text-zinc-400 font-semibold">Band Overall:</span>
-                    <span className="text-xl font-black text-[#0F172B] dark:text-[#F4F4F5] bg-slate-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-zinc-700">
-                      {att.overallBand ?? 'Chờ'}
+                    <span className={`font-black bg-slate-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-zinc-700 ${showScores && typeof att.overallBand === 'number' ? 'text-xl text-[#0F172B] dark:text-[#F4F4F5]' : 'text-xs text-amber-700 dark:text-amber-300'}`}>
+                      {showScores ? (att.overallBand ?? 'Ms. Như đang check') : 'Ms. Như đang check'}
                     </span>
                   </div>
 
@@ -2051,12 +2077,12 @@ export default function StudentProfile({
                         <span className="flex items-center gap-1">
                           <Headphones className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Listening
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-zinc-100">{att.scores?.listening?.band ?? '-'}</span>
+                        <span className="font-bold text-slate-900 dark:text-zinc-100">{showScores ? (att.scores?.listening?.band ?? '-') : 'Đang check'}</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{ width: `${((att.scores?.listening?.band || 0) / 9) * 100}%` }}
+                          style={{ width: `${showScores ? ((att.scores?.listening?.band || 0) / 9) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -2066,12 +2092,12 @@ export default function StudentProfile({
                         <span className="flex items-center gap-1">
                           <BookOpen className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Reading
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-zinc-100">{att.scores?.reading?.band ?? '-'}</span>
+                        <span className="font-bold text-slate-900 dark:text-zinc-100">{showScores ? (att.scores?.reading?.band ?? '-') : 'Đang check'}</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{ width: `${((att.scores?.reading?.band || 0) / 9) * 100}%` }}
+                          style={{ width: `${showScores ? ((att.scores?.reading?.band || 0) / 9) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -2079,16 +2105,22 @@ export default function StudentProfile({
                     <div>
                       <div className="flex justify-between text-slate-600 dark:text-zinc-300 font-semibold mb-1">
                         <span className="flex items-center gap-1">
-                          <PenTool className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> {att.scores?.speaking ? 'Speaking AI' : 'Writing'}
+                          <PenTool className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> {att.singleSkill === 'speaking' ? 'Speaking' : (att.scores?.speaking ? 'Writing · Speaking' : 'Writing')}
                         </span>
                         <span className="font-bold text-slate-900 dark:text-zinc-100">
-                          {att.scores?.speaking ? (att.scores.speaking.band ?? '-') : (att.scores?.writing?.overallBand ?? '-')}
+                          {!showScores
+                            ? 'Ms. Như đang check'
+                            : att.singleSkill === 'speaking'
+                              ? (att.scores?.speaking?.band ?? '-')
+                              : att.scores?.speaking
+                                ? `${att.scores?.writing?.overallBand ?? '-'} · ${att.scores?.speaking?.band ?? '-'}`
+                                : (att.scores?.writing?.overallBand ?? '-')}
                         </span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{ width: `${(((att.scores?.speaking ? att.scores.speaking.band : att.scores?.writing?.overallBand) || 0) / 9) * 100}%` }}
+                          style={{ width: `${showScores ? (((att.singleSkill === 'speaking' ? att.scores?.speaking?.band : att.scores?.writing?.overallBand) || 0) / 9) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -2107,7 +2139,8 @@ export default function StudentProfile({
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Skill Growth Highlights */}
@@ -2220,6 +2253,7 @@ export default function StudentProfile({
                   const risk = isTeacherViewer ? getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs) : null;
                   const extSignals = isTeacherViewer ? countExtensionCheatSignals(att.antiCheatLogs) : 0;
                   const RiskIcon = risk?.icon;
+                  const showRowScores = isAttemptApprovedForViewer(att);
 
                   return (
                     <tr key={att.id} className="hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/50 transition">
@@ -2247,29 +2281,46 @@ export default function StudentProfile({
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="font-bold text-[#0F172B] dark:text-zinc-100">{att.scores?.listening?.band ?? '-'}</span>
-                        <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">({att.scores?.listening?.raw || 0}/{att.scores?.listening?.total || 0} câu)</span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="font-bold text-[#0F172B] dark:text-zinc-100">{att.scores?.reading?.band ?? '-'}</span>
-                        <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">({att.scores?.reading?.raw || 0}/{att.scores?.reading?.total || 0} câu)</span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {att.scores?.speaking ? (
+                        {showRowScores ? (
                           <>
-                            <span className="font-bold text-[#0F172B] dark:text-zinc-100">Spk {att.scores.speaking.band ?? '-'}</span>
-                            <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">Speaking AI</span>
+                            <span className="font-bold text-[#0F172B] dark:text-zinc-100">{att.scores?.listening?.band ?? '-'}</span>
+                            <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">({att.scores?.listening?.raw || 0}/{att.scores?.listening?.total || 0} câu)</span>
+                          </>
+                        ) : (
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Đang check</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {showRowScores ? (
+                          <>
+                            <span className="font-bold text-[#0F172B] dark:text-zinc-100">{att.scores?.reading?.band ?? '-'}</span>
+                            <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">({att.scores?.reading?.raw || 0}/{att.scores?.reading?.total || 0} câu)</span>
+                          </>
+                        ) : (
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Đang check</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {!showRowScores ? (
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Ms. Như đang check</span>
+                        ) : att.singleSkill === 'speaking' ? (
+                          <>
+                            <span className="font-bold text-[#0F172B] dark:text-zinc-100">Spk {att.scores?.speaking?.band ?? '-'}</span>
+                            <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">Speaking</span>
                           </>
                         ) : (
                           <>
-                            <span className="font-bold text-[#0F172B] dark:text-zinc-100">{att.scores?.writing?.overallBand ?? (att.testMode === 'single_skill' ? '-' : 'Chờ chấm')}</span>
-                            <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">T1: {att.scores?.writing?.task1Band ?? '-'} | T2: {att.scores?.writing?.task2Band ?? '-'}</span>
+                            <span className="font-bold text-[#0F172B] dark:text-zinc-100">{att.scores?.writing?.overallBand ?? (att.testMode === 'single_skill' ? '-' : 'Chờ duyệt')}</span>
+                            <span className="text-xs text-[#475569] dark:text-zinc-400 block font-normal">
+                              T1: {att.scores?.writing?.task1Band ?? '-'} | T2: {att.scores?.writing?.task2Band ?? '-'}
+                              {att.scores?.speaking?.band != null ? ` | S: ${att.scores.speaking.band}` : ''}
+                            </span>
                           </>
                         )}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="text-base font-black text-[#0F172B] dark:text-[#F4F4F5] bg-slate-100 dark:bg-zinc-800 px-3 py-1 rounded-lg border border-slate-200 dark:border-zinc-700">
-                          {att.overallBand ?? 'Chờ'}
+                        <span className={`font-black bg-slate-100 dark:bg-zinc-800 px-3 py-1 rounded-lg border border-slate-200 dark:border-zinc-700 ${showRowScores && typeof att.overallBand === 'number' ? 'text-base text-[#0F172B] dark:text-[#F4F4F5]' : 'text-xs text-amber-700 dark:text-amber-300'}`}>
+                          {showRowScores ? (att.overallBand ?? 'Ms. Như đang check') : 'Ms. Như đang check'}
                         </span>
                       </td>
                       {isTeacherViewer && risk && (
@@ -2687,13 +2738,13 @@ export default function StudentProfile({
                               setCheckoutModalState({
                                 itemType: 'aieo_vip',
                                 itemId: '',
-                                itemLabel: 'Gói Ai eo VIP Full Quyền (1 Tháng)',
+                                itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
                                 itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
                               });
                             }}
                             className="w-full py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-[#991B1B] hover:bg-[#B91C1C] text-[#F4F4F5]"
                           >
-                            <Crown className="w-3.5 h-3.5" /> Đăng Ký Gói Ai eo VIP ({aieoVipPriceLabel}/1 tháng)
+                            <Crown className="w-3.5 h-3.5" /> Đăng Ký Gói IELTS VIP ({aieoVipPriceLabel}/1 tháng)
                           </button>
                         )}
                         {isViewerSuperAdmin && !isTargetSystemAdmin && onGrantUserTitles && !item.isRoleBuiltIn && item.id !== 'newbie' && (() => {
@@ -2952,7 +3003,7 @@ export default function StudentProfile({
                         type="button"
                         onClick={() => {
                           if (!frameAllowed) {
-                            showToast?.('Khung Avatar Neon thuộc đặc quyền Gói Ai eo VIP (80.000đ/1 tháng)!', 'info');
+                            showToast?.('Khung Avatar Neon thuộc đặc quyền Gói IELTS VIP (80.000đ/1 tháng)!', 'info');
                             return;
                           }
                           setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }));
