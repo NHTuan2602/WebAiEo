@@ -1111,7 +1111,10 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
   const coveredSkills = new Set();
 
   userAttempts.forEach(a => {
-    const val = Number(a.overallBand);
+    const isApprovedBand =
+      a.teacherGraded !== false ||
+      (a.testMode === 'single_skill' && (a.focusSkill === 'listening' || a.focusSkill === 'reading'));
+    const val = isApprovedBand && typeof a.overallBand === 'number' ? Number(a.overallBand) : NaN;
     if (!Number.isNaN(val) && val > highestBand) {
       highestBand = val;
     }

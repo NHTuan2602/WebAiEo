@@ -1505,7 +1505,7 @@ export default function TeacherDashboard({
                   className="px-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 shrink-0"
                 >
                   <option value="all">Tất cả trạng thái</option>
-                  <option value="pending">Chờ chấm Writing</option>
+                  <option value="pending">Chờ duyệt &amp; chấm (Viết / Nói / 4 Kỹ Năng)</option>
                   <option value="graded">Đã chấm xong</option>
                 </select>
                 <select
@@ -1668,11 +1668,15 @@ export default function TeacherDashboard({
                           {att.teacherGraded ? (
                             <span className="text-xs bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-200 dark:border-emerald-500/30 inline-flex items-center gap-1 whitespace-nowrap">
                               {att.aiGraded && <Sparkles className="w-3.5 h-3.5 text-[#0F766E] dark:text-teal-400 shrink-0" />}
-                              {att.aiGraded ? 'AI Đã Chấm' : 'Đã Chấm'}
+                              Đã Duyệt Trả Điểm
+                            </span>
+                          ) : att.aiGraded ? (
+                            <span className="text-xs bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-200 px-2.5 py-1 rounded-lg font-bold border border-indigo-200 dark:border-indigo-500/40 inline-flex items-center gap-1 whitespace-nowrap">
+                              <Sparkles className="w-3.5 h-3.5 shrink-0" /> AI Chấm Nháp · Chờ Duyệt
                             </span>
                           ) : (
                             <span className="inline-block text-xs bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 px-2.5 py-1 rounded-lg font-bold border border-amber-300 dark:border-amber-500/30 whitespace-nowrap">
-                              Cần Chấm Writing
+                              Chờ Ms. Như Duyệt
                             </span>
                           )}
                         </td>
@@ -1681,11 +1685,11 @@ export default function TeacherDashboard({
                             {att.overallBand ?? '-'}
                           </div>
                           <div className="text-[13px] font-medium text-[#475569] dark:text-slate-400 mt-0.5 tabular-nums whitespace-nowrap">
-                            {att.focusSkill === 'speaking' || att.scores?.speaking
+                            {att.testMode === 'single_skill' && att.focusSkill === 'speaking'
                               ? `Speaking ${att.scores?.speaking?.band ?? att.overallBand ?? '-'}`
                               : att.testMode === 'single_skill'
                               ? `${(att.focusSkill || '').toUpperCase()} ${att.overallBand ?? '-'}`
-                              : `L ${att.scores?.listening?.band ?? '-'} · R ${att.scores?.reading?.band ?? '-'} · W ${att.scores?.writing?.overallBand ?? '-'}`}
+                              : `L ${att.scores?.listening?.band ?? '-'} · R ${att.scores?.reading?.band ?? '-'} · W ${att.scores?.writing?.overallBand ?? '-'}${att.scores?.speaking ? ` · S ${att.scores?.speaking?.band ?? '-'}` : ''}`}
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-right whitespace-nowrap">

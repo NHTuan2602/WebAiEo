@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import {
   BookOpen,
+  Clock,
   Download,
   FileAudio,
   Pause,
@@ -18,7 +19,8 @@ export default function SpeakingQuestionLuyennoiCard({
   rec,
   idx = 0,
   totalCount = 1,
-  attemptCriteria = {}
+  attemptCriteria = {},
+  canShowApprovedScores = true
 }) {
   const [activeTab, setActiveTab] = useState('fixes'); // 'fixes' | 'fluency'
   const [showUpgradeDrawer, setShowUpgradeDrawer] = useState(false);
@@ -64,19 +66,21 @@ export default function SpeakingQuestionLuyennoiCard({
             {rec.topic && <span className="truncate">{rec.topic}</span>}
             <span>· {rec.durationSec || 0}s</span>
           </div>
-          <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
+          <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
             {rec.prompt}
-          </h4>
+          </h3>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowUpgradeDrawer(v => !v)}
-          className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6] hover:underline underline-offset-4 shrink-0 py-1"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>{showUpgradeDrawer ? 'Ẩn gợi ý cải thiện' : 'Cải thiện câu này'}</span>
-        </button>
+        {canShowApprovedScores && (
+          <button
+            type="button"
+            onClick={() => setShowUpgradeDrawer(v => !v)}
+            className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6] hover:underline underline-offset-4 shrink-0 py-1"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{showUpgradeDrawer ? 'Ẩn gợi ý cải thiện' : 'Cải thiện câu này'}</span>
+          </button>
+        )}
       </div>
 
       {/* Main Luyennoi Feedback Card */}
@@ -117,14 +121,36 @@ export default function SpeakingQuestionLuyennoiCard({
             )}
           </div>
 
-          <div
-            className="w-12 h-12 rounded-full bg-emerald-500 text-white font-black text-base flex items-center justify-center shadow-md ring-4 ring-emerald-500/20 tabular-nums shrink-0"
-            title="Band câu này"
-          >
-            {qBandLabel}
-          </div>
+          {canShowApprovedScores ? (
+            <div
+              className="w-12 h-12 rounded-full bg-emerald-500 text-white font-black text-base flex items-center justify-center shadow-md ring-4 ring-emerald-500/20 tabular-nums shrink-0"
+              title="Band câu này"
+            >
+              {qBandLabel}
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-500/35 text-xs font-bold shrink-0">
+              <Clock className="w-3.5 h-3.5" /> Ms. Như đang check
+            </span>
+          )}
         </div>
 
+        {!canShowApprovedScores ? (
+          <div className="space-y-2">
+            {rec.transcript ? (
+              <div className="text-sm text-slate-800 dark:text-slate-100 leading-relaxed font-medium bg-white/80 dark:bg-slate-900/75 rounded-xl p-3.5 border border-slate-200 dark:border-slate-700">
+                <span className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                  Nội dung ghi âm đã nộp:
+                </span>
+                {rec.transcript}
+              </div>
+            ) : null}
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+              File ghi âm đã lưu an toàn. Điểm số, sửa lỗi chi tiết và gợi ý nâng Band sẽ hiển thị sau khi Ms. Như duyệt bài!
+            </p>
+          </div>
+        ) : (
+        <>
         {/* Luyennoi Tabs: Sửa lỗi | Trôi chảy */}
         <div className="flex items-center gap-5 border-b border-indigo-200/80 dark:border-slate-700">
           {[
@@ -282,10 +308,12 @@ export default function SpeakingQuestionLuyennoiCard({
             </span>
           ))}
         </div>
+        </>
+        )}
       </div>
 
       {/* Collapsible Band 8.0+ Recommendation & Lexical Upgrade Drawer ("Cải thiện câu này") */}
-      {showUpgradeDrawer && (
+      {canShowApprovedScores && showUpgradeDrawer && (
         <div className="rounded-2xl bg-emerald-50/85 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/35 p-4 space-y-3">
           {rec.upgradedSample ? (
             <div>

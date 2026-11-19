@@ -4317,39 +4317,58 @@ export default function App() {
     return calculateOverallIeltsBand(activeSkillBands);
   };
 
-  // AI Writing Grading Trigger (Teacher only — students wait for Ms. Nhu approval)
+  // AI Writing Draft Grading Trigger (Teacher only - stays private draft until Ms. Nhu clicks Approve)
   const handleGradeWritingWithAI = async (targetAttempt) => {
     const isTeacherUser = currentUser?.role === 'teacher';
     if (!targetAttempt || !isTeacherUser) return;
     setIsGradingAI(true);
-    setAiGradingStep('Đang hỗ trợ phân tích lỗi chính tả, ngữ pháp & gợi ý band Writing...');
+    setAiGradingStep('Đang chấm nháp Writing: phân tích lỗi chính tả, ngữ pháp & gợi ý band...');
 
     try {
       const aiResult = await runWritingGradingEngine(targetAttempt);
+      const linkedTest = tests.find(t => t.id === targetAttempt.testId);
+      const linkedCfg = linkedTest ? normalizeExamConfig(linkedTest) : null;
+      const writingScope = targetAttempt.writingTaskScope || linkedCfg?.writingTaskScope || 'both';
       const rawT1 = parseFloat(aiResult.task1Band);
       const rawT2 = parseFloat(aiResult.task2Band);
       const t1 = Number.isFinite(rawT1) ? roundDownIeltsHalfBand(Math.max(0, Math.min(9.0, rawT1))) : 0;
       const t2 = Number.isFinite(rawT2) ? roundDownIeltsHalfBand(Math.max(0, Math.min(9.0, rawT2))) : 0;
-      const writingOverall = calculateWritingBand(t1, t2);
+      const writingOverall =
+        writingScope === 'task1'
+          ? t1
+          : writingScope === 'task2'
+          ? t2
+          : calculateWritingBand(t1, t2);
 
-      const finalOverall = computeAttemptFinalOverall(targetAttempt.scores, writingOverall, targetAttempt);
+      const nextScores = {
+        ...targetAttempt.scores,
+        writing: {
+          task1Band: writingScope === 'task2' ? null : t1,
+          task2Band: writingScope === 'task1' ? null : t2,
+          overallBand: writingOverall
+        }
+      };
+      const finalOverall = computeAttemptFinalOverall(nextScores, writingOverall, targetAttempt);
+      const wasAlreadyApproved = Boolean(targetAttempt.teacherGraded);
 
       const updatedAiAttempt = {
         ...targetAttempt,
-        teacherGraded: isTeacherUser ? true : Boolean(targetAttempt.teacherGraded),
+        // Keep draft status (false) until Ms. Nhu explicitly clicks "Duyệt & Trả Điểm Cho Học Sinh"
+        teacherGraded: wasAlreadyApproved,
         aiGraded: true,
         aiDetails: aiResult,
         aiWritingTicket: aiResult.aiWritingTicket || undefined,
-        scores: {
-          ...targetAttempt.scores,
-          writing: { task1Band: t1, task2Band: t2, overallBand: writingOverall }
-        },
+        scores: nextScores,
         overallBand: finalOverall,
         teacherFeedback: aiResult.feedback
       };
       setAttempts(prev => prev.map(att => (att.id === targetAttempt.id ? updatedAiAttempt : att)));
       dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAiAttempt });
-      showToast(`Đã hoàn tất chấm điểm & phân tích lỗi (${aiResult._engineLabel})!`);
+      showToast(
+        wasAlreadyApproved
+          ? `Đã cập nhật điểm & phân tích lỗi Writing (${aiResult._engineLabel})!`
+          : `Đã chấm nháp Writing (${aiResult._engineLabel})! Học sinh CHƯA thấy - hãy kiểm tra & bấm "Duyệt & Trả Điểm Cho Học Sinh".`
+      );
     } catch (err) {
       alert('Có lỗi xảy ra trong quá trình chấm điểm: ' + err.message);
     } finally {
@@ -4362,7 +4381,7 @@ export default function App() {
     if (!targetAttempt || currentUser?.role !== 'teacher') return;
     const recordings = Array.isArray(targetAttempt.speakingRecordings) ? targetAttempt.speakingRecordings : [];
     setIsGradingAI(true);
-    setAiGradingStep('AI Examiner đang nghe lại file ghi âm và chấm 4 tiêu chí Speaking...');
+    setAiGradingStep('Đang nghe lại file ghi âm & chấm nháp 4 tiêu chí Speaking (chỉ GV thấy)...');
 
     try {
       const evaluation = await requestAiSpeakingGrading({
@@ -4391,9 +4410,20 @@ export default function App() {
         };
       });
 
+      const nextScores = {
+        ...targetAttempt.scores,
+        speaking: { band: spBand, criteria }
+      };
+      const isSingleSpeaking = targetAttempt.testMode === 'single_skill' && targetAttempt.focusSkill === 'speaking';
+      const nextOverall = isSingleSpeaking
+        ? spBand
+        : computeAttemptFinalOverall(nextScores, nextScores.writing?.overallBand ?? null, targetAttempt);
+      const wasAlreadyApproved = Boolean(targetAttempt.teacherGraded);
+
       const updatedAttempt = {
         ...targetAttempt,
-        teacherGraded: true,
+        // Keep draft status (false) until Ms. Nhu explicitly clicks "Duyệt & Trả Điểm Cho Học Sinh"
+        teacherGraded: wasAlreadyApproved,
         aiGraded: true,
         speakingRecordings: refreshedRecordings,
         speakingAiDetails: {
@@ -4404,11 +4434,8 @@ export default function App() {
           _gradedMode: evaluation?._gradedMode || 'fallback',
           _fallbackReason: evaluation?._fallbackReason || ''
         },
-        scores: {
-          ...targetAttempt.scores,
-          speaking: { band: spBand, criteria }
-        },
-        overallBand: spBand,
+        scores: nextScores,
+        overallBand: nextOverall,
         teacherFeedback: evaluation?.overallFeedback || targetAttempt.teacherFeedback || ''
       };
 
@@ -4429,9 +4456,9 @@ export default function App() {
       }
 
       showToast(
-        evaluation?._gradedMode === 'gemini_audio'
-          ? `AI (${evaluation._usedModel}) đã nghe lại file ghi âm & chấm Band ${spBand}!`
-          : `Đã chấm Speaking theo dữ liệu ghi âm (${evaluation?._fallbackReason || 'Bộ chấm tích hợp'}) - Band ${spBand}`
+        wasAlreadyApproved
+          ? `Đã cập nhật điểm Speaking (Band ${spBand})!`
+          : `Đã chấm nháp Speaking (Band ${spBand})! Học sinh CHƯA thấy - hãy kiểm tra & bấm "Duyệt & Trả Điểm Cho Học Sinh".`
       );
     } catch (err) {
       showToast('Lỗi chấm AI Speaking: ' + (err?.message || err), 'error');
@@ -4439,6 +4466,62 @@ export default function App() {
       setIsGradingAI(false);
       setAiGradingStep('');
     }
+  };
+
+  const handleApproveAndPublishAttempt = (targetAttempt) => {
+    if (!targetAttempt || currentUser?.role !== 'teacher') return;
+    const isSingleSpeaking = targetAttempt.testMode === 'single_skill' && targetAttempt.focusSkill === 'speaking';
+    const isSingleWriting = targetAttempt.testMode === 'single_skill' && targetAttempt.focusSkill === 'writing';
+    const hasWritingBand = typeof targetAttempt.scores?.writing?.overallBand === 'number';
+    const hasSpeakingBand = typeof targetAttempt.scores?.speaking?.band === 'number';
+    if (isSingleSpeaking && !hasSpeakingBand) {
+      openTeacherGradingModal(targetAttempt);
+      showToast('Vui lòng chấm nháp AI hoặc nhập điểm 4 tiêu chí Speaking trước khi duyệt trả điểm!', 'info');
+      return;
+    }
+    if (isSingleWriting && !hasWritingBand) {
+      openTeacherGradingModal(targetAttempt);
+      showToast('Vui lòng chấm nháp AI hoặc nhập điểm Writing trước khi duyệt trả điểm!', 'info');
+      return;
+    }
+    if (targetAttempt.testMode !== 'single_skill' && !hasWritingBand && !hasSpeakingBand) {
+      openTeacherGradingModal(targetAttempt);
+      showToast('Vui lòng nhập hoặc chấm nháp điểm Writing / Speaking trước khi duyệt trả điểm!', 'info');
+      return;
+    }
+
+    const finalOverall = isSingleSpeaking
+      ? targetAttempt.scores.speaking.band
+      : computeAttemptFinalOverall(targetAttempt.scores, targetAttempt.scores?.writing?.overallBand ?? null, targetAttempt);
+
+    const publishedAttempt = {
+      ...targetAttempt,
+      teacherGraded: true,
+      overallBand: finalOverall
+    };
+    setAttempts(prev => prev.map(att => (att.id === targetAttempt.id ? publishedAttempt : att)));
+    dispatchSyncAction('UPSERT_ATTEMPT', { attempt: publishedAttempt });
+    if (publishedAttempt.studentId && publishedAttempt.studentId !== currentUser?.username) {
+      dispatchSyncAction('CREATE_NOTIFICATION', {
+        title: `Ms. Như đã duyệt & trả điểm: ${publishedAttempt.testTitle}`,
+        message: `Bài thi của bạn đã được Ms. Như duyệt xong (Overall Band ${finalOverall ?? '-'}). Bấm vào để xem điểm chi tiết, lỗi sai & nhận xét!`,
+        type: 'announcement',
+        testId: publishedAttempt.testId || '',
+        targetUsernames: [publishedAttempt.studentId]
+      });
+    }
+    showToast(`Đã duyệt & trả điểm (Band ${finalOverall ?? '-'}) cho học sinh ${publishedAttempt.studentName}!`);
+  };
+
+  const handleRevokeApprovalAttempt = (targetAttempt) => {
+    if (!targetAttempt || currentUser?.role !== 'teacher') return;
+    const revertedAttempt = {
+      ...targetAttempt,
+      teacherGraded: false
+    };
+    setAttempts(prev => prev.map(att => (att.id === targetAttempt.id ? revertedAttempt : att)));
+    dispatchSyncAction('UPSERT_ATTEMPT', { attempt: revertedAttempt });
+    showToast('Đã chuyển bài thi về trạng thái Chờ duyệt (ẩn điểm & lỗi khỏi học sinh).', 'info');
   };
 
   const sanitizeBandScore = (val) => {
@@ -4683,10 +4766,25 @@ export default function App() {
       };
     }
 
+    const wasPreviouslyApproved = Boolean(gradingAttempt.teacherGraded);
     const updatedAttempts = attempts.map(att => (att.id === gradingAttempt.id ? updatedAttemptObj : att));
 
     setAttempts(updatedAttempts);
     dispatchSyncAction('UPSERT_ATTEMPT', { attempt: updatedAttemptObj });
+    if (
+      updatedAttemptObj.teacherGraded &&
+      !wasPreviouslyApproved &&
+      updatedAttemptObj.studentId &&
+      updatedAttemptObj.studentId !== currentUser?.username
+    ) {
+      dispatchSyncAction('CREATE_NOTIFICATION', {
+        title: `Ms. Như đã duyệt & trả điểm: ${updatedAttemptObj.testTitle}`,
+        message: `Bài thi của bạn đã được Ms. Như duyệt xong (Overall Band ${updatedAttemptObj.overallBand ?? '-'}). Vào xem điểm chi tiết, lỗi sai & nhận xét ngay!`,
+        type: 'announcement',
+        testId: updatedAttemptObj.testId || '',
+        targetUsernames: [updatedAttemptObj.studentId]
+      });
+    }
     setGradingAttempt(null);
     if (isSingleSpeakingAttempt) {
       const crit = updatedAttemptObj.scores?.speaking?.criteria || {};
@@ -7160,6 +7258,8 @@ export default function App() {
           handleGradeSpeakingWithAI={att => handleGradeSpeakingWithAI(att, false)}
           handleGradeWritingWithAI={handleGradeWritingWithAI}
           isGradingAI={isGradingAI}
+          onApproveAttempt={handleApproveAndPublishAttempt}
+          onRevokeApproval={handleRevokeApprovalAttempt}
           onRetryTest={startExam}
           openTeacherGradingModal={openTeacherGradingModal}
           previousView={previousView}

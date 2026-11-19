@@ -289,6 +289,7 @@ export default function SkillPracticeHub({
       if (!a || a.testMode !== 'single_skill') return false;
       const sk = a.focusSkill || '';
       if (!['reading', 'listening', 'writing'].includes(sk)) return false;
+      if (sk === 'writing' && !a.teacherGraded) return false;
       if (skillFilter !== 'all' && sk !== skillFilter) return false;
       return typeof a.overallBand === 'number' && a.overallBand >= 0;
     });
@@ -1699,7 +1700,7 @@ export default function SkillPracticeHub({
                                 </span>
                               )}
                               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30">
-                                {totalItems} câu · AI Chấm 4 Tiêu Chí
+                                {totalItems} câu · Ms. Như duyệt &amp; chấm
                               </span>
                               {sp.speakingTrack === 'daily' && !isTeacher && (
                                 usedCount > 0 ? (

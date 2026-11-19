@@ -796,8 +796,76 @@ function stripAnswerKeysFromTest(test) {
   return clone;
 }
 
+function isAttemptApprovedForStudentViewer(att) {
+  if (!att || typeof att !== 'object') return false;
+  if (att.teacherGraded) return true;
+  return att.testMode === 'single_skill' && (att.focusSkill === 'listening' || att.focusSkill === 'reading');
+}
+
+function stripSpeakingRecordingEvaluationFields(rec) {
+  if (!rec || typeof rec !== 'object') return rec;
+  return {
+    questionId: String(rec.questionId || ''),
+    part: Number(rec.part) || 1,
+    topic: String(rec.topic || '').slice(0, 200),
+    prompt: String(rec.prompt || '').slice(0, 600),
+    audioId: typeof rec.audioId === 'string' ? rec.audioId.slice(0, 180) : '',
+    audioUrl: typeof rec.audioUrl === 'string' ? rec.audioUrl.slice(0, 300) : '',
+    mimeType: typeof rec.mimeType === 'string' ? rec.mimeType.slice(0, 80) : 'audio/webm',
+    sizeBytes: Math.max(0, Math.round(Number(rec.sizeBytes) || 0)),
+    durationSec: Math.max(0, Math.round(Number(rec.durationSec) || 0)),
+    transcript: String(rec.transcript || rec.clientTranscript || '').slice(0, 4000),
+    clientTranscript: String(rec.clientTranscript || '').slice(0, 4000),
+    band: null,
+    criteria: null,
+    fluencyMetrics: null,
+    feedback: '',
+    grammarVocabularyFixes: [],
+    vocabularyUpgrades: [],
+    upgradedSample: ''
+  };
+}
+
+function sanitizeAttemptForStudentViewer(att) {
+  if (!att || typeof att !== 'object') return att;
+  if (isAttemptApprovedForStudentViewer(att)) {
+    const clean = { ...att };
+    delete clean.aiDraftBand;
+    delete clean.aiDraftFeedback;
+    return clean;
+  }
+  const baseScores = att.scores && typeof att.scores === 'object' ? { ...att.scores } : {};
+  const sanitizedScores = {
+    ...baseScores,
+    ...(baseScores.writing !== undefined
+      ? { writing: { task1Band: null, task2Band: null, overallBand: null } }
+      : {}),
+    ...(baseScores.speaking !== undefined
+      ? { speaking: { band: null, criteria: null } }
+      : {})
+  };
+  const sanitizedRecordings = Array.isArray(att.speakingRecordings)
+    ? att.speakingRecordings.map(stripSpeakingRecordingEvaluationFields)
+    : att.speakingRecordings;
+  const result = {
+    ...att,
+    teacherGraded: false,
+    aiGraded: false,
+    overallBand: null,
+    teacherFeedback: '',
+    aiDetails: null,
+    speakingAiDetails: null,
+    scores: sanitizedScores,
+    ...(sanitizedRecordings !== undefined ? { speakingRecordings: sanitizedRecordings } : {})
+  };
+  delete result.aiDraftBand;
+  delete result.aiDraftFeedback;
+  return result;
+}
+
 function sanitizeAttemptForPeer(att) {
   if (!att || typeof att !== 'object') return att;
+  const approved = isAttemptApprovedForStudentViewer(att);
   return {
     id: att.id,
     testId: att.testId,
@@ -813,9 +881,9 @@ function sanitizeAttemptForPeer(att) {
     timelinessStatus: att.timelinessStatus || 'flexible',
     lateByMinutes: Number(att.lateByMinutes) || 0,
     teacherGraded: Boolean(att.teacherGraded),
-    aiGraded: Boolean(att.aiGraded),
-    overallBand: att.overallBand ?? null,
-    scores: att.scores || {}
+    aiGraded: approved ? Boolean(att.aiGraded) : false,
+    overallBand: approved ? (att.overallBand ?? null) : null,
+    scores: approved ? (att.scores || {}) : {}
   };
 }
 
@@ -1735,7 +1803,7 @@ function getSnapshotForViewer(store, viewer = null) {
     })
     .map(att => {
       const isMine = att.studentId === viewer.username || att.studentUsername === viewer.username;
-      return isMine ? att : sanitizeAttemptForPeer(att);
+      return isMine ? sanitizeAttemptForStudentViewer(att) : sanitizeAttemptForPeer(att);
     });
 
   const studentRooms = {};
@@ -3864,14 +3932,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           ? attempt.speakingRecordings
               .filter(r => r && typeof r === 'object')
               .slice(0, 24)
-              .map(r => ({
-                questionId: String(r.questionId || ''),
-                part: Number(r.part) || 1,
-                prompt: String(r.prompt || '').slice(0, 600),
-                audioUrl: typeof r.audioUrl === 'string' ? r.audioUrl.slice(0, 300) : '',
-                transcript: String(r.transcript || '').slice(0, 4000),
-                durationSec: Math.max(0, Math.round(Number(r.durationSec) || 0))
-              }))
+              .map(stripSpeakingRecordingEvaluationFields)
           : undefined;
 
         attempt = {
@@ -3893,6 +3954,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           overallBand: finalOverallBand,
           teacherGraded: finalTeacherGraded,
           aiGraded: finalAiGraded,
+          aiDetails: null,
+          speakingAiDetails: null,
           teacherFeedback: finalFeedback,
           ...(aiDraftBand !== null ? { aiDraftBand, aiDraftFeedback } : {})
         };
@@ -5983,7 +6046,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       if (!viewer) {
         res.statusCode = 401;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để sử dụng AI chấm Speaking.' }));
+        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để sử dụng công cụ chấm Speaking.' }));
+        return;
+      }
+      if (viewer.role !== 'teacher') {
+        res.statusCode = 403;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Bài Speaking cần nộp chờ Ms. Như duyệt và chấm điểm.' }));
         return;
       }
       try {
@@ -6048,7 +6117,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       if (!viewer) {
         res.statusCode = 401;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để sử dụng AI phân tích Writing.' }));
+        res.end(JSON.stringify({ ok: false, error: 'Vui lòng đăng nhập để sử dụng công cụ phân tích Writing.' }));
+        return;
+      }
+      if (viewer.role !== 'teacher') {
+        res.statusCode = 403;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Bài Writing cần nộp chờ Ms. Như duyệt và chấm điểm.' }));
         return;
       }
       try {
@@ -6113,7 +6188,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           const attIdx = (store.attempts || []).findIndex(a => a.id === attemptId);
           if (attIdx >= 0) {
             const targetAtt = store.attempts[attIdx];
-            const canUpdate = viewer.role === 'teacher' || (targetAtt.studentId === viewer.username && !targetAtt.teacherGraded);
+            const canUpdate = viewer.role === 'teacher';
             if (canUpdate) {
               const nextScores = {
                 ...(targetAtt.scores || {}),
@@ -6127,13 +6202,15 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               if ((nextScores.listening?.total || 0) > 0) activeBands.push(Number(nextScores.listening.band) || 0);
               if ((nextScores.reading?.total || 0) > 0) activeBands.push(Number(nextScores.reading.band) || 0);
               activeBands.push(evaluation.overallBand);
+              if (typeof nextScores.speaking?.band === 'number') activeBands.push(Number(nextScores.speaking.band));
               const nextOverall = targetAtt.testMode === 'single_skill' && targetAtt.focusSkill === 'writing'
                 ? evaluation.overallBand
                 : calculateOverallIeltsBand(activeBands);
               updatedAttempt = {
                 ...targetAtt,
                 aiGraded: true,
-                teacherGraded: viewer.role === 'teacher' ? true : Boolean(targetAtt.teacherGraded),
+                // Keep existing approval state: AI draft grading stays hidden from students until Ms. Nhu clicks Approve!
+                teacherGraded: Boolean(targetAtt.teacherGraded),
                 aiDetails: evaluation,
                 scores: nextScores,
                 overallBand: nextOverall,

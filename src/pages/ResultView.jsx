@@ -33,6 +33,8 @@ export default function ResultView({
   handleGradeSpeakingWithAI,
   handleGradeWritingWithAI,
   isGradingAI,
+  onApproveAttempt = null,
+  onRevokeApproval = null,
   onRetryTest = null,
   openTeacherGradingModal,
   previousView,
@@ -417,6 +419,81 @@ export default function ResultView({
           </div>
         </div>
 
+        {/* Teacher Approval & Release Control Bar (Explicit Ms. Nhu Approval Gate for Writing / Speaking / 4-Skill Exams) */}
+        {isTeacher && (showWritingCard || showSpeakingCard) && (
+          <div
+            className={`mt-6 rounded-2xl border p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+              attempt.teacherGraded
+                ? 'bg-emerald-50/90 dark:bg-emerald-950/25 border-emerald-200 dark:border-emerald-700/60'
+                : 'bg-amber-50/90 dark:bg-amber-950/25 border-amber-300 dark:border-amber-600/60'
+            }`}
+          >
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
+                    attempt.teacherGraded
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-amber-600 text-white'
+                  }`}
+                >
+                  {attempt.teacherGraded
+                    ? '✓ Đã duyệt & trả điểm cho học sinh'
+                    : attempt.aiGraded
+                    ? 'Bản nháp AI (Học sinh CHƯA thấy điểm & lỗi)'
+                    : 'Chờ Ms. Như chấm & duyệt'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed max-w-2xl">
+                {attempt.teacherGraded
+                  ? 'Học sinh đã thấy điểm Band, bảng sửa lỗi Writing/Speaking và nhận xét của Ms. Như.'
+                  : 'Học sinh hiện CHỈ thấy "Ms. Như đang check" (ẩn hoàn toàn điểm số và bảng lỗi). Ms. Như có thể bấm AI chấm nháp để xem lỗi trước, sau đó bấm "Duyệt & Trả Điểm Cho Học Sinh" để công bố!'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {!attempt.teacherGraded ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openTeacherGradingModal?.(attempt)}
+                    className="px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold inline-flex items-center gap-1.5 transition"
+                  >
+                    <Edit className="w-3.5 h-3.5" /> Chỉnh Sửa Điểm
+                  </button>
+                  {onApproveAttempt && (
+                    <button
+                      type="button"
+                      onClick={() => onApproveAttempt(attempt)}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
+                    >
+                      <CheckCircle className="w-4 h-4" /> Duyệt &amp; Trả Điểm Cho Học Sinh
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => openTeacherGradingModal?.(attempt)}
+                    className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold inline-flex items-center gap-1.5 transition"
+                  >
+                    <Edit className="w-3.5 h-3.5" /> Sửa Điểm
+                  </button>
+                  {onRevokeApproval && (
+                    <button
+                      type="button"
+                      onClick={() => onRevokeApproval(attempt)}
+                      className="px-3.5 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs font-bold inline-flex items-center gap-1.5 transition"
+                    >
+                      <Lock className="w-3.5 h-3.5" /> Ẩn về Chờ duyệt
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Daily Zone Post-Submission Summary Bar (Số câu đúng + Thời gian + Số lần làm + Làm Lại) */}
         {isSingleSkill && (
           <div className="mt-6 rounded-2xl bg-[#EDFFFD] dark:bg-teal-950/30 border border-[#B5F5F1] dark:border-teal-800 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -716,13 +793,34 @@ export default function ResultView({
         })()}
 
         {/* SPEAKING 4 CRITERIA & TEACHER RE-GRADE PANEL */}
+        {showSpeakingCard && !canShowApprovedScores && (
+          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-900 dark:text-white text-sm">
+                  Ms. Như đang check bài Speaking của bạn
+                </h2>
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                  Toàn bộ file ghi âm đã được gửi an toàn tới Ms. Như. Điểm 4 tiêu chí, phân tích lỗi nói và nhận xét sẽ hiển thị ngay sau khi Ms. Như duyệt và trả bài!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showSpeakingCard && canShowApprovedScores && (
           <div className="bg-white dark:bg-[#0F172B] rounded-2xl border border-[#007A7A]/30 p-5 sm:p-6 mb-8 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="bg-[#007A7A] text-white text-xs font-extrabold uppercase px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-300" /> {isTeacher ? 'Chấm Speaking (GV)' : 'Ms. Như Đã Duyệt Điểm'}
+                    <Sparkles className="w-3 h-3 text-amber-300" />{' '}
+                    {isTeacher
+                      ? (attempt.teacherGraded ? 'Đã duyệt Speaking (GV)' : 'Chấm Nháp Speaking (Chỉ GV thấy)')
+                      : 'Ms. Như Đã Duyệt Điểm'}
                   </span>
                 </div>
                 <h2 className="font-extrabold text-slate-900 dark:text-white text-base">
@@ -746,7 +844,13 @@ export default function ResultView({
                     className="px-4 py-2 text-xs font-extrabold text-white bg-[#007A7A] hover:bg-[#065B5B] disabled:opacity-55 rounded-xl transition flex items-center gap-1.5 shadow-sm"
                   >
                     {isGradingAI ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-300" />}
-                    <span>{isGradingAI ? 'Đang nghe & chấm lại...' : 'AI Chấm Lại Từ File Ghi Âm'}</span>
+                    <span>
+                      {isGradingAI
+                        ? 'Đang nghe & chấm nháp...'
+                        : attempt.teacherGraded
+                        ? 'AI Chấm Lại Từ File Ghi Âm'
+                        : 'AI Chấm Nháp Từ File Ghi Âm'}
+                    </span>
                   </button>
                 </div>
               )}
@@ -845,9 +949,11 @@ export default function ResultView({
                     <>
                       <Sparkles className="w-4 h-4 text-amber-300" />
                       <span>
-                        {attempt.teacherGraded || (attempt.scores.writing.overallBand !== null && attempt.scores.writing.overallBand !== undefined)
+                        {attempt.teacherGraded
                           ? 'Chấm Lại Bằng AI'
-                          : 'Chấm Điểm Bằng AI Ngay'}
+                          : attempt.aiGraded
+                          ? 'AI Chấm Nháp Lại (Chỉ GV thấy)'
+                          : 'AI Chấm Nháp & Bắt Lỗi'}
                       </span>
                     </>
                   )}
@@ -1131,7 +1237,7 @@ export default function ResultView({
                   </p>
                 </div>
 
-                {canShowCorrectAnswers ? (
+                {canShowApprovedScores && canShowCorrectAnswers ? (
                   targetTest?.writing?.task1?.modelAnswer ? (
                     <div className="bg-emerald-50/80 dark:bg-emerald-500/15 p-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30">
                       <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase mb-1.5 flex items-center gap-1.5">
@@ -1145,7 +1251,11 @@ export default function ResultView({
                 ) : (
                   <div className="bg-slate-100 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-xs text-[#475569] dark:text-slate-400">
                     <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span className="font-semibold italic">Bài mẫu tham khảo Task 1 đang được khóa bởi Giáo viên.</span>
+                    <span className="font-semibold italic">
+                      {!canShowApprovedScores
+                        ? 'Bài mẫu tham khảo & phân tích lỗi Task 1 sẽ hiển thị sau khi Ms. Như duyệt bài.'
+                        : 'Bài mẫu tham khảo Task 1 đang được khóa bởi Giáo viên.'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1168,7 +1278,7 @@ export default function ResultView({
                   </p>
                 </div>
 
-                {canShowCorrectAnswers ? (
+                {canShowApprovedScores && canShowCorrectAnswers ? (
                   targetTest?.writing?.task2?.modelAnswer ? (
                     <div className="bg-emerald-50/80 dark:bg-emerald-500/15 p-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30">
                       <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase mb-1.5 flex items-center gap-1.5">
@@ -1182,7 +1292,11 @@ export default function ResultView({
                 ) : (
                   <div className="bg-slate-100 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-xs text-[#475569] dark:text-slate-400">
                     <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span className="font-semibold italic">Bài mẫu tham khảo Task 2 đang được khóa bởi Giáo viên.</span>
+                    <span className="font-semibold italic">
+                      {!canShowApprovedScores
+                        ? 'Bài mẫu tham khảo & phân tích lỗi Task 2 sẽ hiển thị sau khi Ms. Như duyệt bài.'
+                        : 'Bài mẫu tham khảo Task 2 đang được khóa bởi Giáo viên.'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1203,6 +1317,7 @@ export default function ResultView({
                   rec={rec}
                   idx={idx}
                   totalCount={arr.length}
+                  canShowApprovedScores={canShowApprovedScores}
                   attemptCriteria={attempt.scores?.speaking?.criteria || attempt.speakingAiDetails?.criteria || {}}
                 />
               ))}
