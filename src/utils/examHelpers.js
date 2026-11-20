@@ -164,6 +164,8 @@ export function buildDefaultQuestionFields(type = 'mcq', skill = 'reading', prev
       type: meta.id,
       options: [],
       correctAnswer: '',
+      correctAnswers: [],
+      requiredSelections: 1,
       wordLimit: meta.wordLimit || ''
     };
   }
@@ -173,6 +175,8 @@ export function buildDefaultQuestionFields(type = 'mcq', skill = 'reading', prev
     type: meta.id,
     options: nextOptions,
     correctAnswer: nextOptions[0] || '',
+    correctAnswers: meta.id === 'mcq' && nextOptions[0] ? [nextOptions[0]] : [],
+    requiredSelections: 1,
     wordLimit: meta.wordLimit || ''
   };
 }
@@ -182,10 +186,53 @@ function extractLeadingOptionCode(val = '') {
   return m ? m[1].toLowerCase() : '';
 }
 
-// Shared answer checker supporting all 11 Reading + 6 Listening IELTS types & multi-variant keys (e.g. "15 | fifteen" or "color / colour")
-export function isObjectiveAnswerCorrect(question, userRaw) {
+function getComparableChoiceKey(value) {
+  const normalized = String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return extractLeadingOptionCode(value) || normalized;
+}
+
+function uniqueChoiceAnswers(values = []) {
+  const seen = new Set();
+  return values.filter(value => {
+    const key = getComparableChoiceKey(value);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function getQuestionCorrectAnswers(question) {
+  const explicitAnswers = Array.isArray(question?.correctAnswers)
+    ? question.correctAnswers.map(answer => String(answer ?? '').trim()).filter(Boolean)
+    : [];
+  if (explicitAnswers.length > 0) return uniqueChoiceAnswers(explicitAnswers);
+
+  const singleAnswer = String(question?.correctAnswer ?? '').trim();
+  if (!singleAnswer) return [];
+  if (question?.type !== 'mcq' || !/[,;|/&]|\band\b/i.test(singleAnswer)) return [singleAnswer];
+
+  const parts = singleAnswer.split(/\s*(?:,|;|\||\/|&|\band\b)\s*/i).filter(Boolean);
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const allPartsMatchOptions = parts.length > 1 && parts.every(part =>
+    options.some(option => getComparableChoiceKey(option) === getComparableChoiceKey(part))
+  );
+  return allPartsMatchOptions ? uniqueChoiceAnswers(parts) : [singleAnswer];
+}
+
+export function getObjectiveAnswerMaxScore(question) {
+  const expectedAnswers = getQuestionCorrectAnswers(question);
+  return question?.type === 'mcq' && expectedAnswers.length > 1 ? expectedAnswers.length : 1;
+}
+
+function isSingleObjectiveAnswerCorrect(question, userRaw) {
+  const expectedAnswers = getQuestionCorrectAnswers(question);
+
   const normalizedUser = String(userRaw ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-  const normalizedKey = String(question?.correctAnswer ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizedKey = String(
+    question?.type === 'mcq' && expectedAnswers.length === 1
+      ? expectedAnswers[0]
+      : question?.correctAnswer ?? ''
+  ).trim().replace(/\s+/g, ' ').toLowerCase();
   if (!normalizedUser || !normalizedKey) return false;
 
   if (normalizedUser === normalizedKey) return true;
@@ -201,7 +248,9 @@ export function isObjectiveAnswerCorrect(question, userRaw) {
 
   // Also allow matching code shorthand (e.g. key "B" matches selected option "B. Heading Two" and vice versa)
   const userCode = extractLeadingOptionCode(userRaw);
-  const keyCode = extractLeadingOptionCode(question?.correctAnswer);
+  const keyCode = extractLeadingOptionCode(
+    question?.type === 'mcq' && expectedAnswers.length === 1 ? expectedAnswers[0] : question?.correctAnswer
+  );
   if (
     userCode &&
     keyCode &&
@@ -211,6 +260,23 @@ export function isObjectiveAnswerCorrect(question, userRaw) {
     return true;
   }
   return false;
+}
+
+export function getObjectiveAnswerScore(question, userRaw) {
+  const expectedAnswers = getQuestionCorrectAnswers(question);
+  if (question?.type === 'mcq' && expectedAnswers.length > 1) {
+    const expectedKeys = new Set(expectedAnswers.map(getComparableChoiceKey));
+    const selectedAnswers = uniqueChoiceAnswers(Array.isArray(userRaw) ? userRaw : userRaw ? [userRaw] : []);
+    const selectedKeys = selectedAnswers.map(getComparableChoiceKey);
+    if (selectedKeys.length > expectedKeys.size) return 0;
+    return selectedKeys.filter(key => expectedKeys.has(key)).length;
+  }
+  return isSingleObjectiveAnswerCorrect(question, userRaw) ? 1 : 0;
+}
+
+// Shared answer checker supporting multi-variant keys and exact multi-select answers.
+export function isObjectiveAnswerCorrect(question, userRaw) {
+  return getObjectiveAnswerScore(question, userRaw) === getObjectiveAnswerMaxScore(question);
 }
 
 export function buildRoomInviteLink(pin) {

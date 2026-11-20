@@ -1,9 +1,32 @@
 import { Bookmark } from 'lucide-react';
-import { getQuestionTypeMeta } from '../../utils/examHelpers';
+import { getQuestionCorrectAnswers, getQuestionTypeMeta } from '../../utils/examHelpers';
 import {
   groupQuestionsForRendering,
   stripLeadingQuestionNumber
 } from '../../utils/examUiHelpers';
+
+function questionNeedsMultipleSelections(question) {
+  return question?.type === 'mcq' && getRequiredSelectionCount(question) > 1;
+}
+
+function getRequiredSelectionCount(question) {
+  return Math.max(
+    1,
+    Number(question?.requiredSelections) || 0,
+    getQuestionCorrectAnswers(question).length
+  );
+}
+
+function toggleSelectedOption(currentAnswer, option) {
+  const selected = Array.isArray(currentAnswer)
+    ? currentAnswer
+    : currentAnswer
+    ? [currentAnswer]
+    : [];
+  return selected.includes(option)
+    ? selected.filter(value => value !== option)
+    : [...selected, option];
+}
 
 /**
  * Renders Reading/Listening questions in authentic Computer-Delivered IELTS styles:
@@ -155,29 +178,53 @@ export default function ExamQuestionList({
                                 </button>
                               </div>
                             </div>
+                            {questionNeedsMultipleSelections(q) && (
+                              <p className="mt-1 pl-9 text-xs font-bold text-amber-700 dark:text-amber-300">
+                                Chọn {getRequiredSelectionCount(q)} đáp án
+                              </p>
+                            )}
                           </td>
                           {block.options.map(opt => {
-                            const checked = selectedVal === opt;
+                            const multiSelect = questionNeedsMultipleSelections(q);
+                            const checked = Array.isArray(selectedVal)
+                              ? selectedVal.includes(opt)
+                              : selectedVal === opt;
+                            const selectionCount = Array.isArray(selectedVal)
+                              ? selectedVal.length
+                              : selectedVal
+                              ? 1
+                              : 0;
+                            const selectionLimitReached = multiSelect && !checked && selectionCount >= getRequiredSelectionCount(q);
                             return (
                               <td
                                 key={opt}
                                 onClick={e => {
                                   e.stopPropagation();
                                   onSelectQuestion?.(q);
-                                  onAnswerChange?.(q.id, opt);
+                                  if (selectionLimitReached) return;
+                                  onAnswerChange?.(
+                                    q.id,
+                                    multiSelect ? toggleSelectedOption(selectedVal, opt) : opt
+                                  );
                                 }}
-                                className={`py-2.5 px-1.5 text-center border-r last:border-r-0 border-[#E2E8F0] dark:border-[#2C2C2C] cursor-pointer transition ${
+                                className={`py-2.5 px-1.5 text-center border-r last:border-r-0 border-[#E2E8F0] dark:border-[#2C2C2C] transition ${
+                                  selectionLimitReached ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                                } ${
                                   checked ? 'bg-blue-50/70 dark:bg-blue-500/15' : 'hover:bg-slate-100/70 dark:hover:bg-white/5'
                                 }`}
                               >
                                 <span
-                                  className={`inline-flex w-4 h-4 rounded-full items-center justify-center border transition ${
+                                  className={`inline-flex w-4 h-4 ${multiSelect ? 'rounded-sm' : 'rounded-full'} items-center justify-center border transition ${
                                     checked
                                       ? 'border-[#2563EB] dark:border-[#60A5FA] bg-[#2563EB] dark:bg-[#3B82F6]'
                                       : 'border-slate-400 dark:border-neutral-500 bg-transparent'
                                   }`}
                                 >
-                                  {checked && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  {checked && (
+                                    <span
+                                      className={`w-1.5 h-1.5 ${multiSelect ? 'rounded-[1px]' : 'rounded-full'} bg-white`}
+                                    />
+                                  )}
                                 </span>
                               </td>
                             );
@@ -200,6 +247,8 @@ export default function ExamQuestionList({
         const typeMeta = getQuestionTypeMeta(q.type, scopeType);
         const optionList = Array.isArray(q.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
         const hasChoiceOptions = optionList.length > 0;
+        const multiSelect = questionNeedsMultipleSelections(q);
+        const expectedSelectionCount = getRequiredSelectionCount(q);
         const wordLimitHint = String(q.wordLimit || '').trim();
 
         return (
@@ -240,6 +289,11 @@ export default function ExamQuestionList({
                         {wordLimitHint}
                       </span>
                     )}
+                    {multiSelect && (
+                      <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                        Chọn {expectedSelectionCount} đáp án
+                      </span>
+                    )}
                   </div>
                   <p className={`font-bold text-[#111827] dark:text-[#F3F4F6] ${fontSizeClass}`}>
                     {formatText(cleanPrompt)}
@@ -269,22 +323,41 @@ export default function ExamQuestionList({
             {hasChoiceOptions ? (
               <div className="space-y-1.5 pl-1">
                 {optionList.map((opt, optIdx) => {
-                  const isSelected = answers?.[q.id] === opt;
+                  const currentAnswer = answers?.[q.id];
+                  const isSelected = Array.isArray(currentAnswer)
+                    ? currentAnswer.includes(opt)
+                    : currentAnswer === opt;
+                  const selectionCount = Array.isArray(currentAnswer)
+                    ? currentAnswer.length
+                    : currentAnswer
+                    ? 1
+                    : 0;
+                  const selectionLimitReached = multiSelect && !isSelected && selectionCount >= expectedSelectionCount;
                   return (
                     <label
                       key={optIdx}
-                      className={`flex items-start gap-2.5 px-2 py-1 rounded-[4px] cursor-pointer transition ${
+                      className={`flex items-start gap-2.5 px-2 py-1 rounded-[4px] transition ${
+                        selectionLimitReached ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                      } ${
                         isSelected
                           ? 'bg-[#DBEAFE]/80 dark:bg-[#2563EB]/25 text-[#111827] dark:text-white font-semibold'
                           : 'text-[#1F2937] dark:text-[#E5E7EB] hover:bg-[#F1F5F9]/50 dark:hover:bg-[#232323]'
                       }`}
                     >
                       <input
-                        type="radio"
+                        type={multiSelect ? 'checkbox' : 'radio'}
                         name={`${scopeType}_q_${q.id}`}
                         value={opt}
                         checked={isSelected}
-                        onChange={e => onAnswerChange?.(q.id, e.target.value)}
+                        disabled={selectionLimitReached}
+                        onChange={e =>
+                          onAnswerChange?.(
+                            q.id,
+                            multiSelect
+                              ? toggleSelectedOption(currentAnswer, e.target.value)
+                              : e.target.value
+                          )
+                        }
                         className="mt-1.5 w-4 h-4 accent-[#2563EB] shrink-0"
                       />
                       <span className={`${fontSizeClass}`}>

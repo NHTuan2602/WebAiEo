@@ -19,7 +19,12 @@ import {
   XCircle
 } from 'lucide-react';
 import { formatDurationVi, normalizeExamConfig } from '../constants/seedData';
-import { getWordCount, isObjectiveAnswerCorrect } from '../utils/examHelpers';
+import {
+  getObjectiveAnswerMaxScore,
+  getObjectiveAnswerScore,
+  getQuestionCorrectAnswers,
+  getWordCount
+} from '../utils/examHelpers';
 import SpeakingQuestionLuyennoiCard from '../components/speaking/SpeakingQuestionLuyennoiCard';
 import VipMemberName from '../components/common/VipMemberName';
 
@@ -1188,9 +1193,15 @@ export default function ResultView({
           {(activeReviewTab === 'listening' || activeReviewTab === 'reading') && (
             <div className="space-y-4">
               {((activeReviewTab === 'listening' ? targetTest?.listening?.questions : targetTest?.reading?.questions) || []).map((q, idx) => {
-                const userAns = (attempt.answers?.[q.id] || '').trim();
-                const correctAns = (q.correctAnswer || '').trim();
-                const isCorrect = isObjectiveAnswerCorrect(q, userAns);
+                const rawUserAns = attempt.answers?.[q.id] || '';
+                const userAns = Array.isArray(rawUserAns)
+                  ? rawUserAns.join(', ')
+                  : String(rawUserAns).trim();
+                const correctAns = getQuestionCorrectAnswers(q).join(', ');
+                const earnedPoints = getObjectiveAnswerScore(q, rawUserAns);
+                const maxPoints = getObjectiveAnswerMaxScore(q);
+                const isCorrect = earnedPoints === maxPoints;
+                const isPartiallyCorrect = earnedPoints > 0 && earnedPoints < maxPoints;
 
                 return (
                   <div
@@ -1200,6 +1211,8 @@ export default function ResultView({
                         ? 'bg-slate-50/70 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
                         : isCorrect
                         ? 'bg-emerald-50/40 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30'
+                        : isPartiallyCorrect
+                        ? 'bg-amber-50/50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'
                         : 'bg-rose-50/40 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30'
                     }`}
                   >
@@ -1211,11 +1224,17 @@ export default function ResultView({
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold w-fit ${
                           isCorrect
                             ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40'
+                            : isPartiallyCorrect
+                            ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40'
                             : 'bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40'
                         }`}>
                           {isCorrect ? (
                             <>
                               <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Chính xác
+                            </>
+                          ) : isPartiallyCorrect ? (
+                            <>
+                              {earnedPoints}/{maxPoints} điểm
                             </>
                           ) : (
                             <>
@@ -1241,6 +1260,8 @@ export default function ResultView({
                             ? 'text-slate-800 dark:text-slate-100'
                             : isCorrect
                             ? 'text-emerald-700 dark:text-emerald-400'
+                            : isPartiallyCorrect
+                            ? 'text-amber-700 dark:text-amber-300'
                             : 'text-rose-700 dark:text-rose-400'
                         }`}>
                           {userAns || '(Bỏ trống - Không trả lời)'}
@@ -1254,7 +1275,7 @@ export default function ResultView({
                             <Unlock className="w-3 h-3" /> Đáp án đúng chuẩn:
                           </span>
                           <span className="font-extrabold text-emerald-900 dark:text-emerald-200">
-                            {q.correctAnswer}
+                            {correctAns}
                           </span>
                         </div>
                       ) : (

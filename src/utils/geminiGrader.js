@@ -710,6 +710,7 @@ RULES FOR READING (11 TYPES) & LISTENING (6 TYPES) CLASSIFICATION:
 - Supported ${skillLabel} question "type" values: ${getQuestionTypesForSkill(skill).map(t => `"${t.id}"`).join(', ')}.
 - For Multiple Choice: set "type": "mcq", put clean array of options (e.g. ["A. ...", "B. ...", "C. ..."]) into "options".
 - For True/False/Not Given or Yes/No/Not Given: set "type": "tfng", "options": ["TRUE", "FALSE", "NOT GIVEN"] (or ["YES", "NO", "NOT GIVEN"]).
+- For Multiple Choice questions that require selecting TWO OR MORE answers, put every correct option in "correctAnswers" as an array of option values/codes, and set "correctAnswer" to the first correct option for compatibility. For single-answer questions, "correctAnswers" may be omitted.
 - For Matching Headings / Matching Info / Matching Features / Correct Ending / Matching / Map or Diagram Labelling (when options like i..viii or A..H or headings/features exist): set exact matching "type" and populate "options" with the clean choice list.
 - For Form Completion / Flow-chart Completion / Summary Completion (No Box) / Short Answer / Fill in the Blank: set the matching "type", "options": [], and optional "wordLimit" (e.g. "ONE WORD AND/OR A NUMBER").
 - If there are ONLY choice/matching questions and no inline note/summary cloze text, set "clozeText": "".
@@ -733,7 +734,8 @@ Return ONLY strictly valid JSON matching this schema:
       "type": "fill",
       "question": "1. the ____ Room – seats 100",
       "options": [],
-      "correctAnswer": ""
+      "correctAnswer": "",
+      "correctAnswers": []
     }
   ]
 }`;
@@ -767,13 +769,27 @@ Return ONLY strictly valid JSON matching this schema:
       ? Number(q.blankNum)
       : undefined;
 
+    const rawCorrectAnswer = Array.isArray(q?.correctAnswer)
+      ? q.correctAnswer.map(answer => String(answer ?? '').trim()).filter(Boolean)
+      : String(q?.correctAnswer ?? '').trim();
+    const parsedCorrectAnswers = Array.isArray(q?.correctAnswers)
+      ? q.correctAnswers.map(answer => String(answer ?? '').trim()).filter(Boolean)
+      : Array.isArray(rawCorrectAnswer)
+      ? rawCorrectAnswer
+      : type === 'mcq' && /[,;|/&]|\band\b/i.test(rawCorrectAnswer)
+      ? rawCorrectAnswer.split(/\s*(?:,|;|\||\/|&|\band\b)\s*/i).map(answer => answer.replace(/^([a-z])\.$/i, '$1')).filter(Boolean)
+      : rawCorrectAnswer
+      ? [rawCorrectAnswer]
+      : [];
+
     return {
       blankNum,
       type,
       question: String(q?.question || `${blankNum || idx + 1}. Câu hỏi`).trim(),
       options,
       wordLimit: String(q?.wordLimit || '').trim(),
-      correctAnswer: String(q?.correctAnswer ?? '').trim()
+      correctAnswer: parsedCorrectAnswers[0] || '',
+      ...(type === 'mcq' ? { correctAnswers: Array.from(new Set(parsedCorrectAnswers)) } : {})
     };
   });
 

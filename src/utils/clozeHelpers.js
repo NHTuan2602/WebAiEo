@@ -266,9 +266,21 @@ export function applyAnswerKeyTextToQuestions(rawKeyText = '', existingQuestions
     matchedCount++;
 
     if ((q.type === 'mcq' || q.type === 'tfng') && Array.isArray(q.options) && q.options.length > 0) {
-      const norm = rawAns.trim().toUpperCase();
-      const letterMatch = q.options.find(opt => String(opt).trim().toUpperCase().startsWith(`${norm}.`) || String(opt).trim().toUpperCase() === norm);
-      return { ...q, correctAnswer: letterMatch || rawAns };
+      const rawParts = q.type === 'mcq'
+        ? rawAns.split(/\s*(?:,|;|\/|&|\band\b)\s*/i).filter(Boolean)
+        : [rawAns];
+      const matchedAnswers = rawParts.map(part => {
+        const partNorm = part.trim().toUpperCase();
+        return q.options.find(opt => String(opt).trim().toUpperCase().startsWith(`${partNorm}.`) || String(opt).trim().toUpperCase() === partNorm) || part;
+      });
+      return q.type === 'mcq'
+        ? {
+            ...q,
+            correctAnswers: matchedAnswers,
+            correctAnswer: matchedAnswers[0] || '',
+            requiredSelections: Math.max(1, matchedAnswers.length)
+          }
+        : { ...q, correctAnswer: matchedAnswers[0] || rawAns };
     }
 
     return { ...q, correctAnswer: rawAns };

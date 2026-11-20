@@ -52,7 +52,9 @@ import {
   roundWholeBand,
   createUniqueAttemptId,
   getSpeedAdjustedTimeLimit,
-  isObjectiveAnswerCorrect,
+  getObjectiveAnswerMaxScore,
+  getObjectiveAnswerScore,
+  getQuestionCorrectAnswers,
   buildRoomInviteLink,
   parseBulkStudentsText,
   parseRawVocabText,
@@ -161,7 +163,15 @@ const sanitizeCachedTestAnswers = (test) => {
   const cleanQuestions = (questions) => (Array.isArray(questions) ? questions.map(question => {
     if (!question || typeof question !== 'object') return question;
     const clean = { ...question };
+    if (clean.type === 'mcq') {
+      clean.requiredSelections = Math.max(
+        1,
+        Number(question.requiredSelections) || 0,
+        getQuestionCorrectAnswers(question).length
+      );
+    }
     delete clean.correctAnswer;
+    delete clean.correctAnswers;
     delete clean.acceptableAnswers;
     delete clean.explanation;
     return clean;
@@ -4094,19 +4104,21 @@ export default function App() {
     let listeningRaw = 0;
     const lQuestions = activeTest.listening?.questions || [];
     lQuestions.forEach(q => {
-      if (isObjectiveAnswerCorrect(q, examState.answers[q.id])) listeningRaw++;
+      listeningRaw += getObjectiveAnswerScore(q, examState.answers[q.id]);
     });
+    const listeningTotal = lQuestions.reduce((total, q) => total + getObjectiveAnswerMaxScore(q), 0);
 
     let readingRaw = 0;
     const rQuestions = activeTest.reading?.questions || [];
     rQuestions.forEach(q => {
-      if (isObjectiveAnswerCorrect(q, examState.answers[q.id])) readingRaw++;
+      readingRaw += getObjectiveAnswerScore(q, examState.answers[q.id]);
     });
+    const readingTotal = rQuestions.reduce((total, q) => total + getObjectiveAnswerMaxScore(q), 0);
 
     clearExamDraft(currentUser?.username, activeTest.id);
 
-    const lBand = calculateAutoBand(listeningRaw, lQuestions.length, 'listening');
-    const rBand = calculateAutoBand(readingRaw, rQuestions.length, 'reading');
+    const lBand = calculateAutoBand(listeningRaw, listeningTotal, 'listening');
+    const rBand = calculateAutoBand(readingRaw, readingTotal, 'reading');
     const isSingleObjective =
       cfg.testMode === 'single_skill' && (cfg.focusSkill === 'listening' || cfg.focusSkill === 'reading');
     const singleObjectiveBand =
@@ -4167,14 +4179,14 @@ export default function App() {
     const isSingleMode = cfg.testMode === 'single_skill' && Boolean(cfg.focusSkill);
     const attemptScores = isSingleMode
       ? {
-          ...(cfg.focusSkill === 'listening' ? { listening: { raw: listeningRaw, total: lQuestions.length, band: lBand } } : {}),
-          ...(cfg.focusSkill === 'reading' ? { reading: { raw: readingRaw, total: rQuestions.length, band: rBand } } : {}),
+          ...(cfg.focusSkill === 'listening' ? { listening: { raw: listeningRaw, total: listeningTotal, band: lBand } } : {}),
+          ...(cfg.focusSkill === 'reading' ? { reading: { raw: readingRaw, total: readingTotal, band: rBand } } : {}),
           ...(cfg.focusSkill === 'writing' ? { writing: { task1Band: null, task2Band: null, overallBand: null } } : {}),
           ...(cfg.focusSkill === 'speaking' ? { speaking: { band: null, criteria: {} } } : {})
         }
       : {
-          listening: { raw: listeningRaw, total: lQuestions.length, band: lBand },
-          reading: { raw: readingRaw, total: rQuestions.length, band: rBand },
+          listening: { raw: listeningRaw, total: listeningTotal, band: lBand },
+          reading: { raw: readingRaw, total: readingTotal, band: rBand },
           writing: { task1Band: null, task2Band: null, overallBand: null },
           ...(cfg.order.includes('speaking') ? { speaking: { band: null, criteria: {} } } : {})
         };
@@ -4688,20 +4700,20 @@ export default function App() {
       const lQuestions = linkedTest.listening?.questions || [];
       const rQuestions = linkedTest.reading?.questions || [];
       if (lQuestions.length > 0) {
-        let calcLRaw = 0;
-        lQuestions.forEach(q => {
-          if (isObjectiveAnswerCorrect(q, gradingAttempt.answers?.[q.id])) calcLRaw++;
-        });
+        const calcLRaw = lQuestions.reduce(
+          (total, q) => total + getObjectiveAnswerScore(q, gradingAttempt.answers?.[q.id]),
+          0
+        );
         nextLRaw = calcLRaw;
-        lTotal = lQuestions.length;
+        lTotal = lQuestions.reduce((total, q) => total + getObjectiveAnswerMaxScore(q), 0);
       }
       if (rQuestions.length > 0) {
-        let calcRRaw = 0;
-        rQuestions.forEach(q => {
-          if (isObjectiveAnswerCorrect(q, gradingAttempt.answers?.[q.id])) calcRRaw++;
-        });
+        const calcRRaw = rQuestions.reduce(
+          (total, q) => total + getObjectiveAnswerScore(q, gradingAttempt.answers?.[q.id]),
+          0
+        );
         nextRRaw = calcRRaw;
-        rTotal = rQuestions.length;
+        rTotal = rQuestions.reduce((total, q) => total + getObjectiveAnswerMaxScore(q), 0);
       }
     }
 
@@ -5359,6 +5371,32 @@ export default function App() {
             const defaults = buildDefaultQuestionFields(value, skill, q.options);
             return { ...q, ...defaults };
           }
+          if (field === 'correctAnswers') {
+            const correctAnswers = Array.isArray(value) ? value : [];
+            return {
+              ...q,
+              correctAnswers,
+              correctAnswer: correctAnswers[0] || '',
+              requiredSelections: q.type === 'mcq' ? Math.max(1, correctAnswers.length) : 1
+            };
+          }
+          if (field === 'options') {
+            const previousCorrectAnswers = getQuestionCorrectAnswers(q);
+            const getOptionCode = option =>
+              String(option || '').trim().match(/^([ivxlcdm]+|[a-z])(?:\s*[.):\-–]\s+|\s*$)/i)?.[1]?.toLowerCase() || '';
+            const nextCorrectAnswers = previousCorrectAnswers
+              .map(answer => value.find(option =>
+                option === answer || (getOptionCode(answer) && getOptionCode(answer) === getOptionCode(option))
+              ))
+              .filter(Boolean);
+            return {
+              ...q,
+              options: value,
+              correctAnswers: q.type === 'mcq' ? nextCorrectAnswers : [],
+              requiredSelections: q.type === 'mcq' ? Math.max(1, nextCorrectAnswers.length) : 1,
+              correctAnswer: nextCorrectAnswers[0] || ''
+            };
+          }
           return { ...q, [field]: value };
         })
       }
@@ -5375,8 +5413,30 @@ export default function App() {
           const oldOpt = q.options[optIdx];
           const updatedOpts = [...q.options];
           updatedOpts[optIdx] = newValue;
-          const updatedCorrect = q.correctAnswer === oldOpt ? newValue : q.correctAnswer;
-          return { ...q, options: updatedOpts, correctAnswer: updatedCorrect };
+          const getOptionCode = option =>
+            String(option || '').trim().match(/^([ivxlcdm]+|[a-z])(?:\s*[.):\-–]\s+|\s*$)/i)?.[1]?.toLowerCase() || '';
+          const existingCorrectAnswers = q.type === 'mcq' ? getQuestionCorrectAnswers(q) : [];
+          const updatedCorrectAnswers = existingCorrectAnswers.map(answer =>
+            answer === oldOpt || (getOptionCode(answer) && getOptionCode(answer) === getOptionCode(oldOpt))
+              ? newValue
+              : answer
+          );
+          const updatedCorrect = q.type === 'mcq'
+            ? updatedCorrectAnswers[0] || ''
+            : q.correctAnswer === oldOpt
+            ? newValue
+            : q.correctAnswer;
+          return {
+            ...q,
+            options: updatedOpts,
+            correctAnswer: updatedCorrect,
+            ...(q.type === 'mcq'
+              ? {
+                  correctAnswers: updatedCorrectAnswers,
+                  requiredSelections: Math.max(1, updatedCorrectAnswers.length)
+                }
+              : {})
+          };
         })
       }
     }));

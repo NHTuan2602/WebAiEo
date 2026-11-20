@@ -19,7 +19,9 @@ import {
   calculateOverallIeltsBand,
   calculateWritingBand,
   getActiveTeamIds,
-  isObjectiveAnswerCorrect,
+  getObjectiveAnswerMaxScore,
+  getObjectiveAnswerScore,
+  getQuestionCorrectAnswers,
   pickBalancedTeamId,
   roundWholeBand
 } from './src/utils/examHelpers.js';
@@ -785,7 +787,15 @@ function stripQuestionSecrets(questions) {
   return questions.map(q => {
     if (!q || typeof q !== 'object') return q;
     const nextQ = { ...q };
+    if (nextQ.type === 'mcq') {
+      nextQ.requiredSelections = Math.max(
+        1,
+        Number(q.requiredSelections) || 0,
+        getQuestionCorrectAnswers(q).length
+      );
+    }
     delete nextQ.correctAnswer;
+    delete nextQ.correctAnswers;
     delete nextQ.acceptableAnswers;
     delete nextQ.explanation;
     return nextQ;
@@ -934,10 +944,6 @@ function roundIeltsBandServer(score) {
   const num = Number(score);
   if (!Number.isFinite(num) || num <= 0) return 0;
   return Math.min(9.0, Math.round((num + 1e-9) * 2) / 2);
-}
-
-function isObjectiveAnswerCorrectServer(question, userRaw) {
-  return isObjectiveAnswerCorrect(question, userRaw);
 }
 
 function evaluateObjectiveScoresForAttempt(test, answers = {}) {

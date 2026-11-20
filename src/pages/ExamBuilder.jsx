@@ -569,7 +569,9 @@ Write ONE WORD AND/OR A NUMBER for each answer.
       [scopeField]: scopeIdx,
       question: q.question || `${q.blankNum || idx + 1}. Câu hỏi`,
       options: q.options || [],
-      correctAnswer: q.correctAnswer || ''
+      correctAnswer: q.correctAnswer || q.correctAnswers?.[0] || '',
+      requiredSelections: q.type === 'mcq' ? Math.max(1, q.correctAnswers?.length || 1) : 1,
+      ...(Array.isArray(q.correctAnswers) ? { correctAnswers: q.correctAnswers } : {})
     }));
 
     setTestForm(prev => {
