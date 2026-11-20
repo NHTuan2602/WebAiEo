@@ -507,7 +507,15 @@ export default function StudentHome({
 
           {/* Tab 3: Daily Zone Gateway Cards */}
           {!matchedFocusedTest && storefrontTab === 'daily_zone' ? (
-            <div key="daily_zone" className="apple-tab-enter grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div
+              key="daily_zone"
+              className="apple-tab-enter grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+              onAnimationEnd={e => {
+                if (e.currentTarget === e.target) {
+                  e.currentTarget.classList.remove('apple-tab-enter');
+                }
+              }}
+            >
               {[
                 {
                   tab: 'speaking_daily',
@@ -580,7 +588,15 @@ export default function StudentHome({
               )}
             </div>
           ) : (
-            <div key={storefrontTab} className={`apple-tab-enter grid gap-5 ${matchedFocusedTest ? 'grid-cols-1 max-w-xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+            <div
+              key={storefrontTab}
+              className={`apple-tab-enter grid gap-5 ${matchedFocusedTest ? 'grid-cols-1 max-w-xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}
+              onAnimationEnd={e => {
+                if (e.currentTarget === e.target) {
+                  e.currentTarget.classList.remove('apple-tab-enter');
+                }
+              }}
+            >
               {filteredTests.map(test => {
                 const cfg = normalizeExamConfig(test);
                 const schedule = evaluateTestSchedule(cfg, serverNowMs);

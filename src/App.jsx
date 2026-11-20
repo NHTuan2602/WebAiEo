@@ -7099,8 +7099,31 @@ export default function App() {
         />
       )}
 
+      {/* Route Transition Progress Bar & Tactile Page Hold Pill */}
+      {view !== 'EXAM_MODE' && view !== 'GAME_ARENA' && (
+        <div
+          key={`route-loader-${view}-${view === 'SKILL_HUB' ? skillHubTab : ''}-${view === 'STUDENT_PROFILE' ? (selectedProfileStudent || '') : ''}`}
+          className="pointer-events-none"
+          aria-hidden="true"
+        >
+          <div className="apple-route-progress-bar" />
+          <div className="apple-route-pill flex items-center gap-2 px-3 py-1 rounded-full bg-white/95 dark:bg-[#18181B]/95 border border-slate-200 dark:border-zinc-700 text-[#0F172B] dark:text-zinc-100 text-xs font-bold">
+            <span className="w-3 h-3 rounded-full border-2 border-[#007A7A] border-t-transparent animate-spin" />
+            <span>Đang chuyển trang...</span>
+          </div>
+        </div>
+      )}
+
       {/* Main Views */}
-      <div key={view} className={view === 'EXAM_MODE' || view === 'GAME_ARENA' ? '' : 'apple-view-enter'}>
+      <div
+        key={view === 'STUDENT_PROFILE' ? `${view}-${selectedProfileStudent || ''}` : view}
+        className={view === 'EXAM_MODE' || view === 'GAME_ARENA' ? '' : 'apple-view-enter'}
+        onAnimationEnd={e => {
+          if (e.currentTarget === e.target) {
+            e.currentTarget.classList.remove('apple-view-enter');
+          }
+        }}
+      >
       {view === 'AUTH' && (
         <AuthScreen
           authError={authError}
@@ -7235,6 +7258,7 @@ export default function App() {
           onGrantUserTitles={handleGrantUserTitles}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           onOpenAdminTitleManager={targetUsername => setAdminTitleModalState({ isOpen: true, targetUsername: targetUsername || null })}
+          onOpenRealExamPricing={() => setShowRealExamPricingModal(true)}
           onPullSync={() => pullServerSyncState(true)}
           onRequestCoverUnlock={handleRequestCoverUnlock}
           onToggleUserCoverUnlock={currentUser?.isSuperAdmin ? handleToggleUserCoverUnlock : undefined}

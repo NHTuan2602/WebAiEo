@@ -59,7 +59,9 @@ import ImageCropperModal from '../components/modals/ImageCropperModal';
 import {
   AIEO_VIP_PRICE_VND,
   AVATAR_FRAMES,
+  DEFAULT_EXAM_PRICE_VND,
   PROFILE_BANNERS,
+  REAL_EXAM_COMBOS,
   VIP_NAME_COLORS,
   VIP_NEON_COVER_THEMES,
   buildVietQrImageUrl,
@@ -93,6 +95,7 @@ export default function StudentProfile({
   onNavigateAfterPurchase = null,
   onOpenAccountSecurity,
   onOpenAdminTitleManager,
+  onOpenRealExamPricing = null,
   onPullSync = null,
   onRequestCoverUnlock = null,
   onToggleUserCoverUnlock = null,
@@ -204,6 +207,10 @@ export default function StudentProfile({
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
   const unlockPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
   const aieoVipPriceLabel = formatVndCurrency(normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
+  const singleExamPriceLabel = formatVndCurrency(normalizedPayCfg.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND);
+  const combo3PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[0]?.priceVnd ?? 50000);
+  const combo5PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[1]?.priceVnd ?? 70000);
+  const combo10PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[2]?.priceVnd ?? 150000);
   const coverRemainingText = student.customCoverExpiresAt > Date.now()
     ? formatRemainingSubscriptionText(student.customCoverExpiresAt)
     : '';
@@ -1996,7 +2003,7 @@ export default function StudentProfile({
                 Gói Thành Viên 1 Tháng &amp; Đặc Quyền IELTS VIP
               </h2>
               <p className="text-xs text-slate-600 dark:text-zinc-300 mt-0.5">
-                Mở khóa Daily Zone, lượt Combo Thực Chiến 4 Kỹ Năng, Ảnh Bìa Riêng hoặc nâng cấp trọn bộ IELTS VIP cùng bạn bè.
+                Mua đề lẻ hoặc gói Combo Lượt Thi Thực Chiến 4 Kỹ Năng (3 · 5 · 10 đề), mở Ảnh Nền Cá Nhân hoặc nâng cấp trọn bộ IELTS VIP cùng bạn bè.
               </p>
             </div>
             {studentHasAieoVip && (
@@ -2008,31 +2015,31 @@ export default function StudentProfile({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800 mt-4">
-            {/* Card 1: Daily Zone & Thực Chiến 4 Kỹ Năng */}
+            {/* Card 1: Đề Lẻ & Combo Thực Chiến 4 Kỹ Năng */}
             <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:pr-5 flex flex-col justify-between gap-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
-                    <BookOpen className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Daily Zone &amp; Thực Chiến
+                    <BookOpen className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Đề Lẻ &amp; Combo Thực Chiến
                   </span>
-                  <span className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7] bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 px-2 py-0.5 rounded-full">
-                    {studentRealExamCredits > 0 ? `${studentRealExamCredits} lượt Combo` : 'Daily Miễn Phí'}
+                  <span className="text-xs font-bold text-[#0F766E] dark:text-teal-300 bg-[#F0FDFA] dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                    {studentRealExamCredits > 0 ? `Đang có ${studentRealExamCredits} lượt` : `Đề lẻ ${singleExamPriceLabel}`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  Luyện Daily Zone không giới hạn lượt. Kho Thực Chiến Thi Thật 4 kỹ năng (L · R · W · S) tính chi phí theo đề lẻ hoặc Combo ({(student.purchasedTestIds || []).length} đề đã mở · {studentRealExamCredits} lượt Combo còn lại).
+                  • <b>Đề lẻ Thực Chiến:</b> {singleExamPriceLabel}/đề • <b>Combo 3 Đề:</b> {combo3PriceLabel} • <b>Combo 5 Đề:</b> {combo5PriceLabel} • <b>Combo 10 Đề:</b> {combo10PriceLabel} (dùng mở bất kỳ đề Thực Chiến 4 kỹ năng L · R · W · S nào).
                 </p>
                 <p className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7]">
-                  ✓ {studentRealExamCredits > 0 ? `Sẵn sàng đổi ${studentRealExamCredits} đề Thực Chiến` : 'Sẵn sàng vào kho đề thi 4 kỹ năng'}
+                  ✓ Đang có {studentRealExamCredits} lượt Combo · Đã mở {(student.purchasedTestIds || []).length} đề Thực Chiến
                 </p>
               </div>
               {isSelf && (
                 <button
                   type="button"
-                  onClick={() => setView('HOME')}
+                  onClick={() => (onOpenRealExamPricing ? onOpenRealExamPricing() : setView('HOME'))}
                   className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
                 >
-                  Xem Kho Đề Thực Chiến 4 Kỹ Năng
+                  Mua Lượt &amp; Xem Bảng Giá Combo
                 </button>
               )}
             </div>
