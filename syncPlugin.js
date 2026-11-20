@@ -5303,6 +5303,21 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             }
           }
         });
+        const documents = Array.isArray(body?.documents) ? body.documents.slice(0, 1) : [];
+        documents.forEach(document => {
+          if (
+            typeof document === 'object' &&
+            document?.inlineData?.mimeType === 'application/pdf' &&
+            document.inlineData.data
+          ) {
+            requestParts.push(document);
+          } else if (typeof document === 'string') {
+            const match = document.match(/^data:application\/pdf;base64,(.+)$/);
+            if (match) {
+              requestParts.push({ inlineData: { mimeType: 'application/pdf', data: match[1] } });
+            }
+          }
+        });
         const temperature = Number.isFinite(Number(body?.temperature)) ? Number(body.temperature) : 0.2;
         const { parsed, usedModel } = await callGeminiServerJson({ apiKey: effectiveKey, requestParts, temperature });
         sendJsonResponse(res, 200, { ok: true, parsed, usedModel });

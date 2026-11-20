@@ -4,6 +4,7 @@ import {
   Bot,
   CheckCircle2,
   ClipboardPaste,
+  FileText,
   Image as ImageIcon,
   Key,
   Loader2,
@@ -12,7 +13,30 @@ import {
   Upload,
   Wand2
 } from 'lucide-react';
-import { extractExamFromImages } from '../../utils/geminiGrader';
+import { extractExamFromImages, extractReadingExamFromPdf } from '../../utils/geminiGrader';
+
+const MAX_READING_PDF_BYTES = 14 * 1024 * 1024;
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Không thể đọc file PDF.'));
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Dữ liệu PDF không hợp lệ.'));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatFileSize(bytes = 0) {
+  return bytes < 1024 * 1024
+    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function compressImageToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -57,6 +81,7 @@ export default function AiExamExtractorPanel({
   existingMediaImageUrl,
   onApplyExtraction,
   onApplyQuickAnswerText,
+  onApplyReadingPdfExtraction = null,
   scopeLabel,
   setApiTestState,
   setShowApiKeyModal,
@@ -65,6 +90,8 @@ export default function AiExamExtractorPanel({
 }) {
   const [questionImages, setQuestionImages] = useState([]);
   const [answerKeyImages, setAnswerKeyImages] = useState([]);
+  const [readingPdfFile, setReadingPdfFile] = useState(null);
+  const [replaceWholeReading, setReplaceWholeReading] = useState(true);
   const [preferCloze, setPreferCloze] = useState(true);
   const [replaceScope, setReplaceScope] = useState(true);
   const [extraInstructions, setExtraInstructions] = useState('');
@@ -109,6 +136,63 @@ export default function AiExamExtractorPanel({
   };
 
   const hasGeminiAccess = Boolean(aiApiKey?.trim() || aiConfigured);
+
+  const handleSelectReadingPdf = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.name?.toLowerCase().endsWith('.pdf')) {
+      setReadingPdfFile(null);
+      setErrorMsg('Chỉ hỗ trợ file .pdf cho chức năng tạo toàn bộ đề Reading.');
+      return;
+    }
+    if (file.size > MAX_READING_PDF_BYTES) {
+      setReadingPdfFile(null);
+      setErrorMsg(`PDF quá lớn (${formatFileSize(file.size)}). Hãy dùng file nhỏ hơn 14 MB.`);
+      return;
+    }
+    setErrorMsg('');
+    setLastResultInfo(null);
+    setReadingPdfFile(file);
+  };
+
+  const handleRunReadingPdfExtract = async () => {
+    setErrorMsg('');
+    setLastResultInfo(null);
+    if (!hasGeminiAccess) {
+      setErrorMsg('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước để dùng AI đọc PDF.');
+      return;
+    }
+    if (!readingPdfFile) {
+      setErrorMsg('Hãy chọn một file PDF đề Reading trước khi chạy AI.');
+      return;
+    }
+
+    setExtracting(true);
+    try {
+      const signature = new TextDecoder().decode(await readingPdfFile.slice(0, 5).arrayBuffer());
+      if (signature !== '%PDF-') throw new Error('File đã chọn không phải PDF hợp lệ. Hãy chọn lại đề thi.');
+      const extracted = await extractReadingExamFromPdf({
+        apiKey: aiApiKey,
+        pdfDataUrl: await readFileAsDataUrl(readingPdfFile),
+        fileName: readingPdfFile.name,
+        extraInstructions
+      });
+      const summary = onApplyReadingPdfExtraction?.(extracted, { replaceAll: replaceWholeReading });
+      if (summary?.cancelled) return;
+      setLastResultInfo({
+        usedModel: extracted.usedModel,
+        questionCount: summary?.questionCount ?? extracted.questionCount,
+        passageCount: summary?.passageCount ?? extracted.passages.length,
+        answerKeyFound: extracted.answerKeyFound
+      });
+      showToast?.(`AI đã tạo ${summary?.passageCount ?? extracted.passages.length} passage với ${summary?.questionCount ?? extracted.questionCount} câu từ PDF!`);
+    } catch (err) {
+      setErrorMsg(err?.message || 'Không thể phân tích PDF. Hãy kiểm tra file rồi thử lại.');
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const handleRunAiExtract = async () => {
     setErrorMsg('');
@@ -160,10 +244,12 @@ export default function AiExamExtractorPanel({
           </div>
           <h3 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
             <Bot className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
-            <span>Tạo Đề Tự Động Từ Ảnh Đề Thi ({scopeLabel})</span>
+            <span>Tạo Đề Tự Động Từ Ảnh{skill === 'reading' ? ' / PDF' : ''} ({scopeLabel})</span>
           </h3>
           <p className="text-xs text-[#314158] dark:text-slate-300 mt-0.5">
-            Tải ảnh chụp hoặc nhấn <strong>Ctrl+V</strong> dán ảnh đề Cambridge/IDP (đục lỗ Note Completion, MCQ, TFNG, bài đọc...). AI sẽ tự tạo mẫu đục lỗ <code>{'{{1}}'}</code> &amp; danh sách câu hỏi chạy được ngay.
+            {skill === 'reading'
+              ? <>Tải ảnh chụp, dán ảnh bằng <strong>Ctrl+V</strong>, hoặc đưa nguyên file PDF để AI đọc nhiều passage và answer key.</>
+              : <>Tải ảnh chụp hoặc nhấn <strong>Ctrl+V</strong> dán ảnh đề Cambridge/IDP (đục lỗ Note Completion, MCQ, TFNG...). AI sẽ tự tạo mẫu đục lỗ <code>{'{{1}}'}</code> &amp; danh sách câu hỏi chạy được ngay.</>}
           </p>
         </div>
 
@@ -180,6 +266,75 @@ export default function AiExamExtractorPanel({
           <span className={`w-2 h-2 rounded-full ${hasGeminiAccess ? 'bg-[#059271]' : 'bg-rose-500'}`} />
         </button>
       </div>
+
+      {skill === 'reading' && onApplyReadingPdfExtraction && (
+        <section className="rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-500/10 p-4 sm:p-5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div>
+              <h4 className="flex items-center gap-2 text-sm font-extrabold text-indigo-950 dark:text-indigo-100">
+                <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
+                Tạo toàn bộ Reading từ PDF
+              </h4>
+              <p className="mt-1 text-xs leading-relaxed text-indigo-900/80 dark:text-indigo-100/75">
+                AI đọc tất cả trang theo thứ tự, tự tách các passage, câu hỏi và trang đáp án trong cùng một file.
+              </p>
+            </div>
+            <span className="shrink-0 text-xs font-semibold text-indigo-800 dark:text-indigo-200">Tối đa 14 MB</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <label className="cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900">
+              <Upload className="w-4 h-4" />
+              <span>{readingPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF'}</span>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={handleSelectReadingPdf}
+                className="sr-only"
+                aria-label="Chọn PDF đề IELTS Reading"
+              />
+            </label>
+
+            <div className="min-w-0 flex-1" aria-live="polite">
+              {readingPdfFile ? (
+                <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={readingPdfFile.name}>
+                  {readingPdfFile.name} <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(readingPdfFile.size)}</span>
+                </p>
+              ) : (
+                <p className="text-xs text-slate-600 dark:text-slate-300">Chọn một file có passage, câu hỏi và nếu có thì cả answer key.</p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={!readingPdfFile || extracting}
+              onClick={handleRunReadingPdfExtract}
+              className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                !readingPdfFile || extracting
+                  ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                  : 'bg-[#007A7A] text-white hover:bg-[#065B5B]'
+              }`}
+            >
+              {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-amber-300" />}
+              {extracting ? 'AI đang đọc toàn bộ PDF…' : 'AI đọc PDF & tạo đề'}
+            </button>
+          </div>
+
+          <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={replaceWholeReading}
+              onChange={e => setReplaceWholeReading(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded accent-indigo-600"
+            />
+            <span>Thay toàn bộ Reading hiện có bằng đề trong PDF</span>
+          </label>
+
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            File được gửi tới Gemini để phân tích. Hãy rà lại passage, số câu và đáp án trước khi lưu đề.
+          </p>
+        </section>
+      )}
 
       {/* Dual Upload / Paste Zones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -427,7 +582,9 @@ export default function AiExamExtractorPanel({
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>
-              Đã tự động tạo <strong>{lastResultInfo.questionCount} câu hỏi</strong>
+              {lastResultInfo.passageCount
+                ? <>Đã tạo <strong>{lastResultInfo.passageCount} passage · {lastResultInfo.questionCount} câu hỏi</strong> từ PDF{lastResultInfo.answerKeyFound ? ' và đã đọc answer key' : ''}</>
+                : <>Đã tự động tạo <strong>{lastResultInfo.questionCount} câu hỏi</strong></>}
               {lastResultInfo.hasCloze ? ' kèm bài Đục lỗ trực tiếp' : ''}
               {lastResultInfo.hasPassage ? ' kèm văn bản Bài đọc' : ''} (Model: <code>{lastResultInfo.usedModel}</code>). Kiểm tra lại danh sách bên dưới rồi bấm Lưu Đề Thi!
             </span>

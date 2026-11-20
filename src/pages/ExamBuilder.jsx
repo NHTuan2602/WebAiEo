@@ -651,6 +651,89 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return { totalInScope: stampedQuestions.length };
   };
 
+  const handleApplyReadingPdfExtraction = (extracted, { replaceAll = true } = {}) => {
+    const extractedPassages = Array.isArray(extracted?.passages) ? extracted.passages : [];
+    if (extractedPassages.length === 0) {
+      showToast?.('PDF chưa có passage Reading để áp dụng.', 'error');
+      return { cancelled: true };
+    }
+
+    const currentPassages = getReadingPassages(testForm.reading);
+    const currentQuestions = Array.isArray(testForm.reading?.questions) ? testForm.reading.questions : [];
+    const hasExistingContent = currentQuestions.length > 0 || currentPassages.some(
+      passage => String(passage?.passageText || '').trim() || String(passage?.clozeText || '').trim()
+    );
+    const shouldReplaceAll = replaceAll || !hasExistingContent;
+    if (
+      shouldReplaceAll &&
+      hasExistingContent &&
+      !window.confirm('Thay toàn bộ passages, nội dung và câu hỏi Reading hiện tại bằng dữ liệu từ PDF?')
+    ) {
+      return { cancelled: true };
+    }
+
+    const stamp = Date.now();
+    const importedPassages = extractedPassages.map((passage, idx) => ({
+      id: `pass_pdf_${stamp}_${idx}`,
+      title: String(passage?.title || `Passage ${idx + 1}`).trim(),
+      imageUrl: '',
+      imageFileName: '',
+      passageText: String(passage?.passageText || '').trim(),
+      clozeText: String(passage?.clozeText || '').trim()
+    }));
+
+    setTestForm(prev => {
+      const previousPassages = getReadingPassages(prev.reading);
+      const passageOffset = shouldReplaceAll ? 0 : previousPassages.length;
+      const nextPassages = shouldReplaceAll
+        ? importedPassages
+        : [...previousPassages, ...importedPassages];
+      const importedQuestions = extractedPassages.flatMap((passage, passageIdx) =>
+        (Array.isArray(passage?.questions) ? passage.questions : []).map((question, questionIdx) => ({
+          id: `rq_pdf_${stamp}_${passageIdx}_${questionIdx}`,
+          type: question.type || 'fill',
+          source: 'ai',
+          ...(typeof question.blankNum === 'number' ? { blankNum: question.blankNum } : {}),
+          passageIdx: passageOffset + passageIdx,
+          question: question.question || `${question.blankNum || questionIdx + 1}. Câu hỏi`,
+          options: Array.isArray(question.options) ? question.options : [],
+          wordLimit: String(question.wordLimit || '').trim(),
+          correctAnswer: question.correctAnswer || question.correctAnswers?.[0] || '',
+          ...(question.type === 'mcq'
+            ? { requiredSelections: Math.max(1, Number(question.requiredSelections) || question.correctAnswers?.length || 1) }
+            : {}),
+          ...(Array.isArray(question.correctAnswers) ? { correctAnswers: question.correctAnswers } : {})
+        }))
+      );
+      const readingQuestions = shouldReplaceAll
+        ? importedQuestions
+        : [...(Array.isArray(prev.reading?.questions) ? prev.reading.questions : []), ...importedQuestions];
+      const firstPassage = nextPassages[0] || {};
+
+      return {
+        ...prev,
+        reading: {
+          ...prev.reading,
+          passages: nextPassages,
+          passageTitle: firstPassage.title || '',
+          passageText: firstPassage.passageText || '',
+          clozeText: firstPassage.clozeText || '',
+          imageUrl: firstPassage.imageUrl || '',
+          imageFileName: firstPassage.imageFileName || '',
+          questions: readingQuestions
+        }
+      };
+    });
+
+    setBuilderReadingIdx(0);
+    const questionCount = extractedPassages.reduce(
+      (sum, passage) => sum + (Array.isArray(passage?.questions) ? passage.questions.length : 0),
+      0
+    );
+    showToast?.(`Đã đưa ${importedPassages.length} passage và ${questionCount} câu Reading từ PDF vào đề. Hãy rà lại đáp án trước khi lưu.`);
+    return { passageCount: importedPassages.length, questionCount };
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -2646,6 +2729,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
             }
+            onApplyReadingPdfExtraction={handleApplyReadingPdfExtraction}
           />
         </div>
         );

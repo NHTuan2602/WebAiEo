@@ -52,7 +52,7 @@ const SKILL_META = {
 
 const ORIGIN_META = {
   ai: {
-    label: 'Tự động (AI Ảnh)',
+    label: 'Tự động (AI)',
     cardBorder: 'ring-1 ring-[#007A7A]/30 dark:ring-[#1EE1D6]/30',
     badgeClass: 'bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/35',
     Icon: Bot
@@ -416,6 +416,7 @@ export default function SkillQuestionWorkspace({
   groups = [],
   onAddQuestion,
   onApplyAiExtraction,
+  onApplyReadingPdfExtraction = null,
   onApplyQuickAnswerText,
   onChangeClozeText,
   onChangeSourceFilter,
@@ -466,7 +467,7 @@ export default function SkillQuestionWorkspace({
     },
     {
       id: 'ai',
-      label: 'Tạo Tự Động (AI Ảnh)',
+      label: skill === 'reading' ? 'Tạo Tự Động (AI Ảnh / PDF)' : 'Tạo Tự Động (AI Ảnh)',
       count: aiEntries.length,
       Icon: Bot
     },
@@ -521,7 +522,7 @@ export default function SkillQuestionWorkspace({
             </span>
           </h3>
           <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
-            Chọn đúng tab bên dưới theo cách bạn muốn soạn: <strong>AI đọc ảnh / Đục lỗ tự động</strong> hoặc <strong>Tạo bằng tay từng câu</strong>.
+            Chọn đúng tab bên dưới theo cách bạn muốn soạn: <strong>{skill === 'reading' ? 'AI đọc ảnh/PDF' : 'AI đọc ảnh'} / Đục lỗ tự động</strong> hoặc <strong>Tạo bằng tay từng câu</strong>.
           </p>
         </div>
 
@@ -772,6 +773,7 @@ export default function SkillQuestionWorkspace({
             showToast={showToast}
             onApplyQuickAnswerText={onApplyQuickAnswerText}
             onApplyExtraction={onApplyAiExtraction}
+            onApplyReadingPdfExtraction={onApplyReadingPdfExtraction}
           />
 
           {activeGroup?.clozeText?.trim() && (
@@ -808,7 +810,7 @@ export default function SkillQuestionWorkspace({
 
             {aiEntries.length === 0 ? (
               <div className="p-6 rounded-2xl border border-dashed border-[#B5F5F1] dark:border-teal-500/30 text-center text-xs text-[#475569] dark:text-slate-400">
-                Chưa có câu hỏi AI nào trong {scopeLabel}. Hãy dán hoặc chọn ảnh ở khung phía trên rồi bấm <strong>AI Đọc Ảnh &amp; Tạo Đề Ngay</strong>.
+                Chưa có câu hỏi AI nào trong {scopeLabel}. Hãy tải ảnh hoặc PDF ở khung phía trên rồi chạy AI.
               </div>
             ) : (
               renderQuestionList(aiEntries)
