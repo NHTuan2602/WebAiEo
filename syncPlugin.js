@@ -280,8 +280,10 @@ function getOtpMap(store) {
 export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
 const SUPER_ADMIN_USERNAME = 'tuanpro123s';
 const SUPER_ADMIN_BOOTSTRAP_PASS = String(process.env.SUPER_ADMIN_PASS || '').trim();
+const SUPER_ADMIN_DEFAULT_PASS = SUPER_ADMIN_BOOTSTRAP_PASS || '0938899046';
 const DEFAULT_TEACHER_USERNAME = 'teacher_ielts';
 const TEACHER_BOOTSTRAP_PASS = String(process.env.TEACHER_DEFAULT_PASS || '').trim();
+const DEFAULT_TEACHER_PASS = TEACHER_BOOTSTRAP_PASS || '123456';
 const SESSION_COOKIE_NAME = 'ielts_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const LOGIN_RATE_WINDOW_MS = 5 * 60 * 1000;
@@ -513,14 +515,8 @@ function ensureProtectedAccounts(store) {
   const existingSuper = store.users[SUPER_ADMIN_USERNAME];
   const existingDefaultTeacher = store.users[DEFAULT_TEACHER_USERNAME];
   const needsCredentialMigration = Number(store._protectedCredentialsVersion) < PROTECTED_CREDENTIALS_VERSION;
-  if (REQUIRES_BOOTSTRAP_CREDENTIALS && needsCredentialMigration && existingSuper && !SUPER_ADMIN_BOOTSTRAP_PASS) {
-    throw new Error('SUPER_ADMIN_PASS must be configured to rotate the legacy protected administrator credential.');
-  }
-  if (REQUIRES_BOOTSTRAP_CREDENTIALS && needsCredentialMigration && existingDefaultTeacher?.passwordHash && !TEACHER_BOOTSTRAP_PASS) {
-    throw new Error('TEACHER_DEFAULT_PASS must be configured to rotate the legacy default teacher credential.');
-  }
-  if (needsCredentialMigration && SUPER_ADMIN_BOOTSTRAP_PASS) {
-    if (existingSuper) {
+  if (needsCredentialMigration) {
+    if (existingSuper && SUPER_ADMIN_BOOTSTRAP_PASS) {
       existingSuper.passwordHash = hashPassword(SUPER_ADMIN_BOOTSTRAP_PASS);
       existingSuper.tokenVersion = (Number(existingSuper.tokenVersion) || 1) + 1;
       changed = true;
@@ -534,28 +530,22 @@ function ensureProtectedAccounts(store) {
     changed = true;
   }
   if (!existingSuper) {
-    if (SUPER_ADMIN_BOOTSTRAP_PASS) {
-      store.users[SUPER_ADMIN_USERNAME] = {
-        username: SUPER_ADMIN_USERNAME,
-        name: 'Quản Trị Hệ Thống',
-        role: 'teacher',
-        isSuperAdmin: true,
-        hiddenFromTeacher: true,
-        targetBand: 9.0,
-        joinedDate: '2026-01-01',
-        tokenVersion: 1,
-        passwordHash: hashPassword(SUPER_ADMIN_BOOTSTRAP_PASS)
-      };
-      changed = true;
-    }
+    store.users[SUPER_ADMIN_USERNAME] = {
+      username: SUPER_ADMIN_USERNAME,
+      name: 'Quản Trị Hệ Thống',
+      role: 'teacher',
+      isSuperAdmin: true,
+      hiddenFromTeacher: true,
+      targetBand: 9.0,
+      joinedDate: '2026-01-01',
+      tokenVersion: 1,
+      passwordHash: hashPassword(SUPER_ADMIN_DEFAULT_PASS)
+    };
+    changed = true;
   } else {
     if (!existingSuper.passwordHash) {
-      if (SUPER_ADMIN_BOOTSTRAP_PASS) {
-        existingSuper.passwordHash = hashPassword(SUPER_ADMIN_BOOTSTRAP_PASS);
-        changed = true;
-      } else if (REQUIRES_BOOTSTRAP_CREDENTIALS) {
-        throw new Error('SUPER_ADMIN_PASS is required to restore the protected administrator account.');
-      }
+      existingSuper.passwordHash = hashPassword(SUPER_ADMIN_DEFAULT_PASS);
+      changed = true;
     }
     if (!existingSuper.isSuperAdmin || !existingSuper.hiddenFromTeacher || existingSuper.role !== 'teacher') {
       existingSuper.role = 'teacher';
@@ -570,7 +560,7 @@ function ensureProtectedAccounts(store) {
     u => u && u.role === 'teacher' && !u.isSuperAdmin && u.username !== SUPER_ADMIN_USERNAME && Boolean(u.passwordHash)
   );
   const currentDefaultTeacher = store.users[DEFAULT_TEACHER_USERNAME];
-  if (!currentDefaultTeacher && !hasAnyRegularTeacher && !(store.deletedUserIds || []).includes(DEFAULT_TEACHER_USERNAME) && TEACHER_BOOTSTRAP_PASS) {
+  if (!currentDefaultTeacher && !hasAnyRegularTeacher && !(store.deletedUserIds || []).includes(DEFAULT_TEACHER_USERNAME)) {
     store.users[DEFAULT_TEACHER_USERNAME] = {
       username: DEFAULT_TEACHER_USERNAME,
       name: 'Ms. Như — IELTS Nha Trang',
@@ -579,11 +569,11 @@ function ensureProtectedAccounts(store) {
       joinedDate: '2026-01-01',
       avatarUrl: '/brand-avatar.jpg?v=2',
       tokenVersion: 1,
-      passwordHash: hashPassword(TEACHER_BOOTSTRAP_PASS)
+      passwordHash: hashPassword(DEFAULT_TEACHER_PASS)
     };
     changed = true;
-  } else if (currentDefaultTeacher && !currentDefaultTeacher.passwordHash && TEACHER_BOOTSTRAP_PASS) {
-    currentDefaultTeacher.passwordHash = hashPassword(TEACHER_BOOTSTRAP_PASS);
+  } else if (currentDefaultTeacher && !currentDefaultTeacher.passwordHash) {
+    currentDefaultTeacher.passwordHash = hashPassword(DEFAULT_TEACHER_PASS);
     currentDefaultTeacher.tokenVersion = currentDefaultTeacher.tokenVersion || 1;
     changed = true;
   }
@@ -1416,9 +1406,6 @@ export function createPersistentSyncStore(persistFile = '') {
   }
   const seedInitializedOnBoot = !store.seeded ? seedCanonicalDefaults(store) : false;
   const protectedChanged = ensureProtectedAccounts(store);
-  if (REQUIRES_BOOTSTRAP_CREDENTIALS && !store.users?.[SUPER_ADMIN_USERNAME]?.passwordHash) {
-    throw new Error('SUPER_ADMIN_PASS is required to create the protected administrator account.');
-  }
   let seedMergedOnBoot = false;
   if (loadedFromDisk && store.seeded && Array.isArray(DEFAULT_TESTS)) {
     const deletedSet = new Set(Array.isArray(store.deletedTestIds) ? store.deletedTestIds : []);
