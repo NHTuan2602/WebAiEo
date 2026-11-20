@@ -2822,7 +2822,6 @@ Write ONE WORD AND/OR A NUMBER for each answer.
         <SpeakingBuilderPanel
           aiApiKey={aiApiKey}
           aiConfigured={aiConfigured}
-          onApplyQuickPreset={applyQuickPreset}
           onChangeSpeaking={nextSp =>
             setTestForm(prev => {
               const normalizedSp = normalizeSpeakingSection(nextSp);
@@ -2846,18 +2845,10 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               };
             })
           }
-          onToggleHashtag={togglePresetHashtag}
-          onAddCustomHashtag={(rawTag) => {
-            const clean = normalizeSingleHashtag(rawTag);
-            if (!clean) return;
-            updateTestHashtags(curr => [...curr, clean]);
-            showToast?.(`Đã gắn hashtag ${clean} hiển thị bên học sinh!`);
-          }}
           setApiTestState={setApiTestState}
           setShowApiKeyModal={setShowApiKeyModal}
           showToast={showToast}
           speakingData={testForm.speaking}
-          testForm={testForm}
         />
       )}
       </div>
