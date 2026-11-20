@@ -83,7 +83,7 @@ export default function VipPromoPopupModal({
     return (
       <div
         data-vip-floating-dock="true"
-        className={`fixed ${hasNavbar ? 'top-[74px]' : 'top-16'} right-3 sm:right-5 z-[95]`}
+        className={`fixed ${hasNavbar ? 'top-[74px]' : 'top-16'} right-3 sm:right-5 z-30`}
       >
         {isCompactIcon ? (
           <button

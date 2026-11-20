@@ -144,7 +144,7 @@ export default function Navbar({
   ];
 
   return (
-    <header className="apple-glass-nav bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-zinc-800/80 text-slate-800 dark:text-zinc-100 sticky top-0 z-50 transition-colors">
+    <header className="apple-glass-nav bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-zinc-800/80 text-slate-800 dark:text-zinc-100 sticky top-0 z-40 transition-colors">
       <div className="max-w-7xl mx-auto px-3 sm:px-5 h-16 flex items-center justify-between gap-3">
         {/* Luyện Thi IELTS Nha Trang Brand Lockup */}
         <div

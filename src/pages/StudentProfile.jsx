@@ -723,7 +723,7 @@ export default function StudentProfile({
             </button>
 
             {showMemberDirectoryPopup && (
-              <div className="apple-popover-origin fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-[410px] max-h-[75vh] flex flex-col bg-white dark:bg-[#18181B] rounded-2xl shadow-2xl border border-[#E2E8F0] dark:border-zinc-700 z-50 overflow-hidden">
+              <div className="apple-popover-origin fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-[410px] max-h-[75vh] flex flex-col bg-white dark:bg-[#18181B] rounded-2xl shadow-2xl border border-[#E2E8F0] dark:border-zinc-700 z-[35] overflow-hidden">
                 <div className="px-4 py-3 bg-[#F8FAFC] dark:bg-zinc-900 border-b border-[#E2E8F0] dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0">
                   <div>
                     <h2 className="text-sm font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
@@ -2634,14 +2634,14 @@ export default function StudentProfile({
 
         return (
         <div
-          className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="apple-backdrop-enter fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
           onClick={() => setShowTitlesModal(false)}
         >
           <div
-            className="bg-white dark:bg-[#18181B] rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-[#E2E8F0] dark:border-zinc-800 shadow-2xl overflow-hidden"
+            className="apple-modal-sheet bg-white dark:bg-[#18181B] rounded-2xl max-w-3xl w-full max-h-[90dvh] flex flex-col border border-[#E2E8F0] dark:border-zinc-800 shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-6 py-4 bg-zinc-900 text-white border-b border-zinc-800 flex items-center justify-between gap-3">
+            <div className="shrink-0 px-6 py-4 bg-zinc-900 text-white border-b border-zinc-800 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
                   <Trophy className="w-5 h-5 text-amber-400" /> Bảng Danh Hiệu - {student.name}
@@ -2914,14 +2914,14 @@ export default function StudentProfile({
       {/* Modal: Tùy Chỉnh Giao Diện Profile (Hình nền + Khung Avatar + Khẩu hiệu) */}
       {showCustomizeModal && canEditTargetInfo && (
         <div
-          className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="apple-backdrop-enter fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
           onClick={() => setShowCustomizeModal(false)}
         >
           <div
-            className="bg-white dark:bg-[#18181B] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-[#E2E8F0] dark:border-zinc-800 shadow-2xl overflow-hidden"
+            className="apple-modal-sheet bg-white dark:bg-[#18181B] rounded-2xl max-w-2xl w-full max-h-[90dvh] flex flex-col border border-[#E2E8F0] dark:border-zinc-800 shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-6 py-4 bg-[#F8FAFC] dark:bg-zinc-900 border-b border-[#E2E8F0] dark:border-zinc-800 flex items-center justify-between gap-3">
+            <div className="shrink-0 px-6 py-4 bg-[#F8FAFC] dark:bg-zinc-900 border-b border-[#E2E8F0] dark:border-zinc-800 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
                   <Palette className="w-4 h-4 text-slate-700 dark:text-zinc-200" /> Tùy Chỉnh Hồ Sơ Cá Nhân
@@ -3198,7 +3198,7 @@ export default function StudentProfile({
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
+            <div className="shrink-0 px-6 py-4 bg-slate-50 dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowCustomizeModal(false)}
