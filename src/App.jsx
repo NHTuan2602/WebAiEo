@@ -38,11 +38,7 @@ import {
   createEmptySingleSkillTestForm,
   createDefaultSpeakingSection,
   normalizeSpeakingSection,
-  DEFAULT_TESTS,
-  DEFAULT_ATTEMPTS,
-  DEFAULT_USERS,
-  DEFAULT_ROOMS,
-  DEFAULT_TEACHER_NOTES
+  DEFAULT_ROOMS
 } from './constants/seedData';
 import { drawAnimalSpaceshipCanvas } from './utils/animalRenderer';
 import {
@@ -159,6 +155,37 @@ const persistLocalSeenTitles = (username, ids) => {
   } catch {}
 };
 
+const sanitizeCachedTestAnswers = (test) => {
+  if (!test || typeof test !== 'object') return test;
+  const cleanQuestions = (questions) => (Array.isArray(questions) ? questions.map(question => {
+    if (!question || typeof question !== 'object') return question;
+    const clean = { ...question };
+    delete clean.correctAnswer;
+    delete clean.acceptableAnswers;
+    delete clean.explanation;
+    return clean;
+  }) : questions);
+  const clean = { ...test };
+  if (clean.listening) clean.listening = { ...clean.listening, questions: cleanQuestions(clean.listening.questions) };
+  if (clean.reading) clean.reading = { ...clean.reading, questions: cleanQuestions(clean.reading.questions) };
+  if (clean.writing) {
+    clean.writing = {
+      ...clean.writing,
+      task1: clean.writing.task1 ? { ...clean.writing.task1, modelAnswer: '' } : clean.writing.task1,
+      task2: clean.writing.task2 ? { ...clean.writing.task2, modelAnswer: '' } : clean.writing.task2
+    };
+  }
+  if (clean.speaking && typeof clean.speaking === 'object') {
+    const roomPassword = String(clean.speaking.roomPassword || '').trim();
+    clean.speaking = {
+      ...clean.speaking,
+      roomPassword: '',
+      hasRoomPassword: Boolean(clean.speaking.hasRoomPassword || roomPassword)
+    };
+  }
+  return clean;
+};
+
 // ==========================================
 // 2. MAIN APPLICATION COMPONENT
 // ==========================================
@@ -170,73 +197,51 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-          const normalized = Object.fromEntries(
-            Object.entries(parsed).map(([k, v]) => [k, normalizeBrandTeacherUser(v)])
-          );
-          const hasTeacher = Object.values(normalized).some(u => u?.role === 'teacher');
-          return hasTeacher ? normalized : { teacher_ielts: DEFAULT_USERS.teacher_ielts, ...normalized };
+          return Object.fromEntries(Object.entries(parsed).map(([k, v]) => {
+            const normalized = normalizeBrandTeacherUser(v);
+            if (normalized && typeof normalized === 'object') {
+              delete normalized.pass;
+              delete normalized.passwordHash;
+            }
+            return [k, normalized];
+          }));
         }
       } catch (_e) {}
     }
-    localStorage.setItem('ielts_users_db_v2', JSON.stringify(DEFAULT_USERS));
-    return DEFAULT_USERS;
+    return {};
   });
 
   // Current Logged-in User (NULL = Must Login First)
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('ielts_current_user');
     if (saved) {
-      try { return normalizeBrandTeacherUser(JSON.parse(saved)); } catch (_e) {}
+      try {
+        const normalized = normalizeBrandTeacherUser(JSON.parse(saved));
+        if (normalized && typeof normalized === 'object') {
+          delete normalized.pass;
+          delete normalized.passwordHash;
+        }
+        return normalized;
+      } catch (_e) {}
     }
     return null; // Forces login screen
   });
 
   // Tests & Attempts states (loaded before navigation/exam draft restoration)
   const [tests, setTests] = useState(() => {
-    const taggedDefaults = DEFAULT_TESTS.filter(d => Boolean(d.seedTag));
-    let injectedTags = [];
-    try {
-      const rawTags = localStorage.getItem('ielts_seed_tags_v1');
-      injectedTags = rawTags ? JSON.parse(rawTags) : [];
-      if (!Array.isArray(injectedTags)) injectedTags = [];
-    } catch (_e) {
-      injectedTags = [];
-    }
-
-    const markAllTagged = () => {
-      try {
-        const nextTags = Array.from(new Set([...injectedTags, ...taggedDefaults.map(d => d.seedTag)]));
-        localStorage.setItem('ielts_seed_tags_v1', JSON.stringify(nextTags));
-      } catch (_e) {}
-    };
-
     const saved = localStorage.getItem('ielts_tests');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const normalizedSaved = parsed.map(t => {
-            const def = DEFAULT_TESTS.find(d => d.id === t.id);
-            return {
-              ...t,
-              allowViewAnswers: t.allowViewAnswers ?? false,
-              writing: {
-                task1: { ...t.writing?.task1, modelAnswer: t.writing?.task1?.modelAnswer || def?.writing?.task1?.modelAnswer || '' },
-                task2: { ...t.writing?.task2, modelAnswer: t.writing?.task2?.modelAnswer || def?.writing?.task2?.modelAnswer || '' }
-              }
-            };
-          });
-          const existingIds = new Set(normalizedSaved.map(t => t.id));
-          const pendingNewSeeds = taggedDefaults.filter(
-            d => !injectedTags.includes(d.seedTag) && !existingIds.has(d.id)
-          );
-          markAllTagged();
-          return pendingNewSeeds.length > 0 ? [...normalizedSaved, ...pendingNewSeeds] : normalizedSaved;
+        if (Array.isArray(parsed)) {
+          return parsed.map(test => ({
+            ...sanitizeCachedTestAnswers(test),
+            allowViewAnswers: test?.allowViewAnswers ?? false
+          }));
         }
       } catch (_e) {}
     }
-    markAllTagged();
-    return DEFAULT_TESTS;
+    return [];
   });
 
   const [attempts, setAttempts] = useState(() => {
@@ -245,13 +250,11 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map(a => a.id));
-          const missingDefaults = DEFAULT_ATTEMPTS.filter(a => !existingIds.has(a.id));
-          return [...parsed, ...missingDefaults];
+          return parsed;
         }
       } catch (_e) {}
     }
-    return DEFAULT_ATTEMPTS;
+    return [];
   });
 
   // Room PIN Database for Game Arena (Among Us Lobby + Leaderboard)
@@ -429,7 +432,7 @@ export default function App() {
     if (saved) {
       try { return JSON.parse(saved); } catch (_e) {}
     }
-    return DEFAULT_TEACHER_NOTES;
+    return {};
   });
   const [tempNoteText, setTempNoteText] = useState('');
   const [globalToast, setGlobalToast] = useState({ text: '', visible: false, type: 'success' });
@@ -1848,25 +1851,6 @@ export default function App() {
       if (cancelled || bootEpoch !== authEpochRef.current) return;
 
       if (sessionData) {
-        if (!sessionData.snapshot?.seeded) {
-          await dispatchSyncAction('SEED_DEFAULTS', {
-            rooms: roomsDb,
-            tests,
-            attempts: DEFAULT_ATTEMPTS,
-            teacherNotes: DEFAULT_TEACHER_NOTES,
-            users: DEFAULT_USERS,
-            customVocabTopics
-          });
-          if (cancelled || bootEpoch !== authEpochRef.current) return;
-          try {
-            const refreshed = await fetch('/api/sync/auth/session', { cache: 'no-store' });
-            if (refreshed.ok) {
-              sessionData = await refreshed.json();
-            }
-          } catch (_err) {}
-          if (cancelled || bootEpoch !== authEpochRef.current) return;
-        }
-
         if (sessionData.authenticated && sessionData.user) {
           const cleanUser = normalizeBrandTeacherUser(sessionData.user);
           const localSeen = loadLocalSeenTitles(cleanUser.username);
@@ -1880,8 +1864,7 @@ export default function App() {
           }
           if (cleanUser.role === 'teacher') {
             await dispatchSyncAction('SEED_DEFAULTS', {
-              customVocabTopics,
-              defaultTests: DEFAULT_TESTS.filter(d => Boolean(d.seedTag))
+              customVocabTopics
             });
             if ((aiApiKey || '').trim() && !sessionData.snapshot?.aiConfigured) {
               await dispatchSyncAction('SET_AI_CONFIG', { geminiApiKey: aiApiKey.trim() });

@@ -61,11 +61,21 @@ import {
   STATIC_IMAGE_MAX_DATA_URL_LENGTH,
   VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH
 } from './src/constants/profileCustomization.js';
-import { DEFAULT_TESTS } from './src/constants/seedData.js';
+import {
+  DEFAULT_TESTS,
+  DEFAULT_ATTEMPTS,
+  DEFAULT_ROOMS,
+  DEFAULT_TEACHER_NOTES
+} from './src/constants/seedData.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_VERIFY_ATTEMPTS = 5;
+const PROTECTED_CREDENTIALS_VERSION = 1;
+const IS_VITE_STATIC_COMMAND = process.argv.some(arg => ['build', 'preview'].includes(String(arg).toLowerCase()));
+const IS_PRODUCTION_SERVER_PROCESS = /(?:^|[\\/])server\.js$/i.test(String(process.argv[1] || ''));
+const REQUIRES_BOOTSTRAP_CREDENTIALS = !IS_VITE_STATIC_COMMAND
+  && (process.env.NODE_ENV === 'production' || IS_PRODUCTION_SERVER_PROCESS);
 
 function hashOtpSecret(code, secret) {
   return crypto.createHmac('sha256', String(secret || 'otp')).update(String(code || '')).digest('hex');
@@ -269,9 +279,9 @@ function getOtpMap(store) {
 
 export const LOBBY_CHAT_RESET_MS = 10 * 60 * 1000;
 const SUPER_ADMIN_USERNAME = 'tuanpro123s';
-const SUPER_ADMIN_DEFAULT_PASS = process.env.SUPER_ADMIN_PASS || '0938899046';
+const SUPER_ADMIN_BOOTSTRAP_PASS = String(process.env.SUPER_ADMIN_PASS || '').trim();
 const DEFAULT_TEACHER_USERNAME = 'teacher_ielts';
-const DEFAULT_TEACHER_PASS = process.env.TEACHER_DEFAULT_PASS || '123456';
+const TEACHER_BOOTSTRAP_PASS = String(process.env.TEACHER_DEFAULT_PASS || '').trim();
 const SESSION_COOKIE_NAME = 'ielts_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const LOGIN_RATE_WINDOW_MS = 5 * 60 * 1000;
@@ -467,10 +477,6 @@ function ensureProtectedAccounts(store) {
   }
   Object.entries(store.users).forEach(([uname, u]) => {
     if (!u || typeof u !== 'object') return;
-    if (typeof u.pass === 'string' && u.pass.length > 0 && !u.passwordHash) {
-      u.passwordHash = hashPassword(u.pass);
-      changed = true;
-    }
     if ('pass' in u) {
       delete u.pass;
       changed = true;
@@ -505,23 +511,51 @@ function ensureProtectedAccounts(store) {
   }
 
   const existingSuper = store.users[SUPER_ADMIN_USERNAME];
-  if (!existingSuper) {
-    store.users[SUPER_ADMIN_USERNAME] = {
-      username: SUPER_ADMIN_USERNAME,
-      name: 'Quản Trị Hệ Thống',
-      role: 'teacher',
-      isSuperAdmin: true,
-      hiddenFromTeacher: true,
-      targetBand: 9.0,
-      joinedDate: '2026-01-01',
-      tokenVersion: 1,
-      passwordHash: hashPassword(SUPER_ADMIN_DEFAULT_PASS)
-    };
+  const existingDefaultTeacher = store.users[DEFAULT_TEACHER_USERNAME];
+  const needsCredentialMigration = Number(store._protectedCredentialsVersion) < PROTECTED_CREDENTIALS_VERSION;
+  if (REQUIRES_BOOTSTRAP_CREDENTIALS && needsCredentialMigration && existingSuper && !SUPER_ADMIN_BOOTSTRAP_PASS) {
+    throw new Error('SUPER_ADMIN_PASS must be configured to rotate the legacy protected administrator credential.');
+  }
+  if (REQUIRES_BOOTSTRAP_CREDENTIALS && needsCredentialMigration && existingDefaultTeacher?.passwordHash && !TEACHER_BOOTSTRAP_PASS) {
+    throw new Error('TEACHER_DEFAULT_PASS must be configured to rotate the legacy default teacher credential.');
+  }
+  if (needsCredentialMigration && SUPER_ADMIN_BOOTSTRAP_PASS) {
+    if (existingSuper) {
+      existingSuper.passwordHash = hashPassword(SUPER_ADMIN_BOOTSTRAP_PASS);
+      existingSuper.tokenVersion = (Number(existingSuper.tokenVersion) || 1) + 1;
+      changed = true;
+    }
+    if (existingDefaultTeacher && TEACHER_BOOTSTRAP_PASS) {
+      existingDefaultTeacher.passwordHash = hashPassword(TEACHER_BOOTSTRAP_PASS);
+      existingDefaultTeacher.tokenVersion = (Number(existingDefaultTeacher.tokenVersion) || 1) + 1;
+      changed = true;
+    }
+    store._protectedCredentialsVersion = PROTECTED_CREDENTIALS_VERSION;
     changed = true;
+  }
+  if (!existingSuper) {
+    if (SUPER_ADMIN_BOOTSTRAP_PASS) {
+      store.users[SUPER_ADMIN_USERNAME] = {
+        username: SUPER_ADMIN_USERNAME,
+        name: 'Quản Trị Hệ Thống',
+        role: 'teacher',
+        isSuperAdmin: true,
+        hiddenFromTeacher: true,
+        targetBand: 9.0,
+        joinedDate: '2026-01-01',
+        tokenVersion: 1,
+        passwordHash: hashPassword(SUPER_ADMIN_BOOTSTRAP_PASS)
+      };
+      changed = true;
+    }
   } else {
     if (!existingSuper.passwordHash) {
-      existingSuper.passwordHash = hashPassword(SUPER_ADMIN_DEFAULT_PASS);
-      changed = true;
+      if (SUPER_ADMIN_BOOTSTRAP_PASS) {
+        existingSuper.passwordHash = hashPassword(SUPER_ADMIN_BOOTSTRAP_PASS);
+        changed = true;
+      } else if (REQUIRES_BOOTSTRAP_CREDENTIALS) {
+        throw new Error('SUPER_ADMIN_PASS is required to restore the protected administrator account.');
+      }
     }
     if (!existingSuper.isSuperAdmin || !existingSuper.hiddenFromTeacher || existingSuper.role !== 'teacher') {
       existingSuper.role = 'teacher';
@@ -535,8 +569,8 @@ function ensureProtectedAccounts(store) {
   const hasAnyRegularTeacher = Object.values(store.users).some(
     u => u && u.role === 'teacher' && !u.isSuperAdmin && u.username !== SUPER_ADMIN_USERNAME && Boolean(u.passwordHash)
   );
-  const existingDefaultTeacher = store.users[DEFAULT_TEACHER_USERNAME];
-  if (!existingDefaultTeacher && !hasAnyRegularTeacher && !(store.deletedUserIds || []).includes(DEFAULT_TEACHER_USERNAME)) {
+  const currentDefaultTeacher = store.users[DEFAULT_TEACHER_USERNAME];
+  if (!currentDefaultTeacher && !hasAnyRegularTeacher && !(store.deletedUserIds || []).includes(DEFAULT_TEACHER_USERNAME) && TEACHER_BOOTSTRAP_PASS) {
     store.users[DEFAULT_TEACHER_USERNAME] = {
       username: DEFAULT_TEACHER_USERNAME,
       name: 'Ms. Như — IELTS Nha Trang',
@@ -545,12 +579,12 @@ function ensureProtectedAccounts(store) {
       joinedDate: '2026-01-01',
       avatarUrl: '/brand-avatar.jpg?v=2',
       tokenVersion: 1,
-      passwordHash: hashPassword(DEFAULT_TEACHER_PASS)
+      passwordHash: hashPassword(TEACHER_BOOTSTRAP_PASS)
     };
     changed = true;
-  } else if (existingDefaultTeacher && !existingDefaultTeacher.passwordHash) {
-    existingDefaultTeacher.passwordHash = hashPassword(DEFAULT_TEACHER_PASS);
-    existingDefaultTeacher.tokenVersion = existingDefaultTeacher.tokenVersion || 1;
+  } else if (currentDefaultTeacher && !currentDefaultTeacher.passwordHash && TEACHER_BOOTSTRAP_PASS) {
+    currentDefaultTeacher.passwordHash = hashPassword(TEACHER_BOOTSTRAP_PASS);
+    currentDefaultTeacher.tokenVersion = currentDefaultTeacher.tokenVersion || 1;
     changed = true;
   }
   return changed;
@@ -1091,6 +1125,36 @@ function removeUserFromGameRooms(store, username = '') {
   return changed;
 }
 
+function cloneSeedData(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function seedCanonicalDefaults(store) {
+  const allCanonicalTests = cloneSeedData(DEFAULT_TESTS);
+  const canonicalTestIds = new Set(allCanonicalTests.map(test => test?.id).filter(Boolean));
+  const deletedTestIds = new Set(Array.isArray(store.deletedTestIds) ? store.deletedTestIds : []);
+  const canonicalTests = allCanonicalTests.filter(test => !deletedTestIds.has(test?.id));
+  const customTests = (Array.isArray(store.tests) ? store.tests : [])
+    .filter(test => test?.id && !canonicalTestIds.has(test.id));
+  const currentRooms = store.rooms && typeof store.rooms === 'object' ? store.rooms : {};
+  const customRooms = Object.fromEntries(
+    Object.entries(currentRooms).filter(([pin]) => !Object.prototype.hasOwnProperty.call(DEFAULT_ROOMS, pin))
+  );
+
+  store.tests = [...canonicalTests, ...customTests];
+  store.seededTags = {
+    ...(store.seededTags && typeof store.seededTags === 'object' ? store.seededTags : {}),
+    ...Object.fromEntries(allCanonicalTests.filter(test => test?.seedTag).map(test => [test.seedTag, true]))
+  };
+  store.rooms = { ...cloneSeedData(DEFAULT_ROOMS), ...customRooms };
+  if (!Array.isArray(store.attempts)) store.attempts = cloneSeedData(DEFAULT_ATTEMPTS);
+  if (!store.teacherNotes || typeof store.teacherNotes !== 'object') {
+    store.teacherNotes = cloneSeedData(DEFAULT_TEACHER_NOTES);
+  }
+  store.seeded = true;
+  return true;
+}
+
 function createInitialStore(audioDir = '') {
   const store = {
     version: 0,
@@ -1135,8 +1199,10 @@ function createInitialStore(audioDir = '') {
     _unlockedSpeakingRooms: new Map(),
     _unlockedExamRooms: new Map(),
     _audioDir: audioDir,
-    _audioMem: new Map()
+    _audioMem: new Map(),
+    _protectedCredentialsVersion: 0
   };
+  seedCanonicalDefaults(store);
   ensureProtectedAccounts(store);
   return store;
 }
@@ -1208,6 +1274,7 @@ function applyParsedStoreSnapshot(store, parsed) {
   if (!parsed || typeof parsed !== 'object') return;
   store.version = Number(parsed.version) || 0;
   store.seeded = Boolean(parsed.seeded);
+  store._protectedCredentialsVersion = Number(parsed._protectedCredentialsVersion) || 0;
   if (parsed.seededTags && typeof parsed.seededTags === 'object') {
     store.seededTags = { ...parsed.seededTags };
   }
@@ -1347,7 +1414,11 @@ export function createPersistentSyncStore(persistFile = '') {
       }
     }
   }
+  const seedInitializedOnBoot = !store.seeded ? seedCanonicalDefaults(store) : false;
   const protectedChanged = ensureProtectedAccounts(store);
+  if (REQUIRES_BOOTSTRAP_CREDENTIALS && !store.users?.[SUPER_ADMIN_USERNAME]?.passwordHash) {
+    throw new Error('SUPER_ADMIN_PASS is required to create the protected administrator account.');
+  }
   let seedMergedOnBoot = false;
   if (loadedFromDisk && store.seeded && Array.isArray(DEFAULT_TESTS)) {
     const deletedSet = new Set(Array.isArray(store.deletedTestIds) ? store.deletedTestIds : []);
@@ -1389,7 +1460,7 @@ export function createPersistentSyncStore(persistFile = '') {
   };
 
   // Persist protected default accounts & _authSecret immediately when initializing a fresh store file
-  if (persistFile && (!hadExistingFile || (loadedFromDisk && (protectedChanged || seedMergedOnBoot)))) {
+  if (persistFile && (!hadExistingFile || (loadedFromDisk && (protectedChanged || seedInitializedOnBoot || seedMergedOnBoot)))) {
     writeStoreSync();
   }
 
@@ -1855,9 +1926,10 @@ function getSnapshotForViewer(store, viewer = null) {
 
 function authorizeSyncAction(store, type, payload = {}, viewer = null) {
   if (type === 'SEED_DEFAULTS') {
-    if (!store.seeded) return { allowed: true };
-    // After initial seed, only authenticated users can append newly tagged seed tests
     if (!viewer) return { allowed: false, status: 401, error: 'Vui lòng đăng nhập để đồng bộ.' };
+    if (viewer.role !== 'teacher') {
+      return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới được đồng bộ dữ liệu mặc định.' };
+    }
     return { allowed: true };
   }
 
@@ -2049,6 +2121,11 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         if ((targetExisting?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
           return { allowed: false, status: 403, error: 'Không thể chỉnh sửa tài khoản Quản trị hệ thống.' };
         }
+        const currentRole = String(targetExisting?.role || 'student').toLowerCase();
+        const requestedRole = String(item?.role || currentRole).toLowerCase();
+        if (!isSuperAdmin && ((requestedRole === 'teacher' && currentRole !== 'teacher') || (currentRole === 'teacher' && requestedRole !== 'teacher'))) {
+          return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới được tạo hoặc thay đổi vai trò Giáo viên.' };
+        }
       }
       return { allowed: true };
     }
@@ -2062,6 +2139,13 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       const targetExisting = store.users?.[uname];
       if ((targetExisting?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Không thể chỉnh sửa tài khoản Quản trị hệ thống.' };
+      }
+      if (isTeacher && !isSuperAdmin) {
+        const currentRole = String(targetExisting?.role || 'student').toLowerCase();
+        const requestedRole = String(payload.user.role || currentRole).toLowerCase();
+        if ((requestedRole === 'teacher' && currentRole !== 'teacher') || (currentRole === 'teacher' && requestedRole !== 'teacher')) {
+          return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới được tạo hoặc thay đổi vai trò Giáo viên.' };
+        }
       }
       if (!isTeacher) {
         if (uname !== viewer.username) {
@@ -2357,7 +2441,12 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
   const prevUser = store.users?.[uname];
   const isTeacher = viewer?.role === 'teacher';
   const isSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+  const currentRole = String(prevUser?.role || 'student').toLowerCase();
+  const requestedRole = String(rawUser.role || currentRole).toLowerCase();
   if ((prevUser?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
+    return false;
+  }
+  if (!isSuperAdmin && ((requestedRole === 'teacher' && currentRole !== 'teacher') || (currentRole === 'teacher' && requestedRole !== 'teacher'))) {
     return false;
   }
 
@@ -2650,7 +2739,9 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     } else {
       delete incoming.isSuperAdmin;
       delete incoming.hiddenFromTeacher;
-      incoming.role = incoming.role === 'teacher' ? 'teacher' : 'student';
+      incoming.role = isSuperAdmin
+        ? (requestedRole === 'teacher' ? 'teacher' : 'student')
+        : (prevUser?.role === 'teacher' ? 'teacher' : 'student');
     }
     store.deletedUserIds = store.deletedUserIds.filter(id => id !== uname);
     store.users[uname] = incoming;
@@ -2754,80 +2845,22 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
   switch (type) {
     case 'SEED_DEFAULTS': {
       if (!store.seeded) {
-        if (payload.rooms && typeof payload.rooms === 'object') {
-          Object.entries(payload.rooms).forEach(([pin, r]) => {
-            store.rooms[pin] = normalizeServerRoom(r, pin);
-          });
-        }
-        if (Array.isArray(payload.tests)) {
-          store.tests = payload.tests;
-          payload.tests.forEach(t => {
-            if (t?.seedTag) store.seededTags[t.seedTag] = true;
-          });
-        }
-        if (Array.isArray(payload.attempts)) {
-          store.attempts = payload.attempts;
-        }
-        if (payload.teacherNotes && typeof payload.teacherNotes === 'object') {
-          store.teacherNotes = { ...payload.teacherNotes };
-        }
-        if (payload.users && typeof payload.users === 'object') {
-          Object.entries(payload.users).forEach(([uname, u]) => {
-            if (!u || uname === SUPER_ADMIN_USERNAME) return;
-            const existingUser = store.users[uname];
-            if (existingUser?.passwordHash) return;
-            const clean = { ...u };
-            if (clean.pass && !clean.passwordHash) {
-              clean.passwordHash = hashPassword(clean.pass);
-            } else if (!clean.passwordHash && uname === DEFAULT_TEACHER_USERNAME) {
-              clean.passwordHash = hashPassword(DEFAULT_TEACHER_PASS);
-            }
-            if (!clean.passwordHash) return;
-            delete clean.pass;
-            delete clean.isSuperAdmin;
-            delete clean.hiddenFromTeacher;
-            clean.tokenVersion = clean.tokenVersion || 1;
-            store.users[uname] = clean;
-          });
-        }
-        if (payload.classes && typeof payload.classes === 'object') {
-          Object.entries(payload.classes).forEach(([cid, cObj]) => {
-            const norm = normalizeClassRecord(cObj, cid);
-            if (norm) store.classes[norm.id] = norm;
-          });
-        }
-        if (Array.isArray(payload.customVocabTopics)) {
-          store.customVocabTopics = payload.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
-        }
-        ensureProtectedAccounts(store);
-        store.seeded = true;
+        seedCanonicalDefaults(store);
         changed = true;
-      } else {
-        if (Array.isArray(payload.customVocabTopics) && store.customVocabTopics.length === 0) {
-          const validTopics = payload.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
-          if (validTopics.length > 0) {
-            store.customVocabTopics = validTopics;
-            changed = true;
-          }
-        }
-        if (store.users?.teacher_ielts?.name === 'Thầy Minh IELTS Master') {
-          store.users.teacher_ielts = {
-            ...store.users.teacher_ielts,
-            name: 'Ms. Như — IELTS Nha Trang'
-          };
+      }
+      if (Array.isArray(payload.customVocabTopics) && store.customVocabTopics.length === 0) {
+        const validTopics = payload.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+        if (validTopics.length > 0) {
+          store.customVocabTopics = validTopics;
           changed = true;
         }
-        if (Array.isArray(payload.defaultTests)) {
-          payload.defaultTests.forEach(dt => {
-            if (!dt?.id || !dt?.seedTag) return;
-            if (store.seededTags[dt.seedTag]) return;
-            store.seededTags[dt.seedTag] = true;
-            if (!store.deletedTestIds.includes(dt.id) && !store.tests.some(t => t.id === dt.id)) {
-              store.tests = [...store.tests, dt];
-            }
-            changed = true;
-          });
-        }
+      }
+      if (store.users?.teacher_ielts?.name === 'Thầy Minh IELTS Master') {
+        store.users.teacher_ielts = {
+          ...store.users.teacher_ielts,
+          name: 'Ms. Như — IELTS Nha Trang'
+        };
+        changed = true;
       }
       break;
     }

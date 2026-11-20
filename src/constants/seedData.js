@@ -2053,10 +2053,6 @@ Write **ONE WORD** for the answer.
 
 export const DEFAULT_ATTEMPTS = [];
 
-export const DEFAULT_USERS = {
-  'teacher_ielts': { username: 'teacher_ielts', pass: '123456', name: 'Ms. Như - IELTS Nha Trang', role: 'teacher', targetBand: 9.0, joinedDate: '2026-01-01' }
-};
-
 export const DEFAULT_ROOMS = {
   '686868': {
     pin: '686868',
