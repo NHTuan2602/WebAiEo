@@ -60,6 +60,7 @@ import {
   normalizePaymentConfig,
   normalizeVipNameColor,
   normalizeVipNeonCoverColor,
+  resolveStudentTitleSummary,
   MAX_AUDIO_UPLOAD_BYTES,
   STATIC_IMAGE_MAX_DATA_URL_LENGTH,
   VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH
@@ -954,21 +955,23 @@ function evaluateObjectiveScoresForAttempt(test, answers = {}) {
 
   if (cfgMode !== 'single_skill' || focusSkill === 'listening') {
     const qs = Array.isArray(test.listening?.questions) ? test.listening.questions : [];
-    const raw = qs.reduce((acc, q) => (isObjectiveAnswerCorrectServer(q, answers?.[q.id]) ? acc + 1 : acc), 0);
+    const raw = qs.reduce((acc, q) => acc + getObjectiveAnswerScore(q, answers?.[q.id]), 0);
+    const total = qs.reduce((acc, q) => acc + getObjectiveAnswerMaxScore(q), 0);
     scores.listening = {
       raw,
-      total: qs.length,
-      band: calculateAutoBandServer(raw, qs.length, 'listening')
+      total,
+      band: calculateAutoBandServer(raw, total, 'listening')
     };
   }
 
   if (cfgMode !== 'single_skill' || focusSkill === 'reading') {
     const qs = Array.isArray(test.reading?.questions) ? test.reading.questions : [];
-    const raw = qs.reduce((acc, q) => (isObjectiveAnswerCorrectServer(q, answers?.[q.id]) ? acc + 1 : acc), 0);
+    const raw = qs.reduce((acc, q) => acc + getObjectiveAnswerScore(q, answers?.[q.id]), 0);
+    const total = qs.reduce((acc, q) => acc + getObjectiveAnswerMaxScore(q), 0);
     scores.reading = {
       raw,
-      total: qs.length,
-      band: calculateAutoBandServer(raw, qs.length, 'reading')
+      total,
+      band: calculateAutoBandServer(raw, total, 'reading')
     };
   }
 
@@ -1568,6 +1571,11 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     showTitleBadge: superAdmin.showTitleBadge !== false,
     grantedTitleIds: Array.isArray(superAdmin.grantedTitleIds) ? superAdmin.grantedTitleIds : [],
     purchasedTitleIds: Array.isArray(superAdmin.purchasedTitleIds) ? superAdmin.purchasedTitleIds : [],
+    purchasedTitleExpiries:
+      superAdmin.purchasedTitleExpiries && typeof superAdmin.purchasedTitleExpiries === 'object'
+        ? superAdmin.purchasedTitleExpiries
+        : {},
+    loginDays: Array.isArray(superAdmin.loginDays) ? superAdmin.loginDays : [],
     vipRedNameEnabled: superAdmin.vipRedNameEnabled === true,
     vipNameColor: normalizeVipNameColor(superAdmin.vipNameColor || 'crimson'),
     vipTagEnabled: superAdmin.vipTagEnabled === true,
@@ -1743,6 +1751,112 @@ function serializeSentNotificationsForTeacher(store, viewer) {
   return list.map(n => serializeNotificationItem(n, viewer.username || ''));
 }
 
+const roomTitleResolveCache = new Map();
+
+function resolveServerActiveTitleId(store, u, isSa) {
+  const fallbackId =
+    typeof u.equippedTitleId === 'string' && u.equippedTitleId
+      ? u.equippedTitleId
+      : (u.role === 'teacher' || isSa)
+      ? 'staff_ielts_10'
+      : 'newbie';
+  const cacheKey = `${store.version}:${String(u.username || '').toLowerCase()}`;
+  if (roomTitleResolveCache.has(cacheKey)) return roomTitleResolveCache.get(cacheKey);
+  let activeId = fallbackId;
+  try {
+    const summary = resolveStudentTitleSummary(
+      u,
+      Array.isArray(store.attempts) ? store.attempts : [],
+      store.rooms || {},
+      Array.isArray(store.customTitles) ? store.customTitles : [],
+      store.paymentConfig || null
+    );
+    if (summary?.title?.id) activeId = String(summary.title.id);
+  } catch {
+    activeId = fallbackId;
+  }
+  if (roomTitleResolveCache.size > 2000) roomTitleResolveCache.clear();
+  roomTitleResolveCache.set(cacheKey, activeId);
+  return activeId;
+}
+
+function enrichRoomPlayerEntryFromStore(store, rawUname, entry) {
+  if (!entry || typeof entry !== 'object') return entry;
+  const uname = String(entry.username || rawUname || '').trim();
+  const key = uname ? findUserKeyInStore(store, uname) : '';
+  const u = key ? store.users?.[key] : null;
+  if (!u) return entry;
+  const isVip = Number(u.aieoVipExpiresAt) > Date.now();
+  const isSa = Boolean(u.isSuperAdmin || u.username === SUPER_ADMIN_USERNAME);
+  const vipRedNameEnabled =
+    isVip && !u.vipEffectsCustomizedAt
+      ? true
+      : (isVip || isSa) && u.vipRedNameEnabled !== undefined
+      ? Boolean(u.vipRedNameEnabled)
+      : isVip;
+  const vipTagEnabled =
+    isVip && !u.vipEffectsCustomizedAt
+      ? true
+      : (isVip || isSa) && u.vipTagEnabled !== undefined
+      ? Boolean(u.vipTagEnabled)
+      : isVip;
+  const vipNeonCoverEnabled =
+    isVip && !u.vipEffectsCustomizedAt
+      ? true
+      : u.vipNeonCoverEnabled !== undefined
+      ? (isVip || isSa) && Boolean(u.vipNeonCoverEnabled)
+      : isVip || (isSa && Boolean(u.vipRedNameEnabled || u.vipTagEnabled));
+
+  // Server-authoritative active title so every viewer (any class, admin or student) sees the same badge.
+  const activeTitleId = resolveServerActiveTitleId(store, u, isSa);
+  const baseGrantedTitleIds = Array.isArray(u.grantedTitleIds) ? u.grantedTitleIds.map(String).filter(Boolean) : [];
+  const effectiveGrantedTitleIds =
+    activeTitleId && !baseGrantedTitleIds.includes(activeTitleId)
+      ? [...baseGrantedTitleIds, activeTitleId]
+      : baseGrantedTitleIds;
+
+  return {
+    ...entry,
+    name: u.name || entry.name || uname,
+    avatarUrl: u.avatarUrl || entry.avatarUrl || '',
+    avatarFrameId: typeof u.avatarFrameId === 'string' && u.avatarFrameId ? u.avatarFrameId : 'none',
+    equippedTitleId: activeTitleId,
+    showTitleBadge: u.showTitleBadge !== false,
+    grantedTitleIds: effectiveGrantedTitleIds,
+    purchasedTitleIds: Array.isArray(u.purchasedTitleIds) ? u.purchasedTitleIds.map(String).filter(Boolean) : [],
+    purchasedTitleExpiries:
+      u.purchasedTitleExpiries && typeof u.purchasedTitleExpiries === 'object'
+        ? u.purchasedTitleExpiries
+        : {},
+    loginDays: Array.isArray(u.loginDays) ? u.loginDays : [],
+    aieoVipExpiresAt: Number(u.aieoVipExpiresAt) || 0,
+    vipRedNameEnabled,
+    vipNameColor: normalizeVipNameColor(u.vipNameColor || 'crimson'),
+    vipTagEnabled,
+    vipNeonCoverEnabled,
+    vipNeonCoverColor: normalizeVipNeonCoverColor(u.vipNeonCoverColor || 'aurora_rgb'),
+    ...(isSa ? { isSuperAdmin: true } : {})
+  };
+}
+
+function enrichRoomWithStoreUserProfiles(store, room) {
+  if (!room || typeof room !== 'object') return room;
+  const enrichMap = (mapObj) => {
+    if (!mapObj || typeof mapObj !== 'object') return {};
+    const out = {};
+    Object.entries(mapObj).forEach(([uname, entry]) => {
+      out[uname] = enrichRoomPlayerEntryFromStore(store, uname, entry);
+    });
+    return out;
+  };
+  return {
+    ...room,
+    lobbyPlayers: enrichMap(room.lobbyPlayers),
+    liveMatch: enrichMap(room.liveMatch),
+    players: enrichMap(room.players)
+  };
+}
+
 function getSnapshotForViewer(store, viewer = null) {
   pruneExpiredStoreChats(store, Date.now());
   const basePayload = {
@@ -1814,7 +1928,7 @@ function getSnapshotForViewer(store, viewer = null) {
   if (viewer.role === 'teacher') {
     const sanitizedRooms = {};
     Object.entries(store.rooms || {}).forEach(([pin, r]) => {
-      sanitizedRooms[pin] = r;
+      sanitizedRooms[pin] = enrichRoomWithStoreUserProfiles(store, r);
     });
     return {
       ...basePayload,
@@ -1902,15 +2016,16 @@ function getSnapshotForViewer(store, viewer = null) {
   const studentRooms = {};
   Object.entries(store.rooms || {}).forEach(([pin, r]) => {
     if (!r) return;
+    const enrichedRoom = enrichRoomWithStoreUserProfiles(store, r);
     const isMyHostedFriendRoom = Boolean(
-      r.roomMode === 'friend_vip' &&
-      r.hostUsername &&
-      r.hostUsername === viewer.username
+      enrichedRoom.roomMode === 'friend_vip' &&
+      enrichedRoom.hostUsername &&
+      enrichedRoom.hostUsername === viewer.username
     );
     if (isMyHostedFriendRoom) {
-      studentRooms[pin] = r;
+      studentRooms[pin] = enrichedRoom;
     } else {
-      const { pass: _hiddenPass, ...rest } = r;
+      const { pass: _hiddenPass, ...rest } = enrichedRoom;
       studentRooms[pin] = { ...rest, hasPassword: Boolean(_hiddenPass) };
     }
   });

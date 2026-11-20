@@ -169,10 +169,25 @@ export default function GameArena({
   setView,
   showMobileKeyboard,
   showToast,
+  supportAdminProfile = null,
   transitionCountdown,
   usersDb,
   wordTimerRef
 }) {
+  const resolveArenaPlayerUser = (playerOrUname) => {
+    const uname = typeof playerOrUname === 'string' ? playerOrUname : playerOrUname?.username;
+    const baseObj = typeof playerOrUname === 'object' && playerOrUname ? playerOrUname : {};
+    const adminMatch =
+      uname && (supportAdminProfile?.username === uname || uname === 'tuanpro123s') && supportAdminProfile
+        ? supportAdminProfile
+        : null;
+    const dbMatch = uname && usersDb?.[uname] ? usersDb[uname] : null;
+    return {
+      ...baseObj,
+      ...(adminMatch || {}),
+      ...(dbMatch || {})
+    };
+  };
   const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
   const [showPilotDrawer, setShowPilotDrawer] = useState(false);
   const [entryZone, setEntryZone] = useState('live'); // 'live' | 'practice'
@@ -713,7 +728,7 @@ export default function GameArena({
                           <div className="min-w-0">
                             <p className="font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1">
                               <span>#{idx + 1}</span>
-                              <VipMemberName user={usersDb[row.username] || row} fallbackName={row.name || row.username} badgeSize="xs" />
+                              <VipMemberName user={resolveArenaPlayerUser(row)} fallbackName={row.name || row.username} badgeSize="xs" />
                               {isMe && <span className="text-xs font-bold text-[#007A7A] dark:text-cyan-300">(Bạn)</span>}
                             </p>
                             <p className="text-xs text-[#475569] dark:text-slate-400 truncate">
@@ -1227,8 +1242,8 @@ export default function GameArena({
             {/* Left: Crewmates Deck (with Integrated Header, Large PIN Board & Empty Slots) */}
             <div className="lg:col-span-7 xl:col-span-8 relative rounded-2xl border border-slate-200 dark:border-[#334155] bg-white dark:bg-slate-900/85 p-4 sm:p-6 min-h-[300px] flex flex-col justify-between gap-4">
               {/* Integrated Dropship Lobby Header & Flat Specs */}
-              <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800">
-                <div className="flex items-start gap-2.5 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800">
+                <div className="flex items-start gap-2.5 min-w-0 flex-1">
                   <div className="w-9 h-9 rounded-lg bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 flex items-center justify-center text-[#007A7A] dark:text-[#1EE1D6] shrink-0 mt-0.5">
                     <Rocket className="w-4 h-4" />
                   </div>
@@ -1370,7 +1385,8 @@ export default function GameArena({
                     ? activeTeamIds[(activeTeamIds.indexOf(playerTeamId) + 1) % activeTeamIds.length]
                     : '';
                   const canCycleTeam = Boolean(participatesInTeam && (isRoomHost || isSelf));
-                  const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb, customTitles, paymentConfig);
+                  const resolvedPlayerUser = resolveArenaPlayerUser(player);
+                  const pTitle = resolveVisibleTitleBadge(resolvedPlayerUser, attempts, roomsDb, customTitles, paymentConfig);
 
                   if (compactKahoot) {
                     return (
@@ -1403,7 +1419,7 @@ export default function GameArena({
                           animalId={player.animalId || 'cat'}
                           accessoryId={player.accessoryId || 'none'}
                           colorId={player.colorId || 'cyan'}
-                          avatarUrl={player.avatarUrl || usersDb[player.username]?.avatarUrl || ''}
+                          avatarUrl={player.avatarUrl || resolvedPlayerUser.avatarUrl || ''}
                           size={46}
                           flip={idx % 2 === 1}
                           animate={true}
@@ -1420,7 +1436,7 @@ export default function GameArena({
                             >
                               <span className={`w-2 h-2 rounded-full shrink-0 ${player.ready || isHost ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                               <span className="truncate max-w-[140px]">
-                                <VipMemberName user={usersDb[player.username] || player} fallbackName={player.name} badgeSize="xs" />
+                                <VipMemberName user={resolvedPlayerUser} fallbackName={player.name} badgeSize="xs" />
                               </span>
                             </button>
                             {isHost ? (
@@ -1511,7 +1527,7 @@ export default function GameArena({
                         animalId={player.animalId || 'cat'}
                         accessoryId={player.accessoryId || 'none'}
                         colorId={player.colorId || 'cyan'}
-                        avatarUrl={player.avatarUrl || usersDb[player.username]?.avatarUrl || ''}
+                        avatarUrl={player.avatarUrl || resolvedPlayerUser.avatarUrl || ''}
                         size={54}
                         flip={idx % 2 === 1}
                         animate={true}
@@ -1532,7 +1548,7 @@ export default function GameArena({
                       >
                         <span className={`w-2 h-2 rounded-full ${player.ready || isHost ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                         <span className="truncate max-w-[130px]">
-                          <VipMemberName user={usersDb[player.username] || player} fallbackName={player.name} badgeSize="xs" />
+                          <VipMemberName user={resolvedPlayerUser} fallbackName={player.name} badgeSize="xs" />
                         </span>
                       </button>
                       {pTitle && (
@@ -1786,7 +1802,7 @@ export default function GameArena({
 
         {/* Non-disruptive Quick Profile Card in Lobby */}
         {inspectedLobbyUsername && (() => {
-          const member = usersDb[inspectedLobbyUsername] || room.lobbyPlayers?.[inspectedLobbyUsername];
+          const member = resolveArenaPlayerUser(room.lobbyPlayers?.[inspectedLobbyUsername] || { username: inspectedLobbyUsername });
           if (!member) return null;
           const isMemberTeacher = member.role === 'teacher';
           const memberAttempts = attempts.filter(a => a.studentId === inspectedLobbyUsername);
@@ -1823,7 +1839,7 @@ export default function GameArena({
                           {isMemberTeacher ? 'Giáo viên' : 'Học viên'}
                         </span>
                         {(() => {
-                          const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles);
+                          const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles, paymentConfig);
                           if (!mTitle || mTitle.isRoleBuiltIn) return null;
                           return (
                             <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full border ${mTitle.gameBadgeClass}`}>
@@ -2106,10 +2122,10 @@ export default function GameArena({
                           onShip={true}
                         />
                         <p className="font-extrabold text-sm text-[#0F172B] dark:text-white mt-1.5 truncate max-w-full">
-                          <VipMemberName user={usersDb[p.username] || p} fallbackName={p.name} badgeSize="xs" />
+                          <VipMemberName user={resolveArenaPlayerUser(p)} fallbackName={p.name} badgeSize="xs" />
                         </p>
                         {(() => {
-                          const podTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles, paymentConfig);
+                          const podTitle = resolveVisibleTitleBadge(resolveArenaPlayerUser(p), attempts, roomsDb, customTitles, paymentConfig);
                           if (!podTitle) return null;
                           return (
                             <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full border mt-0.5 ${podTitle.gameBadgeClass}`}>
@@ -2203,10 +2219,10 @@ export default function GameArena({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-extrabold text-sm text-[#0F172B] dark:text-white truncate max-w-[190px] sm:max-w-[260px]">
-                              <VipMemberName user={usersDb[p.username] || p} fallbackName={p.name} badgeSize="xs" />
+                              <VipMemberName user={resolveArenaPlayerUser(p)} fallbackName={p.name} badgeSize="xs" />
                             </span>
                             {(() => {
-                              const rowTitle = resolveVisibleTitleBadge(usersDb[p.username] || p, attempts, roomsDb, customTitles, paymentConfig);
+                              const rowTitle = resolveVisibleTitleBadge(resolveArenaPlayerUser(p), attempts, roomsDb, customTitles, paymentConfig);
                               if (!rowTitle) return null;
                               return (
                                 <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full border ${rowTitle.gameBadgeClass}`}>
@@ -2449,7 +2465,7 @@ export default function GameArena({
                 {gameLives > 0 ? '❤️'.repeat(gameLives) : '💀'}
               </span>
               {(() => {
-                const selfTitle = resolveVisibleTitleBadge(currentUser, attempts, roomsDb, customTitles);
+                const selfTitle = resolveVisibleTitleBadge(currentUser, attempts, roomsDb, customTitles, paymentConfig);
                 if (!selfTitle) return null;
                 return (
                   <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-extrabold border ${selfTitle.gameBadgeClass}`}>
@@ -2804,7 +2820,7 @@ export default function GameArena({
                           >
                             <span className="truncate font-semibold flex items-center gap-1 min-w-0">
                               <span>#{sIdx + 1}</span>
-                              <VipMemberName user={usersDb[st.username] || st} fallbackName={st.name || st.username} badgeSize="xs" />
+                              <VipMemberName user={resolveArenaPlayerUser(st)} fallbackName={st.name || st.username} badgeSize="xs" />
                               <span className="text-xs text-slate-400">({st.topicLabel})</span>
                             </span>
                             <span className="font-mono font-extrabold text-amber-600 dark:text-amber-300 ml-2 shrink-0">{st.score}đ</span>
@@ -2857,7 +2873,7 @@ export default function GameArena({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {topStandings.map((st, sIdx) => {
                         const isMe = st.username === currentUser?.username || st.name === currentUser?.name;
-                        const stTitle = st.username ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb, customTitles, paymentConfig) : null;
+                        const stTitle = st.username ? resolveVisibleTitleBadge(resolveArenaPlayerUser(st), attempts, roomsDb, customTitles, paymentConfig) : null;
                         return (
                           <div
                             key={st.username || st.name || sIdx}
@@ -2869,7 +2885,7 @@ export default function GameArena({
                           >
                             <span className="truncate font-semibold flex items-center gap-1.5 min-w-0">
                               <span className="shrink-0">#{sIdx + 1}</span>
-                              <VipMemberName user={usersDb[st.username] || st} fallbackName={st.name || st.username} badgeSize="xs" />
+                              <VipMemberName user={resolveArenaPlayerUser(st)} fallbackName={st.name || st.username} badgeSize="xs" />
                               {isMe && <span className="text-xs font-bold shrink-0">(Bạn)</span>}
                               {stTitle && (
                                 <span className={`text-xs font-extrabold px-1.5 py-0.2 rounded-full border shrink-0 ${stTitle.gameBadgeClass}`}>

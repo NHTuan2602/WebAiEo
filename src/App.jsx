@@ -7457,6 +7457,7 @@ export default function App() {
           setView={setView}
           showMobileKeyboard={showMobileKeyboard}
           showToast={showToast}
+          supportAdminProfile={supportAdminProfile}
           transitionCountdown={transitionCountdown}
           usersDb={usersDb}
           wordTimerRef={wordTimerRef}
