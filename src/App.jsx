@@ -3673,12 +3673,11 @@ export default function App() {
     } else {
       setView('HOME');
       showToast(`Chào mừng trở lại, ${loggedInUser.name}!`);
-      if (!hasActiveAieoVip(loggedInUser)) {
-        try {
-          sessionStorage.setItem(`ielts_vip_promo_shown_${loggedInUser.username.toLowerCase()}`, '1');
-        } catch {}
-        setShowVipPromoModal(true);
-      }
+      try {
+        sessionStorage.setItem(`ielts_real_exam_pricing_shown_${loggedInUser.username.toLowerCase()}`, '1');
+      } catch {}
+      setShowVipPromoModal(false);
+      setShowRealExamPricingModal(true);
     }
   };
 
@@ -3687,9 +3686,11 @@ export default function App() {
     if (prevUsername) {
       try {
         sessionStorage.removeItem(`ielts_vip_promo_shown_${prevUsername.toLowerCase()}`);
+        sessionStorage.removeItem(`ielts_real_exam_pricing_shown_${prevUsername.toLowerCase()}`);
       } catch {}
     }
     setShowVipPromoModal(false);
+    setShowRealExamPricingModal(false);
     authEpochRef.current += 1;
     lastSyncVersionRef.current = -1;
     lastBootIdRef.current = '';
@@ -6909,20 +6910,19 @@ export default function App() {
       !syncHydrated ||
       !uname ||
       currentUser?.role === 'teacher' ||
-      hasActiveAieoVip(currentUser) ||
       view !== 'HOME'
     ) {
       return undefined;
     }
     try {
-      const seenKey = `ielts_vip_promo_shown_${uname}`;
+      const seenKey = `ielts_real_exam_pricing_shown_${uname}`;
       if (sessionStorage.getItem(seenKey)) return undefined;
       sessionStorage.setItem(seenKey, '1');
     } catch {
       return undefined;
     }
     const timerId = setTimeout(() => {
-      setShowVipPromoModal(true);
+      setShowRealExamPricingModal(true);
     }, 220);
     return () => clearTimeout(timerId);
   }, [syncHydrated, currentUser, view]);

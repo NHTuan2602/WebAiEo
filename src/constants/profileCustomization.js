@@ -929,14 +929,14 @@ export const STUDENT_TITLES = [
     tier: 'Gói IELTS VIP (1 Tháng)',
     difficulty: 'VIP Độc Quyền',
     isVipBundleTitle: true,
-    defaultPriceVnd: 80000,
+    defaultPriceVnd: 20000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-red-500',
-    conditionText: 'Đặc quyền Gói IELTS VIP (80.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu IELTS VIP.',
+    conditionText: 'Đặc quyền Gói IELTS VIP (20.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu IELTS VIP.',
     badgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
     heroBadgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
     gameBadgeClass: 'bg-[#991B1B] text-[#FFFFFF] border-[#EF4444] font-semibold',
     isUnlocked: (_stats, userObj) => Number(userObj?.aieoVipExpiresAt) > Date.now(),
-    getProgress: (_stats, userObj, priceVnd = 80000) => {
+    getProgress: (_stats, userObj, priceVnd = 20000) => {
       const exp = Number(userObj?.aieoVipExpiresAt) || 0;
       const now = Date.now();
       if (exp > now) {
@@ -1203,7 +1203,7 @@ export const REAL_EXAM_COMBO_3_PRICE_VND = 50000; // Combo 3 đề Thực Chiế
 export const REAL_EXAM_COMBO_5_PRICE_VND = 70000; // Combo 5 đề Thực Chiến: 70.000đ
 export const REAL_EXAM_COMBO_10_PRICE_VND = 150000; // Combo 10 đề Thực Chiến: 150.000đ
 export const FRIEND_ROOM_TICKET_PRICE_VND = 5000;
-export const AIEO_VIP_PRICE_VND = 80000;
+export const AIEO_VIP_PRICE_VND = 20000;
 
 export const REAL_EXAM_COMBOS = [
   {
@@ -1866,15 +1866,22 @@ export function normalizePaymentConfig(raw = {}) {
     const n = Number(val);
     return Number.isFinite(n) && n >= 0 ? Math.min(10_000_000, Math.round(n)) : fallback;
   };
+  const rawSchemaVersion = Math.floor(Number(obj.pricingSchemaVersion) || 0);
   const coverUnlockPrice = clampVnd(obj.coverUnlockPrice, CUSTOM_COVER_UNLOCK_PRICE_VND);
   const skillPassPrice = clampVnd(obj.skillPassPrice, SKILL_PASS_PRICE_VND);
-  const defaultExamPriceVnd = clampVnd(obj.defaultExamPriceVnd, DEFAULT_EXAM_PRICE_VND);
+  let defaultExamPriceVnd = clampVnd(obj.defaultExamPriceVnd, DEFAULT_EXAM_PRICE_VND);
   const periodicMockPrice = clampVnd(obj.periodicMockPrice ?? obj.periodicMockPriceVnd, PERIODIC_MOCK_PRICE_VND);
   const realExamCombo3Price = clampVnd(obj.realExamCombo3Price ?? obj.combo3ExamPriceVnd, REAL_EXAM_COMBO_3_PRICE_VND);
   const realExamCombo5Price = clampVnd(obj.realExamCombo5Price ?? obj.combo5ExamPriceVnd, REAL_EXAM_COMBO_5_PRICE_VND);
   const realExamCombo10Price = clampVnd(obj.realExamCombo10Price ?? obj.combo10ExamPriceVnd, REAL_EXAM_COMBO_10_PRICE_VND);
   const friendRoomTicketPrice = clampVnd(obj.friendRoomTicketPrice, FRIEND_ROOM_TICKET_PRICE_VND);
-  const aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
+  let aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
+
+  // Auto-migrate legacy persisted defaults (15k single test -> 20k, 80k VIP -> 20k) once
+  if (rawSchemaVersion < 2) {
+    if (defaultExamPriceVnd === 15000) defaultExamPriceVnd = DEFAULT_EXAM_PRICE_VND;
+    if (aieoVipPrice === 80000) aieoVipPrice = AIEO_VIP_PRICE_VND;
+  }
 
   const bankCode = String(obj.bankCode || '')
     .trim()
@@ -1914,6 +1921,7 @@ export function normalizePaymentConfig(raw = {}) {
   });
 
   return {
+    pricingSchemaVersion: 2,
     coverUnlockPrice,
     skillPassPrice,
     defaultExamPriceVnd,

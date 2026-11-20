@@ -1919,7 +1919,11 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
           return { allowed: false, status: 403, error: 'Mã phòng này đang thuộc về Giáo viên hoặc chủ phòng khác.' };
         }
         if (!existingRoom && !canCreateFriendRoomNow(viewerRecord)) {
-          return { allowed: false, status: 403, error: 'Cần mua 1 Lượt Tạo Phòng (5.000đ) hoặc đăng ký Gói IELTS VIP (80.000đ/1 tháng) để tạo phòng đấu bạn bè!' };
+          return {
+          allowed: false,
+          status: 403,
+          error: `Cần mua 1 Lượt Tạo Phòng (5.000đ) hoặc đăng ký Gói IELTS VIP (${formatVndCurrency(store.paymentConfig?.aieoVipPrice ?? AIEO_VIP_PRICE_VND)}/1 tháng) để tạo phòng đấu bạn bè!`
+        };
         }
         const oldPin = payload?.oldPin ? String(payload.oldPin).trim() : '';
         if (oldPin && oldPin !== cleanPin) {
@@ -3865,7 +3869,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'UPDATE_PAYMENT_CONFIG': {
-      store.paymentConfig = normalizePaymentConfig(payload?.paymentConfig || payload);
+      store.paymentConfig = normalizePaymentConfig({ ...(payload?.paymentConfig || payload || {}), pricingSchemaVersion: 2 });
       changed = true;
       break;
     }
@@ -5144,7 +5148,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       try {
         const body = await readJsonBody(req);
         const rawCfg = body?.paymentConfig || body || {};
-        store.paymentConfig = normalizePaymentConfig(rawCfg);
+        store.paymentConfig = normalizePaymentConfig({ ...rawCfg, pricingSchemaVersion: 2 });
         const prevSec = store.paymentSecrets && typeof store.paymentSecrets === 'object'
           ? store.paymentSecrets
           : { sepayApiKey: '', payosClientId: '', payosApiKey: '', payosChecksumKey: '' };

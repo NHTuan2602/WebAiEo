@@ -3138,7 +3138,7 @@ export default function StudentProfile({
                         type="button"
                         onClick={() => {
                           if (!frameAllowed) {
-                            showToast?.('Khung Avatar Neon thuộc đặc quyền Gói IELTS VIP (80.000đ/1 tháng)!', 'info');
+                            showToast?.(`Khung Avatar Neon thuộc đặc quyền Gói IELTS VIP (${aieoVipPriceLabel}/1 tháng)!`, 'info');
                             return;
                           }
                           setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }));
