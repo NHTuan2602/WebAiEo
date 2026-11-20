@@ -7,6 +7,7 @@ import {
   canCreateFriendRoomNow,
   evaluateTitleUnlockNotification,
   getFriendRoomTicketCredits,
+  getRealExamComboMeta,
   getRealExamCredits,
   getTestPurchasePriceVnd,
   hasActiveAieoVip,
@@ -97,6 +98,7 @@ import PaymentConfigModal from './components/modals/PaymentConfigModal';
 import AdminTitleManagerModal from './components/modals/AdminTitleManagerModal';
 import TitleUnlockedCelebrationModal from './components/modals/TitleUnlockedCelebrationModal';
 import CoverCheckoutModal from './components/modals/CoverCheckoutModal';
+import RealExamPricingModal from './components/modals/RealExamPricingModal';
 import VipPromoPopupModal from './components/modals/VipPromoPopupModal';
 import AuthScreen from './pages/AuthScreen';
 import StudentHome from './pages/StudentHome';
@@ -362,6 +364,7 @@ export default function App() {
   const [showMailConfigModal, setShowMailConfigModal] = useState(false);
   const [mailConfigured, setMailConfigured] = useState(false);
   const [showPaymentConfigModal, setShowPaymentConfigModal] = useState(false);
+  const [showRealExamPricingModal, setShowRealExamPricingModal] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState(null);
   const [gamePracticeLeaderboard, setGamePracticeLeaderboard] = useState([]);
   const [syncHydrated, setSyncHydrated] = useState(false);
@@ -725,9 +728,12 @@ export default function App() {
     });
     if (!snap && lastSyncRejectionStatusRef.current > 0) return false;
     const targetName = usersDb[targetUsername]?.name || targetUsername;
+    const comboLabelMeta = getRealExamComboMeta(planType, paymentConfig);
     const planLabel =
       planType === 'aieo_vip'
         ? 'Gói IELTS VIP (1 Tháng)'
+        : comboLabelMeta
+        ? `${comboLabelMeta.label} (+${comboLabelMeta.credits} lượt Thực Chiến)`
         : planType === 'real_exam_credit'
         ? '+1 Lượt Thực Chiến Thi Thật'
         : planType === 'room_ticket'
@@ -747,9 +753,12 @@ export default function App() {
   const openGlobalCheckoutModal = (opts = {}) => {
     const cfgPay = normalizePaymentConfig(paymentConfig || {});
     const itemType = opts.itemType || 'aieo_vip';
+    const comboMeta = getRealExamComboMeta(itemType, cfgPay);
     const defaultLabel =
       itemType === 'aieo_vip'
         ? 'Gói IELTS VIP Full Quyền (1 Tháng)'
+        : comboMeta
+        ? `${comboMeta.label} - Thực Chiến Thi Thật 4 Kỹ Năng`
         : itemType === 'room_ticket'
         ? 'Vé Tạo 1 Phòng Đấu Riêng (5k/lần)'
         : itemType === 'test'
@@ -758,6 +767,8 @@ export default function App() {
     const defaultPrice =
       itemType === 'aieo_vip'
         ? (cfgPay.aieoVipPrice ?? AIEO_VIP_PRICE_VND)
+        : comboMeta
+        ? comboMeta.price
         : itemType === 'room_ticket'
         ? (cfgPay.friendRoomTicketPrice ?? FRIEND_ROOM_TICKET_PRICE_VND)
         : itemType === 'test'
@@ -774,12 +785,13 @@ export default function App() {
 
   const handleRequestCoverUnlock = async (reqOpts = {}) => {
     if (!currentUser?.username) return false;
+    const isComboRequest = Boolean(getRealExamComboMeta(reqOpts?.itemType, paymentConfig));
     const payload =
       reqOpts?.itemType === 'title' && reqOpts?.itemId
         ? { itemType: 'title', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
         : reqOpts?.itemType === 'test' && reqOpts?.itemId
         ? { itemType: 'test', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
-        : reqOpts?.itemType === 'aieo_vip' || reqOpts?.itemType === 'room_ticket'
+        : isComboRequest || reqOpts?.itemType === 'aieo_vip' || reqOpts?.itemType === 'room_ticket'
         ? { itemType: reqOpts.itemType, renew: Boolean(reqOpts.renew) }
         : { itemType: 'cover', renew: Boolean(reqOpts.renew) };
     const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', payload);
@@ -4147,6 +4159,7 @@ export default function App() {
     if (!targetTest) return false;
     try {
       await dispatchSyncAction('REDEEM_REAL_EXAM_CREDIT', { testId: cleanId });
+      const remaining = Math.max(0, credits - 1);
       setUsersDb(prev => {
         const u = prev[currentUser.username];
         if (!u) return prev;
@@ -4169,7 +4182,7 @@ export default function App() {
           purchasedTestIds: Array.from(new Set([...prevPurchased, cleanId]))
         };
       });
-      showToast(`Đã đổi 1 lượt Combo mở khóa "${targetTest.title}"! Sẵn sàng vào thi thật 4 kỹ năng.`);
+      showToast(`Đã trừ 1 lượt làm đề có phí (còn ${remaining} lượt) và mở khóa "${targetTest.title}"!`);
       return true;
     } catch (err) {
       showToast(err?.message || 'Không thể đổi lượt Combo lúc này.', 'error');
@@ -6975,6 +6988,7 @@ export default function App() {
           onMarkNotificationsRead={handleMarkNotificationsRead}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
           onOpenNotificationTarget={handleOpenNotificationTarget}
+          onOpenRealExamPricing={() => setShowRealExamPricingModal(true)}
           onOpenSpeakingDaily={openSpeakingDaily}
           openMemberProfile={openMemberProfile}
           openStudentGamePortal={openStudentGamePortal}
@@ -7018,6 +7032,7 @@ export default function App() {
           focusedTestId={focusedTestId}
           onClearFocusedTest={() => setFocusedTestId(null)}
           onOpenCheckoutModal={openGlobalCheckoutModal}
+          onOpenRealExamPricing={() => setShowRealExamPricingModal(true)}
           openExamBuilder={openExamBuilder}
           onRedeemRealExamCredit={handleRedeemRealExamCredit}
           openMemberProfile={openMemberProfile}
@@ -7679,6 +7694,20 @@ export default function App() {
           />
         );
       })()}
+
+      {Boolean(showRealExamPricingModal && currentUser && currentUser.role !== 'teacher') && (
+        <RealExamPricingModal
+          isOpen={true}
+          currentUser={currentUser}
+          paymentConfig={paymentConfig}
+          onClose={() => setShowRealExamPricingModal(false)}
+          onSelectCombo={opts => openGlobalCheckoutModal(opts)}
+          onGoToRealExams={() => {
+            setFocusedTestId(null);
+            setView('HOME');
+          }}
+        />
+      )}
 
       {Boolean(globalCheckoutState && currentUser) && (
         <CoverCheckoutModal

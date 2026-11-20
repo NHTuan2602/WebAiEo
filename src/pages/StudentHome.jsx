@@ -11,10 +11,13 @@ import {
   Mic,
   MonitorCheck,
   Play,
+  Plus,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  TrendingUp
+  Ticket,
+  TrendingUp,
+  X
 } from 'lucide-react';
 import { canUserAccessTest, canViewerSeeMember, evaluateSpeakingDailyCompliance, evaluateTestSchedule, formatViDateTime, getAssignedClassNames, getEffectiveTestHashtags, getListeningTracks, getReadingPassages, normalizeExamConfig } from '../constants/seedData';
 import { BRAND_INFO } from '../constants/brandInfo';
@@ -45,6 +48,7 @@ export default function StudentHome({
   focusedTestId = null,
   onClearFocusedTest,
   onOpenCheckoutModal = null,
+  onOpenRealExamPricing = null,
   onRedeemRealExamCredit = null,
   openExamBuilder = null,
   openMemberProfile,
@@ -66,6 +70,7 @@ export default function StudentHome({
 }) {
   const [storefrontTab, setStorefrontTab] = useState('real_exam');
   const [redeemingTestId, setRedeemingTestId] = useState('');
+  const [confirmRedeemTest, setConfirmRedeemTest] = useState(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 15_000);
@@ -451,14 +456,19 @@ export default function StudentHome({
                   <span className="text-sm font-extrabold text-[#0F172B] dark:text-[#FAFAFA]">
                     Chi Phí Test &amp; Combo Thực Chiến (Full 4 Kỹ Năng · 1 Lượt/Đề)
                   </span>
-                  {myRealExamCredits > 0 && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-extrabold">
-                      Bạn đang có {myRealExamCredits} lượt Combo
+                  {!isTeacher && (
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold inline-flex items-center gap-1 ${
+                      myRealExamCredits > 0
+                        ? 'bg-[#0F766E] text-white'
+                        : 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#334155] dark:text-zinc-300 border border-[#E2E8F0] dark:border-zinc-700'
+                    }`}>
+                      <Ticket className="w-3 h-3" />
+                      Bạn đang có {myRealExamCredits} lượt
                     </span>
                   )}
                 </div>
                 <p className="text-xs sm:text-sm text-[#475569] dark:text-zinc-400">
-                  1 đề lẻ: <strong>{formatVndCurrency(normalizedPayCfg.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND)}</strong> • Mua Combo để dùng đổi lượt mở bất kỳ đề Thực Chiến 4 kỹ năng nào!
+                  1 đề lẻ: <strong>{formatVndCurrency(normalizedPayCfg.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND)}</strong> (quét mã mở thẳng đề đó) • Hoặc mua Combo lấy lượt dùng dần cho mọi đề Thực Chiến!
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -488,6 +498,15 @@ export default function StudentHome({
                     </button>
                   );
                 })}
+                {!isTeacher && onOpenRealExamPricing && (
+                  <button
+                    type="button"
+                    onClick={onOpenRealExamPricing}
+                    className="px-3 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs sm:text-sm font-bold inline-flex items-center gap-1 transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Bảng Giá
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -746,22 +765,14 @@ export default function StudentHome({
                           <button
                             type="button"
                             disabled={redeemingTestId === test.id}
-                            onClick={async () => {
-                              if (!onRedeemRealExamCredit) return;
-                              setRedeemingTestId(test.id);
-                              try {
-                                await onRedeemRealExamCredit(test.id);
-                              } finally {
-                                setRedeemingTestId('');
-                              }
-                            }}
+                            onClick={() => setConfirmRedeemTest({ id: test.id, title: test.title, price: testPrice })}
                             className="w-full font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 bg-[#0F766E] hover:bg-[#0D9488] text-white disabled:opacity-60"
                           >
-                            <Sparkles className="w-4 h-4" />
+                            <Ticket className="w-4 h-4" />
                             <span>
                               {redeemingTestId === test.id
-                                ? 'Đang mở đề...'
-                                : `Dùng 1 Lượt Combo (Còn ${myRealExamCredits})`}
+                                ? 'Đang trừ lượt & mở đề...'
+                                : `Dùng 1 Lượt Mở Đề Này (Còn ${myRealExamCredits} lượt)`}
                             </span>
                           </button>
                           <button
@@ -776,60 +787,75 @@ export default function StudentHome({
                             }
                             className="w-full font-semibold py-2 rounded-lg text-xs transition bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-[#334155] dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800"
                           >
-                            Hoặc đóng chi phí test lẻ ({formatVndCurrency(testPrice)})
+                            Hoặc mua đề lẻ trực tiếp ({formatVndCurrency(testPrice)})
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => {
-                            if (isPaidLocked && onOpenCheckoutModal) {
-                              onOpenCheckoutModal({
-                                itemType: 'test',
-                                itemId: test.id,
-                                itemLabel: test.title,
-                                itemPrice: testPrice
-                              });
-                              return;
-                            }
-                            startExam(test.id);
-                          }}
-                          disabled={isButtonDisabled}
-                          className={`w-full font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 ${
-                            isButtonDisabled
-                              ? 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#475569] dark:text-zinc-400 cursor-not-allowed'
-                              : isPaidLocked
-                              ? 'bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950'
-                              : 'bg-[#0F766E] hover:bg-[#0D9488] text-white'
-                          }`}
-                        >
-                          {isButtonDisabled ? (
-                            <>
-                              <Lock className="w-3.5 h-3.5" />
-                              <span>
-                                {schedule.notYetOpen
-                                  ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
-                                  : 'Đã hết hạn nộp bài'}
-                              </span>
-                            </>
-                          ) : isPaidLocked ? (
-                            <>
-                              <ShoppingBag className="w-3.5 h-3.5" />
-                              <span>Chi Phí Test: {formatVndCurrency(testPrice)} (1 Lượt)</span>
-                            </>
-                          ) : requiresPasswordPrompt ? (
-                            <>
-                              <KeyRound className="w-3.5 h-3.5" />
-                              <span>{hasDraft ? 'Nhập Pass · Tiếp Tục Bài' : 'Nhập Mật Khẩu Thi Thật'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-3.5 h-3.5 fill-white" />
-                              <span>
-                                {hasDraft ? 'Tiếp Tục Bài Đang Làm' : 'Bắt Đầu Thi 4 Kỹ Năng'}
-                              </span>
-                            </>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => {
+                              if (isPaidLocked && onOpenCheckoutModal) {
+                                onOpenCheckoutModal({
+                                  itemType: 'test',
+                                  itemId: test.id,
+                                  itemLabel: test.title,
+                                  itemPrice: testPrice
+                                });
+                                return;
+                              }
+                              startExam(test.id);
+                            }}
+                            disabled={isButtonDisabled}
+                            className={`w-full font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2 ${
+                              isButtonDisabled
+                                ? 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#475569] dark:text-zinc-400 cursor-not-allowed'
+                                : isPaidLocked
+                                ? 'bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950'
+                                : 'bg-[#0F766E] hover:bg-[#0D9488] text-white'
+                            }`}
+                          >
+                            {isButtonDisabled ? (
+                              <>
+                                <Lock className="w-3.5 h-3.5" />
+                                <span>
+                                  {schedule.notYetOpen
+                                    ? `Chưa mở (${formatViDateTime(schedule.openAt)})`
+                                    : 'Đã hết hạn nộp bài'}
+                                </span>
+                              </>
+                            ) : isPaidLocked ? (
+                              <>
+                                <ShoppingBag className="w-3.5 h-3.5" />
+                                <span>
+                                  {isPeriodicMockCard
+                                    ? `Đăng Ký Mock Định Kỳ (${formatVndCurrency(testPrice)})`
+                                    : `Mua Đề Lẻ Trực Tiếp (${formatVndCurrency(testPrice)})`}
+                                </span>
+                              </>
+                            ) : requiresPasswordPrompt ? (
+                              <>
+                                <KeyRound className="w-3.5 h-3.5" />
+                                <span>{hasDraft ? 'Nhập Pass · Tiếp Tục Bài' : 'Nhập Mật Khẩu Thi Thật'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3.5 h-3.5 fill-white" />
+                                <span>
+                                  {hasDraft ? 'Tiếp Tục Bài Đang Làm' : 'Bắt Đầu Thi 4 Kỹ Năng'}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                          {isPaidLocked && !isPeriodicMockCard && onOpenRealExamPricing && (
+                            <button
+                              type="button"
+                              onClick={onOpenRealExamPricing}
+                              className="w-full font-semibold py-2 rounded-lg text-xs transition bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-[#0F766E] dark:text-teal-400 hover:bg-slate-50 dark:hover:bg-zinc-800"
+                            >
+                              Hoặc mua Combo tiết kiệm (3 / 5 / 10 đề) →
+                            </button>
                           )}
-                        </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1116,6 +1142,102 @@ export default function StudentHome({
       <footer className="bg-white dark:bg-[#18181B] text-[#334155] dark:text-zinc-300 border-t border-slate-200 dark:border-zinc-800 px-4 sm:px-6 py-9 sm:py-10">
         <BrandContactFooter variant="full" />
       </footer>
+
+      {/* Confirmation Modal Before Deducting 1 Paid Combo Credit */}
+      {Boolean(confirmRedeemTest) && (
+        <div
+          className="fixed inset-0 z-[128] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-redeem-title"
+          onClick={() => !redeemingTestId && setConfirmRedeemTest(null)}
+        >
+          <div
+            className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-[#0F766E] dark:text-teal-400 shrink-0" />
+                <h3 id="confirm-redeem-title" className="text-base font-extrabold text-[#0F172B] dark:text-[#FAFAFA]">
+                  Xác Nhận Dùng 1 Lượt Làm Đề
+                </h3>
+              </div>
+              <button
+                type="button"
+                disabled={Boolean(redeemingTestId)}
+                onClick={() => setConfirmRedeemTest(null)}
+                aria-label="Đóng hộp thoại xác nhận dùng lượt"
+                className="p-1.5 rounded-lg text-[#475569] dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="rounded-xl bg-[#F8FAFC] dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-3.5 space-y-1.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#475569] dark:text-zinc-400">
+                  Đề thi sẽ mở khóa
+                </p>
+                <p className="text-sm font-extrabold text-[#0F172B] dark:text-[#FAFAFA]">
+                  {confirmRedeemTest.title}
+                </p>
+                <p className="text-xs text-[#475569] dark:text-zinc-400">
+                  Full 4 kỹ năng L·R·W·S • 1 lượt thi thật • Nộp bài chờ Ms. Như duyệt điểm
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 divide-x divide-slate-200 dark:divide-zinc-800 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#18181B]">
+                <div className="p-3 text-center">
+                  <p className="text-xs font-semibold text-[#475569] dark:text-zinc-400">Lượt hiện có</p>
+                  <p className="text-lg font-black text-[#0F172B] dark:text-[#FAFAFA] tabular-nums mt-0.5">
+                    {myRealExamCredits} lượt
+                  </p>
+                </div>
+                <div className="p-3 text-center">
+                  <p className="text-xs font-semibold text-[#475569] dark:text-zinc-400">Sau khi mở đề (-1)</p>
+                  <p className="text-lg font-black text-[#0F766E] dark:text-teal-400 tabular-nums mt-0.5">
+                    {Math.max(0, myRealExamCredits - 1)} lượt
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
+                Sau khi bấm xác nhận, hệ thống sẽ <strong>trừ 1 lượt làm đề có phí</strong> từ tài khoản của bạn và mở khóa ngay đề thi này.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={Boolean(redeemingTestId)}
+                  onClick={() => setConfirmRedeemTest(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-bold text-[#334155] dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(redeemingTestId)}
+                  onClick={async () => {
+                    if (!onRedeemRealExamCredit || !confirmRedeemTest?.id) return;
+                    const tid = confirmRedeemTest.id;
+                    setRedeemingTestId(tid);
+                    try {
+                      const ok = await onRedeemRealExamCredit(tid);
+                      if (ok) setConfirmRedeemTest(null);
+                    } finally {
+                      setRedeemingTestId('');
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-extrabold transition disabled:opacity-60 inline-flex items-center gap-1.5"
+                >
+                  <Ticket className="w-3.5 h-3.5" />
+                  <span>{redeemingTestId ? 'Đang mở đề...' : 'Xác Nhận (-1 Lượt) & Mở Đề'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

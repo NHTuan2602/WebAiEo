@@ -71,6 +71,8 @@ import {
 } from '../constants/seedData';
 import {
   formatVndCurrency,
+  getRealExamComboMeta,
+  getRealExamCredits,
   getTestPurchasePriceVnd,
   hasActiveAieoVip,
   hasCustomCoverPermission,
@@ -2397,19 +2399,53 @@ export default function TeacherDashboard({
                                       </button>
                                       {onToggleUserSubscription && (() => {
                                         const hasVip = hasActiveAieoVip(account);
+                                        const stuCredits = getRealExamCredits(account);
+                                        const pendingSubReq = account.subscriptionRequested || null;
+                                        const isPendingComboOrTest = Boolean(
+                                          pendingSubReq &&
+                                          (pendingSubReq.itemType === 'test' ||
+                                            Boolean(getRealExamComboMeta(pendingSubReq.itemType, paymentConfig)))
+                                        );
                                         return (
-                                          <button
-                                            type="button"
-                                            onClick={() => onToggleUserSubscription(account.username, 'aieo_vip', !hasVip)}
-                                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition ${
-                                              hasVip
-                                                ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                                                : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] border-[#CBD5E1] dark:border-slate-700 hover:border-rose-500'
-                                            }`}
-                                            title="Bật/Tắt gói IELTS VIP 1 tháng"
-                                          >
-                                            {hasVip ? 'IELTS VIP' : '+ IELTS VIP'}
-                                          </button>
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => onToggleUserSubscription(account.username, 'aieo_vip', !hasVip)}
+                                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition ${
+                                                hasVip
+                                                  ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                                                  : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] border-[#CBD5E1] dark:border-slate-700 hover:border-rose-500'
+                                              }`}
+                                              title="Bật/Tắt gói IELTS VIP 1 tháng"
+                                            >
+                                              {hasVip ? 'IELTS VIP' : '+ IELTS VIP'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => onToggleUserSubscription(account.username, 'real_exam_credit', true)}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white transition"
+                                              title="Cộng thêm +1 lượt làm đề có phí (Thực Chiến)"
+                                            >
+                                              {stuCredits} lượt (+1)
+                                            </button>
+                                            {isPendingComboOrTest && (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  onToggleUserSubscription(
+                                                    account.username,
+                                                    pendingSubReq.itemType,
+                                                    true,
+                                                    pendingSubReq.itemId || ''
+                                                  )
+                                                }
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-200 border-amber-400 hover:bg-amber-200 transition"
+                                                title="Duyệt yêu cầu mua đề lẻ / Combo Thực Chiến"
+                                              >
+                                                Duyệt: {pendingSubReq.itemLabel || pendingSubReq.itemType}
+                                              </button>
+                                            )}
+                                          </>
                                         );
                                       })()}
                                     </div>

@@ -3762,9 +3762,12 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const tid = String(payload?.testId || '').trim();
       const targetTest = (store.tests || []).find(t => t?.id === tid);
       if (!uname || !targetUser || !targetTest) break;
+      if (targetTest.testMode === 'single_skill') break;
+      if (targetTest.examCategory === 'periodic_mock' || Number(targetTest.priceVnd) >= PERIODIC_MOCK_PRICE_VND) break;
       const currentCredits = getRealExamCredits(targetUser);
       if (currentCredits < 1) break;
       const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
+      if (prevTests.includes(tid)) break;
       const nextTests = Array.from(new Set([...prevTests, tid]));
       const nextCredits = Math.max(0, currentCredits - 1);
       store.users[uname] = {

@@ -11,14 +11,17 @@ import {
   Mic,
   Moon,
   Phone,
+  Plus,
   ShieldAlert,
   Sparkles,
   Sun,
+  Ticket,
   Trash2,
   UserCheck,
   X
 } from 'lucide-react';
 import { BRAND_INFO } from '../../constants/brandInfo';
+import { getRealExamCredits } from '../../constants/profileCustomization';
 import UserAvatarBadge from './UserAvatarBadge';
 import VipMemberName from './VipMemberName';
 
@@ -32,6 +35,7 @@ export default function Navbar({
   onMarkNotificationsRead,
   onOpenAccountSecurity,
   onOpenNotificationTarget,
+  onOpenRealExamPricing = null,
   onOpenSpeakingDaily,
   openMemberProfile,
   openStudentGamePortal,
@@ -58,6 +62,7 @@ export default function Navbar({
   if (view === 'AUTH') return null;
   const isTeacher = currentUser?.role === 'teacher';
   const isSuperAdmin = Boolean(currentUser?.isSuperAdmin || currentUser?.username === 'tuanpro123s');
+  const myRealExamCredits = getRealExamCredits(currentUser);
   const notifList = Array.isArray(notifications) ? notifications : [];
   const unreadNotifCount = notifList.filter(n => !n?.isRead).length;
   const readNotifCount = notifList.filter(n => Boolean(n?.isRead)).length;
@@ -209,6 +214,33 @@ export default function Navbar({
                 </p>
               </div>
             </button>
+            {!isTeacher && currentUser && (
+              <div
+                data-exam-credits-pill="true"
+                className="inline-flex items-center rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 overflow-hidden shrink-0"
+                title={`Số lượt làm đề có phí (Combo Thực Chiến): ${myRealExamCredits} lượt. Bấm dấu + để xem bảng giá và mua thêm Combo.`}
+              >
+                <button
+                  type="button"
+                  onClick={() => onOpenRealExamPricing?.()}
+                  className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 text-xs font-extrabold text-[#0F172B] dark:text-[#FAFAFA] hover:bg-slate-200/70 dark:hover:bg-zinc-700/70 transition whitespace-nowrap"
+                  aria-label={`Số lượt làm đề có phí: ${myRealExamCredits} lượt. Mở bảng giá và combo`}
+                >
+                  <Ticket className="w-3.5 h-3.5 text-[#0F766E] dark:text-teal-400 shrink-0" />
+                  <span className="tabular-nums">{myRealExamCredits}</span>
+                  <span className="hidden sm:inline font-semibold text-[#334155] dark:text-zinc-300">lượt</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenRealExamPricing?.()}
+                  aria-label="Mở bảng giá và mua thêm lượt Combo Thực Chiến"
+                  title="Xem bảng giá & mua thêm Combo lượt thi"
+                  className="inline-flex items-center justify-center px-2 py-1.5 bg-[#0F766E] hover:bg-[#0D9488] text-white border-l border-[#0F766E] transition self-stretch"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setShowAvatarModal(true)}
