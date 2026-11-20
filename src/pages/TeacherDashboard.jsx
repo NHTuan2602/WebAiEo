@@ -76,6 +76,7 @@ import {
   getTestPurchasePriceVnd,
   hasActiveAieoVip,
   hasCustomCoverPermission,
+  formatRemainingSubscriptionText,
   normalizePaymentConfig,
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
@@ -2461,6 +2462,33 @@ export default function TeacherDashboard({
                                     ? `✓ Email OTP: ${account.email || account.maskedEmail}`
                                     : 'Chưa liên kết Email OTP'}
                                 </p>
+                                {isViewerSuperAdmin && isTeacherAccount && onToggleUserSubscription && (() => {
+                                  const hasVip = hasActiveAieoVip(account);
+                                  return (
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                      {hasVip && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30">
+                                          <Crown className="w-3 h-3" /> IELTS VIP · {formatRemainingSubscriptionText(account.aieoVipExpiresAt)}
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (hasVip && !window.confirm(`Thu hồi gói IELTS VIP của ${account.name || account.username}?`)) return;
+                                          onToggleUserSubscription(account.username, 'aieo_vip', !hasVip);
+                                        }}
+                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                                          hasVip
+                                            ? 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 hover:bg-rose-50 dark:hover:bg-rose-500/10'
+                                            : 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
+                                        }`}
+                                        title={hasVip ? 'Thu hồi gói IELTS VIP' : 'Cấp gói IELTS VIP trong 30 ngày'}
+                                      >
+                                        {hasVip ? 'Thu hồi' : <><Crown className="w-3 h-3" /> + Cấp IELTS VIP (30 ngày)</>}
+                                      </button>
+                                    </div>
+                                  );
+                                })()}
                                 {isViewerSuperAdmin && account.role === 'student' && onToggleUserCoverUnlock && (() => {
                                   const isCoverUnlocked = hasCustomCoverPermission(account);
                                   const isPendingCover = !isCoverUnlocked && Number(account.coverUnlockRequestedAt) > 0;
