@@ -32,6 +32,8 @@ import {
   DAILY_LISTENING_SUBCATEGORIES,
   DAILY_READING_SUBCATEGORIES,
   DAILY_WRITING_T1_SUBCATEGORIES,
+  DAILY_WRITING_T2_TOPICS,
+  DAILY_WRITING_T2_QUESTION_TYPES,
   canUserAccessTest,
   evaluateSpeakingDailyCompliance,
   evaluateTestSchedule,
@@ -89,7 +91,8 @@ export default function SkillPracticeHub({
   const [subCatFilterState, setSubCatFilterState] = useState({ tab: activeTab, sub: 'all' });
   const activeSubCatFilter = subCatFilterState.tab === activeTab ? subCatFilterState.sub : 'all';
   const setActiveSubCatFilter = (nextSub) => setSubCatFilterState({ tab: activeTab, sub: nextSub || 'all' });
-  const hashtagScopeKey = `${activeTab}:${singleHubSkill}:${activeSubCatFilter}`;
+  const [writingTask2Filter, setWritingTask2Filter] = useState({ topic: 'all', questionType: 'all' });
+  const hashtagScopeKey = `${activeTab}:${singleHubSkill}:${activeSubCatFilter}:${activeTab === 'writing_task2' ? `${writingTask2Filter.topic}:${writingTask2Filter.questionType}` : ''}`;
   const [hashtagFilterState, setHashtagFilterState] = useState({ scopeKey: hashtagScopeKey, tag: 'all' });
   const selectedSpeakingHashtag = hashtagFilterState.scopeKey === hashtagScopeKey ? hashtagFilterState.tag : 'all';
   const setSelectedSpeakingHashtag = (nextOrUpdater) => {
@@ -737,13 +740,38 @@ export default function SkillPracticeHub({
     };
     const meta = metaMap[tabKey] || metaMap[actualSkill] || metaMap.reading;
     const IconComp = meta.icon;
+    const isWritingTask2Tab = tabKey === 'writing_task2';
+    const selectedWritingTask2Topic = writingTask2Filter.topic;
+    const selectedWritingTask2QuestionType = writingTask2Filter.questionType;
+    const getTask2Topic = test => String(test?.writingTask2Topic || '').trim();
+    const getTask2QuestionType = test => String(test?.writingTask2QuestionType || '').trim();
+    const isKnownTask2Topic = topicId => DAILY_WRITING_T2_TOPICS.some(topic => topic.id === topicId);
+    const isKnownTask2QuestionType = typeId => DAILY_WRITING_T2_QUESTION_TYPES.some(type => type.id === typeId);
     const focusedMatch = focusedTestId ? list.find(t => t.id === focusedTestId) : null;
     const subFilteredList = focusedMatch
       ? [focusedMatch]
       : activeSubCatFilter === 'all'
       ? list
       : list.filter(t => normalizeExamConfig(t).dailySubCategory === activeSubCatFilter);
-    const displayedList = subFilteredList;
+    const topicFilteredList = !isWritingTask2Tab || selectedWritingTask2Topic === 'all'
+      ? subFilteredList
+      : subFilteredList.filter(test => selectedWritingTask2Topic === '__unclassified__'
+        ? !isKnownTask2Topic(getTask2Topic(test))
+        : getTask2Topic(test) === selectedWritingTask2Topic);
+    const displayedList = !isWritingTask2Tab || selectedWritingTask2QuestionType === 'all'
+      ? topicFilteredList
+      : topicFilteredList.filter(test => selectedWritingTask2QuestionType === '__unclassified__'
+        ? !isKnownTask2QuestionType(getTask2QuestionType(test))
+        : getTask2QuestionType(test) === selectedWritingTask2QuestionType);
+    const task2QuestionTypeScope = selectedWritingTask2Topic === 'all'
+      ? list
+      : list.filter(test => selectedWritingTask2Topic === '__unclassified__'
+        ? !isKnownTask2Topic(getTask2Topic(test))
+        : getTask2Topic(test) === selectedWritingTask2Topic);
+    const unclassifiedTask2TopicCount = list.filter(test => !isKnownTask2Topic(getTask2Topic(test))).length;
+    const unclassifiedTask2QuestionTypeCount = task2QuestionTypeScope.filter(
+      test => !isKnownTask2QuestionType(getTask2QuestionType(test))
+    ).length;
 
     return (
       <div className="space-y-6">
@@ -768,7 +796,15 @@ export default function SkillPracticeHub({
                   dailySubCategory:
                     activeSubCatFilter !== 'all'
                       ? activeSubCatFilter
-                      : meta.subCategories[0]?.id || (tabKey === 'writing_task2' ? 'w2_essay' : '')
+                      : meta.subCategories[0]?.id || (tabKey === 'writing_task2' ? 'w2_essay' : ''),
+                  ...(isWritingTask2Tab
+                    ? {
+                        writingTask2Topic: isKnownTask2Topic(selectedWritingTask2Topic) ? selectedWritingTask2Topic : '',
+                        writingTask2QuestionType: isKnownTask2QuestionType(selectedWritingTask2QuestionType)
+                          ? selectedWritingTask2QuestionType
+                          : ''
+                      }
+                    : {})
                 })
               }
               className="px-4 py-2.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-2 transition self-start sm:self-auto"
@@ -814,6 +850,111 @@ export default function SkillPracticeHub({
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {isWritingTask2Tab && !focusedMatch && (
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-3">
+            <div className="space-y-2">
+              <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">Chọn chủ đề:</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  aria-pressed={selectedWritingTask2Topic === 'all'}
+                  onClick={() => setWritingTask2Filter(prev => ({ ...prev, topic: 'all' }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                    selectedWritingTask2Topic === 'all'
+                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                  }`}
+                >
+                  Tất cả ({list.length})
+                </button>
+                {DAILY_WRITING_T2_TOPICS.map(topic => {
+                  const topicCount = list.filter(test => getTask2Topic(test) === topic.id).length;
+                  return (
+                    <button
+                      key={topic.id}
+                      type="button"
+                      aria-pressed={selectedWritingTask2Topic === topic.id}
+                      onClick={() => setWritingTask2Filter(prev => ({ ...prev, topic: topic.id }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                        selectedWritingTask2Topic === topic.id
+                          ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                          : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                      }`}
+                    >
+                      {topic.label} ({topicCount})
+                    </button>
+                  );
+                })}
+                {unclassifiedTask2TopicCount > 0 && (
+                  <button
+                    type="button"
+                    aria-pressed={selectedWritingTask2Topic === '__unclassified__'}
+                    onClick={() => setWritingTask2Filter(prev => ({ ...prev, topic: '__unclassified__' }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                      selectedWritingTask2Topic === '__unclassified__'
+                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                    }`}
+                  >
+                    Chưa gắn chủ đề ({unclassifiedTask2TopicCount})
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">Chọn dạng bài:</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  aria-pressed={selectedWritingTask2QuestionType === 'all'}
+                  onClick={() => setWritingTask2Filter(prev => ({ ...prev, questionType: 'all' }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                    selectedWritingTask2QuestionType === 'all'
+                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                  }`}
+                >
+                  Tất cả ({task2QuestionTypeScope.length})
+                </button>
+                {DAILY_WRITING_T2_QUESTION_TYPES.map(questionType => {
+                  const questionTypeCount = task2QuestionTypeScope.filter(
+                    test => getTask2QuestionType(test) === questionType.id
+                  ).length;
+                  return (
+                    <button
+                      key={questionType.id}
+                      type="button"
+                      aria-pressed={selectedWritingTask2QuestionType === questionType.id}
+                      onClick={() => setWritingTask2Filter(prev => ({ ...prev, questionType: questionType.id }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                        selectedWritingTask2QuestionType === questionType.id
+                          ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                          : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                      }`}
+                    >
+                      {questionType.label} ({questionTypeCount})
+                    </button>
+                  );
+                })}
+                {unclassifiedTask2QuestionTypeCount > 0 && (
+                  <button
+                    type="button"
+                    aria-pressed={selectedWritingTask2QuestionType === '__unclassified__'}
+                    onClick={() => setWritingTask2Filter(prev => ({ ...prev, questionType: '__unclassified__' }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                      selectedWritingTask2QuestionType === '__unclassified__'
+                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                    }`}
+                  >
+                    Chưa chọn dạng bài ({unclassifiedTask2QuestionTypeCount})
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -908,12 +1049,16 @@ export default function SkillPracticeHub({
                   <h2 className="text-base font-extrabold text-[#0F172B] dark:text-slate-100">
                     {selectedSpeakingHashtag !== 'all'
                       ? `Chưa có bài ${actualSkill.toUpperCase()} nào gắn nhãn ${selectedSpeakingHashtag}`
+                      : isWritingTask2Tab && selectedWritingTask2Topic !== 'all'
+                      ? `Chưa có bài Writing Task 2 thuộc chủ đề ${DAILY_WRITING_T2_TOPICS.find(topic => topic.id === selectedWritingTask2Topic)?.label || 'chưa gắn chủ đề'}`
+                      : isWritingTask2Tab && selectedWritingTask2QuestionType !== 'all'
+                      ? `Chưa có bài Writing Task 2 thuộc dạng ${DAILY_WRITING_T2_QUESTION_TYPES.find(type => type.id === selectedWritingTask2QuestionType)?.label || 'chưa chọn dạng bài'}`
                       : activeSubCatFilter !== 'all'
                       ? `Chưa có bài tập nào trong mục ${getDailySubCategoryLabel(activeSubCatFilter)}`
                       : `Chưa có bài tập ${meta.name} nào`}
                   </h2>
                   <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
-                    {selectedSpeakingHashtag !== 'all' || activeSubCatFilter !== 'all'
+                    {selectedSpeakingHashtag !== 'all' || activeSubCatFilter !== 'all' || (isWritingTask2Tab && (selectedWritingTask2Topic !== 'all' || selectedWritingTask2QuestionType !== 'all'))
                       ? 'Hãy bấm "Tất cả" để xem toàn bộ danh sách bài tập.'
                       : isTeacher
                       ? `Hãy bấm nút Tạo Bài ở góc trên phải để đăng tải bài tập mới vào phân mục này.`
@@ -994,6 +1139,22 @@ export default function SkillPracticeHub({
                               )}
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
+                              {isWritingTask2Tab && (() => {
+                                const topicLabel = DAILY_WRITING_T2_TOPICS.find(topic => topic.id === getTask2Topic(test))?.label;
+                                const questionTypeLabel = DAILY_WRITING_T2_QUESTION_TYPES.find(
+                                  questionType => questionType.id === getTask2QuestionType(test)
+                                )?.label;
+                                return (
+                                  <>
+                                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
+                                      {topicLabel || 'Chưa gắn chủ đề'}
+                                    </span>
+                                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
+                                      {questionTypeLabel || 'Chưa chọn dạng bài'}
+                                    </span>
+                                  </>
+                                );
+                              })()}
                               {getAssignedClassNames(cfg.assignedClassIds, classesDb).map(cls => (
                                 <span
                                   key={cls.id}

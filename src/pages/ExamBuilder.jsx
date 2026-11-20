@@ -40,6 +40,8 @@ import {
   DAILY_READING_SUBCATEGORIES,
   DAILY_WRITING_T1_SUBCATEGORIES,
   DAILY_WRITING_T2_SUBCATEGORIES,
+  DAILY_WRITING_T2_TOPICS,
+  DAILY_WRITING_T2_QUESTION_TYPES,
   PRESET_TEST_HASHTAGS,
   formatViDateTime,
   getEffectiveTestHashtags,
@@ -2728,6 +2730,37 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
               <PenTool className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Writing Academic Task 2 ( Tối thiểu 250 từ )
             </h3>
+
+            {wCfg.testMode === 'single_skill' && wCfg.focusSkill === 'writing' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="block space-y-1.5">
+                  <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">Chủ đề Writing Task 2</span>
+                  <select
+                    value={testForm.writingTask2Topic || ''}
+                    onChange={e => setTestForm(prev => ({ ...prev, writingTask2Topic: e.target.value }))}
+                    className="w-full p-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">Chọn chủ đề</option>
+                    {DAILY_WRITING_T2_TOPICS.map(topic => (
+                      <option key={topic.id} value={topic.id}>{topic.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">Dạng câu hỏi</span>
+                  <select
+                    value={testForm.writingTask2QuestionType || ''}
+                    onChange={e => setTestForm(prev => ({ ...prev, writingTask2QuestionType: e.target.value }))}
+                    className="w-full p-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="">Chọn dạng bài</option>
+                    {DAILY_WRITING_T2_QUESTION_TYPES.map(questionType => (
+                      <option key={questionType.id} value={questionType.id}>{questionType.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Đề Bài Writing Task 2 (Prompt)</label>

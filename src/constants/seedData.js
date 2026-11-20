@@ -156,6 +156,41 @@ export const DAILY_WRITING_T2_SUBCATEGORIES = [
   { id: 'w2_essay', label: 'Writing Task 2 (Essay)', shortLabel: 'W2 • Essay' }
 ];
 
+export const DAILY_WRITING_T2_TOPICS = [
+  { id: 'education', label: 'Education' },
+  { id: 'transport', label: 'Transport' },
+  { id: 'government_funding_public_services', label: 'Government Funding & Public Services' },
+  { id: 'environment_energy', label: 'Environment & Energy' },
+  { id: 'health_lifestyle', label: 'Health & Lifestyle' },
+  { id: 'work_employment', label: 'Work & Employment' },
+  { id: 'city_urbanization', label: 'City & Urbanization' },
+  { id: 'family_parents_children', label: 'Family, Parents & Children' },
+  { id: 'globalization_international_relations', label: 'Globalization & International Relations' },
+  { id: 'economy_business', label: 'Economy & Business' },
+  { id: 'technology_science', label: 'Technology & Science' },
+  { id: 'sport_leisure', label: 'Sport & Leisure' },
+  { id: 'news_media_advertising', label: 'News, Media & Advertising' },
+  { id: 'space_exploration', label: 'Space Exploration' },
+  { id: 'history_museums_heritage', label: 'History, Museums & Heritage' },
+  { id: 'crime_law_military', label: 'Crime, Law & Military' },
+  { id: 'food_agriculture', label: 'Food & Agriculture' },
+  { id: 'tourism_culture', label: 'Tourism & Culture' },
+  { id: 'art_music', label: 'Art & Music' },
+  { id: 'architecture_housing', label: 'Architecture & Housing' },
+  { id: 'animals_wildlife_conservation', label: 'Animals & Wildlife Conservation' },
+  { id: 'language_communication', label: 'Language & Communication' },
+  { id: 'consumerism_materialism', label: 'Consumerism & Materialism' },
+  { id: 'social_issues_demographics_psychology', label: 'Social Issues, Demographics & Psychology' }
+];
+
+export const DAILY_WRITING_T2_QUESTION_TYPES = [
+  { id: 'reason_problem_solution', label: 'Reason / Problem / Solution' },
+  { id: 'agree_disagree', label: 'Agree / Disagree' },
+  { id: 'both_views', label: 'Both Views' },
+  { id: 'pros_cons', label: 'Pros / Cons' },
+  { id: 'two_questions', label: '2 Questions' }
+];
+
 export const getDailySubCategoryLabel = (subCatId = '') => {
   const clean = String(subCatId || '').trim();
   if (!clean) return '';
@@ -971,6 +1006,12 @@ export const createEmptySingleSkillTestForm = (skill = 'speaking', subOpts = {})
     examCategory: 'daily_zone',
     dailySubCategory: defaultSubCat,
     writingTaskScope: taskScope,
+    ...(safeSkill === 'writing' && taskScope === 'task2'
+      ? {
+          writingTask2Topic: String(subOpts?.writingTask2Topic || ''),
+          writingTask2QuestionType: String(subOpts?.writingTask2QuestionType || '')
+        }
+      : {}),
     priceVnd: 0,
     examPurpose: 'free_practice',
     autoAiGrade: false,
@@ -1974,6 +2015,8 @@ Write **ONE WORD** for the answer.
     examCategory: 'daily_zone',
     dailySubCategory: 'w2_essay',
     writingTaskScope: 'task2',
+    writingTask2Topic: 'education',
+    writingTask2QuestionType: 'pros_cons',
     maxAttempts: 0,
     antiCheatEnabled: false,
     allowViewAnswers: true,
