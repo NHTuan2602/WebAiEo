@@ -723,7 +723,7 @@ export default function StudentProfile({
             </button>
 
             {showMemberDirectoryPopup && (
-              <div className="fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-[410px] max-h-[75vh] flex flex-col bg-white dark:bg-[#18181B] rounded-2xl shadow-2xl border border-[#E2E8F0] dark:border-zinc-700 z-50 overflow-hidden">
+              <div className="apple-popover-origin fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-[410px] max-h-[75vh] flex flex-col bg-white dark:bg-[#18181B] rounded-2xl shadow-2xl border border-[#E2E8F0] dark:border-zinc-700 z-50 overflow-hidden">
                 <div className="px-4 py-3 bg-[#F8FAFC] dark:bg-zinc-900 border-b border-[#E2E8F0] dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0">
                   <div>
                     <h2 className="text-sm font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">

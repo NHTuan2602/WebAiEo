@@ -7100,6 +7100,7 @@ export default function App() {
       )}
 
       {/* Main Views */}
+      <div key={view} className={view === 'EXAM_MODE' || view === 'GAME_ARENA' ? '' : 'apple-view-enter'}>
       {view === 'AUTH' && (
         <AuthScreen
           authError={authError}
@@ -7548,6 +7549,7 @@ export default function App() {
           updateReadingPassageField={updateReadingPassageField}
         />
       )}
+      </div>
 
       <GlobalModals
         addStudentMode={addStudentMode}

@@ -23,6 +23,7 @@ import { canUserAccessTest, canViewerSeeMember, evaluateSpeakingDailyCompliance,
 import { BRAND_INFO } from '../constants/brandInfo';
 import { loadExamDraft } from '../utils/sessionPersistence';
 import { Users as ClassMembersIcon } from 'lucide-react';
+import AppleSegmentedControl from '../components/common/AppleSegmentedControl';
 import BrandContactFooter from '../components/common/BrandContactFooter';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
@@ -425,26 +426,19 @@ export default function StudentHome({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center flex-wrap gap-1.5 bg-white dark:bg-[#18181B] p-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-sm font-semibold self-start sm:self-auto">
-                {[
+              <AppleSegmentedControl
+                items={[
                   { id: 'real_exam', label: `Thực Chiến Thi Thật (${realExamTests.length})` },
                   { id: 'periodic_mock', label: `Mock Test Định Kỳ (${periodicMockTests.length})` },
                   { id: 'daily_zone', label: `Daily Zone (${singleSkillCount})` }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setStorefrontTab(tab.id)}
-                    className={`px-3.5 py-2 rounded-md transition whitespace-nowrap ${
-                      storefrontTab === tab.id
-                        ? 'bg-[#0F766E] text-white'
-                        : 'text-[#334155] dark:text-zinc-300 hover:text-[#0F172B] dark:hover:text-white'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+                ]}
+                activeId={storefrontTab}
+                onSelect={setStorefrontTab}
+                tone="teal"
+                ariaLabel="Phân mục đề thi IELTS"
+                containerClassName="flex-wrap gap-1 bg-white dark:bg-[#18181B] p-1 rounded-xl border border-slate-200 dark:border-zinc-800 text-sm font-semibold self-start sm:self-auto"
+                buttonClassName="px-3.5 py-2"
+              />
             )}
           </div>
 
@@ -513,7 +507,7 @@ export default function StudentHome({
 
           {/* Tab 3: Daily Zone Gateway Cards */}
           {!matchedFocusedTest && storefrontTab === 'daily_zone' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div key="daily_zone" className="apple-view-enter grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {[
                 {
                   tab: 'speaking_daily',
@@ -543,7 +537,7 @@ export default function StudentHome({
               ].map(card => (
                 <div
                   key={card.tab}
-                  className="bg-white dark:bg-[#18181B] rounded-lg border border-slate-200 dark:border-zinc-800 p-6 flex flex-col justify-between gap-4"
+                  className="lexi-card bg-white dark:bg-[#18181B] rounded-lg border border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-600 p-6 flex flex-col justify-between gap-4"
                 >
                   <div>
                     <h3 className="font-extrabold text-[#0F172B] dark:text-[#FAFAFA] text-base mb-1.5">
@@ -586,7 +580,7 @@ export default function StudentHome({
               )}
             </div>
           ) : (
-            <div className={`grid gap-5 ${matchedFocusedTest ? 'grid-cols-1 max-w-xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+            <div key={storefrontTab} className={`apple-view-enter grid gap-5 ${matchedFocusedTest ? 'grid-cols-1 max-w-xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
               {filteredTests.map(test => {
                 const cfg = normalizeExamConfig(test);
                 const schedule = evaluateTestSchedule(cfg, serverNowMs);
@@ -1146,14 +1140,14 @@ export default function StudentHome({
       {/* Confirmation Modal Before Deducting 1 Paid Combo Credit */}
       {Boolean(confirmRedeemTest) && (
         <div
-          className="fixed inset-0 z-[128] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm"
+          className="apple-backdrop-enter fixed inset-0 z-[128] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-redeem-title"
           onClick={() => !redeemingTestId && setConfirmRedeemTest(null)}
         >
           <div
-            className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+            className="apple-modal-sheet bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <div className="px-5 py-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3">

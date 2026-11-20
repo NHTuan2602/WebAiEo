@@ -23,12 +23,12 @@ export default function ServerMaintenanceOverlay({
   return (
     <div
       data-server-maintenance-overlay="true"
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#F8FAFC]/95 dark:bg-[#09090B]/95 backdrop-blur-md overflow-y-auto"
+      className="apple-backdrop-enter fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#F8FAFC]/95 dark:bg-[#09090B]/95 backdrop-blur-md overflow-y-auto"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="server-maintenance-heading"
     >
-      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 p-6 sm:p-8 text-center shadow-2xl space-y-5 my-auto">
+      <div className="apple-modal-sheet w-full max-w-lg rounded-2xl bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 p-6 sm:p-8 text-center shadow-2xl space-y-5 my-auto">
         <div className="flex justify-center">
           <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold tracking-wide uppercase">
             {isCrash ? (

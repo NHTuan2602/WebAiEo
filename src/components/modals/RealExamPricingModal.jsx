@@ -25,14 +25,14 @@ export default function RealExamPricingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[125] flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm"
+      className="apple-backdrop-enter fixed inset-0 z-[125] flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="real-exam-pricing-title"
       onClick={() => onClose?.()}
     >
       <div
-        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl"
+        className="apple-modal-sheet bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
