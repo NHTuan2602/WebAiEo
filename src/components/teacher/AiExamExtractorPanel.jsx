@@ -4,16 +4,26 @@ import {
   Bot,
   CheckCircle2,
   ClipboardPaste,
+  Download,
+  Eye,
   FileText,
   Image as ImageIcon,
   Key,
+  Layers,
   Loader2,
+  Printer,
   Sparkles,
   Trash2,
   Upload,
-  Wand2
+  Wand2,
+  X
 } from 'lucide-react';
-import { extractExamFromImages, extractReadingExamFromPdf } from '../../utils/geminiGrader';
+import {
+  convertScreenshotsToIeltsHtml,
+  extractExamFromImages,
+  extractReadingExamFromPdf,
+  extractReadingExamFromScreenshots
+} from '../../utils/geminiGrader';
 
 const MAX_READING_PDF_BYTES = 14 * 1024 * 1024;
 
@@ -99,6 +109,113 @@ export default function AiExamExtractorPanel({
   const [extracting, setExtracting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [lastResultInfo, setLastResultInfo] = useState(null);
+  const [readingSourceTab, setReadingSourceTab] = useState('pdf');
+  const [screenshotFiles, setScreenshotFiles] = useState([]);
+  const [autoApplyScreenshots, setAutoApplyScreenshots] = useState(true);
+  const [cambridgeHtmlResult, setCambridgeHtmlResult] = useState(null);
+  const [showHtmlPreviewModal, setShowHtmlPreviewModal] = useState(false);
+
+  const handlePrintCambridgeHtml = (html) => {
+    if (!html) return;
+    const printWin = window.open('', '_blank', 'width=950,height=800');
+    if (!printWin) {
+      showToast?.('Vui lòng cho phép popup trình duyệt để mở hộp thoại in/lưu PDF.', 'error');
+      return;
+    }
+    printWin.document.open();
+    printWin.document.write(html);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+    }, 400);
+  };
+
+  const handleDownloadCambridgeHtml = (html, fileName = 'cambridge_ielts_reading.html') => {
+    if (!html) return;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast?.('Đã tải xuống file HTML đề thi!');
+  };
+
+  const handleRunScreenshotsConversion = async (autoApply = true) => {
+    setErrorMsg('');
+    setLastResultInfo(null);
+    if (!hasGeminiAccess) {
+      setErrorMsg('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước khi sử dụng AI.');
+      return;
+    }
+    if (screenshotFiles.length === 0) {
+      setErrorMsg('Hãy tải lên hoặc dán (Ctrl+V) ít nhất 1 ảnh chụp màn hình đề thi.');
+      return;
+    }
+
+    setExtracting(true);
+    try {
+      const imagesData = screenshotFiles.map(i => i.dataUrl);
+      if (autoApply && onApplyReadingPdfExtraction) {
+        const extracted = await extractReadingExamFromScreenshots({
+          apiKey: aiApiKey,
+          images: imagesData,
+          extraInstructions
+        });
+        const summary = onApplyReadingPdfExtraction(extracted, { replaceAll: replaceWholeReading });
+        if (summary?.cancelled) {
+          setCambridgeHtmlResult({
+            fullHtml: extracted.fullHtml,
+            rawBodyHtml: extracted.rawBodyHtml,
+            usedModel: extracted.usedModel,
+            title: extracted.title,
+            questionCount: extracted.questionCount,
+            passageCount: extracted.passages.length,
+            extracted
+          });
+          return;
+        }
+        setCambridgeHtmlResult({
+          fullHtml: extracted.fullHtml,
+          rawBodyHtml: extracted.rawBodyHtml,
+          usedModel: extracted.usedModel,
+          title: extracted.title,
+          questionCount: summary?.questionCount ?? extracted.questionCount,
+          passageCount: summary?.passageCount ?? extracted.passages.length,
+          extracted
+        });
+        setLastResultInfo({
+          usedModel: extracted.usedModel,
+          questionCount: summary?.questionCount ?? extracted.questionCount,
+          passageCount: summary?.passageCount ?? extracted.passages.length,
+          answerKeyFound: extracted.answerKeyFound,
+          warnings: Array.isArray(extracted.warnings) ? extracted.warnings : []
+        });
+        showToast?.(`AI đã ghép ${screenshotFiles.length} ảnh và tạo ${summary?.passageCount ?? extracted.passages.length} passage với ${summary?.questionCount ?? extracted.questionCount} câu!`);
+      } else {
+        const result = await convertScreenshotsToIeltsHtml({
+          apiKey: aiApiKey,
+          images: imagesData,
+          extraInstructions
+        });
+        setCambridgeHtmlResult({
+          fullHtml: result.fullHtml,
+          rawBodyHtml: result.rawBodyHtml,
+          usedModel: result.usedModel,
+          title: 'IELTS Reading Mock Test'
+        });
+        showToast?.('Đã chuyển đổi ảnh chụp sang bản in Cambridge A4 thành công!');
+      }
+    } catch (err) {
+      setErrorMsg(err?.message || 'Không thể xử lý ảnh chụp đề thi. Vui lòng kiểm tra lại ảnh.');
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const appendImageFiles = async (fileList, setter) => {
     const files = Array.from(fileList || []).filter(f => f.type?.startsWith('image/'));
@@ -269,71 +386,295 @@ export default function AiExamExtractorPanel({
       </div>
 
       {skill === 'reading' && onApplyReadingPdfExtraction && (
-        <section className="rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-500/10 p-4 sm:p-5 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <section className="rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-500/10 p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-200/60 dark:border-indigo-500/20 pb-3">
             <div>
               <h4 className="flex items-center gap-2 text-sm font-extrabold text-indigo-950 dark:text-indigo-100">
-                <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
-                Tạo toàn bộ Reading từ PDF
+                <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
+                <span>Tạo Toàn Bộ Đề Reading (3 Passages + 40 Câu)</span>
               </h4>
-              <p className="mt-1 text-xs leading-relaxed text-indigo-900/80 dark:text-indigo-100/75">
-                AI đọc tất cả trang theo thứ tự, tự tách các passage, câu hỏi và trang đáp án trong cùng một file.
+              <p className="mt-0.5 text-xs text-indigo-900/80 dark:text-indigo-200/80">
+                Hỗ trợ tải file PDF có sẵn hoặc tự động ghép hàng loạt ảnh chụp web cuộn 2 cột thành PDF chuẩn Cambridge.
               </p>
             </div>
-            <span className="shrink-0 text-xs font-semibold text-indigo-800 dark:text-indigo-200">Tối đa 14 MB</span>
+
+            <div className="flex items-center bg-white/80 dark:bg-slate-800 rounded-xl p-1 border border-indigo-200 dark:border-slate-700 shrink-0">
+              <button
+                type="button"
+                onClick={() => setReadingSourceTab('pdf')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  readingSourceTab === 'pdf'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>File PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReadingSourceTab('screenshots')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  readingSourceTab === 'screenshots'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Ghép Ảnh Web ➜ PDF / Đề</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-400 text-slate-900 font-black">Mới</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <label className="cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900">
-              <Upload className="w-4 h-4" />
-              <span>{readingPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF'}</span>
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                onChange={handleSelectReadingPdf}
-                className="sr-only"
-                aria-label="Chọn PDF đề IELTS Reading"
-              />
-            </label>
+          {readingSourceTab === 'pdf' ? (
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <label className="cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900">
+                  <Upload className="w-4 h-4" />
+                  <span>{readingPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF'}</span>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={handleSelectReadingPdf}
+                    className="sr-only"
+                    aria-label="Chọn PDF đề IELTS Reading"
+                  />
+                </label>
 
-            <div className="min-w-0 flex-1" aria-live="polite">
-              {readingPdfFile ? (
-                <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={readingPdfFile.name}>
-                  {readingPdfFile.name} <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(readingPdfFile.size)}</span>
+                <div className="min-w-0 flex-1" aria-live="polite">
+                  {readingPdfFile ? (
+                    <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={readingPdfFile.name}>
+                      {readingPdfFile.name} <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(readingPdfFile.size)}</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-600 dark:text-slate-300">Chọn file PDF có đầy đủ 3 passage, câu hỏi và answer key (tối đa 14 MB).</p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!readingPdfFile || extracting}
+                  onClick={handleRunReadingPdfExtract}
+                  className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                    !readingPdfFile || extracting
+                      ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                      : 'bg-[#007A7A] text-white hover:bg-[#065B5B]'
+                  }`}
+                >
+                  {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-amber-300" />}
+                  {extracting ? 'AI đang đọc toàn bộ PDF…' : 'AI đọc PDF & tạo đề'}
+                </button>
+              </div>
+
+              <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={replaceWholeReading}
+                  onChange={e => setReplaceWholeReading(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded accent-indigo-600"
+                />
+                <span>Thay toàn bộ Reading hiện có bằng đề trong PDF</span>
+              </label>
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              <div
+                tabIndex={0}
+                onPaste={e => handlePasteZone(e, setScreenshotFiles)}
+                className="bg-white dark:bg-slate-900 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-500/40 p-4 space-y-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span className="text-xs font-extrabold text-indigo-950 dark:text-indigo-100">
+                      Tập ảnh chụp màn hình ({screenshotFiles.length} ảnh)
+                    </span>
+                  </div>
+                  {screenshotFiles.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setScreenshotFiles([])}
+                      className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                    >
+                      Xóa tất cả ảnh
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Nhấn <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border font-mono text-[11px]">Ctrl+V</kbd> để dán ảnh chụp từ bộ nhớ đệm, hoặc tải lên toàn bộ ảnh chụp đề thi theo thứ tự từ trên xuống dưới. AI sẽ tự phát hiện đoạn cuộn trùng lặp để khử bỏ.
                 </p>
-              ) : (
-                <p className="text-xs text-slate-600 dark:text-slate-300">Chọn một file có passage, câu hỏi và nếu có thì cả answer key.</p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Chọn nhiều ảnh chụp màn hình</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={e => {
+                        appendImageFiles(e.target.files, setScreenshotFiles);
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Hỗ trợ PNG, JPG, WebP. Tự động nén thông minh giữ độ sắc nét chữ.
+                  </span>
+                </div>
+
+                {screenshotFiles.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 max-h-48 overflow-y-auto">
+                    {screenshotFiles.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="group relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 aspect-video flex items-center justify-center"
+                      >
+                        <img
+                          src={item.dataUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute bottom-1 left-1 px-1.5 py-0.2 rounded bg-black/75 text-white font-mono text-[10px] font-bold">
+                          #{index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setScreenshotFiles(prev => prev.filter(f => f.id !== item.id))}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-rose-600/90 text-white opacity-0 group-hover:opacity-100 transition shadow-xs"
+                          title="Xóa ảnh này"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoApplyScreenshots}
+                      onChange={e => setAutoApplyScreenshots(e.target.checked)}
+                      className="w-4 h-4 rounded accent-indigo-600"
+                    />
+                    <span>Tự động nạp đề vào hệ thống (Tạo đủ 3 Passages &amp; câu hỏi)</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={replaceWholeReading}
+                      onChange={e => setReplaceWholeReading(e.target.checked)}
+                      className="w-4 h-4 rounded accent-indigo-600"
+                    />
+                    <span>Thay thế toàn bộ Reading hiện tại</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={screenshotFiles.length === 0 || extracting}
+                    onClick={() => handleRunScreenshotsConversion(false)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition border border-indigo-300 dark:border-indigo-600 text-indigo-700 dark:text-indigo-200 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 ${
+                      screenshotFiles.length === 0 || extracting ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>Chỉ xuất bản in Cambridge</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={screenshotFiles.length === 0 || extracting}
+                    onClick={() => handleRunScreenshotsConversion(true)}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold text-white transition shadow-sm ${
+                      screenshotFiles.length === 0 || extracting
+                        ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed'
+                        : 'bg-indigo-600 hover:bg-indigo-700'
+                    }`}
+                  >
+                    {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
+                    <span>{extracting ? 'AI Đang Ghép Ảnh & Tạo Đề…' : 'AI Ghép Ảnh ➜ Xuất PDF & Tạo Đề'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {cambridgeHtmlResult && (
+                <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/30 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <span>Đã tạo bản in Cambridge A4 hoàn chỉnh</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+                          {cambridgeHtmlResult.usedModel}
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {cambridgeHtmlResult.passageCount
+                          ? `${cambridgeHtmlResult.passageCount} Passages · ${cambridgeHtmlResult.questionCount} Câu hỏi`
+                          : 'Bản in đã sẵn sàng để xuất PDF hoặc tải về'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handlePrintCambridgeHtml(cambridgeHtmlResult.fullHtml)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#007A7A] hover:bg-[#065B5B] text-white transition shadow-xs"
+                      title="Mở hộp thoại in trình duyệt và chọn Save as PDF"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>In / Xuất PDF (A4)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadCambridgeHtml(cambridgeHtmlResult.fullHtml)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                      title="Tải file .html về máy"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Tải HTML</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowHtmlPreviewModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 transition"
+                      title="Xem trước định dạng bản in"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Xem Trước</span>
+                    </button>
+                    {cambridgeHtmlResult.extracted && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const summary = onApplyReadingPdfExtraction(cambridgeHtmlResult.extracted, { replaceAll: replaceWholeReading });
+                          if (!summary?.cancelled) {
+                            showToast?.(`Đã nạp lại ${summary?.passageCount ?? cambridgeHtmlResult.passageCount} passage vào đề thi!`);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition"
+                      >
+                        <Wand2 className="w-3.5 h-3.5" />
+                        <span>Nạp Vào Đề</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
-
-            <button
-              type="button"
-              disabled={!readingPdfFile || extracting}
-              onClick={handleRunReadingPdfExtract}
-              className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
-                !readingPdfFile || extracting
-                  ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                  : 'bg-[#007A7A] text-white hover:bg-[#065B5B]'
-              }`}
-            >
-              {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-amber-300" />}
-              {extracting ? 'AI đang đọc toàn bộ PDF…' : 'AI đọc PDF & tạo đề'}
-            </button>
-          </div>
-
-          <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-            <input
-              type="checkbox"
-              checked={replaceWholeReading}
-              onChange={e => setReplaceWholeReading(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded accent-indigo-600"
-            />
-            <span>Thay toàn bộ Reading hiện có bằng đề trong PDF</span>
-          </label>
-
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            File được gửi tới Gemini để phân tích. Hãy rà lại passage, số câu và đáp án trước khi lưu đề.
-          </p>
+          )}
         </section>
       )}
 
@@ -600,6 +941,62 @@ export default function AiExamExtractorPanel({
               </ul>
             </div>
           )}
+        </div>
+      )}
+      {showHtmlPreviewModal && cambridgeHtmlResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-800/80">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <div>
+                  <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                    Bản In Chuẩn Cambridge A4 (IELTS Reading)
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Định dạng trang chuẩn A4 in ấn, tự ngắt trang theo từng Passage, giữ nguyên highlight vàng và hộp từ.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintCambridgeHtml(cambridgeHtmlResult.fullHtml)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#007A7A] hover:bg-[#065B5B] text-white transition shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In / Lưu PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadCambridgeHtml(cambridgeHtmlResult.fullHtml)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Tải HTML</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowHtmlPreviewModal(false)}
+                  className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white transition"
+                  title="Đóng xem trước"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Iframe Preview */}
+            <div className="flex-1 min-h-[500px] bg-slate-100 dark:bg-slate-950 p-2 sm:p-4 overflow-auto">
+              <iframe
+                title="Cambridge Exam A4 Preview"
+                srcDoc={cambridgeHtmlResult.fullHtml}
+                className="w-full h-full min-h-[550px] bg-white rounded-xl shadow-md border border-slate-200"
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

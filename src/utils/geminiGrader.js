@@ -9,7 +9,6 @@ import {
 } from './examHelpers.js';
 import { extractBlankNumbers, isInlineClozeQuestion } from './clozeHelpers.js';
 import { buildAnswerKeyMap, repairReadingPdfNumbering } from './readingNumberRepair.js';
-import { extractPassageParagraphLetters } from './examUiHelpers.js';
 
 export const GEMINI_PREFERRED_MODELS = [
   'gemini-2.5-flash',
@@ -268,6 +267,193 @@ export async function callGeminiGenerateJson({
   }
 
   throw lastError || new Error('Không tìm thấy model Gemini phù hợp cho API Key này.');
+}
+
+export async function callGeminiGenerateText({
+  apiKey,
+  promptText,
+  images = [],
+  documents = [],
+  temperature = 0.2
+}) {
+  const cleanKey = (apiKey || '').trim().replace(/^['"]|['"]$/g, '');
+  if (!cleanKey) {
+    throw new Error('Chưa nhập Google Gemini API Key.');
+  }
+
+  const parts = [{ text: promptText }];
+  (Array.isArray(images) ? images : []).forEach(img => {
+    const part = dataUrlToGeminiPart(img);
+    if (part) parts.push(part);
+  });
+  (Array.isArray(documents) ? documents : []).forEach(document => {
+    const part = dataUrlToGeminiPart(document);
+    if (part?.inlineData?.mimeType === 'application/pdf') parts.push(part);
+  });
+
+  let candidates = [];
+  try {
+    candidates = await discoverGeminiModels(cleanKey);
+  } catch (_err) {}
+  if (!candidates || candidates.length === 0) {
+    candidates = [...GEMINI_PREFERRED_MODELS];
+  }
+
+  let lastError = null;
+  for (const modelId of candidates) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(cleanKey)}`;
+
+    const attemptRequest = async () => {
+      const generationConfig = { temperature };
+      return fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig
+        })
+      });
+    };
+
+    let response = null;
+    try {
+      response = await attemptRequest();
+      if (TRANSIENT_GEMINI_STATUSES.has(response.status)) {
+        await delayMs(600);
+        response = await attemptRequest();
+      }
+    } catch (netErr) {
+      lastError = netErr;
+      continue;
+    }
+
+    if (response.ok) {
+      const data = await response.json();
+      const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!textContent) {
+        lastError = new Error('AI không trả về nội dung text.');
+        continue;
+      }
+      return {
+        text: textContent,
+        usedModel: modelId
+      };
+    }
+
+    const errText = await response.text();
+    const formatted = formatGeminiErrorMessage(response.status, errText);
+    if (response.status === 404 || /not found|not supported for generatecontent/i.test(errText)) {
+      lastError = new Error(formatted);
+      continue;
+    }
+    if (TRANSIENT_GEMINI_STATUSES.has(response.status)) {
+      lastError = new Error(formatted);
+      continue;
+    }
+    throw new Error(formatted);
+  }
+
+  throw lastError || new Error('Không tìm thấy model Gemini phù hợp cho API Key này.');
+}
+
+export const IELTS_CAMBRIDGE_PRINT_CSS = `
+  @page {
+    size: A4;
+    margin: 20mm 15mm 20mm 15mm;
+  }
+  @media print {
+    body {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #111;
+    margin: 0;
+    padding: 24px;
+    background-color: #fff;
+  }
+  .header-test {
+    text-align: center;
+    margin-bottom: 25px;
+  }
+  .highlight-yellow {
+    background-color: #fff100 !important;
+    font-weight: bold;
+    padding: 2px 6px;
+    font-size: 13px;
+    display: inline-block;
+    border-radius: 2px;
+  }
+  .passage-title {
+    font-size: 16px;
+    font-weight: bold;
+    margin: 20px 0 12px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-green {
+    background-color: #00e000 !important;
+    color: #000;
+    padding: 2px 6px;
+    font-weight: bold;
+    margin-right: 6px;
+    border-radius: 2px;
+  }
+  p {
+    margin: 0 0 10px 0;
+    text-align: justify;
+  }
+  .question-block {
+    margin-top: 20px;
+  }
+  .question-instruction {
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 13.5px;
+  }
+  .word-bank {
+    border: 1.5px solid #222;
+    padding: 10px 14px;
+    margin: 12px 0;
+    width: fit-content;
+    min-width: 70%;
+    background-color: #fafafa;
+    line-height: 1.6;
+  }
+  table.exam-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+  }
+  table.exam-table th, table.exam-table td {
+    border: 1px solid #bbb;
+    padding: 8px 10px;
+    vertical-align: top;
+    font-size: 12.5px;
+  }
+  .page-break {
+    page-break-before: always;
+  }
+`;
+
+export function buildIeltsCambridgeHtml(bodyHtml = '', title = 'IELTS Reading Mock Test') {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+${IELTS_CAMBRIDGE_PRINT_CSS}
+</style>
+</head>
+<body>
+${bodyHtml}
+</body>
+</html>`;
 }
 
 export async function testGeminiApiConnection(apiKey, options = {}) {
@@ -829,6 +1015,88 @@ function parsePrintedReadingQuestionNumber(value) {
     : null;
 }
 
+export function normalizeRawExtractedPassages(rawPassages, questionTypes = getQuestionTypesForSkill('reading')) {
+  const validTypeSet = new Set(questionTypes.map(t => t.id));
+  return (Array.isArray(rawPassages) ? rawPassages : []).map((passage, passageIdx) => {
+    const passageClozeText = String(passage?.clozeText || '').trim();
+    const passageClozeBlankSet = new Set(extractBlankNumbers(passageClozeText));
+    const questions = (Array.isArray(passage?.questions) ? passage.questions : []).map((q, idx) => {
+      const rawType = String(q?.type || 'fill').toLowerCase().trim();
+      let type = validTypeSet.has(rawType) ? rawType : 'fill';
+      if (rawType === 'multiple_choice') type = 'mcq';
+      else if (rawType === 'true_false_not_given' || rawType === 'ynng') type = 'tfng';
+      else if (type === 'fill' && Array.isArray(q?.options) && q.options.length >= 2) type = 'mcq';
+
+      const typeMeta = getQuestionTypeMeta(type, 'reading');
+      const parsedOptions = Array.isArray(q?.options)
+        ? q.options.map(option => String(option || '').trim()).filter(Boolean)
+        : [];
+      const options = type === 'tfng'
+        ? (parsedOptions.length ? parsedOptions : ['TRUE', 'FALSE', 'NOT GIVEN'])
+        : typeMeta.answerKind === 'text'
+        ? []
+        : parsedOptions;
+      const printedNumber =
+        parsePrintedReadingQuestionNumber(q?.questionNumber) ||
+        parsePrintedReadingQuestionNumber(q?.blankNum) ||
+        parsePrintedReadingQuestionNumber(q?.question);
+      const questionNumber = printedNumber?.start;
+      const questionTextRange = parsePrintedReadingQuestionNumber(q?.question);
+      const explicitQuestionEnd = parsePrintedReadingQuestionNumber(q?.questionEndNumber)?.start;
+      const questionEnd = Math.max(
+        printedNumber?.end || 0,
+        questionTextRange?.start === questionNumber ? questionTextRange.end : 0,
+        explicitQuestionEnd || 0
+      );
+      const questionEndNumber = questionEnd > questionNumber ? questionEnd : undefined;
+      const blankNum =
+        type === 'fill' || (isInlineClozeQuestion({ type }) && passageClozeBlankSet.has(questionNumber))
+          ? questionNumber
+          : undefined;
+      const rawCorrectAnswer = Array.isArray(q?.correctAnswer)
+        ? q.correctAnswer.map(answer => String(answer ?? '').trim()).filter(Boolean)
+        : String(q?.correctAnswer ?? '').trim();
+      const rawCorrectList = Array.isArray(q?.correctAnswers)
+        ? q.correctAnswers.map(answer => String(answer ?? '').trim()).filter(Boolean)
+        : Array.isArray(rawCorrectAnswer)
+        ? rawCorrectAnswer
+        : type === 'mcq' && /[,;|/&]|\band\b/i.test(rawCorrectAnswer)
+        ? rawCorrectAnswer.split(/\s*(?:,|;|\||\/|&|\band\b)\s*/i).map(answer => answer.replace(/^([a-z])\.$/i, '$1')).filter(Boolean)
+        : rawCorrectAnswer
+        ? [rawCorrectAnswer]
+        : [];
+      const correctAnswers = options.length > 0
+        ? Array.from(new Set(rawCorrectList.map(ans => matchChoiceOption(ans, options) || ans)))
+        : Array.from(new Set(rawCorrectList));
+
+      const rawInstruction = String(q?.instruction || '').trim();
+      const hasNB = Boolean(q?.hasNB || /NB\b/i.test(rawInstruction) || /NB\b/i.test(q?.question || ''));
+
+      return {
+        blankNum,
+        ...(typeof questionNumber === 'number' ? { questionNumber } : {}),
+        ...(typeof questionEndNumber === 'number' ? { questionEndNumber } : {}),
+        type,
+        ...(rawInstruction ? { instruction: rawInstruction } : {}),
+        ...(hasNB ? { hasNB: true } : {}),
+        question: String(q?.question || `${questionNumber || idx + 1}. Câu hỏi`).trim(),
+        options,
+        wordLimit: String(q?.wordLimit || '').trim(),
+        correctAnswer: correctAnswers[0] || '',
+        ...(type === 'mcq' ? { correctAnswers } : {}),
+        ...(type === 'mcq' ? { requiredSelections: Math.max(1, Number(q?.requiredSelections) || correctAnswers.length || 1) } : {})
+      };
+    });
+
+    return {
+      title: String(passage?.title || `Passage ${passageIdx + 1}`).trim(),
+      passageText: String(passage?.passageText || '').trim(),
+      clozeText: passageClozeText,
+      questions
+    };
+  }).filter(passage => passage.passageText || passage.questions.length > 0);
+}
+
 export async function extractReadingExamFromPdf({
   apiKey,
   pdfDataUrl,
@@ -916,85 +1184,7 @@ Return only valid JSON matching this schema:
     : (parsed?.passageText || Array.isArray(parsed?.questions))
     ? [parsed]
     : [];
-  const validTypeSet = new Set(questionTypes.map(t => t.id));
-  const passages = rawPassages.map((passage, passageIdx) => {
-    const passageClozeText = String(passage?.clozeText || '').trim();
-    const passageClozeBlankSet = new Set(extractBlankNumbers(passageClozeText));
-    const questions = (Array.isArray(passage?.questions) ? passage.questions : []).map((q, idx) => {
-      const rawType = String(q?.type || 'fill').toLowerCase().trim();
-      let type = validTypeSet.has(rawType) ? rawType : 'fill';
-      if (rawType === 'multiple_choice') type = 'mcq';
-      else if (rawType === 'true_false_not_given' || rawType === 'ynng') type = 'tfng';
-      else if (type === 'fill' && Array.isArray(q?.options) && q.options.length >= 2) type = 'mcq';
-
-      const typeMeta = getQuestionTypeMeta(type, 'reading');
-      const parsedOptions = Array.isArray(q?.options)
-        ? q.options.map(option => String(option || '').trim()).filter(Boolean)
-        : [];
-      const options = type === 'tfng'
-        ? (parsedOptions.length ? parsedOptions : ['TRUE', 'FALSE', 'NOT GIVEN'])
-        : typeMeta.answerKind === 'text'
-        ? []
-        : parsedOptions;
-      const printedNumber =
-        parsePrintedReadingQuestionNumber(q?.questionNumber) ||
-        parsePrintedReadingQuestionNumber(q?.blankNum) ||
-        parsePrintedReadingQuestionNumber(q?.question);
-      const questionNumber = printedNumber?.start;
-      const questionTextRange = parsePrintedReadingQuestionNumber(q?.question);
-      const explicitQuestionEnd = parsePrintedReadingQuestionNumber(q?.questionEndNumber)?.start;
-      const questionEnd = Math.max(
-        printedNumber?.end || 0,
-        questionTextRange?.start === questionNumber ? questionTextRange.end : 0,
-        explicitQuestionEnd || 0
-      );
-      const questionEndNumber = questionEnd > questionNumber ? questionEnd : undefined;
-      const blankNum =
-        type === 'fill' || (isInlineClozeQuestion({ type }) && passageClozeBlankSet.has(questionNumber))
-          ? questionNumber
-          : undefined;
-      const rawCorrectAnswer = Array.isArray(q?.correctAnswer)
-        ? q.correctAnswer.map(answer => String(answer ?? '').trim()).filter(Boolean)
-        : String(q?.correctAnswer ?? '').trim();
-      const rawCorrectList = Array.isArray(q?.correctAnswers)
-        ? q.correctAnswers.map(answer => String(answer ?? '').trim()).filter(Boolean)
-        : Array.isArray(rawCorrectAnswer)
-        ? rawCorrectAnswer
-        : type === 'mcq' && /[,;|/&]|\band\b/i.test(rawCorrectAnswer)
-        ? rawCorrectAnswer.split(/\s*(?:,|;|\||\/|&|\band\b)\s*/i).map(answer => answer.replace(/^([a-z])\.$/i, '$1')).filter(Boolean)
-        : rawCorrectAnswer
-        ? [rawCorrectAnswer]
-        : [];
-      const correctAnswers = options.length > 0
-        ? Array.from(new Set(rawCorrectList.map(ans => matchChoiceOption(ans, options) || ans)))
-        : Array.from(new Set(rawCorrectList));
-
-      const rawInstruction = String(q?.instruction || '').trim();
-      const hasNB = Boolean(q?.hasNB || /NB\b/i.test(rawInstruction) || /NB\b/i.test(q?.question || ''));
-
-      return {
-        blankNum,
-        ...(typeof questionNumber === 'number' ? { questionNumber } : {}),
-        ...(typeof questionEndNumber === 'number' ? { questionEndNumber } : {}),
-        type,
-        ...(rawInstruction ? { instruction: rawInstruction } : {}),
-        ...(hasNB ? { hasNB: true } : {}),
-        question: String(q?.question || `${questionNumber || idx + 1}. Câu hỏi`).trim(),
-        options,
-        wordLimit: String(q?.wordLimit || '').trim(),
-        correctAnswer: correctAnswers[0] || '',
-        ...(type === 'mcq' ? { correctAnswers } : {}),
-        ...(type === 'mcq' ? { requiredSelections: Math.max(1, Number(q?.requiredSelections) || correctAnswers.length || 1) } : {})
-      };
-    });
-
-    return {
-      title: String(passage?.title || `Passage ${passageIdx + 1}`).trim(),
-      passageText: String(passage?.passageText || '').trim(),
-      clozeText: passageClozeText,
-      questions
-    };
-  }).filter(passage => passage.passageText || passage.questions.length > 0);
+  const passages = normalizeRawExtractedPassages(rawPassages, questionTypes);
 
   const rawQuestionCount = passages.reduce((sum, passage) => sum + passage.questions.length, 0);
   if (passages.length === 0 || rawQuestionCount === 0) {
@@ -1013,6 +1203,163 @@ Return only valid JSON matching this schema:
     questionCount,
     warnings,
     usedModel
+  };
+}
+
+export async function convertScreenshotsToIeltsHtml({
+  apiKey,
+  images = [],
+  extraInstructions = ''
+}) {
+  if (!Array.isArray(images) || images.length === 0) {
+    throw new Error('Vui lòng tải lên hoặc dán (Ctrl+V) ít nhất 1 ảnh chụp đề thi.');
+  }
+
+  const layoutPrompt = `You are an expert exam layout formatter and IELTS digitization engine.
+I provide a sequence of screenshots of an IELTS reading test from a web interface (or scanned document).
+Note:
+1. The web interface typically has 2 columns (passage on left, questions on right) and dark mode.
+2. Multiple screenshots contain overlapping parts due to scrolling. Carefully deduplicate them so no sentences or paragraphs are repeated.
+3. Transcribe and structure the entire content into clean, semantic HTML body tags matching authentic Cambridge IELTS print layout.
+
+Format rules:
+- Mock test header: <div class="header-test"><span class="highlight-yellow">READING MOCK TEST</span></div> (only once at the very beginning).
+- For each Passage (e.g. Passage 1 / R1, Passage 2 / R2, Passage 3 / R3):
+  - If it is Passage 2 or Passage 3, prefix with <div class="page-break"></div>.
+  - Section title: <div class="passage-title"><span class="badge-green">R1</span> TITLE OF THE PASSAGE</div>
+  - Paragraphs: standard <p> tags. Retain paragraph markers (A, B, C...) if present at the start of paragraphs.
+  - Questions: <div class="question-block">...</div>
+  - Question instructions: <div class="question-instruction">...</div> (use <span class="highlight-yellow">...</span> for "NB You may use any letter more than once" or word limits if highlighted).
+  - Summary / Note completion with Word Box (A-I): use <div class="word-bank">A ... B ... C ...</div>
+  - Summary / Note completion with blanks: write 8___________ or 18 ____________
+  - Tables: use <table class="exam-table">...</table>
+  - Matching Information / Matching Features / True False Not Given: list each question item cleanly.
+${extraInstructions ? `\nADDITIONAL TEACHER INSTRUCTIONS:\n${extraInstructions}` : ''}
+- Do NOT output \`\`\`html markdown tags or wrapper <html>/<body> tags. Return ONLY the raw inner HTML content.`;
+
+  const { text: rawText, usedModel } = await callGeminiGenerateText({
+    apiKey,
+    promptText: layoutPrompt,
+    images,
+    temperature: 0.1
+  });
+
+  let rawBodyHtml = (rawText || '').trim();
+  if (rawBodyHtml.startsWith('```')) {
+    rawBodyHtml = rawBodyHtml.split('\n').slice(1).join('\n');
+    if (rawBodyHtml.endsWith('```')) {
+      rawBodyHtml = rawBodyHtml.slice(0, rawBodyHtml.lastIndexOf('```')).trim();
+    }
+  }
+
+  const fullHtml = buildIeltsCambridgeHtml(rawBodyHtml);
+  return {
+    fullHtml,
+    rawBodyHtml,
+    usedModel
+  };
+}
+
+export async function extractReadingExamFromScreenshots({
+  apiKey,
+  images = [],
+  extraInstructions = ''
+}) {
+  if (!Array.isArray(images) || images.length === 0) {
+    throw new Error('Vui lòng tải lên hoặc dán (Ctrl+V) ít nhất 1 ảnh chụp đề thi.');
+  }
+
+  // Bước 1: Gemini Vision đọc tập ảnh, khử trùng lặp do cuộn web, dàn layout chuẩn Cambridge A4
+  const { fullHtml, rawBodyHtml, usedModel: visionModel } = await convertScreenshotsToIeltsHtml({
+    apiKey,
+    images,
+    extraInstructions
+  });
+
+  // Bước 2: Trích xuất cấu trúc đề thi chuẩn IELTS (Passages, ClozeText, Questions, Answers) từ HTML sạch
+  const questionTypes = getQuestionTypesForSkill('reading');
+  const extractionPrompt = `You are a precision IELTS Reading exam digitization engine.
+I am providing the clean, deduplicated transcribed exam text and HTML from screenshots of an IELTS Reading mock test:
+
+--- TRANSCRIBED TEST START ---
+${rawBodyHtml}
+--- TRANSCRIBED TEST END ---
+
+GOAL:
+Extract the complete IELTS Reading section into structured JSON.
+- Identify every passage boundary (e.g. R1/Passage 1, R2/Passage 2, R3/Passage 3).
+- Extract full passage text into "passageText" and title into "title".
+- Extract all questions into each passage's "questions" array.
+- For inline Note/Form/Summary completion (BOTH without a word box AND with a word box A-I):
+  1. Put the complete unbroken text in "clozeText" with {{N}} placeholders for every gap.
+  2. For Summary with Word Box (A-I), set type "summary_box", blankNum N, options [all words from box], question "N. <sentence with ____>".
+  3. For Note/Summary without Word Box, set type "fill", blankNum N.
+- For Matching Information ("Which paragraph contains the following information?"): set type "matching_information", options ["A", "B", "C", "D", "E", "F"...].
+- For Matching Features / People: set type "matching_features", options with the people/features list.
+- For Multiple Choice: set type "mcq", options ["A. ...", "B. ...", "C. ..."].
+- For True/False/Not Given or Yes/No/Not Given: set type "tfng", options ["TRUE", "FALSE", "NOT GIVEN"] (or YES/NO/NOT GIVEN).
+- Question numbers in IELTS Reading run continuously across passages (typically Passage 1 = 1-13, Passage 2 = 14-26, Passage 3 = 27-40).
+${extraInstructions ? `\nADDITIONAL TEACHER NOTES:\n${extraInstructions}` : ''}
+
+Return ONLY valid JSON matching this schema:
+{
+  "title": "Reading mock test title",
+  "answerKeyFound": false,
+  "answerKey": [],
+  "passages": [
+    {
+      "title": "Passage 1 title",
+      "passageText": "Full passage text",
+      "clozeText": "Notes text with {{1}} ... {{2}}",
+      "questions": [
+        {
+          "questionNumber": 1,
+          "blankNum": 1,
+          "type": "fill",
+          "instruction": "Instruction header if present",
+          "hasNB": false,
+          "question": "1. Prompt",
+          "options": [],
+          "wordLimit": "ONE WORD ONLY",
+          "correctAnswer": "",
+          "correctAnswers": []
+        }
+      ]
+    }
+  ]
+}`;
+
+  const { parsed, usedModel: jsonModel } = await callGeminiGenerateJson({
+    apiKey,
+    promptText: extractionPrompt,
+    temperature: 0.1
+  });
+
+  const rawPassages = Array.isArray(parsed?.passages)
+    ? parsed.passages
+    : (parsed?.passageText || Array.isArray(parsed?.questions))
+    ? [parsed]
+    : [];
+
+  const passages = normalizeRawExtractedPassages(rawPassages, questionTypes);
+  const rawQuestionCount = passages.reduce((sum, passage) => sum + passage.questions.length, 0);
+  if (passages.length === 0 || rawQuestionCount === 0) {
+    throw new Error('AI chưa tìm thấy nội dung passage hoặc câu hỏi từ tập ảnh này.');
+  }
+
+  const answerKey = buildAnswerKeyMap(parsed?.answerKey);
+  const { passages: repairedPassages, warnings } = repairReadingPdfNumbering(passages, { answerKey });
+  const questionCount = repairedPassages.reduce((sum, passage) => sum + passage.questions.length, 0);
+
+  return {
+    title: String(parsed?.title || '').trim(),
+    answerKeyFound: Boolean(parsed?.answerKeyFound) || answerKey.size > 0,
+    passages: repairedPassages,
+    questionCount,
+    warnings,
+    fullHtml,
+    rawBodyHtml,
+    usedModel: `${visionModel} ➜ ${jsonModel}`
   };
 }
 

@@ -8,6 +8,7 @@
     "build": "vite build",
     "start": "node server.js",
     "lint": "oxlint",
+    "img2pdf": "python src/ielts_img2pdf.py",
     "preview": "vite preview"
   },
   "dependencies": {
