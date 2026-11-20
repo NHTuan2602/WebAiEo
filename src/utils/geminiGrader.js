@@ -6,6 +6,7 @@ import {
   roundDownIeltsHalfBand,
   roundWholeBand
 } from './examHelpers.js';
+import { buildAnswerKeyMap, repairReadingPdfNumbering } from './readingNumberRepair.js';
 
 export const GEMINI_PREFERRED_MODELS = [
   'gemini-2.5-flash',
@@ -845,7 +846,8 @@ DOCUMENT HANDLING:
 - Put each question's printed start number in questionNumber, and its end number in questionEndNumber only when one prompt covers a printed range such as 11-12. Use blankNum only for fill-in-the-blank questions. Sort each passage's questions by questionNumber ascending; never use the array position as a substitute for a printed number.
 - Include every Reading question exactly once, including questions that continue on another page. Preserve all statements, headings, options, instructions, and word limits.
 - Use the supported question types: ${questionTypes.map(t => `"${t.id}"`).join(', ')}. For multiple choice, include the full option text. For select-two/select-more questions, include every correct option in correctAnswers and set requiredSelections to that count.
-- Copy exact correct answers from the answer key when it exists, including acceptable alternatives. If no answer key is present, answer only when the passage clearly supports it; leave correctAnswer empty when uncertain.
+- Copy exact correct answers from the answer key when it exists, including acceptable alternatives. Also list every answer-key entry in the top-level answerKey array by its printed question number. If no answer key is present, answer only when the passage clearly supports it; leave correctAnswer empty when uncertain.
+- Question numbers in IELTS Reading run continuously across passages (typically Passage 1 = 1-13, Passage 2 = 14-26, Passage 3 = 27-40). Never restart numbering at 1 for a later passage, and never output two questions with the same number.
 - For inline Note/Form/Table/Flow-chart/Summary completion, preserve the complete instruction text and section layout in clozeText, replacing each answer gap with {{N}} using its original question number. Put the corresponding fill question in the same passage's questions array. For question styles without inline gaps, set clozeText to an empty string.
 - Extract the full passage text with paragraph breaks and its printed title. Keep tables/labels that are part of the passage readable as text.
 - Do not include explanations, grading commentary, or markdown outside the JSON.
@@ -855,6 +857,9 @@ Return only valid JSON matching this schema:
 {
   "title": "Reading test title, if printed",
   "answerKeyFound": true,
+  "answerKey": [
+    { "questionNumber": 1, "answers": ["exact answer", "acceptable alternative"] }
+  ],
   "passages": [
     {
       "title": "Passage 1 title",
@@ -947,10 +952,7 @@ Return only valid JSON matching this schema:
         ...(type === 'mcq' ? { correctAnswers: Array.from(new Set(correctAnswers)) } : {}),
         ...(type === 'mcq' ? { requiredSelections: Math.max(1, Number(q?.requiredSelections) || correctAnswers.length || 1) } : {})
       };
-    }).sort((a, b) =>
-      (a.questionNumber || a.blankNum || Number.POSITIVE_INFINITY) -
-        (b.questionNumber || b.blankNum || Number.POSITIVE_INFINITY)
-    );
+    });
 
     return {
       title: String(passage?.title || `Passage ${passageIdx + 1}`).trim(),
@@ -958,37 +960,24 @@ Return only valid JSON matching this schema:
       clozeText: String(passage?.clozeText || '').trim(),
       questions
     };
-  }).filter(passage => passage.passageText || passage.questions.length > 0)
-    .sort((a, b) => {
-      const aFirst = a.questions.reduce((min, question) => Math.min(min, question.questionNumber || Number.POSITIVE_INFINITY), Number.POSITIVE_INFINITY);
-      const bFirst = b.questions.reduce((min, question) => Math.min(min, question.questionNumber || Number.POSITIVE_INFINITY), Number.POSITIVE_INFINITY);
-      return aFirst - bFirst;
-    });
+  }).filter(passage => passage.passageText || passage.questions.length > 0);
 
-  const questionCount = passages.reduce((sum, passage) => sum + passage.questions.length, 0);
-  if (passages.length === 0 || questionCount === 0) {
+  const rawQuestionCount = passages.reduce((sum, passage) => sum + passage.questions.length, 0);
+  if (passages.length === 0 || rawQuestionCount === 0) {
     throw new Error('AI chưa tìm được passage và câu hỏi Reading trong PDF. Hãy kiểm tra file có đúng đề Reading, đủ trang và chữ đủ rõ.');
   }
-  if (passages.some(passage => passage.questions.some(question => !Number.isFinite(question.questionNumber)))) {
-    throw new Error('AI chưa xác định được số in trên một hoặc nhiều câu hỏi. Đề chưa được nhập để tránh nhảy số; hãy chạy lại PDF rõ nét hơn.');
-  }
 
-  const hasUnlinkedClozeBlank = passages.some(passage => {
-    const clozeNumbers = String(passage.clozeText || '').match(/\{\{\s*\d+\s*\}\}|\[\s*\d+\s*\]|\(__+\s*\d+\s*__+\)/g) || [];
-    return clozeNumbers.some(token => {
-      const number = Number(token.match(/\d+/)?.[0]);
-      return !passage.questions.some(question => question.type === 'fill' && question.blankNum === number);
-    });
-  });
-  if (hasUnlinkedClozeBlank) {
-    throw new Error('Một số chỗ trống trong đề PDF chưa khớp câu hỏi theo số. Đề chưa được nhập để tránh sai số; hãy chạy lại hoặc kiểm tra PDF.');
-  }
+  // Auto-repair wrong / missing / restarted question numbers instead of rejecting the PDF.
+  const answerKey = buildAnswerKeyMap(parsed?.answerKey);
+  const { passages: repairedPassages, warnings } = repairReadingPdfNumbering(passages, { answerKey });
+  const questionCount = repairedPassages.reduce((sum, passage) => sum + passage.questions.length, 0);
 
   return {
     title: String(parsed?.title || '').trim(),
-    answerKeyFound: Boolean(parsed?.answerKeyFound),
-    passages,
+    answerKeyFound: Boolean(parsed?.answerKeyFound) || answerKey.size > 0,
+    passages: repairedPassages,
     questionCount,
+    warnings,
     usedModel
   };
 }

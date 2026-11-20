@@ -184,7 +184,8 @@ export default function AiExamExtractorPanel({
         usedModel: extracted.usedModel,
         questionCount: summary?.questionCount ?? extracted.questionCount,
         passageCount: summary?.passageCount ?? extracted.passages.length,
-        answerKeyFound: extracted.answerKeyFound
+        answerKeyFound: extracted.answerKeyFound,
+        warnings: Array.isArray(extracted.warnings) ? extracted.warnings : []
       });
       showToast?.(`AI đã tạo ${summary?.passageCount ?? extracted.passages.length} passage với ${summary?.questionCount ?? extracted.questionCount} câu từ PDF!`);
     } catch (err) {
@@ -589,6 +590,16 @@ export default function AiExamExtractorPanel({
               {lastResultInfo.hasPassage ? ' kèm văn bản Bài đọc' : ''} (Model: <code>{lastResultInfo.usedModel}</code>). Kiểm tra lại danh sách bên dưới rồi bấm Lưu Đề Thi!
             </span>
           </div>
+          {lastResultInfo.warnings?.length > 0 && (
+            <div className="w-full mt-1 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200 font-medium">
+              <p className="font-bold mb-1">Đã tự sửa số thứ tự câu hỏi — hãy rà lại:</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {lastResultInfo.warnings.map((warning, idx) => (
+                  <li key={idx}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
