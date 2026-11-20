@@ -159,7 +159,7 @@ Hệ thống luyện & thi thử IELTS trực tuyến chuẩn phòng thi máy t�
 
 ## 5. QUY CHUẨN GIAO DIỆN (UI/UX & DESIGN SYSTEM RULES)
 
-Được thực thi đồng thời qua `src/index.css`, `src/anti-ai-reset.css` và bộ kiểm tra `.agents/skills/impeccable` (`impeccable detect --json src` phải trả về `[]`):
+Được thực thi đồng thời qua `src/index.css`, `src/anti-ai-reset.css`, skill `.agents/skills/impeccable` (`impeccable detect --json src` phải trả về `[]`) và skill tương tác mượt `.agents/skills/apple-design/SKILL.md`:
 
 - **Bảng màu bắt buộc:**
   - **Light Mode:** Nền trang phẳng `#F8FAFC` (cấm tuyệt đối nền hồng `#fff0f6`/`#fff5f8` hoặc `radial-gradient` blob), bề mặt card `#FFFFFF`, nền phụ `#F1F5F9`, viền `#E2E8F0`, chữ chính `#0F172A`, chữ phụ `#334155` / `#475569` (đạt chuẩn WCAG AA >= 4.5:1; cấm dùng `#62748e`, `#94a3b8` cho chữ chức năng trên nền sáng).

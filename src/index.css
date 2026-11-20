@@ -270,6 +270,55 @@ html.dark .vip-color-pink { color: #f472b6 !important; }
   .vip-dock-pop-in {
     animation: none !important;
   }
+  button:active,
+  a:active {
+    transform: none !important;
+  }
+}
+
+/* Apple Design: instant tactile pointer-down feedback & zero 300ms tap delay */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.985);
+  transition: transform 90ms ease-out;
+}
+
+/* Optical tracking for larger headings while keeping body legible */
+h1 {
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  letter-spacing: -0.012em;
+}
+
+/* Accessibility: respect reduced transparency & higher contrast preferences */
+@media (prefers-reduced-transparency: reduce) {
+  header,
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  header {
+    background-color: #ffffff !important;
+  }
+  html.dark header {
+    background-color: #18181b !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --ltt-border: #94a3b8 !important;
+  }
+  html.dark {
+    --ltt-border: #52525b !important;
+  }
 }
 
 html.dark {
