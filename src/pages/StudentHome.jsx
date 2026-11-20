@@ -25,6 +25,7 @@ import { loadExamDraft } from '../utils/sessionPersistence';
 import { Users as ClassMembersIcon } from 'lucide-react';
 import AppleSegmentedControl from '../components/common/AppleSegmentedControl';
 import BrandContactFooter from '../components/common/BrandContactFooter';
+import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 import {
@@ -72,6 +73,7 @@ export default function StudentHome({
   const [storefrontTab, setStorefrontTab] = useState('real_exam');
   const [redeemingTestId, setRedeemingTestId] = useState('');
   const [confirmRedeemTest, setConfirmRedeemTest] = useState(null);
+  const [historyPage, setHistoryPage] = useState(1);
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 15_000);
@@ -908,23 +910,33 @@ export default function StudentHome({
               <div className="py-10 px-4 border-t border-slate-200 dark:border-zinc-800 text-center text-[#475569] dark:text-zinc-400 text-sm sm:text-base">
                 Bạn chưa hoàn thành bài thi nào. Hãy chọn một đề thi ở phía trên để bắt đầu!
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-[#334155] dark:text-zinc-300">
-                  <thead className="bg-[#F8FAFC] dark:bg-zinc-900 border-y border-slate-200 dark:border-zinc-800 text-xs text-[#334155] dark:text-zinc-300 font-bold">
-                    <tr>
-                      <th className="px-4 py-3.5">Tên Đề Thi / Bài Tập</th>
-                      <th className="px-4 py-3.5">Thời Gian Nộp</th>
-                      <th className="px-4 py-3.5 text-center">Listening</th>
-                      <th className="px-4 py-3.5 text-center">Reading</th>
-                      <th className="px-4 py-3.5 text-center">Writing</th>
-                      <th className="px-4 py-3.5 text-center">Speaking</th>
-                      <th className="px-4 py-3.5 text-center">Overall</th>
-                      <th className="px-4 py-3.5 text-right">Chi Tiết</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
-                    {studentAttempts.map(att => {
+            ) : (() => {
+              const historySlice = paginateItems(studentAttempts, historyPage, 5);
+              return (
+              <div className="space-y-3">
+                <ListPaginationBar
+                  currentPage={historySlice.safePage}
+                  totalItems={historySlice.totalItems}
+                  pageSize={5}
+                  onPageChange={setHistoryPage}
+                  itemLabel="lượt thi"
+                />
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-[#334155] dark:text-zinc-300">
+                    <thead className="bg-[#F8FAFC] dark:bg-zinc-900 border-y border-slate-200 dark:border-zinc-800 text-xs text-[#334155] dark:text-zinc-300 font-bold">
+                      <tr>
+                        <th className="px-4 py-3.5">Tên Đề Thi / Bài Tập</th>
+                        <th className="px-4 py-3.5">Thời Gian Nộp</th>
+                        <th className="px-4 py-3.5 text-center">Listening</th>
+                        <th className="px-4 py-3.5 text-center">Reading</th>
+                        <th className="px-4 py-3.5 text-center">Writing</th>
+                        <th className="px-4 py-3.5 text-center">Speaking</th>
+                        <th className="px-4 py-3.5 text-center">Overall</th>
+                        <th className="px-4 py-3.5 text-right">Chi Tiết</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
+                      {historySlice.pageItems.map(att => {
                       const canShowApprovedScore = isTeacher || Boolean(att.teacherGraded);
                       return (
                       <tr key={att.id} className="hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40 transition">
@@ -1004,8 +1016,17 @@ export default function StudentHome({
                     })}
                   </tbody>
                 </table>
+                </div>
+                <ListPaginationBar
+                  currentPage={historySlice.safePage}
+                  totalItems={historySlice.totalItems}
+                  pageSize={5}
+                  onPageChange={setHistoryPage}
+                  itemLabel="lượt thi"
+                />
               </div>
-            )}
+              );
+            })()}
           </div>
         </section>
 

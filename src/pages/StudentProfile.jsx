@@ -78,6 +78,7 @@ import {
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 import CoverCheckoutModal from '../components/modals/CoverCheckoutModal';
+import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 
@@ -151,6 +152,7 @@ export default function StudentProfile({
   const [statusDrafts, setStatusDrafts] = useState({});
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [titleFilter, setTitleFilter] = useState('all');
+  const [profileHistoryPage, setProfileHistoryPage] = useState(1);
   const [donateAmount, setDonateAmount] = useState(0);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [checkoutModalState, setCheckoutModalState] = useState(null);
@@ -2371,38 +2373,50 @@ export default function StudentProfile({
           <div className="py-10 border-t border-[#E2E8F0] dark:border-zinc-800 text-center text-[#475569] dark:text-zinc-400 text-sm">
             Chưa có dữ liệu bài thi.
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-[#334155] dark:text-zinc-300">
-              <thead className="bg-[#F8FAFC] dark:bg-zinc-900 border-y border-[#E2E8F0] dark:border-zinc-800 text-xs text-[#334155] dark:text-zinc-300 uppercase">
-                <tr>
-                  <th className="px-6 py-3.5">Đề Thi</th>
-                  <th className="px-6 py-3.5">Thời Gian Nộp</th>
-                  <th className="px-6 py-3.5 text-center">Listening</th>
-                  <th className="px-6 py-3.5 text-center">Reading</th>
-                  <th className="px-6 py-3.5 text-center">Writing</th>
-                  <th className="px-6 py-3.5 text-center">Overall Band</th>
-                  {isTeacherViewer && (
-                    <th className="px-6 py-3.5 text-center">Gian Lận (Tab)</th>
-                  )}
-                  {canInspectAttemptDetails && (
-                    <th className="px-6 py-3.5 text-right whitespace-nowrap">Chi Tiết</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]/70 dark:divide-zinc-800">
-                {studentAttempts.map((att, idx) => {
-                  const risk = isTeacherViewer ? getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs) : null;
-                  const extSignals = isTeacherViewer ? countExtensionCheatSignals(att.antiCheatLogs) : 0;
-                  const RiskIcon = risk?.icon;
-                  const showRowScores = isAttemptApprovedForViewer(att);
+        ) : (() => {
+          const profHistorySlice = paginateItems(studentAttempts, profileHistoryPage, 5);
+          return (
+          <div className="space-y-3">
+            <div className="px-6 pt-3">
+              <ListPaginationBar
+                currentPage={profHistorySlice.safePage}
+                totalItems={profHistorySlice.totalItems}
+                pageSize={5}
+                onPageChange={setProfileHistoryPage}
+                itemLabel="lượt thi"
+              />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-[#334155] dark:text-zinc-300">
+                <thead className="bg-[#F8FAFC] dark:bg-zinc-900 border-y border-[#E2E8F0] dark:border-zinc-800 text-xs text-[#334155] dark:text-zinc-300 uppercase">
+                  <tr>
+                    <th className="px-6 py-3.5">Đề Thi</th>
+                    <th className="px-6 py-3.5">Thời Gian Nộp</th>
+                    <th className="px-6 py-3.5 text-center">Listening</th>
+                    <th className="px-6 py-3.5 text-center">Reading</th>
+                    <th className="px-6 py-3.5 text-center">Writing</th>
+                    <th className="px-6 py-3.5 text-center">Overall Band</th>
+                    {isTeacherViewer && (
+                      <th className="px-6 py-3.5 text-center">Gian Lận (Tab)</th>
+                    )}
+                    {canInspectAttemptDetails && (
+                      <th className="px-6 py-3.5 text-right whitespace-nowrap">Chi Tiết</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2E8F0]/70 dark:divide-zinc-800">
+                  {profHistorySlice.pageItems.map((att, idx) => {
+                    const risk = isTeacherViewer ? getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs) : null;
+                    const extSignals = isTeacherViewer ? countExtensionCheatSignals(att.antiCheatLogs) : 0;
+                    const RiskIcon = risk?.icon;
+                    const showRowScores = isAttemptApprovedForViewer(att);
 
-                  return (
-                    <tr key={att.id} className="hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/50 transition">
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-[#0F172B] dark:text-[#F4F4F5]">{att.testTitle}</p>
-                        <span className="text-xs font-medium text-[#475569] dark:text-zinc-400">Lần thi #{studentAttempts.length - idx}</span>
-                      </td>
+                    return (
+                      <tr key={att.id} className="hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/50 transition">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-[#0F172B] dark:text-[#F4F4F5]">{att.testTitle}</p>
+                          <span className="text-xs font-medium text-[#475569] dark:text-zinc-400">Lần thi #{studentAttempts.length - (profHistorySlice.startIdx + idx)}</span>
+                        </td>
                       <td className="px-6 py-4 text-xs text-[#475569] dark:text-zinc-400">
                         <div className="space-y-0.5">
                           <span className="font-semibold text-[#0F172B] dark:text-zinc-200 block">{att.submittedAt}</span>
@@ -2499,8 +2513,19 @@ export default function StudentProfile({
                 })}
               </tbody>
             </table>
+            </div>
+            <div className="px-6 pb-3">
+              <ListPaginationBar
+                currentPage={profHistorySlice.safePage}
+                totalItems={profHistorySlice.totalItems}
+                pageSize={5}
+                onPageChange={setProfileHistoryPage}
+                itemLabel="lượt thi"
+              />
+            </div>
           </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* SECTION 3: NHẬN XÉT & ĐÁNH GIÁ CỦA GIÁO VIÊN (Bảo mật riêng giữa GV & HS) */}

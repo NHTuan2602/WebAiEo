@@ -81,6 +81,7 @@ import {
 } from '../constants/profileCustomization';
 import { countExtensionCheatSignals, exportAttemptsToCsv, getRiskAssessment, normalizeRoomObject } from '../utils/examHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
+import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 import ClassManagerTab from '../components/teacher/ClassManagerTab';
@@ -172,6 +173,10 @@ export default function TeacherDashboard({
   const [renamingTestId, setRenamingTestId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [selectedUsernames, setSelectedUsernames] = useState([]);
+  const [testsPage, setTestsPage] = useState(1);
+  const [exercisesPage, setExercisesPage] = useState(1);
+  const [gradingPage, setGradingPage] = useState(1);
+  const [accountsPage, setAccountsPage] = useState(1);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [notifyForm, setNotifyForm] = useState({
     title: '',
@@ -1421,11 +1426,28 @@ export default function TeacherDashboard({
                 ? 'Tất cả bài tập trong mục này đã được 100% học sinh hoàn thành!'
                 : 'Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút kỹ năng phía trên để tạo ngay.'}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredSkillExercises.map(renderManagementItemCard)}
-            </div>
-          )}
+          ) : (() => {
+            const exSlice = paginateItems(filteredSkillExercises, exercisesPage, 5);
+            return (
+              <div className="space-y-3">
+                <ListPaginationBar
+                  currentPage={exSlice.safePage}
+                  totalItems={exSlice.totalItems}
+                  pageSize={5}
+                  onPageChange={setExercisesPage}
+                  itemLabel="bài tập"
+                />
+                {exSlice.pageItems.map(renderManagementItemCard)}
+                <ListPaginationBar
+                  currentPage={exSlice.safePage}
+                  totalItems={exSlice.totalItems}
+                  pageSize={5}
+                  onPageChange={setExercisesPage}
+                  itemLabel="bài tập"
+                />
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1522,9 +1544,28 @@ export default function TeacherDashboard({
                 </div>
               )}
             </div>
-          ) : (
-            filteredFullExamTests.map(renderManagementItemCard)
-          )}
+          ) : (() => {
+            const testSlice = paginateItems(filteredFullExamTests, testsPage, 5);
+            return (
+              <div className="space-y-3">
+                <ListPaginationBar
+                  currentPage={testSlice.safePage}
+                  totalItems={testSlice.totalItems}
+                  pageSize={5}
+                  onPageChange={setTestsPage}
+                  itemLabel="đề thi"
+                />
+                {testSlice.pageItems.map(renderManagementItemCard)}
+                <ListPaginationBar
+                  currentPage={testSlice.safePage}
+                  totalItems={testSlice.totalItems}
+                  pageSize={5}
+                  onPageChange={setTestsPage}
+                  itemLabel="đề thi"
+                />
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1649,184 +1690,202 @@ export default function TeacherDashboard({
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-[#334155] dark:text-slate-300">
-                <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 border-y border-slate-200 dark:border-slate-700 text-xs font-bold tracking-wider text-[#334155] dark:text-slate-300 uppercase whitespace-nowrap">
-                  <tr>
-                    <th className="px-4 py-3.5">Học Sinh</th>
-                    <th className="px-4 py-3.5">Đề Thi</th>
-                    <th className="px-4 py-3.5">Thời Gian Nộp</th>
-                    <th className="px-3.5 py-3.5 text-center">Chống Gian Lận</th>
-                    <th className="px-3.5 py-3.5 text-center">Trạng Thái</th>
-                    <th className="px-3.5 py-3.5 text-center">Overall</th>
-                    <th className="px-4 py-3.5 text-right">Thao Tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {filteredAttempts.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-slate-400">
-                        Không có bài nộp nào khớp bộ lọc hiện tại.{' '}
-                        <button
-                          type="button"
-                          onClick={() => setGradingFilters({ testId: 'all', status: 'all', risk: 'all', search: '' })}
-                          className="text-[#0F766E] dark:text-[#1EE1D6] font-bold underline ml-1"
-                        >
-                          Đặt lại bộ lọc
-                        </button>
-                      </td>
-                    </tr>
-                  ) : filteredAttempts.map(att => {
-                    const risk = getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs);
-                    const extSignals = countExtensionCheatSignals(att.antiCheatLogs);
-                    const RiskIcon = risk.icon;
+            {(() => {
+              const gradingSlice = paginateItems(filteredAttempts, gradingPage, 5);
+              return (
+                <>
+                  <ListPaginationBar
+                    currentPage={gradingSlice.safePage}
+                    totalItems={gradingSlice.totalItems}
+                    pageSize={5}
+                    onPageChange={setGradingPage}
+                    itemLabel="bài nộp"
+                  />
 
-                    return (
-                      <tr key={att.id} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
-                        <td className="px-4 py-3.5 font-bold text-[#0F172B] dark:text-white whitespace-nowrap">
-                          <div className="flex items-center gap-2.5">
-                            <UserAvatarBadge
-                              user={usersDb?.[att.studentId] || { username: att.studentId, name: att.studentName }}
-                              sizeClass="w-8 h-8"
-                              textClass="text-xs"
-                              rounded="rounded-lg"
-                            />
-                            {openMemberProfile && att.studentId ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-[#334155] dark:text-slate-300">
+                      <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 border-y border-slate-200 dark:border-slate-700 text-xs font-bold tracking-wider text-[#334155] dark:text-slate-300 uppercase whitespace-nowrap">
+                        <tr>
+                          <th className="px-3.5 py-3">Học Sinh &amp; Thời Gian</th>
+                          <th className="px-3.5 py-3">Đề Thi / Bài Tập</th>
+                          <th className="px-3 py-3 text-center">Trạng Thái &amp; Giám Sát</th>
+                          <th className="px-3 py-3 text-center">Điểm Band</th>
+                          <th className="px-3.5 py-3 text-right sticky right-0 bg-[#F8FAFC] dark:bg-slate-800 z-10">Chấm &amp; Thao Tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                        {filteredAttempts.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-slate-400">
+                              Không có bài nộp nào khớp bộ lọc hiện tại.{' '}
                               <button
                                 type="button"
-                                onClick={() => openMemberProfile(att.studentId, 'TEACHER_DASHBOARD')}
-                                title="Xem hồ sơ thành viên"
-                                className="inline-flex items-center gap-1.5 text-left hover:text-[#0F766E] dark:hover:text-teal-400 hover:underline transition whitespace-nowrap"
+                                onClick={() => setGradingFilters({ testId: 'all', status: 'all', risk: 'all', search: '' })}
+                                className="text-[#0F766E] dark:text-[#1EE1D6] font-bold underline ml-1"
                               >
-                                <span>{att.studentName}</span>
-                                <Eye className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                                Đặt lại bộ lọc
                               </button>
-                            ) : (
-                              <span className="whitespace-nowrap">{att.studentName}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-sm text-[#334155] dark:text-slate-300 min-w-[200px] max-w-[270px]">
-                          <div className="space-y-1">
-                            <span
-                              className={`inline-block text-xs font-bold uppercase px-2 py-0.5 rounded border whitespace-nowrap ${
-                                att.testMode === 'single_skill'
-                                  ? 'bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                                  : 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30'
-                              }`}
-                            >
-                              {att.testMode === 'single_skill'
-                                ? `BÀI TẬP • ${(att.focusSkill || 'SK').toUpperCase()}`
-                                : 'ĐỀ THI'}
-                            </span>
-                            <p className="font-semibold text-[#0F172B] dark:text-slate-100 leading-snug line-clamp-2" title={att.testTitle}>
-                              {att.testTitle}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-xs text-[#475569] dark:text-slate-400 whitespace-nowrap">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[13px] font-semibold text-[#0F172B] dark:text-slate-100 tabular-nums">{att.submittedAt}</span>
-                              {att.timelinessStatus === 'late' ? (
-                                <span className="inline-block text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-[#991B1B] dark:text-rose-300 whitespace-nowrap">
-                                  Muộn{att.lateByMinutes ? ` ${att.lateByMinutes}p` : ''}
-                                </span>
-                              ) : att.timelinessStatus === 'on_time' ? (
-                                <span className="inline-block text-xs font-bold px-2 py-0.5 rounded-full bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300 whitespace-nowrap">
-                                  Đúng hạn
-                                </span>
-                              ) : null}
-                            </div>
-                            {(att.startedAt || Number(att.durationSeconds) > 0) && (
-                              <p className="text-[13px] text-[#475569] dark:text-slate-400 tabular-nums">
-                                {Number(att.durationSeconds) > 0 ? `Thời lượng: ${formatDurationVi(att.durationSeconds)}` : ''}
-                                {Number(att.durationSeconds) > 0 && att.startedAt ? ' · ' : ''}
-                                {att.startedAt ? `Mở: ${att.startedAt}` : ''}
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
-                          <div className="inline-flex flex-col items-center gap-1">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap shrink-0 ${risk.color}`}>
-                              <RiskIcon className="w-3.5 h-3.5 shrink-0" />
-                              <span>{risk.label} ({att.tabSwitchCount} lần)</span>
-                            </span>
-                            {extSignals > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-[#991B1B] dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 whitespace-nowrap">
-                                Extension / Bypass: {extSignals}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
-                          {att.teacherGraded ? (
-                            <span className="text-xs bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-200 dark:border-emerald-500/30 inline-flex items-center gap-1 whitespace-nowrap">
-                              {att.aiGraded && <Sparkles className="w-3.5 h-3.5 text-[#0F766E] dark:text-teal-400 shrink-0" />}
-                              Đã Duyệt Trả Điểm
-                            </span>
-                          ) : att.aiGraded ? (
-                            <span className="text-xs bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-200 px-2.5 py-1 rounded-lg font-bold border border-indigo-200 dark:border-indigo-500/40 inline-flex items-center gap-1 whitespace-nowrap">
-                              <Sparkles className="w-3.5 h-3.5 shrink-0" /> AI Chấm Nháp · Chờ Duyệt
-                            </span>
-                          ) : (
-                            <span className="inline-block text-xs bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 px-2.5 py-1 rounded-lg font-bold border border-amber-300 dark:border-amber-500/30 whitespace-nowrap">
-                              Chờ Ms. Như Duyệt
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
-                          <div className="text-base font-black text-[#0F766E] dark:text-[#1EE1D6] tabular-nums leading-tight">
-                            {att.overallBand ?? '-'}
-                          </div>
-                          <div className="text-[13px] font-medium text-[#475569] dark:text-slate-400 mt-0.5 tabular-nums whitespace-nowrap">
-                            {att.testMode === 'single_skill' && att.focusSkill === 'speaking'
-                              ? `Speaking ${att.scores?.speaking?.band ?? att.overallBand ?? '-'}`
-                              : att.testMode === 'single_skill'
-                              ? `${(att.focusSkill || '').toUpperCase()} ${att.overallBand ?? '-'}`
-                              : `L ${att.scores?.listening?.band ?? '-'} · R ${att.scores?.reading?.band ?? '-'} · W ${att.scores?.writing?.overallBand ?? '-'}${att.scores?.speaking ? ` · S ${att.scores?.speaking?.band ?? '-'}` : ''}`}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => openTeacherGradingModal(att)}
-                              className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap shrink-0"
-                            >
-                              {att.testMode === 'single_skill' ? 'Chấm & Xem' : 'Chấm Điểm (L/R/W)'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedAttemptId(att.id);
-                                setPreviousView('TEACHER_DASHBOARD');
-                                setView('RESULT_VIEW');
-                              }}
-                              aria-label={`Xem chi tiết bài làm của ${att.studentName}`}
-                              className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-teal-500/15 text-[#0F172B] hover:text-[#0F766E] dark:text-slate-300 dark:hover:text-[#1EE1D6] border border-[#CBD5E1] dark:border-slate-700 transition"
-                              title="Xem chi tiết từng câu & bài làm"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteAttempt(att)}
-                              aria-label={`Xóa lượt thi của ${att.studentName}`}
-                              className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-slate-400 dark:hover:text-rose-400 border border-[#FECACA] dark:border-slate-700 transition"
-                              title="Xóa lượt thi này để mở khóa cho học viên thi lại"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            </td>
+                          </tr>
+                        ) : gradingSlice.pageItems.map(att => {
+                          const risk = getRiskAssessment(att.tabSwitchCount, att.antiCheatLogs);
+                          const extSignals = countExtensionCheatSignals(att.antiCheatLogs);
+                          const RiskIcon = risk.icon;
+
+                          return (
+                            <tr key={att.id} className="group hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
+                              <td className="px-3.5 py-3 font-bold text-[#0F172B] dark:text-white">
+                                <div className="flex items-start gap-2.5">
+                                  <UserAvatarBadge
+                                    user={usersDb?.[att.studentId] || { username: att.studentId, name: att.studentName }}
+                                    sizeClass="w-8 h-8"
+                                    textClass="text-xs"
+                                    rounded="rounded-lg"
+                                  />
+                                  <div className="min-w-0 space-y-0.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {openMemberProfile && att.studentId ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => openMemberProfile(att.studentId, 'TEACHER_DASHBOARD')}
+                                          title="Xem hồ sơ thành viên"
+                                          className="inline-flex items-center gap-1 text-left hover:text-[#0F766E] dark:hover:text-teal-400 hover:underline transition whitespace-nowrap"
+                                        >
+                                          <span>{att.studentName}</span>
+                                          <Eye className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                                        </button>
+                                      ) : (
+                                        <span className="whitespace-nowrap">{att.studentName}</span>
+                                      )}
+                                      {att.timelinessStatus === 'late' ? (
+                                        <span className="inline-block text-xs font-bold px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-500/20 text-[#991B1B] dark:text-rose-300 whitespace-nowrap">
+                                          Muộn{att.lateByMinutes ? ` ${att.lateByMinutes}p` : ''}
+                                        </span>
+                                      ) : att.timelinessStatus === 'on_time' ? (
+                                        <span className="inline-block text-xs font-bold px-1.5 py-0.2 rounded-full bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300 whitespace-nowrap">
+                                          Đúng hạn
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <p className="text-xs font-normal text-[#475569] dark:text-slate-400 tabular-nums whitespace-nowrap">
+                                      {att.submittedAt}
+                                      {Number(att.durationSeconds) > 0 ? ` · ${formatDurationVi(att.durationSeconds)}` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-3.5 py-3 text-sm text-[#334155] dark:text-slate-300 max-w-[230px]">
+                                <div className="space-y-1">
+                                  <span
+                                    className={`inline-block text-xs font-bold uppercase px-2 py-0.5 rounded border whitespace-nowrap ${
+                                      att.testMode === 'single_skill'
+                                        ? 'bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                        : 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30'
+                                    }`}
+                                  >
+                                    {att.testMode === 'single_skill'
+                                      ? `BÀI TẬP • ${(att.focusSkill || 'SK').toUpperCase()}`
+                                      : 'ĐỀ THI'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTeacherGradingModal(att)}
+                                    className="block text-left font-semibold text-[#0F172B] dark:text-slate-100 hover:text-[#0F766E] dark:hover:text-[#1EE1D6] leading-snug line-clamp-2 transition"
+                                    title={`Bấm để chấm nhanh: ${att.testTitle}`}
+                                  >
+                                    {att.testTitle}
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 text-center whitespace-nowrap">
+                                <div className="inline-flex flex-col items-center gap-1">
+                                  {att.teacherGraded ? (
+                                    <span className="text-xs bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 px-2.5 py-0.5 rounded-lg font-bold border border-emerald-200 dark:border-emerald-500/30 inline-flex items-center gap-1 whitespace-nowrap">
+                                      {att.aiGraded && <Sparkles className="w-3.5 h-3.5 text-[#0F766E] dark:text-teal-400 shrink-0" />}
+                                      Đã Duyệt Trả Điểm
+                                    </span>
+                                  ) : att.aiGraded ? (
+                                    <span className="text-xs bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-200 px-2.5 py-0.5 rounded-lg font-bold border border-indigo-200 dark:border-indigo-500/40 inline-flex items-center gap-1 whitespace-nowrap">
+                                      <Sparkles className="w-3.5 h-3.5 shrink-0" /> AI Chấm Nháp · Chờ Duyệt
+                                    </span>
+                                  ) : (
+                                    <span className="inline-block text-xs bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 px-2.5 py-0.5 rounded-lg font-bold border border-amber-300 dark:border-amber-500/30 whitespace-nowrap">
+                                      Chờ Ms. Như Duyệt
+                                    </span>
+                                  )}
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap shrink-0 ${risk.color}`}>
+                                    <RiskIcon className="w-3 h-3 shrink-0" />
+                                    <span>{risk.label} ({att.tabSwitchCount} lần)</span>
+                                  </span>
+                                  {extSignals > 0 && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-[#991B1B] dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 whitespace-nowrap">
+                                      Extension / Bypass: {extSignals}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 text-center whitespace-nowrap">
+                                <div className="text-base font-black text-[#0F766E] dark:text-[#1EE1D6] tabular-nums leading-tight">
+                                  {att.overallBand ?? '-'}
+                                </div>
+                                <div className="text-xs font-medium text-[#475569] dark:text-slate-400 mt-0.5 tabular-nums whitespace-nowrap">
+                                  {att.testMode === 'single_skill' && att.focusSkill === 'speaking'
+                                    ? `Speaking ${att.scores?.speaking?.band ?? att.overallBand ?? '-'}`
+                                    : att.testMode === 'single_skill'
+                                    ? `${(att.focusSkill || '').toUpperCase()} ${att.overallBand ?? '-'}`
+                                    : `L ${att.scores?.listening?.band ?? '-'} · R ${att.scores?.reading?.band ?? '-'} · W ${att.scores?.writing?.overallBand ?? '-'}${att.scores?.speaking ? ` · S ${att.scores?.speaking?.band ?? '-'}` : ''}`}
+                                </div>
+                              </td>
+                              <td className="px-3.5 py-3 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-[#F8FAFC] dark:group-hover:bg-slate-800 transition z-10">
+                                <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => openTeacherGradingModal(att)}
+                                    className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap shrink-0"
+                                  >
+                                    {att.testMode === 'single_skill' ? 'Chấm & Xem' : 'Chấm Điểm'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedAttemptId(att.id);
+                                      setPreviousView('TEACHER_DASHBOARD');
+                                      setView('RESULT_VIEW');
+                                    }}
+                                    aria-label={`Xem chi tiết bài làm của ${att.studentName}`}
+                                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-teal-500/15 text-[#0F172B] hover:text-[#0F766E] dark:text-slate-300 dark:hover:text-[#1EE1D6] border border-[#CBD5E1] dark:border-slate-700 transition"
+                                    title="Xem chi tiết từng câu & bài làm"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteAttempt(att)}
+                                    aria-label={`Xóa lượt thi của ${att.studentName}`}
+                                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-slate-400 dark:hover:text-rose-400 border border-[#FECACA] dark:border-slate-700 transition"
+                                    title="Xóa lượt thi này để mở khóa cho học viên thi lại"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <ListPaginationBar
+                    currentPage={gradingSlice.safePage}
+                    totalItems={gradingSlice.totalItems}
+                    pageSize={5}
+                    onPageChange={setGradingPage}
+                    itemLabel="bài nộp"
+                  />
+                </>
+              );
+            })()}
           </div>
         </div>
         );
@@ -2268,44 +2327,56 @@ export default function TeacherDashboard({
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-[#334155] dark:text-slate-300">
-                <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 border-y border-slate-200 dark:border-slate-700 text-xs text-[#334155] dark:text-slate-300 uppercase whitespace-nowrap">
-                  <tr>
-                    <th className="pl-4 pr-2 py-4 w-10">
-                      <input
-                        type="checkbox"
-                        aria-label="Chọn tất cả tài khoản đang hiển thị"
-                        checked={allSelectableChecked}
-                        disabled={selectableFilteredNames.length === 0}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedUsernames(prev => Array.from(new Set([...prev, ...selectableFilteredNames])));
-                          } else {
-                            const dropSet = new Set(selectableFilteredNames);
-                            setSelectedUsernames(prev => prev.filter(u => !dropSet.has(u)));
-                          }
-                        }}
-                        className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:opacity-40"
-                      />
-                    </th>
-                    <th className="px-4 py-4">Tài Khoản</th>
-                    <th className="px-4 py-4 text-center">Vai Trò</th>
-                    <th className="px-4 py-4 text-center">Mục Tiêu / Ghi Chú</th>
-                    <th className="px-4 py-4 text-center">Hoạt Động</th>
-                    <th className="px-4 py-4 text-center">Ngày Tạo</th>
-                    <th className="px-4 py-4 text-right">Thao Tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {filteredAccounts.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-slate-400">
-                        Không tìm thấy tài khoản nào phù hợp với bộ lọc hiện tại.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredAccounts.map(account => {
+            {(() => {
+              const accountsSlice = paginateItems(filteredAccounts, accountsPage, 5);
+              return (
+                <>
+                  <ListPaginationBar
+                    currentPage={accountsSlice.safePage}
+                    totalItems={accountsSlice.totalItems}
+                    pageSize={5}
+                    onPageChange={setAccountsPage}
+                    itemLabel="tài khoản"
+                  />
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-[#334155] dark:text-slate-300">
+                      <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 border-y border-slate-200 dark:border-slate-700 text-xs text-[#334155] dark:text-slate-300 uppercase whitespace-nowrap">
+                        <tr>
+                          <th className="pl-4 pr-2 py-4 w-10">
+                            <input
+                              type="checkbox"
+                              aria-label="Chọn tất cả tài khoản đang hiển thị"
+                              checked={allSelectableChecked}
+                              disabled={selectableFilteredNames.length === 0}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedUsernames(prev => Array.from(new Set([...prev, ...selectableFilteredNames])));
+                                } else {
+                                  const dropSet = new Set(selectableFilteredNames);
+                                  setSelectedUsernames(prev => prev.filter(u => !dropSet.has(u)));
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:opacity-40"
+                            />
+                          </th>
+                          <th className="px-4 py-4">Tài Khoản</th>
+                          <th className="px-4 py-4 text-center">Vai Trò</th>
+                          <th className="px-4 py-4 text-center">Mục Tiêu / Ghi Chú</th>
+                          <th className="px-4 py-4 text-center">Hoạt Động</th>
+                          <th className="px-4 py-4 text-center">Ngày Tạo</th>
+                          <th className="px-4 py-4 text-right sticky right-0 bg-[#F8FAFC] dark:bg-slate-800 z-10">Thao Tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                        {filteredAccounts.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-slate-400">
+                              Không tìm thấy tài khoản nào phù hợp với bộ lọc hiện tại.
+                            </td>
+                          </tr>
+                        ) : (
+                          accountsSlice.pageItems.map(account => {
                       const isSuperAdminAccount = Boolean(account.isSuperAdmin || account.username === 'tuanpro123s');
                       const isTeacherAccount = account.role === 'teacher';
                       const isSelfAccount = account.username === currentUser?.username;
@@ -2319,7 +2390,7 @@ export default function TeacherDashboard({
                         : null;
 
                       return (
-                        <tr key={account.username} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
+                        <tr key={account.username} className="group hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
                           <td className="pl-4 pr-2 py-4 w-10">
                             <input
                               type="checkbox"
@@ -2566,7 +2637,7 @@ export default function TeacherDashboard({
                           <td className="px-4 py-4 text-center text-[13px] font-mono text-[#475569] dark:text-slate-400 whitespace-nowrap tabular-nums">
                             {account.joinedDate || '-'}
                           </td>
-                          <td className="px-4 py-4 text-right whitespace-nowrap">
+                          <td className="px-4 py-4 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-[#F8FAFC] dark:group-hover:bg-slate-800 transition z-10">
                             <div className="inline-flex items-center gap-2 whitespace-nowrap">
                               {openMemberProfile && (
                                 <button
@@ -2653,6 +2724,17 @@ export default function TeacherDashboard({
                 </tbody>
               </table>
             </div>
+
+                  <ListPaginationBar
+                    currentPage={accountsSlice.safePage}
+                    totalItems={accountsSlice.totalItems}
+                    pageSize={5}
+                    onPageChange={setAccountsPage}
+                    itemLabel="tài khoản"
+                  />
+                </>
+              );
+            })()}
           </div>
         </div>
         );
