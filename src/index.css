@@ -87,7 +87,8 @@ html.dark .lexi-card:hover {
   .vip-avatar-aura,
   .vip-neon-aurora-frame,
   .vip-neon-aurora-seam,
-  .vip-cover-led-aurora {
+  .vip-cover-led-aurora,
+  .vip-paid-badge {
     transition: none !important;
     animation: none !important;
   }
@@ -182,6 +183,36 @@ html.dark .vip-color-pink { color: #f472b6 !important; }
 
 .vip-cover-led-aurora {
   animation: vipLedAuroraPulse 4.5s ease-in-out infinite;
+}
+
+.vip-paid-badge {
+  background-size: 260% 260% !important;
+  animation: vipNeonShift 3.6s ease-in-out infinite;
+}
+
+.vip-paid-emerald {
+  background-image: linear-gradient(110deg, #047857, #10b981, #0d9488, #059669, #d97706, #047857) !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.34) !important;
+}
+
+.vip-paid-ruby {
+  background-image: linear-gradient(110deg, #9f1239, #e11d48, #db2777, #f43f5e, #be123c, #9f1239) !important;
+  box-shadow: 0 0 12px rgba(225, 29, 72, 0.36) !important;
+}
+
+.vip-paid-gold {
+  background-image: linear-gradient(110deg, #f59e0b, #fde047, #fbbf24, #fb923c, #facc15, #f59e0b) !important;
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.44) !important;
+}
+
+.vip-paid-imperial {
+  background-image: linear-gradient(110deg, #f59e0b, #fde047, #fb923c, #f472b6, #fde047, #f59e0b) !important;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5) !important;
+}
+
+.vip-paid-vip {
+  background-image: linear-gradient(110deg, #991b1b, #dc2626, #e11d48, #d97706, #b91c1c, #991b1b) !important;
+  box-shadow: 0 0 14px rgba(220, 38, 38, 0.42) !important;
 }
 
 @keyframes vipModalExpandFromTopRight {

@@ -30,7 +30,7 @@ export default function VipMemberName({
       </span>
       {showVipBadge && showVipTag && (
         <span
-          className={`inline-flex items-center font-semibold uppercase tracking-wider bg-[#991B1B] text-[#FFFFFF] border border-[#EF4444] shadow-none shrink-0 ${badgeCls}`}
+          className={`vip-paid-badge vip-paid-vip inline-flex items-center font-semibold uppercase tracking-wider bg-[#991B1B] text-[#FFFFFF] border border-[#F59E0B] shrink-0 ${badgeCls}`}
           title="Thành viên Gói IELTS VIP"
         >
           <Crown className={badgeSize === 'xs' ? 'w-2.5 h-2.5 text-amber-300' : 'w-3 h-3 text-amber-300'} />
