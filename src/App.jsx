@@ -7099,10 +7099,22 @@ export default function App() {
         />
       )}
 
-      {/* Route Transition Progress Bar & Tactile Page Hold Pill */}
+      {/* Route Transition Progress Bar & Tactile Page Hold Pill (Student, Teacher & SuperAdmin) */}
       {view !== 'EXAM_MODE' && view !== 'GAME_ARENA' && (
         <div
-          key={`route-loader-${view}-${view === 'SKILL_HUB' ? skillHubTab : ''}-${view === 'STUDENT_PROFILE' ? (selectedProfileStudent || '') : ''}`}
+          key={`route-loader-${view}-${
+            view === 'TEACHER_DASHBOARD'
+              ? teacherHubTab
+              : view === 'SKILL_HUB'
+              ? skillHubTab
+              : view === 'STUDENT_PROFILE'
+              ? selectedProfileStudent || ''
+              : view === 'EXAM_BUILDER'
+              ? builderTab || ''
+              : view === 'RESULT_VIEW'
+              ? `${selectedAttemptId || ''}-${resultReviewTab || ''}`
+              : ''
+          }`}
           className="pointer-events-none"
           aria-hidden="true"
         >

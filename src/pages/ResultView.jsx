@@ -380,8 +380,8 @@ export default function ResultView({
         )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-lg border border-slate-200 dark:border-slate-800 p-8 mb-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+      <div className="bg-white dark:bg-[#18181B] rounded-3xl shadow-lg border border-slate-200 dark:border-zinc-800 p-6 sm:p-8 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-200 dark:border-zinc-800">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold px-3 py-1 rounded-full">
@@ -575,99 +575,121 @@ export default function ResultView({
             : [showListeningCard, showReadingCard, showWritingCard, showSpeakingCard].filter(Boolean).length >= 4
             ? 'md:grid-cols-2 lg:grid-cols-4'
             : 'md:grid-cols-3'
-        } gap-6 my-8`}>
+        } divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800 border-y border-slate-200 dark:border-zinc-800 my-6`}>
           {showListeningCard && (
-            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
-                  <Headphones className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" /> Listening
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-[#007A7A] dark:text-[#1EE1D6]">
-                    {canShowApprovedScores ? (attempt.scores?.listening?.band ?? 0) : 'Chờ duyệt'}
+            <div className="py-4 md:py-5 md:px-4 first:md:pl-0 last:md:pr-0 flex flex-col justify-between gap-2.5">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-extrabold text-slate-800 dark:text-zinc-100 text-sm flex items-center gap-2">
+                    <Headphones className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" /> Listening
                   </span>
                   {isTeacher && (
                     <button
                       type="button"
                       onClick={() => openTeacherGradingModal?.(attempt)}
-                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] hover:border-[#007A7A] transition flex items-center gap-1"
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:text-[#007A7A] dark:hover:text-[#1EE1D6] hover:border-[#007A7A] transition flex items-center gap-1 shrink-0"
                       title="Chỉnh sửa điểm Listening"
                     >
                       <Edit className="w-3 h-3" /> Sửa
                     </button>
                   )}
                 </div>
+                <div>
+                  {canShowApprovedScores ? (
+                    <span className="text-2xl font-black tabular-nums text-[#007A7A] dark:text-[#1EE1D6]">
+                      {attempt.scores?.listening?.band ?? 0}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100/90 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs font-bold whitespace-nowrap">
+                      Chờ duyệt
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-[#475569] dark:text-slate-400">
+              <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
                 {canShowApprovedScores
-                  ? <>Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.listening?.raw || 0}</span> / {attempt.scores?.listening?.total || 0} câu</>
+                  ? <>Đúng: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.listening?.raw || 0}</span> / {attempt.scores?.listening?.total || 0} câu</>
                   : 'Ms. Như đang check và sẽ trả kết quả'}
               </p>
             </div>
           )}
 
           {showReadingCard && (
-            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-[#1447E6] dark:text-blue-400" /> Reading
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-[#1447E6] dark:text-blue-400">
-                    {canShowApprovedScores ? (attempt.scores?.reading?.band ?? 0) : 'Chờ duyệt'}
+            <div className="py-4 md:py-5 md:px-4 first:md:pl-0 last:md:pr-0 flex flex-col justify-between gap-2.5">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-extrabold text-slate-800 dark:text-zinc-100 text-sm flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-[#1447E6] dark:text-blue-400 shrink-0" /> Reading
                   </span>
                   {isTeacher && (
                     <button
                       type="button"
                       onClick={() => openTeacherGradingModal?.(attempt)}
-                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500 transition flex items-center gap-1"
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500 transition flex items-center gap-1 shrink-0"
                       title="Chỉnh sửa điểm Reading"
                     >
                       <Edit className="w-3 h-3" /> Sửa
                     </button>
                   )}
                 </div>
+                <div>
+                  {canShowApprovedScores ? (
+                    <span className="text-2xl font-black tabular-nums text-[#1447E6] dark:text-blue-400">
+                      {attempt.scores?.reading?.band ?? 0}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100/90 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs font-bold whitespace-nowrap">
+                      Chờ duyệt
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-[#475569] dark:text-slate-400">
+              <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
                 {canShowApprovedScores
-                  ? <>Đúng: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.reading?.raw || 0}</span> / {attempt.scores?.reading?.total || 0} câu</>
+                  ? <>Đúng: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.reading?.raw || 0}</span> / {attempt.scores?.reading?.total || 0} câu</>
                   : 'Ms. Như đang check và sẽ trả kết quả'}
               </p>
             </div>
           )}
 
           {showWritingCard && (
-            <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-5 border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
-                  <PenTool className="w-4 h-4 text-[#059271] dark:text-emerald-400" /> Writing
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-bold text-[#059271] dark:text-emerald-400">
-                    {canShowApprovedScores && attempt.scores?.writing?.overallBand !== null && attempt.scores?.writing?.overallBand !== undefined
-                      ? attempt.scores.writing.overallBand
-                      : 'Ms. Như đang check'}
+            <div className="py-4 md:py-5 md:px-4 first:md:pl-0 last:md:pr-0 flex flex-col justify-between gap-2.5">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-extrabold text-slate-800 dark:text-zinc-100 text-sm flex items-center gap-2">
+                    <PenTool className="w-4 h-4 text-[#059271] dark:text-emerald-400 shrink-0" /> Writing
                   </span>
                   {isTeacher && (
                     <button
                       type="button"
                       onClick={() => openTeacherGradingModal?.(attempt)}
-                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500 transition flex items-center gap-1"
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500 transition flex items-center gap-1 shrink-0"
                       title="Chấm hoặc chỉnh sửa điểm Writing"
                     >
                       <Edit className="w-3 h-3" /> Sửa
                     </button>
                   )}
                 </div>
+                <div>
+                  {canShowApprovedScores && attempt.scores?.writing?.overallBand !== null && attempt.scores?.writing?.overallBand !== undefined ? (
+                    <span className="text-2xl font-black tabular-nums text-[#059271] dark:text-emerald-400">
+                      {attempt.scores.writing.overallBand}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100/90 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs font-bold whitespace-nowrap">
+                      Ms. Như đang check
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-[#475569] dark:text-slate-400">
+              <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
                 {canShowApprovedScores
                   ? (
                     writingTaskScope === 'task1'
-                      ? <>Task 1: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task1Band ?? '-'}</span></>
+                      ? <>Task 1: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.writing?.task1Band ?? '-'}</span></>
                       : writingTaskScope === 'task2'
-                      ? <>Task 2: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task2Band ?? '-'}</span></>
-                      : <>Task 1: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task1Band ?? '-'}</span> | Task 2: <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.scores?.writing?.task2Band ?? '-'}</span></>
+                      ? <>Task 2: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.writing?.task2Band ?? '-'}</span></>
+                      : <>Task 1: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.writing?.task1Band ?? '-'}</span> | Task 2: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.writing?.task2Band ?? '-'}</span></>
                   )
                   : 'Bài viết đã gửi - Chờ Ms. Như duyệt điểm'}
               </p>
@@ -675,50 +697,56 @@ export default function ResultView({
           )}
 
           {showSpeakingCard && (
-            <div className="bg-indigo-50/75 dark:bg-[#0F172B] rounded-2xl p-5 border border-[#007A7A]/30">
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
-                  <Mic className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" /> Speaking
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-black text-[#0F766E] dark:text-[#1EE1D6]">
-                    {canShowApprovedScores && typeof attempt.scores?.speaking?.band === 'number'
-                      ? attempt.scores.speaking.band
-                      : 'Ms. Như đang check'}
+            <div className="py-4 md:py-5 md:px-4 first:md:pl-0 last:md:pr-0 flex flex-col justify-between gap-2.5">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm flex items-center gap-2">
+                    <Mic className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0" /> Speaking
                   </span>
                   {isTeacher && (
                     <button
                       type="button"
                       onClick={() => openTeacherGradingModal?.(attempt)}
-                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-[#0F766E] transition flex items-center gap-1"
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:text-[#0F766E] transition flex items-center gap-1 shrink-0"
                       title="Chỉnh sửa điểm Speaking"
                     >
                       <Edit className="w-3 h-3" /> Sửa
                     </button>
                   )}
                 </div>
+                <div>
+                  {canShowApprovedScores && typeof attempt.scores?.speaking?.band === 'number' ? (
+                    <span className="text-2xl font-black tabular-nums text-[#0F766E] dark:text-[#1EE1D6]">
+                      {attempt.scores.speaking.band}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100/90 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs font-bold whitespace-nowrap">
+                      Ms. Như đang check
+                    </span>
+                  )}
+                </div>
               </div>
               {canShowApprovedScores ? (
                 <div className="grid grid-cols-4 gap-1.5 text-center text-xs font-mono">
-                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                  <div className="bg-white dark:bg-zinc-900 rounded-lg py-1 border border-slate-200 dark:border-zinc-700">
                     <span className="block text-xs text-slate-400 font-sans">FC</span>
                     <strong>{attempt.scores?.speaking?.criteria?.fc ?? '-'}</strong>
                   </div>
-                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                  <div className="bg-white dark:bg-zinc-900 rounded-lg py-1 border border-slate-200 dark:border-zinc-700">
                     <span className="block text-xs text-slate-400 font-sans">LR</span>
                     <strong>{attempt.scores?.speaking?.criteria?.lr ?? '-'}</strong>
                   </div>
-                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                  <div className="bg-white dark:bg-zinc-900 rounded-lg py-1 border border-slate-200 dark:border-zinc-700">
                     <span className="block text-xs text-slate-400 font-sans">GRA</span>
                     <strong>{attempt.scores?.speaking?.criteria?.gra ?? '-'}</strong>
                   </div>
-                  <div className="bg-white dark:bg-slate-900/70 rounded-lg py-1 border border-indigo-200/70 dark:border-slate-700">
+                  <div className="bg-white dark:bg-zinc-900 rounded-lg py-1 border border-slate-200 dark:border-zinc-700">
                     <span className="block text-xs text-slate-400 font-sans">PR</span>
                     <strong>{attempt.scores?.speaking?.criteria?.pr ?? '-'}</strong>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-[#475569] dark:text-slate-400">
+                <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
                   File ghi âm đã lưu an toàn - Ms. Như đang check &amp; chấm 4 tiêu chí.
                 </p>
               )}
@@ -814,8 +842,8 @@ export default function ResultView({
         })()}
 
         {/* SPEAKING 4 CRITERIA & TEACHER RE-GRADE PANEL */}
-        {showSpeakingCard && !canShowApprovedScores && (
-          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
+        {showSpeakingCard && !showWritingCard && !canShowApprovedScores && (
+          <div className="bg-slate-50 dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 mb-8">
             <div className="flex items-center gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                 <Clock className="w-5 h-5" />
@@ -824,7 +852,7 @@ export default function ResultView({
                 <h2 className="font-bold text-slate-900 dark:text-white text-sm">
                   Ms. Như đang check bài Speaking của bạn
                 </h2>
-                <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
                   Toàn bộ file ghi âm đã được gửi an toàn tới Ms. Như. Điểm 4 tiêu chí, phân tích lỗi nói và nhận xét sẽ hiển thị ngay sau khi Ms. Như duyệt và trả bài!
                 </p>
               </div>
@@ -1002,7 +1030,7 @@ export default function ResultView({
             )}
           </div>
         ) : (
-          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 mb-8">
+          <div className="bg-slate-50 dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 p-5 mb-8">
             {!attempt.teacherGraded ? (
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
@@ -1010,10 +1038,14 @@ export default function ResultView({
                 </div>
                 <div>
                   <h2 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Ms. Như đang check bài làm của bạn
+                    {showSpeakingCard
+                      ? 'Ms. Như đang chấm & duyệt bài thi 4 kỹ năng của bạn'
+                      : 'Ms. Như đang check bài làm của bạn'}
                   </h2>
-                  <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
-                    Bài viết và các phần làm bài đã được gửi an toàn tới Ms. Như. Điểm chính thức và nhận xét chi tiết sẽ hiển thị ngay sau khi Ms. Như duyệt và trả bài!
+                  <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5 leading-relaxed">
+                    {showSpeakingCard
+                      ? 'Bài viết Writing, toàn bộ file ghi âm Speaking và phần làm bài Listening · Reading đã được lưu an toàn. Điểm chính thức 4 kỹ năng, bảng sửa lỗi và nhận xét sẽ hiển thị ngay sau khi Ms. Như duyệt và trả bài!'
+                      : 'Bài viết và các phần làm bài đã được gửi an toàn tới Ms. Như. Điểm chính thức và nhận xét chi tiết sẽ hiển thị ngay sau khi Ms. Như duyệt và trả bài!'}
                   </p>
                 </div>
               </div>
@@ -1144,6 +1176,15 @@ export default function ResultView({
           </div>
 
           {/* Listening & Reading Questions Review */}
+          <div
+            key={`review-tab-${activeReviewTab}`}
+            className="apple-tab-enter"
+            onAnimationEnd={e => {
+              if (e.currentTarget === e.target) {
+                e.currentTarget.classList.remove('apple-tab-enter');
+              }
+            }}
+          >
           {(activeReviewTab === 'listening' || activeReviewTab === 'reading') && (
             <div className="space-y-4">
               {((activeReviewTab === 'listening' ? targetTest?.listening?.questions : targetTest?.reading?.questions) || []).map((q, idx) => {
@@ -1344,6 +1385,7 @@ export default function ResultView({
               ))}
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

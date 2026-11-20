@@ -1245,7 +1245,15 @@ export default function SkillPracticeHub({
         </aside>
 
         {/* MAIN WORKSPACE */}
-        <main className="flex-1 min-w-0 space-y-8">
+        <main
+          key={`skill-hub-tab-${activeTab}`}
+          className="apple-view-enter flex-1 min-w-0 space-y-8"
+          onAnimationEnd={e => {
+            if (e.currentTarget === e.target) {
+              e.currentTarget.classList.remove('apple-view-enter');
+            }
+          }}
+        >
           {!isTeacher && (
             <div className="rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="font-bold text-[#065F46] dark:text-emerald-200 flex items-center gap-2">

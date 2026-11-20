@@ -807,6 +807,15 @@ Write ONE WORD AND/OR A NUMBER for each answer.
       })()}
 
       {/* TAB 1: GENERAL SETTINGS, VISIBILITY, ATTEMPT LIMITS, SECTION TIMERS & ANSWER PERMISSIONS */}
+      <div
+        key={`builder-tab-${builderTab}`}
+        className="apple-view-enter space-y-6"
+        onAnimationEnd={e => {
+          if (e.currentTarget === e.target) {
+            e.currentTarget.classList.remove('apple-view-enter');
+          }
+        }}
+      >
       {builderTab === 'general' && (() => {
         const cfg = normalizeExamConfig(testForm);
         const skillLabels = {
@@ -2800,6 +2809,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           testForm={testForm}
         />
       )}
+      </div>
     </div>
   );
 }

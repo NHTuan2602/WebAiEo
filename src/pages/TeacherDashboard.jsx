@@ -1322,7 +1322,15 @@ export default function TeacherDashboard({
           )}
         </aside>
 
-        <div className="min-w-0 space-y-5">
+        <div
+          key={`teacher-workspace-${teacherHubTab}`}
+          className="apple-view-enter min-w-0 space-y-5"
+          onAnimationEnd={e => {
+            if (e.currentTarget === e.target) {
+              e.currentTarget.classList.remove('apple-view-enter');
+            }
+          }}
+        >
 
       {/* Tab 2: Kho Bài Tập Daily Zone (Miễn Phí - Từng Kỹ Năng Riêng) */}
       {teacherHubTab === 'skill_exercises' && (
@@ -2699,14 +2707,14 @@ export default function TeacherDashboard({
 
         return (
           <div
-            className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
+            className="apple-backdrop-enter fixed inset-0 z-[110] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4"
             onClick={() => setCompletionModalTestId(null)}
           >
             <div
               role="dialog"
               aria-modal="true"
               aria-label={`Kiểm tra tiến độ: ${targetItem.title}`}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col overflow-hidden"
+              className="apple-modal-sheet bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88dvh] flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -2932,11 +2940,11 @@ export default function TeacherDashboard({
       {/* Teacher Notification Broadcast Modal */}
       {showNotifyModal && (
         <div
-          className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="apple-backdrop-enter fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
           onClick={() => setShowNotifyModal(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden"
+            className="apple-modal-sheet bg-white dark:bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90dvh] flex flex-col border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <div className="px-6 py-4 bg-[#F8FAFC] dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
