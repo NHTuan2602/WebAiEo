@@ -27,7 +27,7 @@ Hệ thống luyện & thi thử IELTS trực tuyến chuẩn phòng thi máy t�
 - **Kiểm tra lint & audit UI:** `npm run lint -- --quiet` và `.\.agents\skills\impeccable\scripts\impeccable.cmd detect --json src`.
 
 **Các biến môi trường (chỉ liệt kê tên biến, tuyệt đối không ghi giá trị thật):**
-- *Server & Storage:* `PORT`, `HOST`, `RAILWAY_VOLUME_MOUNT_PATH`, `SYNC_STATE_FILE`
+- *Server & Storage:* `PORT`, `HOST`, `RAILWAY_VOLUME_MOUNT_PATH`, `SYNC_STATE_FILE`, `MAINTENANCE_MODE` *(tùy chọn `1` để bật trang bảo trì 503 toàn hệ thống)*
 - *Auth & Protected Accounts:* `SESSION_SECRET`, `SUPER_ADMIN_PASS`, `TEACHER_DEFAULT_PASS`
 - *AI Grading / Extraction:* `GEMINI_API_KEY`, `VITE_GEMINI_API_KEY` *(hoặc lưu qua giao diện Admin vào `store.aiConfig`)*
 - *Thanh toán tự động:* `SEPAY_API_KEY`, `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` *(hoặc cấu hình trong `PaymentConfigModal`)*
@@ -65,6 +65,7 @@ Hệ thống luyện & thi thử IELTS trực tuyến chuẩn phòng thi máy t�
 
 ### `src/components/`
 - `common/Navbar.jsx` — Thanh điều hướng chính, badge số lượt làm đề có phí + nút `+` mở bảng giá cạnh tên học viên, chuông thông báo, chuyển sáng/tối.
+- `common/ServerMaintenanceOverlay.jsx` & `AppErrorBoundary.jsx` — Trang thông báo bảo trì/mất kết nối/crash React kèm ảnh meme nhúng inline offline-safe, tự động ping `/health` khôi phục (kết hợp `public/maintenance.html` + `public/sw-offline.js` cho lỗi 5xx/offline lúc F5).
 - `common/UserAvatarBadge.jsx` — Hiển thị avatar người dùng kèm khung avatar (`AVATAR_FRAMES`) và hào quang VIP (`data-avatar-badge="true"`).
 - `common/VipMemberName.jsx` — Hiển thị tên màu tùy chỉnh (preset/hex) + huy hiệu động `IELTS VIP`.
 - `common/BrandContactFooter.jsx` — Footer thương hiệu IELTS Nha Trang (Ms. Như) dạng đầy đủ hoặc thẻ gọn.

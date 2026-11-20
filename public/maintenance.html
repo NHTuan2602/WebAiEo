@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="google" content="notranslate" />
+    <title>Đang Bảo Trì Máy Chủ | Luyện Thi IELTS Nha Trang</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --muted: #475569;
+        --badge-bg: #fef3c7;
+        --badge-text: #92400e;
+        --badge-border: #fcd34d;
+        --accent: #0f766e;
+        --accent-hover: #0d9488;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #09090b;
+          --surface: #18181b;
+          --border: #27272a;
+          --text: #fafafa;
+          --muted: #a1a1aa;
+          --badge-bg: rgba(245, 158, 11, 0.16);
+          --badge-text: #fcd34d;
+          --badge-border: rgba(245, 158, 11, 0.4);
+        }
+      }
+      html.dark {
+        --bg: #09090b;
+        --surface: #18181b;
+        --border: #27272a;
+        --text: #fafafa;
+        --muted: #a1a1aa;
+        --badge-bg: rgba(245, 158, 11, 0.16);
+        --badge-text: #fcd34d;
+        --badge-border: rgba(245, 158, 11, 0.4);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      }
+      .card {
+        width: 100%;
+        max-width: 520px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px 24px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.14);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: var(--badge-bg);
+        color: var(--badge-text);
+        border: 1px solid var(--badge-border);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 18px;
+      }
+      .img-wrap {
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #18181b;
+        margin-bottom: 20px;
+      }
+      .img-wrap img {
+        display: block;
+        width: 100%;
+        max-height: 280px;
+        object-fit: cover;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 20px;
+        line-height: 1.4;
+        font-weight: 800;
+      }
+      p {
+        margin: 0 auto 20px;
+        max-width: 56ch;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border: none;
+        border-radius: 12px;
+        background: var(--accent);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .btn:hover { background: var(--accent-hover); }
+      .btn:disabled { opacity: 0.65; cursor: wait; }
+      .status-note {
+        margin-top: 12px;
+        margin-bottom: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .footer {
+        margin-top: 20px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--muted);
+      }
+    </style>
+    <script>
+      try {
+        if (localStorage.getItem('ielts_theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <main class="card">
+      <div class="badge">Mất kết nối máy chủ / Đang bảo trì</div>
+      <div class="img-wrap">
+        <img src="/server-maintenance.jpg" alt="Thông báo bảo trì máy chủ" />
+      </div>
+      <h1>Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát</h1>
+      <p>
+        Hệ thống đang tự động kiểm tra lại máy chủ mỗi vài giây và sẽ tự mở lại trang ngay khi máy chủ sẵn sàng.
+      </p>
+      <button id="retryBtn" class="btn" type="button">Thử Kết Nối Lại Ngay</button>
+      <p id="statusNote" class="status-note">Đang chờ máy chủ phản hồi...</p>
+      <div class="footer">
+        Luyện Thi IELTS Nha Trang (Ms. Như) • Hotline: 0969 917 460 • Zalo kỹ thuật: 0367 073 526
+      </div>
+    </main>
+    <script>
+      (function () {
+        var btn = document.getElementById('retryBtn');
+        var note = document.getElementById('statusNote');
+        var checking = false;
+
+        async function checkHealth(manual) {
+          if (checking) return;
+          checking = true;
+          if (btn) btn.disabled = true;
+          if (manual && note) note.textContent = 'Đang kiểm tra kết nối máy chủ...';
+          try {
+            var res = await fetch('/health', { cache: 'no-store' });
+            if (res.ok) {
+              var data = await res.json().catch(function () { return {}; });
+              if (data && data.ok) {
+                if (note) note.textContent = 'Máy chủ đã hoạt động lại! Đang tải trang...';
+                window.location.replace('/');
+                return;
+              }
+            }
+            if (note) note.textContent = 'Máy chủ vẫn đang bảo trì, hệ thống sẽ tự thử lại sau 4 giây...';
+          } catch (e) {
+            if (note) note.textContent = 'Chưa kết nối được máy chủ, đang tự động thử lại...';
+          } finally {
+            checking = false;
+            if (btn) btn.disabled = false;
+          }
+        }
+
+        if (btn) {
+          btn.addEventListener('click', function () { checkHealth(true); });
+        }
+        window.addEventListener('online', function () { checkHealth(true); });
+        setInterval(function () { checkHealth(false); }, 4000);
+      })();
+    </script>
+  </body>
+</html>

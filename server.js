@@ -8,6 +8,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, 'dist');
 const INDEX_HTML_PATH = path.join(DIST_DIR, 'index.html');
+const MAINTENANCE_HTML_PATH = path.join(DIST_DIR, 'maintenance.html');
+
+function isMaintenanceModeEnabled() {
+  const flag = String(process.env.MAINTENANCE_MODE || '').trim().toLowerCase();
+  return flag === '1' || flag === 'true' || flag === 'on';
+}
+
+function sendMaintenancePage(res, statusCode = 503) {
+  res.statusCode = statusCode;
+  res.setHeader('Cache-Control', 'no-store');
+  if (fs.existsSync(MAINTENANCE_HTML_PATH)) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    fs.createReadStream(MAINTENANCE_HTML_PATH).pipe(res);
+    return;
+  }
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.end('Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát');
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -104,10 +122,36 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
     const pathname = rawUrl.split('?')[0];
 
     if (pathname === '/health') {
-      res.statusCode = 200;
+      const inMaintenance = isMaintenanceModeEnabled();
+      res.statusCode = inMaintenance ? 503 : 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
-      res.end(JSON.stringify({ ok: true, version: store.version, uptime: Math.round(process.uptime()) }));
+      res.end(
+        JSON.stringify(
+          inMaintenance
+            ? { ok: false, maintenance: true, version: store.version, uptime: Math.round(process.uptime()) }
+            : { ok: true, version: store.version, uptime: Math.round(process.uptime()) }
+        )
+      );
+      return;
+    }
+
+    if (isMaintenanceModeEnabled()) {
+      if (pathname === '/server-maintenance.jpg' || pathname === '/maintenance.html' || pathname === '/sw-offline.js') {
+        const assetPath = resolveStaticAssetPath(pathname);
+        if (assetPath && fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
+          sendStaticFile(res, assetPath, false);
+          return;
+        }
+      }
+      if (pathname.startsWith('/api/')) {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(JSON.stringify({ ok: false, maintenance: true, error: 'Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát' }));
+        return;
+      }
+      sendMaintenancePage(res, 503);
       return;
     }
 
@@ -115,10 +159,18 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
     if (syncHandler) {
       req.originalUrl = rawUrl;
       req.url = rawUrl.slice(syncHandler.route.length) || '/';
-      syncHandler.fn(req, res, () => {
-        res.statusCode = 404;
-        res.end(JSON.stringify({ ok: false, error: 'Not found' }));
-      });
+      try {
+        syncHandler.fn(req, res, () => {
+          res.statusCode = 404;
+          res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+        });
+      } catch (_err) {
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: false, error: 'Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát' }));
+        }
+      }
       return;
     }
 

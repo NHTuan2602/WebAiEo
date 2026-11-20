@@ -91,6 +91,7 @@ import {
 } from './utils/sessionPersistence';
 import { useExamAntiCheat } from './hooks/useExamAntiCheat';
 import Navbar from './components/common/Navbar';
+import ServerMaintenanceOverlay from './components/common/ServerMaintenanceOverlay';
 import GlobalModals from './components/modals/GlobalModals';
 import AccountSecurityModal from './components/modals/AccountSecurityModal';
 import MailConfigModal from './components/modals/MailConfigModal';
@@ -356,6 +357,23 @@ export default function App() {
   const [lobbyChatInput, setLobbyChatInput] = useState('');
   const [lobbyNowTick, setLobbyNowTick] = useState(() => Date.now());
   const [serverSyncConnected, setServerSyncConnected] = useState(false);
+  const [maintenancePreviewMode, setMaintenancePreviewMode] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const p = new URLSearchParams(window.location.search).get('maintenance');
+      return p === '1' || p === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [serverOutageActive, setServerOutageActive] = useState(false);
+  const [serverOutageDismissed, setServerOutageDismissed] = useState(false);
+  const [serverOutageChecking, setServerOutageChecking] = useState(false);
+  const consecutiveSyncFailuresRef = useRef(0);
+  const serverOutageActiveRef = useRef(false);
+  useEffect(() => {
+    serverOutageActiveRef.current = serverOutageActive;
+  }, [serverOutageActive]);
   const [copiedRoomPin, setCopiedRoomPin] = useState(false);
   const [apiTestState, setApiTestState] = useState({ testing: false, ok: null, message: '', model: '' });
   const [showAuthPass, setShowAuthPass] = useState(false);
@@ -1625,15 +1643,71 @@ export default function App() {
     }
   };
 
+  const markServerSyncSuccess = () => {
+    consecutiveSyncFailuresRef.current = 0;
+    serverSyncConnectedRef.current = true;
+    setServerSyncConnected(true);
+    if (serverOutageActiveRef.current) {
+      serverOutageActiveRef.current = false;
+      setServerOutageActive(false);
+      setServerOutageDismissed(false);
+      showToast('Đã kết nối lại máy chủ thành công!', 'success');
+    }
+  };
+
+  const markServerSyncFailure = (immediate = false) => {
+    serverSyncConnectedRef.current = false;
+    setServerSyncConnected(false);
+    consecutiveSyncFailuresRef.current += 1;
+    if (immediate || consecutiveSyncFailuresRef.current >= 2) {
+      serverOutageActiveRef.current = true;
+      setServerOutageActive(true);
+    }
+  };
+
+  const verifyServerHealthNow = async (manualTrigger = false) => {
+    if (maintenancePreviewMode && manualTrigger) {
+      setMaintenancePreviewMode(false);
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('maintenance');
+        window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+      } catch {}
+    }
+    if (manualTrigger) setServerOutageChecking(true);
+    try {
+      const res = await fetch('/health', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data?.ok) {
+          markServerSyncSuccess();
+          await pullServerSyncState(true);
+          return true;
+        }
+      }
+      markServerSyncFailure(true);
+      return false;
+    } catch {
+      markServerSyncFailure(true);
+      return false;
+    } finally {
+      if (manualTrigger) setServerOutageChecking(false);
+    }
+  };
+
   const pullServerSyncState = async (forceApply = false) => {
     const epochAtStart = authEpochRef.current;
     try {
       const res = await fetch('/api/sync/state', { cache: 'no-store' });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        if (res.status >= 500) {
+          markServerSyncFailure(res.status === 503);
+        }
+        return null;
+      }
       const snap = await res.json();
       if (epochAtStart !== authEpochRef.current) return null;
-      serverSyncConnectedRef.current = true;
-      setServerSyncConnected(true);
+      markServerSyncSuccess();
       if (snap?.authenticated === false && !currentUserRef.current && !forceApply) {
         if (snap.bootId) lastBootIdRef.current = snap.bootId;
         if (typeof snap.aiConfigured === 'boolean') {
@@ -1647,8 +1721,7 @@ export default function App() {
       }
       return snap;
     } catch (_err) {
-      serverSyncConnectedRef.current = false;
-      setServerSyncConnected(false);
+      markServerSyncFailure(false);
       return null;
     }
   };
@@ -1661,8 +1734,12 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, payload })
       });
-      serverSyncConnectedRef.current = true;
-      setServerSyncConnected(true);
+      if (res.status >= 500) {
+        lastSyncRejectionStatusRef.current = res.status;
+        markServerSyncFailure(res.status === 503);
+        return null;
+      }
+      markServerSyncSuccess();
       if (!res.ok) {
         lastSyncRejectionStatusRef.current = res.status;
         const errData = await res.json().catch(() => ({}));
@@ -1687,8 +1764,7 @@ export default function App() {
       return data?.snapshot || null;
     } catch (_err) {
       lastSyncRejectionStatusRef.current = 0;
-      serverSyncConnectedRef.current = false;
-      setServerSyncConnected(false);
+      markServerSyncFailure(false);
       return null;
     }
   };
@@ -1760,12 +1836,12 @@ export default function App() {
         const res = await fetch('/api/sync/auth/session', { cache: 'no-store' });
         if (res.ok) {
           sessionData = await res.json();
-          serverSyncConnectedRef.current = true;
-          setServerSyncConnected(true);
+          markServerSyncSuccess();
+        } else if (res.status >= 500) {
+          markServerSyncFailure(true);
         }
       } catch (_err) {
-        serverSyncConnectedRef.current = false;
-        setServerSyncConnected(false);
+        markServerSyncFailure(true);
       }
       if (cancelled || bootEpoch !== authEpochRef.current) return;
 
@@ -1850,8 +1926,7 @@ export default function App() {
         if (streamEpoch !== authEpochRef.current) return;
         try {
           const parsed = JSON.parse(e.data);
-          serverSyncConnectedRef.current = true;
-          setServerSyncConnected(true);
+          markServerSyncSuccess();
           applyRemoteSnapshotData.current?.(parsed);
         } catch (_err) {}
       });
@@ -1872,6 +1947,30 @@ export default function App() {
       evtSource?.close();
     };
   }, [currentUser?.username]);
+
+  // Monitor browser offline/online transitions & auto-recover from server outage
+  useEffect(() => {
+    const handleOffline = () => {
+      markServerSyncFailure(true);
+    };
+    const handleOnline = () => {
+      verifyServerHealthNow(false);
+    };
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!serverOutageActive) return undefined;
+    const retryTimer = setInterval(() => {
+      verifyServerHealthNow(false);
+    }, 3500);
+    return () => clearInterval(retryTimer);
+  }, [serverOutageActive]);
 
   // Tick timer for Crewmate speech bubbles + 10-minute chat cycle sweep + auto-scroll Lobby Chat while in Lobby
   useEffect(() => {
@@ -7725,6 +7824,29 @@ export default function App() {
           onRequestUnlock={handleRequestCoverUnlock}
           onPullSync={() => pullServerSyncState(true)}
           showToast={showToast}
+        />
+      )}
+
+      {(maintenancePreviewMode || (serverOutageActive && !serverOutageDismissed)) && (
+        <ServerMaintenanceOverlay
+          isOpen={true}
+          mode="disconnected"
+          checking={serverOutageChecking}
+          canDismiss={maintenancePreviewMode || view === 'EXAM_MODE'}
+          dismissLabel={maintenancePreviewMode ? 'Đóng xem trước' : 'Tạm ẩn (giữ bài đang làm)'}
+          onRetry={() => verifyServerHealthNow(true)}
+          onDismiss={() => {
+            if (maintenancePreviewMode) {
+              setMaintenancePreviewMode(false);
+              try {
+                const u = new URL(window.location.href);
+                u.searchParams.delete('maintenance');
+                window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+              } catch {}
+            } else {
+              setServerOutageDismissed(true);
+            }
+          }}
         />
       )}
     </div>
