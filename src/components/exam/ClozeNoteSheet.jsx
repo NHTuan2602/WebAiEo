@@ -106,6 +106,26 @@ export default function ClozeNoteSheet({
     const preambleLines = firstBodyIdx > 0 ? filteredLines.slice(0, firstBodyIdx) : [];
     const boxLines = firstBodyIdx > 0 ? filteredLines.slice(firstBodyIdx) : filteredLines;
 
+    const blankNumbers = sectionBlankLinks
+      .map(item => Number(item.blankNum))
+      .filter(num => Number.isFinite(num) && num > 0);
+    const minBlank = blankNumbers.length ? Math.min(...blankNumbers) : null;
+    const maxBlank = blankNumbers.length ? Math.max(...blankNumbers) : null;
+    const questionRangeLabel = minBlank
+      ? minBlank === maxBlank
+        ? `Question ${minBlank}`
+        : `Questions ${minBlank}–${maxBlank}`
+      : '';
+
+    const hasPreambleHeader = preambleLines.some(l =>
+      /^Questions?\s+\d+/i.test(getLinePlainText(l))
+    );
+    const hasPreambleWordLimit = preambleLines.some(l =>
+      /(?:write\s+|choose\s+)?(?:one|two|three|no\s+more)\s+words?/i.test(getLinePlainText(l))
+    );
+    const linkedWordLimit = sectionBlankLinks.find(item => item.linkedQ?.wordLimit)?.linkedQ?.wordLimit || '';
+    const linkedInstruction = sectionBlankLinks.find(item => item.linkedQ?.instruction)?.linkedQ?.instruction || '';
+
     const allowSpacedCodes = optionsUseSpaceSeparatedCodes(sharedWordBoxOptions);
     const usedByMap = new Map();
     choiceBlanks.forEach(({ blankNum, linkedQ }) => {
@@ -341,6 +361,27 @@ export default function ClozeNoteSheet({
 
     return (
       <div key={`cloze-sec-${sectionIdx}`} className="space-y-3">
+        {!hasPreambleHeader && questionRangeLabel && (
+          <div className="space-y-1 pb-1.5 border-b border-slate-200 dark:border-[#32353E]">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-[17px] font-bold text-[#111827] dark:text-white">
+                {questionRangeLabel}
+              </h4>
+              <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
+                {sharedWordBoxOptions.length > 0 ? 'Summary Completion (Box)' : 'Summary Completion'}
+              </span>
+            </div>
+            <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
+              {linkedInstruction || (sharedWordBoxOptions.length > 0 ? 'Complete the summary using the list of words below.' : 'Complete the summary below.')}
+            </p>
+            {linkedWordLimit && sharedWordBoxOptions.length === 0 && (
+              <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                Write {linkedWordLimit} from the passage for each answer.
+              </p>
+            )}
+          </div>
+        )}
+
         {preambleLines.length > 0 && (
           <div className="space-y-1.5">
             {preambleLines.map(line =>
@@ -358,6 +399,11 @@ export default function ClozeNoteSheet({
                   {renderSegments(line.segments)}
                 </p>
               )
+            )}
+            {hasPreambleHeader && !hasPreambleWordLimit && linkedWordLimit && sharedWordBoxOptions.length === 0 && (
+              <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400 uppercase tracking-wide pt-0.5">
+                Write {linkedWordLimit} from the passage for each answer.
+              </p>
             )}
           </div>
         )}

@@ -9,6 +9,7 @@
 
 import { isInlineClozeQuestion } from './clozeHelpers.js';
 import { matchChoiceOption } from './examHelpers.js';
+import { extractPassageParagraphLetters } from './examUiHelpers.js';
 
 const CLOZE_TOKEN_REGEX = /\{\{\s*(\d+)\s*\}\}|\[\s*(\d+)\s*\]|\(__+\s*(\d+)\s*__+\)/g;
 const LEADING_NUMBER_REGEX = /^(\s*(?:(?:câu|questions?|q)\s*)?)(\d{1,3})(\s*[-–—]\s*\d{1,3})?(?=\s*[.):\-–—]|\s|$)/i;
@@ -294,9 +295,44 @@ export function repairReadingPdfNumbering(rawPassages = [], { answerKey = new Ma
   // 6. Answers from the answer key, canonical option matching, consistent blankNum, matching printed prefix, final sort.
   passages = passages.map(passage => {
     const clozeSet = new Set(listClozeNumbers(passage.clozeText));
+    const passageLetters = extractPassageParagraphLetters(passage.passageText);
+    const defaultParagraphLetters = passageLetters.length >= 2 ? passageLetters : ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+
+    const sortedRaw = [...passage.questions].sort((a, b) => a.questionNumber - b.questionNumber);
+
+    // Propagate matching_features / matching_headings options if consecutive questions share type
+    for (let k = 0; k < sortedRaw.length; k++) {
+      const curr = sortedRaw[k];
+      if (curr.type === 'matching_features' || curr.type === 'matching_headings') {
+        const currOpts = Array.isArray(curr.options) ? curr.options.filter(Boolean) : [];
+        if (currOpts.length === 0) {
+          let donor = null;
+          for (let m = k - 1; m >= 0 && sortedRaw[m].type === curr.type; m--) {
+            if (Array.isArray(sortedRaw[m].options) && sortedRaw[m].options.length > 0) {
+              donor = sortedRaw[m];
+              break;
+            }
+          }
+          if (!donor) {
+            for (let m = k + 1; m < sortedRaw.length && sortedRaw[m].type === curr.type; m++) {
+              if (Array.isArray(sortedRaw[m].options) && sortedRaw[m].options.length > 0) {
+                donor = sortedRaw[m];
+                break;
+              }
+            }
+          }
+          if (donor) {
+            curr.options = [...donor.options];
+            if (!curr.instruction && donor.instruction) curr.instruction = donor.instruction;
+            if (donor.hasNB) curr.hasNB = true;
+          }
+        }
+      }
+    }
+
     return {
       ...passage,
-      questions: passage.questions
+      questions: sortedRaw
         .map(q => {
           const next = { ...q };
           delete next._inferred;
@@ -308,6 +344,17 @@ export function repairReadingPdfNumbering(rawPassages = [], { answerKey = new Ma
           const end = getEnd(next);
           if (end > next.questionNumber) next.questionEndNumber = end;
           else delete next.questionEndNumber;
+
+          // Auto-repair matching_information options if empty
+          if (next.type === 'matching_information') {
+            const currentOpts = Array.isArray(next.options) ? next.options.filter(Boolean) : [];
+            if (currentOpts.length === 0) {
+              next.options = defaultParagraphLetters;
+              if (!next.instruction) next.instruction = 'Which paragraph contains the following information?';
+              next.hasNB = true;
+            }
+          }
+
           if (!hasAnswer(next)) {
             const keyed = answerKey.get(next.questionNumber);
             if (keyed?.length) {

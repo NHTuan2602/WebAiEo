@@ -9,6 +9,7 @@ import {
 } from './examHelpers.js';
 import { extractBlankNumbers, isInlineClozeQuestion } from './clozeHelpers.js';
 import { buildAnswerKeyMap, repairReadingPdfNumbering } from './readingNumberRepair.js';
+import { extractPassageParagraphLetters } from './examUiHelpers.js';
 
 export const GEMINI_PREFERRED_MODELS = [
   'gemini-2.5-flash',
@@ -851,10 +852,17 @@ DOCUMENT HANDLING:
 - Put each question's printed start number in questionNumber, and its end number in questionEndNumber only when one prompt covers a printed range such as 11-12. Set blankNum to the printed number for every question whose blank appears as {{N}} in clozeText (including both "fill" and "summary_box" / "summary_nobox"). Sort each passage's questions by questionNumber ascending; never use the array position as a substitute for a printed number.
 - Include every Reading question exactly once, including questions that continue on another page. Preserve all statements, headings, options, instructions, and word limits.
 - Use the supported question types: ${questionTypes.map(t => `"${t.id}"`).join(', ')}. For multiple choice, include the full option text. For select-two/select-more questions, include every correct option in correctAnswers and set requiredSelections to that count.
+- SPECIAL RULES FOR MATCHING QUESTION TYPES:
+  1. For "matching_information" ("Which paragraph contains the following information?"):
+     You MUST populate "options" with the paragraph letters of that passage (e.g. ["A", "B", "C", "D", "E", "F", "G"]). NEVER leave options empty! Put the printed instruction heading in "instruction" (e.g. "Which paragraph contains the following information? NB You may use any letter more than once.").
+  2. For "matching_features" ("Match each statement with the correct person/feature..."):
+     Extract the full list of options/people (e.g. ["A Phil Rasmussen", "B Malcolm Douglas", "C Sandra Clair", "D Isla Burgess"]) into "options" for EVERY question in that group! Put the printed instruction heading in "instruction" (e.g. "Look at the following statements and the list of people below. Match each statement with the correct person, A, B, C or D. NB You may use any letter more than once.").
+  3. For "matching_headings":
+     Populate "options" with the Roman numerals (e.g. ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii"]) and provide the headings list.
 - Copy exact correct answers from the answer key when it exists, including acceptable alternatives. Also list every answer-key entry in the top-level answerKey array by its printed question number. If no answer key is present, answer only when the passage clearly supports it; leave correctAnswer empty when uncertain.
 - Question numbers in IELTS Reading run continuously across passages (typically Passage 1 = 1-13, Passage 2 = 14-26, Passage 3 = 27-40). Never restart numbering at 1 for a later passage, and never output two questions with the same number.
 - For inline Note/Form/Table/Flow-chart/Summary completion (BOTH without a word box AND with a word box A-I):
-  1. Preserve the COMPLETE unbroken instruction text, bold title (e.g. "**The Discovery of Johnston's Diaries**"), and full paragraph/bullet text in clozeText, replacing each answer gap with {{N}} using its original question number. NEVER cut off words after a blank — every sentence must be complete from start to finish!
+  1. Preserve the COMPLETE unbroken instruction text (e.g. "Questions 18-21\\nComplete the summary below.\\nWrite ONE WORD ONLY from the passage for each answer."), bold title (e.g. "**The Discovery of Johnston's Diaries**"), and full paragraph/bullet text in clozeText, replacing each answer gap with {{N}} using its original question number. NEVER cut off words after a blank — every sentence must be complete from start to finish!
   2. For Summary Completion WITH a Word Box (e.g. "Complete the summary using the list of words, A-I, below"):
      - Keep the full summary paragraph with {{N}} gaps in clozeText (do NOT repeat the A-I word box as plain text inside clozeText because the UI builds the interactive Word Box from options).
      - Put each blank in the passage's questions array with "type": "summary_box", "questionNumber": N, "blankNum": N, "options": ["A drawings", "B plantings", ...] (the full word list from the box), "question": "N. <complete sentence containing ____ (NOT raw {{N}})>", and "correctAnswer" set to the matching option string from options.
@@ -882,6 +890,8 @@ Return only valid JSON matching this schema:
           "questionEndNumber": 1,
           "blankNum": 1,
           "type": "fill",
+          "instruction": "Which paragraph contains the following information? (or section instruction)",
+          "hasNB": true,
           "question": "1. Short question prompt",
           "options": [],
           "wordLimit": "ONE WORD AND/OR A NUMBER",
@@ -959,11 +969,16 @@ Return only valid JSON matching this schema:
         ? Array.from(new Set(rawCorrectList.map(ans => matchChoiceOption(ans, options) || ans)))
         : Array.from(new Set(rawCorrectList));
 
+      const rawInstruction = String(q?.instruction || '').trim();
+      const hasNB = Boolean(q?.hasNB || /NB\b/i.test(rawInstruction) || /NB\b/i.test(q?.question || ''));
+
       return {
         blankNum,
         ...(typeof questionNumber === 'number' ? { questionNumber } : {}),
         ...(typeof questionEndNumber === 'number' ? { questionEndNumber } : {}),
         type,
+        ...(rawInstruction ? { instruction: rawInstruction } : {}),
+        ...(hasNB ? { hasNB: true } : {}),
         question: String(q?.question || `${questionNumber || idx + 1}. Câu hỏi`).trim(),
         options,
         wordLimit: String(q?.wordLimit || '').trim(),

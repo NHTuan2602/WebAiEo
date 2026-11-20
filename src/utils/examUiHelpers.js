@@ -3,9 +3,68 @@
  * Supports question numbering, matching-matrix grouping, passage block parsing,
  * inline highlight segmentation, and dynamic question range labels.
  */
-import { extractBlankNumbers, isInlineClozeQuestion } from './clozeHelpers';
+import { extractBlankNumbers, isInlineClozeQuestion } from './clozeHelpers.js';
 
 const STANDARD_VERDICT_OPTIONS = new Set(['TRUE', 'FALSE', 'YES', 'NO', 'NOT GIVEN']);
+
+/** Extract lettered paragraphs (e.g. A, B, C, D, E, F, G) from passage text if present. */
+export function extractPassageParagraphLetters(passageText = '') {
+  const text = String(passageText || '').replace(/\r\n/g, '\n');
+  if (!text.trim()) return [];
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const found = new Set();
+  for (const line of lines) {
+    const m = line.match(/^(?:\[?([A-I])\]?[\s.)\t]|paragraph\s+([A-I])\b)/i);
+    if (m) {
+      found.add((m[1] || m[2]).toUpperCase());
+    }
+  }
+  const sorted = Array.from(found).sort();
+  if (sorted.length >= 2 && sorted[0] === 'A') {
+    return sorted;
+  }
+  return [];
+}
+
+/** Returns standard official Cambridge IELTS instructions for a question group when missing. */
+export function getStandardGroupInstruction(question, options = []) {
+  if (question?.instruction) return question.instruction;
+  const type = question?.type;
+  if (type === 'matching_information') {
+    return 'Which paragraph contains the following information?';
+  }
+  if (type === 'matching_headings') {
+    return 'Choose the correct heading for each paragraph from the list of headings below.';
+  }
+  if (type === 'matching_features') {
+    return 'Match each statement with the correct item from the list below.';
+  }
+  if (type === 'summary_box') {
+    return 'Complete the summary using the list of words below.';
+  }
+  if (type === 'summary_nobox') {
+    const limit = question?.wordLimit || 'ONE WORD ONLY';
+    return `Complete the summary below. Write ${limit} from the passage for each answer.`;
+  }
+  if (type === 'tfng') {
+    const isYesNo = Array.isArray(options) && options.some(o => /YES|NO/i.test(o));
+    if (isYesNo) {
+      return 'Do the following statements agree with the claims of the writer? Choose YES, NO, or NOT GIVEN.';
+    }
+    return 'Do the following statements agree with the information given in the Reading Passage? Choose TRUE, FALSE, or NOT GIVEN.';
+  }
+  if (type === 'mcq') {
+    const count = Number(question?.requiredSelections) || 1;
+    if (count > 1) {
+      return `Choose ${count} letters from the options below.`;
+    }
+    return 'Choose the correct letter, A, B, C or D.';
+  }
+  if (type === 'correct_ending') {
+    return 'Complete each sentence with the correct ending from the list below.';
+  }
+  return '';
+}
 
 /** Extract canonical numeric label for a question (blankNum -> leading regex -> fallback). */
 export function getQuestionDisplayNumber(question, fallbackNum = 1) {
@@ -122,6 +181,8 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
           key: `wordbox-${q.id}`,
           groupType: 'summary_box',
           options: opts,
+          instruction: q.instruction || getStandardGroupInstruction(q, opts),
+          hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
           items: questions.slice(i, j).map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
@@ -150,7 +211,10 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
         groups.push({
           kind: 'matrix',
           key: `matrix-${q.id}`,
+          groupType: q.type,
           options: opts,
+          instruction: q.instruction || getStandardGroupInstruction(q, opts),
+          hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
           items: questions.slice(i, j).map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
@@ -181,6 +245,36 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
           key: `wordbox-${q.id}`,
           groupType: q.type,
           options: opts,
+          instruction: q.instruction || getStandardGroupInstruction(q, opts),
+          hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
+          items: questions.slice(i, j).map((item, idx) => ({
+            question: item,
+            displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
+          }))
+        });
+        i = j;
+        continue;
+      }
+    }
+
+    // 4. Consecutive questions of the same type (e.g. 2+ tfng questions or 2+ mcq questions sharing option style)
+    if (q?.type === 'tfng' || q?.type === 'mcq') {
+      let j = i + 1;
+      while (j < questions.length) {
+        const nextQ = questions[j];
+        if (nextQ?.type === q.type) {
+          j++;
+        } else {
+          break;
+        }
+      }
+      if (j - i >= 2) {
+        groups.push({
+          kind: 'questionGroup',
+          key: `qgroup-${q.id}`,
+          groupType: q.type,
+          instruction: q.instruction || getStandardGroupInstruction(q, opts),
+          hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
           items: questions.slice(i, j).map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
@@ -361,11 +455,56 @@ export function buildReadingDisplayBlocks({
     : safeQuestions.filter(q => typeof q?.passageIdx === 'number' && q.passageIdx < passageIndices[0]).length;
 
   passageIndices.forEach(passageIdx => {
-    const passageQuestions = safeQuestions.filter(q => {
+    const rawPassageQuestions = safeQuestions.filter(q => {
       if (typeof q?.passageIdx === 'number') return q.passageIdx === passageIdx;
       if (hasScopedQuestions) return passageIdx === 0;
       return showAll ? passageIdx === 0 : true;
     });
+
+    // Auto-repair matching_information options from passage text, and propagate matching_features/matching_headings options
+    const passageText = safePassages[passageIdx]?.passageText || '';
+    const passageLetters = extractPassageParagraphLetters(passageText);
+    const defaultParagraphLetters = passageLetters.length >= 2 ? passageLetters : ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+
+    const passageQuestions = rawPassageQuestions.map(q => {
+      const qCopy = { ...q };
+      const opts = Array.isArray(qCopy.options) ? qCopy.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+      if (qCopy.type === 'matching_information' && opts.length === 0) {
+        qCopy.options = defaultParagraphLetters;
+        if (!qCopy.instruction) qCopy.instruction = 'Which paragraph contains the following information?';
+        qCopy.hasNB = true;
+      }
+      return qCopy;
+    });
+
+    for (let k = 0; k < passageQuestions.length; k++) {
+      const curr = passageQuestions[k];
+      if (curr.type === 'matching_features' || curr.type === 'matching_headings') {
+        const currOpts = Array.isArray(curr.options) ? curr.options.filter(Boolean) : [];
+        if (currOpts.length === 0) {
+          let donor = null;
+          for (let m = k - 1; m >= 0 && passageQuestions[m].type === curr.type; m--) {
+            if (Array.isArray(passageQuestions[m].options) && passageQuestions[m].options.length > 0) {
+              donor = passageQuestions[m];
+              break;
+            }
+          }
+          if (!donor) {
+            for (let m = k + 1; m < passageQuestions.length && passageQuestions[m].type === curr.type; m++) {
+              if (Array.isArray(passageQuestions[m].options) && passageQuestions[m].options.length > 0) {
+                donor = passageQuestions[m];
+                break;
+              }
+            }
+          }
+          if (donor) {
+            curr.options = [...donor.options];
+            if (!curr.instruction && donor.instruction) curr.instruction = donor.instruction;
+            if (donor.hasNB) curr.hasNB = true;
+          }
+        }
+      }
+    }
     const numberedQuestions = passageQuestions
       .map((question, idx) => ({
         question,
