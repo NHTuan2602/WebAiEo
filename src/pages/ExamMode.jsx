@@ -229,9 +229,16 @@ export default function ExamMode({
 
   const activeReadingCloze = activePassage?.clozeText || '';
   const readingClozeSet = new Set(extractBlankNumbers(activeReadingCloze));
-  const standaloneReadingQs = displayedReadingQs.filter(
-    q => !(q.type === 'fill' && typeof q.blankNum === 'number' && readingClozeSet.has(q.blankNum))
-  );
+  const standaloneReadingQs = displayedReadingQs.filter(q => {
+    const belongsToActivePassage =
+      typeof q.passageIdx !== 'number' || q.passageIdx === safePassageIdx;
+    const renderedInActiveCloze =
+      belongsToActivePassage &&
+      q.type === 'fill' &&
+      typeof q.blankNum === 'number' &&
+      readingClozeSet.has(q.blankNum);
+    return !renderedInActiveCloze;
+  });
 
   const listeningNeedsLeftPane = Boolean(activeTrack?.imageUrl || activeTrack?.contextText);
 
@@ -849,7 +856,16 @@ export default function ExamMode({
             {examState.skill === 'reading' && readingPassages.length > 1 && hasScopedReadingQs && (
               <button
                 type="button"
-                onClick={() => setExamState(prev => ({ ...prev, showAllReadingQs: !prev.showAllReadingQs }))}
+                onClick={() =>
+                  setExamState(prev => {
+                    const nextShowAll = !prev.showAllReadingQs;
+                    return {
+                      ...prev,
+                      showAllReadingQs: nextShowAll,
+                      readingQuestionViewMode: nextShowAll
+                    };
+                  })
+                }
                 className="text-xs font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
               >
                 {examState.showAllReadingQs ? `Chỉ xem Passage ${safePassageIdx + 1}` : `Xem tất cả (${allReadingQs.length})`}

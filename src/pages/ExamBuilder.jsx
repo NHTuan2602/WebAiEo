@@ -99,7 +99,7 @@ export default function ExamBuilder({
   const [showAdvancedListeningExtras, setShowAdvancedListeningExtras] = useState(false);
   const [showAdvancedReadingImg, setShowAdvancedReadingImg] = useState(false);
   const [filterListeningByTrack, setFilterListeningByTrack] = useState(true);
-  const [filterReadingByPassage, setFilterReadingByPassage] = useState(true);
+  const [filterReadingByPassage, setFilterReadingByPassage] = useState(false);
   const [questionTabBySkill, setQuestionTabBySkill] = useState({ listening: 'all', reading: 'all' });
   const [sourceFilterBySkill, setSourceFilterBySkill] = useState({ listening: 'all', reading: 'all' });
   const [customHashtagInput, setCustomHashtagInput] = useState('');
