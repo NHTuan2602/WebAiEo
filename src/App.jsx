@@ -751,17 +751,19 @@ export default function App() {
       planType === 'aieo_vip'
         ? 'Gói IELTS VIP (1 Tháng)'
         : comboLabelMeta
-        ? `${comboLabelMeta.label} (+${comboLabelMeta.credits} lượt Thực Chiến)`
+        ? `${comboLabelMeta.label} (${unlocked ? '+' : '-'}${comboLabelMeta.credits} lượt Thực Chiến)`
         : planType === 'real_exam_credit'
-        ? '+1 Lượt Thực Chiến Thi Thật'
+        ? `${unlocked ? '+1' : '-1'} Lượt Thực Chiến Thi Thật`
         : planType === 'room_ticket'
-        ? 'Vé Tạo 1 Phòng Đấu Riêng (5k)'
+        ? `${unlocked ? '+1' : '-1'} Vé Tạo Phòng Đấu Riêng (5k)`
         : planType === 'test'
         ? 'quyền thi Đề Thực Chiến 4 Kỹ Năng'
         : 'quyền mở gói tháng';
     showToast(
       unlocked
         ? `Đã kích hoạt ${planLabel} cho ${targetName}!`
+        : planType === 'real_exam_credit' || planType === 'room_ticket'
+        ? `Đã trừ ${planLabel} của ${targetName}.`
         : `Đã thu hồi ${planLabel} của ${targetName}.`,
       unlocked ? 'success' : 'info'
     );

@@ -2507,6 +2507,16 @@ export default function TeacherDashboard({
                                             >
                                               {stuCredits} lượt (+1)
                                             </button>
+                                            {stuCredits > 0 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => onToggleUserSubscription(account.username, 'real_exam_credit', false)}
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border-[#FECACA] dark:border-rose-500/30 hover:bg-[#B91C1C] hover:text-white transition"
+                                                title="Trừ bớt -1 lượt làm đề có phí nếu cộng nhầm"
+                                              >
+                                                -1 lượt
+                                              </button>
+                                            )}
                                             {isPendingComboOrTest && (
                                               <button
                                                 type="button"

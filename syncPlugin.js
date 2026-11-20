@@ -3671,7 +3671,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       } else if (kind === 'real_exam_credit' || Boolean(getRealExamComboMeta(kind, store.paymentConfig))) {
         const comboMeta = getRealExamComboMeta(kind, store.paymentConfig);
         const addCount = comboMeta ? comboMeta.credits : Math.max(1, Math.floor(Number(payload?.credits) || 1));
-        const nextCredits = active ? getRealExamCredits(targetUser) + addCount : 0;
+        const currCredits = getRealExamCredits(targetUser);
+        const nextCredits = active ? currCredits + addCount : Math.max(0, currCredits - addCount);
         store.users[targetKey] = {
           ...targetUser,
           realExamCredits: nextCredits,
@@ -3697,7 +3698,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         }
         changed = true;
       } else if (kind === 'room_ticket') {
-        const nextCredits = active ? getFriendRoomTicketCredits(targetUser) + 1 : 0;
+        const currTickets = getFriendRoomTicketCredits(targetUser);
+        const nextCredits = active ? currTickets + 1 : Math.max(0, currTickets - 1);
         store.users[targetKey] = {
           ...targetUser,
           roomCreateCredits: nextCredits,

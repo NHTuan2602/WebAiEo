@@ -1188,6 +1188,21 @@ export default function StudentProfile({
                       >
                         +1 Vé Phòng (5k){(student.roomCreateCredits || 0) > 0 ? ` · Đang có ${student.roomCreateCredits}` : ''}
                       </button>
+                      {(student.roomCreateCredits || 0) > 0 && (
+                        <button
+                          type="button"
+                          disabled={isTogglingSubscription}
+                          onClick={async () => {
+                            setIsTogglingSubscription(true);
+                            await onToggleUserSubscription(student.username, 'room_ticket', false);
+                            setIsTogglingSubscription(false);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-[#B91C1C] dark:text-rose-300 text-xs font-semibold transition"
+                          title="Trừ bớt -1 Vé Phòng nếu cộng nhầm"
+                        >
+                          -1 Vé Phòng
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={isTogglingSubscription}
@@ -1200,6 +1215,21 @@ export default function StudentProfile({
                       >
                         +1 Lượt Thực Chiến{studentRealExamCredits > 0 ? ` · Đang có ${studentRealExamCredits}` : ''}
                       </button>
+                      {studentRealExamCredits > 0 && (
+                        <button
+                          type="button"
+                          disabled={isTogglingSubscription}
+                          onClick={async () => {
+                            setIsTogglingSubscription(true);
+                            await onToggleUserSubscription(student.username, 'real_exam_credit', false);
+                            setIsTogglingSubscription(false);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-[#B91C1C] dark:text-rose-300 text-xs font-semibold transition"
+                          title="Trừ bớt -1 Lượt Thực Chiến nếu cộng nhầm"
+                        >
+                          -1 Lượt Thực Chiến
+                        </button>
+                      )}
                     </>
                   )}
                   {isSelf && onOpenAccountSecurity && (
