@@ -1304,6 +1304,7 @@ export default function ExamMode({
            ============================================================ */}
         {examState.skill === 'speaking' && (
           <IntegratedSpeakingSection
+            autoExaminerMode={cfg.testMode === 'full_exam' && ['real_exam', 'periodic_mock'].includes(cfg.examCategory)}
             test={activeTest}
             recordingsMap={speakingRecordingsMap}
             speakingNotes={speakingNotes}

@@ -1005,6 +1005,7 @@ export const createEmptySingleSkillTestForm = (skill = 'speaking', subOpts = {})
     focusSkill: safeSkill,
     examCategory: 'daily_zone',
     dailySubCategory: defaultSubCat,
+    dailyFolderName: String(subOpts?.dailyFolderName || ''),
     writingTaskScope: taskScope,
     ...(safeSkill === 'writing' && taskScope === 'task2'
       ? {

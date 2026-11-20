@@ -50,6 +50,7 @@ import {
   normalizeSpeakingSection
 } from '../constants/seedData';
 import { getQuestionTypeMeta } from '../utils/examHelpers';
+import { getDailyFolderName } from '../utils/dailyFolderProgress';
 import { verifySpeakingRoomPassword } from '../utils/speakingApi';
 import {
   formatRemainingSubscriptionText,
@@ -91,8 +92,15 @@ export default function SkillPracticeHub({
   const [subCatFilterState, setSubCatFilterState] = useState({ tab: activeTab, sub: 'all' });
   const activeSubCatFilter = subCatFilterState.tab === activeTab ? subCatFilterState.sub : 'all';
   const setActiveSubCatFilter = (nextSub) => setSubCatFilterState({ tab: activeTab, sub: nextSub || 'all' });
+  const [dailyFolderFilterState, setDailyFolderFilterState] = useState({ tab: activeTab, sub: activeSubCatFilter, folder: 'all' });
+  const activeDailyFolderFilter =
+    dailyFolderFilterState.tab === activeTab && dailyFolderFilterState.sub === activeSubCatFilter
+      ? dailyFolderFilterState.folder
+      : 'all';
+  const setActiveDailyFolderFilter = nextFolder =>
+    setDailyFolderFilterState({ tab: activeTab, sub: activeSubCatFilter, folder: nextFolder || 'all' });
   const [writingTask2Filter, setWritingTask2Filter] = useState({ topic: 'all', questionType: 'all' });
-  const hashtagScopeKey = `${activeTab}:${singleHubSkill}:${activeSubCatFilter}:${activeTab === 'writing_task2' ? `${writingTask2Filter.topic}:${writingTask2Filter.questionType}` : ''}`;
+  const hashtagScopeKey = `${activeTab}:${singleHubSkill}:${activeSubCatFilter}:${['reading', 'listening'].includes(activeTab) ? activeDailyFolderFilter : ''}:${activeTab === 'writing_task2' ? `${writingTask2Filter.topic}:${writingTask2Filter.questionType}` : ''}`;
   const [hashtagFilterState, setHashtagFilterState] = useState({ scopeKey: hashtagScopeKey, tag: 'all' });
   const selectedSpeakingHashtag = hashtagFilterState.scopeKey === hashtagScopeKey ? hashtagFilterState.tag : 'all';
   const setSelectedSpeakingHashtag = (nextOrUpdater) => {
@@ -741,8 +749,10 @@ export default function SkillPracticeHub({
     const meta = metaMap[tabKey] || metaMap[actualSkill] || metaMap.reading;
     const IconComp = meta.icon;
     const isWritingTask2Tab = tabKey === 'writing_task2';
+    const isSuperHomeworkTab = tabKey === 'reading' || tabKey === 'listening';
     const selectedWritingTask2Topic = writingTask2Filter.topic;
     const selectedWritingTask2QuestionType = writingTask2Filter.questionType;
+    const selectedDailyFolder = isSuperHomeworkTab ? activeDailyFolderFilter : 'all';
     const getTask2Topic = test => String(test?.writingTask2Topic || '').trim();
     const getTask2QuestionType = test => String(test?.writingTask2QuestionType || '').trim();
     const isKnownTask2Topic = topicId => DAILY_WRITING_T2_TOPICS.some(topic => topic.id === topicId);
@@ -753,9 +763,38 @@ export default function SkillPracticeHub({
       : activeSubCatFilter === 'all'
       ? list
       : list.filter(t => normalizeExamConfig(t).dailySubCategory === activeSubCatFilter);
-    const topicFilteredList = !isWritingTask2Tab || selectedWritingTask2Topic === 'all'
+    const folderGroups = new Map();
+    if (isSuperHomeworkTab) {
+      subFilteredList.forEach(test => {
+        const folderName = getDailyFolderName(test);
+        const subCategory = normalizeExamConfig(test).dailySubCategory;
+        const folderNameKey = folderName ? folderName.normalize('NFKC').toLocaleLowerCase() : '__unfiled__';
+        const folderKey = `${subCategory}:${folderNameKey}`;
+        const existing = folderGroups.get(folderKey);
+        folderGroups.set(folderKey, {
+          folderKey,
+          subCategory,
+          folderName: existing?.folderName || folderName,
+          count: (existing?.count || 0) + 1
+        });
+      });
+    }
+    const dailyFolderOptions = Array.from(folderGroups.values()).sort((a, b) =>
+      a.folderName === '' ? 1 : b.folderName === '' ? -1 :
+        a.subCategory.localeCompare(b.subCategory) || a.folderName.localeCompare(b.folderName)
+    );
+    const folderFilteredList = !isSuperHomeworkTab || selectedDailyFolder === 'all'
       ? subFilteredList
-      : subFilteredList.filter(test => selectedWritingTask2Topic === '__unclassified__'
+      : subFilteredList.filter(test => {
+          const folderName = getDailyFolderName(test);
+          const subCategory = normalizeExamConfig(test).dailySubCategory;
+          const folderNameKey = folderName ? folderName.normalize('NFKC').toLocaleLowerCase() : '__unfiled__';
+          const folderKey = `${subCategory}:${folderNameKey}`;
+          return folderKey === selectedDailyFolder;
+        });
+    const topicFilteredList = !isWritingTask2Tab || selectedWritingTask2Topic === 'all'
+      ? folderFilteredList
+      : folderFilteredList.filter(test => selectedWritingTask2Topic === '__unclassified__'
         ? !isKnownTask2Topic(getTask2Topic(test))
         : getTask2Topic(test) === selectedWritingTask2Topic);
     const displayedList = !isWritingTask2Tab || selectedWritingTask2QuestionType === 'all'
@@ -797,6 +836,10 @@ export default function SkillPracticeHub({
                     activeSubCatFilter !== 'all'
                       ? activeSubCatFilter
                       : meta.subCategories[0]?.id || (tabKey === 'writing_task2' ? 'w2_essay' : ''),
+                  dailyFolderName:
+                    isSuperHomeworkTab && selectedDailyFolder !== 'all' && selectedDailyFolder !== '__unfiled__'
+                      ? dailyFolderOptions.find(option => option.folderKey === selectedDailyFolder)?.folderName || ''
+                      : '',
                   ...(isWritingTask2Tab
                     ? {
                         writingTask2Topic: isKnownTask2Topic(selectedWritingTask2Topic) ? selectedWritingTask2Topic : '',
@@ -847,6 +890,46 @@ export default function SkillPracticeHub({
                     }`}
                   >
                     {sub.label}{subCount > 0 ? ` (${subCount})` : ''}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {isSuperHomeworkTab && dailyFolderOptions.length > 0 && !focusedMatch && (
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">Bộ bài / thư mục:</p>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                aria-pressed={selectedDailyFolder === 'all'}
+                onClick={() => setActiveDailyFolderFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                  selectedDailyFolder === 'all'
+                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                    : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                }`}
+              >
+                Tất cả ({subFilteredList.length})
+              </button>
+              {dailyFolderOptions.map(option => {
+                const isSelected = selectedDailyFolder === option.folderKey;
+                return (
+                  <button
+                    key={option.folderKey}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => setActiveDailyFolderFilter(option.folderKey)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                      isSelected
+                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                    }`}
+                  >
+                    {option.folderName
+                      ? `${activeSubCatFilter === 'all' ? `${getDailySubCategoryLabel(option.subCategory)} • ` : ''}${option.folderName}`
+                      : `Chưa xếp thư mục${activeSubCatFilter === 'all' ? ` • ${getDailySubCategoryLabel(option.subCategory)}` : ''}`} ({option.count})
                   </button>
                 );
               })}
@@ -1053,12 +1136,14 @@ export default function SkillPracticeHub({
                       ? `Chưa có bài Writing Task 2 thuộc chủ đề ${DAILY_WRITING_T2_TOPICS.find(topic => topic.id === selectedWritingTask2Topic)?.label || 'chưa gắn chủ đề'}`
                       : isWritingTask2Tab && selectedWritingTask2QuestionType !== 'all'
                       ? `Chưa có bài Writing Task 2 thuộc dạng ${DAILY_WRITING_T2_QUESTION_TYPES.find(type => type.id === selectedWritingTask2QuestionType)?.label || 'chưa chọn dạng bài'}`
+                      : isSuperHomeworkTab && selectedDailyFolder !== 'all'
+                      ? `Chưa có bài nào trong thư mục ${dailyFolderOptions.find(option => option.folderKey === selectedDailyFolder)?.folderName || 'chưa xếp thư mục'}`
                       : activeSubCatFilter !== 'all'
                       ? `Chưa có bài tập nào trong mục ${getDailySubCategoryLabel(activeSubCatFilter)}`
                       : `Chưa có bài tập ${meta.name} nào`}
                   </h2>
                   <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
-                    {selectedSpeakingHashtag !== 'all' || activeSubCatFilter !== 'all' || (isWritingTask2Tab && (selectedWritingTask2Topic !== 'all' || selectedWritingTask2QuestionType !== 'all'))
+                    {selectedSpeakingHashtag !== 'all' || activeSubCatFilter !== 'all' || (isSuperHomeworkTab && selectedDailyFolder !== 'all') || (isWritingTask2Tab && (selectedWritingTask2Topic !== 'all' || selectedWritingTask2QuestionType !== 'all'))
                       ? 'Hãy bấm "Tất cả" để xem toàn bộ danh sách bài tập.'
                       : isTeacher
                       ? `Hãy bấm nút Tạo Bài ở góc trên phải để đăng tải bài tập mới vào phân mục này.`
@@ -1121,6 +1206,11 @@ export default function SkillPracticeHub({
                               <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${meta.bg} ${meta.color}`}>
                                 {subCatLabel || actualSkill.toUpperCase()} • {cfg.durations[actualSkill]}p
                               </span>
+                              {isSuperHomeworkTab && getDailyFolderName(test) && (
+                                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300">
+                                  Thư mục: {getDailyFolderName(test)}
+                                </span>
+                              )}
                               {hasExamPass && (
                                 <span
                                   className={`text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border ${

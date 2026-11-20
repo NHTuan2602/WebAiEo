@@ -85,6 +85,8 @@ import ListPaginationBar, { paginateItems } from '../components/common/ListPagin
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 import ClassManagerTab from '../components/teacher/ClassManagerTab';
+import DailyFolderProgressPanel from '../components/teacher/DailyFolderProgressPanel';
+import { getDailyFolderName, getDailyFolderGroups } from '../utils/dailyFolderProgress';
 
 export default function TeacherDashboard({
   aiConfigured = false,
@@ -315,6 +317,7 @@ export default function TeacherDashboard({
 
   const fullExamTests = (tests || []).filter(t => normalizeExamConfig(t).testMode !== 'single_skill');
   const skillExercises = (tests || []).filter(t => normalizeExamConfig(t).testMode === 'single_skill');
+  const dailyFolderGroups = getDailyFolderGroups(skillExercises);
   const publicFullExamsCount = fullExamTests.filter(t => normalizeExamConfig(t).visibility !== 'private').length;
   const pendingGradingCount = (attempts || []).filter(a => !a.teacherGraded).length;
   const speakingDailyCompliance = evaluateSpeakingDailyCompliance({
@@ -481,6 +484,11 @@ export default function TeacherDashboard({
                     }
                     return null;
                   })()}
+                  {isExercise && ['reading', 'listening'].includes(cfg.focusSkill) && getDailyFolderName(t) && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30 shrink-0">
+                      Thư mục: {getDailyFolderName(t)}
+                    </span>
+                  )}
                   {(() => {
                     const spMeta = cfg.focusSkill === 'speaking' ? normalizeSpeakingSection(t.speaking) : null;
                     const activePass = String(spMeta?.roomPassword || cfg.examPassword || '').trim();
@@ -1012,6 +1020,7 @@ export default function TeacherDashboard({
       items: [
         { id: 'tests', label: 'Thực Chiến & Mock', count: fullExamTests.length, icon: BookOpen },
         { id: 'skill_exercises', label: 'Daily Zone (Miễn Phí)', count: skillExercises.length, icon: Sparkles },
+        { id: 'daily_progress', label: 'Tiến độ SuperHomework', count: dailyFolderGroups.length, icon: ClipboardList },
         {
           id: 'grading',
           label: 'Chấm Bài & Giám Sát',
@@ -1336,6 +1345,18 @@ export default function TeacherDashboard({
             }
           }}
         >
+
+      {teacherHubTab === 'daily_progress' && (
+        <DailyFolderProgressPanel
+          attempts={attempts}
+          classesDb={classesDb}
+          handleCreateNotification={handleCreateNotification}
+          openSingleSkillBuilder={openSingleSkillBuilder}
+          showToast={showToast}
+          studentAccounts={studentAccounts}
+          tests={skillExercises}
+        />
+      )}
 
       {/* Tab 2: Kho Bài Tập Daily Zone (Miễn Phí - Từng Kỹ Năng Riêng) */}
       {teacherHubTab === 'skill_exercises' && (
