@@ -52,57 +52,144 @@ export function splitLineIntoClozeSegments(line = '') {
   return segments;
 }
 
+function cleanParagraphText(text = '') {
+  return String(text || '')
+    .replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2')
+    .replace(/\band\s*,\s*/gi, ', and ')
+    .replace(/,\s*and\s*,/gi, ', and')
+    .replace(/\s+([,.:;?!])/g, '$1')
+    .replace(/([,.:;?!])(?=[A-Za-z])/g, '$1 ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 export function parseClozeLines(clozeText = '') {
   if (!clozeText) return [];
   const rawLines = String(clozeText).replace(/\r\n/g, '\n').split('\n');
-  return rawLines.map((rawLine, lineIdx) => {
+  const parsedItems = [];
+
+  for (let lineIdx = 0; lineIdx < rawLines.length; lineIdx++) {
+    const rawLine = rawLines[lineIdx];
     const trimmed = rawLine.trim();
     if (!trimmed) {
-      return { id: lineIdx, kind: 'spacer', segments: [] };
+      parsedItems.push({ id: lineIdx, kind: 'spacer', segments: [] });
+      continue;
     }
 
     // Markdown bold heading: **HIRING A PUBLIC ROOM** or clean heading without blanks
     const boldHeadingMatch = trimmed.match(/^\*\*(.+)\*\*$/);
     if (boldHeadingMatch) {
-      return {
+      parsedItems.push({
         id: lineIdx,
         kind: 'heading',
         segments: splitLineIntoClozeSegments(boldHeadingMatch[1].trim())
-      };
+      });
+      continue;
     }
 
     if (trimmed.startsWith('### ') || trimmed.startsWith('## ')) {
-      return {
+      parsedItems.push({
         id: lineIdx,
         kind: 'subheading',
         segments: splitLineIntoClozeSegments(trimmed.replace(/^#{2,3}\s+/, ''))
-      };
+      });
+      continue;
+    }
+
+    // Question group header: e.g. "Questions 18-21 Complete the summary below:"
+    if (/^Questions?\s+\d+/i.test(trimmed)) {
+      parsedItems.push({
+        id: lineIdx,
+        kind: 'groupHeader',
+        segments: splitLineIntoClozeSegments(trimmed)
+      });
+      continue;
+    }
+
+    // Word limit directive line: e.g. "Write ONE WORD ONLY from the passage for each answer."
+    if (/(?:write|choose)\s+(?:one|two|three|no\s+more)\s+words?/i.test(trimmed)) {
+      parsedItems.push({
+        id: lineIdx,
+        kind: 'wordLimit',
+        segments: splitLineIntoClozeSegments(trimmed)
+      });
+      continue;
     }
 
     if (/^[•\-*]\s+/.test(trimmed)) {
-      return {
+      parsedItems.push({
         id: lineIdx,
         kind: 'bullet',
         segments: splitLineIntoClozeSegments(trimmed.replace(/^[•\-*]\s+/, ''))
-      };
+      });
+      continue;
     }
 
     // Short uppercase line with no blank token -> section title
     const hasBlank = Boolean(trimmed.match(BLANK_TOKEN_REGEX));
     if (!hasBlank && trimmed.length <= 64 && trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed)) {
-      return {
+      parsedItems.push({
         id: lineIdx,
         kind: 'heading',
         segments: [{ type: 'text', value: trimmed }]
-      };
+      });
+      continue;
     }
 
-    return {
+    parsedItems.push({
       id: lineIdx,
       kind: 'paragraph',
-      segments: splitLineIntoClozeSegments(rawLine)
-    };
-  });
+      rawText: trimmed
+    });
+  }
+
+  // Merge consecutive 'paragraph' lines into unified prose paragraphs with natural reflow
+  const mergedLines = [];
+  let currentParagraph = null;
+
+  for (const item of parsedItems) {
+    if (item.kind === 'paragraph') {
+      if (!currentParagraph) {
+        currentParagraph = {
+          id: item.id,
+          kind: 'paragraph',
+          rawText: item.rawText
+        };
+      } else {
+        const prevText = currentParagraph.rawText;
+        const nextText = item.rawText;
+        if (/^[,.:;?!]/.test(nextText)) {
+          currentParagraph.rawText = prevText.trimEnd() + nextText;
+        } else if (prevText.endsWith('-')) {
+          currentParagraph.rawText = prevText.slice(0, -1) + nextText;
+        } else {
+          currentParagraph.rawText = prevText.trimEnd() + ' ' + nextText;
+        }
+      }
+    } else {
+      if (currentParagraph) {
+        const cleaned = cleanParagraphText(currentParagraph.rawText);
+        mergedLines.push({
+          id: currentParagraph.id,
+          kind: 'paragraph',
+          segments: splitLineIntoClozeSegments(cleaned)
+        });
+        currentParagraph = null;
+      }
+      mergedLines.push(item);
+    }
+  }
+
+  if (currentParagraph) {
+    const cleaned = cleanParagraphText(currentParagraph.rawText);
+    mergedLines.push({
+      id: currentParagraph.id,
+      kind: 'paragraph',
+      segments: splitLineIntoClozeSegments(cleaned)
+    });
+  }
+
+  return mergedLines;
 }
 
 export const INLINE_CLOZE_QUESTION_TYPES = new Set([

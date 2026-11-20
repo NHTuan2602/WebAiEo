@@ -131,7 +131,13 @@ export default function ExamQuestionList({
     const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
     const cleanPrompt = formatInlineBlankPlaceholders(stripLeadingQuestionNumber(q.question) || q.question);
     const typeMeta = getQuestionTypeMeta(q.type, scopeType);
-    const optionList = Array.isArray(q.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+    let optionList = Array.isArray(q.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+    if (
+      optionList.length === 0 &&
+      (q.type === 'matching_information' || q.type === 'matching_info' || (q.type === 'matching' && !q.wordLimit))
+    ) {
+      optionList = ['A', 'B', 'C', 'D', 'E', 'F'];
+    }
     const hasChoiceOptions = optionList.length > 0;
     const multiSelect = questionNeedsMultipleSelections(q);
     const expectedSelectionCount = getRequiredSelectionCount(q);
@@ -292,10 +298,21 @@ export default function ExamQuestionList({
           const firstNum = block.items[0]?.displayNum;
           const lastNum = block.items[block.items.length - 1]?.displayNum;
           const groupMeta = getQuestionTypeMeta(block.groupType || 'matching_information', scopeType);
+          const isMatchingInfo =
+            block.groupType === 'matching_information' ||
+            block.groupType === 'matching_info' ||
+            block.groupType === 'matching' ||
+            (Array.isArray(block.options) && block.options.every(opt => /^[A-I]$/i.test(opt)));
+          const instructionText =
+            block.instruction ||
+            (isMatchingInfo
+              ? 'Which paragraph contains the following information?'
+              : getStandardGroupInstruction(block.items[0]?.question, block.options));
+          const showNB = Boolean(block.hasNB || isMatchingInfo);
 
           return (
             <div key={block.key} className="space-y-2.5">
-              <div className="space-y-1">
+              <div className="space-y-1.5 pb-1 border-b border-slate-200 dark:border-[#32353E]">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-[15px] sm:text-base font-extrabold text-[#111827] dark:text-white">
                     Questions {firstNum}–{lastNum}
@@ -304,15 +321,17 @@ export default function ExamQuestionList({
                     {groupMeta.shortLabel}
                   </span>
                 </div>
-                {block.instruction && (
+                {instructionText && (
                   <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
-                    {formatText(block.instruction)}
+                    {formatText(instructionText)}
                   </p>
                 )}
-                {block.hasNB && (
-                  <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400">
-                    NB You may use any letter more than once.
-                  </p>
+                {showNB && (
+                  <div>
+                    <span className="inline-block px-2 py-0.5 rounded text-xs font-extrabold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30">
+                      NB You may use any letter more than once.
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -481,9 +500,15 @@ export default function ExamQuestionList({
             onSelectQuestion?.(nextEmpty ? nextEmpty.question : target.question);
           };
 
+          const firstItem = block.items[0]?.question;
+          const instructionText =
+            block.instruction ||
+            getStandardGroupInstruction(firstItem, block.options) ||
+            'Complete the summary using the list of words, A-I, below.';
+
           return (
             <div key={block.key} className="space-y-3">
-              <div className="space-y-1">
+              <div className="space-y-1 pb-1 border-b border-slate-200 dark:border-[#32353E]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="text-[15px] sm:text-base font-extrabold text-[#111827] dark:text-white">
@@ -497,15 +522,17 @@ export default function ExamQuestionList({
                     Bấm từ trong hộp, kéo thả hoặc chọn trực tiếp tại từng câu
                   </span>
                 </div>
-                {block.instruction && (
+                {instructionText && (
                   <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
-                    {formatText(block.instruction)}
+                    {formatText(instructionText)}
                   </p>
                 )}
                 {block.hasNB && (
-                  <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400">
-                    NB You may use any letter more than once.
-                  </p>
+                  <div>
+                    <span className="inline-block px-2 py-0.5 rounded text-xs font-extrabold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30">
+                      NB You may use any letter more than once.
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -710,6 +737,10 @@ export default function ExamQuestionList({
           const firstNum = block.items[0]?.displayNum;
           const lastNum = block.items[block.items.length - 1]?.displayNum;
           const groupMeta = getQuestionTypeMeta(block.groupType, scopeType);
+          const firstItem = block.items[0]?.question;
+          const instructionText =
+            block.instruction ||
+            getStandardGroupInstruction(firstItem, firstItem?.options);
 
           return (
             <div key={block.key} className="space-y-3">
@@ -722,15 +753,17 @@ export default function ExamQuestionList({
                     {groupMeta.shortLabel}
                   </span>
                 </div>
-                {block.instruction && (
+                {instructionText && (
                   <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
-                    {formatText(block.instruction)}
+                    {formatText(instructionText)}
                   </p>
                 )}
                 {block.hasNB && (
-                  <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400">
-                    NB You may use any letter more than once.
-                  </p>
+                  <div>
+                    <span className="inline-block px-2 py-0.5 rounded text-xs font-extrabold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30">
+                      NB You may use any letter more than once.
+                    </span>
+                  </div>
                 )}
               </div>
               <div className="space-y-3">

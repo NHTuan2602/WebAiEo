@@ -19,7 +19,7 @@ function splitClozeSections(parsedLines = []) {
     const plain = getLinePlainText(line);
     const isNewQuestionHeader =
       line.kind !== 'spacer' &&
-      /^Questions?\s+\d+/i.test(plain) &&
+      (line.kind === 'groupHeader' || /^Questions?\s+\d+/i.test(plain)) &&
       current.some(item => item.kind !== 'spacer');
     if (isNewQuestionHeader) {
       sections.push(current);
@@ -117,12 +117,12 @@ export default function ClozeNoteSheet({
         : `Questions ${minBlank}–${maxBlank}`
       : '';
 
-    const hasPreambleHeader = preambleLines.some(l =>
-      /^Questions?\s+\d+/i.test(getLinePlainText(l))
-    );
-    const hasPreambleWordLimit = preambleLines.some(l =>
-      /(?:write\s+|choose\s+)?(?:one|two|three|no\s+more)\s+words?/i.test(getLinePlainText(l))
-    );
+    const hasPreambleHeader =
+      preambleLines.some(l => l.kind === 'groupHeader' || /^Questions?\s+\d+/i.test(getLinePlainText(l))) ||
+      boxLines.some(l => l.kind === 'groupHeader');
+    const hasPreambleWordLimit =
+      preambleLines.some(l => l.kind === 'wordLimit' || /(?:write\s+|choose\s+)?(?:one|two|three|no\s+more)\s+words?/i.test(getLinePlainText(l))) ||
+      boxLines.some(l => l.kind === 'wordLimit');
     const linkedWordLimit = sectionBlankLinks.find(item => item.linkedQ?.wordLimit)?.linkedQ?.wordLimit || '';
     const linkedInstruction = sectionBlankLinks.find(item => item.linkedQ?.instruction)?.linkedQ?.instruction || '';
 
@@ -294,7 +294,7 @@ export default function ClozeNoteSheet({
                 if (readOnlyPreview || !qId) return;
                 onAnswerChange?.(qId, e.target.value);
               }}
-              className={`w-40 sm:w-52 h-[34px] px-3 rounded-[3px] text-center text-[15px] font-bold transition-all outline-none border ${
+              className={`w-32 sm:w-44 h-[34px] px-2.5 rounded-[3px] text-center text-[15px] font-bold transition-all outline-none border ${
                 isActive
                   ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
                   : resolvedChoiceVal
@@ -323,6 +323,27 @@ export default function ClozeNoteSheet({
     const renderLine = (line) => {
       if (line.kind === 'spacer') {
         return <div key={line.id} className="h-2" />;
+      }
+      if (line.kind === 'groupHeader') {
+        return (
+          <div key={line.id} className="flex flex-wrap items-center gap-2 pt-2 pb-1 border-b border-slate-200 dark:border-[#32353E]">
+            <h4 className="text-[17px] font-extrabold text-[#111827] dark:text-white">
+              {renderSegments(line.segments)}
+            </h4>
+            <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
+              {sharedWordBoxOptions.length > 0 ? 'Summary Completion (Box)' : 'Summary Completion'}
+            </span>
+          </div>
+        );
+      }
+      if (line.kind === 'wordLimit') {
+        return (
+          <div key={line.id} className="pt-1 pb-1">
+            <span className="inline-block px-2.5 py-1 rounded text-xs font-extrabold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 uppercase tracking-wide">
+              {renderSegments(line.segments)}
+            </span>
+          </div>
+        );
       }
       if (line.kind === 'heading') {
         return (
@@ -362,9 +383,9 @@ export default function ClozeNoteSheet({
     return (
       <div key={`cloze-sec-${sectionIdx}`} className="space-y-3">
         {!hasPreambleHeader && questionRangeLabel && (
-          <div className="space-y-1 pb-1.5 border-b border-slate-200 dark:border-[#32353E]">
+          <div className="space-y-1.5 pb-2 border-b border-slate-200 dark:border-[#32353E]">
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-[17px] font-bold text-[#111827] dark:text-white">
+              <h4 className="text-[17px] font-extrabold text-[#111827] dark:text-white">
                 {questionRangeLabel}
               </h4>
               <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
@@ -372,38 +393,57 @@ export default function ClozeNoteSheet({
               </span>
             </div>
             <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
-              {linkedInstruction || (sharedWordBoxOptions.length > 0 ? 'Complete the summary using the list of words below.' : 'Complete the summary below.')}
+              {linkedInstruction || (sharedWordBoxOptions.length > 0 ? 'Complete the summary using the list of words, A-I, below.' : 'Complete the summary below:')}
             </p>
-            {linkedWordLimit && sharedWordBoxOptions.length === 0 && (
-              <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
-                Write {linkedWordLimit} from the passage for each answer.
-              </p>
+            {sharedWordBoxOptions.length === 0 && (
+              <div>
+                <span className="inline-block px-2.5 py-1 rounded text-xs font-extrabold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 uppercase tracking-wide">
+                  Write {linkedWordLimit || 'ONE WORD ONLY'} from the passage for each answer.
+                </span>
+              </div>
             )}
           </div>
         )}
 
         {preambleLines.length > 0 && (
-          <div className="space-y-1.5">
-            {preambleLines.map(line =>
-              line.kind === 'spacer' ? (
-                <div key={line.id} className="h-1" />
-              ) : (
-                <p
-                  key={line.id}
-                  className={
-                    /^Questions?\s+\d+/i.test(line.segments.map(s => s.value || '').join(''))
-                      ? 'font-bold text-[#111827] dark:text-white text-[18px] pb-1'
-                      : 'text-[15px] font-normal text-[#111827] dark:text-[#E5E7EB] leading-[1.6]'
-                  }
-                >
+          <div className="space-y-1.5 pb-1">
+            {preambleLines.map(line => {
+              if (line.kind === 'spacer') {
+                return <div key={line.id} className="h-1" />;
+              }
+              if (line.kind === 'groupHeader' || /^Questions?\s+\d+/i.test(getLinePlainText(line))) {
+                return (
+                  <div key={line.id} className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200 dark:border-[#32353E]">
+                    <h4 className="text-[17px] font-extrabold text-[#111827] dark:text-white">
+                      {renderSegments(line.segments)}
+                    </h4>
+                    <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
+                      {sharedWordBoxOptions.length > 0 ? 'Summary Completion (Box)' : 'Summary Completion'}
+                    </span>
+                  </div>
+                );
+              }
+              if (line.kind === 'wordLimit' || /(?:write|choose)\s+(?:one|two|three|no\s+more)\s+words?/i.test(getLinePlainText(line))) {
+                return (
+                  <div key={line.id} className="pt-0.5">
+                    <span className="inline-block px-2.5 py-1 rounded text-xs font-extrabold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 uppercase tracking-wide">
+                      {renderSegments(line.segments)}
+                    </span>
+                  </div>
+                );
+              }
+              return (
+                <p key={line.id} className="text-[15px] font-medium text-[#111827] dark:text-[#E5E7EB] leading-[1.6]">
                   {renderSegments(line.segments)}
                 </p>
-              )
-            )}
+              );
+            })}
             {hasPreambleHeader && !hasPreambleWordLimit && linkedWordLimit && sharedWordBoxOptions.length === 0 && (
-              <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400 uppercase tracking-wide pt-0.5">
-                Write {linkedWordLimit} from the passage for each answer.
-              </p>
+              <div>
+                <span className="inline-block px-2.5 py-1 rounded text-xs font-extrabold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 uppercase tracking-wide">
+                  Write {linkedWordLimit} from the passage for each answer.
+                </span>
+              </div>
             )}
           </div>
         )}

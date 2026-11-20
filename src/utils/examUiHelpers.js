@@ -30,7 +30,7 @@ export function extractPassageParagraphLetters(passageText = '') {
 export function getStandardGroupInstruction(question, options = []) {
   if (question?.instruction) return question.instruction;
   const type = question?.type;
-  if (type === 'matching_information') {
+  if (type === 'matching_information' || type === 'matching_info') {
     return 'Which paragraph contains the following information?';
   }
   if (type === 'matching_headings') {
@@ -40,16 +40,16 @@ export function getStandardGroupInstruction(question, options = []) {
     return 'Match each statement with the correct item from the list below.';
   }
   if (type === 'summary_box') {
-    return 'Complete the summary using the list of words below.';
+    return 'Complete the summary using the list of words, A-I, below.';
   }
-  if (type === 'summary_nobox') {
+  if (type === 'summary_nobox' || type === 'fill') {
     const limit = question?.wordLimit || 'ONE WORD ONLY';
     return `Complete the summary below. Write ${limit} from the passage for each answer.`;
   }
   if (type === 'tfng') {
     const isYesNo = Array.isArray(options) && options.some(o => /YES|NO/i.test(o));
     if (isYesNo) {
-      return 'Do the following statements agree with the claims of the writer? Choose YES, NO, or NOT GIVEN.';
+      return 'Choose YES if the statement agrees with the claims of the writer, choose NO if the statement contradicts the claims of the writer, or NOT GIVEN if it is impossible to say what the writer thinks about this.';
     }
     return 'Do the following statements agree with the information given in the Reading Passage? Choose TRUE, FALSE, or NOT GIVEN.';
   }
@@ -194,13 +194,35 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
     }
 
     // 2. Compact matching-matrix grid table (A-I, i-viii)
-    const signature = MATRIX_ELIGIBLE_TYPES.has(q?.type) && isShortMatrixOptionList(opts) ? opts.join('||') : null;
+    const isMatchingInfoType =
+      q?.type === 'matching_information' ||
+      q?.type === 'matching_info' ||
+      (q?.type === 'matching' && (!opts.length || isShortMatrixOptionList(opts)));
+    const effectiveMatrixOpts =
+      opts.length > 0
+        ? opts
+        : isMatchingInfoType
+        ? ['A', 'B', 'C', 'D', 'E', 'F']
+        : [];
+    const signature =
+      (MATRIX_ELIGIBLE_TYPES.has(q?.type) || isMatchingInfoType) && isShortMatrixOptionList(effectiveMatrixOpts)
+        ? effectiveMatrixOpts.join('||')
+        : null;
     if (signature) {
       let j = i + 1;
       while (j < questions.length) {
         const nextQ = questions[j];
         const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()).filter(Boolean) : [];
-        if (MATRIX_ELIGIBLE_TYPES.has(nextQ?.type) && nextOpts.join('||') === signature) {
+        const nextEffectiveOpts =
+          nextOpts.length > 0
+            ? nextOpts
+            : isMatchingInfoType && (nextQ?.type === 'matching_information' || nextQ?.type === 'matching_info' || nextQ?.type === 'matching')
+            ? ['A', 'B', 'C', 'D', 'E', 'F']
+            : [];
+        if (
+          (MATRIX_ELIGIBLE_TYPES.has(nextQ?.type) || isMatchingInfoType) &&
+          nextEffectiveOpts.join('||') === signature
+        ) {
           j++;
         } else {
           break;
@@ -212,9 +234,9 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
           kind: 'matrix',
           key: `matrix-${q.id}`,
           groupType: q.type,
-          options: opts,
-          instruction: q.instruction || getStandardGroupInstruction(q, opts),
-          hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
+          options: effectiveMatrixOpts,
+          instruction: q.instruction || getStandardGroupInstruction(q, effectiveMatrixOpts),
+          hasNB: Boolean(q.hasNB || isMatchingInfoType || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
           items: questions.slice(i, j).map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
