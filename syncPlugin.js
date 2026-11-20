@@ -2123,7 +2123,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         }
         const currentRole = String(targetExisting?.role || 'student').toLowerCase();
         const requestedRole = String(item?.role || currentRole).toLowerCase();
-        if (!isSuperAdmin && ((requestedRole === 'teacher' && currentRole !== 'teacher') || (currentRole === 'teacher' && requestedRole !== 'teacher'))) {
+        if (!isSuperAdmin && (requestedRole === 'teacher' || currentRole === 'teacher')) {
           return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới được tạo hoặc thay đổi vai trò Giáo viên.' };
         }
       }
@@ -2143,7 +2143,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       if (isTeacher && !isSuperAdmin) {
         const currentRole = String(targetExisting?.role || 'student').toLowerCase();
         const requestedRole = String(payload.user.role || currentRole).toLowerCase();
-        if ((requestedRole === 'teacher' && currentRole !== 'teacher') || (currentRole === 'teacher' && requestedRole !== 'teacher')) {
+        const isSelfTeacherUpdate = uname === viewer.username && currentRole === 'teacher' && requestedRole === 'teacher';
+        if ((requestedRole === 'teacher' || currentRole === 'teacher') && !isSelfTeacherUpdate) {
           return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới được tạo hoặc thay đổi vai trò Giáo viên.' };
         }
       }
@@ -2443,10 +2444,11 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
   const isSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
   const currentRole = String(prevUser?.role || 'student').toLowerCase();
   const requestedRole = String(rawUser.role || currentRole).toLowerCase();
+  const isSelfTeacherUpdate = uname === viewer?.username && currentRole === 'teacher' && requestedRole === 'teacher';
   if ((prevUser?.isSuperAdmin || uname === SUPER_ADMIN_USERNAME) && !isSuperAdmin) {
     return false;
   }
-  if (!isSuperAdmin && ((requestedRole === 'teacher' && currentRole !== 'teacher') || (currentRole === 'teacher' && requestedRole !== 'teacher'))) {
+  if (!isSuperAdmin && (requestedRole === 'teacher' || currentRole === 'teacher') && !isSelfTeacherUpdate) {
     return false;
   }
 
