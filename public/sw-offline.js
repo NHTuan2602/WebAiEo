@@ -1,4 +1,4 @@
-const OFFLINE_CACHE = 'ielts-maintenance-fallback-v1';
+const OFFLINE_CACHE = 'ielts-maintenance-fallback-v2';
 const FALLBACK_URLS = ['/maintenance.html', '/server-maintenance.jpg'];
 
 self.addEventListener('install', (event) => {
@@ -36,10 +36,14 @@ self.addEventListener('fetch', (event) => {
   // Never intercept API, SSE stream, or audio endpoints
   if (url.pathname.startsWith('/api/') || url.pathname === '/health') return;
 
-  // Serve cached meme image offline if network fails
+  // Serve cached meme image offline or on 5xx if network fails
   if (url.pathname === '/server-maintenance.jpg') {
     event.respondWith(
-      fetch(req).catch(() => caches.match('/server-maintenance.jpg'))
+      caches.match('/server-maintenance.jpg').then((cached) =>
+        fetch(req)
+          .then((res) => (res && res.ok ? res : cached || res))
+          .catch(() => cached)
+      )
     );
     return;
   }

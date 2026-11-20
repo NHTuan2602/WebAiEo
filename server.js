@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, 'dist');
 const INDEX_HTML_PATH = path.join(DIST_DIR, 'index.html');
 const MAINTENANCE_HTML_PATH = path.join(DIST_DIR, 'maintenance.html');
+const PUBLIC_MAINTENANCE_HTML_PATH = path.join(__dirname, 'public', 'maintenance.html');
 
 function isMaintenanceModeEnabled() {
   const flag = String(process.env.MAINTENANCE_MODE || '').trim().toLowerCase();
@@ -18,9 +19,14 @@ function isMaintenanceModeEnabled() {
 function sendMaintenancePage(res, statusCode = 503) {
   res.statusCode = statusCode;
   res.setHeader('Cache-Control', 'no-store');
-  if (fs.existsSync(MAINTENANCE_HTML_PATH)) {
+  const htmlPath = fs.existsSync(MAINTENANCE_HTML_PATH)
+    ? MAINTENANCE_HTML_PATH
+    : fs.existsSync(PUBLIC_MAINTENANCE_HTML_PATH)
+    ? PUBLIC_MAINTENANCE_HTML_PATH
+    : '';
+  if (htmlPath) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    fs.createReadStream(MAINTENANCE_HTML_PATH).pipe(res);
+    fs.createReadStream(htmlPath).pipe(res);
     return;
   }
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');

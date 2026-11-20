@@ -1353,71 +1353,50 @@ export default function GameArena({
                 </div>
               )}
 
-              {/* Crewmates + Empty Waiting Slots Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 justify-items-center items-start my-auto pt-1">
-                {lobbyPlayersList.map((player, idx) => {
-                    const isHost = player.role === 'teacher' || (isFriendVipRoom && player.username === room.hostUsername);
-                    const isSelf = player.username === currentUser?.username;
-                    const showBubble = Boolean(player.chat && player.chatAt && Math.abs(lobbyNowTick - player.chatAt) < 5500);
-                    const participatesInTeam = isTeamRoom && (isFriendVipRoom || player.role !== 'teacher');
-                    const playerTeamId = participatesInTeam
-                      ? activeTeamIds.includes(player.teamId)
-                        ? player.teamId
-                        : activeTeamIds[idx % activeTeamIds.length]
-                      : '';
-                    const playerTeamMeta = playerTeamId ? GAME_TEAM_META[playerTeamId] : null;
-                    const nextTeamId = playerTeamId
-                      ? activeTeamIds[(activeTeamIds.indexOf(playerTeamId) + 1) % activeTeamIds.length]
-                      : '';
-                    const canCycleTeam = Boolean(participatesInTeam && (isRoomHost || isSelf));
+              {/* Crewmates Stage: Kahoot-Style Player Wall for Solo vs 2 / 3 / 4 Team Columns */}
+              {(() => {
+                const renderLobbyPlayerUnit = (player, idx, compactKahoot = false) => {
+                  const isHost = player.role === 'teacher' || (isFriendVipRoom && player.username === room.hostUsername);
+                  const isSelf = player.username === currentUser?.username;
+                  const showBubble = Boolean(player.chat && player.chatAt && Math.abs(lobbyNowTick - player.chatAt) < 5500);
+                  const participatesInTeam = isTeamRoom && (isFriendVipRoom || player.role !== 'teacher');
+                  const playerTeamId = participatesInTeam
+                    ? activeTeamIds.includes(player.teamId)
+                      ? player.teamId
+                      : activeTeamIds[idx % activeTeamIds.length]
+                    : '';
+                  const playerTeamMeta = playerTeamId ? GAME_TEAM_META[playerTeamId] : null;
+                  const nextTeamId = playerTeamId
+                    ? activeTeamIds[(activeTeamIds.indexOf(playerTeamId) + 1) % activeTeamIds.length]
+                    : '';
+                  const canCycleTeam = Boolean(participatesInTeam && (isRoomHost || isSelf));
+                  const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb, customTitles, paymentConfig);
 
+                  if (compactKahoot) {
                     return (
-                      <div key={player.username} className="flex flex-col items-center relative group">
-                        {/* Speech Bubble above Crewmate */}
+                      <div
+                        key={player.username}
+                        className={`relative group flex items-center gap-3 px-3.5 py-2.5 rounded-xl border transition ${
+                          isSelf
+                            ? 'bg-[#EDFFFD] dark:bg-teal-500/15 border-[#007A7A] dark:border-[#1EE1D6]/60'
+                            : 'bg-[#F8FAFC] dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                        }`}
+                      >
                         {showBubble && (
-                          <div className="absolute -top-10 z-20 bg-white text-slate-900 text-xs font-bold px-2.5 py-1 rounded-xl shadow-lg max-w-[150px] truncate border border-slate-200 dark:border-slate-200">
+                          <div className="absolute -top-9 left-1/2 -translate-x-1/2 z-20 bg-white text-slate-900 text-xs font-bold px-2.5 py-1 rounded-xl shadow-lg max-w-[170px] truncate border border-slate-200">
                             {player.chat}
                           </div>
                         )}
 
-                        {/* Kick Button for Room Host */}
                         {isRoomHost && !isHost && (
                           <button
                             type="button"
                             onClick={() => handleKickLobbyPlayer(activePin, player.username, player.name)}
-                            className="absolute -top-2 -right-2 z-20 w-6 h-6 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition"
+                            className="absolute -top-2 -right-2 z-20 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition"
                             title={`Mời ${player.name} rời sảnh`}
                           >
                             <UserMinus className="w-3 h-3" />
                           </button>
-                        )}
-
-                        {/* Host Crown / Teacher Approval Status */}
-                        {isHost ? (
-                          <div className="mb-0.5 text-amber-600 dark:text-amber-400 flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider">
-                            <Crown className="w-3.5 h-3.5" /> {isFriendVipRoom ? 'Chủ Phòng VIP' : 'Chủ Phòng'}
-                          </div>
-                        ) : (
-                          <div className="mb-0.5 flex flex-col items-center gap-0.5">
-                            <div className={`text-xs font-bold uppercase tracking-wider ${player.approved || player.ready || isFriendVipRoom ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                              {isFriendVipRoom
-                                ? (player.ready ? '✓ Sẵn sàng' : '✓ Bạn bè đã vào')
-                                : (player.approved ? '✓ GV Đã Duyệt' : player.ready ? 'Sẵn sàng (Chờ GV duyệt)' : 'Chờ GV duyệt')}
-                            </div>
-                            {isTeacher && !isFriendVipRoom && (
-                              <button
-                                type="button"
-                                onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, player.username, false)}
-                                className={`px-2 py-0.5 rounded-md text-xs font-extrabold border transition ${
-                                  player.approved
-                                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                                    : 'bg-white dark:bg-slate-800 hover:bg-[#007A7A] text-[#0F172B] dark:text-slate-200 hover:text-white border-slate-300 dark:border-[#334155]'
-                                }`}
-                              >
-                                {player.approved ? '✓ Đã duyệt' : '+ Duyệt vào thi'}
-                              </button>
-                            )}
-                          </div>
                         )}
 
                         <AnimalPilotAvatar
@@ -1425,79 +1404,275 @@ export default function GameArena({
                           accessoryId={player.accessoryId || 'none'}
                           colorId={player.colorId || 'cyan'}
                           avatarUrl={player.avatarUrl || usersDb[player.username]?.avatarUrl || ''}
-                          size={58}
+                          size={46}
                           flip={idx % 2 === 1}
                           animate={true}
                           onShip={false}
                         />
 
-                        {/* Floor Shadow */}
-                        <div className="w-11 h-2 bg-slate-900/20 dark:bg-black/50 rounded-full blur-[2px] -mt-1 mb-2" />
+                        <div className="min-w-0 text-left space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => setInspectedLobbyUsername(player.username)}
+                              className="text-xs sm:text-sm font-extrabold text-[#0F172B] dark:text-white hover:text-[#007A7A] dark:hover:text-[#1EE1D6] flex items-center gap-1.5 cursor-pointer"
+                              title={`Xem nhanh hồ sơ ${player.name}`}
+                            >
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${player.ready || isHost ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                              <span className="truncate max-w-[140px]">
+                                <VipMemberName user={usersDb[player.username] || player} fallbackName={player.name} badgeSize="xs" />
+                              </span>
+                            </button>
+                            {isHost ? (
+                              <span className="px-2 py-0.2 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold inline-flex items-center gap-1">
+                                <Crown className="w-3 h-3" /> {isFriendVipRoom ? 'Chủ Phòng VIP' : 'Chủ Phòng'}
+                              </span>
+                            ) : (
+                              <span className={`text-xs font-bold ${player.approved || player.ready || isFriendVipRoom ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                {isFriendVipRoom
+                                  ? (player.ready ? '✓ Sẵn sàng' : '✓ Đã vào')
+                                  : (player.approved ? '✓ GV Đã Duyệt' : player.ready ? 'Chờ GV duyệt' : 'Chờ duyệt')}
+                              </span>
+                            )}
+                          </div>
 
-                        {/* Nameplate (click to quick-view member profile in lobby) */}
-                        <button
-                          type="button"
-                          onClick={() => setInspectedLobbyUsername(player.username)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition hover:scale-105 cursor-pointer ${
-                            isSelf
-                              ? 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A]/60 dark:border-[#1EE1D6]/50 text-[#007A7A] dark:text-[#1EE1D6]'
-                              : 'bg-white/95 dark:bg-slate-800/90 border-slate-300 dark:border-[#334155] text-[#0F172B] dark:text-slate-200 hover:border-[#007A7A]'
-                          }`}
-                          title={`Xem nhanh hồ sơ ${player.name}`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${
-                            player.ready || isHost ? 'bg-emerald-500' : 'bg-amber-400'
-                          }`} />
-                          <span className="truncate max-w-[140px]">
-                            <VipMemberName user={usersDb[player.username] || player} fallbackName={player.name} badgeSize="xs" />
-                          </span>
-                        </button>
-                        {(() => {
-                          const pTitle = resolveVisibleTitleBadge(usersDb[player.username] || player, attempts, roomsDb, customTitles, paymentConfig);
-                          if (!pTitle) return null;
-                          return (
-                            <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full border ${pTitle.gameBadgeClass}`}>
-                              {pTitle.icon} {pTitle.label}
-                            </span>
-                          );
-                        })()}
-                        {playerTeamMeta && (
-                          <button
-                            type="button"
-                            disabled={!canCycleTeam}
-                            onClick={() => canCycleTeam && handleSetPlayerTeam?.(activePin, player.username, nextTeamId)}
-                            className={`mt-1 text-xs font-extrabold px-2 py-0.5 rounded-full border transition ${playerTeamMeta.badgeCls} ${
-                              canCycleTeam ? 'cursor-pointer hover:opacity-90' : 'cursor-default'
-                            }`}
-                            title={canCycleTeam ? `Bấm để chuyển sang ${GAME_TEAM_META[nextTeamId]?.name}` : playerTeamMeta.name}
-                          >
-                            {playerTeamMeta.dot} {playerTeamMeta.short}{canCycleTeam ? ' ↻' : ''}
-                          </button>
-                        )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {pTitle && (
+                              <span className={`text-xs font-extrabold px-2 py-0.2 rounded-full border ${pTitle.gameBadgeClass}`}>
+                                {pTitle.icon} {pTitle.label}
+                              </span>
+                            )}
+                            {!isHost && isTeacher && !isFriendVipRoom && (
+                              <button
+                                type="button"
+                                onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, player.username, false)}
+                                className={`px-2 py-0.5 rounded-md text-xs font-extrabold border transition ${
+                                  player.approved
+                                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                                    : 'bg-white dark:bg-slate-900 hover:bg-[#007A7A] text-[#0F172B] dark:text-slate-200 hover:text-white border-slate-300 dark:border-[#334155]'
+                                }`}
+                              >
+                                {player.approved ? '✓ Đã duyệt' : '+ Duyệt vào thi'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     );
-                  })}
+                  }
 
-                {Array.from({
-                  length: Math.max(
-                    0,
-                    Math.min(Math.max(2, Number(roomMaxPlayers || 4)), 4) - lobbyPlayersList.length
-                  )
-                }).map((_, emptyIdx) => (
-                  <div
-                    key={`empty-slot-${emptyIdx}`}
-                    className="w-full max-w-[132px] h-[116px] rounded-xl border border-dashed border-slate-300/85 dark:border-slate-700/75 bg-white/45 dark:bg-slate-950/35 flex flex-col items-center justify-center gap-1.5 text-center px-2 opacity-65"
-                  >
-                    <Users className="w-4 h-4 text-[#475569] dark:text-slate-400" />
-                    <span className="text-xs font-semibold text-[#475569] dark:text-slate-400">
-                      Vị trí trống #{lobbyPlayersList.length + emptyIdx + 1}
-                    </span>
-                    <span className="text-xs text-[#475569] dark:text-slate-400">
-                      Chờ tham gia
-                    </span>
+                  return (
+                    <div key={player.username} className="flex flex-col items-center relative group">
+                      {showBubble && (
+                        <div className="absolute -top-10 z-20 bg-white text-slate-900 text-xs font-bold px-2.5 py-1 rounded-xl shadow-lg max-w-[150px] truncate border border-slate-200 dark:border-slate-200">
+                          {player.chat}
+                        </div>
+                      )}
+
+                      {isRoomHost && !isHost && (
+                        <button
+                          type="button"
+                          onClick={() => handleKickLobbyPlayer(activePin, player.username, player.name)}
+                          className="absolute -top-2 -right-2 z-20 w-6 h-6 rounded-full bg-rose-600/90 hover:bg-rose-500 text-white flex items-center justify-center shadow opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition"
+                          title={`Mời ${player.name} rời sảnh`}
+                        >
+                          <UserMinus className="w-3 h-3" />
+                        </button>
+                      )}
+
+                      {isHost ? (
+                        <div className="mb-0.5 text-amber-600 dark:text-amber-400 flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider">
+                          <Crown className="w-3.5 h-3.5" /> {isFriendVipRoom ? 'Chủ Phòng VIP' : 'Chủ Phòng'}
+                        </div>
+                      ) : (
+                        <div className="mb-0.5 flex flex-col items-center gap-0.5">
+                          <div className={`text-xs font-bold uppercase tracking-wider ${player.approved || player.ready || isFriendVipRoom ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                            {isFriendVipRoom
+                              ? (player.ready ? '✓ Sẵn sàng' : '✓ Bạn bè đã vào')
+                              : (player.approved ? '✓ GV Đã Duyệt' : player.ready ? 'Sẵn sàng (Chờ GV duyệt)' : 'Chờ GV duyệt')}
+                          </div>
+                          {isTeacher && !isFriendVipRoom && (
+                            <button
+                              type="button"
+                              onClick={() => handleTeacherApproveLobbyPlayer?.(activePin, player.username, false)}
+                              className={`px-2 py-0.5 rounded-md text-xs font-extrabold border transition ${
+                                player.approved
+                                  ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                                  : 'bg-white dark:bg-slate-800 hover:bg-[#007A7A] text-[#0F172B] dark:text-slate-200 hover:text-white border-slate-300 dark:border-[#334155]'
+                              }`}
+                            >
+                              {player.approved ? '✓ Đã duyệt' : '+ Duyệt vào thi'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      <AnimalPilotAvatar
+                        animalId={player.animalId || 'cat'}
+                        accessoryId={player.accessoryId || 'none'}
+                        colorId={player.colorId || 'cyan'}
+                        avatarUrl={player.avatarUrl || usersDb[player.username]?.avatarUrl || ''}
+                        size={54}
+                        flip={idx % 2 === 1}
+                        animate={true}
+                        onShip={false}
+                      />
+
+                      <div className="w-11 h-2 bg-slate-900/20 dark:bg-black/50 rounded-full blur-[2px] -mt-1 mb-2" />
+
+                      <button
+                        type="button"
+                        onClick={() => setInspectedLobbyUsername(player.username)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition hover:scale-105 cursor-pointer ${
+                          isSelf
+                            ? 'bg-[#EDFFFD] dark:bg-teal-500/20 border-[#007A7A]/60 dark:border-[#1EE1D6]/50 text-[#007A7A] dark:text-[#1EE1D6]'
+                            : 'bg-white/95 dark:bg-slate-800/90 border-slate-300 dark:border-[#334155] text-[#0F172B] dark:text-slate-200 hover:border-[#007A7A]'
+                        }`}
+                        title={`Xem nhanh hồ sơ ${player.name}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${player.ready || isHost ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                        <span className="truncate max-w-[130px]">
+                          <VipMemberName user={usersDb[player.username] || player} fallbackName={player.name} badgeSize="xs" />
+                        </span>
+                      </button>
+                      {pTitle && (
+                        <span className={`mt-0.5 text-xs font-extrabold px-2 py-0.5 rounded-full border ${pTitle.gameBadgeClass}`}>
+                          {pTitle.icon} {pTitle.label}
+                        </span>
+                      )}
+                      {playerTeamMeta && (
+                        <button
+                          type="button"
+                          disabled={!canCycleTeam}
+                          onClick={() => canCycleTeam && handleSetPlayerTeam?.(activePin, player.username, nextTeamId)}
+                          className={`mt-1 text-xs font-extrabold px-2 py-0.5 rounded-full border transition ${playerTeamMeta.badgeCls} ${
+                            canCycleTeam ? 'cursor-pointer hover:opacity-90' : 'cursor-default'
+                          }`}
+                          title={canCycleTeam ? `Bấm để chuyển sang ${GAME_TEAM_META[nextTeamId]?.name}` : playerTeamMeta.name}
+                        >
+                          {playerTeamMeta.dot} {playerTeamMeta.short}{canCycleTeam ? ' ↻' : ''}
+                        </button>
+                      )}
+                    </div>
+                  );
+                };
+
+                if (!isTeamRoom) {
+                  return (
+                    <div className="space-y-4 my-auto pt-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs">
+                        <span className="font-extrabold text-[#0F172B] dark:text-white flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
+                          <span>Sảnh Đấu Đơn (Kahoot Live) · {lobbyPlayersList.length} người đã vào</span>
+                        </span>
+                        <span className="font-semibold text-[#475569] dark:text-slate-300">
+                          {studentLobbyPlayers.length === 0
+                            ? `Đang chờ học viên nhập PIN #${room.pin}...`
+                            : `${readyCount}/${lobbyPlayersList.length} người đã sẵn sàng`}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-center gap-3 min-h-[130px] py-2">
+                        {lobbyPlayersList.map((player, idx) => renderLobbyPlayerUnit(player, idx, true))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const refereeTeachers = !isFriendVipRoom
+                  ? lobbyPlayersList.filter(p => p.role === 'teacher')
+                  : [];
+                const teamCombatants = !isFriendVipRoom
+                  ? lobbyPlayersList.filter(p => p.role !== 'teacher')
+                  : lobbyPlayersList;
+                const teamGridColsCls =
+                  activeTeamIds.length === 2
+                    ? 'grid-cols-1 sm:grid-cols-2'
+                    : activeTeamIds.length === 3
+                    ? 'grid-cols-1 md:grid-cols-3'
+                    : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4';
+                const canSwitchMyTeam = Boolean(
+                  myLobbyEntry && (isFriendVipRoom || myLobbyEntry.role !== 'teacher')
+                );
+
+                return (
+                  <div className="space-y-3 my-auto pt-1">
+                    {refereeTeachers.length > 0 && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#F8FAFC] dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-xs">
+                        <span className="font-bold text-[#475569] dark:text-slate-300 flex items-center gap-1.5">
+                          <Crown className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Chủ Phòng / Trọng Tài:</span>
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {refereeTeachers.map((tPlayer, tIdx) => renderLobbyPlayerUnit(tPlayer, tIdx, true))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={`grid ${teamGridColsCls} gap-3.5 items-stretch`}>
+                      {activeTeamIds.map(tid => {
+                        const tMeta = GAME_TEAM_META[tid];
+                        const membersOfTeam = teamCombatants.filter((p, idx) => {
+                          const assigned = activeTeamIds.includes(p.teamId)
+                            ? p.teamId
+                            : activeTeamIds[idx % activeTeamIds.length];
+                          return assigned === tid;
+                        });
+                        const isMyTeam = canSwitchMyTeam && myLobbyEntry?.teamId === tid;
+
+                        return (
+                          <div
+                            key={tid}
+                            className={`rounded-xl border p-3.5 flex flex-col justify-between gap-3 min-h-[210px] ${tMeta.cardCls}`}
+                          >
+                            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200/70 dark:border-slate-700/70">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span>{tMeta.dot}</span>
+                                <span className="text-xs sm:text-sm font-extrabold text-[#0F172B] dark:text-white truncate">
+                                  {tMeta.name}
+                                </span>
+                                <span className="px-2 py-0.2 rounded-full bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 text-xs font-extrabold tabular-nums">
+                                  {membersOfTeam.length}
+                                </span>
+                              </div>
+                              {canSwitchMyTeam && (
+                                <button
+                                  type="button"
+                                  disabled={isMyTeam}
+                                  onClick={() => !isMyTeam && handleSetPlayerTeam?.(activePin, currentUser.username, tid)}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition shrink-0 ${
+                                    isMyTeam
+                                      ? `${tMeta.badgeCls} cursor-default`
+                                      : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-[#0F172B] dark:text-slate-200 border-slate-300 dark:border-slate-700'
+                                  }`}
+                                >
+                                  {isMyTeam ? '✓ Đội bạn' : `+ Vào ${tMeta.short}`}
+                                </button>
+                              )}
+                            </div>
+
+                            {membersOfTeam.length === 0 ? (
+                              <div className="my-auto py-5 rounded-xl border border-dashed border-slate-300/85 dark:border-slate-700/75 bg-white/45 dark:bg-slate-950/35 flex flex-col items-center justify-center gap-1 text-center px-3">
+                                <Users className="w-4 h-4 text-[#475569] dark:text-slate-400" />
+                                <span className="text-xs font-bold text-[#475569] dark:text-slate-300">
+                                  Vị trí trống {tMeta.short}
+                                </span>
+                                <span className="text-xs text-[#475569] dark:text-slate-400">
+                                  Chờ thành viên vào đội
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap items-start justify-center gap-3 my-auto py-1">
+                                {membersOfTeam.map((player, mIdx) => renderLobbyPlayerUnit(player, mIdx, false))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
 
             {/* Right: Persistent Live Lobby Chat Box */}
