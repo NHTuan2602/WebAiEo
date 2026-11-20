@@ -54,9 +54,9 @@ const FONT_SIZE_CLASSES = {
 };
 
 const FONT_SIZE_LABELS = {
-  regular: 'Regular',
-  large: 'Large',
-  xl: 'XL'
+  regular: 'Trung bình',
+  large: 'Lớn',
+  xl: 'Rất lớn'
 };
 
 export default function ExamMode({
@@ -92,7 +92,24 @@ export default function ExamMode({
   const [activeBlankNum, setActiveBlankNum] = useState(null);
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [splitPercent, setSplitPercent] = useState(50);
-  const [fontSizeMode, setFontSizeMode] = useState('regular');
+  const [fontSizeMode, setFontSizeMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ielts_exam_font_size');
+      return saved && FONT_SIZE_CLASSES[saved] ? saved : 'regular';
+    } catch {
+      return 'regular';
+    }
+  });
+
+  const updateFontSizeMode = (modeOrFn) => {
+    setFontSizeMode(prev => {
+      const next = typeof modeOrFn === 'function' ? modeOrFn(prev) : modeOrFn;
+      try {
+        localStorage.setItem('ielts_exam_font_size', next);
+      } catch {}
+      return next;
+    });
+  };
   const [showMenuDrawer, setShowMenuDrawer] = useState(false);
   const [showInlineNoteForm, setShowInlineNoteForm] = useState(false);
   const [inlineNoteDraft, setInlineNoteDraft] = useState('');
@@ -875,13 +892,13 @@ export default function ExamMode({
             <button
               type="button"
               onClick={() =>
-                setFontSizeMode(prev => (prev === 'regular' ? 'large' : prev === 'large' ? 'xl' : 'regular'))
+                updateFontSizeMode(prev => (prev === 'regular' ? 'large' : prev === 'large' ? 'xl' : 'regular'))
               }
               className="text-xs font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] flex items-center gap-1 transition"
               title="Đổi cỡ chữ đề thi"
             >
               <Type className="w-3.5 h-3.5" />
-              <span>{FONT_SIZE_LABELS[fontSizeMode]}</span>
+              <span>{FONT_SIZE_LABELS[fontSizeMode] || 'Trung bình'}</span>
             </button>
           </div>
         </div>
@@ -1535,7 +1552,7 @@ export default function ExamMode({
                     <button
                       key={mode}
                       type="button"
-                      onClick={() => setFontSizeMode(mode)}
+                      onClick={() => updateFontSizeMode(mode)}
                       className={`py-2 px-2 rounded-lg border font-bold transition ${
                         fontSizeMode === mode
                           ? 'bg-[#2563EB] text-white border-[#2563EB]'

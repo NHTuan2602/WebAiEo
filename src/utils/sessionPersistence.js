@@ -41,8 +41,8 @@ export function buildInitialExamState(test = null) {
     listeningTrackIdx: 0,
     showAllListeningQs: false,
     readingPassageIdx: 0,
-    showAllReadingQs: true,
-    readingQuestionViewMode: true,
+    showAllReadingQs: false,
+    readingQuestionViewMode: false,
     writingTaskIdx: cfg.writingTaskScope === 'task2' ? 1 : 0,
     startedAt: '',
     startedAtMs: null,
@@ -86,17 +86,18 @@ export function loadExamDraft(username, testId, testsList = []) {
       listeningTrackIdx: Number(parsed.listeningTrackIdx) || 0,
       showAllListeningQs: Boolean(parsed.showAllListeningQs),
       readingPassageIdx: Number(parsed.readingPassageIdx) || 0,
-      // Older drafts stored `false` as the default, so migrate those drafts to
-      // the new all-questions default. Keep a deliberate view choice going
-      // forward via readingQuestionViewMode.
       showAllReadingQs:
-        typeof parsed.readingQuestionViewMode === 'boolean'
+        typeof parsed.showAllReadingQs === 'boolean'
+          ? parsed.showAllReadingQs
+          : typeof parsed.readingQuestionViewMode === 'boolean'
           ? parsed.readingQuestionViewMode
-          : true,
+          : false,
       readingQuestionViewMode:
         typeof parsed.readingQuestionViewMode === 'boolean'
           ? parsed.readingQuestionViewMode
-          : true,
+          : typeof parsed.showAllReadingQs === 'boolean'
+          ? parsed.showAllReadingQs
+          : false,
       writingTaskIdx: Number(parsed.writingTaskIdx) === 1 ? 1 : 0,
       startedAt: typeof parsed.startedAt === 'string' ? parsed.startedAt : '',
       startedAtMs: Number(parsed.startedAtMs) > 0 ? Number(parsed.startedAtMs) : null,

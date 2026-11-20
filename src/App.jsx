@@ -3541,18 +3541,43 @@ export default function App() {
   const autoAdvanceFnRef = useRef(null);
   const examSubmitLockRef = useRef(false);
 
-  // Exam Countdown Timer (only decrements safely; timeout triggers separate effect below)
+  // Exam Countdown Timer (wall-clock based: accurately elapses time even if the tab is throttled or switched)
   useEffect(() => {
     if (view !== 'EXAM_MODE') return;
 
-    const timer = setInterval(() => {
-      setExamState(prev => ({
-        ...prev,
-        timeRemaining: prev.timeRemaining > 0 ? prev.timeRemaining - 1 : 0
-      }));
-    }, 1000);
+    let lastTickMs = Date.now();
 
-    return () => clearInterval(timer);
+    const syncElapsed = () => {
+      const now = Date.now();
+      const elapsedSec = Math.floor((now - lastTickMs) / 1000);
+      if (elapsedSec >= 1) {
+        lastTickMs += elapsedSec * 1000;
+        setExamState(prev => {
+          const currentRem = Number(prev.timeRemaining) || 0;
+          if (currentRem <= 0) return prev;
+          const nextRem = Math.max(0, currentRem - elapsedSec);
+          return {
+            ...prev,
+            timeRemaining: nextRem
+          };
+        });
+      }
+    };
+
+    const timer = setInterval(syncElapsed, 1000);
+
+    const handleVisibilityOrFocus = () => {
+      syncElapsed();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
   }, [view]);
 
   useEffect(() => {
