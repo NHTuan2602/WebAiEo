@@ -7,6 +7,9 @@
  * be repaired deterministically and report warnings so the teacher can review.
  */
 
+import { isInlineClozeQuestion } from './clozeHelpers.js';
+import { matchChoiceOption } from './examHelpers.js';
+
 const CLOZE_TOKEN_REGEX = /\{\{\s*(\d+)\s*\}\}|\[\s*(\d+)\s*\]|\(__+\s*(\d+)\s*__+\)/g;
 const LEADING_NUMBER_REGEX = /^(\s*(?:(?:câu|questions?|q)\s*)?)(\d{1,3})(\s*[-–—]\s*\d{1,3})?(?=\s*[.):\-–—]|\s|$)/i;
 
@@ -220,20 +223,29 @@ export function repairReadingPdfNumbering(rawPassages = [], { answerKey = new Ma
     return next;
   });
 
-  // 5. Link inline cloze gaps {{N}} to fill questions; repair or create missing ones.
+  // 5. Link inline cloze gaps {{N}} to fill / summary_box / summary_nobox / diagram_label questions; repair or create missing ones.
   const created = [];
   passages = passages.map((passage, passageIdx) => {
     const clozeNums = listClozeNumbers(passage.clozeText);
     if (clozeNums.length === 0) return passage;
     let clozeText = passage.clozeText;
     let questions = passage.questions.map(q => ({ ...q }));
-    const fillNumbers = () => new Set(questions.filter(q => q.type === 'fill').map(q => q.blankNum || q.questionNumber));
+    const linkedClozeNumbers = () =>
+      new Set(
+        questions
+          .filter(q => isInlineClozeQuestion(q))
+          .map(q => q.blankNum || q.questionNumber)
+      );
 
-    // 5a. A question with that number exists but AI typed it as non-fill without options -> convert.
+    // 5a. Match existing questions by printed number: keep summary_box/choice options intact, convert plain text questions to fill.
     clozeNums.forEach(n => {
-      if (fillNumbers().has(n)) return;
       const target = questions.find(q => q.questionNumber === n);
-      if (target && (!Array.isArray(target.options) || target.options.length === 0) && target.type !== 'tfng') {
+      if (!target) return;
+      if (isInlineClozeQuestion(target)) {
+        target.blankNum = n;
+        return;
+      }
+      if ((!Array.isArray(target.options) || target.options.length === 0) && target.type !== 'tfng') {
         target.type = 'fill';
         target.blankNum = n;
         delete target.correctAnswers;
@@ -241,26 +253,27 @@ export function repairReadingPdfNumbering(rawPassages = [], { answerKey = new Ma
       }
     });
 
-    // 5b. Cloze uses a different numbering than the fill questions -> map by order.
-    let unlinked = clozeNums.filter(n => !fillNumbers().has(n));
+    // 5b. Cloze uses a different numbering than the inline blank questions -> map by order.
+    let unlinked = clozeNums.filter(n => !linkedClozeNumbers().has(n));
     if (unlinked.length > 0) {
       const clozeSet = new Set(clozeNums);
-      const orphanFills = questions
-        .filter(q => q.type === 'fill' && !clozeSet.has(q.blankNum || q.questionNumber))
+      const orphanBlanks = questions
+        .filter(q => isInlineClozeQuestion(q) && !clozeSet.has(q.blankNum || q.questionNumber))
         .map(q => q.blankNum || q.questionNumber)
         .sort((a, b) => a - b);
-      if (orphanFills.length === unlinked.length) {
-        const mapping = new Map(unlinked.map((n, i) => [n, orphanFills[i]]));
+      if (orphanBlanks.length === unlinked.length) {
+        const mapping = new Map(unlinked.map((n, i) => [n, orphanBlanks[i]]));
         clozeText = remapClozeNumbers(clozeText, n => mapping.get(n) ?? n);
         warnings.push(
-          `Passage ${passageIdx + 1}: số ô trống trong bảng/ghi chú (${formatNumberList(unlinked)}) đã được khớp lại theo câu ${formatNumberList(orphanFills)}.`
+          `Passage ${passageIdx + 1}: số ô trống trong bảng/ghi chú (${formatNumberList(unlinked)}) đã được khớp lại theo câu ${formatNumberList(orphanBlanks)}.`
         );
         unlinked = [];
       }
     }
 
-    // 5c. Still missing -> create a fill question so the gap is answerable (answer from key if found).
+    // 5c. Still missing -> create a fill question only when no question with that number exists.
     unlinked.forEach(n => {
+      if (questions.some(q => q.questionNumber === n)) return;
       const answers = answerKey.get(n) || [];
       questions.push({
         type: 'fill',
@@ -278,30 +291,50 @@ export function repairReadingPdfNumbering(rawPassages = [], { answerKey = new Ma
     return { ...passage, clozeText, questions };
   });
 
-  // 6. Answers from the answer key, consistent blankNum, matching printed prefix, final sort.
-  passages = passages.map(passage => ({
-    ...passage,
-    questions: passage.questions
-      .map(q => {
-        const next = { ...q };
-        delete next._inferred;
-        if (next.type === 'fill') next.blankNum = next.questionNumber;
-        else delete next.blankNum;
-        const end = getEnd(next);
-        if (end > next.questionNumber) next.questionEndNumber = end;
-        else delete next.questionEndNumber;
-        if (!hasAnswer(next)) {
-          const keyed = answerKey.get(next.questionNumber);
-          if (keyed?.length) {
-            next.correctAnswer = keyed[0];
-            if (next.type === 'mcq') next.correctAnswers = keyed;
+  // 6. Answers from the answer key, canonical option matching, consistent blankNum, matching printed prefix, final sort.
+  passages = passages.map(passage => {
+    const clozeSet = new Set(listClozeNumbers(passage.clozeText));
+    return {
+      ...passage,
+      questions: passage.questions
+        .map(q => {
+          const next = { ...q };
+          delete next._inferred;
+          if (next.type === 'fill' || (isInlineClozeQuestion(next) && clozeSet.has(next.questionNumber))) {
+            next.blankNum = next.questionNumber;
+          } else {
+            delete next.blankNum;
           }
-        }
-        next.question = rewriteLeadingNumber(next.question, next.questionNumber, next.questionEndNumber);
-        return next;
-      })
-      .sort((a, b) => a.questionNumber - b.questionNumber)
-  })).map(({ _order, ...passage }) => passage);
+          const end = getEnd(next);
+          if (end > next.questionNumber) next.questionEndNumber = end;
+          else delete next.questionEndNumber;
+          if (!hasAnswer(next)) {
+            const keyed = answerKey.get(next.questionNumber);
+            if (keyed?.length) {
+              next.correctAnswer = keyed[0];
+              if (next.type === 'mcq') next.correctAnswers = keyed;
+            }
+          }
+          if (Array.isArray(next.options) && next.options.length > 0) {
+            if (next.correctAnswer) {
+              const canonical = matchChoiceOption(next.correctAnswer, next.options);
+              if (canonical) next.correctAnswer = canonical;
+            }
+            if (Array.isArray(next.correctAnswers) && next.correctAnswers.length > 0) {
+              next.correctAnswers = Array.from(
+                new Set(next.correctAnswers.map(ans => matchChoiceOption(ans, next.options) || ans))
+              );
+              if (!next.correctAnswer && next.correctAnswers[0]) {
+                next.correctAnswer = next.correctAnswers[0];
+              }
+            }
+          }
+          next.question = rewriteLeadingNumber(next.question, next.questionNumber, next.questionEndNumber);
+          return next;
+        })
+        .sort((a, b) => a.questionNumber - b.questionNumber)
+    };
+  }).map(({ _order, ...passage }) => passage);
 
   if (inferred.length) {
     warnings.push(`AI không đọc được số của câu ${formatNumberList(inferred)} nên đã tự suy ra theo câu liền kề.`);

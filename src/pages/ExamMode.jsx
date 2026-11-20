@@ -32,7 +32,7 @@ import {
   getReadingPassages,
   normalizeExamConfig
 } from '../constants/seedData';
-import { extractBlankNumbers } from '../utils/clozeHelpers';
+import { extractBlankNumbers, isInlineClozeQuestion } from '../utils/clozeHelpers';
 import { getWordCount } from '../utils/examHelpers';
 import {
   buildScopedNavParts,
@@ -226,9 +226,10 @@ export default function ExamMode({
 
   const activeListeningCloze = activeTrack?.clozeText || '';
   const listeningClozeSet = new Set(extractBlankNumbers(activeListeningCloze));
-  const standaloneListeningQs = displayedListeningQs.filter(
-    q => !(q.type === 'fill' && typeof q.blankNum === 'number' && listeningClozeSet.has(q.blankNum))
-  );
+  const standaloneListeningQs = displayedListeningQs.filter(q => {
+    const num = typeof q.blankNum === 'number' ? q.blankNum : getQuestionDisplayNumber(q, 0);
+    return !(isInlineClozeQuestion(q) && num > 0 && listeningClozeSet.has(num));
+  });
 
   const listeningNeedsLeftPane = Boolean(activeTrack?.imageUrl || activeTrack?.contextText);
 
@@ -248,7 +249,7 @@ export default function ExamMode({
   const scrollToQuestionOrBlank = (q, fallbackIdx) => {
     setActiveQuestionId(q.id);
     const derivedNum = getQuestionDisplayNumber(q, fallbackIdx + 1);
-    const blankTarget = typeof q.blankNum === 'number' ? q.blankNum : (q.type === 'fill' ? derivedNum : null);
+    const blankTarget = typeof q.blankNum === 'number' ? q.blankNum : (isInlineClozeQuestion(q) ? derivedNum : null);
     if (blankTarget && blankInputRefs.current[blankTarget]) {
       setActiveBlankNum(blankTarget);
       const inputEl = blankInputRefs.current[blankTarget];
@@ -260,8 +261,8 @@ export default function ExamMode({
     if (cardEl) {
       setActiveBlankNum(null);
       cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const innerInput = cardEl.querySelector('input[type="text"]');
-      if (innerInput) innerInput.focus({ preventScroll: true });
+      const innerControl = cardEl.querySelector('input[type="text"], select');
+      if (innerControl) innerControl.focus({ preventScroll: true });
     } else {
       setActiveBlankNum(blankTarget || fallbackIdx + 1);
     }

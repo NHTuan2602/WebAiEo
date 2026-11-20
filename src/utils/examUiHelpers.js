@@ -3,7 +3,7 @@
  * Supports question numbering, matching-matrix grouping, passage block parsing,
  * inline highlight segmentation, and dynamic question range labels.
  */
-import { extractBlankNumbers } from './clozeHelpers';
+import { extractBlankNumbers, isInlineClozeQuestion } from './clozeHelpers';
 
 const STANDARD_VERDICT_OPTIONS = new Set(['TRUE', 'FALSE', 'YES', 'NO', 'NOT GIVEN']);
 
@@ -68,9 +68,30 @@ const MATRIX_ELIGIBLE_TYPES = new Set([
   'diagram_label'
 ]);
 
+const WORD_BOX_GROUP_TYPES = new Set([
+  'summary_box',
+  'matching_headings',
+  'matching_information',
+  'matching_features',
+  'correct_ending',
+  'matching',
+  'map_diagram',
+  'diagram_label'
+]);
+
+function isWordBoxOptionList(options) {
+  if (!Array.isArray(options) || options.length < 2 || options.length > 16) return false;
+  const trimmed = options.map(opt => String(opt || '').trim()).filter(Boolean);
+  if (trimmed.length !== options.length) return false;
+  if (trimmed.every(opt => STANDARD_VERDICT_OPTIONS.has(opt.toUpperCase()))) return false;
+  return trimmed.every(opt => opt.length <= 160);
+}
+
 /**
- * Group consecutive questions into standard cards or Computer-Delivered matrix grid tables
- * when 3+ consecutive choice/matching questions share identical compact options (e.g., A–I, i–viii).
+ * Group consecutive questions into:
+ * - Computer-Delivered matrix grid tables (3+ consecutive questions sharing compact A–I / i–viii codes)
+ * - Shared Word-Box / Summary-Box groups (2+ consecutive summary_box or matching questions sharing a word/phrase list)
+ * - Standard single question cards
  */
 export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
   if (!Array.isArray(questions) || questions.length === 0) return [];
@@ -79,14 +100,45 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
 
   while (i < questions.length) {
     const q = questions[i];
-    const opts = Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()) : [];
-    const signature = MATRIX_ELIGIBLE_TYPES.has(q?.type) && isShortMatrixOptionList(opts) ? opts.join('||') : null;
+    const opts = Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
 
+    // 1. Summary Box with shared options (prefer inline word-box flow over repeated radios or tight matrix)
+    const isSummaryBox = q?.type === 'summary_box' && isWordBoxOptionList(opts);
+    if (isSummaryBox) {
+      const sig = opts.join('||');
+      let j = i + 1;
+      while (j < questions.length) {
+        const nextQ = questions[j];
+        const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+        if (nextQ?.type === 'summary_box' && nextOpts.join('||') === sig) {
+          j++;
+        } else {
+          break;
+        }
+      }
+      if (j - i >= 2) {
+        groups.push({
+          kind: 'wordBoxGroup',
+          key: `wordbox-${q.id}`,
+          groupType: 'summary_box',
+          options: opts,
+          items: questions.slice(i, j).map((item, idx) => ({
+            question: item,
+            displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
+          }))
+        });
+        i = j;
+        continue;
+      }
+    }
+
+    // 2. Compact matching-matrix grid table (A-I, i-viii)
+    const signature = MATRIX_ELIGIBLE_TYPES.has(q?.type) && isShortMatrixOptionList(opts) ? opts.join('||') : null;
     if (signature) {
       let j = i + 1;
       while (j < questions.length) {
         const nextQ = questions[j];
-        const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()) : [];
+        const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()).filter(Boolean) : [];
         if (MATRIX_ELIGIBLE_TYPES.has(nextQ?.type) && nextOpts.join('||') === signature) {
           j++;
         } else {
@@ -98,6 +150,36 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
         groups.push({
           kind: 'matrix',
           key: `matrix-${q.id}`,
+          options: opts,
+          items: questions.slice(i, j).map((item, idx) => ({
+            question: item,
+            displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
+          }))
+        });
+        i = j;
+        continue;
+      }
+    }
+
+    // 3. Shared Word/Phrase Box for matching_headings, matching_features, correct_ending, etc.
+    //    when options have full text (e.g. "A drawings", "D original plans") and are repeated across 2+ questions
+    if (WORD_BOX_GROUP_TYPES.has(q?.type) && opts.length >= 3 && isWordBoxOptionList(opts) && !isShortMatrixOptionList(opts)) {
+      const sig = opts.join('||');
+      let j = i + 1;
+      while (j < questions.length) {
+        const nextQ = questions[j];
+        const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+        if (nextQ?.type === q.type && nextOpts.join('||') === sig) {
+          j++;
+        } else {
+          break;
+        }
+      }
+      if (j - i >= 2) {
+        groups.push({
+          kind: 'wordBoxGroup',
+          key: `wordbox-${q.id}`,
+          groupType: q.type,
           options: opts,
           items: questions.slice(i, j).map((item, idx) => ({
             question: item,
@@ -303,7 +385,7 @@ export function buildReadingDisplayBlocks({
 
     numberedQuestions.forEach(item => {
       const isRenderedInCloze =
-        item.question.type === 'fill' &&
+        isInlineClozeQuestion(item.question) &&
         clozeNumbers.has(item.displayNum);
       if (!isRenderedInCloze) {
         items.push({

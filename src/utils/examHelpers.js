@@ -181,20 +181,102 @@ export function buildDefaultQuestionFields(type = 'mcq', skill = 'reading', prev
   };
 }
 
-function extractLeadingOptionCode(val = '') {
-  const m = String(val || '').trim().match(/^([ivxlcdm]+|[A-Za-z])(?:\s*[.):\-–]\s+|\s*$)/);
-  return m ? m[1].toLowerCase() : '';
+const ROMAN_CODE_PATTERN = '(?:xii|xi|ix|x|viii|vii|vi|iv|v|iii|ii|i)';
+
+export function extractLeadingOptionCode(val = '', { allowSpaceSeparated = false } = {}) {
+  const str = String(val || '').trim();
+  if (!str) return '';
+  const punctuated = str.match(new RegExp(`^(${ROMAN_CODE_PATTERN}|[A-Za-z])(?:\\s*[.):\\-–]\\s+|\\s*$)`, 'i'));
+  if (punctuated) return punctuated[1].toLowerCase();
+  if (allowSpaceSeparated) {
+    // IELTS word-box style: "A drawings", "D original plans", "ii The history..."
+    const spaced = str.match(new RegExp(`^(${ROMAN_CODE_PATTERN}|[A-Z])\\s+\\S`));
+    if (spaced) return spaced[1].toLowerCase();
+  }
+  return '';
 }
 
-function getComparableChoiceKey(value) {
-  const normalized = String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
-  return extractLeadingOptionCode(value) || normalized;
+export function stripLeadingOptionCode(val = '', { allowSpaceSeparated = false } = {}) {
+  const str = String(val || '').trim();
+  if (!str) return '';
+  const punctuated = str.match(new RegExp(`^(?:${ROMAN_CODE_PATTERN}|[A-Za-z])\\s*[.):\\-–]\\s*(.+)$`, 'i'));
+  if (punctuated) return punctuated[1].trim();
+  if (allowSpaceSeparated) {
+    const spaced = str.match(new RegExp(`^(?:${ROMAN_CODE_PATTERN}|[A-Z])\\s+(.+)$`));
+    if (spaced) return spaced[1].trim();
+  }
+  return str;
 }
 
-function uniqueChoiceAnswers(values = []) {
+export function optionsUseSpaceSeparatedCodes(options = []) {
+  if (!Array.isArray(options) || options.length < 2) return false;
+  const codes = new Set();
+  let matchedCount = 0;
+  for (const opt of options) {
+    const code = extractLeadingOptionCode(opt, { allowSpaceSeparated: true });
+    if (code) {
+      matchedCount += 1;
+      codes.add(code);
+    }
+  }
+  return matchedCount >= 2 && codes.size === matchedCount && matchedCount >= Math.ceil(options.length * 0.75);
+}
+
+/**
+ * Resolve a raw answer value (e.g. "H", "H.", "future", "H future") to the exact canonical
+ * option string inside `options` (e.g. "H future") when unambiguous.
+ */
+export function matchChoiceOption(rawValue, options = []) {
+  const raw = String(rawValue ?? '').trim();
+  if (!raw || !Array.isArray(options) || options.length === 0) return '';
+  const normalizedRaw = raw.replace(/\s+/g, ' ').toLowerCase();
+  const cleanOptions = options.map(opt => String(opt || '').trim()).filter(Boolean);
+
+  const exact = cleanOptions.find(opt => opt.replace(/\s+/g, ' ').toLowerCase() === normalizedRaw);
+  if (exact) return exact;
+
+  const allowSpaced = optionsUseSpaceSeparatedCodes(cleanOptions);
+  const rawCode = extractLeadingOptionCode(raw, { allowSpaceSeparated: allowSpaced });
+  const rawBody = stripLeadingOptionCode(raw, { allowSpaceSeparated: allowSpaced })
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+  if (rawCode && normalizedRaw === rawCode) {
+    const byCode = cleanOptions.find(opt => extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpaced }) === rawCode);
+    if (byCode) return byCode;
+  }
+
+  if (rawCode) {
+    const byCodeAndBody = cleanOptions.find(opt => {
+      const optCode = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpaced });
+      const optBody = stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpaced }).replace(/\s+/g, ' ').toLowerCase();
+      return optCode === rawCode && (!rawBody || !optBody || optBody === rawBody);
+    });
+    if (byCodeAndBody) return byCodeAndBody;
+  }
+
+  // Match by option body text when answer key gives the word itself (e.g. "future" -> "H future")
+  const bodyMatches = cleanOptions.filter(opt => {
+    const optBody = stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpaced }).replace(/\s+/g, ' ').toLowerCase();
+    return optBody && optBody === normalizedRaw;
+  });
+  if (bodyMatches.length === 1) return bodyMatches[0];
+
+  return '';
+}
+
+function getComparableChoiceKey(value, options = []) {
+  const matched = matchChoiceOption(value, options);
+  const target = matched || value;
+  const allowSpaced = optionsUseSpaceSeparatedCodes(options);
+  const normalized = String(target || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return extractLeadingOptionCode(target, { allowSpaceSeparated: allowSpaced }) || normalized;
+}
+
+function uniqueChoiceAnswers(values = [], options = []) {
   const seen = new Set();
   return values.filter(value => {
-    const key = getComparableChoiceKey(value);
+    const key = getComparableChoiceKey(value, options);
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -202,21 +284,21 @@ function uniqueChoiceAnswers(values = []) {
 }
 
 export function getQuestionCorrectAnswers(question) {
+  const options = Array.isArray(question?.options) ? question.options : [];
   const explicitAnswers = Array.isArray(question?.correctAnswers)
     ? question.correctAnswers.map(answer => String(answer ?? '').trim()).filter(Boolean)
     : [];
-  if (explicitAnswers.length > 0) return uniqueChoiceAnswers(explicitAnswers);
+  if (explicitAnswers.length > 0) return uniqueChoiceAnswers(explicitAnswers, options);
 
   const singleAnswer = String(question?.correctAnswer ?? '').trim();
   if (!singleAnswer) return [];
   if (question?.type !== 'mcq' || !/[,;|/&]|\band\b/i.test(singleAnswer)) return [singleAnswer];
 
   const parts = singleAnswer.split(/\s*(?:,|;|\||\/|&|\band\b)\s*/i).filter(Boolean);
-  const options = Array.isArray(question?.options) ? question.options : [];
   const allPartsMatchOptions = parts.length > 1 && parts.every(part =>
-    options.some(option => getComparableChoiceKey(option) === getComparableChoiceKey(part))
+    options.some(option => getComparableChoiceKey(option, options) === getComparableChoiceKey(part, options))
   );
-  return allPartsMatchOptions ? uniqueChoiceAnswers(parts) : [singleAnswer];
+  return allPartsMatchOptions ? uniqueChoiceAnswers(parts, options) : [singleAnswer];
 }
 
 export function getObjectiveAnswerMaxScore(question) {
@@ -225,14 +307,14 @@ export function getObjectiveAnswerMaxScore(question) {
 }
 
 function isSingleObjectiveAnswerCorrect(question, userRaw) {
+  const options = Array.isArray(question?.options) ? question.options : [];
   const expectedAnswers = getQuestionCorrectAnswers(question);
+  const rawKey = question?.type === 'mcq' && expectedAnswers.length === 1
+    ? expectedAnswers[0]
+    : question?.correctAnswer ?? '';
 
   const normalizedUser = String(userRaw ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-  const normalizedKey = String(
-    question?.type === 'mcq' && expectedAnswers.length === 1
-      ? expectedAnswers[0]
-      : question?.correctAnswer ?? ''
-  ).trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizedKey = String(rawKey).trim().replace(/\s+/g, ' ').toLowerCase();
   if (!normalizedUser || !normalizedKey) return false;
 
   if (normalizedUser === normalizedKey) return true;
@@ -244,13 +326,27 @@ function isSingleObjectiveAnswerCorrect(question, userRaw) {
       .map(part => part.trim().replace(/\s+/g, ' '))
       .filter(Boolean);
     if (acceptedVariants.includes(normalizedUser)) return true;
+    if (options.length > 0) {
+      const matchedUser = matchChoiceOption(userRaw, options);
+      if (matchedUser && acceptedVariants.some(variant => matchChoiceOption(variant, options) === matchedUser)) {
+        return true;
+      }
+    }
   }
 
-  // Also allow matching code shorthand (e.g. key "B" matches selected option "B. Heading Two" and vice versa)
-  const userCode = extractLeadingOptionCode(userRaw);
-  const keyCode = extractLeadingOptionCode(
-    question?.type === 'mcq' && expectedAnswers.length === 1 ? expectedAnswers[0] : question?.correctAnswer
-  );
+  // Canonical match against question.options (handles "H" <-> "H future" <-> "future")
+  if (options.length > 0) {
+    const matchedUser = matchChoiceOption(userRaw, options);
+    const matchedKey = matchChoiceOption(rawKey, options);
+    if (matchedUser && matchedKey && matchedUser === matchedKey) {
+      return true;
+    }
+  }
+
+  // Fallback code shorthand (e.g. key "B" matches selected option "B. Heading Two" or "B plantings")
+  const allowSpaced = optionsUseSpaceSeparatedCodes(options) || options.length === 0;
+  const userCode = extractLeadingOptionCode(userRaw, { allowSpaceSeparated: allowSpaced });
+  const keyCode = extractLeadingOptionCode(rawKey, { allowSpaceSeparated: allowSpaced });
   if (
     userCode &&
     keyCode &&
@@ -263,11 +359,12 @@ function isSingleObjectiveAnswerCorrect(question, userRaw) {
 }
 
 export function getObjectiveAnswerScore(question, userRaw) {
+  const options = Array.isArray(question?.options) ? question.options : [];
   const expectedAnswers = getQuestionCorrectAnswers(question);
   if (question?.type === 'mcq' && expectedAnswers.length > 1) {
-    const expectedKeys = new Set(expectedAnswers.map(getComparableChoiceKey));
-    const selectedAnswers = uniqueChoiceAnswers(Array.isArray(userRaw) ? userRaw : userRaw ? [userRaw] : []);
-    const selectedKeys = selectedAnswers.map(getComparableChoiceKey);
+    const expectedKeys = new Set(expectedAnswers.map(ans => getComparableChoiceKey(ans, options)));
+    const selectedAnswers = uniqueChoiceAnswers(Array.isArray(userRaw) ? userRaw : userRaw ? [userRaw] : [], options);
+    const selectedKeys = selectedAnswers.map(ans => getComparableChoiceKey(ans, options));
     if (selectedKeys.length > expectedKeys.size) return 0;
     return selectedKeys.filter(key => expectedKeys.has(key)).length;
   }

@@ -3,9 +3,11 @@ import {
   getQuestionTypeMeta,
   getQuestionTypesForSkill,
   getWordCount,
+  matchChoiceOption,
   roundDownIeltsHalfBand,
   roundWholeBand
 } from './examHelpers.js';
+import { extractBlankNumbers, isInlineClozeQuestion } from './clozeHelpers.js';
 import { buildAnswerKeyMap, repairReadingPdfNumbering } from './readingNumberRepair.js';
 
 export const GEMINI_PREFERRED_MODELS = [
@@ -703,15 +705,14 @@ YOUR GOAL:
 Convert the visual exam sheet accurately into structured JSON without missing text, numbers, bullet points, or questions.
 
 RULES FOR INLINE CLOZE / NOTE / FORM / SUMMARY COMPLETION ("Đục Lỗ"):
-- ${preferCloze ? 'Whenever the exam has Note Completion, Form Completion, Table/Flowchart Completion, or Summary Fill-in-the-blank (like "Questions 1-10: Complete the notes below", numbered gaps "1 .....", "(1)", inline blanks inside sentences/bullets):' : 'If the exam contains inline Note/Form/Summary Completion:'}
-  1. Preserve the EXACT instruction header (e.g. "Questions 1-10\\nComplete the notes below.\\nWrite ONE WORD AND/OR A NUMBER for each answer."), the main uppercase box title (e.g. "**HIRING A PUBLIC ROOM**"), section subheadings (e.g. "**Room and cost**"), Example lines, and bullet lines prefixed with "• ".
-  2. Replace EVERY answer gap in "clozeText" with the exact token "{{N}}" where N is the question number (example: "• the {{1}} Room – seats 100", "• Cost of Main Hall for Saturday evening: £{{2}}"). Keep all surrounding words intact!
-  3. Also create a corresponding entry in "questions" with:
-     - "blankNum": N (integer)
-     - "type": "fill"
-     - "question": "N. <short surrounding phrase with ____>"
-     - "options": []
-     - "correctAnswer": exact answer from Answer Key if known, otherwise ""
+- ${preferCloze ? 'Whenever the exam has Note Completion, Form Completion, Table/Flowchart Completion, Summary Fill-in-the-blank (No Box), OR Summary Completion with a Word Box (e.g. "Complete the summary using the list of words, A-I, below"):' : 'If the exam contains inline Note/Form/Summary Completion (with or without a Word Box):'}
+  1. Preserve the EXACT instruction header (e.g. "Questions 1-10\\nComplete the notes below.\\nWrite ONE WORD AND/OR A NUMBER for each answer." or "Questions 32-36\\nComplete the summary using the list of words, A-I, below."), the bold title (e.g. "**The Discovery of Johnston's Diaries**"), section subheadings, Example lines, and the COMPLETE unbroken paragraph/bullet text. NEVER truncate sentences after a blank!
+  2. Replace EVERY answer gap in "clozeText" with the exact token "{{N}}" where N is the question number (example: "Most valuable of all for today's gardeners at Hidcote were {{33}} revealing how the garden changed in the course of the year."). Keep ALL surrounding words before AND after every blank intact!
+  3. For Summary Completion WITH a Word Box (A-I, etc.):
+     - Do NOT duplicate the A-I word list as raw text inside "clozeText" (the UI renders the interactive Word Box automatically from "options").
+     - Create one entry in "questions" per blank with "type": "summary_box", "blankNum": N, "question": "N. <complete sentence with ____ (NOT raw {{N}})>", "options": ["A drawings", "B plantings", ...] (exact full list from the box), and "correctAnswer" set to the matching option string from "options" (e.g. "H future" if the key says "H").
+  4. For Note/Form/Table/Summary WITHOUT a Word Box:
+     - Create one entry in "questions" per blank with "blankNum": N, "type": "fill", "question": "N. <complete sentence/phrase with ____>", "options": [], "correctAnswer": exact answer from Answer Key if known, otherwise "".
 
 RULES FOR READING (11 TYPES) & LISTENING (6 TYPES) CLASSIFICATION:
 - Supported ${skillLabel} question "type" values: ${getQuestionTypesForSkill(skill).map(t => `"${t.id}"`).join(', ')}.
@@ -789,14 +790,18 @@ Return ONLY strictly valid JSON matching this schema:
       ? [rawCorrectAnswer]
       : [];
 
+    const normalizedCorrectAnswers = options.length > 0
+      ? Array.from(new Set(parsedCorrectAnswers.map(ans => matchChoiceOption(ans, options) || ans)))
+      : Array.from(new Set(parsedCorrectAnswers));
+
     return {
       blankNum,
       type,
       question: String(q?.question || `${blankNum || idx + 1}. Câu hỏi`).trim(),
       options,
       wordLimit: String(q?.wordLimit || '').trim(),
-      correctAnswer: parsedCorrectAnswers[0] || '',
-      ...(type === 'mcq' ? { correctAnswers: Array.from(new Set(parsedCorrectAnswers)) } : {})
+      correctAnswer: normalizedCorrectAnswers[0] || '',
+      ...(type === 'mcq' ? { correctAnswers: normalizedCorrectAnswers } : {})
     };
   });
 
@@ -843,12 +848,18 @@ DOCUMENT HANDLING:
 - Extract only the Reading section. Do not turn Listening, Writing, Speaking, or answer-key text into passages or questions.
 - Return one passage object for each actual reading passage. Never merge separate passages. Join text that continues across page breaks.
 - Keep original question numbers and blank numbers exactly as printed so inline blanks remain matched to the answer key. Do not invent missing questions or renumber them.
-- Put each question's printed start number in questionNumber, and its end number in questionEndNumber only when one prompt covers a printed range such as 11-12. Use blankNum only for fill-in-the-blank questions. Sort each passage's questions by questionNumber ascending; never use the array position as a substitute for a printed number.
+- Put each question's printed start number in questionNumber, and its end number in questionEndNumber only when one prompt covers a printed range such as 11-12. Set blankNum to the printed number for every question whose blank appears as {{N}} in clozeText (including both "fill" and "summary_box" / "summary_nobox"). Sort each passage's questions by questionNumber ascending; never use the array position as a substitute for a printed number.
 - Include every Reading question exactly once, including questions that continue on another page. Preserve all statements, headings, options, instructions, and word limits.
 - Use the supported question types: ${questionTypes.map(t => `"${t.id}"`).join(', ')}. For multiple choice, include the full option text. For select-two/select-more questions, include every correct option in correctAnswers and set requiredSelections to that count.
 - Copy exact correct answers from the answer key when it exists, including acceptable alternatives. Also list every answer-key entry in the top-level answerKey array by its printed question number. If no answer key is present, answer only when the passage clearly supports it; leave correctAnswer empty when uncertain.
 - Question numbers in IELTS Reading run continuously across passages (typically Passage 1 = 1-13, Passage 2 = 14-26, Passage 3 = 27-40). Never restart numbering at 1 for a later passage, and never output two questions with the same number.
-- For inline Note/Form/Table/Flow-chart/Summary completion, preserve the complete instruction text and section layout in clozeText, replacing each answer gap with {{N}} using its original question number. Put the corresponding fill question in the same passage's questions array. For question styles without inline gaps, set clozeText to an empty string.
+- For inline Note/Form/Table/Flow-chart/Summary completion (BOTH without a word box AND with a word box A-I):
+  1. Preserve the COMPLETE unbroken instruction text, bold title (e.g. "**The Discovery of Johnston's Diaries**"), and full paragraph/bullet text in clozeText, replacing each answer gap with {{N}} using its original question number. NEVER cut off words after a blank — every sentence must be complete from start to finish!
+  2. For Summary Completion WITH a Word Box (e.g. "Complete the summary using the list of words, A-I, below"):
+     - Keep the full summary paragraph with {{N}} gaps in clozeText (do NOT repeat the A-I word box as plain text inside clozeText because the UI builds the interactive Word Box from options).
+     - Put each blank in the passage's questions array with "type": "summary_box", "questionNumber": N, "blankNum": N, "options": ["A drawings", "B plantings", ...] (the full word list from the box), "question": "N. <complete sentence containing ____ (NOT raw {{N}})>", and "correctAnswer" set to the matching option string from options.
+  3. For Note/Form/Table/Flow-chart/Summary completion WITHOUT a Word Box, put the corresponding "type": "fill" question with "blankNum": N in the same passage's questions array.
+  4. If a passage has multiple inline cloze/summary blocks, include all of them in clozeText in printed order separated by a blank line. For question styles without inline gaps, set clozeText to an empty string.
 - Extract the full passage text with paragraph breaks and its printed title. Keep tables/labels that are part of the passage readable as text.
 - Do not include explanations, grading commentary, or markdown outside the JSON.
 ${extraInstructions ? `\nADDITIONAL TEACHER NOTES:\n${extraInstructions}` : ''}
@@ -897,6 +908,8 @@ Return only valid JSON matching this schema:
     : [];
   const validTypeSet = new Set(questionTypes.map(t => t.id));
   const passages = rawPassages.map((passage, passageIdx) => {
+    const passageClozeText = String(passage?.clozeText || '').trim();
+    const passageClozeBlankSet = new Set(extractBlankNumbers(passageClozeText));
     const questions = (Array.isArray(passage?.questions) ? passage.questions : []).map((q, idx) => {
       const rawType = String(q?.type || 'fill').toLowerCase().trim();
       let type = validTypeSet.has(rawType) ? rawType : 'fill';
@@ -926,11 +939,14 @@ Return only valid JSON matching this schema:
         explicitQuestionEnd || 0
       );
       const questionEndNumber = questionEnd > questionNumber ? questionEnd : undefined;
-      const blankNum = type === 'fill' ? questionNumber : undefined;
+      const blankNum =
+        type === 'fill' || (isInlineClozeQuestion({ type }) && passageClozeBlankSet.has(questionNumber))
+          ? questionNumber
+          : undefined;
       const rawCorrectAnswer = Array.isArray(q?.correctAnswer)
         ? q.correctAnswer.map(answer => String(answer ?? '').trim()).filter(Boolean)
         : String(q?.correctAnswer ?? '').trim();
-      const correctAnswers = Array.isArray(q?.correctAnswers)
+      const rawCorrectList = Array.isArray(q?.correctAnswers)
         ? q.correctAnswers.map(answer => String(answer ?? '').trim()).filter(Boolean)
         : Array.isArray(rawCorrectAnswer)
         ? rawCorrectAnswer
@@ -939,6 +955,9 @@ Return only valid JSON matching this schema:
         : rawCorrectAnswer
         ? [rawCorrectAnswer]
         : [];
+      const correctAnswers = options.length > 0
+        ? Array.from(new Set(rawCorrectList.map(ans => matchChoiceOption(ans, options) || ans)))
+        : Array.from(new Set(rawCorrectList));
 
       return {
         blankNum,
@@ -949,7 +968,7 @@ Return only valid JSON matching this schema:
         options,
         wordLimit: String(q?.wordLimit || '').trim(),
         correctAnswer: correctAnswers[0] || '',
-        ...(type === 'mcq' ? { correctAnswers: Array.from(new Set(correctAnswers)) } : {}),
+        ...(type === 'mcq' ? { correctAnswers } : {}),
         ...(type === 'mcq' ? { requiredSelections: Math.max(1, Number(q?.requiredSelections) || correctAnswers.length || 1) } : {})
       };
     });
@@ -957,7 +976,7 @@ Return only valid JSON matching this schema:
     return {
       title: String(passage?.title || `Passage ${passageIdx + 1}`).trim(),
       passageText: String(passage?.passageText || '').trim(),
-      clozeText: String(passage?.clozeText || '').trim(),
+      clozeText: passageClozeText,
       questions
     };
   }).filter(passage => passage.passageText || passage.questions.length > 0);

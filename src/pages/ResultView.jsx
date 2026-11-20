@@ -19,12 +19,14 @@ import {
   XCircle
 } from 'lucide-react';
 import { formatDurationVi, normalizeExamConfig } from '../constants/seedData';
+import { formatInlineBlankPlaceholders } from '../utils/clozeHelpers';
 import {
   getObjectiveAnswerMaxScore,
   getObjectiveAnswerScore,
   getQuestionCorrectAnswers,
   getWordCount
 } from '../utils/examHelpers';
+import { getQuestionDisplayNumber, stripLeadingQuestionNumber } from '../utils/examUiHelpers';
 import SpeakingQuestionLuyennoiCard from '../components/speaking/SpeakingQuestionLuyennoiCard';
 import VipMemberName from '../components/common/VipMemberName';
 
@@ -1218,7 +1220,7 @@ export default function ResultView({
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                       <span className="font-bold text-slate-900 dark:text-white text-sm">
-                        Câu {idx + 1}: {q.question}
+                        Câu {getQuestionDisplayNumber(q, idx + 1)}: {formatInlineBlankPlaceholders(stripLeadingQuestionNumber(q.question) || q.question)}
                       </span>
                       {canShowCorrectAnswers ? (
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold w-fit ${

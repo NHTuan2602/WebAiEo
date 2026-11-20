@@ -1,9 +1,45 @@
-import { Bookmark } from 'lucide-react';
-import { getQuestionCorrectAnswers, getQuestionTypeMeta } from '../../utils/examHelpers';
+import { useState } from 'react';
+import { Bookmark, X } from 'lucide-react';
+import { formatInlineBlankPlaceholders } from '../../utils/clozeHelpers';
+import {
+  extractLeadingOptionCode,
+  getQuestionCorrectAnswers,
+  getQuestionTypeMeta,
+  matchChoiceOption,
+  optionsUseSpaceSeparatedCodes,
+  stripLeadingOptionCode
+} from '../../utils/examHelpers';
 import {
   groupQuestionsForRendering,
   stripLeadingQuestionNumber
 } from '../../utils/examUiHelpers';
+
+const INLINE_SLOT_REGEX = /(\{\{\s*\d+\s*\}\}|\[\s*\d+\s*\]|\(__+\s*\d+\s*__+\)|_{4,})/g;
+
+function splitPromptWithInlineSlot(promptText = '') {
+  const str = String(promptText || '');
+  const parts = [];
+  let lastIdx = 0;
+  let foundSlot = false;
+  const regex = new RegExp(INLINE_SLOT_REGEX.source, 'g');
+  let match;
+  while ((match = regex.exec(str)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push({ type: 'text', value: str.slice(lastIdx, match.index) });
+    }
+    if (!foundSlot) {
+      parts.push({ type: 'slot', raw: match[0] });
+      foundSlot = true;
+    } else {
+      parts.push({ type: 'text', value: '________' });
+    }
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < str.length) {
+    parts.push({ type: 'text', value: str.slice(lastIdx) });
+  }
+  return { parts, foundSlot };
+}
 
 function questionNeedsMultipleSelections(question) {
   return question?.type === 'mcq' && getRequiredSelectionCount(question) > 1;
@@ -51,6 +87,7 @@ export default function ExamQuestionList({
   scopeType = 'reading',
   showScopeBadge = false
 }) {
+  const [dragOverQuestionId, setDragOverQuestionId] = useState(null);
   const formatText = (val) => (typeof renderText === 'function' ? renderText(val) : val);
   if (!Array.isArray(questions) || questions.length === 0) return null;
 
@@ -239,11 +276,254 @@ export default function ExamQuestionList({
           );
         }
 
+        if (block.kind === 'wordBoxGroup') {
+          const firstNum = block.items[0]?.displayNum;
+          const lastNum = block.items[block.items.length - 1]?.displayNum;
+          const groupMeta = getQuestionTypeMeta(block.groupType, scopeType);
+          const allowSpacedCodes = optionsUseSpaceSeparatedCodes(block.options);
+          const usedByMap = new Map();
+          block.items.forEach(({ question: itemQ, displayNum }) => {
+            const rawVal = answers?.[itemQ.id] || '';
+            const canonical = matchChoiceOption(rawVal, block.options) || String(rawVal || '').trim();
+            if (!canonical) return;
+            const list = usedByMap.get(canonical) || [];
+            list.push(displayNum);
+            usedByMap.set(canonical, list);
+          });
+
+          const handleGroupChipClick = (optionVal) => {
+            const activeItem = block.items.find(({ question: itemQ }) => itemQ.id === activeQuestionId);
+            const firstEmpty = block.items.find(
+              ({ question: itemQ }) => !String(answers?.[itemQ.id] || '').trim()
+            );
+            const target = activeItem || firstEmpty || block.items[0];
+            if (!target) return;
+            onAnswerChange?.(target.question.id, optionVal);
+            const nextEmpty = block.items.find(
+              ({ question: itemQ }) =>
+                itemQ.id !== target.question.id && !String(answers?.[itemQ.id] || '').trim()
+            );
+            onSelectQuestion?.(nextEmpty ? nextEmpty.question : target.question);
+          };
+
+          return (
+            <div key={block.key} className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-[15px] sm:text-base font-extrabold text-[#111827] dark:text-white">
+                    Questions {firstNum}–{lastNum}
+                  </h4>
+                  <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
+                    {groupMeta.shortLabel}
+                  </span>
+                </div>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Bấm từ trong hộp, kéo thả hoặc chọn trực tiếp tại từng câu
+                </span>
+              </div>
+
+              {/* Shared Word Bank Box (rendered ONCE instead of repeating radio buttons per question) */}
+              <div className="rounded-lg border border-slate-300 dark:border-[#3A3D46] bg-slate-50/90 dark:bg-[#1A1C22] p-3.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {block.options.map((opt, optIdx) => {
+                    const code = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
+                    const labelText = code ? stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes }) : opt;
+                    const usedBy = usedByMap.get(opt) || [];
+                    const isUsed = usedBy.length > 0;
+                    return (
+                      <button
+                        key={`${opt}-${optIdx}`}
+                        type="button"
+                        draggable
+                        onDragStart={e => {
+                          e.dataTransfer.setData('text/plain', opt);
+                          e.dataTransfer.effectAllowed = 'copy';
+                        }}
+                        onClick={() => handleGroupChipClick(opt)}
+                        className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-md border text-left text-[14px] transition cursor-grab active:cursor-grabbing ${
+                          isUsed
+                            ? 'bg-blue-50/75 dark:bg-[#1E2A40] border-[#2563EB]/60 dark:border-[#60A5FA]/50 text-[#111827] dark:text-white'
+                            : 'bg-white dark:bg-[#23262F] border-slate-200 dark:border-[#373B45] text-[#111827] dark:text-[#F3F4F6] hover:border-[#2563EB] dark:hover:border-[#60A5FA]'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          {code && labelText && labelText !== opt ? (
+                            <>
+                              <span className="shrink-0 w-6 h-6 rounded bg-slate-100 dark:bg-[#2F3340] border border-slate-300 dark:border-[#494E5E] text-xs font-extrabold uppercase inline-flex items-center justify-center text-[#111827] dark:text-white">
+                                {code.toUpperCase()}
+                              </span>
+                              <span className="font-medium truncate">{labelText}</span>
+                            </>
+                          ) : (
+                            <span className="font-semibold truncate">{opt}</span>
+                          )}
+                        </span>
+                        {isUsed && (
+                          <span className="shrink-0 text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-[#2563EB] text-white tabular-nums">
+                            {usedBy.join(',')}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Clean per-question rows with inline drop/select slot */}
+              <div className="rounded-lg border border-slate-200 dark:border-[#32353E] divide-y divide-slate-200/80 dark:divide-[#2B2E36] bg-white dark:bg-[#141414]">
+                {block.items.map(({ question: q, displayNum }) => {
+                  const isActive = activeQuestionId === q.id;
+                  const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
+                  const isDragOver = dragOverQuestionId === q.id;
+                  const cleanPrompt = stripLeadingQuestionNumber(q.question) || q.question;
+                  const { parts, foundSlot } = splitPromptWithInlineSlot(cleanPrompt);
+                  const rawVal = answers?.[q.id] || '';
+                  const selectedVal = matchChoiceOption(rawVal, block.options) || String(rawVal || '').trim();
+
+                  const slotControl = (
+                    <span
+                      onDragOver={e => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'copy';
+                        if (dragOverQuestionId !== q.id) setDragOverQuestionId(q.id);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverQuestionId === q.id) setDragOverQuestionId(null);
+                      }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        setDragOverQuestionId(null);
+                        const dropped = e.dataTransfer.getData('text/plain');
+                        if (!dropped) return;
+                        const canonical = matchChoiceOption(dropped, block.options) || dropped;
+                        onAnswerChange?.(q.id, canonical);
+                        onSelectQuestion?.(q);
+                      }}
+                      className="inline-flex items-center gap-1 align-baseline mx-1 my-0.5"
+                    >
+                      <select
+                        value={selectedVal}
+                        aria-label={`Câu ${displayNum}`}
+                        onFocus={() => onSelectQuestion?.(q)}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onSelectQuestion?.(q);
+                        }}
+                        onChange={e => {
+                          onAnswerChange?.(q.id, e.target.value);
+                          onSelectQuestion?.(q);
+                        }}
+                        className={`min-w-[140px] max-w-[260px] h-[34px] px-2.5 pr-7 rounded-[4px] text-[14px] font-bold transition outline-none border cursor-pointer ${
+                          isDragOver
+                            ? 'bg-blue-50 dark:bg-blue-500/25 text-[#111827] dark:text-white border-[#2563EB] ring-2 ring-[#2563EB]/50'
+                            : isActive
+                            ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
+                            : selectedVal
+                            ? 'bg-blue-50/70 dark:bg-[#1E2A40] text-[#111827] dark:text-white border-[#2563EB] dark:border-[#60A5FA]'
+                            : 'bg-white dark:bg-[#2D3038] text-[#111827] dark:text-[#E5E7EB] border-[#767676] dark:border-[#5D5F66] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
+                        }`}
+                      >
+                        <option value="">{displayNum} — Chọn từ</option>
+                        {block.options.map((opt, optIdx) => (
+                          <option key={optIdx} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedVal && (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            onAnswerChange?.(q.id, '');
+                            onSelectQuestion?.(q);
+                          }}
+                          title={`Xóa đáp án câu ${displayNum}`}
+                          className="p-0.5 rounded text-slate-400 hover:text-rose-500 dark:text-neutral-400 dark:hover:text-rose-400 transition"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </span>
+                  );
+
+                  return (
+                    <div
+                      key={q.id}
+                      ref={el => {
+                        if (el && questionCardRefs?.current) {
+                          questionCardRefs.current[q.id] = el;
+                        }
+                      }}
+                      onClick={() => onSelectQuestion?.(q)}
+                      className={`px-3.5 py-3 transition-colors ${
+                        isActive
+                          ? 'bg-[#EFF6FF]/75 dark:bg-[#1E2430]'
+                          : 'hover:bg-slate-50/70 dark:hover:bg-[#1B1D23]'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <span
+                            className={`shrink-0 min-w-[26px] h-[26px] px-1.5 rounded-[3px] text-[13px] font-bold inline-flex items-center justify-center border mt-0.5 ${
+                              isActive
+                                ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                                : selectedVal
+                                ? 'bg-blue-50 dark:bg-blue-500/20 text-[#2563EB] dark:text-blue-300 border-[#2563EB]/40'
+                                : 'bg-white dark:bg-[#262626] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#4A4A4A]'
+                            }`}
+                          >
+                            {displayNum}
+                          </span>
+                          <div className={`min-w-0 flex-1 ${fontSizeClass} leading-[1.85] text-[#111827] dark:text-[#F3F4F6]`}>
+                            {foundSlot ? (
+                              parts.map((part, partIdx) =>
+                                part.type === 'slot' ? (
+                                  <span key={partIdx}>{slotControl}</span>
+                                ) : (
+                                  <span key={partIdx}>{formatText(part.value)}</span>
+                                )
+                              )
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                                <span className="font-medium">{formatText(cleanPrompt)}</span>
+                                {slotControl}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {renderScopeJumpChip(q)}
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onToggleBookmark?.(q.id);
+                            }}
+                            title={isFlagged ? 'Bỏ đánh dấu câu này' : 'Đánh dấu xem lại'}
+                            className={`p-1 rounded transition ${
+                              isFlagged
+                                ? 'text-amber-500 dark:text-amber-400'
+                                : 'text-slate-400 dark:text-neutral-500 hover:text-amber-500'
+                            }`}
+                          >
+                            <Bookmark className={`w-4 h-4 ${isFlagged ? 'fill-current' : ''}`} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
         const q = block.question;
         const displayNum = block.displayNum;
         const isActive = activeQuestionId === q.id;
         const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
-        const cleanPrompt = stripLeadingQuestionNumber(q.question) || q.question;
+        const cleanPrompt = formatInlineBlankPlaceholders(stripLeadingQuestionNumber(q.question) || q.question);
         const typeMeta = getQuestionTypeMeta(q.type, scopeType);
         const optionList = Array.isArray(q.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
         const hasChoiceOptions = optionList.length > 0;

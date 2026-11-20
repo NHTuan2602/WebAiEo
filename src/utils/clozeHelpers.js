@@ -105,6 +105,27 @@ export function parseClozeLines(clozeText = '') {
   });
 }
 
+export const INLINE_CLOZE_QUESTION_TYPES = new Set([
+  'fill',
+  'summary_box',
+  'summary_nobox',
+  'diagram_label',
+  'form_completion',
+  'flowchart_completion'
+]);
+
+export function isInlineClozeQuestion(question = {}) {
+  const type = String(question?.type || '').toLowerCase().trim();
+  return INLINE_CLOZE_QUESTION_TYPES.has(type) || typeof question?.blankNum === 'number';
+}
+
+export function formatInlineBlankPlaceholders(text = '') {
+  return String(text || '').replace(new RegExp(BLANK_TOKEN_REGEX.source, 'g'), token => {
+    const num = parseBlankNumberFromToken(token);
+    return num ? `____(${num})____` : '________';
+  });
+}
+
 export function filterQuestionsByScope(questions = [], scopeField, scopeIdx) {
   if (!Array.isArray(questions)) return [];
   if (!scopeField || typeof scopeIdx !== 'number') return questions;
@@ -115,14 +136,21 @@ export function filterQuestionsByScope(questions = [], scopeField, scopeIdx) {
 
 export function resolveQuestionForBlank(questions = [], blankNum, scopeField, scopeIdx) {
   const scoped = filterQuestionsByScope(questions, scopeField, scopeIdx);
+  const targetNum = Number(blankNum);
 
   // 1. Explicit blankNum match inside scope (or unscoped legacy questions)
-  const byBlankScoped = scoped.find(q => Number(q?.blankNum) === Number(blankNum));
+  const byBlankScoped = scoped.find(q => Number(q?.blankNum) === targetNum);
   if (byBlankScoped) return byBlankScoped;
 
-  // 2. Fallback: fill question inside scope whose title starts with "<blankNum>." or "Câu <blankNum>"
-  const numRegex = new RegExp(`^(?:câu\\s*)?${blankNum}(?:[.)\\s:]|$)`, 'i');
-  return scoped.find(q => q?.type === 'fill' && numRegex.test(String(q.question || '').trim())) || null;
+  // 2. Explicit printed questionNumber match for any inline-capable question (incl. summary_box)
+  const byQuestionNumber = scoped.find(
+    q => Number(q?.questionNumber) === targetNum && isInlineClozeQuestion(q)
+  );
+  if (byQuestionNumber) return byQuestionNumber;
+
+  // 3. Fallback: inline-capable question inside scope whose title starts with "<blankNum>." or "Câu <blankNum>"
+  const numRegex = new RegExp(`^(?:(?:câu|questions?|q)\\s*)?${targetNum}(?:[.)\\s:]|$)`, 'i');
+  return scoped.find(q => isInlineClozeQuestion(q) && numRegex.test(String(q.question || '').trim())) || null;
 }
 
 export function getQuestionOrigin(question = {}) {
@@ -174,12 +202,18 @@ export function syncClozeBlanksWithQuestions({
     if (existing) {
       const idx = nextQuestions.findIndex(q => q.id === existing.id);
       if (idx >= 0) {
+        const current = nextQuestions[idx];
+        const preserveChoiceBlank =
+          (current.type === 'summary_box' || current.type === 'diagram_label') &&
+          Array.isArray(current.options) &&
+          current.options.length > 0;
         nextQuestions[idx] = {
-          ...nextQuestions[idx],
-          type: 'fill',
+          ...current,
+          type: preserveChoiceBlank ? current.type : 'fill',
           blankNum: num,
-          source: nextQuestions[idx].source || defaultSource,
-          options: [],
+          questionNumber: Number(current.questionNumber) || num,
+          source: current.source || defaultSource,
+          options: preserveChoiceBlank ? current.options : [],
           [scopeField]: scopeIdx
         };
       }
