@@ -61,6 +61,7 @@ import { clearBuilderDraft } from '../utils/sessionPersistence';
 import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
 import SkillQuestionWorkspace from '../components/teacher/SkillQuestionWorkspace';
 import SpeakingBuilderPanel from '../components/teacher/SpeakingBuilderPanel';
+import QuickPassageSplitModal from '../components/teacher/QuickPassageSplitModal';
 
 export default function ExamBuilder({
   addQuestionToSkill,
@@ -103,6 +104,81 @@ export default function ExamBuilder({
   const [questionTabBySkill, setQuestionTabBySkill] = useState({ listening: 'all', reading: 'all' });
   const [sourceFilterBySkill, setSourceFilterBySkill] = useState({ listening: 'all', reading: 'all' });
   const [customHashtagInput, setCustomHashtagInput] = useState('');
+  const [showPassageSplitModal, setShowPassageSplitModal] = useState(false);
+
+  const handleApplyPassageSplit = ({ p1End = 14, p2End = 27 } = {}) => {
+    const p1E = Math.max(1, Number(p1End) || 14);
+    const p2E = Math.max(p1E + 1, Number(p2End) || 27);
+
+    setTestForm(prev => {
+      const currentPassages = getReadingPassages(prev.reading);
+      const nextPassages = [...currentPassages];
+      const defaultTitles = [
+        'Bài 1: Reading Passage 1',
+        'Bài 2: Reading Passage 2',
+        'Bài 3: Reading Passage 3'
+      ];
+      while (nextPassages.length < 3) {
+        const nextNum = nextPassages.length + 1;
+        nextPassages.push({
+          id: `passage-${Date.now()}-${nextNum}`,
+          title: defaultTitles[nextNum - 1] || `Bài ${nextNum}: Reading Passage ${nextNum}`,
+          imageUrl: '',
+          imageFileName: '',
+          passageText: '',
+          clozeText: ''
+        });
+      }
+
+      const currentQuestions = Array.isArray(prev.reading?.questions) ? prev.reading.questions : [];
+      const updatedQuestions = currentQuestions.map((q, idx) => {
+        let num = idx + 1;
+        if (typeof q?.questionNumber === 'number' && q.questionNumber > 0) {
+          num = q.questionNumber;
+        } else if (typeof q?.blankNum === 'number' && q.blankNum > 0) {
+          num = q.blankNum;
+        } else {
+          const match = String(q?.question || '').trim().match(/^(?:(?:questions?|q|câu)\s*)?(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?(?=\b|\s|[.):])/i);
+          if (match) {
+            const parsedNum = Number(match[1]);
+            if (Number.isFinite(parsedNum) && parsedNum > 0) num = parsedNum;
+          }
+        }
+
+        let targetPassageIdx = 0;
+        if (num > p2E) {
+          targetPassageIdx = 2;
+        } else if (num > p1E) {
+          targetPassageIdx = 1;
+        } else {
+          targetPassageIdx = 0;
+        }
+
+        return {
+          ...q,
+          passageIdx: targetPassageIdx
+        };
+      });
+
+      const p1Count = updatedQuestions.filter(q => q.passageIdx === 0).length;
+      const p2Count = updatedQuestions.filter(q => q.passageIdx === 1).length;
+      const p3Count = updatedQuestions.filter(q => q.passageIdx === 2).length;
+
+      showToast?.(`Đã chia ${updatedQuestions.length} câu: Passage 1 (${p1Count} câu), Passage 2 (${p2Count} câu), Passage 3 (${p3Count} câu)!`);
+
+      return {
+        ...prev,
+        reading: {
+          ...prev.reading,
+          passages: nextPassages,
+          questions: updatedQuestions
+        }
+      };
+    });
+
+    setBuilderReadingIdx(0);
+    setShowPassageSplitModal(false);
+  };
 
   const updateTestHashtags = (updater) => {
     setTestForm(prev => {
@@ -2540,13 +2616,24 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   Tạo nhiều bài đọc / chủ đề đánh số 1, 2, 3... để học sinh chuyển qua lại dễ dàng khi có nhiều ảnh hoặc nhiều đoạn đọc.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={addReadingPassage}
-                className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0"
-              >
-                <Plus className="w-4 h-4" /> Thêm Chủ Đề / Bài Đọc #{passages.length + 1}
-              </button>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowPassageSplitModal(true)}
+                  className="bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-extrabold px-3.5 py-2.5 rounded-xl shadow-xs transition flex items-center gap-1.5"
+                  title="Tự động phân chia câu hỏi theo số thứ tự vào 3 Passage"
+                >
+                  <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Chia Nhanh Câu Theo Passage</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={addReadingPassage}
+                  className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Thêm Chủ Đề / Bài Đọc #{passages.length + 1}
+                </button>
+              </div>
             </div>
 
             {/* Numbered Passage Selector Bar (1, 2, 3...) */}
@@ -2732,6 +2819,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
             }
             onApplyReadingPdfExtraction={handleApplyReadingPdfExtraction}
+            onQuickAllocatePassages={() => setShowPassageSplitModal(true)}
           />
         </div>
         );
@@ -2939,6 +3027,14 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           speakingData={testForm.speaking}
         />
       )}
+
+      <QuickPassageSplitModal
+        isOpen={showPassageSplitModal}
+        onClose={() => setShowPassageSplitModal(false)}
+        questions={testForm.reading?.questions || []}
+        passages={getReadingPassages(testForm.reading)}
+        onApply={handleApplyPassageSplit}
+      />
       </div>
     </div>
   );
