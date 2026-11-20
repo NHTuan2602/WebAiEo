@@ -589,6 +589,13 @@ export default function App() {
         : patch.targetBand !== undefined
           ? Math.min(9.0, Math.max(4.0, Math.round((Number(patch.targetBand) || 7.0) * 2) / 2))
           : targetUser.targetBand;
+    const cleanSkillTarget = (rawVal, fallbackVal) => {
+      if (rawVal === undefined) return fallbackVal ?? null;
+      if (rawVal === null || rawVal === '') return null;
+      const n = Number(rawVal);
+      if (!Number.isFinite(n)) return fallbackVal ?? null;
+      return Math.min(9.0, Math.max(4.0, Math.round(n * 2) / 2));
+    };
     const nextAvatar = patch.avatarUrl !== undefined ? (patch.avatarUrl || '') : targetUser.avatarUrl;
     const mergedAckIds = Array.isArray(patch.acknowledgedTitleIds)
       ? Array.from(new Set([...(Array.isArray(targetUser.acknowledgedTitleIds) ? targetUser.acknowledgedTitleIds : []), ...patch.acknowledgedTitleIds]))
@@ -598,6 +605,10 @@ export default function App() {
       role: nextRole,
       ...(patch.name !== undefined ? { name: patch.name.trim() || targetUser.name } : {}),
       ...(nextRole === 'teacher' || patch.targetBand !== undefined ? { targetBand: cleanBand } : {}),
+      ...(patch.targetListening !== undefined ? { targetListening: cleanSkillTarget(patch.targetListening, targetUser.targetListening) } : {}),
+      ...(patch.targetReading !== undefined ? { targetReading: cleanSkillTarget(patch.targetReading, targetUser.targetReading) } : {}),
+      ...(patch.targetWriting !== undefined ? { targetWriting: cleanSkillTarget(patch.targetWriting, targetUser.targetWriting) } : {}),
+      ...(patch.targetSpeaking !== undefined ? { targetSpeaking: cleanSkillTarget(patch.targetSpeaking, targetUser.targetSpeaking) } : {}),
       ...(patch.studyGoal !== undefined ? { studyGoal: patch.studyGoal.trim() } : {}),
       ...(patch.avatarUrl !== undefined ? { avatarUrl: nextAvatar } : {}),
       ...(patch.profileBannerId !== undefined ? { profileBannerId: patch.profileBannerId || 'ocean' } : {}),
@@ -4027,17 +4038,19 @@ export default function App() {
       const entries = Object.values(speakingRecordingsMap).filter(Boolean);
       for (const rec of entries) {
         let finalAudioUrl = rec.audioUrl || '';
+        let finalAudioId = String(rec.audioId || '');
         if (!finalAudioUrl && rec.blob) {
           try {
             const up = await uploadSpeakingRecording({
               blob: rec.blob,
-              audioId: `sp4_${attemptId}_${rec.questionId || 'q'}`,
+              audioId: finalAudioId || `sp4_${attemptId}_${rec.questionId || 'q'}`,
               mimeType: rec.blob.type || 'audio/webm',
               username: currentUser?.username || 'student',
               attemptId,
               questionId: rec.questionId || ''
             });
             if (up?.audioUrl) finalAudioUrl = up.audioUrl;
+            if (up?.audioId) finalAudioId = up.audioId;
           } catch (uploadErr) {
             console.warn('Upload integrated speaking audio skipped:', uploadErr?.message || uploadErr);
           }
@@ -4046,12 +4059,28 @@ export default function App() {
           questionId: String(rec.questionId || ''),
           part: Number(rec.part) || 1,
           prompt: String(rec.prompt || ''),
+          audioId: finalAudioId,
           audioUrl: finalAudioUrl,
           transcript: String(rec.transcript || ''),
           durationSec: Math.max(0, Math.round(Number(rec.durationSec) || 0))
         });
       }
     }
+
+    const isSingleMode = cfg.testMode === 'single_skill' && Boolean(cfg.focusSkill);
+    const attemptScores = isSingleMode
+      ? {
+          ...(cfg.focusSkill === 'listening' ? { listening: { raw: listeningRaw, total: lQuestions.length, band: lBand } } : {}),
+          ...(cfg.focusSkill === 'reading' ? { reading: { raw: readingRaw, total: rQuestions.length, band: rBand } } : {}),
+          ...(cfg.focusSkill === 'writing' ? { writing: { task1Band: null, task2Band: null, overallBand: null } } : {}),
+          ...(cfg.focusSkill === 'speaking' ? { speaking: { band: null, criteria: {} } } : {})
+        }
+      : {
+          listening: { raw: listeningRaw, total: lQuestions.length, band: lBand },
+          reading: { raw: readingRaw, total: rQuestions.length, band: rBand },
+          writing: { task1Band: null, task2Band: null, overallBand: null },
+          ...(cfg.order.includes('speaking') ? { speaking: { band: null, criteria: {} } } : {})
+        };
 
     const newAttempt = {
       id: attemptId,
@@ -4078,20 +4107,7 @@ export default function App() {
       tabSwitchCount: examState.tabSwitchCount,
       teacherGraded: isSingleObjective,
       aiGraded: false,
-      scores: {
-        listening: {
-          raw: listeningRaw,
-          total: lQuestions.length,
-          band: cfg.testMode === 'single_skill' && cfg.focusSkill !== 'listening' ? null : lBand
-        },
-        reading: {
-          raw: readingRaw,
-          total: rQuestions.length,
-          band: cfg.testMode === 'single_skill' && cfg.focusSkill !== 'reading' ? null : rBand
-        },
-        writing: { task1Band: null, task2Band: null, overallBand: null },
-        speaking: { band: null, criteria: {} }
-      },
+      scores: attemptScores,
       overallBand: isSingleObjective ? singleObjectiveBand : null,
       teacherFeedback: ''
     };
@@ -4277,12 +4293,15 @@ export default function App() {
     }
 
     setAiGradingStep('AI Examiner đang phân tích lỗi ngữ pháp, chính tả, bảng sửa câu & nâng band...');
+    const testCfg = test ? normalizeExamConfig(test) : null;
+    const effectiveScope = targetAttempt.writingTaskScope || testCfg?.writingTaskScope || 'both';
     const { evaluation } = await requestAiWritingGrading({
       attemptId: targetAttempt.id,
-      task1Prompt: test?.writing?.task1?.prompt || '',
-      task1Text: targetAttempt.answers?.w1 || '',
-      task2Prompt: test?.writing?.task2?.prompt || '',
-      task2Text: targetAttempt.answers?.w2 || '',
+      writingTaskScope: effectiveScope,
+      task1Prompt: effectiveScope === 'task2' ? '' : (test?.writing?.task1?.prompt || ''),
+      task1Text: effectiveScope === 'task2' ? '' : (targetAttempt.answers?.w1 || ''),
+      task2Prompt: effectiveScope === 'task1' ? '' : (test?.writing?.task2?.prompt || ''),
+      task2Text: effectiveScope === 'task1' ? '' : (targetAttempt.answers?.w2 || ''),
       clientApiKey: cleanKey
     });
     const usedModel = evaluation?._usedModel || 'built-in-writing-examiner';
@@ -4883,8 +4902,8 @@ export default function App() {
     showToast('Đã sao chép văn bản nội bộ (chỉ dán được vào phần bài làm trong bài thi)!', 'info');
   };
 
-  // Exam Builder
-  const openExamBuilder = (testToEdit = null, initialTab = 'general', initialClassIds = []) => {
+  // Exam Builder (presetCategory: 'real_exam' | 'periodic_mock')
+  const openExamBuilder = (testToEdit = null, initialTab = 'general', initialClassIds = [], presetCategory = 'real_exam') => {
     setEditingTest(testToEdit || null);
     setBuilderListeningIdx(0);
     setBuilderReadingIdx(0);
@@ -4939,12 +4958,25 @@ export default function App() {
         speaking: { ...createDefaultSpeakingSection(), ...(cloned.speaking || {}) }
       });
     } else {
+      const payCfgNorm = normalizePaymentConfig(paymentConfig || {});
+      const isPeriodicPreset = presetCategory === 'periodic_mock';
+      const presetPrice = isPeriodicPreset
+        ? (payCfgNorm.periodicMockPrice || 300000)
+        : (payCfgNorm.defaultExamPriceVnd || 20000);
       setTestForm({
         ...createEmptyTestForm(),
         id: 'test-' + Date.now(),
         assignedClassIds: Array.isArray(initialClassIds) ? Array.from(new Set(initialClassIds.filter(Boolean))) : [],
-        title: 'Đề Thực Chiến IELTS Full 4 Kỹ Năng Mới',
-        description: 'Đề thi thực chiến liên hoàn đủ 4 kỹ năng Listening, Reading, Writing và Speaking (1 lượt thi thật, chờ Ms. Như duyệt điểm).',
+        examCategory: isPeriodicPreset ? 'periodic_mock' : 'real_exam',
+        examPurpose: isPeriodicPreset ? 'periodic_mock' : 'real_exam',
+        priceVnd: presetPrice,
+        maxAttempts: 1,
+        title: isPeriodicPreset
+          ? 'Mock Test Định Kỳ IELTS Full 4 Kỹ Năng (3 Tháng/Lần)'
+          : 'Đề Thực Chiến IELTS Full 4 Kỹ Năng Mới',
+        description: isPeriodicPreset
+          ? 'Kỳ thi Mock Test Định Kỳ 3 tháng/lần đủ 4 kỹ năng Listening, Reading, Writing và Speaking do Ms. Như trực tiếp duyệt chấm (1 lượt thi thật).'
+          : 'Đề thi thực chiến liên hoàn đủ 4 kỹ năng Listening, Reading, Writing và Speaking (1 lượt thi thật, áp dụng đề lẻ 20k hoặc Combo 3/5/10 đề).',
         createdAt: new Date().toISOString().split('T')[0],
         listening: {
           audioUrl: '',
@@ -5038,22 +5070,31 @@ export default function App() {
     const baseSingleForm = createEmptySingleSkillTestForm(skill, subOpts);
     let nextSpeaking = baseSingleForm.speaking;
     let extraSingleFields = {};
-    if (skill === 'speaking' && view === 'SKILL_HUB') {
-      if (skillHubTab === 'speaking_daily') {
+    const requestedDailySub = String(subOpts?.dailySubCategory || '').trim();
+    if (skill === 'speaking') {
+      if (requestedDailySub === 'speaking_forecast' || (view === 'SKILL_HUB' && skillHubTab === 'forecast')) {
+        nextSpeaking = createDefaultSpeakingSection({
+          speakingTrack: 'general',
+          isForecast: true,
+          hashtags: ['#CayForecastMsNhu']
+        });
+        extraSingleFields = {
+          title: 'Cày Forecast Speaking Cùng Ms. Như Mới',
+          hashtags: ['#CayForecastMsNhu'],
+          dailySubCategory: 'speaking_forecast'
+        };
+      } else if (requestedDailySub === 'speaking_daily' || (view === 'SKILL_HUB' && skillHubTab === 'speaking_daily')) {
         nextSpeaking = createDefaultSpeakingSection({
           speakingTrack: 'daily',
           dailyDate: getVietnamTodayDateKey(Date.now() + serverClockOffsetMsRef.current),
           dailyMandatory: true,
           hashtags: ['#DailySpeaking']
         });
-        extraSingleFields = { hashtags: ['#DailySpeaking'], dailySubCategory: 'speaking_daily' };
-      } else if (skillHubTab === 'forecast') {
-        nextSpeaking = createDefaultSpeakingSection({
-          speakingTrack: 'general',
-          isForecast: true,
-          hashtags: ['#CayForecastMsNhu']
-        });
-        extraSingleFields = { hashtags: ['#CayForecastMsNhu'], dailySubCategory: 'speaking_forecast' };
+        extraSingleFields = {
+          title: 'Daily Speaking Mới',
+          hashtags: ['#DailySpeaking'],
+          dailySubCategory: 'speaking_daily'
+        };
       }
     }
     setTestForm({
@@ -6977,6 +7018,7 @@ export default function App() {
           focusedTestId={focusedTestId}
           onClearFocusedTest={() => setFocusedTestId(null)}
           onOpenCheckoutModal={openGlobalCheckoutModal}
+          openExamBuilder={openExamBuilder}
           onRedeemRealExamCredit={handleRedeemRealExamCredit}
           openMemberProfile={openMemberProfile}
           openSkillPracticeHub={(tab = 'speaking_daily') => {

@@ -85,7 +85,7 @@ export default function BrandContactFooter({ variant = 'full' }) {
       </div>
 
       <div className="pt-5 border-t border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs sm:text-sm text-[#475569] dark:text-zinc-400">
-        <span>Listening • Reading • Writing • Vocabulary Arena</span>
+        <span>Listening • Reading • Writing • Speaking • Vocabulary Arena</span>
         <span>© 2026 {BRAND_INFO.siteName} - {BRAND_INFO.englishSubName}</span>
       </div>
     </div>

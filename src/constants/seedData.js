@@ -508,13 +508,17 @@ export const normalizeExamConfig = (test) => {
   ]);
 
   const dailySubCategory = String(test?.dailySubCategory || '').trim();
-  const writingTaskScope = ['task1', 'task2', 'both'].includes(test?.writingTaskScope)
-    ? test.writingTaskScope
-    : dailySubCategory.startsWith('w1_')
-    ? 'task1'
-    : dailySubCategory === 'w2_essay'
-    ? 'task2'
-    : 'both';
+  let writingTaskScope;
+  if (testMode === 'single_skill' && focusSkill === 'writing') {
+    // Daily Zone Writing is ALWAYS single-task (Task 1 OR Task 2); full 2-task Writing only exists in Thực Chiến / Mock Test full exams.
+    if (test?.writingTaskScope === 'task2' || dailySubCategory === 'w2_essay' || /\b(task\s*2|w2)\b/i.test(String(test?.title || ''))) {
+      writingTaskScope = 'task2';
+    } else {
+      writingTaskScope = 'task1';
+    }
+  } else {
+    writingTaskScope = 'both';
+  }
 
   return {
     testMode,
@@ -1036,17 +1040,17 @@ export const DEFAULT_TESTS = [
   {
     id: 'test-ielts-cam-18-01',
     seedTag: 'cam18_t1_v1',
-    title: 'IELTS Academic Mock Test 02 - Cambridge Standard (Đục Lỗ + Full 3 Skills)',
+    title: 'IELTS Academic Mock Test 02 - Cambridge Standard (Đục Lỗ + Full 4 Skills)',
     description:
-      'Đề thi IELTS Academic hoàn chỉnh chuẩn phòng thi Luyện thi IELTS Nha Trang (Ms. Như): Listening 3 Parts (Note Completion đục lỗ Q1–Q10, Bảo tàng Hàng hải Q11–Q15, Nghiên cứu đất đô thị Q16–Q20 có giọng đọc tiếng Anh), Reading 2 Academic Passages (16 câu Đục lỗ, TFNG, MCQ) và Writing Task 1 (kèm biểu đồ) + Task 2.',
+      'Đề thi IELTS Academic hoàn chỉnh chuẩn phòng thi Luyện thi IELTS Nha Trang (Ms. Như): Listening 3 Parts, Reading 2 Academic Passages, Writing Task 1 + Task 2 và Speaking Part 1–3.',
     createdAt: '2026-11-14',
     visibility: 'public',
-    maxAttempts: 0,
+    maxAttempts: 1,
     sequentialMode: false,
     allowEarlyNextSection: true,
     antiCheatEnabled: false,
-    sectionOrder: ['listening', 'reading', 'writing'],
-    sectionDurations: { listening: 30, reading: 60, writing: 60 },
+    sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
+    sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 },
     maxAudioPlays: 2,
     shuffleOptions: false,
     allowViewAnswers: true,
@@ -1410,15 +1414,15 @@ D Green infrastructure must still obey aerodynamic logic. Planting shade trees l
   },
   {
     id: 'test-1',
-    title: 'IELTS Academic Practice Test 01 - Full Simulation',
-    description: 'Đề thi thử Academic 3 kỹ năng Listening, Reading, Writing chuẩn cấu trúc IDP/BC.',
+    title: 'IELTS Academic Practice Test 01 - Full 4 Skills Simulation',
+    description: 'Đề thi thử Academic Full 4 kỹ năng Listening, Reading, Writing và Speaking chuẩn cấu trúc IDP/BC.',
     createdAt: '2026-03-01',
     visibility: 'public',
-    maxAttempts: 0,
+    maxAttempts: 1,
     sequentialMode: true,
     allowEarlyNextSection: false,
-    sectionOrder: ['listening', 'reading', 'writing'],
-    sectionDurations: { listening: 15, reading: 20, writing: 25 },
+    sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
+    sectionDurations: { listening: 15, reading: 20, writing: 25, speaking: 12 },
     maxAudioPlays: 1,
     shuffleOptions: true,
     allowViewAnswers: false,
@@ -1926,18 +1930,21 @@ Write **ONE WORD** for the answer.
   {
     id: 'test-single-writing-academic-01',
     seedTag: 'single_w_acad_v1',
-    title: 'Writing Lẻ Chuẩn Giám Khảo - Clean Energy Transition & AI in Education',
+    title: 'Daily Writing Task 1 (Dynamic) - Clean Energy Transition',
     description:
-      'Đề Writing Task 1 + Task 2 chuẩn để test bộ chấm khắt khe IELTS Examiner: điểm thành phần nguyên 1–9, công thức làm tròn xuống (T2×2+T1)/3, phát hiện lỗi ngữ pháp/chính tả, bảng phân tích từng câu, lỗi tư duy đề & nâng cấp Collocation.',
+      'Bài tập lẻ Writing Task 1 (Biểu đồ Dynamic) trong Daily Zone: luyện viết báo cáo xu hướng tối thiểu 150 từ, nộp chờ Ms. Như duyệt chấm & nhận xét lỗi chi tiết.',
     createdAt: '2026-11-18',
     visibility: 'public',
     testMode: 'single_skill',
     focusSkill: 'writing',
+    examCategory: 'daily_zone',
+    dailySubCategory: 'w1_dynamic',
+    writingTaskScope: 'task1',
     maxAttempts: 0,
     antiCheatEnabled: false,
     allowViewAnswers: true,
     sectionOrder: ['writing'],
-    sectionDurations: { listening: 10, reading: 20, writing: 60 },
+    sectionDurations: { listening: 10, reading: 20, writing: 20 },
     writing: {
       task1: {
         prompt:
@@ -1946,6 +1953,38 @@ Write **ONE WORD** for the answer.
         imageUrl: CAMBRIDGE_TASK1_CHART_SVG_URL,
         modelAnswer:
           'The bar chart illustrates electricity output in Northland across coal, natural gas, hydroelectricity, and wind and solar power in 2005, 2015, and 2025. Overall, total coal generation fell steeply over the period, while wind and solar power surged more than thirteenfold to become the largest electricity source by 2025. Coal initially dominated supply at 140 TWh in 2005 before receding to 115 TWh in 2015 and dropping sharply to 45 TWh in 2025. Meanwhile, wind and solar expanded rapidly from 10 TWh to 42 TWh in 2015 and peaked at 135 TWh in 2025.'
+      },
+      task2: {
+        prompt: '',
+        minWords: 250,
+        modelAnswer: ''
+      }
+    }
+  },
+  {
+    id: 'test-single-writing-task2-01',
+    seedTag: 'single_w2_acad_v1',
+    title: 'Daily Writing Task 2 (Essay) - AI in Education',
+    description:
+      'Bài tập lẻ Writing Task 2 (Essay) trong Daily Zone: luyện viết bài luận tối thiểu 250 từ, nộp chờ Ms. Như duyệt chấm & chữa từng câu chi tiết.',
+    createdAt: '2026-11-18',
+    visibility: 'public',
+    testMode: 'single_skill',
+    focusSkill: 'writing',
+    examCategory: 'daily_zone',
+    dailySubCategory: 'w2_essay',
+    writingTaskScope: 'task2',
+    maxAttempts: 0,
+    antiCheatEnabled: false,
+    allowViewAnswers: true,
+    sectionOrder: ['writing'],
+    sectionDurations: { listening: 10, reading: 20, writing: 40 },
+    writing: {
+      task1: {
+        prompt: '',
+        minWords: 150,
+        imageUrl: '',
+        modelAnswer: ''
       },
       task2: {
         prompt:

@@ -71,6 +71,7 @@ import {
 } from '../constants/seedData';
 import {
   formatVndCurrency,
+  getTestPurchasePriceVnd,
   hasActiveAieoVip,
   hasCustomCoverPermission,
   normalizePaymentConfig,
@@ -159,6 +160,7 @@ export default function TeacherDashboard({
   usersDb
 }) {
   const [accountRoleFilter, setAccountRoleFilter] = useState('all');
+  const [fullExamCategoryFilter, setFullExamCategoryFilter] = useState('all');
   const [exerciseSkillFilter, setExerciseSkillFilter] = useState('all');
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [onlyIncompleteFilter, setOnlyIncompleteFilter] = useState(false);
@@ -329,17 +331,36 @@ export default function TeacherDashboard({
     return true;
   };
 
-  const filteredFullExamTests = fullExamTests.filter(matchesItemFilters);
+  const realExamFullTests = fullExamTests.filter(t => normalizeExamConfig(t).examCategory !== 'periodic_mock');
+  const periodicMockFullTests = fullExamTests.filter(t => normalizeExamConfig(t).examCategory === 'periodic_mock');
+  const fullExamByCategory = fullExamCategoryFilter === 'periodic_mock'
+    ? periodicMockFullTests
+    : fullExamCategoryFilter === 'real_exam'
+      ? realExamFullTests
+      : fullExamTests;
+  const filteredFullExamTests = fullExamByCategory.filter(matchesItemFilters);
   const skillFilteredList = exerciseSkillFilter === 'all'
     ? skillExercises
-    : skillExercises.filter(t => normalizeExamConfig(t).focusSkill === exerciseSkillFilter);
+    : exerciseSkillFilter === 'writing_task1'
+      ? skillExercises.filter(t => {
+          const c = normalizeExamConfig(t);
+          return c.focusSkill === 'writing' && c.writingTaskScope === 'task1';
+        })
+      : exerciseSkillFilter === 'writing_task2'
+        ? skillExercises.filter(t => {
+            const c = normalizeExamConfig(t);
+            return c.focusSkill === 'writing' && c.writingTaskScope !== 'task1';
+          })
+        : skillExercises.filter(t => normalizeExamConfig(t).focusSkill === exerciseSkillFilter);
   const filteredSkillExercises = skillFilteredList.filter(matchesItemFilters);
 
   const SKILL_EXERCISE_BUTTONS = [
-    { id: 'speaking', label: '+ Bài Tập Speaking AI', shortLabel: 'Speaking AI', icon: Mic, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
-    { id: 'listening', label: '+ Bài Tập Listening', shortLabel: 'Listening', icon: Headphones, cls: 'bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
-    { id: 'reading', label: '+ Bài Tập Reading', shortLabel: 'Reading', icon: BookOpen, cls: 'bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-200 border-[#CBD5E1] dark:border-slate-700 hover:bg-slate-700 hover:text-white' },
-    { id: 'writing', label: '+ Bài Tập Writing', shortLabel: 'Writing', icon: PenTool, cls: 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-[#047857] hover:text-white' }
+    { id: 'speaking_daily', skill: 'speaking', subOpts: { dailySubCategory: 'speaking_daily' }, label: '+ Daily Speaking', shortLabel: 'Daily Speaking', icon: Mic, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
+    { id: 'speaking_forecast', skill: 'speaking', subOpts: { dailySubCategory: 'speaking_forecast' }, label: '+ Cày Forecast', shortLabel: 'Cày Forecast', icon: Sparkles, cls: 'bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border-amber-300 dark:border-amber-500/30 hover:bg-amber-600 hover:text-white' },
+    { id: 'reading', skill: 'reading', subOpts: { dailySubCategory: 'shw_1' }, label: '+ Reading (SHW 1-14)', shortLabel: 'Reading', icon: BookOpen, cls: 'bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-200 border-[#CBD5E1] dark:border-slate-700 hover:bg-slate-700 hover:text-white' },
+    { id: 'listening', skill: 'listening', subOpts: { dailySubCategory: 'listening_shw' }, label: '+ Listening', shortLabel: 'Listening', icon: Headphones, cls: 'bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
+    { id: 'writing_task1', skill: 'writing', subOpts: { writingTaskScope: 'task1', dailySubCategory: 'w1_map' }, label: '+ Writing Task 1 (W1)', shortLabel: 'Writing W1', icon: PenTool, cls: 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-[#047857] hover:text-white' },
+    { id: 'writing_task2', skill: 'writing', subOpts: { writingTaskScope: 'task2', dailySubCategory: 'w2_essay' }, label: '+ Writing Task 2 (W2)', shortLabel: 'Writing W2', icon: PenTool, cls: 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-[#047857] hover:text-white' }
   ];
 
   const renderManagementItemCard = (t) => {
@@ -420,12 +441,20 @@ export default function TeacherDashboard({
                     className={`text-xs font-bold uppercase px-2 py-0.5 rounded-md border shrink-0 ${
                       isExercise
                         ? 'bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30'
-                        : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-[#CBD5E1] dark:border-slate-700'
+                        : cfg.examCategory === 'periodic_mock'
+                          ? 'bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border-amber-300 dark:border-amber-500/30'
+                          : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-[#CBD5E1] dark:border-slate-700'
                     }`}
                   >
                     {isExercise
-                      ? `BÀI TẬP • ${cfg.focusSkill === 'speaking' ? 'SPEAKING AI' : (cfg.focusSkill || 'skill').toUpperCase()}`
-                      : 'ĐỀ THI IELTS'}
+                      ? `DAILY • ${
+                          cfg.focusSkill === 'speaking'
+                            ? (cfg.dailySubCategory === 'speaking_forecast' ? 'FORECAST SPEAKING' : 'DAILY SPEAKING')
+                            : cfg.focusSkill === 'writing'
+                              ? (cfg.writingTaskScope === 'task1' ? 'WRITING TASK 1 (W1)' : 'WRITING TASK 2 (W2)')
+                              : (cfg.focusSkill || 'skill').toUpperCase()
+                        }`
+                      : `${cfg.examCategory === 'periodic_mock' ? 'MOCK ĐỊNH KỲ' : 'THỰC CHIẾN'} • ${formatVndCurrency(getTestPurchasePriceVnd(t))}`}
                   </span>
                   {isExercise && cfg.focusSkill === 'speaking' && (() => {
                     const spMeta = normalizeSpeakingSection(t.speaking);
@@ -566,20 +595,20 @@ export default function TeacherDashboard({
                   {isExercise ? (
                     <span className="text-xs bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] font-bold px-2.5 py-1 rounded-md border border-[#B5F5F1] dark:border-teal-500/30">
                       {cfg.focusSkill === 'speaking'
-                        ? `Speaking AI: ${getSpeakingQuestionItems(t.speaking, 'all').length} câu (Part 1·2·3)`
+                        ? `Speaking: ${getSpeakingQuestionItems(t.speaking, 'all').length} câu (Part 1·2·3)`
                         : cfg.focusSkill === 'listening'
                         ? `Bài tập Listening: ${t.listening?.questions?.length || 0} câu (${cfg.durations.listening}p)`
                         : cfg.focusSkill === 'reading'
                         ? `Bài tập Reading: ${t.reading?.questions?.length || 0} câu (${cfg.durations.reading}p)`
-                        : `Bài tập Writing: Task 1 & 2 (${cfg.durations.writing}p)`}
+                        : `${cfg.writingTaskScope === 'task1' ? 'Bài tập Writing Task 1 (W1)' : 'Bài tập Writing Task 2 (W2)'} (${cfg.durations.writing}p)`}
                     </span>
                   ) : (
                     <>
                       <span className="text-xs bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 font-bold px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-500/30">
-                        Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0}
+                        Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0} • Speaking: {getSpeakingQuestionItems(t.speaking, 'all').length}
                       </span>
                       <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 font-bold px-2.5 py-1 rounded-md">
-                        <Clock className="w-3 h-3 text-[#475569]" /> {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W
+                        <Clock className="w-3 h-3 text-[#475569]" /> {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W • {cfg.durations.speaking}p S
                       </span>
                     </>
                   )}
@@ -974,8 +1003,8 @@ export default function TeacherDashboard({
     {
       title: 'Giảng Dạy & Đề Thi',
       items: [
-        { id: 'tests', label: 'Kho Đề Thi', count: fullExamTests.length, icon: BookOpen },
-        { id: 'skill_exercises', label: 'Bài Tập 4 Kỹ Năng', count: skillExercises.length, icon: Sparkles },
+        { id: 'tests', label: 'Thực Chiến & Mock', count: fullExamTests.length, icon: BookOpen },
+        { id: 'skill_exercises', label: 'Daily Zone (Miễn Phí)', count: skillExercises.length, icon: Sparkles },
         {
           id: 'grading',
           label: 'Chấm Bài & Giám Sát',
@@ -1023,10 +1052,17 @@ export default function TeacherDashboard({
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => openExamBuilder()}
-            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-4 py-2.5 rounded-lg transition flex items-center gap-1.5"
+            onClick={() => openExamBuilder(null, 'general', [], 'real_exam')}
+            className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" /> Tạo Đề Thi Mới
+            <Plus className="w-4 h-4" /> + Thực Chiến (20k)
+          </button>
+          <button
+            type="button"
+            onClick={() => openExamBuilder(null, 'general', [], 'periodic_mock')}
+            className="bg-[#FEF3C7] hover:bg-amber-200 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-[#92400E] dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> + Mock Định Kỳ (300k)
           </button>
           <button
             type="button"
@@ -1286,17 +1322,17 @@ export default function TeacherDashboard({
 
         <div className="min-w-0 space-y-5">
 
-      {/* Tab 2: Kho Bài Tập 4 Kỹ Năng Riêng Biệt */}
+      {/* Tab 2: Kho Bài Tập Daily Zone (Miễn Phí - Từng Kỹ Năng Riêng) */}
       {teacherHubTab === 'skill_exercises' && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-3">
             <div>
               <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" />
-                Tạo Bài Tập Cho Từng Kỹ Năng Riêng Biệt
+                Tạo Bài Tập Daily Zone (Miễn Phí - Làm Lại Không Giới Hạn)
               </h2>
               <p className="text-sm text-[#475569] dark:text-slate-400 mt-0.5 max-w-2xl">
-                Chọn kỹ năng để soạn bài tập nhanh (Speaking AI, Listening, Reading, Writing).
+                Chọn đúng phân mục để soạn bài tập lẻ có thể cài Mật Khẩu Team: Daily Speaking, Cày Forecast, Reading SHW 1-14, Listening, Writing Task 1 (W1) hoặc Writing Task 2 (W2).
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1306,7 +1342,7 @@ export default function TeacherDashboard({
                   <button
                     key={sk.id}
                     type="button"
-                    onClick={() => openSingleSkillBuilder?.(sk.id)}
+                    onClick={() => openSingleSkillBuilder?.(sk.skill, null, [], sk.subOpts)}
                     className={`px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${sk.cls}`}
                   >
                     <IconComp className="w-3.5 h-3.5" />
@@ -1320,11 +1356,12 @@ export default function TeacherDashboard({
           <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold">
               {[
-                { id: 'all', label: `Tất cả bài tập (${skillExercises.length})` },
-                { id: 'speaking', label: `Speaking AI (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'speaking').length})` },
-                { id: 'listening', label: `Listening (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'listening').length})` },
+                { id: 'all', label: `Tất cả Daily (${skillExercises.length})` },
+                { id: 'speaking', label: `Speaking (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'speaking').length})` },
                 { id: 'reading', label: `Reading (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'reading').length})` },
-                { id: 'writing', label: `Writing (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'writing').length})` }
+                { id: 'listening', label: `Listening (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'listening').length})` },
+                { id: 'writing_task1', label: `Writing W1 (${skillExercises.filter(t => { const c = normalizeExamConfig(t); return c.focusSkill === 'writing' && c.writingTaskScope === 'task1'; }).length})` },
+                { id: 'writing_task2', label: `Writing W2 (${skillExercises.filter(t => { const c = normalizeExamConfig(t); return c.focusSkill === 'writing' && c.writingTaskScope !== 'task1'; }).length})` }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -1382,49 +1419,98 @@ export default function TeacherDashboard({
         </div>
       )}
 
-      {/* Tab 1: Kho Đề Thi */}
+      {/* Tab 1: Kho Đề Thi Full 4 Kỹ Năng (Thực Chiến & Mock Định Kỳ - Có Phí) */}
       {teacherHubTab === 'tests' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 sm:px-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white">
-                Danh Sách Đề Thi IELTS ({fullExamTests.length})
-              </h2>
-              <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
-                Đề thi chuẩn Listening · Reading · Writing ({publicFullExamsCount} đề công khai).
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative w-44 sm:w-52">
-                <Search className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={itemSearchQuery}
-                  onChange={e => setItemSearchQuery(e.target.value)}
-                  placeholder="Tìm đề thi..."
-                  className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
-                />
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 sm:px-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white">
+                  Thực Chiến &amp; Mock Định Kỳ - Full 4 Kỹ Năng ({fullExamTests.length})
+                </h2>
+                <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
+                  Kho đề thi có phí chuẩn Full 4 kỹ năng Listening · Reading · Writing · Speaking (1 lượt thi thật · {publicFullExamsCount} đề công khai).
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setOnlyIncompleteFilter(prev => !prev)}
-                className={`px-3 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
-                  onlyIncompleteFilter
-                    ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                    : 'bg-white dark:bg-slate-900 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
-                }`}
-              >
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>{onlyIncompleteFilter ? 'Đang lọc: Còn HS chưa làm' : 'Lọc đề còn HS chưa làm'}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-44 sm:w-52">
+                  <Search className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={itemSearchQuery}
+                    onChange={e => setItemSearchQuery(e.target.value)}
+                    placeholder="Tìm đề thi..."
+                    className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOnlyIncompleteFilter(prev => !prev)}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
+                    onlyIncompleteFilter
+                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                      : 'bg-white dark:bg-slate-900 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
+                  }`}
+                >
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>{onlyIncompleteFilter ? 'Đang lọc: Còn HS chưa làm' : 'Lọc đề còn HS chưa làm'}</span>
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap items-center gap-1 bg-[#F8FAFC] dark:bg-slate-800/70 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                {[
+                  { id: 'all', label: `Tất cả (${fullExamTests.length})` },
+                  { id: 'real_exam', label: `Thực Chiến 20k (${realExamFullTests.length})` },
+                  { id: 'periodic_mock', label: `Mock Định Kỳ 300k (${periodicMockFullTests.length})` }
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setFullExamCategoryFilter(cat.id)}
+                    className={`px-3 py-1.5 rounded-md transition ${
+                      fullExamCategoryFilter === cat.id
+                        ? 'bg-[#007A7A] text-white'
+                        : 'text-[#334155] dark:text-slate-300 hover:text-[#0F172B] dark:hover:text-white'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs font-semibold text-[#475569] dark:text-slate-400">
+                Thực Chiến áp dụng Combo 3/5/10 đề · Mock Định Kỳ là đề riêng 3 tháng/lần
+              </span>
             </div>
           </div>
 
           {filteredFullExamTests.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-lg border border-slate-200 dark:border-slate-800 text-center text-sm text-[#475569] dark:text-slate-400">
-              {onlyIncompleteFilter
-                ? 'Tất cả đề thi IELTS đã được 100% học sinh trong lớp hoàn thành!'
-                : 'Chưa có đề thi IELTS nào. Bấm + Tạo Đề Thi Mới để bắt đầu.'}
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-lg border border-slate-200 dark:border-slate-800 text-center space-y-3">
+              <p className="text-sm text-[#475569] dark:text-slate-400">
+                {onlyIncompleteFilter
+                  ? 'Tất cả đề thi IELTS đã được 100% học sinh trong lớp hoàn thành!'
+                  : fullExamCategoryFilter === 'periodic_mock'
+                    ? 'Chưa có đề Mock Test Định Kỳ (300.000đ) nào. Tạo ngay đề 3 tháng/lần cho học viên!'
+                    : 'Chưa có đề thi Full 4 Kỹ Năng nào trong mục này.'}
+              </p>
+              {!onlyIncompleteFilter && (
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openExamBuilder(null, 'general', [], 'real_exam')}
+                    className="px-4 py-2 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold transition"
+                  >
+                    + Tạo Đề Thực Chiến (20.000đ)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openExamBuilder(null, 'general', [], 'periodic_mock')}
+                    className="px-4 py-2 rounded-lg bg-[#FEF3C7] hover:bg-amber-200 text-[#92400E] border border-amber-300 text-xs font-bold transition"
+                  >
+                    + Tạo Mock Định Kỳ (300.000đ)
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             filteredFullExamTests.map(renderManagementItemCard)

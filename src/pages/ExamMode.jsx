@@ -337,12 +337,14 @@ export default function ExamMode({
     } else if (skillType === 'reading') {
       setExamState(prev => ({ ...prev, readingPassageIdx: targetIdx }));
     } else {
-      setExamState(prev => ({ ...prev, writingTaskIdx: targetIdx }));
+      const clampedTaskIdx = writingTaskScope === 'task1' ? 0 : writingTaskScope === 'task2' ? 1 : targetIdx;
+      setExamState(prev => ({ ...prev, writingTaskIdx: clampedTaskIdx }));
     }
   };
 
   const handleStepQuestion = (delta) => {
     if (examState.skill === 'writing') {
+      if (writingTaskScope !== 'both') return;
       const nextTask = Math.max(0, Math.min(1, activeWritingTask + delta));
       switchPartIndex(nextTask, 'writing');
       return;

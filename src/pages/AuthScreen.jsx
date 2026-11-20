@@ -274,9 +274,9 @@ export default function AuthScreen({
                 <div className="w-9 h-9 rounded-lg bg-[#F1F5F9] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] flex items-center justify-center mb-3 border border-slate-200 dark:border-teal-500/30">
                   <Headphones className="w-4 h-4" />
                 </div>
-                <h2 className="font-bold text-sm text-[#0F172B] dark:text-white">Full 3 Kỹ Năng</h2>
+                <h2 className="font-bold text-sm text-[#0F172B] dark:text-white">Full 4 Kỹ Năng</h2>
                 <p className="text-xs sm:text-[13px] text-[#475569] dark:text-slate-400 mt-1 leading-relaxed">
-                  Listening đa file audio, Reading chia đôi Passage và Writing đếm từ tự động.
+                  Listening đa file audio, Reading chia đôi Passage, Writing đếm từ tự động &amp; Speaking ghi âm trực tiếp.
                 </p>
               </div>
 
@@ -286,7 +286,7 @@ export default function AuthScreen({
                 </div>
                 <h2 className="font-bold text-sm text-[#0F172B] dark:text-white">Giáo Viên Chấm &amp; Chữa Bài</h2>
                 <p className="text-xs sm:text-[13px] text-[#475569] dark:text-slate-400 mt-1 leading-relaxed">
-                  Chấm Listening/Reading tự động, Giáo viên nhận xét chi tiết bài Writing &amp; lưu tiến trình F5.
+                  Chấm Listening/Reading tự động, Ms. Như trực tiếp duyệt &amp; chữa bài Writing/Speaking, lưu tiến trình F5.
                 </p>
               </div>
 

@@ -46,6 +46,7 @@ export default function StudentHome({
   onClearFocusedTest,
   onOpenCheckoutModal = null,
   onRedeemRealExamCredit = null,
+  openExamBuilder = null,
   openMemberProfile,
   openSkillPracticeHub,
   openSpeakingDaily,
@@ -240,6 +241,10 @@ export default function StudentHome({
                           username: currentUser.username,
                           name: currentUser.name || '',
                           targetBand: currentUser.targetBand || 7.5,
+                          targetListening: currentUser.targetListening ?? '',
+                          targetReading: currentUser.targetReading ?? '',
+                          targetWriting: currentUser.targetWriting ?? '',
+                          targetSpeaking: currentUser.targetSpeaking ?? '',
                           studyGoal: currentUser.studyGoal || '',
                           avatarUrl: currentUser.avatarUrl || ''
                         })
@@ -261,12 +266,32 @@ export default function StudentHome({
                     </p>
                   </div>
                   <div className="bg-transparent border-0 rounded-none pl-4">
-                    <p className="text-xs font-semibold text-[#1E293B] dark:text-[#E4E4E7]">Mục Tiêu Band</p>
+                    <p className="text-xs font-semibold text-[#1E293B] dark:text-[#E4E4E7]">Mục Tiêu Overall</p>
                     <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums mt-1">
                       {currentUser?.targetBand || '8.0'}
                     </p>
                   </div>
                 </div>
+
+                {!isTeacher && (
+                  <div className="grid grid-cols-4 gap-2 text-center border-b border-slate-200 dark:border-zinc-800 pb-3.5">
+                    {[
+                      { code: 'L', label: 'Listening', val: currentUser?.targetListening ?? currentUser?.targetBand ?? '7.5' },
+                      { code: 'R', label: 'Reading', val: currentUser?.targetReading ?? currentUser?.targetBand ?? '7.5' },
+                      { code: 'W', label: 'Writing', val: currentUser?.targetWriting ?? currentUser?.targetBand ?? '7.5' },
+                      { code: 'S', label: 'Speaking', val: currentUser?.targetSpeaking ?? currentUser?.targetBand ?? '7.5' }
+                    ].map(sk => (
+                      <div key={sk.code} className="bg-transparent border-0 rounded-none">
+                        <p className="text-xs font-bold text-[#475569] dark:text-zinc-400" title={`Mục tiêu ${sk.label}`}>
+                          {sk.code}
+                        </p>
+                        <p className="text-sm font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">
+                          {sk.val}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {currentUser?.studyGoal && (
                   <p className="text-sm text-[#334155] dark:text-zinc-300 truncate" title={currentUser.studyGoal}>
@@ -520,10 +545,26 @@ export default function StudentHome({
               ))}
             </div>
           ) : filteredTests.length === 0 ? (
-            <div className="bg-white dark:bg-[#18181B] rounded-lg border border-dashed border-slate-300 dark:border-zinc-700 p-10 text-center text-[#475569] dark:text-zinc-400 text-sm">
-              {storefrontTab === 'periodic_mock'
-                ? 'Hiện chưa có đề Mock Test Định Kỳ (300.000đ · 3 tháng/lần) đang mở. Ms. Như sẽ mở đề khi đến kỳ kiểm tra định kỳ.'
-                : 'Hiện chưa có đề Thực Chiến Thi Thật 4 Kỹ Năng nào đang mở. Giáo viên sẽ mở đề trong thời gian sớm nhất.'}
+            <div className="bg-white dark:bg-[#18181B] rounded-lg border border-dashed border-slate-300 dark:border-zinc-700 p-10 text-center space-y-4 text-[#475569] dark:text-zinc-400 text-sm">
+              <p>
+                {storefrontTab === 'periodic_mock'
+                  ? 'Hiện chưa có đề Mock Test Định Kỳ (300.000đ · 3 tháng/lần) đang mở. Ms. Như sẽ mở đề khi đến kỳ kiểm tra định kỳ.'
+                  : 'Hiện chưa có đề Thực Chiến Thi Thật 4 Kỹ Năng nào đang mở. Giáo viên sẽ mở đề trong thời gian sớm nhất.'}
+              </p>
+              {isTeacher && openExamBuilder && (
+                <button
+                  type="button"
+                  onClick={() => openExamBuilder(null, 'general', [], storefrontTab === 'periodic_mock' ? 'periodic_mock' : 'real_exam')}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs sm:text-sm font-bold transition"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>
+                    {storefrontTab === 'periodic_mock'
+                      ? '+ Tạo Đề Mock Test Định Kỳ (300.000đ) Ngay'
+                      : '+ Tạo Đề Thực Chiến Thi Thật (20.000đ) Ngay'}
+                  </span>
+                </button>
+              )}
             </div>
           ) : (
             <div className={`grid gap-5 ${matchedFocusedTest ? 'grid-cols-1 max-w-xl' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>

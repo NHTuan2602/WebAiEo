@@ -271,7 +271,7 @@ export default function StudentProfile({
     if (!att) return false;
     if (isTeacherViewer) return true;
     if (att.teacherGraded) return true;
-    return att.testMode === 'single_skill' && (att.singleSkill === 'listening' || att.singleSkill === 'reading');
+    return att.testMode === 'single_skill' && (att.focusSkill === 'listening' || att.focusSkill === 'reading');
   };
 
   const studentAttempts = attempts.filter(a => a.studentId === activeUsername);
@@ -288,19 +288,46 @@ export default function StudentProfile({
     ? (latestAttempt.overallBand - firstAttempt.overallBand).toFixed(1)
     : null;
 
-  const avgListening = approvedStudentAttempts.length > 0
-    ? (approvedStudentAttempts.reduce((acc, a) => acc + (a.scores?.listening?.band || 0), 0) / approvedStudentAttempts.length).toFixed(1)
+  // Calculate each skill average ONLY across approved attempts that actually include that skill
+  // (single-skill Writing/Speaking exercises must NEVER dilute Listening/Reading averages to 0.0!)
+  const gradedListeningAttempts = approvedStudentAttempts.filter(
+    a => (a.testMode !== 'single_skill' || a.focusSkill === 'listening') && typeof a.scores?.listening?.band === 'number'
+  );
+  const avgListening = gradedListeningAttempts.length > 0
+    ? (gradedListeningAttempts.reduce((acc, a) => acc + a.scores.listening.band, 0) / gradedListeningAttempts.length).toFixed(1)
     : null;
-  const avgReading = approvedStudentAttempts.length > 0
-    ? (approvedStudentAttempts.reduce((acc, a) => acc + (a.scores?.reading?.band || 0), 0) / approvedStudentAttempts.length).toFixed(1)
+  const gradedReadingAttempts = approvedStudentAttempts.filter(
+    a => (a.testMode !== 'single_skill' || a.focusSkill === 'reading') && typeof a.scores?.reading?.band === 'number'
+  );
+  const avgReading = gradedReadingAttempts.length > 0
+    ? (gradedReadingAttempts.reduce((acc, a) => acc + a.scores.reading.band, 0) / gradedReadingAttempts.length).toFixed(1)
     : null;
-  const gradedWritingAttempts = approvedStudentAttempts.filter(a => typeof a.scores?.writing?.overallBand === 'number');
+  const gradedWritingAttempts = approvedStudentAttempts.filter(
+    a => (a.testMode !== 'single_skill' || a.focusSkill === 'writing') && typeof a.scores?.writing?.overallBand === 'number'
+  );
   const avgWriting = gradedWritingAttempts.length > 0
     ? (gradedWritingAttempts.reduce((acc, a) => acc + a.scores.writing.overallBand, 0) / gradedWritingAttempts.length).toFixed(1)
     : null;
-  const overallAvg = gradedOverallBands.length > 0
-    ? (gradedOverallBands.reduce((acc, b) => acc + b, 0) / gradedOverallBands.length).toFixed(1)
+  const gradedSpeakingAttempts = approvedStudentAttempts.filter(
+    a => (a.testMode !== 'single_skill' || a.focusSkill === 'speaking') && typeof a.scores?.speaking?.band === 'number'
+  );
+  const avgSpeaking = gradedSpeakingAttempts.length > 0
+    ? (gradedSpeakingAttempts.reduce((acc, a) => acc + a.scores.speaking.band, 0) / gradedSpeakingAttempts.length).toFixed(1)
     : null;
+
+  const approvedFullExamBands = approvedStudentAttempts
+    .filter(a => a.testMode !== 'single_skill' && typeof a.overallBand === 'number')
+    .map(a => a.overallBand);
+  const availableSkillAvgNumbers = [avgListening, avgReading, avgWriting, avgSpeaking]
+    .filter(v => v !== null)
+    .map(Number);
+  const overallAvg = approvedFullExamBands.length > 0
+    ? (approvedFullExamBands.reduce((acc, b) => acc + b, 0) / approvedFullExamBands.length).toFixed(1)
+    : availableSkillAvgNumbers.length > 0
+      ? (availableSkillAvgNumbers.reduce((acc, b) => acc + b, 0) / availableSkillAvgNumbers.length).toFixed(1)
+      : gradedOverallBands.length > 0
+        ? (gradedOverallBands.reduce((acc, b) => acc + b, 0) / gradedOverallBands.length).toFixed(1)
+        : null;
 
   const totalTabSwitches = isTeacherViewer
     ? studentAttempts.reduce((acc, a) => acc + (a.tabSwitchCount || 0), 0)
@@ -1055,6 +1082,10 @@ export default function StudentProfile({
                             name: student.name || '',
                             role: student.role || 'student',
                             targetBand: student.targetBand || 7.5,
+                            targetListening: student.targetListening ?? '',
+                            targetReading: student.targetReading ?? '',
+                            targetWriting: student.targetWriting ?? '',
+                            targetSpeaking: student.targetSpeaking ?? '',
                             studyGoal: student.studyGoal || '',
                             avatarUrl: student.avatarUrl || ''
                           })
@@ -1759,7 +1790,7 @@ export default function StudentProfile({
                     <div>
                       <p className="text-sm font-extrabold text-[#0F172B] dark:text-[#F4F4F5] line-clamp-2">{t.title}</p>
                       <p className="text-xs text-[#475569] dark:text-zinc-400 mt-1 line-clamp-2">
-                        {t.description || 'Đề thi thử IELTS 3 kỹ năng chuẩn quốc tế.'}
+                        {t.description || 'Đề thi thử IELTS Full 4 kỹ năng chuẩn quốc tế.'}
                       </p>
                     </div>
                     {startExam && (
@@ -1808,9 +1839,9 @@ export default function StudentProfile({
               <div>
                 <p className="text-xs text-[#475569] dark:text-zinc-400 font-bold uppercase">Điểm Overall Trung Bình</p>
                 <p className="text-2xl font-black text-[#0F172B] dark:text-[#F4F4F5]">{overallAvg ?? '-'}</p>
-                {totalAttempts > 0 && (
+                {approvedStudentAttempts.length > 0 && (
                   <span className="text-xs block font-semibold text-[#475569] dark:text-zinc-400 mt-0.5">
-                    L: {avgListening ?? '-'} • R: {avgReading ?? '-'} • W: {avgWriting ?? 'Chờ'}
+                    L: {avgListening ?? '-'} • R: {avgReading ?? '-'} • W: {avgWriting ?? '-'} • S: {avgSpeaking ?? '-'}
                   </span>
                 )}
               </div>
@@ -1849,6 +1880,110 @@ export default function StudentProfile({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Mục Tiêu & Tiến Độ Từng Kỹ Năng (L · R · W · S + Band Overall) */}
+          <div className={`${profileCardCls} p-5 sm:p-6 mb-8`}>
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#E2E8F0] dark:border-zinc-800">
+              <div>
+                <h2 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
+                  <Target className="w-5 h-5 text-slate-700 dark:text-zinc-200" />
+                  Mục Tiêu &amp; Tiến Độ Từng Kỹ Năng (4 Kỹ Năng + Overall)
+                </h2>
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5 max-w-2xl">
+                  Theo dõi điểm trung bình thực tế của từng kỹ năng riêng biệt so với mục tiêu cá nhân đã cài đặt.
+                </p>
+              </div>
+              {canEditTargetInfo && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingTargetUser({
+                      username: student.username,
+                      name: student.name || '',
+                      role: student.role || 'student',
+                      targetBand: student.targetBand || 7.5,
+                      targetListening: student.targetListening ?? '',
+                      targetReading: student.targetReading ?? '',
+                      targetWriting: student.targetWriting ?? '',
+                      targetSpeaking: student.targetSpeaking ?? '',
+                      studyGoal: student.studyGoal || '',
+                      avatarUrl: student.avatarUrl || ''
+                    })
+                  }
+                  className={profileActionBtnCls}
+                >
+                  <Edit className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Cài Mục Tiêu 4 Kỹ Năng
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800 bg-transparent border-0 rounded-none pt-4">
+              {[
+                {
+                  key: 'listening',
+                  label: 'Listening',
+                  actual: avgListening,
+                  count: gradedListeningAttempts.length,
+                  target: student.targetListening ?? student.targetBand ?? 7.5
+                },
+                {
+                  key: 'reading',
+                  label: 'Reading',
+                  actual: avgReading,
+                  count: gradedReadingAttempts.length,
+                  target: student.targetReading ?? student.targetBand ?? 7.5
+                },
+                {
+                  key: 'writing',
+                  label: 'Writing',
+                  actual: avgWriting,
+                  count: gradedWritingAttempts.length,
+                  target: student.targetWriting ?? student.targetBand ?? 7.5
+                },
+                {
+                  key: 'speaking',
+                  label: 'Speaking',
+                  actual: avgSpeaking,
+                  count: gradedSpeakingAttempts.length,
+                  target: student.targetSpeaking ?? student.targetBand ?? 7.5
+                },
+                {
+                  key: 'overall',
+                  label: 'Band Overall',
+                  actual: overallAvg,
+                  count: approvedStudentAttempts.length,
+                  target: student.targetBand ?? 7.5
+                }
+              ].map((sk) => {
+                const actualNum = sk.actual !== null ? Number(sk.actual) : null;
+                const targetNum = Number(sk.target) || 7.5;
+                const reached = actualNum !== null && actualNum >= targetNum;
+                return (
+                  <div key={sk.key} className="py-2 sm:py-1 sm:px-4 first:sm:pl-0 last:sm:pr-0 bg-transparent border-0 rounded-none">
+                    <p className="text-xs font-bold uppercase text-[#475569] dark:text-zinc-400">
+                      {sk.label}
+                    </p>
+                    <p className="text-xl font-black text-[#0F172B] dark:text-[#F4F4F5] mt-1 tabular-nums">
+                      {sk.actual ?? '-'}
+                      <span className="text-xs font-semibold text-[#475569] dark:text-zinc-400 ml-1">
+                        / {targetNum}
+                      </span>
+                    </p>
+                    <p className={`text-xs font-semibold mt-0.5 ${
+                      reached
+                        ? 'text-[#0F766E] dark:text-teal-400'
+                        : 'text-[#475569] dark:text-zinc-400'
+                    }`}>
+                      {actualNum === null
+                        ? 'Chưa có điểm duyệt'
+                        : reached
+                          ? `Đạt mục tiêu (${sk.count} bài)`
+                          : `Còn thiếu ${(targetNum - actualNum).toFixed(1)} (${sk.count} bài)`}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
       {/* Gói Thành Viên 1 Tháng & Tùy Chỉnh IELTS VIP */}

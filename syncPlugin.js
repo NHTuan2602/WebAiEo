@@ -681,6 +681,10 @@ function sanitizeUserForViewer(user, viewer) {
     name: user.name || user.username,
     role: user.role === 'teacher' ? 'teacher' : 'student',
     targetBand: user.targetBand ?? (user.role === 'teacher' ? 9.0 : 7.5),
+    targetListening: user.targetListening ?? null,
+    targetReading: user.targetReading ?? null,
+    targetWriting: user.targetWriting ?? null,
+    targetSpeaking: user.targetSpeaking ?? null,
     studyGoal: user.studyGoal || '',
     joinedDate: user.joinedDate || '',
     avatarUrl: user.avatarUrl || '',
@@ -2376,6 +2380,14 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     return prevVal || '';
   };
 
+  const clampTargetSkillBand = (val, fallback) => {
+    if (val === undefined) return fallback ?? null;
+    if (val === null || val === '') return null;
+    const n = Number(val);
+    if (!Number.isFinite(n)) return fallback ?? null;
+    return Math.min(9.0, Math.max(4.0, Math.round(n * 2) / 2));
+  };
+
   if (!isTeacher && prevUser) {
     // Student may only update non-privilege profile fields on own account
     const mergedAckSelf = mergeAcknowledgedTitleIds(prevUser.acknowledgedTitleIds, rawUser.acknowledgedTitleIds);
@@ -2386,6 +2398,10 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       name: typeof rawUser.name === 'string' && rawUser.name.trim() ? rawUser.name.trim() : prevUser.name,
       avatarUrl: sanitizeMediaUrl(rawUser.avatarUrl, prevUser.avatarUrl, { allowRelativeBrand: true, allowAnimated: hasAnimAvatarPerm }),
       targetBand: rawUser.targetBand ?? prevUser.targetBand,
+      targetListening: clampTargetSkillBand(rawUser.targetListening, prevUser.targetListening),
+      targetReading: clampTargetSkillBand(rawUser.targetReading, prevUser.targetReading),
+      targetWriting: clampTargetSkillBand(rawUser.targetWriting, prevUser.targetWriting),
+      targetSpeaking: clampTargetSkillBand(rawUser.targetSpeaking, prevUser.targetSpeaking),
       studyGoal: rawUser.studyGoal ?? prevUser.studyGoal,
       profileBannerId: typeof rawUser.profileBannerId === 'string' && rawUser.profileBannerId ? rawUser.profileBannerId.slice(0, 40) : (prevUser.profileBannerId || 'ocean'),
       profileCoverUrl: hasCoverPerm ? sanitizeMediaUrl(rawUser.profileCoverUrl, prevUser.profileCoverUrl, { allowRelativeBrand: false, allowAnimated: hasCoverPerm }) : '',
@@ -2460,6 +2476,10 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     store.users[uname] = cleanSelf;
   } else {
     const incoming = { ...rawUser, username: uname };
+    incoming.targetListening = clampTargetSkillBand(rawUser.targetListening, prevUser?.targetListening);
+    incoming.targetReading = clampTargetSkillBand(rawUser.targetReading, prevUser?.targetReading);
+    incoming.targetWriting = clampTargetSkillBand(rawUser.targetWriting, prevUser?.targetWriting);
+    incoming.targetSpeaking = clampTargetSkillBand(rawUser.targetSpeaking, prevUser?.targetSpeaking);
     incoming.loginDays = mergeLoginDays(prevUser?.loginDays, incoming.loginDays);
     if (!isSuperAdmin) {
       incoming.grantedTitleIds = Array.isArray(prevUser?.grantedTitleIds) ? prevUser.grantedTitleIds : [];
@@ -3854,10 +3874,20 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       if (!isTeacher && viewer) {
         const testObj = (store.tests || []).find(t => t.id === attempt.testId);
         const serverObjEval = evaluateObjectiveScoresForAttempt(testObj, attempt.answers || {});
-        const isSpeakingMode = attempt.testMode === 'single_skill' && attempt.focusSkill === 'speaking';
+        const effectiveTestMode =
+          testObj?.testMode === 'single_skill'
+            ? 'single_skill'
+            : attempt.testMode === 'single_skill'
+            ? 'single_skill'
+            : 'full_exam';
+        const focusSkill = effectiveTestMode === 'single_skill'
+          ? (testObj?.focusSkill || attempt.focusSkill || null)
+          : null;
+        const isSingleSkill = effectiveTestMode === 'single_skill' && Boolean(focusSkill);
+        const isSpeakingMode = isSingleSkill && focusSkill === 'speaking';
         const isSingleObjectiveMode =
-          attempt.testMode === 'single_skill' &&
-          (attempt.focusSkill === 'reading' || attempt.focusSkill === 'listening');
+          isSingleSkill &&
+          (focusSkill === 'reading' || focusSkill === 'listening');
 
         const validTicket = isSpeakingMode && attempt.aiGradingTicket
           ? verifyToken(attempt.aiGradingTicket, store._authSecret)
@@ -3884,20 +3914,32 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           validWritingTicket.digest === writingDigest
         );
 
-        let sanitizedScores = {
-          listening: attempt.scores?.listening || { raw: 0, total: 0, band: null },
-          reading: attempt.scores?.reading || { raw: 0, total: 0, band: null },
-          writing: { task1Band: null, task2Band: null, overallBand: null },
-          speaking: { band: null, criteria: {} }
-        };
+        const isSingleWritingMode = isSingleSkill && focusSkill === 'writing';
+        let sanitizedScores = isSingleSkill
+          ? {
+              ...(focusSkill === 'listening' ? { listening: attempt.scores?.listening || { raw: 0, total: 0, band: null } } : {}),
+              ...(focusSkill === 'reading' ? { reading: attempt.scores?.reading || { raw: 0, total: 0, band: null } } : {}),
+              ...(isSingleWritingMode ? { writing: { task1Band: null, task2Band: null, overallBand: null } } : {}),
+              ...(isSpeakingMode ? { speaking: { band: null, criteria: {} } } : {})
+            }
+          : {
+              listening: attempt.scores?.listening || { raw: 0, total: 0, band: null },
+              reading: attempt.scores?.reading || { raw: 0, total: 0, band: null },
+              writing: { task1Band: null, task2Band: null, overallBand: null },
+              speaking: { band: null, criteria: {} }
+            };
         let finalOverallBand = null;
         let finalTeacherGraded = false;
         let finalAiGraded = false;
         let finalFeedback = '';
 
         if (serverObjEval) {
-          if (serverObjEval.scores.listening) sanitizedScores.listening = serverObjEval.scores.listening;
-          if (serverObjEval.scores.reading) sanitizedScores.reading = serverObjEval.scores.reading;
+          if ((!isSingleSkill || focusSkill === 'listening') && serverObjEval.scores.listening) {
+            sanitizedScores.listening = serverObjEval.scores.listening;
+          }
+          if ((!isSingleSkill || focusSkill === 'reading') && serverObjEval.scores.reading) {
+            sanitizedScores.reading = serverObjEval.scores.reading;
+          }
           if (isSingleObjectiveMode) {
             finalOverallBand = serverObjEval.overallBand;
             finalTeacherGraded = true;
@@ -6190,28 +6232,47 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             const targetAtt = store.attempts[attIdx];
             const canUpdate = viewer.role === 'teacher';
             if (canUpdate) {
+              const linkedTest = (store.tests || []).find(t => t.id === targetAtt.testId);
+              const rawScope =
+                String(body?.writingTaskScope || targetAtt.writingTaskScope || linkedTest?.writingTaskScope || '').trim() ||
+                (String(targetAtt.dailySubCategory || linkedTest?.dailySubCategory || '').startsWith('w1_')
+                  ? 'task1'
+                  : String(targetAtt.dailySubCategory || linkedTest?.dailySubCategory || '') === 'w2_essay'
+                  ? 'task2'
+                  : 'both');
+              const effectiveScope =
+                targetAtt.testMode === 'single_skill' && targetAtt.focusSkill === 'writing'
+                  ? (rawScope === 'task2' ? 'task2' : 'task1')
+                  : 'both';
+              const wBandFinal =
+                effectiveScope === 'task1'
+                  ? evaluation.task1Band
+                  : effectiveScope === 'task2'
+                  ? evaluation.task2Band
+                  : evaluation.overallBand;
               const nextScores = {
                 ...(targetAtt.scores || {}),
                 writing: {
-                  task1Band: evaluation.task1Band,
-                  task2Band: evaluation.task2Band,
-                  overallBand: evaluation.overallBand
+                  task1Band: effectiveScope === 'task2' ? null : evaluation.task1Band,
+                  task2Band: effectiveScope === 'task1' ? null : evaluation.task2Band,
+                  overallBand: wBandFinal
                 }
               };
               const activeBands = [];
               if ((nextScores.listening?.total || 0) > 0) activeBands.push(Number(nextScores.listening.band) || 0);
               if ((nextScores.reading?.total || 0) > 0) activeBands.push(Number(nextScores.reading.band) || 0);
-              activeBands.push(evaluation.overallBand);
+              activeBands.push(wBandFinal);
               if (typeof nextScores.speaking?.band === 'number') activeBands.push(Number(nextScores.speaking.band));
               const nextOverall = targetAtt.testMode === 'single_skill' && targetAtt.focusSkill === 'writing'
-                ? evaluation.overallBand
+                ? wBandFinal
                 : calculateOverallIeltsBand(activeBands);
               updatedAttempt = {
                 ...targetAtt,
+                writingTaskScope: effectiveScope,
                 aiGraded: true,
                 // Keep existing approval state: AI draft grading stays hidden from students until Ms. Nhu clicks Approve!
                 teacherGraded: Boolean(targetAtt.teacherGraded),
-                aiDetails: evaluation,
+                aiDetails: { ...evaluation, overallBand: wBandFinal },
                 scores: nextScores,
                 overallBand: nextOverall,
                 teacherFeedback: evaluation.feedback || targetAtt.teacherFeedback || ''

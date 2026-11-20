@@ -210,14 +210,14 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     setTestForm(prev => ({
       ...prev,
       title: 'Đề Tập Soạn IELTS Mini (Mẫu Hướng Dẫn)',
-      description: 'Đề mẫu 3 kỹ năng ngắn gọn giúp giáo viên dễ xem cấu trúc và sửa lại nội dung.',
+      description: 'Đề mẫu Full 4 kỹ năng ngắn gọn giúp giáo viên dễ xem cấu trúc và sửa lại nội dung.',
       visibility: 'private',
-      maxAttempts: 0,
+      maxAttempts: 1,
       sequentialMode: false,
       allowEarlyNextSection: true,
       antiCheatEnabled: false,
-      sectionOrder: ['listening', 'reading', 'writing'],
-      sectionDurations: { listening: 20, reading: 30, writing: 30 },
+      sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
+      sectionDurations: { listening: 20, reading: 30, writing: 30, speaking: 12 },
       maxAudioPlays: 2,
       allowViewAnswers: true,
       listening: {
@@ -666,8 +666,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           </h1>
           <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
             {normalizeExamConfig(testForm).testMode === 'single_skill'
-              ? 'Biên soạn nội dung, câu hỏi, audio / hình ảnh hoặc đề Speaking AI riêng cho bài tập kỹ năng này.'
-              : 'Tùy chỉnh câu hỏi Listening (kèm file ghi âm MP3/WAV), Reading (kèm hình ảnh minh họa), Writing và quyền xem đáp án.'}
+              ? 'Biên soạn nội dung, câu hỏi, audio / hình ảnh hoặc đề Speaking riêng cho bài tập Daily Zone này.'
+              : 'Tùy chỉnh câu hỏi Listening (kèm file ghi âm MP3/WAV), Reading (kèm hình ảnh minh họa), Writing, Speaking và quyền xem đáp án.'}
           </p>
         </div>
 

@@ -224,6 +224,10 @@ export default function GlobalModals({
               name: editingTargetUser.name,
               role: editingTargetUser.role,
               targetBand: editingTargetUser.targetBand,
+              targetListening: editingTargetUser.targetListening,
+              targetReading: editingTargetUser.targetReading,
+              targetWriting: editingTargetUser.targetWriting,
+              targetSpeaking: editingTargetUser.targetSpeaking,
               studyGoal: editingTargetUser.studyGoal,
               avatarUrl: editingTargetUser.avatarUrl
             });
@@ -346,38 +350,99 @@ export default function GlobalModals({
               </div>
             )}
 
-            {editingTargetUser.role !== 'teacher' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Target IELTS Band (4.0 – 9.0)
-                </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {[6.0, 6.5, 7.0, 7.5, 8.0, 8.5].map(bandVal => (
-                    <button
-                      key={bandVal}
-                      type="button"
-                      onClick={() => setEditingTargetUser(prev => ({ ...prev, targetBand: bandVal }))}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
-                        Number(editingTargetUser.targetBand) === bandVal
-                          ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {bandVal.toFixed(1)}
-                    </button>
-                  ))}
+            {editingTargetUser.role !== 'teacher' && (() => {
+              const baseOverall = Number(editingTargetUser.targetBand) || 7.5;
+              const skillInputs = [
+                { key: 'targetListening', label: 'Listening' },
+                { key: 'targetReading', label: 'Reading' },
+                { key: 'targetWriting', label: 'Writing' },
+                { key: 'targetSpeaking', label: 'Speaking' }
+              ];
+              const handleSkillTargetChange = (skillKey, rawVal) => {
+                setEditingTargetUser(prev => {
+                  if (!prev) return prev;
+                  const next = { ...prev, [skillKey]: rawVal === '' ? '' : rawVal };
+                  const l = Number(next.targetListening || baseOverall);
+                  const r = Number(next.targetReading || baseOverall);
+                  const w = Number(next.targetWriting || baseOverall);
+                  const s = Number(next.targetSpeaking || baseOverall);
+                  if ([l, r, w, s].every(v => Number.isFinite(v) && v >= 4 && v <= 9)) {
+                    const avg = (l + r + w + s) / 4;
+                    const roundedOverall = Math.min(9.0, Math.max(4.0, Math.round((avg + 1e-9) * 2) / 2));
+                    next.targetBand = roundedOverall;
+                  }
+                  return next;
+                });
+              };
+              return (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Mục Tiêu Từng Kỹ Năng (Listening · Reading · Writing · Speaking)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {skillInputs.map(sk => (
+                      <div key={sk.key} className="space-y-1">
+                        <span className="block text-xs font-semibold text-slate-600 dark:text-slate-400">
+                          {sk.label}
+                        </span>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="4.0"
+                          max="9.0"
+                          placeholder={String(baseOverall)}
+                          value={editingTargetUser[sk.key] ?? ''}
+                          onChange={e => handleSkillTargetChange(sk.key, e.target.value)}
+                          className="w-full px-2.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="4.0"
-                  max="9.0"
-                  value={editingTargetUser.targetBand}
-                  onChange={e => setEditingTargetUser(prev => ({ ...prev, targetBand: e.target.value }))}
-                  className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                />
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Mục Tiêu Band Overall (4.0 – 9.0)
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[6.0, 6.5, 7.0, 7.5, 8.0, 8.5].map(bandVal => (
+                      <button
+                        key={bandVal}
+                        type="button"
+                        onClick={() =>
+                          setEditingTargetUser(prev => ({
+                            ...prev,
+                            targetBand: bandVal,
+                            targetListening: prev.targetListening || bandVal,
+                            targetReading: prev.targetReading || bandVal,
+                            targetWriting: prev.targetWriting || bandVal,
+                            targetSpeaking: prev.targetSpeaking || bandVal
+                          }))
+                        }
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                          Number(editingTargetUser.targetBand) === bandVal
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {bandVal.toFixed(1)}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="4.0"
+                    max="9.0"
+                    value={editingTargetUser.targetBand}
+                    onChange={e => setEditingTargetUser(prev => ({ ...prev, targetBand: e.target.value }))}
+                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
               </div>
-            )}
+              );
+            })()}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">

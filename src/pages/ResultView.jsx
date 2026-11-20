@@ -83,11 +83,18 @@ export default function ResultView({
 
   const isSingleSkill = attempt.testMode === 'single_skill' && Boolean(attempt.focusSkill);
   const focusSkill = isSingleSkill ? attempt.focusSkill : null;
-  const writingTaskScope = attempt.writingTaskScope || targetTestCfg?.writingTaskScope || 'both';
-  const isSpeakingAttempt =
-    focusSkill === 'speaking' ||
-    Boolean(attempt.scores?.speaking) ||
-    (Array.isArray(attempt.speakingRecordings) && attempt.speakingRecordings.length > 0);
+  const rawScope = attempt.writingTaskScope || targetTestCfg?.writingTaskScope || 'both';
+  const writingTaskScope =
+    isSingleSkill && focusSkill === 'writing'
+      ? (rawScope === 'task2' ? 'task2' : 'task1')
+      : rawScope;
+  const isSpeakingAttempt = isSingleSkill
+    ? focusSkill === 'speaking'
+    : Boolean(
+        targetTestCfg?.order?.includes('speaking') ||
+        (Array.isArray(attempt.speakingRecordings) && attempt.speakingRecordings.length > 0) ||
+        typeof attempt.scores?.speaking?.band === 'number'
+      );
 
   const sameStudentSameTest = attempts
     .filter(
@@ -140,16 +147,24 @@ export default function ResultView({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/35 border border-indigo-200 dark:border-indigo-500/30 text-xs text-indigo-900 dark:text-indigo-200 font-semibold">
         <span>
-          Quy chuẩn chấm điểm IELTS Examiner: 4 tiêu chí thành phần tính <strong>điểm chẵn (1–9)</strong> • Overall Writing = <strong>(Bài 2 × 2 + Bài 1) ÷ 3 → làm tròn xuống 0.5</strong>
+          {writingTaskScope === 'task1' ? (
+            <>Quy chuẩn chấm điểm IELTS Examiner (Task 1): 4 tiêu chí TA · CC · LR · GRA tính <strong>điểm chẵn (1–9)</strong></>
+          ) : writingTaskScope === 'task2' ? (
+            <>Quy chuẩn chấm điểm IELTS Examiner (Task 2): 4 tiêu chí TR · CC · LR · GRA tính <strong>điểm chẵn (1–9)</strong></>
+          ) : (
+            <>Quy chuẩn chấm điểm IELTS Examiner: 4 tiêu chí thành phần tính <strong>điểm chẵn (1–9)</strong> • Overall Writing = <strong>(Bài 2 × 2 + Bài 1) ÷ 3 → làm tròn xuống 0.5</strong></>
+          )}
         </span>
         <span className="font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
           Writing Band: {attempt.scores?.writing?.overallBand ?? aiD.overallBand ?? '--'}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {renderWritingCriteriaBox('Task 1', attempt.scores?.writing?.task1Band ?? aiD.task1Band, aiD.task1Criteria, 'text-blue-700 dark:text-blue-400', 'ta', 'TA')}
-        {renderWritingCriteriaBox('Task 2', attempt.scores?.writing?.task2Band ?? aiD.task2Band, aiD.task2Criteria, 'text-indigo-700 dark:text-indigo-400', 'tr', 'TR')}
+      <div className={`grid grid-cols-1 ${writingTaskScope === 'both' ? 'md:grid-cols-2' : ''} gap-4`}>
+        {writingTaskScope !== 'task2' &&
+          renderWritingCriteriaBox('Task 1', attempt.scores?.writing?.task1Band ?? aiD.task1Band, aiD.task1Criteria, 'text-blue-700 dark:text-blue-400', 'ta', 'TA')}
+        {writingTaskScope !== 'task1' &&
+          renderWritingCriteriaBox('Task 2', attempt.scores?.writing?.task2Band ?? aiD.task2Band, aiD.task2Criteria, 'text-indigo-700 dark:text-indigo-400', 'tr', 'TR')}
       </div>
 
       {/* Quick Spelling / Grammar / Vocab Error List */}
@@ -513,7 +528,13 @@ export default function ResultView({
                     ? `${attempt.scores?.listening?.raw || 0}/${attempt.scores?.listening?.total || 0} câu`
                     : focusSkill === 'speaking'
                     ? `${(attempt.speakingRecordings || []).filter(r => Number(r?.durationSec) > 0 || r?.audioUrl).length} câu`
-                    : `${getWordCount(attempt.answers?.w1) + getWordCount(attempt.answers?.w2)} từ`}
+                    : `${
+                        writingTaskScope === 'task1'
+                          ? getWordCount(attempt.answers?.w1)
+                          : writingTaskScope === 'task2'
+                          ? getWordCount(attempt.answers?.w2)
+                          : getWordCount(attempt.answers?.w1) + getWordCount(attempt.answers?.w2)
+                      } từ`}
                 </p>
               </div>
               <div>

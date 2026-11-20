@@ -56,7 +56,17 @@ export default function TeacherGradingModal({
 
   const isSingleSkill = gradingAttempt.testMode === 'single_skill' && Boolean(gradingAttempt.focusSkill);
   const focusSkill = isSingleSkill ? gradingAttempt.focusSkill : null;
-  const writingTaskScope = gradingAttempt.writingTaskScope || 'both';
+  const rawScope =
+    gradingAttempt.writingTaskScope ||
+    (String(gradingAttempt.dailySubCategory || '').startsWith('w1_')
+      ? 'task1'
+      : String(gradingAttempt.dailySubCategory || '') === 'w2_essay'
+      ? 'task2'
+      : 'both');
+  const writingTaskScope =
+    isSingleSkill && focusSkill === 'writing'
+      ? (rawScope === 'task2' ? 'task2' : 'task1')
+      : 'both';
   const isSingleSpeakingOnly = isSingleSkill && focusSkill === 'speaking';
   const isSpeakingAttempt =
     isSingleSpeakingOnly ||
