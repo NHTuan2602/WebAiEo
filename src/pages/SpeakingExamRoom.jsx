@@ -650,7 +650,6 @@ export default function SpeakingExamRoom({
               blob: rec.blob,
               audioId,
               mimeType: finalMime,
-              username: currentUser?.username || '',
               attemptId,
               questionId: item.id
             });

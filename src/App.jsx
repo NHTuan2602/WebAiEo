@@ -4,6 +4,7 @@ import {
   AIEO_VIP_PRICE_VND,
   DEFAULT_EXAM_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
+  MAX_AUDIO_UPLOAD_BYTES,
   canCreateFriendRoomNow,
   evaluateTitleUnlockNotification,
   getFriendRoomTicketCredits,
@@ -4142,7 +4143,6 @@ export default function App() {
               blob: rec.blob,
               audioId: finalAudioId || `sp4_${attemptId}_${rec.questionId || 'q'}`,
               mimeType: rec.blob.type || 'audio/webm',
-              username: currentUser?.username || 'student',
               attemptId,
               questionId: rec.questionId || ''
             });
@@ -5234,20 +5234,33 @@ export default function App() {
     });
   };
 
-  const handleAudioFileUpload = (e, targetIdx = builderListeningIdx) => {
-    const file = e.target.files?.[0];
+  const handleAudioFileUpload = async (e, targetIdx = builderListeningIdx) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) {
-      alert('File âm thanh quá lớn (vui lòng chọn file dưới 15MB để lưu trữ mượt mà trên trình duyệt, hoặc dùng Link URL ngoài)!');
+    if (file.size > MAX_AUDIO_UPLOAD_BYTES) {
+      alert('File âm thanh quá lớn (giới hạn tối đa 100MB/file).');
+      input.value = '';
       return;
     }
-    readFileAsDataUrl(file, (dataUrl) => {
+    try {
+      const uploaded = await uploadSpeakingRecording({
+        blob: file,
+        audioId: `spk_prompt_listening_${Date.now()}_${targetIdx}_${Math.random().toString(36).slice(2, 7)}`,
+        mimeType: file.type || 'audio/mpeg',
+        questionId: `listening_topic_${targetIdx + 1}`
+      });
+      if (!uploaded?.audioUrl) throw new Error('Máy chủ chưa lưu được file âm thanh.');
       updateListeningTrackField(targetIdx, {
-        audioUrl: dataUrl,
+        audioUrl: uploaded.audioUrl,
         audioFileName: file.name
       });
       showToast(`Đã tải lên file ghi âm Chủ đề ${targetIdx + 1}: ${file.name}`);
-    });
+    } catch (error) {
+      showToast(error?.message || 'Không thể tải file âm thanh lên. Vui lòng thử lại hoặc dùng Link URL.', 'error');
+    } finally {
+      input.value = '';
+    }
   };
 
   const handleListeningImageUpload = (e, targetIdx = builderListeningIdx) => {

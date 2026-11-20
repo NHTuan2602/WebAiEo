@@ -18,6 +18,7 @@ import {
   getVietnamTodayDateKey,
   normalizeSpeakingSection
 } from '../../constants/seedData';
+import { MAX_AUDIO_UPLOAD_BYTES } from '../../constants/profileCustomization';
 import { generateSpeakingQuestionsWithAI } from '../../utils/geminiGrader';
 import { cleanAudioMimeType } from '../../utils/speakingAiEngine';
 import { pickSupportedAudioMimeType, uploadSpeakingRecording } from '../../utils/speakingApi';
@@ -101,8 +102,8 @@ export default function SpeakingBuilderPanel({
 
   const handleUploadQuestionAudio = async (file, uploadKey, onApplyAudio) => {
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) {
-      showToast?.('File ghi âm quá lớn (vui lòng chọn file dưới 15MB hoặc dán Link URL).', 'error');
+    if (file.size > MAX_AUDIO_UPLOAD_BYTES) {
+      showToast?.('File ghi âm quá lớn (giới hạn tối đa 100MB).', 'error');
       return;
     }
     setUploadingKey(uploadKey);

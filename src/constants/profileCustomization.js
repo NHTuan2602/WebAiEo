@@ -1787,7 +1787,8 @@ export const VIETQR_BANK_OPTIONS = [
 ];
 
 export const STATIC_IMAGE_MAX_DATA_URL_LENGTH = 500_000;
-export const VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH = 1_500_000;
+export const VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH = 28_000_000;
+export const MAX_AUDIO_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 export function hasAnimatedAvatarPermission(user, nowMs = Date.now()) {
   if (!user || typeof user !== 'object') return false;

@@ -271,7 +271,7 @@ export default function GlobalModals({
                               return;
                             }
                             if (rawDataUrl.length > VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH) {
-                              showToast('Ảnh động vượt giới hạn (~1.1 MB). Vui lòng chọn tệp GIF/WebP nhẹ hơn.', 'error');
+                              showToast('Ảnh GIF/WebP động vượt quá 20 MB. Vui lòng chọn tệp nhẹ hơn.', 'error');
                               return;
                             }
                             setEditingTargetUser(prev => (prev ? { ...prev, avatarUrl: rawDataUrl } : prev));
@@ -1227,7 +1227,7 @@ export default function GlobalModals({
             <div className="mb-3.5 p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50 dark:from-amber-950/30 dark:to-rose-950/25 border border-amber-300 dark:border-amber-500/40 space-y-2">
               <p className="text-xs font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                 <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Đặc quyền Avatar Động VIP đang mở (.GIF / .WebP động ≤ 1.1 MB)</span>
+                <span>Đặc quyền Avatar Động VIP đang mở (.GIF / .WebP động ≤ 20 MB)</span>
               </p>
               <div className="flex items-center gap-1.5">
                 <input
@@ -1303,7 +1303,7 @@ export default function GlobalModals({
                         return;
                       }
                       if (rawDataUrl.length > VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH) {
-                        showToast('Ảnh GIF/WebP động vượt quá ~1.1 MB. Vui lòng nén nhẹ hơn hoặc dán link https:// bên trên!', 'error');
+                        showToast('Ảnh GIF/WebP động vượt quá 20 MB. Vui lòng nén nhẹ hơn hoặc dán link https:// bên trên!', 'error');
                         return;
                       }
                       await handleUpdateUserAvatar(rawDataUrl);

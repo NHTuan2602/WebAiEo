@@ -58,6 +58,7 @@ import {
   normalizePaymentConfig,
   normalizeVipNameColor,
   normalizeVipNeonCoverColor,
+  MAX_AUDIO_UPLOAD_BYTES,
   STATIC_IMAGE_MAX_DATA_URL_LENGTH,
   VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH
 } from './src/constants/profileCustomization.js';
@@ -288,7 +289,7 @@ const SESSION_COOKIE_NAME = 'ielts_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const LOGIN_RATE_WINDOW_MS = 5 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 15;
-const MAX_AUDIO_UPLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_SYNC_ACTION_BODY_BYTES = 32 * 1024 * 1024;
 const ALLOWED_AUDIO_MIMES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/m4a', 'audio/mpeg', 'audio/mp3', 'audio/x-mpeg-3', 'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/vnd.wave', 'audio/aac', 'audio/x-m4a', 'audio/flac']);
 
 const GEMINI_AUDIO_PREFERRED_MODELS = [
@@ -1212,11 +1213,11 @@ function getEffectiveGeminiKey(store, clientOverride = '') {
   ).trim().replace(/^['"]|['"]$/g, '');
 }
 
-function saveAudioRecord(store, { audioId, mimeType, dataBase64, username = '', attemptId = '', questionId = '' }) {
+function saveAudioRecord(store, { audioId, mimeType, dataBase64, buffer: rawBuffer, username = '', attemptId = '', questionId = '' }) {
   const safeId = sanitizeAudioId(audioId) || `spk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const cleanMime = cleanAudioMimeType(mimeType);
   const rawB64 = String(dataBase64 || '').replace(/^data:[^;]+;base64,/, '');
-  const buffer = Buffer.from(rawB64, 'base64');
+  const buffer = Buffer.isBuffer(rawBuffer) ? rawBuffer : Buffer.from(rawB64, 'base64');
   const ext = inferAudioExtension(cleanMime);
   const meta = {
     audioId: safeId,
@@ -1497,14 +1498,13 @@ export function createPersistentSyncStore(persistFile = '') {
   return { store, schedulePersist, flushPersist, syncFromDiskIfNewer };
 }
 
-function readJsonBody(req) {
+function readJsonBody(req, maxBytes = 24 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let totalBytes = 0;
-    const MAX_BYTES = 24 * 1024 * 1024;
     req.on('data', chunk => {
       totalBytes += chunk.length;
-      if (totalBytes > MAX_BYTES) {
+      if (totalBytes > maxBytes) {
         reject(new Error('Payload too large'));
         req.destroy();
         return;
@@ -1520,6 +1520,31 @@ function readJsonBody(req) {
       }
     });
     req.on('error', reject);
+  });
+}
+
+function readBinaryBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let totalBytes = 0;
+    let exceeded = false;
+    req.on('data', chunk => {
+      if (exceeded) return;
+      totalBytes += chunk.length;
+      if (totalBytes > maxBytes) {
+        exceeded = true;
+        req.resume();
+        reject(new Error('File ghi âm vượt quá giới hạn 100MB.'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (!exceeded) resolve(Buffer.concat(chunks, totalBytes));
+    });
+    req.on('error', error => {
+      if (!exceeded) reject(error);
+    });
   });
 }
 
@@ -6018,36 +6043,64 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         return;
       }
       try {
-        const body = await readJsonBody(req);
-        if (!body?.dataBase64) {
+        const contentType = String(req.headers?.['content-type'] || '').split(';')[0].trim().toLowerCase();
+        const isLegacyJsonUpload = contentType === 'application/json';
+        const body = isLegacyJsonUpload ? await readJsonBody(req) : null;
+        if (isLegacyJsonUpload && !body?.dataBase64) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ ok: false, error: 'Missing audio data' }));
           return;
         }
-        const rawMime = String(body.mimeType || '').split(';')[0].trim().toLowerCase();
+        const rawMime = String(isLegacyJsonUpload ? body.mimeType || '' : contentType).split(';')[0].trim().toLowerCase();
         if (rawMime && !ALLOWED_AUDIO_MIMES.has(rawMime)) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ ok: false, error: 'Định dạng audio không hợp lệ.' }));
           return;
         }
-        const cleanMime = cleanAudioMimeType(body.mimeType);
+        const cleanMime = cleanAudioMimeType(rawMime || 'audio/webm');
         if (!ALLOWED_AUDIO_MIMES.has(cleanMime.split(';')[0])) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.end(JSON.stringify({ ok: false, error: 'Định dạng audio không hợp lệ.' }));
           return;
         }
-        const rawB64 = String(body.dataBase64 || '').replace(/^data:[^;]+;base64,/, '');
-        const approxBytes = Math.ceil((rawB64.length * 3) / 4);
-        if (approxBytes > MAX_AUDIO_UPLOAD_BYTES) {
-          res.statusCode = 413;
-          res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          res.end(JSON.stringify({ ok: false, error: 'File ghi âm vượt quá giới hạn 15MB.' }));
-          return;
+        let meta;
+        if (isLegacyJsonUpload) {
+          const rawB64 = String(body.dataBase64 || '').replace(/^data:[^;]+;base64,/, '');
+          const approxBytes = Math.ceil((rawB64.length * 3) / 4);
+          if (approxBytes > MAX_AUDIO_UPLOAD_BYTES) {
+            res.statusCode = 413;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ ok: false, error: 'File ghi âm vượt quá giới hạn 100MB.' }));
+            return;
+          }
+          meta = saveAudioRecord(store, { ...body, mimeType: cleanMime, username: viewer.username });
+        } else {
+          const buffer = await readBinaryBody(req, MAX_AUDIO_UPLOAD_BYTES);
+          if (!buffer.length) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ ok: false, error: 'Missing audio data' }));
+            return;
+          }
+          const decodeHeader = name => {
+            try {
+              return decodeURIComponent(String(req.headers?.[name] || ''));
+            } catch {
+              return '';
+            }
+          };
+          meta = saveAudioRecord(store, {
+            audioId: decodeHeader('x-audio-id'),
+            mimeType: cleanMime,
+            buffer,
+            username: viewer.username,
+            attemptId: decodeHeader('x-attempt-id'),
+            questionId: decodeHeader('x-question-id')
+          });
         }
-        const meta = saveAudioRecord(store, { ...body, username: viewer.username });
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify({
@@ -6058,7 +6111,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           sizeBytes: meta.sizeBytes
         }));
       } catch (err) {
-        res.statusCode = 400;
+        res.statusCode = String(err?.message || '').includes('vượt quá giới hạn 100MB') ? 413 : 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Audio upload failed' }));
       }
@@ -6380,7 +6433,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
 
     if (req.method === 'POST' && reqUrl === '/action') {
       try {
-        const body = await readJsonBody(req);
+        const body = await readJsonBody(req, MAX_SYNC_ACTION_BODY_BYTES);
         const authCheck = authorizeSyncAction(store, body.type, body.payload, viewer);
         if (!authCheck.allowed) {
           res.statusCode = authCheck.status || 403;

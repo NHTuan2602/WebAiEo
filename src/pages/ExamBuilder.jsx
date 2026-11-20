@@ -2171,7 +2171,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                     <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Tải File Ghi Âm Chủ Đề #{activeIdx + 1} Từ Máy Tính
                   </span>
                   <p className="text-xs text-[#475569] dark:text-slate-400 mb-4">
-                    Hỗ trợ MP3, WAV, OGG, M4A (Tối đa 15MB/file; nếu có nhiều file dung lượng lớn nên dùng Link URL ngoài để tránh đầy bộ nhớ trình duyệt).
+                    Hỗ trợ MP3, WAV, OGG, M4A (Tối đa 100MB/file).
                   </p>
                 </div>
 
