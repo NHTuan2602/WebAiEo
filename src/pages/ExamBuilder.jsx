@@ -694,6 +694,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           type: question.type || 'fill',
           source: 'ai',
           ...(typeof question.blankNum === 'number' ? { blankNum: question.blankNum } : {}),
+          ...(typeof question.questionNumber === 'number' ? { questionNumber: question.questionNumber } : {}),
+          ...(typeof question.questionEndNumber === 'number' ? { questionEndNumber: question.questionEndNumber } : {}),
           passageIdx: passageOffset + passageIdx,
           question: question.question || `${question.blankNum || questionIdx + 1}. Câu hỏi`,
           options: Array.isArray(question.options) ? question.options : [],

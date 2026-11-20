@@ -3,16 +3,21 @@
  * Supports question numbering, matching-matrix grouping, passage block parsing,
  * inline highlight segmentation, and dynamic question range labels.
  */
+import { extractBlankNumbers } from './clozeHelpers';
 
 const STANDARD_VERDICT_OPTIONS = new Set(['TRUE', 'FALSE', 'YES', 'NO', 'NOT GIVEN']);
 
 /** Extract canonical numeric label for a question (blankNum -> leading regex -> fallback). */
 export function getQuestionDisplayNumber(question, fallbackNum = 1) {
+  const explicitQuestionNum = Number(question?.questionNumber);
+  if (Number.isFinite(explicitQuestionNum) && explicitQuestionNum > 0) {
+    return explicitQuestionNum;
+  }
   if (typeof question?.blankNum === 'number' && question.blankNum > 0) {
     return question.blankNum;
   }
   const raw = String(question?.question || '').trim();
-  const match = raw.match(/^(?:Câu\s*|Q\s*)?(\d+)(?:\s*[.):\-–]|\s+)/i);
+  const match = raw.match(/^(?:(?:câu|questions?|q)\s*)?(\d+)(?:\s*[-–—]\s*\d+)?(?:\s*[.):\-–—]\s*|\s+|$)/i);
   if (match) {
     const parsed = Number(match[1]);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
@@ -23,15 +28,22 @@ export function getQuestionDisplayNumber(question, fallbackNum = 1) {
 /** Strip redundant leading question number prefix when rendered inside a boxed number badge. */
 export function stripLeadingQuestionNumber(questionText = '') {
   const raw = String(questionText || '').trim();
-  return raw.replace(/^(?:Câu\s*|Q\s*)?\d+\s*[.):\-–]\s*/i, '');
+  return raw.replace(/^(?:(?:câu|questions?|q)\s*)?\d+(?:\s*[-–—]\s*\d+)?(?:\s*[.):\-–—]\s*|\s+)/i, '');
 }
 
 /** Compute dynamic question range label (e.g. "1–13" or "14–26") for a part/passage. */
 export function getQuestionRangeText(questions = [], globalOffset = 0) {
   if (!Array.isArray(questions) || questions.length === 0) return '';
-  const nums = questions.map((q, idx) => getQuestionDisplayNumber(q, globalOffset + idx + 1));
-  const minNum = Math.min(...nums);
-  const maxNum = Math.max(...nums);
+  const nums = questions.map((q, idx) => {
+    const start = getQuestionDisplayNumber(q, globalOffset + idx + 1);
+    const explicitEnd = Number(q?.questionEndNumber);
+    return {
+      start,
+      end: Number.isFinite(explicitEnd) && explicitEnd >= start ? explicitEnd : start
+    };
+  });
+  const minNum = Math.min(...nums.map(item => item.start));
+  const maxNum = Math.max(...nums.map(item => item.end));
   return minNum === maxNum ? `${minNum}` : `${minNum}–${maxNum}`;
 }
 
@@ -201,17 +213,151 @@ export function buildScopedNavParts({
   let runningOffset = 0;
 
   for (let idx = 0; idx < items.length; idx++) {
-    const partQs = hasScopedQs
-      ? allQuestions.filter(q => typeof q?.[scopeField] !== 'number' || q[scopeField] === idx)
+    const scopedQuestions = hasScopedQs
+      ? allQuestions.filter(q =>
+          typeof q?.[scopeField] === 'number'
+            ? q[scopeField] === idx
+            : idx === 0
+        )
       : allQuestions;
+    const partQs = scopedQuestions
+      .map((question, questionIdx) => ({ question, questionIdx }))
+      .sort((a, b) => {
+        const aNum = getQuestionDisplayNumber(a.question, runningOffset + a.questionIdx + 1);
+        const bNum = getQuestionDisplayNumber(b.question, runningOffset + b.questionIdx + 1);
+        return aNum - bNum || a.questionIdx - b.questionIdx;
+      })
+      .map(item => item.question);
+    const navQuestions = partQs.flatMap((question, questionIdx) => {
+      const start = getQuestionDisplayNumber(question, runningOffset + questionIdx + 1);
+      const explicitEnd = Number(question?.questionEndNumber);
+      const end = Number.isFinite(explicitEnd) && explicitEnd >= start ? explicitEnd : start;
+      const rangeSize = Math.min(40, end - start + 1);
+      return Array.from({ length: rangeSize }, (_, offset) => {
+        const number = start + offset;
+        return {
+          id: `${question.id || `q-${questionIdx}`}__nav_${number}`,
+          answerId: question.id,
+          question,
+          num: question.num ?? number,
+          answered: question.answered,
+          questionNumber: number,
+          ...(end > start ? { questionEndNumber: end } : {}),
+          blankNum: question.blankNum
+        };
+      });
+    });
     parts.push({
       idx,
       offset: runningOffset,
       label: items.length > 1 ? `${multiLabelPrefix} ${idx + 1}` : singleLabel,
-      questions: partQs
+      questions: partQs,
+      navQuestions
     });
-    runningOffset += partQs.length;
+    runningOffset += navQuestions.length;
   }
 
   return parts;
+}
+
+/** Build the visible Reading question stream, interleaving cloze sheets by their printed question numbers. */
+export function buildReadingDisplayBlocks({
+  passages = [],
+  questions = [],
+  activePassageIdx = 0,
+  showAll = false
+}) {
+  const safePassages = Array.isArray(passages) ? passages : [];
+  const safeQuestions = Array.isArray(questions) ? questions : [];
+  const hasScopedQuestions = safeQuestions.some(q => typeof q?.passageIdx === 'number');
+  const passageIndices = showAll
+    ? safePassages.map((_, idx) => idx)
+    : [Math.max(0, Math.min(activePassageIdx, safePassages.length - 1))];
+  const blocks = [];
+  let fallbackOffset = showAll || !hasScopedQuestions
+    ? 0
+    : safeQuestions.filter(q => typeof q?.passageIdx === 'number' && q.passageIdx < passageIndices[0]).length;
+
+  passageIndices.forEach(passageIdx => {
+    const passageQuestions = safeQuestions.filter(q => {
+      if (typeof q?.passageIdx === 'number') return q.passageIdx === passageIdx;
+      if (hasScopedQuestions) return passageIdx === 0;
+      return showAll ? passageIdx === 0 : true;
+    });
+    const numberedQuestions = passageQuestions
+      .map((question, idx) => ({
+        question,
+        originalIdx: idx,
+        displayNum: getQuestionDisplayNumber(question, fallbackOffset + idx + 1),
+        baseOffset: fallbackOffset + idx
+      }))
+      .sort((a, b) => a.displayNum - b.displayNum || a.originalIdx - b.originalIdx);
+    const clozeText = String(safePassages[passageIdx]?.clozeText || '').trim();
+    const clozeNumbers = new Set(extractBlankNumbers(clozeText));
+    const items = [];
+
+    if (clozeText) {
+      const firstClozeNum = clozeNumbers.size ? Math.min(...clozeNumbers) : Number.POSITIVE_INFINITY;
+      items.push({ kind: 'cloze', passageIdx, clozeText, displayNum: firstClozeNum });
+    }
+
+    numberedQuestions.forEach(item => {
+      const isRenderedInCloze =
+        item.question.type === 'fill' &&
+        clozeNumbers.has(item.displayNum);
+      if (!isRenderedInCloze) {
+        items.push({
+          kind: 'question',
+          passageIdx,
+          question: item.question,
+          displayNum: item.displayNum,
+          baseOffset: item.baseOffset,
+          originalIdx: item.originalIdx
+        });
+      }
+    });
+
+    items.sort((a, b) =>
+      a.displayNum - b.displayNum ||
+      (a.kind === 'cloze' ? -1 : b.kind === 'cloze' ? 1 : a.originalIdx - b.originalIdx)
+    );
+
+    if (showAll && safePassages.length > 1 && items.length > 0) {
+      blocks.push({
+        kind: 'passageHeading',
+        key: `passage-heading-${passageIdx}`,
+        passageIdx,
+        title: String(safePassages[passageIdx]?.title || `Passage ${passageIdx + 1}`)
+      });
+    }
+
+    let pendingQuestions = [];
+    const flushQuestions = () => {
+      if (pendingQuestions.length === 0) return;
+      blocks.push({
+        kind: 'questions',
+        key: `passage-questions-${passageIdx}-${pendingQuestions[0].question.id || pendingQuestions[0].displayNum}`,
+        passageIdx,
+        questions: pendingQuestions.map(item => item.question),
+        baseOffset: pendingQuestions[0].baseOffset
+      });
+      pendingQuestions = [];
+    };
+
+    items.forEach(item => {
+      if (item.kind === 'question') {
+        pendingQuestions.push(item);
+        return;
+      }
+      flushQuestions();
+      blocks.push({
+        ...item,
+        key: `passage-cloze-${passageIdx}-${item.displayNum}`
+      });
+    });
+    flushQuestions();
+    fallbackOffset += passageQuestions.length;
+  });
+
+  return blocks;
 }

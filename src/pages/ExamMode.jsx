@@ -36,6 +36,7 @@ import { extractBlankNumbers } from '../utils/clozeHelpers';
 import { getWordCount } from '../utils/examHelpers';
 import {
   buildScopedNavParts,
+  buildReadingDisplayBlocks,
   getQuestionDisplayNumber,
   getQuestionRangeText,
   parseReadingPassageBlocks,
@@ -169,10 +170,12 @@ export default function ExamMode({
   const activePassage = readingPassages[safePassageIdx];
   const allReadingQs = activeTest.reading?.questions || [];
   const hasScopedReadingQs = allReadingQs.some(q => typeof q.passageIdx === 'number');
-  const displayedReadingQs =
-    readingPassages.length > 1 && hasScopedReadingQs && !examState.showAllReadingQs
-      ? allReadingQs.filter(q => typeof q.passageIdx !== 'number' || q.passageIdx === safePassageIdx)
-      : allReadingQs;
+  const readingDisplayBlocks = buildReadingDisplayBlocks({
+    passages: readingPassages,
+    questions: allReadingQs,
+    activePassageIdx: safePassageIdx,
+    showAll: Boolean(examState.showAllReadingQs)
+  });
 
   const listeningTracks = getListeningTracks(activeTest.listening);
   const safeTrackIdx = Math.min(Math.max(0, examState.listeningTrackIdx || 0), listeningTracks.length - 1);
@@ -226,19 +229,6 @@ export default function ExamMode({
   const standaloneListeningQs = displayedListeningQs.filter(
     q => !(q.type === 'fill' && typeof q.blankNum === 'number' && listeningClozeSet.has(q.blankNum))
   );
-
-  const activeReadingCloze = activePassage?.clozeText || '';
-  const readingClozeSet = new Set(extractBlankNumbers(activeReadingCloze));
-  const standaloneReadingQs = displayedReadingQs.filter(q => {
-    const belongsToActivePassage =
-      typeof q.passageIdx !== 'number' || q.passageIdx === safePassageIdx;
-    const renderedInActiveCloze =
-      belongsToActivePassage &&
-      q.type === 'fill' &&
-      typeof q.blankNum === 'number' &&
-      readingClozeSet.has(q.blankNum);
-    return !renderedInActiveCloze;
-  });
 
   const listeningNeedsLeftPane = Boolean(activeTrack?.imageUrl || activeTrack?.contextText);
 
@@ -333,7 +323,6 @@ export default function ExamMode({
       ? 'Part 1–3'
       : getQuestionRangeText(activePartQs, activePartObj?.offset || 0);
 
-  const readingBaseOffset = examState.showAllReadingQs ? 0 : activePartObj?.offset || 0;
   const listeningBaseOffset = examState.showAllListeningQs ? 0 : activePartObj?.offset || 0;
 
   const switchPartIndex = (targetIdx, skillType = examState.skill) => {
@@ -795,7 +784,7 @@ export default function ExamMode({
             </h1>
             <p className="text-[14px] text-[#1F2937] dark:text-[#D1D5DB] mt-0.5">
               {examState.skill === 'reading' &&
-                `Read the text and answer questions ${activePartRange || `1–${displayedReadingQs.length || 1}`}`}
+                `Read the text and answer questions ${activePartRange || `1–${activePartQs.length || 1}`}`}
               {examState.skill === 'listening' &&
                 `Listen and answer questions ${activePartRange || `1–${displayedListeningQs.length || 1}`}`}
               {examState.skill === 'writing' &&
@@ -977,63 +966,87 @@ export default function ExamMode({
             right={
               <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
-                  {activeReadingCloze.trim() && (
-                    <ClozeNoteSheet
-                      activeBlankNum={activeBlankNum}
-                      answers={examState.answers}
-                      bookmarkedQuestions={bookmarkedQuestions}
-                      clozeText={activeReadingCloze}
-                      fontSizeClass={fontSizeClass}
-                      inputRefs={blankInputRefs}
-                      onAnswerChange={(qId, val) =>
-                        setExamState(prev => ({
-                          ...prev,
-                          answers: { ...prev.answers, [qId]: val }
-                        }))
-                      }
-                      onBlankFocus={(num, qId) => {
-                        setActiveBlankNum(num);
-                        if (qId) setActiveQuestionId(qId);
-                      }}
-                      onPassageTextSelect={handlePassageTextSelect}
-                      onToggleBookmark={toggleBookmarkQuestion}
-                      questions={allReadingQs}
-                      renderText={renderHighlightRuns}
-                      scopeField="passageIdx"
-                      scopeIdx={safePassageIdx}
-                    />
-                  )}
+                  {readingDisplayBlocks.map(block => {
+                    if (block.kind === 'passageHeading') {
+                      return (
+                        <div key={block.key} className="pt-2 border-b border-slate-200 dark:border-[#343434]">
+                          <h4 className="text-xs font-extrabold uppercase tracking-wide text-[#2563EB] dark:text-blue-300">
+                            Passage {block.passageIdx + 1} · {block.title}
+                          </h4>
+                        </div>
+                      );
+                    }
 
-                  {standaloneReadingQs.length > 0 ? (
-                    <ExamQuestionList
-                      activeQuestionId={activeQuestionId}
-                      answers={examState.answers}
-                      baseOffset={readingBaseOffset}
-                      bookmarkedQuestions={bookmarkedQuestions}
-                      fontSizeClass={fontSizeClass}
-                      onAnswerChange={(qId, val) =>
-                        setExamState(prev => ({
-                          ...prev,
-                          answers: { ...prev.answers, [qId]: val }
-                        }))
-                      }
-                      onSelectQuestion={q => {
-                        setActiveQuestionId(q.id);
-                        setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
-                      }}
-                      onSwitchScope={pIdx => switchPartIndex(pIdx, 'reading')}
-                      onTextSelect={handlePassageTextSelect}
-                      onToggleBookmark={toggleBookmarkQuestion}
-                      questionCardRefs={questionCardRefs}
-                      questions={standaloneReadingQs}
-                      renderText={renderHighlightRuns}
-                      scopeLabelPrefix="Passage"
-                      scopeType="reading"
-                      showScopeBadge={examState.showAllReadingQs && readingPassages.length > 1}
-                    />
-                  ) : !activeReadingCloze.trim() ? (
+                    if (block.kind === 'cloze') {
+                      return (
+                        <ClozeNoteSheet
+                          key={block.key}
+                          activeBlankNum={activeBlankNum}
+                          answers={examState.answers}
+                          bookmarkedQuestions={bookmarkedQuestions}
+                          clozeText={block.clozeText}
+                          fontSizeClass={fontSizeClass}
+                          inputRefs={blankInputRefs}
+                          onAnswerChange={(qId, val) =>
+                            setExamState(prev => ({
+                              ...prev,
+                              answers: { ...prev.answers, [qId]: val }
+                            }))
+                          }
+                          onBlankFocus={(num, qId) => {
+                            setActiveBlankNum(num);
+                            if (qId) setActiveQuestionId(qId);
+                            if (examState.showAllReadingQs && block.passageIdx !== safePassageIdx) {
+                              setExamState(prev => ({ ...prev, readingPassageIdx: block.passageIdx }));
+                            }
+                          }}
+                          onPassageTextSelect={handlePassageTextSelect}
+                          onToggleBookmark={toggleBookmarkQuestion}
+                          questions={allReadingQs}
+                          renderText={renderHighlightRuns}
+                          scopeField="passageIdx"
+                          scopeIdx={block.passageIdx}
+                        />
+                      );
+                    }
+
+                    return (
+                      <ExamQuestionList
+                        key={block.key}
+                        activeQuestionId={activeQuestionId}
+                        answers={examState.answers}
+                        baseOffset={block.baseOffset || 0}
+                        bookmarkedQuestions={bookmarkedQuestions}
+                        fontSizeClass={fontSizeClass}
+                        onAnswerChange={(qId, val) =>
+                          setExamState(prev => ({
+                            ...prev,
+                            answers: { ...prev.answers, [qId]: val }
+                          }))
+                        }
+                        onSelectQuestion={q => {
+                          setActiveQuestionId(q.id);
+                          setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
+                          if (examState.showAllReadingQs && typeof q.passageIdx === 'number' && q.passageIdx !== safePassageIdx) {
+                            setExamState(prev => ({ ...prev, readingPassageIdx: q.passageIdx }));
+                          }
+                        }}
+                        onSwitchScope={pIdx => switchPartIndex(pIdx, 'reading')}
+                        onTextSelect={handlePassageTextSelect}
+                        onToggleBookmark={toggleBookmarkQuestion}
+                        questionCardRefs={questionCardRefs}
+                        questions={block.questions}
+                        renderText={renderHighlightRuns}
+                        scopeLabelPrefix="Passage"
+                        scopeType="reading"
+                        showScopeBadge={examState.showAllReadingQs && readingPassages.length > 1}
+                      />
+                    );
+                  })}
+
+                  {readingDisplayBlocks.length === 0 ? (
                     <p className="text-xs text-slate-500 dark:text-neutral-400 italic py-8 text-center">
-                      Chưa có câu hỏi gắn riêng cho Passage {safePassageIdx + 1}.
+                      Chưa có câu hỏi Reading nào để hiển thị.
                     </p>
                   ) : null}
                 </div>
@@ -1366,12 +1379,13 @@ export default function ExamMode({
           <div className="flex items-center justify-start sm:justify-center gap-4 overflow-x-auto cd-exam-scroll flex-1 py-0.5">
             {navParts.map(part => {
               const isActive = part.idx === activePartIdx;
+              const paletteQuestions = part.navQuestions || part.questions;
               const answeredInPart =
                 examState.skill === 'writing'
-                  ? part.questions[0]?.answered
+                  ? paletteQuestions[0]?.answered
                     ? 1
                     : 0
-                  : part.questions.filter(q => String(examState.answers[q.id] || '').trim().length > 0).length;
+                  : paletteQuestions.filter(q => String(examState.answers[q.answerId || q.id] || '').trim().length > 0).length;
 
               if (!isActive) {
                 return (
@@ -1383,7 +1397,7 @@ export default function ExamMode({
                   >
                     <span>{part.label}</span>
                     <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">
-                      {answeredInPart} of {part.questions.length}
+                      {answeredInPart} of {paletteQuestions.length}
                     </span>
                   </button>
                 );
@@ -1395,15 +1409,16 @@ export default function ExamMode({
                     {part.label}
                   </span>
                   <div className="flex items-center gap-1">
-                    {part.questions.map((q, qIdx) => {
+                    {paletteQuestions.map((navQuestion, qIdx) => {
+                      const q = navQuestion.question || navQuestion;
                       const displayNum =
                         examState.skill === 'writing'
-                          ? q.num
-                          : getQuestionDisplayNumber(q, (part.offset || 0) + qIdx + 1);
+                          ? navQuestion.num
+                          : getQuestionDisplayNumber(navQuestion, (part.offset || 0) + qIdx + 1);
                       const isAnswered =
                         examState.skill === 'writing'
-                          ? Boolean(q.answered)
-                          : String(examState.answers[q.id] || '').trim().length > 0;
+                          ? Boolean(navQuestion.answered)
+                          : String(examState.answers[navQuestion.answerId || q.id] || '').trim().length > 0;
                       const isFlagged = Boolean(bookmarkedQuestions[q.id]);
                       const isFocused =
                         examState.skill === 'writing' ||
@@ -1412,12 +1427,12 @@ export default function ExamMode({
 
                       return (
                         <button
-                          key={q.id}
+                          key={navQuestion.id}
                           type="button"
                           onClick={() => {
                             if (examState.skill !== 'writing') scrollToQuestionOrBlank(q, qIdx);
                           }}
-                          title={`Câu ${displayNum}${isAnswered ? ' • Đã trả lời' : ''}${isFlagged ? ' • Đã đánh dấu' : ''}`}
+                          title={`${navQuestion.questionEndNumber ? `Câu ${displayNum} trong câu hỏi ${getQuestionDisplayNumber(q)}–${navQuestion.questionEndNumber}` : `Câu ${displayNum}`}${isAnswered ? ' • Đã trả lời' : ''}${isFlagged ? ' • Đã đánh dấu' : ''}`}
                           className={`relative min-w-[27px] h-7 px-1.5 rounded-[4px] text-xs font-extrabold transition flex items-center justify-center border ${
                             isFocused
                               ? 'bg-white dark:bg-[#2A2A2A] text-[#111827] dark:text-white border-[#2563EB] dark:border-white ring-1 ring-[#2563EB] dark:ring-white/80'

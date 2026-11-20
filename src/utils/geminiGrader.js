@@ -808,6 +808,20 @@ Return ONLY strictly valid JSON matching this schema:
   };
 }
 
+function parsePrintedReadingQuestionNumber(value) {
+  if (Number.isFinite(Number(value)) && Number(value) > 0) {
+    const number = Number(value);
+    return { start: number, end: number };
+  }
+  const match = String(value || '').trim().match(/^(?:(?:questions?|q|câu)\s*)?(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?(?=\b|\s|[.):])/i);
+  if (!match) return null;
+  const start = Number(match[1]);
+  const end = Number(match[2] || match[1]);
+  return Number.isFinite(start) && start > 0
+    ? { start, end: Number.isFinite(end) && end >= start ? end : start }
+    : null;
+}
+
 export async function extractReadingExamFromPdf({
   apiKey,
   pdfDataUrl,
@@ -828,6 +842,7 @@ DOCUMENT HANDLING:
 - Extract only the Reading section. Do not turn Listening, Writing, Speaking, or answer-key text into passages or questions.
 - Return one passage object for each actual reading passage. Never merge separate passages. Join text that continues across page breaks.
 - Keep original question numbers and blank numbers exactly as printed so inline blanks remain matched to the answer key. Do not invent missing questions or renumber them.
+- Put each question's printed start number in questionNumber, and its end number in questionEndNumber only when one prompt covers a printed range such as 11-12. Use blankNum only for fill-in-the-blank questions. Sort each passage's questions by questionNumber ascending; never use the array position as a substitute for a printed number.
 - Include every Reading question exactly once, including questions that continue on another page. Preserve all statements, headings, options, instructions, and word limits.
 - Use the supported question types: ${questionTypes.map(t => `"${t.id}"`).join(', ')}. For multiple choice, include the full option text. For select-two/select-more questions, include every correct option in correctAnswers and set requiredSelections to that count.
 - Copy exact correct answers from the answer key when it exists, including acceptable alternatives. If no answer key is present, answer only when the passage clearly supports it; leave correctAnswer empty when uncertain.
@@ -847,6 +862,8 @@ Return only valid JSON matching this schema:
       "clozeText": "Questions 1-2\\nComplete the notes below.\\n{{1}} ... {{2}}",
       "questions": [
         {
+          "questionNumber": 1,
+          "questionEndNumber": 1,
           "blankNum": 1,
           "type": "fill",
           "question": "1. Short question prompt",
@@ -891,8 +908,20 @@ Return only valid JSON matching this schema:
         : typeMeta.answerKind === 'text'
         ? []
         : parsedOptions;
-      const parsedBlankNum = Number(q?.blankNum);
-      const blankNum = Number.isFinite(parsedBlankNum) && parsedBlankNum > 0 ? parsedBlankNum : undefined;
+      const printedNumber =
+        parsePrintedReadingQuestionNumber(q?.questionNumber) ||
+        parsePrintedReadingQuestionNumber(q?.blankNum) ||
+        parsePrintedReadingQuestionNumber(q?.question);
+      const questionNumber = printedNumber?.start;
+      const questionTextRange = parsePrintedReadingQuestionNumber(q?.question);
+      const explicitQuestionEnd = parsePrintedReadingQuestionNumber(q?.questionEndNumber)?.start;
+      const questionEnd = Math.max(
+        printedNumber?.end || 0,
+        questionTextRange?.start === questionNumber ? questionTextRange.end : 0,
+        explicitQuestionEnd || 0
+      );
+      const questionEndNumber = questionEnd > questionNumber ? questionEnd : undefined;
+      const blankNum = type === 'fill' ? questionNumber : undefined;
       const rawCorrectAnswer = Array.isArray(q?.correctAnswer)
         ? q.correctAnswer.map(answer => String(answer ?? '').trim()).filter(Boolean)
         : String(q?.correctAnswer ?? '').trim();
@@ -908,15 +937,20 @@ Return only valid JSON matching this schema:
 
       return {
         blankNum,
+        ...(typeof questionNumber === 'number' ? { questionNumber } : {}),
+        ...(typeof questionEndNumber === 'number' ? { questionEndNumber } : {}),
         type,
-        question: String(q?.question || `${blankNum || idx + 1}. Câu hỏi`).trim(),
+        question: String(q?.question || `${questionNumber || idx + 1}. Câu hỏi`).trim(),
         options,
         wordLimit: String(q?.wordLimit || '').trim(),
         correctAnswer: correctAnswers[0] || '',
         ...(type === 'mcq' ? { correctAnswers: Array.from(new Set(correctAnswers)) } : {}),
         ...(type === 'mcq' ? { requiredSelections: Math.max(1, Number(q?.requiredSelections) || correctAnswers.length || 1) } : {})
       };
-    });
+    }).sort((a, b) =>
+      (a.questionNumber || a.blankNum || Number.POSITIVE_INFINITY) -
+        (b.questionNumber || b.blankNum || Number.POSITIVE_INFINITY)
+    );
 
     return {
       title: String(passage?.title || `Passage ${passageIdx + 1}`).trim(),
@@ -924,11 +958,30 @@ Return only valid JSON matching this schema:
       clozeText: String(passage?.clozeText || '').trim(),
       questions
     };
-  }).filter(passage => passage.passageText || passage.questions.length > 0);
+  }).filter(passage => passage.passageText || passage.questions.length > 0)
+    .sort((a, b) => {
+      const aFirst = a.questions.reduce((min, question) => Math.min(min, question.questionNumber || Number.POSITIVE_INFINITY), Number.POSITIVE_INFINITY);
+      const bFirst = b.questions.reduce((min, question) => Math.min(min, question.questionNumber || Number.POSITIVE_INFINITY), Number.POSITIVE_INFINITY);
+      return aFirst - bFirst;
+    });
 
   const questionCount = passages.reduce((sum, passage) => sum + passage.questions.length, 0);
   if (passages.length === 0 || questionCount === 0) {
     throw new Error('AI chưa tìm được passage và câu hỏi Reading trong PDF. Hãy kiểm tra file có đúng đề Reading, đủ trang và chữ đủ rõ.');
+  }
+  if (passages.some(passage => passage.questions.some(question => !Number.isFinite(question.questionNumber)))) {
+    throw new Error('AI chưa xác định được số in trên một hoặc nhiều câu hỏi. Đề chưa được nhập để tránh nhảy số; hãy chạy lại PDF rõ nét hơn.');
+  }
+
+  const hasUnlinkedClozeBlank = passages.some(passage => {
+    const clozeNumbers = String(passage.clozeText || '').match(/\{\{\s*\d+\s*\}\}|\[\s*\d+\s*\]|\(__+\s*\d+\s*__+\)/g) || [];
+    return clozeNumbers.some(token => {
+      const number = Number(token.match(/\d+/)?.[0]);
+      return !passage.questions.some(question => question.type === 'fill' && question.blankNum === number);
+    });
+  });
+  if (hasUnlinkedClozeBlank) {
+    throw new Error('Một số chỗ trống trong đề PDF chưa khớp câu hỏi theo số. Đề chưa được nhập để tránh sai số; hãy chạy lại hoặc kiểm tra PDF.');
   }
 
   return {
