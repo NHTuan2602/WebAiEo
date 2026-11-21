@@ -3292,11 +3292,16 @@ export function isWebpBufferAnimated(bytes) {
   return isRiff && isWebp && isVp8x && (bytes[20] & 0x02) !== 0;
 }
 
+export function isSyncMediaUrl(rawUrl) {
+  return /^\/api\/sync\/media\/[a-zA-Z0-9._-]{6,120}$/.test(String(rawUrl || '').trim());
+}
+
 export function isAnimatedDataUrl(rawUrl) {
   const str = String(rawUrl || '').trim();
   if (!str) return false;
   if (/^data:image\/(gif|apng);/i.test(str)) return true;
   if (/^https:\/\/.+\.(gif|apng)([?#].*)?$/i.test(str)) return true;
+  if (/^\/api\/sync\/media\/.+\.(gif|apng|anim\.webp)([?#].*)?$/i.test(str)) return true;
   if (/^data:image\/webp;base64,/i.test(str)) {
     const b64 = str.slice(str.indexOf(',') + 1, str.indexOf(',') + 64);
     try {
@@ -3386,13 +3391,13 @@ export function normalizePaymentConfig(raw = {}) {
 
   const rawQr = String(obj.customQrUrl || '').trim();
   const customQrUrl =
-    (rawQr.startsWith('data:image/') || rawQr.startsWith('https://')) && rawQr.length <= 500_000
+    (rawQr.startsWith('data:image/') || rawQr.startsWith('https://') || isSyncMediaUrl(rawQr)) && rawQr.length <= 500_000
       ? rawQr
       : '';
 
   const rawDonateQr = String(obj.donateQrUrl || '').trim();
   const donateQrUrl =
-    (rawDonateQr.startsWith('data:image/') || rawDonateQr.startsWith('https://')) && rawDonateQr.length <= 500_000
+    (rawDonateQr.startsWith('data:image/') || rawDonateQr.startsWith('https://') || isSyncMediaUrl(rawDonateQr)) && rawDonateQr.length <= 500_000
       ? rawDonateQr
       : '';
   const donateMessage = String(obj.donateMessage || '').trim().slice(0, 240);

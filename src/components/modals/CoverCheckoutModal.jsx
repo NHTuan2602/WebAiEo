@@ -131,10 +131,11 @@ export default function CoverCheckoutModal({
     };
   }, [isOpen, isUnlocked, itemType, isTitleOrder, isTestOrder, itemId, renew, onPullSync]);
 
-  // Poll order status every 3s while checkout modal stays open (backup alongside instant SSE)
+  // Poll order status every 5s while checkout modal stays open & tab is visible (backup alongside instant SSE)
   useEffect(() => {
     if (!isOpen || isUnlocked || !order?.orderCode) return undefined;
-    const interval = setInterval(async () => {
+    const pollOrderStatus = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const res = await fetch(`/api/sync/payment/order?code=${encodeURIComponent(order.orderCode)}`, { cache: 'no-store' });
         if (!res.ok) return;
@@ -144,8 +145,22 @@ export default function CoverCheckoutModal({
           await onPullSync?.();
         }
       } catch {}
-    }, 3000);
-    return () => clearInterval(interval);
+    };
+    const interval = setInterval(pollOrderStatus, 5000);
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        pollOrderStatus();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
+    return () => {
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
+    };
   }, [isOpen, isUnlocked, order?.orderCode, onPullSync]);
 
   if (!isOpen) return null;

@@ -29,6 +29,7 @@ import {
   hasAnimatedAvatarPermission,
   hasVipFriendRoomAccess,
   isAnimatedDataUrl,
+  isSyncMediaUrl,
   normalizePaymentConfig
 } from '../../constants/profileCustomization';
 import { detectAnimatedImageFile, normalizeRoomObject, parseBulkStudentsText, parseRawVocabText, readImageFileAsDataUrl } from '../../utils/examHelpers';
@@ -285,7 +286,7 @@ export default function GlobalModals({
                       }}
                     />
                   </label>
-                  {editingTargetUser.avatarUrl?.startsWith('data:image/') && (
+                  {(editingTargetUser.avatarUrl?.startsWith('data:image/') || isSyncMediaUrl(editingTargetUser.avatarUrl)) && (
                     <button
                       type="button"
                       onClick={() => setAvatarCropState({ sourceUrl: editingTargetUser.avatarUrl, target: 'editing_avatar' })}
@@ -1319,7 +1320,7 @@ export default function GlobalModals({
 
             {currentUser.avatarUrl && (
               <div className="flex flex-wrap items-center gap-2">
-                {currentUser.avatarUrl.startsWith('data:image/') && !isAnimatedDataUrl(currentUser.avatarUrl) && (
+                {(currentUser.avatarUrl.startsWith('data:image/') || isSyncMediaUrl(currentUser.avatarUrl)) && !isAnimatedDataUrl(currentUser.avatarUrl) && (
                   <button
                     type="button"
                     onClick={() => setAvatarCropState({ sourceUrl: currentUser.avatarUrl, target: 'self_avatar' })}

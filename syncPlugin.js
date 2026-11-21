@@ -61,6 +61,8 @@ import {
   hasUnlockedAvatarFrame,
   hasVipFriendRoomAccess,
   isAnimatedDataUrl,
+  isSyncMediaUrl,
+  isWebpBufferAnimated,
   normalizePaymentConfig,
   normalizeVipNameColor,
   normalizeVipNeonCoverColor,
@@ -1165,7 +1167,7 @@ function seedCanonicalDefaults(store) {
   return true;
 }
 
-function createInitialStore(audioDir = '') {
+function createInitialStore(audioDir = '', mediaDir = '') {
   const store = {
     version: 0,
     seeded: false,
@@ -1212,6 +1214,9 @@ function createInitialStore(audioDir = '') {
     _dailyRankCache: null,
     _audioDir: audioDir,
     _audioMem: new Map(),
+    _mediaDir: mediaDir,
+    _mediaMem: new Map(),
+    _mediaCache: new Map(),
     _protectedCredentialsVersion: 0
   };
   seedCanonicalDefaults(store);
@@ -1279,6 +1284,381 @@ function loadAudioRecord(store, rawId) {
     }
   }
   return store._audioMem?.get(safeId) || null;
+}
+
+const MEDIA_MIME_TO_EXT = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/apng': 'apng',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/wave': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/ogg': 'ogg',
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/aac': 'm4a'
+};
+
+const MEDIA_EXT_TO_MIME = {
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  'anim.webp': 'image/webp',
+  gif: 'image/gif',
+  apng: 'image/apng',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  webm: 'audio/webm',
+  m4a: 'audio/mp4'
+};
+
+const MAX_MEDIA_MEMORY_CACHE_ENTRIES = 32;
+const MAX_MEDIA_MEMORY_CACHE_ITEM_BYTES = 1_500_000;
+
+function sanitizeMediaId(raw = '') {
+  const str = String(raw || '').trim();
+  const match = /^(med_[a-f0-9]{16,32}\.(?:jpg|png|webp|anim\.webp|gif|apng|mp3|wav|ogg|webm|m4a))$/.exec(str);
+  return match ? match[1] : '';
+}
+
+function externalizeDataUrl(store, rawVal) {
+  if (typeof rawVal !== 'string' || !rawVal.startsWith('data:')) {
+    return { url: rawVal, changed: false };
+  }
+  const commaIdx = rawVal.indexOf(',');
+  if (commaIdx < 16 || commaIdx > 128) {
+    return { url: rawVal, changed: false };
+  }
+  const header = rawVal.slice(0, commaIdx);
+  const mimeMatch = /^data:((?:image|audio)\/[a-zA-Z0-9.+-]+)(?:;[^,;]+)*;base64$/i.exec(header);
+  if (!mimeMatch) {
+    return { url: rawVal, changed: false };
+  }
+  const cleanMime = mimeMatch[1].toLowerCase();
+  let ext = MEDIA_MIME_TO_EXT[cleanMime];
+  if (!ext) {
+    return { url: rawVal, changed: false };
+  }
+  const b64Payload = rawVal.slice(commaIdx + 1).trim();
+  if (!b64Payload) {
+    return { url: rawVal, changed: false };
+  }
+  let buffer;
+  try {
+    buffer = Buffer.from(b64Payload, 'base64');
+  } catch {
+    return { url: rawVal, changed: false };
+  }
+  if (!buffer || buffer.length === 0) {
+    return { url: rawVal, changed: false };
+  }
+  if (cleanMime === 'image/webp' && isWebpBufferAnimated(buffer)) {
+    ext = 'anim.webp';
+  }
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 20);
+  const mediaId = `med_${hash}.${ext}`;
+  const canonicalMime = MEDIA_EXT_TO_MIME[ext] || cleanMime;
+  const meta = {
+    mediaId,
+    mimeType: canonicalMime,
+    sizeBytes: buffer.length
+  };
+
+  if (store?._mediaDir) {
+    try {
+      fs.mkdirSync(store._mediaDir, { recursive: true });
+      const binPath = path.join(store._mediaDir, `${mediaId}.bin`);
+      if (!fs.existsSync(binPath)) {
+        fs.writeFileSync(binPath, buffer);
+        fs.writeFileSync(path.join(store._mediaDir, `${mediaId}.meta.json`), JSON.stringify(meta), 'utf8');
+      }
+    } catch (err) {
+      console.error(`[LexiPrep Sync] Failed persisting externalized media ${mediaId}:`, err?.message || err);
+      if (store._mediaMem) {
+        store._mediaMem.set(mediaId, { buffer, meta });
+      }
+    }
+  } else if (store?._mediaMem) {
+    store._mediaMem.set(mediaId, { buffer, meta });
+  }
+
+  return { url: `/api/sync/media/${mediaId}`, changed: true };
+}
+
+function loadMediaRecord(store, rawId) {
+  const safeId = sanitizeMediaId(rawId);
+  if (!safeId) return null;
+  if (store?._mediaCache?.has(safeId)) {
+    return store._mediaCache.get(safeId);
+  }
+  if (store?._mediaMem?.has(safeId)) {
+    return store._mediaMem.get(safeId);
+  }
+  if (store?._mediaDir) {
+    const binPath = path.join(store._mediaDir, `${safeId}.bin`);
+    const metaPath = path.join(store._mediaDir, `${safeId}.meta.json`);
+    if (fs.existsSync(binPath)) {
+      const extMatch = /\.((?:anim\.webp)|[a-z0-9]+)$/i.exec(safeId);
+      const fallbackMime = MEDIA_EXT_TO_MIME[extMatch?.[1]?.toLowerCase() || ''] || 'application/octet-stream';
+      let meta = { mediaId: safeId, mimeType: fallbackMime };
+      try {
+        if (fs.existsSync(metaPath)) {
+          meta = { ...meta, ...JSON.parse(fs.readFileSync(metaPath, 'utf8')) };
+        }
+      } catch {}
+      try {
+        const buffer = fs.readFileSync(binPath);
+        const rec = { buffer, meta: { ...meta, sizeBytes: buffer.length } };
+        if (store._mediaCache && buffer.length <= MAX_MEDIA_MEMORY_CACHE_ITEM_BYTES) {
+          if (store._mediaCache.size >= MAX_MEDIA_MEMORY_CACHE_ENTRIES) {
+            const oldestKey = store._mediaCache.keys().next().value;
+            if (oldestKey) store._mediaCache.delete(oldestKey);
+          }
+          store._mediaCache.set(safeId, rec);
+        }
+        return rec;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function externalizePaymentConfigMedia(store, cfg) {
+  if (!cfg || typeof cfg !== 'object') return { config: cfg, changed: false };
+  let changed = false;
+  const next = { ...cfg };
+  if (typeof next.customQrUrl === 'string' && next.customQrUrl.startsWith('data:')) {
+    const res = externalizeDataUrl(store, next.customQrUrl);
+    if (res.changed) {
+      next.customQrUrl = res.url;
+      changed = true;
+    }
+  }
+  if (typeof next.donateQrUrl === 'string' && next.donateQrUrl.startsWith('data:')) {
+    const res = externalizeDataUrl(store, next.donateQrUrl);
+    if (res.changed) {
+      next.donateQrUrl = res.url;
+      changed = true;
+    }
+  }
+  return { config: next, changed };
+}
+
+function externalizeTestMedia(store, testObj) {
+  if (!testObj || typeof testObj !== 'object') return { test: testObj, changed: false };
+  let changed = false;
+  let nextTest = testObj;
+
+  const ensureClone = () => {
+    if (nextTest === testObj) nextTest = { ...testObj };
+    return nextTest;
+  };
+
+  if (testObj.listening && typeof testObj.listening === 'object') {
+    let lChanged = false;
+    const nextL = { ...testObj.listening };
+    if (typeof nextL.imageUrl === 'string' && nextL.imageUrl.startsWith('data:')) {
+      const r = externalizeDataUrl(store, nextL.imageUrl);
+      if (r.changed) { nextL.imageUrl = r.url; lChanged = true; }
+    }
+    if (typeof nextL.audioUrl === 'string' && nextL.audioUrl.startsWith('data:')) {
+      const r = externalizeDataUrl(store, nextL.audioUrl);
+      if (r.changed) { nextL.audioUrl = r.url; lChanged = true; }
+    }
+    if (Array.isArray(nextL.tracks)) {
+      let tracksChanged = false;
+      const nextTracks = nextL.tracks.map(tr => {
+        if (!tr || typeof tr !== 'object') return tr;
+        let trChanged = false;
+        let cloned = tr;
+        if (typeof tr.imageUrl === 'string' && tr.imageUrl.startsWith('data:')) {
+          const r = externalizeDataUrl(store, tr.imageUrl);
+          if (r.changed) { cloned = { ...cloned, imageUrl: r.url }; trChanged = true; }
+        }
+        if (typeof tr.audioUrl === 'string' && tr.audioUrl.startsWith('data:')) {
+          const r = externalizeDataUrl(store, tr.audioUrl);
+          if (r.changed) { cloned = { ...cloned, audioUrl: r.url }; trChanged = true; }
+        }
+        if (trChanged) tracksChanged = true;
+        return cloned;
+      });
+      if (tracksChanged) {
+        nextL.tracks = nextTracks;
+        lChanged = true;
+      }
+    }
+    if (lChanged) {
+      ensureClone().listening = nextL;
+      changed = true;
+    }
+  }
+
+  if (testObj.reading && typeof testObj.reading === 'object') {
+    let rChanged = false;
+    const nextR = { ...testObj.reading };
+    if (typeof nextR.imageUrl === 'string' && nextR.imageUrl.startsWith('data:')) {
+      const r = externalizeDataUrl(store, nextR.imageUrl);
+      if (r.changed) { nextR.imageUrl = r.url; rChanged = true; }
+    }
+    if (Array.isArray(nextR.passages)) {
+      let passagesChanged = false;
+      const nextPassages = nextR.passages.map(p => {
+        if (!p || typeof p !== 'object') return p;
+        if (typeof p.imageUrl === 'string' && p.imageUrl.startsWith('data:')) {
+          const r = externalizeDataUrl(store, p.imageUrl);
+          if (r.changed) { passagesChanged = true; return { ...p, imageUrl: r.url }; }
+        }
+        return p;
+      });
+      if (passagesChanged) {
+        nextR.passages = nextPassages;
+        rChanged = true;
+      }
+    }
+    if (rChanged) {
+      ensureClone().reading = nextR;
+      changed = true;
+    }
+  }
+
+  if (testObj.writing && typeof testObj.writing === 'object') {
+    let wChanged = false;
+    const nextW = { ...testObj.writing };
+    ['task1', 'task2'].forEach(tk => {
+      if (nextW[tk] && typeof nextW[tk] === 'object' && typeof nextW[tk].imageUrl === 'string' && nextW[tk].imageUrl.startsWith('data:')) {
+        const r = externalizeDataUrl(store, nextW[tk].imageUrl);
+        if (r.changed) {
+          nextW[tk] = { ...nextW[tk], imageUrl: r.url };
+          wChanged = true;
+        }
+      }
+    });
+    if (wChanged) {
+      ensureClone().writing = nextW;
+      changed = true;
+    }
+  }
+
+  if (testObj.speaking && typeof testObj.speaking === 'object') {
+    let sChanged = false;
+    const nextS = { ...testObj.speaking };
+    ['part1', 'part2', 'part3'].forEach(pk => {
+      const partVal = nextS[pk];
+      if (Array.isArray(partVal)) {
+        let pChanged = false;
+        const mapped = partVal.map(item => {
+          if (!item || typeof item !== 'object') return item;
+          let cloned = item;
+          let iChanged = false;
+          if (typeof item.audioUrl === 'string' && item.audioUrl.startsWith('data:')) {
+            const r = externalizeDataUrl(store, item.audioUrl);
+            if (r.changed) { cloned = { ...cloned, audioUrl: r.url }; iChanged = true; }
+          }
+          if (typeof item.imageUrl === 'string' && item.imageUrl.startsWith('data:')) {
+            const r = externalizeDataUrl(store, item.imageUrl);
+            if (r.changed) { cloned = { ...cloned, imageUrl: r.url }; iChanged = true; }
+          }
+          if (iChanged) pChanged = true;
+          return cloned;
+        });
+        if (pChanged) { nextS[pk] = mapped; sChanged = true; }
+      } else if (partVal && typeof partVal === 'object') {
+        let cloned = partVal;
+        let pChanged = false;
+        if (typeof partVal.audioUrl === 'string' && partVal.audioUrl.startsWith('data:')) {
+          const r = externalizeDataUrl(store, partVal.audioUrl);
+          if (r.changed) { cloned = { ...cloned, audioUrl: r.url }; pChanged = true; }
+        }
+        if (typeof partVal.imageUrl === 'string' && partVal.imageUrl.startsWith('data:')) {
+          const r = externalizeDataUrl(store, partVal.imageUrl);
+          if (r.changed) { cloned = { ...cloned, imageUrl: r.url }; pChanged = true; }
+        }
+        if (pChanged) { nextS[pk] = cloned; sChanged = true; }
+      }
+    });
+    if (sChanged) {
+      ensureClone().speaking = nextS;
+      changed = true;
+    }
+  }
+
+  return { test: nextTest, changed };
+}
+
+function externalizeStoreMedia(store) {
+  if (!store || typeof store !== 'object') return false;
+  let anyChanged = false;
+
+  if (store.users && typeof store.users === 'object') {
+    Object.entries(store.users).forEach(([uname, u]) => {
+      if (!u || typeof u !== 'object') return;
+      let uChanged = false;
+      let nextU = u;
+      if (typeof u.avatarUrl === 'string' && u.avatarUrl.startsWith('data:')) {
+        const r = externalizeDataUrl(store, u.avatarUrl);
+        if (r.changed) { nextU = { ...nextU, avatarUrl: r.url }; uChanged = true; }
+      }
+      if (typeof u.profileCoverUrl === 'string' && u.profileCoverUrl.startsWith('data:')) {
+        const r = externalizeDataUrl(store, u.profileCoverUrl);
+        if (r.changed) { nextU = { ...nextU, profileCoverUrl: r.url }; uChanged = true; }
+      }
+      if (uChanged) {
+        store.users[uname] = nextU;
+        anyChanged = true;
+      }
+    });
+  }
+
+  if (store.rooms && typeof store.rooms === 'object') {
+    Object.values(store.rooms).forEach(r => {
+      if (!r || typeof r !== 'object') return;
+      ['lobbyPlayers', 'liveMatch'].forEach(bucketKey => {
+        const bucket = r[bucketKey];
+        if (!bucket || typeof bucket !== 'object') return;
+        Object.entries(bucket).forEach(([uname, player]) => {
+          if (player && typeof player.avatarUrl === 'string' && player.avatarUrl.startsWith('data:')) {
+            const res = externalizeDataUrl(store, player.avatarUrl);
+            if (res.changed) {
+              bucket[uname] = { ...player, avatarUrl: res.url };
+              anyChanged = true;
+            }
+          }
+        });
+      });
+    });
+  }
+
+  if (Array.isArray(store.tests)) {
+    let testsChanged = false;
+    const nextTests = store.tests.map(t => {
+      const res = externalizeTestMedia(store, t);
+      if (res.changed) testsChanged = true;
+      return res.test;
+    });
+    if (testsChanged) {
+      store.tests = nextTests;
+      anyChanged = true;
+    }
+  }
+
+  if (store.paymentConfig && typeof store.paymentConfig === 'object') {
+    const res = externalizePaymentConfigMedia(store, store.paymentConfig);
+    if (res.changed) {
+      store.paymentConfig = res.config;
+      anyChanged = true;
+    }
+  }
+
+  return anyChanged;
 }
 
 /** Hydrate persisted JSON state into `store`, keeping malformed/missing fields safe. */
@@ -1414,7 +1794,8 @@ function applyParsedStoreSnapshot(store, parsed) {
  */
 export function createPersistentSyncStore(persistFile = '') {
   const audioDir = persistFile ? path.join(path.dirname(persistFile), 'audio') : '';
-  const store = createInitialStore(audioDir);
+  const mediaDir = persistFile ? path.join(path.dirname(persistFile), 'media') : '';
+  const store = createInitialStore(audioDir, mediaDir);
   const bootTimestamp = Date.now();
   const backupFile = persistFile ? `${persistFile}.bak` : '';
   let lastDiskMtimeMs = 0;
@@ -1469,6 +1850,8 @@ export function createPersistentSyncStore(persistFile = '') {
     });
   }
 
+  const mediaMigratedOnBoot = externalizeStoreMedia(store);
+
   let writeTimer = null;
   const writeStoreSync = () => {
     if (!persistFile) return;
@@ -1478,6 +1861,9 @@ export function createPersistentSyncStore(persistFile = '') {
       const {
         _audioDir,
         _audioMem,
+        _mediaDir,
+        _mediaMem,
+        _mediaCache,
         _rateLimits,
         _otpChallenges,
         _unlockedSpeakingRooms,
@@ -1504,8 +1890,11 @@ export function createPersistentSyncStore(persistFile = '') {
     }
   };
 
-  // Persist protected default accounts & _authSecret immediately when initializing a fresh store file
-  if (persistFile && (!hadExistingFile || (loadedFromDisk && (protectedChanged || seedInitializedOnBoot || seedMergedOnBoot)))) {
+  // Persist protected default accounts, _authSecret & migrated externalized media immediately on boot
+  if (persistFile && (!hadExistingFile || (loadedFromDisk && (protectedChanged || seedInitializedOnBoot || seedMergedOnBoot || mediaMigratedOnBoot)))) {
+    if (mediaMigratedOnBoot) {
+      console.log('[LexiPrep Sync] Migrated inline Base64 media to cached /api/sync/media/ files.');
+    }
     writeStoreSync();
   }
 
@@ -1528,6 +1917,7 @@ export function createPersistentSyncStore(persistFile = '') {
       if (parsed && typeof parsed === 'object' && Number(parsed.version) > Number(store.version)) {
         applyParsedStoreSnapshot(store, parsed);
         ensureProtectedAccounts(store);
+        externalizeStoreMedia(store);
         return true;
       }
     } catch {}
@@ -1913,10 +2303,12 @@ function serializeSentNotificationsForTeacher(store, viewer) {
 
 function getSnapshotForViewer(store, viewer = null) {
   pruneExpiredStoreChats(store, Date.now());
+  const todayKey = getVietnamDateKey(Date.now());
   const basePayload = {
     authenticated: Boolean(viewer),
     bootId: store._bootId || '',
     version: store.version,
+    dateKey: todayKey,
     seeded: store.seeded,
     serverTime: Date.now(),
     aiConfigured: Boolean(getEffectiveGeminiKey(store)),
@@ -1979,7 +2371,6 @@ function getSnapshotForViewer(store, viewer = null) {
   const adminFields = buildPublicAdminSnapshotFields(store, viewer);
   const notifications = serializeNotificationsForViewer(store, viewer);
   const sentNotifications = serializeSentNotificationsForTeacher(store, viewer);
-  const todayKey = getVietnamDateKey(Date.now());
   let globalDailyRankTitles = null;
   if (
     store._dailyRankCache &&
@@ -2729,6 +3120,12 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     const str = String(val || '').trim();
     if (!str) return '';
     if (allowRelativeBrand && str.startsWith('/brand-avatar.jpg')) return str;
+    if (isSyncMediaUrl(str)) {
+      if (isAnimatedDataUrl(str) && !allowAnimated) {
+        return prevVal || '';
+      }
+      return str;
+    }
     const isHttps = /^https:\/\//i.test(str);
     const isSafeDataImage = /^data:image\/(jpeg|jpg|png|webp|gif|apng);base64,/i.test(str);
     if (!isHttps && !isSafeDataImage) {
@@ -2740,7 +3137,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     }
     const maxLen = animated && allowAnimated ? VIP_ANIMATED_AVATAR_MAX_DATA_URL_LENGTH : STATIC_IMAGE_MAX_DATA_URL_LENGTH;
     if (str.length <= maxLen) {
-      return str;
+      return isSafeDataImage ? externalizeDataUrl(store, str).url : str;
     }
     return prevVal || '';
   };
@@ -3287,9 +3684,13 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin);
       const current = base.lobbyPlayers[username] || payload.fallbackPlayer;
       if (!current) break;
+      const nextPatch = { ...(payload.patch || {}) };
+      if (typeof nextPatch.avatarUrl === 'string' && nextPatch.avatarUrl.startsWith('data:')) {
+        nextPatch.avatarUrl = externalizeDataUrl(store, nextPatch.avatarUrl).url;
+      }
       base.lobbyPlayers[username] = {
         ...current,
-        ...(payload.patch || {})
+        ...nextPatch
       };
       store.rooms[cleanPin] = base;
       changed = true;
@@ -3577,13 +3978,13 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const openAt = parseScheduleTimestampServer(rawTest.openAt);
       const dueAt = parseScheduleTimestampServer(rawTest.dueAt);
       const assignedClassIds = normalizeClassIdList(rawTest.assignedClassIds);
-      const test = {
+      const test = externalizeTestMedia(store, {
         ...rawTest,
         assignedClassIds,
         scheduleMode,
         openAt,
         dueAt
-      };
+      }).test;
       const idx = store.tests.findIndex(t => t.id === test.id);
       const prevTest = idx >= 0 ? store.tests[idx] : null;
       const wasPublicBefore = prevTest ? (prevTest.visibility || 'public') !== 'private' : false;
@@ -4305,7 +4706,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'UPDATE_PAYMENT_CONFIG': {
-      store.paymentConfig = normalizePaymentConfig({ ...(payload?.paymentConfig || payload || {}), pricingSchemaVersion: 2 });
+      const normalizedCfg = normalizePaymentConfig({ ...(payload?.paymentConfig || payload || {}), pricingSchemaVersion: 2 });
+      store.paymentConfig = externalizePaymentConfigMedia(store, normalizedCfg).config;
       changed = true;
       break;
     }
@@ -4906,7 +5308,34 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
   const sseClientUsers = new WeakMap();
   let broadcastTimer = null;
 
+  const matchesIfNoneMatch = (ifNoneMatchHeader, etag) => {
+    if (!ifNoneMatchHeader || !etag) return false;
+    const target = String(etag).replace(/^W\//i, '').trim();
+    return String(ifNoneMatchHeader)
+      .split(',')
+      .some(part => {
+        const clean = part.trim();
+        return clean === '*' || clean.replace(/^W\//i, '').trim() === target;
+      });
+  };
+
+  const computeStateEtag = (viewerUser, todayKey) => {
+    const bootShort = String(store._bootId || '').slice(0, 8);
+    const viewerSig = viewerUser
+      ? `${viewerUser.username}:${viewerUser.role}:${viewerUser.tokenVersion || 1}`
+      : 'anon';
+    const aiFlag = getEffectiveGeminiKey(store) ? '1' : '0';
+    const mailFlag = getEffectiveMailConfig(store).configured ? '1' : '0';
+    const hash = crypto
+      .createHash('sha1')
+      .update(`${store.version}|${bootShort}|${viewerSig}|${todayKey}|${aiFlag}|${mailFlag}`)
+      .digest('hex')
+      .slice(0, 16);
+    return `W/"s-${store.version}-${hash}"`;
+  };
+
   const broadcast = () => {
+    const todayKey = getVietnamDateKey(Date.now());
     for (const res of sseClients) {
       if (res.destroyed || res.writableEnded) {
         sseClients.delete(res);
@@ -4918,9 +5347,18 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const matchedKey = findUserKeyInStore(store, sessionInfo.username);
         const userRec = matchedKey ? store.users?.[matchedKey] : null;
         const sessionStillValid = Boolean(userRec && (userRec.tokenVersion || 1) === sessionInfo.tokenVersion);
+        if (
+          sessionStillValid &&
+          sessionInfo.lastSentVersion === store.version &&
+          sessionInfo.lastSentDateKey === todayKey
+        ) {
+          continue;
+        }
         const viewer = sessionStillValid ? userRec : null;
         const dataStr = `event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`;
         res.write(dataStr);
+        sessionInfo.lastSentVersion = store.version;
+        sessionInfo.lastSentDateKey = todayKey;
         if (!sessionStillValid) {
           sseClients.delete(res);
         }
@@ -4949,25 +5387,43 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
   }, 10000);
   chatSweepTimer.unref?.();
 
-  const sendJsonResponse = (res, statusCode, dataObj, req = null) => {
+  const sendJsonResponse = (res, statusCode, dataObj, req = null, extraHeaders = null) => {
     res.statusCode = statusCode;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
+    if (extraHeaders && typeof extraHeaders === 'object') {
+      Object.entries(extraHeaders).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) res.setHeader(k, String(v));
+      });
+    }
     const jsonStr = JSON.stringify(dataObj);
     const acceptEnc = String(req?.headers?.['accept-encoding'] || '').toLowerCase();
-    if (req && jsonStr.length >= 1024 && /\bgzip\b/.test(acceptEnc)) {
+    const wantsBr = Boolean(req && /\bbr\b/.test(acceptEnc));
+    const wantsGzip = Boolean(req && /\bgzip\b/.test(acceptEnc));
+    if (req && jsonStr.length >= 512 && (wantsBr || wantsGzip)) {
       const rawBuf = Buffer.from(jsonStr, 'utf8');
-      zlib.gzip(rawBuf, { level: 5 }, (err, compressed) => {
+      const done = (encName) => (err, compressed) => {
         if (!err && compressed && compressed.length < rawBuf.length) {
-          res.setHeader('Content-Encoding', 'gzip');
-          res.setHeader('Vary', 'Accept-Encoding');
+          res.setHeader('Content-Encoding', encName);
+          if (!res.getHeader('Vary')) {
+            res.setHeader('Vary', 'Accept-Encoding');
+          }
           res.setHeader('Content-Length', String(compressed.length));
           res.end(compressed);
         } else {
           res.setHeader('Content-Length', String(rawBuf.length));
           res.end(rawBuf);
         }
-      });
+      };
+      if (wantsBr) {
+        zlib.brotliCompress(
+          rawBuf,
+          { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } },
+          done('br')
+        );
+      } else {
+        zlib.gzip(rawBuf, { level: 5 }, done('gzip'));
+      }
       return;
     }
     res.end(jsonStr);
@@ -5099,16 +5555,16 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         onChanged?.(store);
         scheduleBroadcast(50);
       }
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-store');
-      res.statusCode = 200;
-      res.end(
-        JSON.stringify({
+      sendJsonResponse(
+        res,
+        200,
+        {
           ok: true,
           authenticated: Boolean(viewer),
           user: viewer ? sanitizeUserForViewer(viewer, viewer) : null,
           snapshot: getSnapshotForViewer(store, viewer)
-        })
+        },
+        req
       );
       return;
     }
@@ -5604,7 +6060,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       try {
         const body = await readJsonBody(req);
         const rawCfg = body?.paymentConfig || body || {};
-        store.paymentConfig = normalizePaymentConfig({ ...rawCfg, pricingSchemaVersion: 2 });
+        store.paymentConfig = externalizePaymentConfigMedia(
+          store,
+          normalizePaymentConfig({ ...rawCfg, pricingSchemaVersion: 2 })
+        ).config;
         const prevSec = store.paymentSecrets && typeof store.paymentSecrets === 'object'
           ? store.paymentSecrets
           : { sepayApiKey: '', payosClientId: '', payosApiKey: '', payosChecksumKey: '' };
@@ -6559,9 +7018,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         onChanged?.(store);
         scheduleBroadcast(25);
 
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ ok: true, room: getSnapshotForViewer(store, viewer).rooms[cleanPin], snapshot: getSnapshotForViewer(store, viewer) }));
+        const viewerSnap = getSnapshotForViewer(store, viewer);
+        sendJsonResponse(res, 200, { ok: true, room: viewerSnap.rooms[cleanPin], snapshot: viewerSnap }, req);
       } catch (err) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -6653,7 +7111,67 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       return;
     }
 
-    if (req.method === 'GET' && reqUrl.startsWith('/audio/')) {
+    if ((req.method === 'GET' || req.method === 'HEAD') && reqUrl.startsWith('/media/')) {
+      let rawId = '';
+      try {
+        rawId = decodeURIComponent(reqUrl.slice('/media/'.length));
+      } catch {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ ok: false, error: 'Invalid media id' }));
+        return;
+      }
+      const safeId = sanitizeMediaId(rawId);
+      const record = safeId ? loadMediaRecord(store, safeId) : null;
+      if (!record) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(JSON.stringify({ ok: false, error: 'Media not found' }));
+        return;
+      }
+      const totalLen = record.buffer.length;
+      const etag = `"${safeId}"`;
+      const mime = record.meta?.mimeType || 'application/octet-stream';
+      res.setHeader('ETag', etag);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+
+      const rangeHeader = req.headers?.range;
+      if (!rangeHeader && matchesIfNoneMatch(req.headers?.['if-none-match'], etag)) {
+        res.statusCode = 304;
+        res.end();
+        return;
+      }
+
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Accept-Ranges', 'bytes');
+      if (rangeHeader && /^bytes=\d*-\d*$/i.test(rangeHeader)) {
+        const [startStr, endStr] = rangeHeader.replace(/^bytes=/i, '').split('-');
+        const start = startStr ? Math.min(totalLen - 1, Math.max(0, parseInt(startStr, 10))) : 0;
+        const end = endStr ? Math.min(totalLen - 1, Math.max(start, parseInt(endStr, 10))) : totalLen - 1;
+        const slice = record.buffer.subarray(start, end + 1);
+        res.statusCode = 206;
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${totalLen}`);
+        res.setHeader('Content-Length', String(slice.length));
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(slice);
+        }
+      } else {
+        res.statusCode = 200;
+        res.setHeader('Content-Length', String(totalLen));
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(record.buffer);
+        }
+      }
+      return;
+    }
+
+    if ((req.method === 'GET' || req.method === 'HEAD') && reqUrl.startsWith('/audio/')) {
       if (!viewer) {
         res.statusCode = 401;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -6680,12 +7198,21 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       const totalLen = record.buffer.length;
       const rawStoredMime = String(record.meta?.mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
       const mime = ALLOWED_AUDIO_MIMES.has(rawStoredMime) ? rawStoredMime : 'audio/webm';
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Content-Type', mime);
+      const audioEtag = `"aud_${record.meta?.audioId || sanitizeAudioId(rawId)}-${totalLen}"`;
+      res.setHeader('ETag', audioEtag);
+      res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Cache-Control', 'private, max-age=3600');
 
       const rangeHeader = req.headers?.range;
+      if (!rangeHeader && matchesIfNoneMatch(req.headers?.['if-none-match'], audioEtag)) {
+        res.statusCode = 304;
+        res.end();
+        return;
+      }
+
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Type', mime);
+
       if (rangeHeader && /^bytes=\d*-\d*$/i.test(rangeHeader)) {
         const [startStr, endStr] = rangeHeader.replace(/^bytes=/i, '').split('-');
         const start = startStr ? Math.min(totalLen - 1, Math.max(0, parseInt(startStr, 10))) : 0;
@@ -6694,11 +7221,19 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         res.statusCode = 206;
         res.setHeader('Content-Range', `bytes ${start}-${end}/${totalLen}`);
         res.setHeader('Content-Length', String(slice.length));
-        res.end(slice);
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(slice);
+        }
       } else {
         res.statusCode = 200;
         res.setHeader('Content-Length', String(totalLen));
-        res.end(record.buffer);
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(record.buffer);
+        }
       }
       return;
     }
@@ -6916,21 +7451,81 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     }
 
     if (req.method === 'GET' && reqUrl === '/state') {
+      if (pruneExpiredStoreChats(store, Date.now())) {
+        onChanged?.(store);
+        scheduleBroadcast(25);
+      }
       if (viewer && recordUserLoginDay(store, viewer)) {
         store.version += 1;
         onChanged?.(store);
         scheduleBroadcast(50);
       }
-      sendJsonResponse(res, 200, getSnapshotForViewer(store, viewer), req);
+      const todayKey = getVietnamDateKey(Date.now());
+      const stateEtag = computeStateEtag(viewer, todayKey);
+      let qSinceVersion = NaN;
+      let qBootId = '';
+      let qDateKey = '';
+      let qUser = '';
+      try {
+        const parsedQuery = new URL(req.url || '/state', 'http://localhost').searchParams;
+        if (parsedQuery.has('sinceVersion')) {
+          qSinceVersion = Number(parsedQuery.get('sinceVersion'));
+        }
+        qBootId = String(parsedQuery.get('bootId') || '').trim();
+        qDateKey = String(parsedQuery.get('dateKey') || '').trim();
+        qUser = String(parsedQuery.get('user') || '').trim();
+      } catch {}
+
+      const versionQueryUnchanged = Boolean(
+        viewer &&
+        Number.isFinite(qSinceVersion) &&
+        qSinceVersion === store.version &&
+        qBootId &&
+        qBootId === (store._bootId || '') &&
+        qDateKey === todayKey &&
+        qUser === viewer.username
+      );
+
+      if (matchesIfNoneMatch(req.headers?.['if-none-match'], stateEtag) || versionQueryUnchanged) {
+        res.statusCode = 304;
+        res.setHeader('ETag', stateEtag);
+        res.setHeader('Cache-Control', 'private, no-cache');
+        res.setHeader('Vary', 'Accept-Encoding, Cookie');
+        res.end();
+        return;
+      }
+
+      sendJsonResponse(res, 200, getSnapshotForViewer(store, viewer), req, {
+        ETag: stateEtag,
+        'Cache-Control': 'private, no-cache',
+        Vary: 'Accept-Encoding, Cookie'
+      });
       return;
     }
 
     if (req.method === 'GET' && reqUrl === '/stream') {
+      if (pruneExpiredStoreChats(store, Date.now())) {
+        onChanged?.(store);
+        scheduleBroadcast(25);
+      }
       if (viewer && recordUserLoginDay(store, viewer)) {
         store.version += 1;
         onChanged?.(store);
         scheduleBroadcast(50);
       }
+      const todayKey = getVietnamDateKey(Date.now());
+      let qLastVersion = NaN;
+      let qBootId = '';
+      let qDateKey = '';
+      try {
+        const parsedQuery = new URL(req.url || '/stream', 'http://localhost').searchParams;
+        if (parsedQuery.has('lastVersion')) {
+          qLastVersion = Number(parsedQuery.get('lastVersion'));
+        }
+        qBootId = String(parsedQuery.get('bootId') || '').trim();
+        qDateKey = String(parsedQuery.get('dateKey') || '').trim();
+      } catch {}
+
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -6939,13 +7534,39 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
       res.flushHeaders?.();
 
       sseClients.add(res);
+      const clientAlreadyCurrent = Boolean(
+        viewer &&
+        Number.isFinite(qLastVersion) &&
+        qLastVersion === store.version &&
+        qBootId &&
+        qBootId === (store._bootId || '') &&
+        qDateKey === todayKey
+      );
       sseClientUsers.set(
         res,
         viewer
-          ? { username: viewer.username, tokenVersion: viewer.tokenVersion || 1, sid: viewerPayload?.sid || '' }
+          ? {
+              username: viewer.username,
+              tokenVersion: viewer.tokenVersion || 1,
+              sid: viewerPayload?.sid || '',
+              lastSentVersion: store.version,
+              lastSentDateKey: todayKey
+            }
           : null
       );
-      res.write(`event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`);
+
+      if (clientAlreadyCurrent) {
+        res.write(
+          `event: sync_ack\ndata: ${JSON.stringify({
+            version: store.version,
+            bootId: store._bootId || '',
+            dateKey: todayKey,
+            serverTime: Date.now()
+          })}\n\n`
+        );
+      } else {
+        res.write(`event: sync\ndata: ${JSON.stringify(getSnapshotForViewer(store, viewer))}\n\n`);
+      }
 
       const keepAlive = setInterval(() => {
         try {
@@ -6954,7 +7575,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           clearInterval(keepAlive);
           sseClients.delete(res);
         }
-      }, 15000);
+      }, 25000);
 
       req.on('close', () => {
         clearInterval(keepAlive);

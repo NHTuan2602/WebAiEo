@@ -40,6 +40,9 @@ const MIME_TYPES = {
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -48,7 +51,12 @@ const MIME_TYPES = {
   '.gif': 'image/gif',
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
-  '.woff2': 'font/woff2'
+  '.woff2': 'font/woff2',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.webm': 'audio/webm'
 };
 
 /** Resolve optional persistent sync state path (Railway Volume if mounted, else local .data). */
@@ -83,9 +91,13 @@ function resolveStaticAssetPath(urlPathname) {
   return candidate;
 }
 
-const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg']);
+const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg', '.txt', '.xml', '.webmanifest']);
+const CACHEABLE_MEDIA_EXTS = new Set([
+  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.ico',
+  '.woff', '.woff2', '.mp3', '.wav', '.ogg', '.m4a', '.webm', '.webmanifest'
+]);
 const compressedAssetCache = new Map();
-const MAX_COMPRESSED_CACHE_ENTRIES = 48;
+const MAX_COMPRESSED_CACHE_ENTRIES = 64;
 
 function pickAcceptedEncoding(req) {
   const raw = String(req?.headers?.['accept-encoding'] || '').toLowerCase();
@@ -95,9 +107,30 @@ function pickAcceptedEncoding(req) {
   return '';
 }
 
-function getCompressedStaticBuffer(filePath, enc, isAsset) {
-  const cacheKey = `${filePath}:${enc}`;
-  if (isAsset && compressedAssetCache.has(cacheKey)) {
+function matchesIfNoneMatch(ifNoneMatchHeader, etag) {
+  if (!ifNoneMatchHeader || !etag) return false;
+  const target = String(etag).replace(/^W\//i, '').trim();
+  return String(ifNoneMatchHeader)
+    .split(',')
+    .some(part => {
+      const clean = part.trim();
+      return clean === '*' || clean.replace(/^W\//i, '').trim() === target;
+    });
+}
+
+function resolveStaticCacheControl(filePath, ext, isAsset) {
+  if (isAsset) return 'public, max-age=31536000, immutable';
+  const baseName = path.basename(filePath).toLowerCase();
+  if (baseName === 'sw-offline.js') return 'no-cache, max-age=0';
+  if (ext === '.html') return 'no-cache';
+  if (CACHEABLE_MEDIA_EXTS.has(ext)) return 'public, max-age=86400, stale-while-revalidate=604800';
+  if (ext === '.js' || ext === '.mjs' || ext === '.css') return 'public, max-age=3600';
+  return 'no-cache';
+}
+
+function getCompressedStaticBuffer(filePath, enc, mtimeMs) {
+  const cacheKey = `${filePath}:${Math.floor(mtimeMs || 0)}:${enc}`;
+  if (compressedAssetCache.has(cacheKey)) {
     return compressedAssetCache.get(cacheKey);
   }
   const rawBuf = fs.readFileSync(filePath);
@@ -111,32 +144,49 @@ function getCompressedStaticBuffer(filePath, enc, isAsset) {
       ? zlib.gzipSync(rawBuf, { level: 6 })
       : rawBuf;
   const result = compressed.length < rawBuf.length ? { encoding: enc, buffer: compressed } : { encoding: '', buffer: rawBuf };
-  if (isAsset) {
-    if (compressedAssetCache.size >= MAX_COMPRESSED_CACHE_ENTRIES) {
-      const oldestKey = compressedAssetCache.keys().next().value;
-      if (oldestKey) compressedAssetCache.delete(oldestKey);
-    }
-    compressedAssetCache.set(cacheKey, result);
+  if (compressedAssetCache.size >= MAX_COMPRESSED_CACHE_ENTRIES) {
+    const oldestKey = compressedAssetCache.keys().next().value;
+    if (oldestKey) compressedAssetCache.delete(oldestKey);
   }
+  compressedAssetCache.set(cacheKey, result);
   return result;
 }
 
-/** Stream a static file response with Brotli/Gzip compression, caching and MIME headers. */
+/** Stream a static file response with Brotli/Gzip compression, ETag/304 revalidation, caching and MIME headers. */
 function sendStaticFile(req, res, filePath, isAsset) {
   const ext = path.extname(filePath).toLowerCase();
+  let stat = null;
+  try {
+    stat = fs.statSync(filePath);
+  } catch {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.end('Not Found');
+    return;
+  }
+
+  const cacheControl = resolveStaticCacheControl(filePath, ext, isAsset);
+  const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`;
+  res.setHeader('Cache-Control', cacheControl);
+  res.setHeader('ETag', etag);
+  if (COMPRESSIBLE_EXTS.has(ext)) {
+    res.setHeader('Vary', 'Accept-Encoding');
+  }
+
+  if (matchesIfNoneMatch(req.headers?.['if-none-match'], etag)) {
+    res.statusCode = 304;
+    res.end();
+    return;
+  }
+
   res.statusCode = 200;
   res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
-  res.setHeader(
-    'Cache-Control',
-    isAsset ? 'public, max-age=31536000, immutable' : 'no-store'
-  );
 
   if (COMPRESSIBLE_EXTS.has(ext)) {
     const enc = pickAcceptedEncoding(req);
     try {
-      res.setHeader('Vary', 'Accept-Encoding');
       const { encoding, buffer } = enc
-        ? getCompressedStaticBuffer(filePath, enc, isAsset)
+        ? getCompressedStaticBuffer(filePath, enc, stat.mtimeMs)
         : { encoding: '', buffer: fs.readFileSync(filePath) };
       if (encoding) {
         res.setHeader('Content-Encoding', encoding);
@@ -158,14 +208,11 @@ function sendStaticFile(req, res, filePath, isAsset) {
     }
   }
 
-  try {
-    const stat = fs.statSync(filePath);
-    res.setHeader('Content-Length', String(stat.size));
-    if (req.method === 'HEAD') {
-      res.end();
-      return;
-    }
-  } catch {}
+  res.setHeader('Content-Length', String(stat.size));
+  if (req.method === 'HEAD') {
+    res.end();
+    return;
+  }
   const stream = fs.createReadStream(filePath);
   stream.on('error', () => {
     if (!res.headersSent) {

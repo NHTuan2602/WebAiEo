@@ -1370,6 +1370,9 @@ export default function App() {
   const skipNextVocabTopicsBroadcastRef = useRef(false);
   const lastSyncVersionRef = useRef(-1);
   const lastBootIdRef = useRef('');
+  const lastSyncEtagRef = useRef('');
+  const lastSyncDateKeyRef = useRef('');
+  const sseOpenRef = useRef(false);
   const lastSyncRejectionStatusRef = useRef(0);
   const chatScrollRef = useRef(null);
   const roomsDbRef = useRef(roomsDb);
@@ -1525,6 +1528,7 @@ export default function App() {
     }
     if (snap.authenticated === false) {
       lastSyncVersionRef.current = -1;
+      lastSyncEtagRef.current = '';
       if (snap.bootId) {
         lastBootIdRef.current = snap.bootId;
       }
@@ -1557,11 +1561,18 @@ export default function App() {
     if (snap.bootId) {
       if (lastBootIdRef.current && snap.bootId !== lastBootIdRef.current) {
         lastSyncVersionRef.current = -1;
+        lastSyncEtagRef.current = '';
       }
       lastBootIdRef.current = snap.bootId;
     }
+    if (typeof snap.dateKey === 'string' && snap.dateKey) {
+      lastSyncDateKeyRef.current = snap.dateKey;
+    }
     if (typeof snap.version === 'number') {
       if (snap.version < lastSyncVersionRef.current) return;
+      if (snap.version > lastSyncVersionRef.current) {
+        lastSyncEtagRef.current = '';
+      }
       lastSyncVersionRef.current = snap.version;
     }
     if (typeof snap.aiConfigured === 'boolean') {
@@ -1726,19 +1737,48 @@ export default function App() {
   };
 
   const pullServerSyncState = async (forceApply = false) => {
+    if (!forceApply && typeof document !== 'undefined' && document.hidden) {
+      return null;
+    }
     const epochAtStart = authEpochRef.current;
     try {
-      const res = await fetch('/api/sync/state', { cache: 'no-store' });
+      const headers = {};
+      let url = '/api/sync/state';
+      if (!forceApply) {
+        if (lastSyncEtagRef.current) {
+          headers['If-None-Match'] = lastSyncEtagRef.current;
+        }
+        const activeUname = currentUserRef.current?.username || '';
+        if (activeUname && lastSyncVersionRef.current >= 0 && lastBootIdRef.current && lastSyncDateKeyRef.current) {
+          const qs = new URLSearchParams({
+            sinceVersion: String(lastSyncVersionRef.current),
+            bootId: lastBootIdRef.current,
+            dateKey: lastSyncDateKeyRef.current,
+            user: activeUname
+          });
+          url = `/api/sync/state?${qs.toString()}`;
+        }
+      }
+      const res = await fetch(url, { cache: 'no-store', headers });
+      if (res.status === 304) {
+        if (epochAtStart !== authEpochRef.current) return null;
+        const freshEtag = res.headers.get('etag');
+        if (freshEtag) lastSyncEtagRef.current = freshEtag;
+        markServerSyncSuccess();
+        return null;
+      }
       if (!res.ok) {
         if (res.status >= 500) {
           markServerSyncFailure(res.status === 503);
         }
         return null;
       }
+      const responseEtag = res.headers.get('etag') || '';
       const snap = await res.json();
       if (epochAtStart !== authEpochRef.current) return null;
       markServerSyncSuccess();
       if (snap?.authenticated === false && !currentUserRef.current && !forceApply) {
+        if (responseEtag) lastSyncEtagRef.current = responseEtag;
         if (snap.bootId) lastBootIdRef.current = snap.bootId;
         if (typeof snap.aiConfigured === 'boolean') {
           setAiConfigured(snap.aiConfigured);
@@ -1749,6 +1789,7 @@ export default function App() {
       if (forceApply || isNewBoot || (typeof snap?.version === 'number' && snap.version > lastSyncVersionRef.current) || snap?.authenticated === false) {
         applyRemoteSnapshotData.current?.(snap);
       }
+      if (responseEtag) lastSyncEtagRef.current = responseEtag;
       return snap;
     } catch (_err) {
       markServerSyncFailure(false);
@@ -1922,18 +1963,52 @@ export default function App() {
     };
   }, []);
 
-  // Reconnect SSE stream & poll fallback whenever authenticated user changes (prevents stale pre-login stream logout)
+  // Reconnect SSE stream & lightweight visibility-aware fallback whenever authenticated user changes
   useEffect(() => {
     const activeUsername = currentUser?.username;
-    if (!activeUsername) return undefined;
+    if (!activeUsername) {
+      sseOpenRef.current = false;
+      lastSyncEtagRef.current = '';
+      return undefined;
+    }
 
     const streamEpoch = authEpochRef.current;
     let evtSource = null;
+    let lastFallbackPollAt = Date.now();
+    sseOpenRef.current = false;
+
+    const buildStreamUrl = () => {
+      const qs = new URLSearchParams();
+      if (lastSyncVersionRef.current >= 0) qs.set('lastVersion', String(lastSyncVersionRef.current));
+      if (lastBootIdRef.current) qs.set('bootId', lastBootIdRef.current);
+      if (lastSyncDateKeyRef.current) qs.set('dateKey', lastSyncDateKeyRef.current);
+      const q = qs.toString();
+      return q ? `/api/sync/stream?${q}` : '/api/sync/stream';
+    };
 
     if (typeof EventSource !== 'undefined') {
-      evtSource = new EventSource('/api/sync/stream');
+      evtSource = new EventSource(buildStreamUrl());
+      evtSource.onopen = () => {
+        if (streamEpoch !== authEpochRef.current) return;
+        sseOpenRef.current = true;
+        markServerSyncSuccess();
+      };
+      evtSource.addEventListener('sync_ack', (e) => {
+        if (streamEpoch !== authEpochRef.current) return;
+        sseOpenRef.current = true;
+        try {
+          const ack = JSON.parse(e.data);
+          if (ack?.bootId) lastBootIdRef.current = ack.bootId;
+          if (ack?.dateKey) lastSyncDateKeyRef.current = ack.dateKey;
+          if (typeof ack?.version === 'number' && ack.version > lastSyncVersionRef.current) {
+            lastSyncVersionRef.current = ack.version;
+          }
+        } catch {}
+        markServerSyncSuccess();
+      });
       evtSource.addEventListener('sync', (e) => {
         if (streamEpoch !== authEpochRef.current) return;
+        sseOpenRef.current = true;
         try {
           const parsed = JSON.parse(e.data);
           markServerSyncSuccess();
@@ -1942,18 +2017,44 @@ export default function App() {
       });
       evtSource.onerror = () => {
         if (streamEpoch !== authEpochRef.current) return;
+        sseOpenRef.current = false;
         serverSyncConnectedRef.current = false;
         setServerSyncConnected(false);
       };
     }
 
+    // Adaptive fallback poll:
+    // - Paused completely when tab is hidden (0 background egress)
+    // - When SSE is connected: conditional 304 safety check every 30s
+    // - When SSE is disconnected: conditional 304 fallback every 5s
     const pollTimer = setInterval(() => {
       if (streamEpoch !== authEpochRef.current) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const now = Date.now();
+      const isSseHealthy = Boolean(sseOpenRef.current && evtSource && evtSource.readyState === 1);
+      const minIntervalMs = isSseHealthy ? 30_000 : 5_000;
+      if (now - lastFallbackPollAt < minIntervalMs) return;
+      lastFallbackPollAt = now;
       pullServerSyncState(false);
-    }, 1500);
+    }, 5000);
+
+    const handleVisibilityChange = () => {
+      if (streamEpoch !== authEpochRef.current) return;
+      if (typeof document !== 'undefined' && !document.hidden) {
+        lastFallbackPollAt = Date.now();
+        pullServerSyncState(false);
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
 
     return () => {
       clearInterval(pollTimer);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+      sseOpenRef.current = false;
       evtSource?.close();
     };
   }, [currentUser?.username]);
@@ -1977,9 +2078,23 @@ export default function App() {
   useEffect(() => {
     if (!serverOutageActive) return undefined;
     const retryTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       verifyServerHealthNow(false);
-    }, 3500);
-    return () => clearInterval(retryTimer);
+    }, 6000);
+    const handleVisibleRetry = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        verifyServerHealthNow(false);
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibleRetry);
+    }
+    return () => {
+      clearInterval(retryTimer);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibleRetry);
+      }
+    };
   }, [serverOutageActive]);
 
   // Tick timer for Crewmate speech bubbles + 10-minute chat cycle sweep + auto-scroll Lobby Chat while in Lobby

@@ -2376,7 +2376,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   </label>
                   <input
                     type="text"
-                    value={activeTrack?.audioUrl?.startsWith('data:') ? '' : (activeTrack?.audioUrl || '')}
+                    value={activeTrack?.audioUrl?.startsWith('data:') || activeTrack?.audioUrl?.startsWith('/api/sync/') ? '' : (activeTrack?.audioUrl || '')}
                     onChange={e =>
                       updateListeningTrackField(activeIdx, {
                         audioUrl: e.target.value,
@@ -2461,7 +2461,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                             </label>
                             <input
                               type="text"
-                              value={activeTrack?.imageUrl?.startsWith('data:') ? '' : (activeTrack?.imageUrl || '')}
+                              value={activeTrack?.imageUrl?.startsWith('data:') || activeTrack?.imageUrl?.startsWith('/api/sync/') ? '' : (activeTrack?.imageUrl || '')}
                               onChange={e => updateListeningTrackField(activeIdx, { imageUrl: e.target.value })}
                               placeholder="https://example.com/listening-map.png"
                               className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -2744,7 +2744,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           </label>
                           <input
                             type="text"
-                            value={activePassage?.imageUrl?.startsWith('data:') ? '' : (activePassage?.imageUrl || '')}
+                            value={activePassage?.imageUrl?.startsWith('data:') || activePassage?.imageUrl?.startsWith('/api/sync/') ? '' : (activePassage?.imageUrl || '')}
                             onChange={e => updateReadingPassageField(activeIdx, { imageUrl: e.target.value })}
                             placeholder="https://example.com/reading-diagram.png"
                             className="w-full px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"

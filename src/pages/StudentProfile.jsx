@@ -73,6 +73,7 @@ import {
   hasActiveAieoVip,
   hasCustomCoverPermission,
   hasUnlockedAvatarFrame,
+  isSyncMediaUrl,
   normalizePaymentConfig,
   resolveStudentTitleSummary,
   resolveUserVipNameVisual,
@@ -262,7 +263,7 @@ export default function StudentProfile({
   const hasCustomCover = Boolean(
     studentHasCoverPermission &&
     student.profileCoverUrl &&
-    (student.profileCoverUrl.startsWith('data:image/') || student.profileCoverUrl.startsWith('https://'))
+    (student.profileCoverUrl.startsWith('data:image/') || student.profileCoverUrl.startsWith('https://') || isSyncMediaUrl(student.profileCoverUrl))
   );
 
   const openCustomizeModal = () => {
@@ -3420,7 +3421,7 @@ export default function StudentProfile({
                 const previewCoverOk = Boolean(
                   canUseCustomCover &&
                   customDraft.profileCoverUrl &&
-                  (customDraft.profileCoverUrl.startsWith('data:image/') || customDraft.profileCoverUrl.startsWith('https://'))
+                  (customDraft.profileCoverUrl.startsWith('data:image/') || customDraft.profileCoverUrl.startsWith('https://') || isSyncMediaUrl(customDraft.profileCoverUrl))
                 );
                 const previewUser = {
                   ...student,
@@ -3546,7 +3547,7 @@ export default function StudentProfile({
                           }}
                         />
                       </label>
-                      {customDraft.profileCoverUrl?.startsWith('data:image/') && (
+                      {(customDraft.profileCoverUrl?.startsWith('data:image/') || isSyncMediaUrl(customDraft.profileCoverUrl)) && (
                         <button
                           type="button"
                           onClick={() => setCoverCropSource(customDraft.profileCoverUrl)}
