@@ -157,6 +157,15 @@ export default function StudentProfile({
   const [titleFilter, setTitleFilter] = useState('all');
   const [profileHistoryPage, setProfileHistoryPage] = useState(1);
   const [donateAmount, setDonateAmount] = useState(0);
+  const [isCustomDonateMode, setIsCustomDonateMode] = useState(true);
+  const [customDonateInput, setCustomDonateInput] = useState('');
+  const [qrDonateAmount, setQrDonateAmount] = useState(0);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQrDonateAmount(donateAmount);
+    }, isCustomDonateMode ? 350 : 0);
+    return () => clearTimeout(timer);
+  }, [donateAmount, isCustomDonateMode]);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [checkoutModalState, setCheckoutModalState] = useState(null);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
@@ -1344,7 +1353,7 @@ export default function StudentProfile({
           bankCode: donateBankCode,
           accountNumber: donateAccountNumber,
           accountName: donateAccountName,
-          amount: donateAmount,
+          amount: qrDonateAmount,
           addInfo: donateAddInfo
         });
         const adminDonateQrSrc = normalizedPayCfg.donateQrUrl || dynamicDonateQr;
@@ -1392,9 +1401,13 @@ export default function StudentProfile({
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border border-[#E2E8F0] dark:border-zinc-700 text-xs font-bold">
                     <Heart className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Quỹ Duy Trì Website &amp; Server
                   </span>
-                  {donateAmount > 0 && (
-                    <span className="px-2.5 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 text-[#1E293B] dark:text-[#E4E4E7] text-xs font-bold">
-                      Mức gợi ý: {formatVndCurrency(donateAmount)}
+                  {donateAmount > 0 ? (
+                    <span className="px-2.5 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-950/60 border border-[#B5F5F1] dark:border-teal-700 text-[#0F766E] dark:text-[#1EE1D6] text-xs font-bold tabular-nums">
+                      Số tiền trên QR: {formatVndCurrency(donateAmount)}
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 text-[#475569] dark:text-zinc-300 text-xs font-semibold">
+                      QR tùy tâm (nhập tiền bất kỳ)
                     </span>
                   )}
                 </div>
@@ -1410,27 +1423,102 @@ export default function StudentProfile({
                 </div>
 
                 {!normalizedPayCfg.donateQrUrl && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {[
-                      { val: 0, label: 'Tùy tâm' },
-                      { val: 10000, label: '10.000đ' },
-                      { val: 20000, label: '20.000đ' },
-                      { val: 50000, label: '50.000đ' },
-                      { val: 100000, label: '100.000đ' }
-                    ].map(opt => (
+                  <div className="space-y-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button
-                        key={opt.val}
                         type="button"
-                        onClick={() => setDonateAmount(opt.val)}
+                        onClick={() => {
+                          setIsCustomDonateMode(true);
+                          const parsed = Number(String(customDonateInput || '').replace(/\D/g, '')) || 0;
+                          setDonateAmount(Math.min(50_000_000, parsed));
+                        }}
                         className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold border transition ${
-                          donateAmount === opt.val
+                          isCustomDonateMode
                             ? 'bg-[#0F766E] text-white border-[#0F766E]'
                             : 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700 hover:border-slate-400 dark:hover:border-zinc-500'
                         }`}
                       >
-                        {opt.label}
+                        Tùy tâm
                       </button>
-                    ))}
+                      {[
+                        { val: 10000, label: '10.000đ' },
+                        { val: 20000, label: '20.000đ' },
+                        { val: 50000, label: '50.000đ' },
+                        { val: 100000, label: '100.000đ' }
+                      ].map(opt => (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => {
+                            setIsCustomDonateMode(false);
+                            setDonateAmount(opt.val);
+                            setQrDonateAmount(opt.val);
+                          }}
+                          className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold border transition ${
+                            !isCustomDonateMode && donateAmount === opt.val
+                              ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                              : 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700 hover:border-slate-400 dark:hover:border-zinc-500'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {isCustomDonateMode && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative flex-1 min-w-[200px] max-w-xs">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={customDonateInput}
+                            onChange={e => {
+                              const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                              if (!digits) {
+                                setCustomDonateInput('');
+                                setDonateAmount(0);
+                                return;
+                              }
+                              const num = Math.min(50_000_000, Number(digits));
+                              setCustomDonateInput(num.toLocaleString('vi-VN'));
+                              setDonateAmount(num);
+                            }}
+                            onBlur={() => setQrDonateAmount(donateAmount)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                setQrDonateAmount(donateAmount);
+                              }
+                            }}
+                            placeholder="Nhập số tiền tùy tâm (VD: 15.000)..."
+                            aria-label="Nhập số tiền ủng hộ tùy tâm (VNĐ)"
+                            className="w-full pl-3 pr-14 py-2 rounded-lg text-xs font-bold tabular-nums bg-[#F8FAFC] dark:bg-zinc-900 text-[#0F172B] dark:text-[#FAFAFA] border border-[#CBD5E1] dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#475569] dark:text-zinc-400 pointer-events-none">
+                            VNĐ
+                          </span>
+                        </div>
+                        {customDonateInput && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomDonateInput('');
+                              setDonateAmount(0);
+                              setQrDonateAmount(0);
+                            }}
+                            className="px-2.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 transition"
+                            title="Xóa số tiền để dùng mã QR mở"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                        <span className="text-xs text-[#475569] dark:text-zinc-400">
+                          {donateAmount > 0
+                            ? 'Mã QR tự động điền đúng số tiền bạn nhập.'
+                            : 'Để trống nếu muốn tự nhập tiền trên app ngân hàng.'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 

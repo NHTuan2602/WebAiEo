@@ -3437,7 +3437,14 @@ export function buildVietQrImageUrl({
   const cleanBank = String(bankCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   const cleanAccount = String(accountNumber || '').trim().replace(/[^a-zA-Z0-9]/g, '');
   if (!cleanBank || !cleanAccount || cleanAccount.length < 4) return '';
-  const safeAmount = Math.max(0, Math.round(Number(amount) || CUSTOM_COVER_UNLOCK_PRICE_VND));
+  const parsedAmount =
+    amount === '' || amount === null || amount === undefined
+      ? CUSTOM_COVER_UNLOCK_PRICE_VND
+      : Number(amount);
+  const safeAmount =
+    Number.isFinite(parsedAmount) && parsedAmount >= 0
+      ? Math.min(50_000_000, Math.round(parsedAmount))
+      : CUSTOM_COVER_UNLOCK_PRICE_VND;
   const params = new URLSearchParams();
   if (safeAmount > 0) params.set('amount', String(safeAmount));
   if (addInfo) params.set('addInfo', String(addInfo).trim().slice(0, 60));
