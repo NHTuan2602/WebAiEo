@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 import { attachSyncMiddleware, createPersistentSyncStore } from './syncPlugin.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -82,8 +83,46 @@ function resolveStaticAssetPath(urlPathname) {
   return candidate;
 }
 
-/** Stream a static file response with appropriate caching and MIME headers. */
-function sendStaticFile(res, filePath, isAsset) {
+const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg']);
+const compressedAssetCache = new Map();
+const MAX_COMPRESSED_CACHE_ENTRIES = 48;
+
+function pickAcceptedEncoding(req) {
+  const raw = String(req?.headers?.['accept-encoding'] || '').toLowerCase();
+  if (!raw) return '';
+  if (/\bbr\b/.test(raw)) return 'br';
+  if (/\bgzip\b/.test(raw)) return 'gzip';
+  return '';
+}
+
+function getCompressedStaticBuffer(filePath, enc, isAsset) {
+  const cacheKey = `${filePath}:${enc}`;
+  if (isAsset && compressedAssetCache.has(cacheKey)) {
+    return compressedAssetCache.get(cacheKey);
+  }
+  const rawBuf = fs.readFileSync(filePath);
+  if (rawBuf.length < 512) return { encoding: '', buffer: rawBuf };
+  const compressed =
+    enc === 'br'
+      ? zlib.brotliCompressSync(rawBuf, {
+          params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 }
+        })
+      : enc === 'gzip'
+      ? zlib.gzipSync(rawBuf, { level: 6 })
+      : rawBuf;
+  const result = compressed.length < rawBuf.length ? { encoding: enc, buffer: compressed } : { encoding: '', buffer: rawBuf };
+  if (isAsset) {
+    if (compressedAssetCache.size >= MAX_COMPRESSED_CACHE_ENTRIES) {
+      const oldestKey = compressedAssetCache.keys().next().value;
+      if (oldestKey) compressedAssetCache.delete(oldestKey);
+    }
+    compressedAssetCache.set(cacheKey, result);
+  }
+  return result;
+}
+
+/** Stream a static file response with Brotli/Gzip compression, caching and MIME headers. */
+function sendStaticFile(req, res, filePath, isAsset) {
   const ext = path.extname(filePath).toLowerCase();
   res.statusCode = 200;
   res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
@@ -91,6 +130,42 @@ function sendStaticFile(res, filePath, isAsset) {
     'Cache-Control',
     isAsset ? 'public, max-age=31536000, immutable' : 'no-store'
   );
+
+  if (COMPRESSIBLE_EXTS.has(ext)) {
+    const enc = pickAcceptedEncoding(req);
+    try {
+      res.setHeader('Vary', 'Accept-Encoding');
+      const { encoding, buffer } = enc
+        ? getCompressedStaticBuffer(filePath, enc, isAsset)
+        : { encoding: '', buffer: fs.readFileSync(filePath) };
+      if (encoding) {
+        res.setHeader('Content-Encoding', encoding);
+      }
+      res.setHeader('Content-Length', String(buffer.length));
+      if (req.method === 'HEAD') {
+        res.end();
+        return;
+      }
+      res.end(buffer);
+      return;
+    } catch {
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      }
+      res.end('Internal asset read error');
+      return;
+    }
+  }
+
+  try {
+    const stat = fs.statSync(filePath);
+    res.setHeader('Content-Length', String(stat.size));
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+  } catch {}
   const stream = fs.createReadStream(filePath);
   stream.on('error', () => {
     if (!res.headersSent) {
@@ -146,7 +221,7 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
       if (pathname === '/server-maintenance.jpg' || pathname === '/maintenance.html' || pathname === '/sw-offline.js') {
         const assetPath = resolveStaticAssetPath(pathname);
         if (assetPath && fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
-          sendStaticFile(res, assetPath, false);
+          sendStaticFile(req, res, assetPath, false);
           return;
         }
       }
@@ -182,12 +257,12 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
 
     const targetPath = resolveStaticAssetPath(pathname);
     if (targetPath && fs.existsSync(targetPath) && fs.statSync(targetPath).isFile()) {
-      sendStaticFile(res, targetPath, pathname.startsWith('/assets/'));
+      sendStaticFile(req, res, targetPath, pathname.startsWith('/assets/'));
       return;
     }
 
     if (!path.extname(pathname) && fs.existsSync(INDEX_HTML_PATH)) {
-      sendStaticFile(res, INDEX_HTML_PATH, false);
+      sendStaticFile(req, res, INDEX_HTML_PATH, false);
       return;
     }
 

@@ -267,7 +267,7 @@ export default function Navbar({
             )}
           </div>
 
-          {!isTeacher && !currentUser?.isSuperAdmin && (
+          {(!isTeacher || isSuperAdmin) && (
             <div className="relative shrink-0" ref={notifBoxRef}>
               <button
                 type="button"
@@ -277,7 +277,7 @@ export default function Navbar({
                     ? 'bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 border-slate-200 dark:border-zinc-700'
                     : 'text-[#475569] dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 border-transparent'
                 }`}
-                title="Thông báo bài tập & đề thi"
+                title={isSuperAdmin ? 'Thông báo nạp tiền & hệ thống (Admin)' : 'Thông báo bài tập & đề thi'}
                 aria-label="Thông báo"
               >
                 <Bell className="w-4 h-4" />
@@ -294,7 +294,7 @@ export default function Navbar({
                     <div>
                       <h4 className="text-xs font-extrabold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5">
                         <Bell className="w-3.5 h-3.5 text-slate-700 dark:text-zinc-200" />
-                        Thông Báo Lớp Học ({notifList.length})
+                        {isSuperAdmin ? `Thông Báo Admin & Nạp Tiền (${notifList.length})` : `Thông Báo Lớp Học (${notifList.length})`}
                       </h4>
                       <p className="text-xs text-[#475569] dark:text-zinc-400">
                         {unreadNotifCount > 0 ? `${unreadNotifCount} thông báo chưa đọc` : 'Đã xem hết tất cả thông báo'}

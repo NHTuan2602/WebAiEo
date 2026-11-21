@@ -333,6 +333,7 @@ export default function App() {
   const [showVipPromoModal, setShowVipPromoModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [sentNotifications, setSentNotifications] = useState([]);
+  const [adminPaymentHistory, setAdminPaymentHistory] = useState([]);
   const [classesDb, setClassesDb] = useState({});
   const [customTitles, setCustomTitles] = useState([]);
   const [speakingUnlockTokens, setSpeakingUnlockTokens] = useState(() => {
@@ -1628,6 +1629,9 @@ export default function App() {
     if (Array.isArray(snap.adminFeedbacks)) {
       setAdminFeedbacks(prev => (JSON.stringify(prev) === JSON.stringify(snap.adminFeedbacks) ? prev : snap.adminFeedbacks));
     }
+    if (Array.isArray(snap.adminPaymentHistory)) {
+      setAdminPaymentHistory(prev => (JSON.stringify(prev) === JSON.stringify(snap.adminPaymentHistory) ? prev : snap.adminPaymentHistory));
+    }
     if (Array.isArray(snap.sentNotifications)) {
       setSentNotifications(prev => (JSON.stringify(prev) === JSON.stringify(snap.sentNotifications) ? prev : snap.sentNotifications));
     }
@@ -1649,13 +1653,19 @@ export default function App() {
     if (Array.isArray(snap.notifications)) {
       const nextNotifs = snap.notifications;
       const viewerRole = currentUserRef.current?.role;
-      const isViewerTeacherOrAdmin = viewerRole === 'teacher' || Boolean(currentUserRef.current?.isSuperAdmin);
-      if (!isViewerTeacherOrAdmin && seenNotifIdsRef.current !== null && currentUserRef.current?.username) {
+      const isViewerSuperAdmin = Boolean(currentUserRef.current?.isSuperAdmin);
+      const isNonAdminTeacher = viewerRole === 'teacher' && !isViewerSuperAdmin;
+      if (!isNonAdminTeacher && seenNotifIdsRef.current !== null && currentUserRef.current?.username) {
         const freshlyArrived = nextNotifs.find(
           n => n && !n.isRead && !seenNotifIdsRef.current.has(n.id) && n.createdBy !== currentUserRef.current?.username
         );
         if (freshlyArrived) {
-          showToast(`🔔 ${freshlyArrived.title}: ${freshlyArrived.message}`, 'info');
+          showToast(
+            freshlyArrived.type === 'payment'
+              ? `${freshlyArrived.title}`
+              : `🔔 ${freshlyArrived.title}: ${freshlyArrived.message}`,
+            freshlyArrived.type === 'payment' ? 'success' : 'info'
+          );
         }
       }
       seenNotifIdsRef.current = new Set(nextNotifs.map(n => n?.id).filter(Boolean));
@@ -2473,6 +2483,12 @@ export default function App() {
     if (!notif) return;
     if (!notif.isRead) {
       handleMarkNotificationsRead(notif.id);
+    }
+    if (notif.type === 'payment' || notif.payerUsername) {
+      if (currentUser?.isSuperAdmin) {
+        openMemberProfile(currentUser.username, view);
+        return;
+      }
     }
     if (notif.roomPin) {
       setJoinedRoomPin(notif.roomPin);
@@ -3840,6 +3856,7 @@ export default function App() {
     seenNotifIdsRef.current = null;
     setNotifications([]);
     setSentNotifications([]);
+    setAdminPaymentHistory([]);
     setCustomTitles([]);
     setSpeakingUnlockTokens({});
     setExamUnlockTokens({});
@@ -7357,6 +7374,7 @@ export default function App() {
       {view === 'STUDENT_PROFILE' && (
         <StudentProfile
           adminFeedbacks={adminFeedbacks}
+          adminPaymentHistory={adminPaymentHistory}
           attempts={attempts}
           classesDb={classesDb}
           currentRoomPin={currentRoomPin}

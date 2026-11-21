@@ -2536,6 +2536,8 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     user?.customCoverUnlocked ||
     Number(user?.skillPracticeExpiresAt) > 0 ||
     Number(user?.aieoVipExpiresAt) > 0 ||
+    Number(user?.donatedTotalVnd) > 0 ||
+    Number(user?.totalPaidVnd) > 0 ||
     (Array.isArray(user?.purchasedTitleIds) && user.purchasedTitleIds.length > 0)
   );
 
@@ -3249,6 +3251,7 @@ export function evaluateTitleUnlockNotification({
 // ==========================================
 
 export const CUSTOM_COVER_UNLOCK_PRICE_VND = 5000;
+export const MIN_DONATE_AMOUNT_VND = 5000;
 
 export const VIETQR_BANK_OPTIONS = [
   { code: 'MB', name: 'MB Bank (Quân Đội)' },

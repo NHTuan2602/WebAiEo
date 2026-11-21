@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import QRCode from 'qrcode';
 import {
   buildSpeakingExaminerPrompt,
@@ -42,6 +43,7 @@ import {
   PERIODIC_MOCK_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
   AIEO_VIP_PRICE_VND,
+  MIN_DONATE_AMOUNT_VND,
   SUBSCRIPTION_DURATION_MS,
   canCreateFriendRoomNow,
   computeDailyLeaderboardTitleHolders,
@@ -51,6 +53,7 @@ import {
   getRealExamCredits,
   getTestPurchasePriceVnd,
   getTitlePriceVnd,
+  getVietnamDateKey,
   hasCustomCoverPermission,
   hasAnimatedAvatarPermission,
   hasSkillPracticeAccess,
@@ -775,6 +778,12 @@ function sanitizeUserForViewer(user, viewer) {
   if (viewer && (viewer.username === user.username || viewer.role === 'teacher')) {
     safe.email = typeof user.email === 'string' ? user.email : '';
   }
+  if (viewer && (viewer.username === user.username || viewer.isSuperAdmin)) {
+    safe.totalPaidVnd = Math.max(0, Math.round(Number(user.totalPaidVnd) || 0));
+    safe.donatedTotalVnd = Math.max(0, Math.round(Number(user.donatedTotalVnd) || 0));
+    safe.paidCount = Math.max(0, Math.floor(Number(user.paidCount) || 0));
+    safe.lastPaidAt = Number(user.lastPaidAt) || 0;
+  }
   if (viewer && viewer.username === user.username && Array.isArray(user.acknowledgedTitleIds)) {
     safe.acknowledgedTitleIds = user.acknowledgedTitleIds;
   }
@@ -1178,6 +1187,7 @@ function createInitialStore(audioDir = '') {
     paymentConfig: normalizePaymentConfig({}),
     paymentSecrets: { sepayApiKey: '', payosClientId: '', payosApiKey: '', payosChecksumKey: '' },
     paymentOrders: [],
+    paymentTransactions: [],
     processedWebhookTxIds: [],
     mailConfig: {
       provider: 'none',
@@ -1199,6 +1209,7 @@ function createInitialStore(audioDir = '') {
     _otpChallenges: new Map(),
     _unlockedSpeakingRooms: new Map(),
     _unlockedExamRooms: new Map(),
+    _dailyRankCache: null,
     _audioDir: audioDir,
     _audioMem: new Map(),
     _protectedCredentialsVersion: 0
@@ -1348,6 +1359,31 @@ function applyParsedStoreSnapshot(store, parsed) {
   if (Array.isArray(parsed.paymentOrders)) {
     store.paymentOrders = parsed.paymentOrders.filter(o => o && o.orderCode && o.username).slice(0, 500);
   }
+  if (Array.isArray(parsed.paymentTransactions)) {
+    store.paymentTransactions = parsed.paymentTransactions
+      .filter(tx => tx && tx.id && tx.username)
+      .slice(0, 500);
+  } else if (Array.isArray(store.paymentOrders) && store.paymentOrders.length > 0) {
+    // Backfill historical paid orders into paymentTransactions on upgrade
+    store.paymentTransactions = store.paymentOrders
+      .filter(o => o && o.status === 'paid' && o.username)
+      .slice(0, 500)
+      .map(o => ({
+        id: `ptx_${o.orderCode}`,
+        orderCode: o.orderCode,
+        username: o.username,
+        userName: store.users?.[o.username]?.name || o.username,
+        itemType: o.itemType || 'cover',
+        itemLabel: o.itemLabel || 'Thanh toán',
+        amount: Math.max(0, Math.round(Number(o.paidAmount || o.amount) || 0)),
+        status: 'paid',
+        gateway: o.gateway || 'auto',
+        txId: o.txId || '',
+        note: '',
+        paidAt: Number(o.paidAt) || Number(o.createdAt) || Date.now(),
+        createdAt: Number(o.createdAt) || Number(o.paidAt) || Date.now()
+      }));
+  }
   if (Array.isArray(parsed.processedWebhookTxIds)) {
     store.processedWebhookTxIds = parsed.processedWebhookTxIds.map(String).filter(Boolean).slice(0, 500);
   }
@@ -1439,7 +1475,18 @@ export function createPersistentSyncStore(persistFile = '') {
     const tmpFile = `${persistFile}.${process.pid}.${Date.now()}.tmp`;
     try {
       fs.mkdirSync(path.dirname(persistFile), { recursive: true });
-      const { _audioDir, _audioMem, _rateLimits, _otpChallenges, _unlockedSpeakingRooms, _bootId, _localMutated, ...serializableStore } = store;
+      const {
+        _audioDir,
+        _audioMem,
+        _rateLimits,
+        _otpChallenges,
+        _unlockedSpeakingRooms,
+        _unlockedExamRooms,
+        _dailyRankCache,
+        _bootId,
+        _localMutated,
+        ...serializableStore
+      } = store;
       const serialized = JSON.stringify(serializableStore);
       fs.writeFileSync(tmpFile, serialized, 'utf8');
       if (fs.existsSync(persistFile) && backupFile) {
@@ -1593,7 +1640,11 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     return isViewerSuperAdmin || fb.authorUsername === viewer?.username;
   });
 
-  return { supportAdminProfile, adminFeedbacks };
+  const adminPaymentHistory = isViewerSuperAdmin
+    ? (Array.isArray(store.paymentTransactions) ? store.paymentTransactions : []).slice(0, 200)
+    : [];
+
+  return { supportAdminProfile, adminFeedbacks, adminPaymentHistory };
 }
 
 function normalizeClassIdList(rawIds) {
@@ -1654,7 +1705,7 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
   const title = String(notif.title || '').trim().slice(0, 140);
   const message = String(notif.message || '').trim().slice(0, 500);
   if (!title || !message) return null;
-  const type = ['exam', 'exercise', 'game', 'announcement'].includes(notif.type) ? notif.type : 'announcement';
+  const type = ['exam', 'exercise', 'game', 'announcement', 'payment'].includes(notif.type) ? notif.type : 'announcement';
   const targetClassIds = normalizeClassIdList(notif.targetClassIds);
   const targetUsernames = Array.isArray(notif.targetUsernames)
     ? Array.from(new Set(notif.targetUsernames.map(u => String(u || '').trim()).filter(Boolean))).slice(0, 100)
@@ -1669,6 +1720,7 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
     type,
     testId: notif.testId ? String(notif.testId) : '',
     roomPin: notif.roomPin ? String(notif.roomPin) : '',
+    payerUsername: notif.payerUsername ? String(notif.payerUsername).trim().slice(0, 64) : '',
     targetClassIds,
     targetClassNames,
     targetUsernames,
@@ -1680,8 +1732,105 @@ function appendStoreNotification(store, notif = {}, viewer = null) {
     dismissedBy: Array.isArray(notif.dismissedBy) ? [...new Set(notif.dismissedBy)] : []
   };
   const prevList = Array.isArray(store.notifications) ? store.notifications : [];
-  store.notifications = [item, ...prevList].slice(0, 80);
+  store.notifications = [item, ...prevList].slice(0, 120);
   return item;
+}
+
+function recordPaymentTransactionAndNotifyAdmin(
+  store,
+  {
+    orderCode = '',
+    username = '',
+    userName = '',
+    itemType = 'donate',
+    itemLabel = 'Ủng hộ duy trì trang web',
+    amount = 0,
+    status = 'paid',
+    gateway = 'auto',
+    txId = '',
+    note = '',
+    paidAt = 0
+  } = {}
+) {
+  const cleanUser = String(username || '').trim();
+  if (!cleanUser) return null;
+  const userKey = findUserKeyInStore(store, cleanUser) || cleanUser;
+  const userRec = store.users?.[userKey];
+  const displayName = String(userName || userRec?.name || userKey).trim().slice(0, 80);
+  const cleanAmount = Math.max(0, Math.round(Number(amount) || 0));
+  const nowMs = Date.now();
+  const cleanOrderCode = String(orderCode || '').trim().slice(0, 32);
+  const cleanTxId = String(txId || '').trim().slice(0, 80);
+  const cleanNote = String(note || '').trim().slice(0, 180);
+  const cleanLabel = String(itemLabel || 'Thanh toán').trim().slice(0, 140);
+
+  if (!Array.isArray(store.paymentTransactions)) store.paymentTransactions = [];
+  const existingIdx = store.paymentTransactions.findIndex(
+    t =>
+      t &&
+      ((cleanTxId && t.txId && t.txId === cleanTxId) ||
+        (cleanOrderCode && t.orderCode && t.orderCode === cleanOrderCode && t.username === userKey))
+  );
+
+  const record = {
+    id: existingIdx >= 0 ? store.paymentTransactions[existingIdx].id : `ptx_${nowMs}_${Math.random().toString(36).slice(2, 6)}`,
+    orderCode: cleanOrderCode || (existingIdx >= 0 ? store.paymentTransactions[existingIdx].orderCode : ''),
+    username: userKey,
+    userName: displayName,
+    itemType: String(itemType || 'donate').slice(0, 32),
+    itemLabel: cleanLabel,
+    amount: cleanAmount,
+    status: status === 'paid' ? 'paid' : 'reported',
+    gateway: String(gateway || 'auto').slice(0, 32),
+    txId: cleanTxId,
+    note: cleanNote,
+    paidAt: status === 'paid' ? (Number(paidAt) || nowMs) : 0,
+    createdAt: existingIdx >= 0 ? (Number(store.paymentTransactions[existingIdx].createdAt) || nowMs) : nowMs
+  };
+
+  if (existingIdx >= 0) {
+    store.paymentTransactions[existingIdx] = record;
+  } else {
+    store.paymentTransactions = [record, ...store.paymentTransactions].slice(0, 500);
+  }
+
+  const gatewayLabel =
+    gateway === 'payos'
+      ? 'PayOS'
+      : gateway === 'sepay'
+      ? 'SePay'
+      : gateway === 'manual_donate'
+      ? 'Ủng hộ tùy tâm'
+      : gateway === 'manual_request'
+      ? 'Chuyển khoản tay'
+      : 'Hệ thống';
+
+  if (userKey !== SUPER_ADMIN_USERNAME) {
+    const notifTitle =
+      record.status === 'paid'
+        ? `💰 +${formatVndCurrency(cleanAmount)} từ ${displayName} (@${userKey})`
+        : `🔔 ${displayName} (@${userKey}) báo chuyển ${formatVndCurrency(cleanAmount)}`;
+    const notifMsg =
+      record.status === 'paid'
+        ? `Tài khoản ${displayName} (@${userKey}) đã nạp/thanh toán thành công ${formatVndCurrency(cleanAmount)} cho "${cleanLabel}" qua ${gatewayLabel}${cleanOrderCode ? ` (mã ${cleanOrderCode})` : ''}.`
+        : `Tài khoản ${displayName} (@${userKey}) vừa báo đã chuyển khoản ${formatVndCurrency(cleanAmount)} — "${cleanLabel}"${cleanNote ? ` · Lời nhắn: "${cleanNote}"` : ''}. Mở Hồ sơ Admin để đối chiếu & xác nhận.`;
+
+    appendStoreNotification(
+      store,
+      {
+        title: notifTitle,
+        message: notifMsg,
+        type: 'payment',
+        payerUsername: userKey,
+        targetUsernames: [SUPER_ADMIN_USERNAME],
+        createdBy: userKey,
+        createdByName: displayName
+      },
+      null
+    );
+  }
+
+  return record;
 }
 
 function serializeNotificationItem(n, uname = '') {
@@ -1693,6 +1842,7 @@ function serializeNotificationItem(n, uname = '') {
     type: n.type || 'announcement',
     testId: n.testId || '',
     roomPin: n.roomPin || '',
+    payerUsername: n.payerUsername || '',
     targetClassIds: normalizeClassIdList(n.targetClassIds),
     targetClassNames: Array.isArray(n.targetClassNames) ? n.targetClassNames : [],
     targetUsernames: Array.isArray(n.targetUsernames) ? n.targetUsernames : [],
@@ -1706,12 +1856,26 @@ function serializeNotificationItem(n, uname = '') {
 }
 
 function serializeNotificationsForViewer(store, viewer) {
-  if (!viewer || viewer.role === 'teacher' || viewer.isSuperAdmin) {
+  if (!viewer) return [];
+  const isViewerSuperAdmin = Boolean(viewer.isSuperAdmin || viewer.username === SUPER_ADMIN_USERNAME);
+  if (viewer.role === 'teacher' && !isViewerSuperAdmin) {
     return [];
   }
   const list = Array.isArray(store.notifications) ? store.notifications : [];
   const uname = viewer.username || '';
   const unameLower = uname.toLowerCase();
+  if (isViewerSuperAdmin) {
+    return list
+      .filter(n => {
+        if (!n) return false;
+        if (Array.isArray(n.dismissedBy) && n.dismissedBy.includes(uname)) return false;
+        const targetUsers = Array.isArray(n.targetUsernames)
+          ? n.targetUsernames.map(u => String(u || '').toLowerCase()).filter(Boolean)
+          : [];
+        return targetUsers.includes(unameLower);
+      })
+      .map(n => serializeNotificationItem(n, uname));
+  }
   const viewerClassSet = getViewerClassIdSet(store, uname);
   const testsById = new Map((Array.isArray(store.tests) ? store.tests : []).map(t => [t?.id, t]));
   return list
@@ -1815,12 +1979,27 @@ function getSnapshotForViewer(store, viewer = null) {
   const adminFields = buildPublicAdminSnapshotFields(store, viewer);
   const notifications = serializeNotificationsForViewer(store, viewer);
   const sentNotifications = serializeSentNotificationsForTeacher(store, viewer);
-  const globalDailyRankTitles = computeDailyLeaderboardTitleHolders({
-    attempts: store.attempts || [],
-    roomsDb: store.rooms || {},
-    gamePracticeLeaderboard: store.gamePracticeLeaderboard || [],
-    usersDb: store.users || {}
-  });
+  const todayKey = getVietnamDateKey(Date.now());
+  let globalDailyRankTitles = null;
+  if (
+    store._dailyRankCache &&
+    store._dailyRankCache.version === store.version &&
+    store._dailyRankCache.dateKey === todayKey
+  ) {
+    globalDailyRankTitles = store._dailyRankCache.data;
+  } else {
+    globalDailyRankTitles = computeDailyLeaderboardTitleHolders({
+      attempts: store.attempts || [],
+      roomsDb: store.rooms || {},
+      gamePracticeLeaderboard: store.gamePracticeLeaderboard || [],
+      usersDb: store.users || {}
+    });
+    store._dailyRankCache = {
+      version: store.version,
+      dateKey: todayKey,
+      data: globalDailyRankTitles
+    };
+  }
 
   if (viewer.role === 'teacher') {
     const sanitizedRooms = {};
@@ -2490,6 +2669,29 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       const targetUname = payload?.username;
       if (!isTeacher && targetUname && targetUname !== viewer.username) {
         return { allowed: false, status: 403, error: 'Không thể gửi điểm luyện tập dưới tên người khác.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'REPORT_DONATE_PAYMENT': {
+      const amount = Math.round(Number(payload?.amount) || 0);
+      if (!Number.isFinite(amount) || amount < MIN_DONATE_AMOUNT_VND) {
+        return {
+          allowed: false,
+          status: 400,
+          error: `Số tiền ủng hộ tùy tâm tối thiểu là ${formatVndCurrency(MIN_DONATE_AMOUNT_VND)}.`
+        };
+      }
+      if (amount > 50_000_000) {
+        return { allowed: false, status: 400, error: 'Số tiền vượt quá giới hạn cho phép.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'CONFIRM_PAYMENT_TRANSACTION':
+    case 'DELETE_PAYMENT_TRANSACTION': {
+      if (!isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới có quyền xác nhận hoặc xóa giao dịch.' };
       }
       return { allowed: true };
     }
@@ -3904,6 +4106,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const uname = viewer?.username ? findUserKeyInStore(store, viewer.username) || viewer.username : '';
       const targetUser = uname ? store.users?.[uname] : null;
       if (!uname || !targetUser) break;
+      const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
       if (payload?.itemType === 'title') {
         const paidTitle = PAID_SHOP_TITLES.find(t => t.id === payload?.itemId);
         if (!paidTitle) break;
@@ -3915,6 +4118,15 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             requestedAt: Date.now()
           }
         };
+        recordPaymentTransactionAndNotifyAdmin(store, {
+          username: uname,
+          userName: targetUser.name || uname,
+          itemType: 'title',
+          itemLabel: `${paidTitle.icon} ${paidTitle.label} (1 Tháng)`,
+          amount: getTitlePriceVnd(paidTitle, payCfgNow),
+          status: 'reported',
+          gateway: 'manual_request'
+        });
         changed = true;
         break;
       }
@@ -3931,6 +4143,15 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             requestedAt: Date.now()
           }
         };
+        recordPaymentTransactionAndNotifyAdmin(store, {
+          username: uname,
+          userName: targetUser.name || uname,
+          itemType: 'test',
+          itemLabel: `Chi phí test: ${targetTest.title}`,
+          amount: getTestPurchasePriceVnd(targetTest, payCfgNow),
+          status: 'reported',
+          gateway: 'manual_request'
+        });
         changed = true;
         break;
       }
@@ -3944,23 +4165,48 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             requestedAt: Date.now()
           }
         };
+        recordPaymentTransactionAndNotifyAdmin(store, {
+          username: uname,
+          userName: targetUser.name || uname,
+          itemType: comboMetaReq.itemType,
+          itemLabel: comboMetaReq.label,
+          amount: comboMetaReq.price,
+          status: 'reported',
+          gateway: 'manual_request'
+        });
         changed = true;
         break;
       }
       if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip' || payload?.itemType === 'room_ticket') {
+        const reqLabel =
+          payload.itemType === 'aieo_vip'
+            ? 'Gói IELTS VIP (1 Tháng)'
+            : payload.itemType === 'room_ticket'
+            ? 'Vé Tạo 1 Phòng Đấu Riêng'
+            : 'Gói Daily Zone (1 Tháng)';
+        const reqAmt =
+          payload.itemType === 'aieo_vip'
+            ? (Number(payCfgNow.aieoVipPrice) || AIEO_VIP_PRICE_VND)
+            : payload.itemType === 'room_ticket'
+            ? (Number(payCfgNow.friendRoomTicketPrice) || FRIEND_ROOM_TICKET_PRICE_VND)
+            : (Number(payCfgNow.skillPassPrice) || SKILL_PASS_PRICE_VND);
         store.users[uname] = {
           ...targetUser,
           subscriptionRequested: {
             itemType: payload.itemType,
-            itemLabel:
-              payload.itemType === 'aieo_vip'
-                ? 'Gói IELTS VIP (1 Tháng)'
-                : payload.itemType === 'room_ticket'
-                ? 'Vé Tạo 1 Phòng Đấu Riêng (5k)'
-                : 'Gói Daily Zone (1 Tháng)',
+            itemLabel: reqLabel,
             requestedAt: Date.now()
           }
         };
+        recordPaymentTransactionAndNotifyAdmin(store, {
+          username: uname,
+          userName: targetUser.name || uname,
+          itemType: payload.itemType,
+          itemLabel: reqLabel,
+          amount: reqAmt,
+          status: 'reported',
+          gateway: 'manual_request'
+        });
         changed = true;
         break;
       }
@@ -3969,7 +4215,92 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         ...targetUser,
         coverUnlockRequestedAt: Date.now()
       };
+      recordPaymentTransactionAndNotifyAdmin(store, {
+        username: uname,
+        userName: targetUser.name || uname,
+        itemType: 'cover',
+        itemLabel: 'Ảnh Nền Riêng (1 Tháng)',
+        amount: payCfgNow.coverUnlockPrice,
+        status: 'reported',
+        gateway: 'manual_request'
+      });
       changed = true;
+      break;
+    }
+
+    case 'REPORT_DONATE_PAYMENT': {
+      const uname = viewer?.username ? findUserKeyInStore(store, viewer.username) || viewer.username : '';
+      const targetUser = uname ? store.users?.[uname] : null;
+      if (!uname || !targetUser) break;
+      const amount = Math.min(50_000_000, Math.round(Number(payload?.amount) || 0));
+      if (amount < MIN_DONATE_AMOUNT_VND) break;
+      const note = String(payload?.note || '').trim().slice(0, 180);
+      recordPaymentTransactionAndNotifyAdmin(store, {
+        username: uname,
+        userName: targetUser.name || uname,
+        itemType: 'donate',
+        itemLabel: `Ủng hộ tùy tâm (${formatVndCurrency(amount)})`,
+        amount,
+        status: 'reported',
+        gateway: 'manual_donate',
+        note
+      });
+      changed = true;
+      break;
+    }
+
+    case 'CONFIRM_PAYMENT_TRANSACTION': {
+      const txId = String(payload?.transactionId || '').trim();
+      if (!txId || !Array.isArray(store.paymentTransactions)) break;
+      const idx = store.paymentTransactions.findIndex(t => t && t.id === txId);
+      if (idx < 0) break;
+      const existing = store.paymentTransactions[idx];
+      if (existing.status === 'paid') break;
+      const nowMs = Date.now();
+      const updated = {
+        ...existing,
+        status: 'paid',
+        paidAt: nowMs
+      };
+      store.paymentTransactions[idx] = updated;
+      const userKey = findUserKeyInStore(store, updated.username);
+      const targetUser = userKey ? store.users?.[userKey] : null;
+      if (userKey && targetUser) {
+        const amt = Math.max(0, Math.round(Number(updated.amount) || 0));
+        store.users[userKey] = {
+          ...targetUser,
+          totalPaidVnd: (Number(targetUser.totalPaidVnd) || 0) + amt,
+          paidCount: (Number(targetUser.paidCount) || 0) + 1,
+          lastPaidAt: nowMs,
+          ...(updated.itemType === 'donate'
+            ? { donatedTotalVnd: (Number(targetUser.donatedTotalVnd) || 0) + amt }
+            : {})
+        };
+        appendStoreNotification(
+          store,
+          {
+            title: updated.itemType === 'donate'
+              ? '💜 Cảm ơn bạn đã ủng hộ duy trì website!'
+              : '✅ Admin đã xác nhận giao dịch của bạn!',
+            message: `Admin Tuấn đã xác nhận khoản ${formatVndCurrency(amt)} (${updated.itemLabel}). Cảm ơn ${targetUser.name || userKey} rất nhiều vì đã đồng hành cùng website!`,
+            type: 'announcement',
+            targetUsernames: [userKey],
+            createdBy: SUPER_ADMIN_USERNAME,
+            createdByName: 'Admin Tuấn'
+          },
+          null
+        );
+      }
+      changed = true;
+      break;
+    }
+
+    case 'DELETE_PAYMENT_TRANSACTION': {
+      const txId = String(payload?.transactionId || '').trim();
+      if (!txId || !Array.isArray(store.paymentTransactions)) break;
+      const before = store.paymentTransactions.length;
+      store.paymentTransactions = store.paymentTransactions.filter(t => t && t.id !== txId);
+      if (store.paymentTransactions.length !== before) changed = true;
       break;
     }
 
@@ -4564,6 +4895,9 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'TOGGLE_USER_SUBSCRIPTION',
   'REDEEM_REAL_EXAM_CREDIT',
   'REQUEST_COVER_UNLOCK',
+  'REPORT_DONATE_PAYMENT',
+  'CONFIRM_PAYMENT_TRANSACTION',
+  'DELETE_PAYMENT_TRANSACTION',
   'UPDATE_PAYMENT_CONFIG',
   'SEED_DEFAULTS'
 ]);
@@ -4615,11 +4949,28 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
   }, 10000);
   chatSweepTimer.unref?.();
 
-  const sendJsonResponse = (res, statusCode, dataObj) => {
+  const sendJsonResponse = (res, statusCode, dataObj, req = null) => {
     res.statusCode = statusCode;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    res.end(JSON.stringify(dataObj));
+    const jsonStr = JSON.stringify(dataObj);
+    const acceptEnc = String(req?.headers?.['accept-encoding'] || '').toLowerCase();
+    if (req && jsonStr.length >= 1024 && /\bgzip\b/.test(acceptEnc)) {
+      const rawBuf = Buffer.from(jsonStr, 'utf8');
+      zlib.gzip(rawBuf, { level: 5 }, (err, compressed) => {
+        if (!err && compressed && compressed.length < rawBuf.length) {
+          res.setHeader('Content-Encoding', 'gzip');
+          res.setHeader('Vary', 'Accept-Encoding');
+          res.setHeader('Content-Length', String(compressed.length));
+          res.end(compressed);
+        } else {
+          res.setHeader('Content-Length', String(rawBuf.length));
+          res.end(rawBuf);
+        }
+      });
+      return;
+    }
+    res.end(jsonStr);
   };
 
   const refreshActiveSessionCookie = (req, res, viewerPayload, activeUser) => {
@@ -4708,15 +5059,15 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           store._authSecret
         );
         res.setHeader('Set-Cookie', buildSessionCookieHeader(req, token, SESSION_TTL_MS / 1000));
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store');
-        res.statusCode = 200;
-        res.end(
-          JSON.stringify({
+        sendJsonResponse(
+          res,
+          200,
+          {
             ok: true,
             user: sanitizeUserForViewer(user, user),
             snapshot: getSnapshotForViewer(store, user)
-          })
+          },
+          req
         );
       } catch (err) {
         res.statusCode = 400;
@@ -5392,6 +5743,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const isSkillPassOrder = rawType === 'skill_pass';
         const isAieoVipOrder = rawType === 'aieo_vip';
         const isRoomTicketOrder = rawType === 'room_ticket';
+        const isDonateOrder = rawType === 'donate';
         const comboMeta = getRealExamComboMeta(rawType, cfg);
         const itemType = isTitleOrder
           ? 'title'
@@ -5405,6 +5757,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           ? 'aieo_vip'
           : isRoomTicketOrder
           ? 'room_ticket'
+          : isDonateOrder
+          ? 'donate'
           : 'cover';
         const renewFlag = Boolean(body?.renew);
         let itemId = '';
@@ -5461,6 +5815,18 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         } else if (isRoomTicketOrder) {
           itemLabel = 'Vé Tạo 1 Phòng Đấu Riêng';
           amount = Number(cfg.friendRoomTicketPrice) >= 0 ? cfg.friendRoomTicketPrice : FRIEND_ROOM_TICKET_PRICE_VND;
+          alreadyUnlocked = false;
+        } else if (isDonateOrder) {
+          const requestedAmt = Math.round(Number(body?.amount) || 0);
+          if (!Number.isFinite(requestedAmt) || requestedAmt < MIN_DONATE_AMOUNT_VND) {
+            sendJsonResponse(res, 400, {
+              ok: false,
+              error: `Mức ủng hộ tùy tâm tối thiểu là ${formatVndCurrency(MIN_DONATE_AMOUNT_VND)}.`
+            });
+            return;
+          }
+          amount = Math.min(50_000_000, requestedAmt);
+          itemLabel = `Ủng hộ tùy tâm (${formatVndCurrency(amount)})`;
           alreadyUnlocked = false;
         }
 
@@ -5677,6 +6043,66 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           });
         }
 
+        // Fallback match direct Donate QR transfer: "UNGHO <USERNAME> ..." (>= 5.000đ)
+        if (!matchedOrder && amount >= MIN_DONATE_AMOUNT_VND && descriptionUpper.includes('UNGHO')) {
+          const matchedDonateUserKey = Object.keys(store.users || {}).find(uKey => {
+            if (!uKey || uKey === SUPER_ADMIN_USERNAME) return false;
+            const cleanU = String(uKey).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            return cleanU.length >= 3 && descriptionUpper.includes(cleanU);
+          });
+          if (matchedDonateUserKey && store.users?.[matchedDonateUserKey]) {
+            const nowMs = Date.now();
+            if (txKey) {
+              store.processedWebhookTxIds = [txKey, ...store.processedWebhookTxIds].slice(0, 500);
+            }
+            const donorUser = store.users[matchedDonateUserKey];
+            store.users[matchedDonateUserKey] = {
+              ...donorUser,
+              totalPaidVnd: (Number(donorUser.totalPaidVnd) || 0) + amount,
+              donatedTotalVnd: (Number(donorUser.donatedTotalVnd) || 0) + amount,
+              paidCount: (Number(donorUser.paidCount) || 0) + 1,
+              lastPaidAt: nowMs
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '💜 Cảm ơn bạn đã ủng hộ duy trì website!',
+                message: `Hệ thống đã tự động ghi nhận khoản ủng hộ ${formatVndCurrency(amount)} của bạn. Cảm ơn ${donorUser.name || matchedDonateUserKey} đã tiếp thêm động lực cho Admin Tuấn!`,
+                type: 'announcement',
+                targetUsernames: [matchedDonateUserKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+            recordPaymentTransactionAndNotifyAdmin(store, {
+              username: matchedDonateUserKey,
+              userName: donorUser.name || matchedDonateUserKey,
+              itemType: 'donate',
+              itemLabel: `Ủng hộ tùy tâm (${formatVndCurrency(amount)})`,
+              amount,
+              status: 'paid',
+              gateway,
+              txId: txKey,
+              paidAt: nowMs
+            });
+            store.version += 1;
+            store._localMutated = true;
+            if (onFlush) onFlush(store);
+            else onChanged?.(store);
+            scheduleBroadcast(10);
+            sendJsonResponse(res, 200, {
+              error: 0,
+              success: true,
+              unlocked: true,
+              donateMatched: true,
+              username: matchedDonateUserKey,
+              amount
+            });
+            return;
+          }
+        }
+
         if (!matchedOrder) {
           sendJsonResponse(res, 200, { error: 0, success: true, matched: false });
           return;
@@ -5842,6 +6268,23 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               },
               null
             );
+          } else if (matchedOrder.itemType === 'donate') {
+            store.users[targetKey] = {
+              ...targetUser,
+              donatedTotalVnd: (Number(targetUser.donatedTotalVnd) || 0) + amount
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: '💜 Cảm ơn bạn đã ủng hộ duy trì website!',
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì máy chủ & phát triển website học tập!`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
           } else {
             const baseCoverExp = Math.max(nowMs, Number(targetUser.customCoverExpiresAt) || 0);
             store.users[targetKey] = {
@@ -5865,6 +6308,27 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               null
             );
           }
+
+          // Always update cumulative payment stats on user record & log + notify Admin
+          const latestUserRec = store.users[targetKey] || targetUser;
+          store.users[targetKey] = {
+            ...latestUserRec,
+            totalPaidVnd: (Number(latestUserRec.totalPaidVnd) || 0) + amount,
+            paidCount: (Number(latestUserRec.paidCount) || 0) + 1,
+            lastPaidAt: nowMs
+          };
+          recordPaymentTransactionAndNotifyAdmin(store, {
+            orderCode: matchedOrder.orderCode,
+            username: targetKey,
+            userName: latestUserRec.name || targetKey,
+            itemType: matchedOrder.itemType || 'cover',
+            itemLabel: matchedOrder.itemLabel || matchedOrder.itemType || 'Thanh toán',
+            amount,
+            status: 'paid',
+            gateway,
+            txId: txKey,
+            paidAt: nowMs
+          });
         }
 
         store.version += 1;
@@ -6457,10 +6921,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         onChanged?.(store);
         scheduleBroadcast(50);
       }
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-store');
-      res.end(JSON.stringify(getSnapshotForViewer(store, viewer)));
+      sendJsonResponse(res, 200, getSnapshotForViewer(store, viewer), req);
       return;
     }
 
@@ -6530,9 +6991,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           }
           scheduleBroadcast(50);
         }
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify({ ok: true, snapshot: getSnapshotForViewer(store, activeViewer) }));
+        sendJsonResponse(res, 200, { ok: true, snapshot: getSnapshotForViewer(store, activeViewer) }, req);
       } catch (err) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');

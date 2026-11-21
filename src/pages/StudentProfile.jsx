@@ -60,6 +60,7 @@ import {
   AIEO_VIP_PRICE_VND,
   AVATAR_FRAMES,
   DEFAULT_EXAM_PRICE_VND,
+  MIN_DONATE_AMOUNT_VND,
   PROFILE_BANNERS,
   REAL_EXAM_COMBOS,
   VIP_NAME_COLORS,
@@ -84,6 +85,7 @@ import VipMemberName from '../components/common/VipMemberName';
 
 export default function StudentProfile({
   adminFeedbacks = [],
+  adminPaymentHistory = [],
   attempts = [],
   classesDb = {},
   currentRoomPin,
@@ -156,13 +158,18 @@ export default function StudentProfile({
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [titleFilter, setTitleFilter] = useState('all');
   const [profileHistoryPage, setProfileHistoryPage] = useState(1);
-  const [donateAmount, setDonateAmount] = useState(0);
+  const [donateAmount, setDonateAmount] = useState(MIN_DONATE_AMOUNT_VND);
   const [isCustomDonateMode, setIsCustomDonateMode] = useState(true);
-  const [customDonateInput, setCustomDonateInput] = useState('');
-  const [qrDonateAmount, setQrDonateAmount] = useState(0);
+  const [customDonateInput, setCustomDonateInput] = useState(MIN_DONATE_AMOUNT_VND.toLocaleString('vi-VN'));
+  const [qrDonateAmount, setQrDonateAmount] = useState(MIN_DONATE_AMOUNT_VND);
+  const [donateNote, setDonateNote] = useState('');
+  const [reportingDonate, setReportingDonate] = useState(false);
+  const [paymentHistoryFilter, setPaymentHistoryFilter] = useState('all');
+  const [busyTxId, setBusyTxId] = useState('');
   useEffect(() => {
+    const safeForQr = Math.max(MIN_DONATE_AMOUNT_VND, Number(donateAmount) || 0);
     const timer = setTimeout(() => {
-      setQrDonateAmount(donateAmount);
+      setQrDonateAmount(safeForQr);
     }, isCustomDonateMode ? 350 : 0);
     return () => clearTimeout(timer);
   }, [donateAmount, isCustomDonateMode]);
@@ -1343,20 +1350,67 @@ export default function StudentProfile({
       {/* Full-Width Profile Content Workspace */}
       <div className="space-y-6 min-w-0">
 
-      {/* SYSTEM ADMIN PROFILE: DEDICATED DONATE QR + FEEDBACK & FEATURE REQUEST INBOX */}
+      {/* SYSTEM ADMIN PROFILE: DEDICATED DONATE QR + ADMIN PAYMENT HISTORY + FEEDBACK INBOX */}
       {isTargetSystemAdmin ? (() => {
         const donateBankCode = normalizedPayCfg.bankCode || 'MB';
         const donateAccountNumber = normalizedPayCfg.accountNumber || '0335613426';
         const donateAccountName = normalizedPayCfg.accountName || 'NGUYEN HOANG TUAN';
-        const donateAddInfo = 'UNG HO ADMIN TUAN DUY TRI WEB IELTS';
+        const cleanViewerDonateTag = String(currentUser?.username || '')
+          .trim()
+          .replace(/[^a-zA-Z0-9]/g, '')
+          .toUpperCase()
+          .slice(0, 24);
+        const donateAddInfo =
+          cleanViewerDonateTag && !isSelf
+            ? `UNGHO ${cleanViewerDonateTag} DUY TRI WEB`
+            : 'UNG HO ADMIN TUAN DUY TRI WEB IELTS';
+        const effectiveDonateQrAmount = Math.max(MIN_DONATE_AMOUNT_VND, Number(qrDonateAmount) || MIN_DONATE_AMOUNT_VND);
+        const isDonateAmountValid = Number(donateAmount) >= MIN_DONATE_AMOUNT_VND;
         const dynamicDonateQr = buildVietQrImageUrl({
           bankCode: donateBankCode,
           accountNumber: donateAccountNumber,
           accountName: donateAccountName,
-          amount: qrDonateAmount,
+          amount: effectiveDonateQrAmount,
           addInfo: donateAddInfo
         });
         const adminDonateQrSrc = normalizedPayCfg.donateQrUrl || dynamicDonateQr;
+
+        const handleReportDonateTransfer = async () => {
+          if (reportingDonate || !currentUser?.username) return;
+          const cleanAmt = Math.round(Number(donateAmount) || 0);
+          if (cleanAmt < MIN_DONATE_AMOUNT_VND) {
+            showToast?.(`Mức ủng hộ tùy tâm tối thiểu là ${formatVndCurrency(MIN_DONATE_AMOUNT_VND)}!`, 'error');
+            return;
+          }
+          setReportingDonate(true);
+          try {
+            const snap = await dispatchSyncAction?.('REPORT_DONATE_PAYMENT', {
+              amount: cleanAmt,
+              note: donateNote.trim()
+            });
+            if (snap) {
+              setDonateNote('');
+              showToast?.(
+                `Đã ghi nhận & gửi thông báo ủng hộ ${formatVndCurrency(cleanAmt)} tới Admin Tuấn! Cảm ơn bạn rất nhiều 💜`
+              );
+            }
+          } finally {
+            setReportingDonate(false);
+          }
+        };
+
+        const safePaymentList = Array.isArray(adminPaymentHistory) ? adminPaymentHistory : [];
+        const paidTxList = safePaymentList.filter(tx => tx?.status === 'paid');
+        const reportedTxList = safePaymentList.filter(tx => tx?.status !== 'paid');
+        const totalPaidRevenue = paidTxList.reduce((acc, tx) => acc + (Number(tx.amount) || 0), 0);
+        const uniquePayerCount = new Set(safePaymentList.map(tx => tx?.username).filter(Boolean)).size;
+        const filteredPaymentTx = safePaymentList.filter(tx => {
+          if (!tx) return false;
+          if (paymentHistoryFilter === 'paid') return tx.status === 'paid';
+          if (paymentHistoryFilter === 'reported') return tx.status !== 'paid';
+          if (paymentHistoryFilter === 'donate') return tx.itemType === 'donate';
+          return true;
+        });
 
         return (
         <div className="space-y-6">
@@ -1401,15 +1455,9 @@ export default function StudentProfile({
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border border-[#E2E8F0] dark:border-zinc-700 text-xs font-bold">
                     <Heart className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Quỹ Duy Trì Website &amp; Server
                   </span>
-                  {donateAmount > 0 ? (
-                    <span className="px-2.5 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-950/60 border border-[#B5F5F1] dark:border-teal-700 text-[#0F766E] dark:text-[#1EE1D6] text-xs font-bold tabular-nums">
-                      Số tiền trên QR: {formatVndCurrency(donateAmount)}
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 text-[#475569] dark:text-zinc-300 text-xs font-semibold">
-                      QR tùy tâm (nhập tiền bất kỳ)
-                    </span>
-                  )}
+                  <span className="px-2.5 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-950/60 border border-[#B5F5F1] dark:border-teal-700 text-[#0F766E] dark:text-[#1EE1D6] text-xs font-bold tabular-nums">
+                    Số tiền trên QR: {formatVndCurrency(effectiveDonateQrAmount)}
+                  </span>
                 </div>
 
                 <div>
@@ -1418,7 +1466,7 @@ export default function StudentProfile({
                   </h2>
                   <p className="text-xs text-slate-600 dark:text-zinc-300 mt-1 leading-relaxed">
                     {normalizedPayCfg.donateMessage ||
-                      'Mọi khoản đóng góp tùy tâm đều giúp Tuấn duy trì máy chủ, tên miền, API chấm AI và phát triển thêm nhiều tính năng mới miễn phí cho cộng đồng.'}
+                      'Mọi khoản đóng góp tùy tâm (tối thiểu 5.000đ) đều giúp Tuấn duy trì máy chủ, tên miền, API chấm AI và phát triển thêm nhiều tính năng mới miễn phí cho cộng đồng.'}
                   </p>
                 </div>
 
@@ -1429,8 +1477,10 @@ export default function StudentProfile({
                         type="button"
                         onClick={() => {
                           setIsCustomDonateMode(true);
-                          const parsed = Number(String(customDonateInput || '').replace(/\D/g, '')) || 0;
-                          setDonateAmount(Math.min(50_000_000, parsed));
+                          const parsed = Number(String(customDonateInput || '').replace(/\D/g, '')) || MIN_DONATE_AMOUNT_VND;
+                          const safeVal = Math.min(50_000_000, Math.max(MIN_DONATE_AMOUNT_VND, parsed));
+                          setCustomDonateInput(safeVal.toLocaleString('vi-VN'));
+                          setDonateAmount(safeVal);
                         }}
                         className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold border transition ${
                           isCustomDonateMode
@@ -1438,7 +1488,7 @@ export default function StudentProfile({
                             : 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] border-[#E2E8F0] dark:border-zinc-700 hover:border-slate-400 dark:hover:border-zinc-500'
                         }`}
                       >
-                        Tùy tâm
+                        Tùy tâm (≥ 5k)
                       </button>
                       {[
                         { val: 10000, label: '10.000đ' },
@@ -1466,57 +1516,62 @@ export default function StudentProfile({
                     </div>
 
                     {isCustomDonateMode && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative flex-1 min-w-[200px] max-w-xs">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={customDonateInput}
-                            onChange={e => {
-                              const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
-                              if (!digits) {
-                                setCustomDonateInput('');
-                                setDonateAmount(0);
-                                return;
-                              }
-                              const num = Math.min(50_000_000, Number(digits));
-                              setCustomDonateInput(num.toLocaleString('vi-VN'));
-                              setDonateAmount(num);
-                            }}
-                            onBlur={() => setQrDonateAmount(donateAmount)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                setQrDonateAmount(donateAmount);
-                              }
-                            }}
-                            placeholder="Nhập số tiền tùy tâm (VD: 15.000)..."
-                            aria-label="Nhập số tiền ủng hộ tùy tâm (VNĐ)"
-                            className="w-full pl-3 pr-14 py-2 rounded-lg text-xs font-bold tabular-nums bg-[#F8FAFC] dark:bg-zinc-900 text-[#0F172B] dark:text-[#FAFAFA] border border-[#CBD5E1] dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#475569] dark:text-zinc-400 pointer-events-none">
-                            VNĐ
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="relative flex-1 min-w-[200px] max-w-xs">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={customDonateInput}
+                              onChange={e => {
+                                const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                if (!digits) {
+                                  setCustomDonateInput('');
+                                  setDonateAmount(0);
+                                  return;
+                                }
+                                const num = Math.min(50_000_000, Number(digits));
+                                setCustomDonateInput(num.toLocaleString('vi-VN'));
+                                setDonateAmount(num);
+                              }}
+                              onBlur={() => {
+                                const clamped = Math.max(MIN_DONATE_AMOUNT_VND, Number(donateAmount) || 0);
+                                setDonateAmount(clamped);
+                                setCustomDonateInput(clamped.toLocaleString('vi-VN'));
+                                setQrDonateAmount(clamped);
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const clamped = Math.max(MIN_DONATE_AMOUNT_VND, Number(donateAmount) || 0);
+                                  setDonateAmount(clamped);
+                                  setCustomDonateInput(clamped.toLocaleString('vi-VN'));
+                                  setQrDonateAmount(clamped);
+                                }
+                              }}
+                              placeholder="Tối thiểu 5.000 VNĐ (VD: 15.000)..."
+                              aria-label="Nhập số tiền ủng hộ tùy tâm tối thiểu 5.000 VNĐ"
+                              className={`w-full pl-3 pr-14 py-2 rounded-lg text-xs font-bold tabular-nums bg-[#F8FAFC] dark:bg-zinc-900 text-[#0F172B] dark:text-[#FAFAFA] border focus:outline-none focus:ring-2 ${
+                                isDonateAmountValid
+                                  ? 'border-[#CBD5E1] dark:border-zinc-700 focus:ring-[#0F766E]'
+                                  : 'border-rose-400 dark:border-rose-500 focus:ring-rose-500'
+                              }`}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#475569] dark:text-zinc-400 pointer-events-none">
+                              VNĐ
+                            </span>
+                          </div>
+                          <span className="text-xs text-[#475569] dark:text-zinc-400">
+                            {isDonateAmountValid
+                              ? 'Mã QR tự động điền đúng số tiền bạn nhập.'
+                              : 'Tối thiểu 5.000đ (mã QR giữ mức 5.000đ).'}
                           </span>
                         </div>
-                        {customDonateInput && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomDonateInput('');
-                              setDonateAmount(0);
-                              setQrDonateAmount(0);
-                            }}
-                            className="px-2.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 transition"
-                            title="Xóa số tiền để dùng mã QR mở"
-                          >
-                            Xóa
-                          </button>
+                        {!isDonateAmountValid && (
+                          <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                            ⚠️ Số tiền ủng hộ tùy tâm tối thiểu là 5.000đ.
+                          </p>
                         )}
-                        <span className="text-xs text-[#475569] dark:text-zinc-400">
-                          {donateAmount > 0
-                            ? 'Mã QR tự động điền đúng số tiền bạn nhập.'
-                            : 'Để trống nếu muốn tự nhập tiền trên app ngân hàng.'}
-                        </span>
                       </div>
                     )}
                   </div>
@@ -1545,14 +1600,215 @@ export default function StudentProfile({
                     <span className="text-[#475569] dark:text-[#A1A1AA]">Chủ tài khoản</span>
                     <span className="font-bold text-[#0F172B] dark:text-[#FAFAFA]">{donateAccountName}</span>
                   </div>
+                  <div className="bg-transparent border-0 rounded-none py-2 flex items-center justify-between gap-3">
+                    <span className="text-[#475569] dark:text-[#A1A1AA]">Nội dung CK</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(donateAddInfo);
+                        showToast?.(`Đã sao chép nội dung CK: ${donateAddInfo}`);
+                      }}
+                      className="font-bold font-mono text-[#0F766E] dark:text-[#1EE1D6] hover:underline inline-flex items-center gap-1.5 text-right"
+                    >
+                      <span>{donateAddInfo}</span>
+                      <Copy className="w-3.5 h-3.5 shrink-0" />
+                    </button>
+                  </div>
                 </div>
 
+                {!isSelf && currentUser?.username && (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={donateNote}
+                      onChange={e => setDonateNote(e.target.value)}
+                      maxLength={140}
+                      placeholder="Lời nhắn gửi Admin Tuấn (không bắt buộc)..."
+                      className="flex-1 px-3 py-2 rounded-lg text-xs bg-[#F8FAFC] dark:bg-zinc-900 text-[#0F172B] dark:text-[#FAFAFA] border border-[#CBD5E1] dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                    />
+                    <button
+                      type="button"
+                      disabled={reportingDonate || !isDonateAmountValid}
+                      onClick={handleReportDonateTransfer}
+                      className="px-4 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D5F59] disabled:opacity-50 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 transition shrink-0"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {reportingDonate
+                        ? 'Đang gửi báo Admin...'
+                        : `Tôi Đã Chuyển Khoản (${formatVndCurrency(Math.max(MIN_DONATE_AMOUNT_VND, Number(donateAmount) || 0))})`}
+                    </button>
+                  </div>
+                )}
+
                 <p className="text-xs italic text-[#475569] dark:text-[#A1A1AA]">
-                  Cảm ơn bạn đã ủng hộ &amp; tin tưởng đồng hành cùng website Luyện Thi IELTS Nha Trang!
+                  Cảm ơn bạn đã ủng hộ &amp; tin tưởng đồng hành cùng website Luyện Thi IELTS Nha Trang! (Hệ thống tự ghi nhận tài khoản &amp; thông báo ngay cho Admin.)
                 </p>
               </div>
             </div>
           </div>
+
+          {/* SUPERADMIN-ONLY PAYMENT & DONATION HISTORY LOG */}
+          {isViewerSuperAdmin && (
+            <div className={`${profileCardCls} p-5 sm:p-6 space-y-4`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm sm:text-base font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                    Lịch Sử Tài Khoản Đã Nạp Tiền &amp; Ủng Hộ ({safePaymentList.length})
+                  </h2>
+                  <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                    Tự động lưu mọi tài khoản thanh toán qua PayOS / SePay và các lượt báo chuyển khoản ủng hộ tùy tâm.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-700 font-extrabold tabular-nums">
+                    Tổng đã nhận: {formatVndCurrency(totalPaidRevenue)}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 font-bold tabular-nums">
+                    {uniquePayerCount} tài khoản
+                  </span>
+                  {reportedTxList.length > 0 && (
+                    <span className="px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 font-extrabold tabular-nums">
+                      {reportedTxList.length} chờ xác nhận
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'all', label: `Tất cả (${safePaymentList.length})` },
+                  { id: 'paid', label: `Đã nhận (${paidTxList.length})` },
+                  { id: 'reported', label: `Chờ xác nhận (${reportedTxList.length})` },
+                  { id: 'donate', label: `Ủng hộ tùy tâm (${safePaymentList.filter(t => t?.itemType === 'donate').length})` }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setPaymentHistoryFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                      paymentHistoryFilter === tab.id
+                        ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {filteredPaymentTx.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#475569] dark:text-zinc-400 bg-[#F8FAFC] dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                  Chưa có giao dịch nạp tiền hoặc ủng hộ nào trong mục này.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {filteredPaymentTx.map(tx => {
+                    const isPaid = tx.status === 'paid';
+                    const gwLabel =
+                      tx.gateway === 'payos'
+                        ? 'PayOS'
+                        : tx.gateway === 'sepay'
+                        ? 'SePay'
+                        : tx.gateway === 'manual_donate'
+                        ? 'Ủng hộ tùy tâm'
+                        : tx.gateway === 'manual_request'
+                        ? 'Chuyển khoản tay'
+                        : 'Tự động';
+                    const timeStr = new Date(Number(tx.paidAt || tx.createdAt) || Date.now()).toLocaleString('vi-VN');
+                    return (
+                      <div
+                        key={tx.id}
+                        className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+                          isPaid
+                            ? 'bg-white dark:bg-zinc-900 border-emerald-200 dark:border-emerald-800/60'
+                            : 'bg-amber-50/70 dark:bg-amber-950/25 border-amber-300 dark:border-amber-700/70'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedProfileStudent(tx.username);
+                                setTempNoteText('');
+                              }}
+                              className="text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6] hover:underline"
+                            >
+                              {tx.userName || tx.username} (@{tx.username})
+                            </button>
+                            <span
+                              className={`text-xs font-extrabold px-2 py-0.5 rounded-full border ${
+                                isPaid
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700'
+                                  : 'bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                              }`}
+                            >
+                              {isPaid ? '✓ Đã nhận' : '⏳ Chờ xác nhận'}
+                            </span>
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
+                              {gwLabel}
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200">
+                            {tx.itemLabel}
+                            {tx.orderCode ? ` · Mã ${tx.orderCode}` : ''}
+                          </p>
+                          {tx.note && (
+                            <p className="text-xs italic text-slate-600 dark:text-zinc-400">
+                              &ldquo;{tx.note}&rdquo;
+                            </p>
+                          )}
+                          <p className="text-xs text-[#475569] dark:text-zinc-400 tabular-nums">{timeStr}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-black tabular-nums text-emerald-700 dark:text-emerald-300">
+                            +{formatVndCurrency(tx.amount)}
+                          </span>
+                          {!isPaid && (
+                            <button
+                              type="button"
+                              disabled={busyTxId === tx.id}
+                              onClick={async () => {
+                                setBusyTxId(tx.id);
+                                try {
+                                  const snap = await dispatchSyncAction?.('CONFIRM_PAYMENT_TRANSACTION', { transactionId: tx.id });
+                                  if (snap) showToast?.(`Đã xác nhận nhận ${formatVndCurrency(tx.amount)} từ @${tx.username}!`);
+                                } finally {
+                                  setBusyTxId('');
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold inline-flex items-center gap-1 transition"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Xác nhận
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={busyTxId === tx.id}
+                            onClick={async () => {
+                              if (!window.confirm(`Xóa bản ghi giao dịch của @${tx.username}?`)) return;
+                              setBusyTxId(tx.id);
+                              try {
+                                await dispatchSyncAction?.('DELETE_PAYMENT_TRANSACTION', { transactionId: tx.id });
+                              } finally {
+                                setBusyTxId('');
+                              }
+                            }}
+                            title="Xóa bản ghi này"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
             {/* Submit New Feedback Card (Unified Primary Teal & Neutral Chrome) */}
