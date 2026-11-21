@@ -2,6 +2,31 @@ import { useEffect, useState } from 'react';
 import { Award, CheckCircle2, Sparkles, Trophy, UserCheck, X } from 'lucide-react';
 
 const DIFFICULTY_ACCENT = {
+  'VIP Độc Quyền': {
+    halo: 'from-red-500 via-amber-400 to-rose-600',
+    pill: 'bg-[#991B1B] text-white border-amber-400',
+    topBar: 'from-red-600 via-amber-500 to-rose-600'
+  },
+  'Độc Quyền': {
+    halo: 'from-purple-500 via-amber-400 to-rose-500',
+    pill: 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-500/25 dark:text-purple-100 dark:border-purple-400/50',
+    topBar: 'from-purple-600 via-amber-500 to-rose-500'
+  },
+  'Phú Quý': {
+    halo: 'from-amber-400 via-yellow-300 to-amber-500',
+    pill: 'bg-amber-100 text-amber-950 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/60',
+    topBar: 'from-amber-400 via-yellow-400 to-amber-600'
+  },
+  'Theo Ngày': {
+    halo: 'from-amber-400 via-yellow-400 to-orange-500',
+    pill: 'bg-amber-100 text-amber-950 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/65',
+    topBar: 'from-amber-500 via-yellow-400 to-orange-500'
+  },
+  'Bí Ẩn': {
+    halo: 'from-violet-500 via-fuchsia-500 to-amber-400',
+    pill: 'bg-zinc-900 text-amber-200 border-amber-400/70',
+    topBar: 'from-violet-600 via-fuchsia-600 to-amber-500'
+  },
   'Cực Khó': {
     halo: 'from-amber-400 via-rose-500 to-fuchsia-500',
     pill: 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-500/25 dark:text-rose-100 dark:border-rose-400/50',
@@ -12,10 +37,30 @@ const DIFFICULTY_ACCENT = {
     pill: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/25 dark:text-amber-100 dark:border-amber-400/50',
     topBar: 'from-amber-500 via-orange-500 to-rose-500'
   },
+  'Lễ Hội': {
+    halo: 'from-pink-400 via-rose-400 to-amber-400',
+    pill: 'bg-pink-100 text-rose-900 border-rose-300 dark:bg-pink-500/25 dark:text-rose-100 dark:border-rose-400/50',
+    topBar: 'from-pink-500 via-rose-500 to-amber-500'
+  },
+  'Điểm Danh': {
+    halo: 'from-emerald-400 via-teal-400 to-cyan-400',
+    pill: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/25 dark:text-emerald-100 dark:border-emerald-400/50',
+    topBar: 'from-emerald-500 via-teal-500 to-cyan-500'
+  },
+  'Bình Thường': {
+    halo: 'from-cyan-400 via-teal-400 to-indigo-500',
+    pill: 'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-500/25 dark:text-sky-100 dark:border-sky-400/50',
+    topBar: 'from-[#007A7A] via-sky-500 to-indigo-500'
+  },
   'Thử Thách': {
     halo: 'from-cyan-400 via-teal-400 to-indigo-500',
     pill: 'bg-cyan-100 text-cyan-900 border-cyan-300 dark:bg-cyan-500/25 dark:text-cyan-100 dark:border-cyan-400/50',
     topBar: 'from-[#007A7A] via-cyan-500 to-indigo-500'
+  },
+  'Dễ': {
+    halo: 'from-lime-400 via-emerald-400 to-teal-400',
+    pill: 'bg-lime-100 text-lime-900 border-lime-300 dark:bg-lime-500/25 dark:text-lime-100 dark:border-lime-400/50',
+    topBar: 'from-lime-500 via-emerald-500 to-[#007A7A]'
   },
   'Cơ Bản': {
     halo: 'from-emerald-400 via-teal-400 to-sky-400',
@@ -117,6 +162,11 @@ export default function TitleUnlockedCelebrationModal({
               <p className="text-slate-600 dark:text-slate-300 font-medium">
                 {activeTitle.conditionText}
               </p>
+              {activeTitle.isDailyRankTitle && activeTitle.dailyRankMeta?.remainingText && (
+                <p className="text-amber-700 dark:text-amber-300 font-bold mt-1">
+                  ⏳ Danh hiệu BXH độc quyền hôm nay · {activeTitle.dailyRankMeta.remainingText}
+                </p>
+              )}
             </div>
           </div>
 

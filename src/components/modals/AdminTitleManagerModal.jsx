@@ -23,6 +23,8 @@ const PRESET_EMOJIS = ['🏅', '👑', '🏆', '💎', '🔥', '🌟', '⚡', '�
 export default function AdminTitleManagerModal({
   attempts = [],
   customTitles = [],
+  dailyRankTitles = null,
+  gamePracticeLeaderboard = [],
   initialTargetUsername = null,
   isOpen = false,
   onClose,
@@ -69,7 +71,11 @@ export default function AdminTitleManagerModal({
     null;
 
   const targetSummary = activeTargetUser
-    ? resolveStudentTitleSummary(activeTargetUser, attempts, roomsDb, customTitles)
+    ? resolveStudentTitleSummary(activeTargetUser, attempts, roomsDb, customTitles, null, {
+        gamePracticeLeaderboard,
+        dailyRankTitles,
+        usersDb
+      })
     : null;
   const targetGrantedSet = new Set(Array.isArray(activeTargetUser?.grantedTitleIds) ? activeTargetUser.grantedTitleIds : []);
 

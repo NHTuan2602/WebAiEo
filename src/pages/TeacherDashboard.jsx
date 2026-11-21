@@ -97,7 +97,9 @@ export default function TeacherDashboard({
   currentRoomPin,
   currentUser,
   customTitles = [],
+  dailyRankTitles = null,
   expandedTeacherTestId,
+  gamePracticeLeaderboard = [],
   gradingFilters,
   handleBulkDeleteAccounts,
   handleCopyInviteLink,
@@ -2627,7 +2629,11 @@ export default function TeacherDashboard({
                               </span>
                             )}
                             {(() => {
-                              const accTitle = resolveVisibleTitleBadge(account, attempts, roomsDb, customTitles);
+                              const accTitle = resolveVisibleTitleBadge(account, attempts, roomsDb, customTitles, paymentConfig, {
+                                gamePracticeLeaderboard,
+                                dailyRankTitles,
+                                usersDb
+                              });
                               if (!accTitle || accTitle.isRoleBuiltIn) return null;
                               return (
                                 <div className="mt-2">

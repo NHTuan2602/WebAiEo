@@ -46,8 +46,10 @@ export default function StudentHome({
   classesDb = {},
   currentUser,
   customTitles = [],
+  dailyRankTitles = null,
   examUnlockTokens = {},
   focusedTestId = null,
+  gamePracticeLeaderboard = [],
   onClearFocusedTest,
   onOpenCheckoutModal = null,
   onOpenRealExamPricing = null,
@@ -1096,7 +1098,12 @@ export default function StudentHome({
                       const memberIsTeacher = !memberIsAdmin && u?.role === 'teacher';
                       const memberAttCount = (attempts || []).filter(att => att.studentId === uname).length;
                       const memberVip = resolveUserVipNameVisual(memberObj);
-                      const mTitle = resolveVisibleTitleBadge(memberObj, attempts, roomsDb, customTitles, paymentConfig);
+                      const mTitle = resolveVisibleTitleBadge(memberObj, attempts, roomsDb, customTitles, paymentConfig, {
+                        gamePracticeLeaderboard,
+                        dailyRankTitles,
+                        usersDb,
+                        nowMs: serverNowMs
+                      });
                       const cardBtn = (
                         <button
                           key={memberVip.showNeonCover ? undefined : uname}

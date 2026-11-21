@@ -399,6 +399,7 @@ export default function App() {
   const [showRealExamPricingModal, setShowRealExamPricingModal] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState(null);
   const [gamePracticeLeaderboard, setGamePracticeLeaderboard] = useState([]);
+  const [dailyRankTitles, setDailyRankTitles] = useState(null);
   const [syncHydrated, setSyncHydrated] = useState(false);
   const [localSeenTitlesMap, setLocalSeenTitlesMap] = useState(() => {
     try {
@@ -1638,6 +1639,9 @@ export default function App() {
     }
     if (Array.isArray(snap.gamePracticeLeaderboard)) {
       setGamePracticeLeaderboard(prev => (JSON.stringify(prev) === JSON.stringify(snap.gamePracticeLeaderboard) ? prev : snap.gamePracticeLeaderboard));
+    }
+    if (snap.dailyRankTitles !== undefined) {
+      setDailyRankTitles(prev => (JSON.stringify(prev) === JSON.stringify(snap.dailyRankTitles) ? prev : snap.dailyRankTitles));
     }
     if (snap.paymentConfig && typeof snap.paymentConfig === 'object') {
       setPaymentConfig(prev => (JSON.stringify(prev) === JSON.stringify(snap.paymentConfig) ? prev : snap.paymentConfig));
@@ -3847,6 +3851,7 @@ export default function App() {
     setShowPaymentConfigModal(false);
     setPaymentConfig(null);
     setGamePracticeLeaderboard([]);
+    setDailyRankTitles(null);
     setIsPracticeGameSession(false);
     setSyncHydrated(false);
     titleBaselinePersistedRef.current = '';
@@ -7044,12 +7049,19 @@ export default function App() {
     const unameKey = currentUser.username.toLowerCase();
     const hasLocal = Object.prototype.hasOwnProperty.call(localSeenTitlesMap, unameKey);
     const localAck = hasLocal ? localSeenTitlesMap[unameKey] : [];
-    const summary = resolveStudentTitleSummary(currentUser, attempts, roomsDb, customTitles);
+    const effectiveNowMs = Date.now() + serverClockOffsetMs;
+    const summary = resolveStudentTitleSummary(currentUser, attempts, roomsDb, customTitles, paymentConfig, {
+      gamePracticeLeaderboard,
+      dailyRankTitles,
+      usersDb,
+      nowMs: effectiveNowMs
+    });
     return evaluateTitleUnlockNotification({
       user: currentUser,
       titleSummary: summary,
       localAcknowledgedIds: localAck,
-      hasLocalBaseline: hasLocal
+      hasLocalBaseline: hasLocal,
+      nowMs: effectiveNowMs
     });
   })();
 
@@ -7129,7 +7141,7 @@ export default function App() {
     const uname = currentUser?.username;
     if (!uname) return;
     const unameKey = uname.toLowerCase();
-    const newlyIds = activeCelebratingTitles.map(item => item.id).filter(Boolean);
+    const newlyIds = activeCelebratingTitles.map(item => item.ackKey || item.id).filter(Boolean);
     const mergedIds = Array.from(
       new Set([
         ...(Array.isArray(currentUser.acknowledgedTitleIds) ? currentUser.acknowledgedTitleIds : []),
@@ -7246,8 +7258,10 @@ export default function App() {
           classesDb={classesDb}
           currentUser={currentUser}
           customTitles={customTitles}
+          dailyRankTitles={dailyRankTitles}
           examUnlockTokens={examUnlockTokens}
           focusedTestId={focusedTestId}
+          gamePracticeLeaderboard={gamePracticeLeaderboard}
           onClearFocusedTest={() => setFocusedTestId(null)}
           onOpenCheckoutModal={openGlobalCheckoutModal}
           onOpenRealExamPricing={() => setShowRealExamPricingModal(true)}
@@ -7348,7 +7362,9 @@ export default function App() {
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
           customTitles={customTitles}
+          dailyRankTitles={dailyRankTitles}
           dispatchSyncAction={dispatchSyncAction}
+          gamePracticeLeaderboard={gamePracticeLeaderboard}
           handleTeacherOpenLobby={handleTeacherOpenLobby}
           onGrantUserTitles={handleGrantUserTitles}
           onOpenAccountSecurity={tab => setAccountSecurityTab(tab || 'password')}
@@ -7364,6 +7380,7 @@ export default function App() {
           previousView={previousView}
           roomsDb={roomsDb}
           selectedProfileStudent={selectedProfileStudent}
+          serverClockOffsetMs={serverClockOffsetMs}
           handleUpdateUserProfileFields={handleUpdateUserProfileFields}
           setEditingTargetUser={setEditingTargetUser}
           setPreviousView={setPreviousView}
@@ -7395,6 +7412,7 @@ export default function App() {
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
           customTitles={customTitles}
+          dailyRankTitles={dailyRankTitles}
           darkMode={darkMode}
           freezeCharges={freezeCharges}
           gameCombo={gameCombo}
@@ -7590,6 +7608,8 @@ export default function App() {
           roomsDb={roomsDb}
           serverClockOffsetMs={serverClockOffsetMs}
           customTitles={customTitles}
+          dailyRankTitles={dailyRankTitles}
+          gamePracticeLeaderboard={gamePracticeLeaderboard}
           setAddStudentMode={setAddStudentMode}
           setCopiedRoomPin={setCopiedRoomPin}
           setCurrentRoomPin={setCurrentRoomPin}
@@ -7784,6 +7804,8 @@ export default function App() {
           key={adminTitleModalState.targetUsername || 'all-users'}
           attempts={attempts}
           customTitles={customTitles}
+          dailyRankTitles={dailyRankTitles}
+          gamePracticeLeaderboard={gamePracticeLeaderboard}
           initialTargetUsername={adminTitleModalState.targetUsername}
           isOpen={true}
           onClose={() => setAdminTitleModalState({ isOpen: false, targetUsername: null })}

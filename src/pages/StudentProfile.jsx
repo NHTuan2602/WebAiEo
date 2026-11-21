@@ -89,7 +89,9 @@ export default function StudentProfile({
   currentRoomPin,
   currentUser,
   customTitles = [],
+  dailyRankTitles = null,
   dispatchSyncAction,
+  gamePracticeLeaderboard = [],
   handleTeacherOpenLobby,
   handleUpdateUserProfileFields,
   onGrantUserTitles,
@@ -106,6 +108,7 @@ export default function StudentProfile({
   previousView,
   roomsDb = {},
   selectedProfileStudent,
+  serverClockOffsetMs = 0,
   setEditingTargetUser,
   setPreviousView,
   setSelectedAttemptId,
@@ -198,8 +201,29 @@ export default function StudentProfile({
     : (isSelf || isTeacherViewer);
   const canInspectAttemptDetails = isTeacherViewer || isSelf;
   const canSeeTeacherNotes = isTeacherViewer || isSelf;
-  const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb, customTitles, paymentConfig);
-  const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles, paymentConfig);
+  const titleExtraOpts = {
+    gamePracticeLeaderboard,
+    dailyRankTitles,
+    usersDb,
+    nowMs: Date.now() + serverClockOffsetMs,
+    hideAdminPrivilegeText: !isViewerSuperAdmin
+  };
+  const titleSummary = resolveStudentTitleSummary(student, attempts, roomsDb, customTitles, paymentConfig, titleExtraOpts);
+  const visibleTitle = resolveVisibleTitleBadge(student, attempts, roomsDb, customTitles, paymentConfig, titleExtraOpts);
+  const viewerUnlockedTitleIdSet = (() => {
+    if (isViewerSuperAdmin) return null;
+    if (isSelf) return new Set(titleSummary?.unlockedIds || []);
+    if (!currentUser?.username) return new Set();
+    const viewerSummary = resolveStudentTitleSummary(
+      currentUser,
+      attempts,
+      roomsDb,
+      customTitles,
+      paymentConfig,
+      titleExtraOpts
+    );
+    return new Set(viewerSummary?.unlockedIds || []);
+  })();
   const heroBanner = getProfileBannerById(student.profileBannerId);
   const studentHasCoverPermission = hasCustomCoverPermission(student);
   const studentHasAieoVip = hasActiveAieoVip(student);
@@ -839,7 +863,7 @@ export default function StudentProfile({
                             </div>
                             <div className="text-xs text-[#475569] dark:text-zinc-400 flex items-center gap-1 flex-wrap mt-0.5">
                               {(() => {
-                                const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles, paymentConfig);
+                                const mTitle = resolveVisibleTitleBadge(member, attempts, roomsDb, customTitles, paymentConfig, titleExtraOpts);
                                 if (isMemberAdmin) {
                                   return (
                                     <>
@@ -2663,7 +2687,9 @@ export default function StudentProfile({
         const allTitleItems = titleSummary.itemsWithProgress || [];
         const easyCount = allTitleItems.filter(i => i.difficulty === 'Dễ' || i.difficulty === 'Khởi Đầu' || i.difficulty === 'Cơ Bản').length;
         const normalCount = allTitleItems.filter(i => i.difficulty === 'Bình Thường' || i.difficulty === 'Thử Thách').length;
-        const hardTitleCount = allTitleItems.filter(i => i.difficulty === 'Khó' || i.difficulty === 'Cực Khó').length;
+        const hardTitleCount = allTitleItems.filter(i => i.difficulty === 'Khó').length;
+        const extremeTitleCount = allTitleItems.filter(i => i.difficulty === 'Cực Khó').length;
+        const dailyRankCount = allTitleItems.filter(i => i.isDailyRankTitle || i.difficulty === 'Theo Ngày').length;
         const checkinTitleCount = allTitleItems.filter(i => i.difficulty === 'Điểm Danh').length;
         const secretTitleCount = allTitleItems.filter(i => i.isSecretTitle || i.difficulty === 'Bí Ẩn').length;
         const holidayTitleCount = allTitleItems.filter(i => i.isHolidayTitle).length;
@@ -2673,7 +2699,9 @@ export default function StudentProfile({
           if (titleFilter === 'locked') return !item.unlocked;
           if (titleFilter === 'easy') return item.difficulty === 'Dễ' || item.difficulty === 'Khởi Đầu' || item.difficulty === 'Cơ Bản';
           if (titleFilter === 'normal') return item.difficulty === 'Bình Thường' || item.difficulty === 'Thử Thách';
-          if (titleFilter === 'hard') return item.difficulty === 'Khó' || item.difficulty === 'Cực Khó';
+          if (titleFilter === 'hard') return item.difficulty === 'Khó';
+          if (titleFilter === 'extreme') return item.difficulty === 'Cực Khó';
+          if (titleFilter === 'daily_rank') return item.isDailyRankTitle || item.difficulty === 'Theo Ngày';
           if (titleFilter === 'checkin') return item.difficulty === 'Điểm Danh';
           if (titleFilter === 'secret') return item.isSecretTitle || item.difficulty === 'Bí Ẩn';
           if (titleFilter === 'holiday') return item.isHolidayTitle;
@@ -2684,10 +2712,11 @@ export default function StudentProfile({
           if (diff === 'VIP Độc Quyền') return 'bg-[#991B1B] text-[#F4F4F5] border-[#EF4444] font-semibold';
           if (diff === 'Độc Quyền') return 'bg-purple-100 text-purple-900 border-purple-400 dark:bg-purple-950/60 dark:text-purple-200 dark:border-purple-700';
           if (diff === 'Phú Quý') return 'bg-[#FBBF24] text-[#09090B] border-[#D97706] font-semibold';
+          if (diff === 'Theo Ngày') return 'bg-amber-100 text-amber-950 border-amber-400 dark:bg-amber-500/25 dark:text-amber-100 dark:border-amber-400/70 font-bold';
           if (diff === 'Bí Ẩn') return 'bg-zinc-900 text-amber-200 border-amber-500/70 dark:bg-zinc-800 dark:text-amber-200 dark:border-amber-500/70';
           if (diff === 'Lễ Hội') return 'bg-pink-100 text-rose-800 border-rose-300 dark:bg-pink-950/60 dark:text-rose-200 dark:border-rose-700';
           if (diff === 'Điểm Danh') return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-700';
-          if (diff === 'Cực Khó') return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-700';
+          if (diff === 'Cực Khó') return 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-950/70 dark:text-rose-200 dark:border-rose-600 font-bold';
           if (diff === 'Khó') return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700';
           if (diff === 'Bình Thường' || diff === 'Thử Thách') return 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950/60 dark:text-sky-200 dark:border-sky-700';
           if (diff === 'Dễ' || diff === 'Cơ Bản' || diff === 'Khởi Đầu') return 'bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-950/60 dark:text-lime-200 dark:border-lime-700';
@@ -2709,11 +2738,13 @@ export default function StudentProfile({
                   <Trophy className="w-5 h-5 text-amber-400" /> Bảng Danh Hiệu - {student.name}
                 </h2>
                 <p className="text-xs text-zinc-300 mt-0.5">
-                  {titleSummary.autoUnlockedAll
+                  {titleSummary.autoUnlockedAll && isViewerSuperAdmin
                     ? 'Đặc quyền Quản trị Hệ thống: Tự động mở khóa 100% tất cả danh hiệu hiện tại và mọi danh hiệu mới trong tương lai!'
+                    : isTargetSystemAdmin
+                    ? 'Bộ sưu tập danh hiệu & cột mốc thành tựu trên hệ thống.'
                     : isTargetTeacher
                     ? 'Giảng viên & Học viên đều có thể cày mở khóa, trang bị hoặc bật/tắt Danh Hiệu trên hồ sơ và Đấu Trường.'
-                    : 'Hoàn thành bài thi, chơi Game & đăng nhập đều đặn (kể cả các ngày Lễ đặc biệt trong năm) để mở khóa toàn bộ!'}
+                    : 'Chinh phục cột mốc điểm IELTS, Daily Zone, Top BXH Theo Ngày, Game & thử thách bí ẩn để mở khóa toàn bộ!'}
                 </p>
               </div>
               <button
@@ -2728,13 +2759,22 @@ export default function StudentProfile({
             <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
               {/* Metrics Summary + Visibility Switch */}
               <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-[#F8FAFC] dark:bg-zinc-900 border border-[#E2E8F0] dark:border-zinc-800">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-                  <span>📝 Số bài làm: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.examCount || 0} bài</b></span>
-                  <span>🎯 Band cao nhất: <b className="text-[#0F172B] dark:text-[#F4F4F5]">{titleSummary.stats?.highestBand ? titleSummary.stats.highestBand.toFixed(1) : '0.0'}</b></span>
-                  <span>🎮 Game kỷ lục: <b className="text-amber-700 dark:text-amber-300">{titleSummary.stats?.bestGameScore || 0}đ</b></span>
-                  <span>📅 Đăng nhập: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.totalLoginDays || 0} ngày</b> (Chuỗi {titleSummary.stats?.bestLoginStreak || 0}N)</span>
-                  <span>🌟 Kỹ năng: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.coveredSkillsCount || 0}/4</b></span>
-                </div>
+                {isTargetSystemAdmin && !isViewerSuperAdmin ? (
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-200">
+                    <ShieldAlert className="w-4 h-4 text-slate-600 dark:text-zinc-300 shrink-0" />
+                    <span>Hồ sơ Quản Trị Hệ Thống · Đang trưng bày bộ sưu tập danh hiệu.</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                    <span>📝 Tổng bài: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.examCount || 0}</b></span>
+                    <span>☀️ Daily Zone: <b className="text-teal-700 dark:text-teal-300">{titleSummary.stats?.dailyZoneCount || 0} bài</b></span>
+                    <span>🎯 Band cao nhất: <b className="text-[#0F172B] dark:text-[#F4F4F5]">{titleSummary.stats?.highestBand ? titleSummary.stats.highestBand.toFixed(1) : '0.0'}</b></span>
+                    <span>✨ Lượt 7.0+: <b className="text-amber-700 dark:text-amber-300">{titleSummary.stats?.band70Count || 0} lần</b></span>
+                    <span>🎮 Game kỷ lục: <b className="text-amber-700 dark:text-amber-300">{titleSummary.stats?.bestGameScore || 0}đ</b></span>
+                    <span>📅 Đăng nhập: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.totalLoginDays || 0}N</b> (Chuỗi {titleSummary.stats?.bestLoginStreak || 0}N)</span>
+                    <span>🌟 Kỹ năng: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.coveredSkillsCount || 0}/4</b></span>
+                  </div>
+                )}
 
                 {isSelf && handleUpdateUserProfileFields && (
                   <button
@@ -2759,13 +2799,15 @@ export default function StudentProfile({
                 )}
               </div>
 
-              {/* Filter Tabs */}
+              {/* Filter Tabs — Tách riêng rõ Dễ, Bình Thường, Khó, Cực Khó, BXH Theo Ngày, Điểm Danh, Bí Ẩn... */}
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { id: 'all', label: `Tất cả (${allTitleItems.length})` },
                   { id: 'easy', label: `🌱 Dễ (${easyCount})` },
                   { id: 'normal', label: `⚡ Bình Thường (${normalCount})` },
-                  { id: 'hard', label: `🔥 Khó & Cực Khó (${hardTitleCount})` },
+                  { id: 'hard', label: `🔥 Khó (${hardTitleCount})` },
+                  { id: 'extreme', label: `👑 Cực Khó (${extremeTitleCount})` },
+                  { id: 'daily_rank', label: `🏅 BXH Theo Ngày (${dailyRankCount})` },
                   { id: 'checkin', label: `📅 Điểm Danh (${checkinTitleCount})` },
                   { id: 'secret', label: `❓ Bí Ẩn (${secretTitleCount})` },
                   { id: 'holiday', label: `🎉 Ngày Lễ (${holidayTitleCount})` },
@@ -2788,6 +2830,18 @@ export default function StudentProfile({
                 ))}
               </div>
 
+              {titleFilter === 'daily_rank' && (
+                <div className="p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-600/50 text-xs text-amber-950 dark:text-amber-100 leading-relaxed space-y-1">
+                  <p className="font-extrabold flex items-center gap-1.5">
+                    <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-300 shrink-0" />
+                    <span>Luật Danh Hiệu BXH Theo Ngày (Hiệu lực 1 ngày · Độc quyền không trùng lặp)</span>
+                  </p>
+                  <p className="text-amber-900/90 dark:text-amber-200/90">
+                    Top 1 · Top 2 · Top 3 từng phần (<b>Tổng 4 KN, Reading, Listening, Writing, Speaking, Game</b>) được chốt trực tiếp theo thành tích <b>trong ngày hôm nay</b> (hết hiệu lực lúc <b>23:59</b> giờ VN). Mỗi hạng chỉ cấp cho <b>duy nhất 1 học viên</b> và mỗi học viên chỉ nhận <b>tối đa 1 danh hiệu BXH cao nhất/ngày</b> — tuyệt đối không trùng lặp.
+                  </p>
+                </div>
+              )}
+
               {filteredTitles.length === 0 ? (
                 <div className="p-8 text-center text-xs text-[#475569] dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800">
                   Không có danh hiệu nào trong nhóm lọc này.
@@ -2796,8 +2850,16 @@ export default function StudentProfile({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {filteredTitles.map(item => {
                   const isEquipped = titleSummary.title?.id === item.id;
-                  const maskSecret = Boolean(item.isSecretTitle && !item.unlocked && !isViewerSuperAdmin);
+                  const viewerCanSeeSecret = Boolean(
+                    isViewerSuperAdmin ||
+                    (viewerUnlockedTitleIdSet && viewerUnlockedTitleIdSet.has(item.id))
+                  );
+                  const maskSecret = Boolean(item.isSecretTitle && !viewerCanSeeSecret);
                   const isLuxuryVipCard = Boolean(item.isPaidTitle || item.isVipBundleTitle);
+                  const isDailyCard = Boolean(item.isDailyRankTitle);
+                  const safeProgressText = maskSecret
+                    ? (item.unlocked ? 'Đã khai mở (Ẩn bí mật)' : '??? (Thử thách ẩn)')
+                    : item.progressText;
                   return (
                     <div
                       key={item.id}
@@ -2806,6 +2868,10 @@ export default function StudentProfile({
                           ? isEquipped
                             ? 'bg-amber-50/70 dark:bg-zinc-800 border-amber-500'
                             : 'bg-[#F8FAFC] dark:bg-zinc-900 border-amber-400/70 dark:border-amber-600/60'
+                          : isDailyCard
+                          ? item.unlocked
+                            ? 'bg-amber-50/85 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500/70'
+                            : 'bg-slate-50/85 dark:bg-zinc-900/80 border-amber-200/70 dark:border-zinc-800 opacity-95'
                           : item.unlocked
                           ? isEquipped
                             ? 'bg-[#EDFFFD]/90 dark:bg-zinc-800 border-[#007A7A] dark:border-zinc-500'
@@ -2838,30 +2904,32 @@ export default function StudentProfile({
                               ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700'
                               : 'bg-slate-100 dark:bg-zinc-800 text-[#475569] dark:text-zinc-400 border-slate-200 dark:border-zinc-700'
                           }`}>
-                            {item.unlocked ? 'Đã đạt' : maskSecret ? 'Bí ẩn' : 'Chưa mở'}
+                            {item.unlocked ? (maskSecret ? 'Bí ẩn' : 'Đã đạt') : maskSecret ? 'Bí ẩn' : 'Chưa mở'}
                           </span>
                         </div>
 
                         <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
                           <b>Cách đạt được:</b>{' '}
                           {maskSecret
-                            ? 'Thử thách ẩn - Hãy luyện tập chăm chỉ ở nhiều khung giờ và bứt phá kỷ lục bất ngờ để tự động khai mở!'
+                            ? 'Thử thách ẩn — Hãy luyện tập chăm chỉ và bứt phá kỷ lục bất ngờ để tự mình khai mở bí mật này!'
                             : item.conditionText}
                         </p>
                       </div>
 
                       <div className="space-y-2">
                         <div>
-                          <div className="flex items-center justify-between text-xs font-bold text-[#475569] dark:text-zinc-400 mb-1">
-                            <span>Tiến độ</span>
-                            <span className={item.unlocked ? 'text-emerald-600 dark:text-emerald-400' : ''}>{item.progressText}</span>
+                          <div className="flex items-center justify-between text-xs font-bold text-[#475569] dark:text-zinc-400 mb-1 gap-2">
+                            <span className="shrink-0">Tiến độ</span>
+                            <span className={`text-right truncate ${item.unlocked ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+                              {safeProgressText}
+                            </span>
                           </div>
                           <div className="h-2 rounded-full bg-slate-200 dark:bg-zinc-800 overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all ${
                                 item.unlocked ? 'bg-emerald-500' : 'bg-[#007A7A] dark:bg-zinc-400'
                               }`}
-                              style={{ width: `${item.progressPct}%` }}
+                              style={{ width: `${maskSecret && !item.unlocked ? 0 : item.progressPct}%` }}
                             />
                           </div>
                         </div>

@@ -44,6 +44,7 @@ import {
   AIEO_VIP_PRICE_VND,
   SUBSCRIPTION_DURATION_MS,
   canCreateFriendRoomNow,
+  computeDailyLeaderboardTitleHolders,
   formatVndCurrency,
   getFriendRoomTicketCredits,
   getRealExamComboMeta,
@@ -640,7 +641,7 @@ function recordUserLoginDay(store, user, ts = Date.now()) {
 function mergeAcknowledgedTitleIds(existing, incoming) {
   if (!Array.isArray(existing) && !Array.isArray(incoming)) return undefined;
   const set = new Set();
-  const validId = /^[a-z0-9_]{1,40}$/i;
+  const validId = /^[a-z0-9_@-]{1,64}$/i;
   (Array.isArray(existing) ? existing : []).forEach(id => {
     const clean = String(id || '').trim();
     if (validId.test(clean)) set.add(clean);
@@ -649,7 +650,8 @@ function mergeAcknowledgedTitleIds(existing, incoming) {
     const clean = String(id || '').trim();
     if (validId.test(clean)) set.add(clean);
   });
-  return Array.from(set).slice(0, 60);
+  const arr = Array.from(set);
+  return arr.length > 250 ? arr.slice(arr.length - 250) : arr;
 }
 
 function parseScheduleTimestampServer(val) {
@@ -911,11 +913,13 @@ function sanitizeAttemptForPeer(att) {
     testTitle: att.testTitle,
     testMode: att.testMode,
     focusSkill: att.focusSkill,
+    dailySubCategory: att.dailySubCategory || '',
     speakingPartMode: att.speakingPartMode,
     studentId: att.studentId,
     studentName: att.studentName,
     startedAt: att.startedAt || '',
     submittedAt: att.submittedAt,
+    submittedAtMs: Number(att.submittedAtMs) || 0,
     durationSeconds: Number(att.durationSeconds) || 0,
     timelinessStatus: att.timelinessStatus || 'flexible',
     lateByMinutes: Number(att.lateByMinutes) || 0,
@@ -1768,6 +1772,7 @@ function getSnapshotForViewer(store, viewer = null) {
       customVocabTopics: [],
       customTitles: [],
       gamePracticeLeaderboard: [],
+      dailyRankTitles: null,
       paymentConfig: null,
       supportAdminProfile: null,
       adminFeedbacks: [],
@@ -1810,6 +1815,12 @@ function getSnapshotForViewer(store, viewer = null) {
   const adminFields = buildPublicAdminSnapshotFields(store, viewer);
   const notifications = serializeNotificationsForViewer(store, viewer);
   const sentNotifications = serializeSentNotificationsForTeacher(store, viewer);
+  const globalDailyRankTitles = computeDailyLeaderboardTitleHolders({
+    attempts: store.attempts || [],
+    roomsDb: store.rooms || {},
+    gamePracticeLeaderboard: store.gamePracticeLeaderboard || [],
+    usersDb: store.users || {}
+  });
 
   if (viewer.role === 'teacher') {
     const sanitizedRooms = {};
@@ -1828,6 +1839,7 @@ function getSnapshotForViewer(store, viewer = null) {
       customVocabTopics: store.customVocabTopics || [],
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
       gamePracticeLeaderboard: Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : [],
+      dailyRankTitles: globalDailyRankTitles,
       paymentConfig: getPublicPaymentConfigSummary(store),
       ...adminFields,
       notifications,
@@ -1917,6 +1929,43 @@ function getSnapshotForViewer(store, viewer = null) {
 
   const myNote = store.teacherNotes?.[viewer.username];
 
+  const viewerLower = String(viewer.username || '').trim().toLowerCase();
+  const studentDailyByTitleId = {};
+  const studentDailyByUsername = {};
+  Object.entries(globalDailyRankTitles.byTitleId || {}).forEach(([tid, rec]) => {
+    if (!rec) return;
+    const holderLower = String(rec.username || '').trim().toLowerCase();
+    const canRevealHolder = holderLower && (holderLower === viewerLower || sameClassPeerSet.has(holderLower));
+    if (canRevealHolder) {
+      studentDailyByTitleId[tid] = rec;
+      studentDailyByUsername[holderLower] = rec;
+    } else {
+      studentDailyByTitleId[tid] = {
+        ...rec,
+        username: '',
+        name: 'Học viên lớp khác',
+        occupiedByOtherClass: true
+      };
+    }
+  });
+  const studentBoardRankings = {};
+  Object.entries(globalDailyRankTitles.boardRankings || {}).forEach(([boardId, rows]) => {
+    studentBoardRankings[boardId] = (Array.isArray(rows) ? rows : []).map(row => {
+      const holderLower = String(row?.username || '').trim().toLowerCase();
+      const canRevealHolder = holderLower && (holderLower === viewerLower || sameClassPeerSet.has(holderLower));
+      return canRevealHolder
+        ? row
+        : { ...row, username: '', name: 'Học viên lớp khác', occupiedByOtherClass: true };
+    });
+  });
+  const studentDailyRankTitles = {
+    dateKey: globalDailyRankTitles.dateKey,
+    expiresAtMs: globalDailyRankTitles.expiresAtMs,
+    byTitleId: studentDailyByTitleId,
+    byUsername: studentDailyByUsername,
+    boardRankings: studentBoardRankings
+  };
+
   return {
     ...basePayload,
     deletedUserIds: [],
@@ -1935,6 +1984,7 @@ function getSnapshotForViewer(store, viewer = null) {
       if (sameClassPeerSet.has(uLower)) return true;
       return store.users?.[entry.username]?.role === 'teacher';
     }),
+    dailyRankTitles: studentDailyRankTitles,
     paymentConfig: getPublicPaymentConfigSummary(store),
     ...adminFields,
     notifications,
@@ -2522,7 +2572,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
         const candidate = typeof rawUser.avatarFrameId === 'string' && rawUser.avatarFrameId ? rawUser.avatarFrameId.slice(0, 40) : (prevUser.avatarFrameId || 'none');
         return hasUnlockedAvatarFrame(prevUser, candidate) ? candidate : (hasUnlockedAvatarFrame(prevUser, prevUser.avatarFrameId) ? prevUser.avatarFrameId : 'none');
       })(),
-      equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 40) : (prevUser.equippedTitleId || 'newbie'),
+      equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 64) : (prevUser.equippedTitleId || 'newbie'),
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
       grantedTitleIds: Array.isArray(prevUser.grantedTitleIds) ? prevUser.grantedTitleIds : [],
@@ -2740,7 +2790,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
         ? 'staff_ielts_10'
         : 'newbie';
     incoming.equippedTitleId = typeof incoming.equippedTitleId === 'string' && incoming.equippedTitleId
-      ? incoming.equippedTitleId.slice(0, 40)
+      ? incoming.equippedTitleId.slice(0, 64)
       : (prevUser?.equippedTitleId || defaultRoleTitle);
     incoming.showTitleBadge = incoming.showTitleBadge !== undefined
       ? Boolean(incoming.showTitleBadge)
