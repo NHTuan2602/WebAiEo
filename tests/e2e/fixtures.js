@@ -197,7 +197,7 @@ export async function dismissOptionalPopups(page) {
       dismissedAny = true;
     }
     const titleDialog = page.locator('[role="dialog"][aria-labelledby="title-unlock-celebration-heading"]');
-    if (await titleDialog.isVisible({ timeout: 400 }).catch(() => false)) {
+    if (await titleDialog.isVisible({ timeout: round === 0 ? 1100 : 350 }).catch(() => false)) {
       await titleDialog.getByRole('button', { name: /Đóng thông báo danh hiệu mới|Để Sau/i }).first().click();
       await titleDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       dismissedAny = true;

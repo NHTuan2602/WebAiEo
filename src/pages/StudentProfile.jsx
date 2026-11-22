@@ -359,13 +359,13 @@ export default function StudentProfile({
 
   // Calculate each skill average ONLY across approved attempts that actually include that skill
   // (single-skill Writing/Speaking exercises must NEVER dilute Listening/Reading averages to 0.0!)
-  const gradedListeningAttempts = approvedStudentAttempts.filter(
+  const gradedListeningAttempts = studentAttempts.filter(
     a => (a.testMode !== 'single_skill' || a.focusSkill === 'listening') && typeof a.scores?.listening?.band === 'number'
   );
   const avgListening = gradedListeningAttempts.length > 0
     ? (gradedListeningAttempts.reduce((acc, a) => acc + a.scores.listening.band, 0) / gradedListeningAttempts.length).toFixed(1)
     : null;
-  const gradedReadingAttempts = approvedStudentAttempts.filter(
+  const gradedReadingAttempts = studentAttempts.filter(
     a => (a.testMode !== 'single_skill' || a.focusSkill === 'reading') && typeof a.scores?.reading?.band === 'number'
   );
   const avgReading = gradedReadingAttempts.length > 0
@@ -2712,12 +2712,24 @@ export default function StudentProfile({
                         <span className="flex items-center gap-1">
                           <Headphones className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Listening
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-zinc-100">{showScores ? (att.scores?.listening?.band ?? '-') : 'Đang check'}</span>
+                        <span className="font-bold text-slate-900 dark:text-zinc-100">
+                          {typeof att.scores?.listening?.band === 'number'
+                            ? att.scores.listening.band
+                            : showScores
+                            ? '-'
+                            : 'Đang check'}
+                        </span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{ width: `${showScores ? ((att.scores?.listening?.band || 0) / 9) * 100 : 0}%` }}
+                          style={{
+                            width: `${
+                              typeof att.scores?.listening?.band === 'number'
+                                ? (att.scores.listening.band / 9) * 100
+                                : 0
+                            }%`
+                          }}
                         />
                       </div>
                     </div>
@@ -2727,12 +2739,24 @@ export default function StudentProfile({
                         <span className="flex items-center gap-1">
                           <BookOpen className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Reading
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-zinc-100">{showScores ? (att.scores?.reading?.band ?? '-') : 'Đang check'}</span>
+                        <span className="font-bold text-slate-900 dark:text-zinc-100">
+                          {typeof att.scores?.reading?.band === 'number'
+                            ? att.scores.reading.band
+                            : showScores
+                            ? '-'
+                            : 'Đang check'}
+                        </span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{ width: `${showScores ? ((att.scores?.reading?.band || 0) / 9) * 100 : 0}%` }}
+                          style={{
+                            width: `${
+                              typeof att.scores?.reading?.band === 'number'
+                                ? (att.scores.reading.band / 9) * 100
+                                : 0
+                            }%`
+                          }}
                         />
                       </div>
                     </div>

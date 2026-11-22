@@ -4402,8 +4402,6 @@ export default function App() {
     });
     const readingTotal = rQuestions.reduce((total, q) => total + getObjectiveAnswerMaxScore(q), 0);
 
-    clearExamDraft(currentUser?.username, activeTest.id);
-
     const lBand = calculateAutoBand(listeningRaw, listeningTotal, 'listening');
     const rBand = calculateAutoBand(readingRaw, readingTotal, 'reading');
     const isSingleObjective =
@@ -4429,105 +4427,118 @@ export default function App() {
 
     const attemptId = createUniqueAttemptId('att', currentUser?.username);
 
-    // Upload any integrated Section 4 Speaking recordings cleanly before persisting attempt
-    const uploadedSpeakingRecordings = [];
-    if (speakingRecordingsMap && typeof speakingRecordingsMap === 'object') {
-      const entries = Object.values(speakingRecordingsMap).filter(Boolean);
-      for (const rec of entries) {
-        let finalAudioUrl = rec.audioUrl || '';
-        let finalAudioId = String(rec.audioId || '');
-        if (!finalAudioUrl && rec.blob) {
-          try {
-            const up = await uploadSpeakingRecording({
-              blob: rec.blob,
-              audioId: finalAudioId || `sp4_${attemptId}_${rec.questionId || 'q'}`,
-              mimeType: rec.blob.type || 'audio/webm',
-              attemptId,
-              questionId: rec.questionId || ''
-            });
-            if (up?.audioUrl) finalAudioUrl = up.audioUrl;
-            if (up?.audioId) finalAudioId = up.audioId;
-          } catch (uploadErr) {
-            console.warn('Upload integrated speaking audio skipped:', uploadErr?.message || uploadErr);
+    try {
+      // Upload any integrated Section 4 Speaking recordings cleanly before persisting attempt
+      const uploadedSpeakingRecordings = [];
+      if (speakingRecordingsMap && typeof speakingRecordingsMap === 'object') {
+        const entries = Object.values(speakingRecordingsMap).filter(Boolean);
+        for (const rec of entries) {
+          let finalAudioUrl = rec.audioUrl || '';
+          let finalAudioId = String(rec.audioId || '');
+          if (!finalAudioUrl && rec.blob) {
+            try {
+              const up = await uploadSpeakingRecording({
+                blob: rec.blob,
+                audioId: finalAudioId || `sp4_${attemptId}_${rec.questionId || 'q'}`,
+                mimeType: rec.blob.type || 'audio/webm',
+                attemptId,
+                questionId: rec.questionId || ''
+              });
+              if (up?.audioUrl) finalAudioUrl = up.audioUrl;
+              if (up?.audioId) finalAudioId = up.audioId;
+            } catch (uploadErr) {
+              console.warn('Upload integrated speaking audio skipped:', uploadErr?.message || uploadErr);
+            }
           }
+          uploadedSpeakingRecordings.push({
+            questionId: String(rec.questionId || ''),
+            part: Number(rec.part) || 1,
+            prompt: String(rec.prompt || ''),
+            audioId: finalAudioId,
+            audioUrl: finalAudioUrl,
+            transcript: String(rec.transcript || ''),
+            durationSec: Math.max(0, Math.round(Number(rec.durationSec) || 0))
+          });
         }
-        uploadedSpeakingRecordings.push({
-          questionId: String(rec.questionId || ''),
-          part: Number(rec.part) || 1,
-          prompt: String(rec.prompt || ''),
-          audioId: finalAudioId,
-          audioUrl: finalAudioUrl,
-          transcript: String(rec.transcript || ''),
-          durationSec: Math.max(0, Math.round(Number(rec.durationSec) || 0))
-        });
       }
-    }
 
-    const isSingleMode = cfg.testMode === 'single_skill' && Boolean(cfg.focusSkill);
-    const attemptScores = isSingleMode
-      ? {
-          ...(cfg.focusSkill === 'listening' ? { listening: { raw: listeningRaw, total: listeningTotal, band: lBand } } : {}),
-          ...(cfg.focusSkill === 'reading' ? { reading: { raw: readingRaw, total: readingTotal, band: rBand } } : {}),
-          ...(cfg.focusSkill === 'writing' ? { writing: { task1Band: null, task2Band: null, overallBand: null } } : {}),
-          ...(cfg.focusSkill === 'speaking' ? { speaking: { band: null, criteria: {} } } : {})
+      const isSingleMode = cfg.testMode === 'single_skill' && Boolean(cfg.focusSkill);
+      const attemptScores = isSingleMode
+        ? {
+            ...(cfg.focusSkill === 'listening' ? { listening: { raw: listeningRaw, total: listeningTotal, band: lBand } } : {}),
+            ...(cfg.focusSkill === 'reading' ? { reading: { raw: readingRaw, total: readingTotal, band: rBand } } : {}),
+            ...(cfg.focusSkill === 'writing' ? { writing: { task1Band: null, task2Band: null, overallBand: null } } : {}),
+            ...(cfg.focusSkill === 'speaking' ? { speaking: { band: null, criteria: {} } } : {})
+          }
+        : {
+            listening: { raw: listeningRaw, total: listeningTotal, band: lBand },
+            reading: { raw: readingRaw, total: readingTotal, band: rBand },
+            writing: { task1Band: null, task2Band: null, overallBand: null },
+            ...(cfg.order.includes('speaking') ? { speaking: { band: null, criteria: {} } } : {})
+          };
+
+      const newAttempt = {
+        id: attemptId,
+        testId: activeTest.id,
+        testTitle: activeTest.title,
+        testMode: cfg.testMode,
+        focusSkill: cfg.focusSkill,
+        examCategory: cfg.examCategory,
+        dailySubCategory: cfg.dailySubCategory,
+        writingTaskScope: cfg.writingTaskScope,
+        examUnlockToken: examUnlockTokens[activeTest.id] || undefined,
+        studentId: currentUser?.username || 'std_guest',
+        studentName: currentUser?.name || 'Học sinh',
+        startedAtMs,
+        startedAt,
+        submittedAtMs,
+        submittedAt: formatViDateTime(submittedAtMs),
+        durationSeconds,
+        timelinessStatus,
+        lateByMinutes,
+        answers: examState.answers,
+        ...(uploadedSpeakingRecordings.length > 0 ? { speakingRecordings: uploadedSpeakingRecordings } : {}),
+        antiCheatLogs: examState.antiCheatLogs,
+        tabSwitchCount: examState.tabSwitchCount,
+        teacherGraded: isSingleObjective,
+        aiGraded: false,
+        scores: attemptScores,
+        overallBand: isSingleObjective ? singleObjectiveBand : null,
+        teacherFeedback: ''
+      };
+
+      // Await authoritative server scoring (student client receives stripped answer keys before submit)
+      const syncedSnap = await dispatchSyncAction('UPSERT_ATTEMPT', { attempt: newAttempt });
+      const rejectedStatus = lastSyncRejectionStatusRef.current;
+      if (!syncedSnap && rejectedStatus >= 400 && rejectedStatus < 500) {
+        return;
+      }
+
+      clearExamDraft(currentUser?.username, activeTest.id);
+      if (!syncedSnap || !Array.isArray(syncedSnap.attempts) || !syncedSnap.attempts.some(a => a?.id === newAttempt.id)) {
+        setAttempts(prev => (prev.some(a => a.id === newAttempt.id) ? prev : [newAttempt, ...prev]));
+      }
+      setSelectedAttemptId(newAttempt.id);
+      if (cfg.testMode === 'single_skill' && cfg.focusSkill) {
+        setResultReviewTab(cfg.focusSkill);
+        if (currentUser?.role !== 'teacher') {
+          setPreviousView('SKILL_HUB');
         }
-      : {
-          listening: { raw: listeningRaw, total: listeningTotal, band: lBand },
-          reading: { raw: readingRaw, total: readingTotal, band: rBand },
-          writing: { task1Band: null, task2Band: null, overallBand: null },
-          ...(cfg.order.includes('speaking') ? { speaking: { band: null, criteria: {} } } : {})
-        };
-
-    const newAttempt = {
-      id: attemptId,
-      testId: activeTest.id,
-      testTitle: activeTest.title,
-      testMode: cfg.testMode,
-      focusSkill: cfg.focusSkill,
-      examCategory: cfg.examCategory,
-      dailySubCategory: cfg.dailySubCategory,
-      writingTaskScope: cfg.writingTaskScope,
-      examUnlockToken: examUnlockTokens[activeTest.id] || undefined,
-      studentId: currentUser?.username || 'std_guest',
-      studentName: currentUser?.name || 'Học sinh',
-      startedAtMs,
-      startedAt,
-      submittedAtMs,
-      submittedAt: formatViDateTime(submittedAtMs),
-      durationSeconds,
-      timelinessStatus,
-      lateByMinutes,
-      answers: examState.answers,
-      ...(uploadedSpeakingRecordings.length > 0 ? { speakingRecordings: uploadedSpeakingRecordings } : {}),
-      antiCheatLogs: examState.antiCheatLogs,
-      tabSwitchCount: examState.tabSwitchCount,
-      teacherGraded: isSingleObjective,
-      aiGraded: false,
-      scores: attemptScores,
-      overallBand: isSingleObjective ? singleObjectiveBand : null,
-      teacherFeedback: ''
-    };
-
-    setAttempts(prev => [newAttempt, ...prev]);
-    dispatchSyncAction('UPSERT_ATTEMPT', { attempt: newAttempt });
-    setSelectedAttemptId(newAttempt.id);
-    if (cfg.testMode === 'single_skill' && cfg.focusSkill) {
-      setResultReviewTab(cfg.focusSkill);
-      if (currentUser?.role !== 'teacher') {
-        setPreviousView('SKILL_HUB');
+      } else {
+        setResultReviewTab('listening');
+        if (currentUser?.role !== 'teacher') {
+          setPreviousView('HOME');
+        }
       }
-    } else {
-      setResultReviewTab('listening');
-      if (currentUser?.role !== 'teacher') {
-        setPreviousView('HOME');
-      }
-    }
-    setView('RESULT_VIEW');
+      setView('RESULT_VIEW');
 
-    if (isSingleObjective) {
-      showToast('Đã nộp bài Daily Zone! Xem ngay số câu đúng, thời gian và số lần làm bài.');
-    } else {
-      showToast('Đã nộp bài thành công! Ms. Như đang check và sẽ duyệt trả điểm chính thức.');
+      if (isSingleObjective) {
+        showToast('Đã nộp bài Daily Zone! Xem ngay điểm Band, số câu đúng, thời gian và số lần làm bài.');
+      } else {
+        showToast('Đã nộp bài thành công! Điểm Nghe & Đọc hiển thị ngay, Writing/Speaking chờ Ms. Như duyệt.');
+      }
+    } finally {
+      examSubmitLockRef.current = false;
     }
   };
 
@@ -5182,7 +5193,20 @@ export default function App() {
       };
     }
 
+    const prevLRaw = Number.isFinite(Number(gradingAttempt.scores?.listening?.raw)) ? Number(gradingAttempt.scores.listening.raw) : 0;
+    const prevLBand = gradingAttempt.scores?.listening?.band ?? calculateAutoBand(prevLRaw, lTotal, 'listening');
+    const prevRRaw = Number.isFinite(Number(gradingAttempt.scores?.reading?.raw)) ? Number(gradingAttempt.scores.reading.raw) : 0;
+    const prevRBand = gradingAttempt.scores?.reading?.band ?? calculateAutoBand(prevRRaw, rTotal, 'reading');
+    const includesListening = gradingAttempt.testMode !== 'single_skill' || gradingAttempt.focusSkill === 'listening';
+    const includesReading = gradingAttempt.testMode !== 'single_skill' || gradingAttempt.focusSkill === 'reading';
+    const objectiveManuallyEdited = Boolean(gradingAttempt.manualObjectiveOverride) ||
+      (includesListening && (cleanLRaw !== prevLRaw || lBand !== prevLBand)) ||
+      (includesReading && (cleanRRaw !== prevRRaw || rBand !== prevRBand));
+
     const wasPreviouslyApproved = Boolean(gradingAttempt.teacherGraded);
+    if (objectiveManuallyEdited) {
+      updatedAttemptObj = { ...updatedAttemptObj, manualObjectiveOverride: true };
+    }
     const updatedAttempts = attempts.map(att => (att.id === gradingAttempt.id ? updatedAttemptObj : att));
 
     setAttempts(updatedAttempts);

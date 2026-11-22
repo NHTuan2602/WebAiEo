@@ -561,9 +561,26 @@ export function applyAnswerKeyTextToQuestions(rawKeyText = '', existingQuestions
       const rawParts = q.type === 'mcq'
         ? rawAns.split(/\s*(?:,|;|\/|&|\band\b)\s*/i).filter(Boolean)
         : [rawAns];
+      const tfngAliasMap = {
+        T: 'TRUE',
+        F: 'FALSE',
+        NG: 'NOT GIVEN',
+        'N/G': 'NOT GIVEN',
+        NOTGIVEN: 'NOT GIVEN',
+        Y: 'YES',
+        N: 'NO'
+      };
       const matchedAnswers = rawParts.map(part => {
         const partNorm = part.trim().toUpperCase();
-        return q.options.find(opt => String(opt).trim().toUpperCase().startsWith(`${partNorm}.`) || String(opt).trim().toUpperCase() === partNorm) || part;
+        const expandedTfng = q.type === 'tfng' ? (tfngAliasMap[partNorm] || partNorm) : partNorm;
+        return (
+          q.options.find(
+            opt =>
+              String(opt).trim().toUpperCase() === expandedTfng ||
+              String(opt).trim().toUpperCase() === partNorm ||
+              String(opt).trim().toUpperCase().startsWith(`${partNorm}.`)
+          ) || (q.type === 'tfng' ? expandedTfng : part)
+        );
       });
       return q.type === 'mcq'
         ? {

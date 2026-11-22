@@ -1017,6 +1017,158 @@ function evaluateObjectiveScoresForAttempt(test, answers = {}) {
   return { scores, overallBand, teacherGraded, roundIeltsBandServer };
 }
 
+function hasAnyObjectiveAnswersMap(answers = {}) {
+  if (!answers || typeof answers !== 'object') return false;
+  return Object.entries(answers).some(([key, val]) => {
+    if (key === 'w1' || key === 'w2') return false;
+    if (Array.isArray(val)) return val.some(item => String(item ?? '').trim().length > 0);
+    return String(val ?? '').trim().length > 0;
+  });
+}
+
+function reconcileAttemptObjectiveScores(attempt, test, { onlyWhenStaleRepair = false } = {}) {
+  if (!attempt || typeof attempt !== 'object' || !test || typeof test !== 'object') {
+    return { attempt, changed: false };
+  }
+  if (attempt.manualObjectiveOverride) {
+    return { attempt, changed: false };
+  }
+  const evalRes = evaluateObjectiveScoresForAttempt(test, attempt.answers || {});
+  if (!evalRes) return { attempt, changed: false };
+
+  const cfgMode =
+    test.testMode === 'single_skill'
+      ? 'single_skill'
+      : attempt.testMode === 'single_skill'
+      ? 'single_skill'
+      : 'full_exam';
+  const focusSkill =
+    cfgMode === 'single_skill'
+      ? (test.focusSkill || attempt.focusSkill || 'reading')
+      : null;
+  const hasListening = cfgMode !== 'single_skill' || focusSkill === 'listening';
+  const hasReading = cfgMode !== 'single_skill' || focusSkill === 'reading';
+  if (!hasListening && !hasReading) {
+    return { attempt, changed: false };
+  }
+
+  const prevScores = attempt.scores && typeof attempt.scores === 'object' ? attempt.scores : {};
+  const nextScores = { ...prevScores };
+  const hasRecordedObjectiveAnswers = hasAnyObjectiveAnswersMap(attempt.answers);
+  let scoresChanged = false;
+
+  const maybeUpdateSkill = (skillKey) => {
+    const evaluated = evalRes.scores?.[skillKey];
+    if (!evaluated) return;
+    const prev = prevScores[skillKey];
+    const prevRaw = Number.isFinite(Number(prev?.raw)) ? Number(prev.raw) : -1;
+    const prevTotal = Number.isFinite(Number(prev?.total)) ? Number(prev.total) : -1;
+    const prevBand = typeof prev?.band === 'number' && Number.isFinite(prev.band) ? prev.band : null;
+
+    // Never wipe pre-seeded/imported historical attempts that have a score but no per-question answers map
+    if (!hasRecordedObjectiveAnswers && prevRaw > 0 && evaluated.raw === 0) {
+      return;
+    }
+
+    if (onlyWhenStaleRepair) {
+      const shouldRepair =
+        !prev ||
+        evaluated.raw > prevRaw ||
+        (evaluated.raw === prevRaw && (evaluated.total !== prevTotal || evaluated.band !== prevBand));
+      if (!shouldRepair) return;
+    }
+
+    if (prevRaw !== evaluated.raw || prevTotal !== evaluated.total || prevBand !== evaluated.band) {
+      nextScores[skillKey] = {
+        ...(prev && typeof prev === 'object' ? prev : {}),
+        raw: evaluated.raw,
+        total: evaluated.total,
+        band: evaluated.band
+      };
+      scoresChanged = true;
+    }
+  };
+
+  if (hasListening) maybeUpdateSkill('listening');
+  if (hasReading) maybeUpdateSkill('reading');
+
+  let nextOverallBand = attempt.overallBand;
+  let nextTeacherGraded = Boolean(attempt.teacherGraded);
+  if (cfgMode === 'single_skill' && (focusSkill === 'listening' || focusSkill === 'reading')) {
+    const skillBand = nextScores[focusSkill]?.band ?? 0;
+    if (!onlyWhenStaleRepair || scoresChanged || nextOverallBand !== skillBand || !nextTeacherGraded) {
+      nextOverallBand = skillBand;
+      nextTeacherGraded = true;
+    }
+  } else if (cfgMode !== 'single_skill' && nextTeacherGraded && scoresChanged) {
+    const skillBands = [];
+    if (typeof nextScores.listening?.band === 'number') skillBands.push(nextScores.listening.band);
+    if (typeof nextScores.reading?.band === 'number') skillBands.push(nextScores.reading.band);
+    if (typeof nextScores.writing?.overallBand === 'number') skillBands.push(nextScores.writing.overallBand);
+    if (typeof nextScores.speaking?.band === 'number') skillBands.push(nextScores.speaking.band);
+    if (skillBands.length > 0) {
+      nextOverallBand = calculateOverallIeltsBand(skillBands);
+    }
+  }
+
+  const metaChanged =
+    nextOverallBand !== attempt.overallBand ||
+    nextTeacherGraded !== Boolean(attempt.teacherGraded);
+
+  if (!scoresChanged && !metaChanged) {
+    return { attempt, changed: false };
+  }
+
+  return {
+    attempt: {
+      ...attempt,
+      scores: nextScores,
+      overallBand: nextOverallBand,
+      teacherGraded: nextTeacherGraded
+    },
+    changed: true
+  };
+}
+
+function reconcileTestAttemptsObjectiveScores(store, test, { onlyWhenStaleRepair = false } = {}) {
+  if (!store || !Array.isArray(store.attempts) || !test?.id) return false;
+  let anyChanged = false;
+  const nextAttempts = store.attempts.map(att => {
+    if (!att || att.testId !== test.id) return att;
+    const res = reconcileAttemptObjectiveScores(att, test, { onlyWhenStaleRepair });
+    if (res.changed) {
+      anyChanged = true;
+      return res.attempt;
+    }
+    return att;
+  });
+  if (anyChanged) {
+    store.attempts = nextAttempts;
+  }
+  return anyChanged;
+}
+
+function reconcileAllStaleAttemptsInStore(store) {
+  if (!store || !Array.isArray(store.attempts) || !Array.isArray(store.tests)) return false;
+  const testMap = new Map(store.tests.filter(t => t?.id).map(t => [t.id, t]));
+  let anyChanged = false;
+  const nextAttempts = store.attempts.map(att => {
+    if (!att?.testId) return att;
+    const linkedTest = testMap.get(att.testId);
+    if (!linkedTest) return att;
+    const res = reconcileAttemptObjectiveScores(att, linkedTest, { onlyWhenStaleRepair: true });
+    if (res.changed) {
+      anyChanged = true;
+      return res.attempt;
+    }
+    return att;
+  });
+  if (anyChanged) {
+    store.attempts = nextAttempts;
+  }
+  return anyChanged;
+}
+
 function getServerChatMsgTs(msg) {
   const rawTs = Number(msg?.createdAt ?? msg?.id);
   return Number.isFinite(rawTs) && rawTs > 1_000_000_000_000 ? rawTs : 0;
@@ -1903,6 +2055,10 @@ export function createPersistentSyncStore(persistFile = '') {
   }
 
   const mediaMigratedOnBoot = externalizeStoreMedia(store);
+  const attemptsRepairedOnBoot = reconcileAllStaleAttemptsInStore(store);
+  if (attemptsRepairedOnBoot) {
+    store.version += 1;
+  }
 
   let writeTimer = null;
   const writeStoreSync = () => {
@@ -1942,10 +2098,13 @@ export function createPersistentSyncStore(persistFile = '') {
     }
   };
 
-  // Persist protected default accounts, _authSecret & migrated externalized media immediately on boot
-  if (persistFile && (!hadExistingFile || (loadedFromDisk && (protectedChanged || seedInitializedOnBoot || seedMergedOnBoot || mediaMigratedOnBoot)))) {
+  // Persist protected default accounts, _authSecret, migrated media & repaired objective scores immediately on boot
+  if (persistFile && (!hadExistingFile || (loadedFromDisk && (protectedChanged || seedInitializedOnBoot || seedMergedOnBoot || mediaMigratedOnBoot || attemptsRepairedOnBoot)))) {
     if (mediaMigratedOnBoot) {
       console.log('[LexiPrep Sync] Migrated inline Base64 media to cached /api/sync/media/ files.');
+    }
+    if (attemptsRepairedOnBoot) {
+      console.log('[LexiPrep Sync] Reconciled stale objective Listening/Reading attempt scores against current answer keys.');
     }
     writeStoreSync();
   }
@@ -1970,6 +2129,9 @@ export function createPersistentSyncStore(persistFile = '') {
         applyParsedStoreSnapshot(store, parsed);
         ensureProtectedAccounts(store);
         externalizeStoreMedia(store);
+        if (reconcileAllStaleAttemptsInStore(store)) {
+          store.version += 1;
+        }
         return true;
       }
     } catch {}
@@ -4155,6 +4317,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const isPublicNow = (test.visibility || 'public') !== 'private';
       if (idx >= 0) {
         store.tests[idx] = test;
+        reconcileTestAttemptsObjectiveScores(store, test);
       } else {
         store.tests = [test, ...store.tests];
       }
@@ -5077,6 +5240,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         delete attempt.aiWritingTicket;
       } else {
         const testObj = (store.tests || []).find(t => t.id === attempt.testId);
+        const isExistingAttempt = (store.attempts || []).some(a => a.id === attempt.id);
         const submittedAtMs = parseScheduleTimestampServer(attempt.submittedAtMs) || Date.now();
         const timeliness = computeTestTimelinessServer(testObj, submittedAtMs);
         attempt = {
@@ -5085,6 +5249,12 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           durationSeconds: Math.max(0, Math.round(Number(attempt.durationSeconds) || 0)),
           ...timeliness
         };
+        if (!isExistingAttempt && testObj && !attempt.manualObjectiveOverride) {
+          const reconciled = reconcileAttemptObjectiveScores(attempt, testObj);
+          if (reconciled.changed) {
+            attempt = reconciled.attempt;
+          }
+        }
       }
 
       const idx = store.attempts.findIndex(a => a.id === attempt.id);

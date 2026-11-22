@@ -306,18 +306,41 @@ export function getObjectiveAnswerMaxScore(question) {
   return question?.type === 'mcq' && expectedAnswers.length > 1 ? expectedAnswers.length : 1;
 }
 
+function normalizeTfngAlias(val = '') {
+  const clean = String(val ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (clean === 't' || clean === 'true') return 'true';
+  if (clean === 'f' || clean === 'false') return 'false';
+  if (clean === 'ng' || clean === 'not given' || clean === 'notgiven' || clean === 'n/g') return 'not given';
+  if (clean === 'y' || clean === 'yes') return 'yes';
+  if (clean === 'n' || clean === 'no') return 'no';
+  return clean;
+}
+
+function isTfngLikeQuestion(question, options = []) {
+  if (question?.type === 'tfng') return true;
+  if (!Array.isArray(options) || options.length < 2) return false;
+  const upperOpts = options.map(o => String(o || '').trim().toUpperCase());
+  return upperOpts.includes('NOT GIVEN') && (upperOpts.includes('TRUE') || upperOpts.includes('YES'));
+}
+
 function isSingleObjectiveAnswerCorrect(question, userRaw) {
   const options = Array.isArray(question?.options) ? question.options : [];
   const expectedAnswers = getQuestionCorrectAnswers(question);
-  const rawKey = question?.type === 'mcq' && expectedAnswers.length === 1
+  const rawKey = expectedAnswers.length === 1
     ? expectedAnswers[0]
-    : question?.correctAnswer ?? '';
+    : (question?.correctAnswer ?? expectedAnswers.join('|') ?? '');
 
   const normalizedUser = String(userRaw ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
   const normalizedKey = String(rawKey).trim().replace(/\s+/g, ' ').toLowerCase();
   if (!normalizedUser || !normalizedKey) return false;
 
   if (normalizedUser === normalizedKey) return true;
+
+  if (isTfngLikeQuestion(question, options)) {
+    if (normalizeTfngAlias(normalizedUser) === normalizeTfngAlias(normalizedKey)) {
+      return true;
+    }
+  }
 
   const hasVariants = /[|/]/.test(normalizedKey);
   if (hasVariants && question?.type !== 'mcq' && question?.type !== 'tfng') {
