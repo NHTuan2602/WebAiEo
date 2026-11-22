@@ -2302,6 +2302,9 @@ function serializeNotificationsForViewer(store, viewer) {
   if (viewer.role === 'teacher' && !isViewerSuperAdmin) {
     return [];
   }
+  if (viewer.isGuest) {
+    return [];
+  }
   const list = Array.isArray(store.notifications) ? store.notifications : [];
   const uname = viewer.username || '';
   const unameLower = uname.toLowerCase();

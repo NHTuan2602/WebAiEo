@@ -221,7 +221,7 @@ export default function Navbar({
                     ? 'font-bold text-[#334155] dark:text-zinc-300 tracking-wide'
                     : 'font-semibold text-[#475569] dark:text-zinc-400'
                 }`}>
-                  {isSuperAdmin ? 'ADMIN' : isTeacher ? 'Giáo viên' : 'Học viên'}
+                  {isSuperAdmin ? 'ADMIN' : isTeacher ? 'Giáo viên' : isGuest ? 'Khách' : 'Học viên'}
                 </p>
               </div>
             </button>
@@ -273,7 +273,7 @@ export default function Navbar({
             )}
           </div>
 
-          {(!isTeacher || isSuperAdmin) && (
+          {(!isTeacher || isSuperAdmin) && !isGuest && (
             <div className="relative shrink-0" ref={notifBoxRef}>
               <button
                 type="button"

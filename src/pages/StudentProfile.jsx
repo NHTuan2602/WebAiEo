@@ -793,7 +793,8 @@ export default function StudentProfile({
             </button>
           )}
 
-          {/* Messenger-Style Dropdown Directory Popup Trigger */}
+          {/* Messenger-Style Dropdown Directory Popup Trigger (hidden for Guest accounts) */}
+          {!currentUser?.isGuest && (
           <div className="relative" ref={memberDirectoryRef}>
             <button
               type="button"
@@ -1013,6 +1014,7 @@ export default function StudentProfile({
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 
@@ -1142,12 +1144,16 @@ export default function StudentProfile({
                     <span className="text-xs bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3 text-slate-600 dark:text-zinc-300" /> Giáo Viên IELTS
                     </span>
+                  ) : student.isGuest ? (
+                    <span className="text-xs bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3 text-amber-600 dark:text-amber-300" /> Tài Khoản Khách
+                    </span>
                   ) : (
                     <span className="text-xs bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
                       <CheckCircle className="w-3 h-3 text-slate-600 dark:text-zinc-300" /> Học Viên Chính Thức
                     </span>
                   )}
-                  {visibleTitle && !visibleTitle.isRoleBuiltIn && (
+                  {!student.isGuest && !currentUser?.isGuest && visibleTitle && !visibleTitle.isRoleBuiltIn && (
                     <button
                       type="button"
                       onClick={() => setShowTitlesModal(true)}
@@ -1212,22 +1218,26 @@ export default function StudentProfile({
                       >
                         <Edit className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> {isTargetTeacher || isTargetSystemAdmin ? 'Chỉnh hồ sơ' : 'Chỉnh mục tiêu'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={openCustomizeModal}
-                        className={profileActionBtnCls}
-                      >
-                        <Palette className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Tùy Chỉnh Hình Nền &amp; Khung
-                      </button>
+                      {!currentUser?.isGuest && (
+                        <button
+                          type="button"
+                          onClick={openCustomizeModal}
+                          className={profileActionBtnCls}
+                        >
+                          <Palette className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Tùy Chỉnh Hình Nền &amp; Khung
+                        </button>
+                      )}
                     </>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setShowTitlesModal(true)}
-                    className={profileActionBtnCls}
-                  >
-                    <Trophy className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
-                  </button>
+                  {!currentUser?.isGuest && !student.isGuest && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTitlesModal(true)}
+                      className={profileActionBtnCls}
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
+                    </button>
+                  )}
                   {isViewerSuperAdmin && !isTargetSystemAdmin && onOpenAdminTitleManager && (
                     <button
                       type="button"
