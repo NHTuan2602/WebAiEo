@@ -55,10 +55,40 @@ export function getStandardGroupInstruction(question, options = []) {
   }
   if (type === 'mcq') {
     const count = Number(question?.requiredSelections) || 1;
-    if (count > 1) {
-      return `Choose ${count} letters from the options below.`;
+    if (count === 2) {
+      return 'Choose TWO correct answers.';
     }
-    return 'Choose the correct letter, A, B, C or D.';
+    if (count === 3) {
+      return 'Choose THREE correct answers.';
+    }
+    if (count > 1) {
+      return `Choose ${count} correct answers.`;
+    }
+    return 'Choose the correct answer.';
+  }
+  if (type === 'matching') {
+    const codes = (Array.isArray(options) ? options : [])
+      .map(o => String(o || '').trim().match(/^([A-L])\b/i)?.[1]?.toUpperCase())
+      .filter(Boolean);
+    const rangeStr =
+      codes.length === 3
+        ? `${codes[0]}, ${codes[1]} or ${codes[2]}`
+        : codes.length >= 2
+        ? `${codes[0]}–${codes[codes.length - 1]}`
+        : 'A, B or C';
+    return `Choose the correct letter, ${rangeStr}, next to each question.`;
+  }
+  if (type === 'flowchart_completion') {
+    if (Array.isArray(options) && options.length > 0) {
+      const codes = options
+        .map(o => String(o || '').trim().match(/^([A-L])\b/i)?.[1]?.toUpperCase())
+        .filter(Boolean);
+      const firstC = codes[0] || 'A';
+      const lastC = codes[codes.length - 1] || 'H';
+      return `Complete the flowchart below. Choose answers from the box and write the correct letter, ${firstC}–${lastC}, next to each question.`;
+    }
+    const limit = question?.wordLimit || 'ONE WORD ONLY';
+    return `Complete the flowchart below. Write ${limit} for each answer.`;
   }
   if (type === 'correct_ending') {
     return 'Complete each sentence with the correct ending from the list below.';
@@ -117,7 +147,7 @@ function isShortMatrixOptionList(options) {
   const trimmed = options.map(opt => String(opt || '').trim()).filter(Boolean);
   if (trimmed.length !== options.length) return false;
   if (trimmed.every(opt => STANDARD_VERDICT_OPTIONS.has(opt.toUpperCase()))) return false;
-  return trimmed.every(opt => opt.length <= 12);
+  return trimmed.every(opt => /^(?:[A-L]|(?:i{1,3}|iv|vi{0,3}|ix|x|xi{1,2}))$/i.test(opt));
 }
 
 const MATRIX_ELIGIBLE_TYPES = new Set([
@@ -140,7 +170,8 @@ const WORD_BOX_GROUP_TYPES = new Set([
   'correct_ending',
   'matching',
   'map_diagram',
-  'diagram_label'
+  'diagram_label',
+  'flowchart_completion'
 ]);
 
 function isWordBoxOptionList(options) {
@@ -282,9 +313,9 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
       }
     }
 
-    // 3. Shared Word/Phrase Box for matching_headings, matching_features, correct_ending, etc.
-    //    when options have full text (e.g. "A drawings", "D original plans") and are repeated across 2+ questions
-    if (WORD_BOX_GROUP_TYPES.has(q?.type) && opts.length >= 3 && isWordBoxOptionList(opts) && !isShortMatrixOptionList(opts)) {
+    // 3. Shared Word/Phrase Box for matching, matching_headings, matching_features, correct_ending, flowchart_completion, etc.
+    //    when options have full text (e.g. "A All the members must do it.", "A size") and are repeated across 2+ questions
+    if (WORD_BOX_GROUP_TYPES.has(q?.type) && opts.length >= 2 && isWordBoxOptionList(opts) && !isShortMatrixOptionList(opts)) {
       const sig = opts.join('||');
       let j = i + 1;
       while (j < questions.length) {
@@ -317,15 +348,63 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
       }
     }
 
-    // 4. Consecutive questions of the same type (e.g. 2+ tfng/mcq questions) OR sharing the same attached diagram imageUrl
-    if (q?.type === 'tfng' || q?.type === 'mcq' || Boolean(q?.imageUrl)) {
+    // 3b. Multi-select MCQ ("Questions 28–30 Choose THREE correct answers.")
+    //     If consecutive multi-select MCQ questions share the same prompt and options, merge them into a single range card
+    const qReqSelections = Math.max(1, Number(q?.requiredSelections) || 1);
+    if (q?.type === 'mcq' && qReqSelections > 1) {
+      const cleanStem = stripLeadingQuestionNumber(q?.question || '').trim().toLowerCase();
+      const optSig = opts.join('||');
       let j = i + 1;
       while (j < questions.length) {
         const nextQ = questions[j];
+        const nextReq = Math.max(1, Number(nextQ?.requiredSelections) || 1);
+        const nextStem = stripLeadingQuestionNumber(nextQ?.question || '').trim().toLowerCase();
+        const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+        if (nextQ?.type === 'mcq' && nextReq > 1 && nextStem === cleanStem && nextOpts.join('||') === optSig) {
+          j++;
+        } else {
+          break;
+        }
+      }
+      const startNum = getQuestionDisplayNumber(q, baseOffset + i + 1);
+      const lastItem = questions[j - 1];
+      const lastStartNum = getQuestionDisplayNumber(lastItem, baseOffset + j);
+      const explicitEnd = Number(q?.questionEndNumber);
+      const effectiveEnd =
+        j - i > 1
+          ? Math.max(lastStartNum, Number.isFinite(explicitEnd) ? explicitEnd : startNum + qReqSelections - 1)
+          : Number.isFinite(explicitEnd) && explicitEnd > startNum
+          ? explicitEnd
+          : startNum + qReqSelections - 1;
+      groups.push({
+        kind: 'single',
+        key: `single-${q.id}`,
+        question: {
+          ...q,
+          questionNumber: startNum,
+          questionEndNumber: effectiveEnd,
+          requiredSelections: Math.max(qReqSelections, j - i),
+          linkedQuestionIds: questions.slice(i, j).map(item => item.id)
+        },
+        displayNum: startNum
+      });
+      i = j;
+      continue;
+    }
+
+    // 4. Consecutive questions of the same type (e.g. 2+ tfng, single-answer mcq, or flowchart_completion) OR sharing the same attached diagram imageUrl
+    const isSingleMcq = q?.type === 'mcq' && qReqSelections === 1;
+    if (q?.type === 'tfng' || isSingleMcq || q?.type === 'flowchart_completion' || Boolean(q?.imageUrl)) {
+      let j = i + 1;
+      while (j < questions.length) {
+        const nextQ = questions[j];
+        const nextReq = Math.max(1, Number(nextQ?.requiredSelections) || 1);
+        const nextIsSingleMcq = nextQ?.type === 'mcq' && nextReq === 1;
         const sameSharedImage = Boolean(q?.imageUrl && nextQ?.imageUrl === q.imageUrl);
         const sameGroupableType =
-          (q?.type === 'tfng' || q?.type === 'mcq') &&
-          nextQ?.type === q.type &&
+          ((q?.type === 'tfng' && nextQ?.type === 'tfng') ||
+            (isSingleMcq && nextIsSingleMcq) ||
+            (q?.type === 'flowchart_completion' && nextQ?.type === 'flowchart_completion')) &&
           (!q?.imageUrl || nextQ?.imageUrl === q.imageUrl);
         if (sameSharedImage || sameGroupableType) {
           j++;

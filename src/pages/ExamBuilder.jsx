@@ -655,6 +655,335 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return matchedCount;
   };
 
+  const handleSyncOptionsToGroup = (skill, scopeField, scopeIdx, sourceQuestionId) => {
+    let syncedCount = 0;
+    setTestForm(prev => {
+      const prevQs = Array.isArray(prev[skill]?.questions) ? prev[skill].questions : [];
+      const sourceQ = prevQs.find(q => q.id === sourceQuestionId);
+      if (!sourceQ || !Array.isArray(sourceQ.options) || sourceQ.options.length === 0) return prev;
+      const targetType = sourceQ.type;
+      const targetScope = sourceQ[scopeField];
+      const nextOpts = [...sourceQ.options];
+      const nextInstruction = sourceQ.instruction || '';
+
+      const nextQs = prevQs.map(q => {
+        if (q.id === sourceQuestionId) return q;
+        const sameScope =
+          typeof targetScope !== 'number' ||
+          typeof q[scopeField] !== 'number' ||
+          q[scopeField] === targetScope;
+        if (!sameScope || q.type !== targetType) return q;
+        syncedCount += 1;
+        return {
+          ...q,
+          options: [...nextOpts],
+          ...(nextInstruction ? { instruction: nextInstruction } : {})
+        };
+      });
+      return {
+        ...prev,
+        [skill]: {
+          ...prev[skill],
+          questions: nextQs
+        }
+      };
+    });
+    if (syncedCount > 0) {
+      showToast?.(`Đã đồng bộ Khung Đáp Án (A, B, C...) sang ${syncedCount} câu cùng nhóm để hiển thị 1 khung chung chuẩn Cambridge!`);
+    } else {
+      showToast?.('Chưa có câu hỏi nào khác cùng dạng trong phần này để đồng bộ khung đáp án.', 'info');
+    }
+  };
+
+  const handleApplyFlowchartBoxTemplate = (skill, scopeField, scopeIdx, flowchartClozeText, wordBoxOptions = []) => {
+    setTestForm(prev => {
+      const prevSkill = prev[skill] || {};
+      const currentCloze =
+        skill === 'listening'
+          ? getListeningTracks(prev.listening)[scopeIdx]?.clozeText || ''
+          : getReadingPassages(prev.reading)[scopeIdx]?.clozeText || '';
+      const nextCloze = currentCloze.trim()
+        ? `${currentCloze.trim()}\n\n${flowchartClozeText}`
+        : flowchartClozeText;
+
+      const templateBlanks = new Set(
+        [...flowchartClozeText.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => Number(m[1]))
+      );
+
+      let synced = syncClozeBlanksWithQuestions({
+        clozeText: nextCloze,
+        existingQuestions: prevSkill.questions || [],
+        scopeField,
+        scopeIdx,
+        skill
+      });
+
+      if (Array.isArray(wordBoxOptions) && wordBoxOptions.length > 0) {
+        synced = synced.map(q => {
+          if (typeof q.blankNum === 'number' && templateBlanks.has(q.blankNum)) {
+            return {
+              ...q,
+              type: 'flowchart_completion',
+              options: [...wordBoxOptions],
+              instruction:
+                'Complete the flowchart below. Choose FIVE answers from the box and write the correct letter, A - H, next to Questions 26 - 30.',
+              correctAnswer: q.correctAnswer || wordBoxOptions[0]
+            };
+          }
+          return q;
+        });
+      }
+
+      if (skill === 'listening') {
+        const tracks = getListeningTracks(prev.listening).map((tr, i) =>
+          i === scopeIdx ? { ...tr, clozeText: nextCloze } : tr
+        );
+        return {
+          ...prev,
+          listening: {
+            ...prevSkill,
+            tracks,
+            clozeText: tracks[0]?.clozeText || '',
+            questions: synced
+          }
+        };
+      }
+
+      const passages = getReadingPassages(prev.reading).map((p, i) =>
+        i === scopeIdx ? { ...p, clozeText: nextCloze } : p
+      );
+      return {
+        ...prev,
+        reading: {
+          ...prevSkill,
+          passages,
+          clozeText: passages[0]?.clozeText || '',
+          questions: synced
+        }
+      };
+    });
+    showToast?.('Đã chèn Mẫu Lưu Đồ (Flow-chart) kèm Hộp từ A–H 2 cột và các ô chọn [ — ▾ ] chuẩn Cambridge!');
+  };
+
+  const handleInsertCambridgePattern = (skill, scopeField, scopeIdx, patternId) => {
+    const stamp = Date.now();
+    if (patternId === 'flowchart_box_ah') {
+      const flowTpl = `Questions 26-30
+Complete the flowchart below. Choose FIVE answers from the box and write the correct letter, A - H, next to Questions 26 - 30.
+
+Choose mice which are all the same {{26}}
+↓
+Divide the mice into two groups, each with a different {{27}}
+↓
+Put each group in a separate cage.
+Feed group A commercial mouse food.
+Feed group B the same, but also sugar contained in {{28}}
+↓
+Take measurements using an electronic scale.
+Place them in a weighing chamber to prevent {{29}}
+↓
+Do all necessary {{30}}`;
+      const boxOpts = [
+        'A size',
+        'B escape',
+        'C age',
+        'D water',
+        'E cereal',
+        'F calculations',
+        'G changes',
+        'H colour'
+      ];
+      handleApplyFlowchartBoxTemplate(skill, scopeField, scopeIdx, flowTpl, boxOpts);
+      return;
+    }
+
+    if (patternId === 'table_completion') {
+      const tableTpl = `Questions 1-10
+Complete the table below.
+Write ONE WORD AND/OR A NUMBER for each answer.
+
+| Name of restaurant | Location | Reason for recommendation | Other comments |
+| --- | --- | --- | --- |
+| The Junction | Greyson Street, near the station | Good for people who are especially keen on {{1}} | • Quite expensive<br>• The {{2}} is a good place for a drink |
+| Paloma | In Bow Street next to the cinema | {{3}} food, good for sharing | • Staff are very friendly<br>• Need to pay £50 deposit<br>• A limited selection of {{4}} food on the menu |
+| The {{5}} | At the top of a {{6}} | • A famous chef<br>• All the {{7}} are very good<br>• Only uses {{8}} ingredients | • Set lunch costs: £ {{9}} per person<br>• Portions probably of {{10}} size |`;
+
+      setTestForm(prev => {
+        const prevSkill = prev[skill] || {};
+        const currentCloze =
+          skill === 'listening'
+            ? getListeningTracks(prev.listening)[scopeIdx]?.clozeText || ''
+            : getReadingPassages(prev.reading)[scopeIdx]?.clozeText || '';
+        const nextCloze = currentCloze.trim()
+          ? `${currentCloze.trim()}\n\n${tableTpl}`
+          : tableTpl;
+        const synced = syncClozeBlanksWithQuestions({
+          clozeText: nextCloze,
+          existingQuestions: prevSkill.questions || [],
+          scopeField,
+          scopeIdx,
+          skill
+        });
+        if (skill === 'listening') {
+          const tracks = getListeningTracks(prev.listening).map((tr, i) =>
+            i === scopeIdx ? { ...tr, clozeText: nextCloze } : tr
+          );
+          return {
+            ...prev,
+            listening: {
+              ...prevSkill,
+              tracks,
+              clozeText: tracks[0]?.clozeText || '',
+              questions: synced
+            }
+          };
+        }
+        const passages = getReadingPassages(prev.reading).map((p, i) =>
+          i === scopeIdx ? { ...p, clozeText: nextCloze } : p
+        );
+        return {
+          ...prev,
+          reading: {
+            ...prevSkill,
+            passages,
+            clozeText: passages[0]?.clozeText || '',
+            questions: synced
+          }
+        };
+      });
+      showToast?.('Đã chèn Mẫu Bảng (Table Completion) kẻ khung đen 4 cột kèm 10 ô điền từ chuẩn Cambridge!');
+      return;
+    }
+
+    setTestForm(prev => {
+      const prevSkill = prev[skill] || {};
+      const prevQs = Array.isArray(prevSkill.questions) ? prevSkill.questions : [];
+      const existingNums = prevQs.map((q, idx) => {
+        const start = getQuestionDisplayNumber(q, idx + 1);
+        const end = Number(q?.questionEndNumber) > start ? Number(q.questionEndNumber) : start;
+        return end;
+      });
+      const baseNextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+
+      let newQuestions = [];
+      if (patternId === 'mcq_single_abc') {
+        const sampleStems = [
+          'Carly says the quality of information on the internet regarding family history is good because',
+          "What advice does Carly's tutor give her about source of information?",
+          'What do the speakers agree about methodology?'
+        ];
+        const sampleOptsList = [
+          [
+            'A. different websites provide a range of information',
+            'B. many people have contributed to the information',
+            'C. the information is sometimes needed for legal reasons'
+          ],
+          [
+            'A. refer to reliable books',
+            'B. contact a local teacher',
+            'C. join an internet discussion group'
+          ],
+          [
+            'A. Tracing male ancestors enables researchers to go back a long way',
+            'B. Tracing female ancestors provides detailed family histories',
+            'C. Tracing male and female ancestors is rewarding'
+          ]
+        ];
+        newQuestions = sampleStems.map((stem, i) => {
+          const qNum = baseNextNum + i;
+          return {
+            id: `${skill[0]}q_pat_mcq_${stamp}_${i}`,
+            type: 'mcq',
+            source: 'manual',
+            [scopeField]: scopeIdx,
+            questionNumber: qNum,
+            questionEndNumber: qNum,
+            requiredSelections: 1,
+            instruction: 'Choose the correct answer.',
+            question: `${qNum}. ${stem}`,
+            options: sampleOptsList[i],
+            correctAnswer: sampleOptsList[i][0],
+            correctAnswers: [sampleOptsList[i][0]]
+          };
+        });
+      } else if (patternId === 'matching_box_dropdown') {
+        const sharedBox = [
+          'A. All the members must do it.',
+          'B. Members have the option of doing it.',
+          'C. The organiser is responsible for doing it.'
+        ];
+        const items = [
+          'Taking tents',
+          'Booking campsites',
+          'Taking bicycles',
+          'Buying train tickets'
+        ];
+        const startN = baseNextNum;
+        const endN = baseNextNum + items.length - 1;
+        newQuestions = items.map((itemText, i) => {
+          const qNum = startN + i;
+          return {
+            id: `${skill[0]}q_pat_match_${stamp}_${i}`,
+            type: 'matching',
+            source: 'manual',
+            [scopeField]: scopeIdx,
+            questionNumber: qNum,
+            questionEndNumber: qNum,
+            instruction: `What does the organiser tell the members about who should do each of the following tasks? Choose the correct letter, A, B or C, next to Questions ${startN}–${endN}.`,
+            question: `${qNum}. ${itemText}`,
+            options: [...sharedBox],
+            correctAnswer: sharedBox[i % sharedBox.length]
+          };
+        });
+      } else if (patternId === 'mcq_multi_three') {
+        const startN = baseNextNum;
+        const endN = baseNextNum + 2;
+        const multiOpts = [
+          'A. Communication Skills',
+          'B. Data Collection',
+          'C. Discourse Analysis',
+          'D. Language and Society',
+          'E. Phonology',
+          'F. Psycholinguistics',
+          'G. Research Methodology',
+          'H. Social Interaction'
+        ];
+        newQuestions = [
+          {
+            id: `${skill[0]}q_pat_multi_${stamp}`,
+            type: 'mcq',
+            source: 'manual',
+            [scopeField]: scopeIdx,
+            questionNumber: startN,
+            questionEndNumber: endN,
+            requiredSelections: 3,
+            instruction: 'Choose THREE correct answers.',
+            question: `${startN}–${endN}. Which THREE modules will Karen study next year?`,
+            options: multiOpts,
+            correctAnswer: multiOpts[0],
+            correctAnswers: [multiOpts[0], multiOpts[2], multiOpts[5]]
+          }
+        ];
+      }
+
+      return {
+        ...prev,
+        [skill]: {
+          ...prevSkill,
+          questions: [...prevQs, ...newQuestions]
+        }
+      };
+    });
+
+    if (patternId === 'mcq_single_abc') {
+      showToast?.('Đã thêm nhóm câu Trắc nghiệm 1 đáp án (A, B, C) chuẩn Cambridge!');
+    } else if (patternId === 'matching_box_dropdown') {
+      showToast?.('Đã thêm nhóm câu Nối thông tin có Khung A–C + Ô chọn [ — ▾ ] chuẩn Cambridge!');
+    } else if (patternId === 'mcq_multi_three') {
+      showToast?.('Đã thêm nhóm câu Chọn 3 đáp án đúng (Choose THREE • A–H) chuẩn Cambridge!');
+    }
+  };
+
   const handleAssignImageToQuestionRange = (skill, fromNum, toNum, imageUrl, options = {}) => {
     const start = Math.min(Number(fromNum) || 0, Number(toNum) || 0);
     const end = Math.max(Number(fromNum) || 0, Number(toNum) || 0);
@@ -2838,6 +3167,9 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             showToast={showToast}
             onApplyQuickAnswerText={(txt, opts) => handleQuickAnswerKeyText('listening', 'trackIdx', activeIdx, txt, opts)}
             onAssignImageToRange={(fromNum, toNum, imgUrl, opts) => handleAssignImageToQuestionRange('listening', fromNum, toNum, imgUrl, opts)}
+            onApplyFlowchartBoxTemplate={(tpl, boxOpts) => handleApplyFlowchartBoxTemplate('listening', 'trackIdx', activeIdx, tpl, boxOpts)}
+            onInsertCambridgePattern={patId => handleInsertCambridgePattern('listening', 'trackIdx', activeIdx, patId)}
+            onSyncOptionsToGroup={qId => handleSyncOptionsToGroup('listening', 'trackIdx', activeIdx, qId)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
             }
@@ -3111,6 +3443,9 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             showToast={showToast}
             onApplyQuickAnswerText={(txt, opts) => handleQuickAnswerKeyText('reading', 'passageIdx', activeIdx, txt, opts)}
             onAssignImageToRange={(fromNum, toNum, imgUrl, opts) => handleAssignImageToQuestionRange('reading', fromNum, toNum, imgUrl, opts)}
+            onApplyFlowchartBoxTemplate={(tpl, boxOpts) => handleApplyFlowchartBoxTemplate('reading', 'passageIdx', activeIdx, tpl, boxOpts)}
+            onInsertCambridgePattern={patId => handleInsertCambridgePattern('reading', 'passageIdx', activeIdx, patId)}
+            onSyncOptionsToGroup={qId => handleSyncOptionsToGroup('reading', 'passageIdx', activeIdx, qId)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
             }

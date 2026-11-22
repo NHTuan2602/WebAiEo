@@ -105,10 +105,11 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await expect(page.locator('input[aria-label="Tải ảnh hoặc PDF bảng đáp án Listening"]')).toBeAttached();
     await expect(page.locator('textarea[aria-label="Nhập hoặc dán bảng đáp án Listening"]')).toBeVisible();
 
-    // Add 1 MCQ question, paste Excel-style TSV answer key ("1\tB\tMultiple Choice"), verify checkbox checks & RangeImageAssignPanel appears
+    // Add 1 MCQ question, verify 5 Cambridge Listening Pattern templates & RangeImageAssignPanel appear, paste Excel-style TSV answer key
     await page.getByRole('tab', { name: /Tạo Bằng Tay/i }).first().click();
     await page.getByRole('button', { name: /Multiple Choice/i }).first().click();
     await expect(page.getByText(/Gắn Hình Bản Đồ \(Map\) \/ Lưu Đồ \(Flow-chart\) Cho Nhóm Câu/i)).toBeVisible();
+    await expect(page.getByText(/Tạo Nhanh Theo 5 Mẫu Giao Diện Thi Máy Cambridge/i)).toBeVisible();
     await page.getByRole('tab', { name: /Tạo Tự Động \(AI Ảnh \/ PDF\)/i }).first().click();
     await page.locator('textarea[aria-label="Nhập hoặc dán bảng đáp án Listening"]').fill('1\tB\tMultiple Choice\n2\tB\tMultiple Choice');
     await page.getByRole('button', { name: /Điền Key \(1–40\)/i }).first().click();

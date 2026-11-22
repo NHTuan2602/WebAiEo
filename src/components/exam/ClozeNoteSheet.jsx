@@ -212,6 +212,9 @@ export default function ClozeNoteSheet({
         const isFlagged = Boolean(qId && bookmarkedQuestions?.[qId]);
 
         if (isChoiceBlank) {
+          const selectedCode = extractLeadingOptionCode(resolvedChoiceVal, {
+            allowSpaceSeparated: allowSpacedCodes
+          });
           return (
             <span
               key={`blank-${seg.blankNum}-${idx}`}
@@ -252,23 +255,30 @@ export default function ClozeNoteSheet({
                   onAnswerChange?.(qId, e.target.value);
                   onBlankFocus?.(seg.blankNum, qId);
                 }}
-                className={`min-w-[82px] max-w-[220px] h-[34px] px-2.5 pr-7 rounded-md text-[14px] font-bold transition-all outline-none border cursor-pointer ${
+                title={resolvedChoiceVal || `Chọn đáp án câu ${seg.blankNum}`}
+                className={`min-w-[70px] max-w-[180px] h-[34px] px-2.5 rounded-lg text-[14px] font-extrabold text-center transition-all outline-none border cursor-pointer ${
                   isDragOver
                     ? 'bg-blue-50 dark:bg-blue-500/25 text-[#111827] dark:text-white border-[#2563EB] ring-2 ring-[#2563EB]/50'
                     : isActive
                     ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
                     : resolvedChoiceVal
                     ? 'bg-blue-50/70 dark:bg-[#1E2A40] text-[#111827] dark:text-white border-[#2563EB] dark:border-[#60A5FA]'
-                    : 'bg-[#F1F5F9] dark:bg-[#2D3038] text-[#111827] dark:text-[#E5E7EB] border-[#CBD5E1] dark:border-[#5D5F66] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
+                    : 'bg-[#F1F5F9] dark:bg-[#252830] text-[#111827] dark:text-[#E5E7EB] border-[#CBD5E1] dark:border-[#4A4D57] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
                 }`}
               >
-                <option value="">{isFlowchartSection ? '—' : `(${seg.blankNum}) —`}</option>
-                {optionList.map((opt, optIdx) => (
-                  <option key={optIdx} value={opt}>
-                    {opt}
-                  </option>
-                ))}
+                <option value="">—</option>
+                {optionList.map((opt, optIdx) => {
+                  const optCode = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
+                  return (
+                    <option key={optIdx} value={opt}>
+                      {optCode ? optCode.toUpperCase() : opt}
+                    </option>
+                  );
+                })}
               </select>
+              {selectedCode && !isFlowchartSection && (
+                <span className="sr-only">{selectedCode}</span>
+              )}
               {!readOnlyPreview && resolvedChoiceVal && qId && (
                 <button
                   type="button"
@@ -322,13 +332,13 @@ export default function ClozeNoteSheet({
                 if (readOnlyPreview || !qId) return;
                 onAnswerChange?.(qId, e.target.value);
               }}
-              className={`w-28 sm:w-36 h-[32px] px-2.5 rounded-md text-center text-[14px] font-bold transition-all outline-none border ${
+              className={`w-28 sm:w-36 h-[32px] px-2.5 rounded-md text-center text-[14px] font-extrabold transition-all outline-none ${
                 isActive
-                  ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
+                  ? 'border border-[#A16207] dark:border-[#EAB308] bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white ring-1 ring-[#CA8A04]/45'
                   : resolvedChoiceVal
-                  ? 'bg-white dark:bg-[#2A2F3D] text-[#111827] dark:text-white border-[#2563EB] dark:border-[#60A5FA]'
-                  : 'bg-[#F1F5F9]/90 dark:bg-[#2E313A] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#525662] hover:border-[#64748B] dark:hover:border-[#9CA3AF]'
-              } placeholder:text-[#475569] dark:placeholder:text-[#CBD5E1] placeholder:font-bold`}
+                  ? 'border border-[#2563EB] dark:border-[#60A5FA] bg-white dark:bg-[#2A2F3D] text-[#111827] dark:text-white'
+                  : 'border border-dashed border-[#94A3B8] dark:border-[#64748B] bg-[#F1F5F9]/90 dark:bg-[#2A2D36] text-[#111827] dark:text-white hover:border-[#475569] dark:hover:border-[#9CA3AF]'
+              } placeholder:text-[#111827] dark:placeholder:text-[#F3F4F6] placeholder:font-extrabold`}
             />
             {!readOnlyPreview && onToggleBookmark && qId && (
               <button
@@ -354,22 +364,22 @@ export default function ClozeNoteSheet({
       }
       if (line.kind === 'flowArrow') {
         return (
-          <div key={line.id} className="flex justify-center py-0.5 text-slate-500 dark:text-zinc-400 font-bold text-base select-none">
+          <div key={line.id} className="flex justify-center py-0.5 text-slate-600 dark:text-zinc-300 font-bold text-base select-none">
             ↓
           </div>
         );
       }
       if (line.kind === 'table') {
         return (
-          <div key={line.id} className="overflow-x-auto rounded-md border border-slate-400 dark:border-zinc-600 bg-white dark:bg-[#14161B] my-2">
+          <div key={line.id} className="overflow-x-auto border-[1.5px] border-slate-800 dark:border-slate-400 bg-white dark:bg-[#14161B] my-2">
             <table className="w-full border-collapse text-left">
               {line.hasHeader && line.headerRow && (
                 <thead>
-                  <tr className="bg-[#F1F5F9] dark:bg-[#1F232C] border-b border-slate-400 dark:border-zinc-600">
+                  <tr className="border-b-[1.5px] border-slate-800 dark:border-slate-400 bg-white dark:bg-[#1A1D24]">
                     {line.headerRow.cells.map((cellLines, cIdx) => (
                       <th
                         key={cIdx}
-                        className="py-3 px-3.5 text-[14px] font-extrabold text-[#111827] dark:text-white border-r last:border-r-0 border-slate-300 dark:border-zinc-600 align-middle text-center"
+                        className="py-3.5 px-4 text-[14px] font-extrabold text-[#111827] dark:text-white align-middle text-left"
                       >
                         {cellLines.map((cl, lIdx) => (
                           <div key={lIdx}>{renderSegments(cl.segments)}</div>
@@ -383,21 +393,21 @@ export default function ClozeNoteSheet({
                 {(line.bodyRows || []).map((row, rIdx) => (
                   <tr
                     key={row.id ?? rIdx}
-                    className="border-b last:border-b-0 border-slate-300 dark:border-zinc-700 align-top"
+                    className="border-b-[1.5px] last:border-b-0 border-slate-800 dark:border-slate-400 align-top"
                   >
                     {row.cells.map((cellLines, cIdx) => (
                       <td
                         key={cIdx}
-                        className={`py-3 px-3.5 border-r last:border-r-0 border-slate-300 dark:border-zinc-700 ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.85]`}
+                        className={`py-4 px-4 ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.85]`}
                       >
                         {cellLines.length === 0 ? (
                           <span>&nbsp;</span>
                         ) : (
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             {cellLines.map((cl, lIdx) =>
                               cl.isBullet ? (
-                                <div key={lIdx} className="flex items-start gap-2">
-                                  <span className="mt-1.5 text-[13px] leading-none text-slate-700 dark:text-zinc-300 shrink-0">•</span>
+                                <div key={lIdx} className="flex items-start gap-2.5">
+                                  <span className="mt-2 text-[14px] leading-none text-[#111827] dark:text-zinc-200 shrink-0">•</span>
                                   <div className="flex-1">{renderSegments(cl.segments)}</div>
                                 </div>
                               ) : (
@@ -603,67 +613,123 @@ export default function ClozeNoteSheet({
           </div>
         )}
 
-        {/* Shared Interactive Word Bank Box for Summary Completion with Box (A-I) */}
-        {sharedWordBoxOptions.length > 0 && (
-          <div className="rounded-lg border border-slate-300 dark:border-[#3A3D46] bg-slate-50/90 dark:bg-[#1A1C22] p-3.5 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                Hộp Từ Gợi Ý ({sharedWordBoxOptions.length} lựa chọn)
-              </span>
-              {!readOnlyPreview && (
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Bấm để điền vào ô đang chọn, kéo thả vào ô trống hoặc chọn trực tiếp ở danh sách
-                </span>
+        {/* Shared Interactive Cambridge Legend Box for Flow-chart / Summary Completion with Box (A-H / A-I) */}
+        {sharedWordBoxOptions.length > 0 && (() => {
+          const parsedBoxItems = sharedWordBoxOptions.map(opt => {
+            const code = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
+            const labelText = code ? stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes }) : opt;
+            return {
+              opt,
+              code: code ? code.toUpperCase() : '',
+              labelText: labelText || opt,
+              usedBy: usedByMap.get(opt) || []
+            };
+          });
+          const useTwoColTable =
+            parsedBoxItems.length >= 6 &&
+            parsedBoxItems.every(item => item.labelText.length <= 28);
+          const halfCount = Math.ceil(parsedBoxItems.length / 2);
+
+          return (
+            <div className={`mx-auto my-3 rounded-xl border border-slate-300 dark:border-[#3A3D46] bg-white dark:bg-[#1A1C22] p-2 shadow-2xs ${useTwoColTable ? 'max-w-md' : 'max-w-xl'}`}>
+              {useTwoColTable ? (
+                <table className="w-full border-collapse text-left text-[14px]">
+                  <tbody>
+                    {Array.from({ length: halfCount }).map((_, rowIdx) => {
+                      const leftItem = parsedBoxItems[rowIdx];
+                      const rightItem = parsedBoxItems[rowIdx + halfCount];
+                      return (
+                        <tr
+                          key={`wb-row-${rowIdx}`}
+                          className="border-b last:border-b-0 border-slate-200 dark:border-[#2C2F36]"
+                        >
+                          {[leftItem, rightItem].map((cellItem, colIdx) => {
+                            if (!cellItem) {
+                              return <td key={colIdx} className="py-2 px-3" />;
+                            }
+                            const isUsed = cellItem.usedBy.length > 0;
+                            return (
+                              <td
+                                key={colIdx}
+                                draggable={!readOnlyPreview}
+                                onDragStart={e => {
+                                  e.dataTransfer.setData('text/plain', cellItem.opt);
+                                  e.dataTransfer.effectAllowed = 'copy';
+                                }}
+                                onClick={() => handleWordChipClick(cellItem.opt)}
+                                className={`py-2 px-3.5 ${colIdx === 0 ? 'border-r border-slate-200 dark:border-[#2C2F36]' : ''} transition ${
+                                  readOnlyPreview ? 'cursor-default' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-[#23262F]'
+                                } ${isUsed ? 'bg-blue-50/60 dark:bg-[#1E2A40]/70' : ''}`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="inline-flex items-center gap-3 min-w-0">
+                                    {cellItem.code && (
+                                      <span className="font-extrabold text-[#111827] dark:text-white w-4 shrink-0">
+                                        {cellItem.code}
+                                      </span>
+                                    )}
+                                    <span className="text-[#1F2937] dark:text-[#E5E7EB] font-medium truncate">
+                                      {cellItem.labelText}
+                                    </span>
+                                  </span>
+                                  {isUsed && (
+                                    <span className="shrink-0 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#2563EB] text-white tabular-nums">
+                                      {cellItem.usedBy.join(',')}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="divide-y divide-slate-200 dark:divide-[#2C2F36]">
+                  {parsedBoxItems.map((item, optIdx) => {
+                    const isUsed = item.usedBy.length > 0;
+                    return (
+                      <div
+                        key={`${item.opt}-${optIdx}`}
+                        draggable={!readOnlyPreview}
+                        onDragStart={e => {
+                          e.dataTransfer.setData('text/plain', item.opt);
+                          e.dataTransfer.effectAllowed = 'copy';
+                        }}
+                        onClick={() => handleWordChipClick(item.opt)}
+                        className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[14px] transition ${
+                          readOnlyPreview ? 'cursor-default' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-[#23262F]'
+                        } ${isUsed ? 'bg-blue-50/60 dark:bg-[#1E2A40]/70' : ''}`}
+                      >
+                        <span className="flex items-center gap-4 min-w-0">
+                          {item.code && item.labelText !== item.opt ? (
+                            <>
+                              <span className="shrink-0 w-5 font-extrabold text-[#111827] dark:text-white">
+                                {item.code}
+                              </span>
+                              <span className="font-medium text-[#1F2937] dark:text-[#E5E7EB]">
+                                {item.labelText}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-semibold text-[#111827] dark:text-white">{item.opt}</span>
+                          )}
+                        </span>
+                        {isUsed && (
+                          <span className="shrink-0 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#2563EB] text-white tabular-nums">
+                            {item.usedBy.join(',')}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {sharedWordBoxOptions.map((opt, optIdx) => {
-                const code = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
-                const labelText = code ? stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes }) : opt;
-                const usedBy = usedByMap.get(opt) || [];
-                const isUsed = usedBy.length > 0;
-                return (
-                  <button
-                    key={`${opt}-${optIdx}`}
-                    type="button"
-                    disabled={readOnlyPreview}
-                    draggable={!readOnlyPreview}
-                    onDragStart={e => {
-                      e.dataTransfer.setData('text/plain', opt);
-                      e.dataTransfer.effectAllowed = 'copy';
-                    }}
-                    onClick={() => handleWordChipClick(opt)}
-                    className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-md border text-left text-[14px] transition ${
-                      readOnlyPreview ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
-                    } ${
-                      isUsed
-                        ? 'bg-blue-50/75 dark:bg-[#1E2A40] border-[#2563EB]/60 dark:border-[#60A5FA]/50 text-[#111827] dark:text-white'
-                        : 'bg-white dark:bg-[#23262F] border-slate-200 dark:border-[#373B45] text-[#111827] dark:text-[#F3F4F6] hover:border-[#2563EB] dark:hover:border-[#60A5FA]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2 min-w-0">
-                      {code && labelText && labelText !== opt ? (
-                        <>
-                          <span className="shrink-0 w-6 h-6 rounded bg-slate-100 dark:bg-[#2F3340] border border-slate-300 dark:border-[#494E5E] text-xs font-extrabold uppercase inline-flex items-center justify-center text-[#111827] dark:text-white">
-                            {code.toUpperCase()}
-                          </span>
-                          <span className="font-medium truncate">{labelText}</span>
-                        </>
-                      ) : (
-                        <span className="font-semibold truncate">{opt}</span>
-                      )}
-                    </span>
-                    {isUsed && (
-                      <span className="shrink-0 text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-[#2563EB] text-white tabular-nums">
-                        {usedBy.join(',')}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div
           className={
@@ -676,30 +742,70 @@ export default function ClozeNoteSheet({
               : 'space-y-1.5'
           }
         >
-          {boxLines.map((line, lIdx) => {
-            const rendered = renderLine(line);
-            const nextLine = boxLines[lIdx + 1];
-            const needsAutoArrow =
-              isFlowchartSection &&
-              !hasFlowArrow &&
-              line.kind !== 'spacer' &&
-              line.kind !== 'heading' &&
-              line.kind !== 'subheading' &&
-              nextLine &&
-              nextLine.kind !== 'spacer' &&
-              nextLine.kind !== 'flowArrow';
-            if (needsAutoArrow) {
-              return (
-                <div key={`fc-wrap-${line.id}`}>
-                  {rendered}
-                  <div className="flex justify-center py-0.5 text-slate-500 dark:text-zinc-400 font-bold text-base select-none">
+          {isFlowchartSection && hasFlowArrow ? (
+            (() => {
+              const flowSteps = [];
+              let currentStepLines = [];
+              boxLines.forEach(line => {
+                if (line.kind === 'flowArrow') {
+                  if (currentStepLines.length > 0) {
+                    flowSteps.push({ type: 'step', lines: currentStepLines });
+                    currentStepLines = [];
+                  }
+                  flowSteps.push({ type: 'arrow', id: line.id });
+                } else if (line.kind !== 'spacer') {
+                  currentStepLines.push(line);
+                }
+              });
+              if (currentStepLines.length > 0) {
+                flowSteps.push({ type: 'step', lines: currentStepLines });
+              }
+              return flowSteps.map((stepItem, sIdx) =>
+                stepItem.type === 'arrow' ? (
+                  <div
+                    key={`fc-arr-${stepItem.id || sIdx}`}
+                    className="flex justify-center py-0.5 text-slate-600 dark:text-zinc-300 font-bold text-base select-none"
+                  >
                     ↓
                   </div>
-                </div>
+                ) : (
+                  <div
+                    key={`fc-step-${sIdx}`}
+                    className={`rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191B21] px-6 py-4 text-center ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.85] space-y-1 shadow-2xs`}
+                  >
+                    {stepItem.lines.map(l => (
+                      <div key={l.id}>{renderSegments(l.segments)}</div>
+                    ))}
+                  </div>
+                )
               );
-            }
-            return rendered;
-          })}
+            })()
+          ) : (
+            boxLines.map((line, lIdx) => {
+              const rendered = renderLine(line);
+              const nextLine = boxLines[lIdx + 1];
+              const needsAutoArrow =
+                isFlowchartSection &&
+                !hasFlowArrow &&
+                line.kind !== 'spacer' &&
+                line.kind !== 'heading' &&
+                line.kind !== 'subheading' &&
+                nextLine &&
+                nextLine.kind !== 'spacer' &&
+                nextLine.kind !== 'flowArrow';
+              if (needsAutoArrow) {
+                return (
+                  <div key={`fc-wrap-${line.id}`}>
+                    {rendered}
+                    <div className="flex justify-center py-0.5 text-slate-500 dark:text-zinc-400 font-bold text-base select-none">
+                      ↓
+                    </div>
+                  </div>
+                );
+              }
+              return rendered;
+            })
+          )}
         </div>
       </div>
     );

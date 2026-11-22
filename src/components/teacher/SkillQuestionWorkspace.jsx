@@ -2,12 +2,15 @@ import { useState } from 'react';
 import {
   Bot,
   ClipboardPaste,
+  Eye,
+  EyeOff,
   FileCode2,
   FileText,
   Image as ImageIcon,
   Layers,
   PenTool,
   Plus,
+  RefreshCw,
   Sparkles,
   Trash2,
   Upload,
@@ -24,6 +27,8 @@ import {
   readImageFileAsDataUrl
 } from '../../utils/examHelpers';
 import { getQuestionDisplayNumber } from '../../utils/examUiHelpers';
+import ClozeNoteSheet from '../exam/ClozeNoteSheet';
+import ExamQuestionList from '../exam/ExamQuestionList';
 import AiExamExtractorPanel from './AiExamExtractorPanel';
 import ClozeEditorBox from './ClozeEditorBox';
 
@@ -175,6 +180,7 @@ function QuestionCardItem({
   idx,
   meta,
   onRemoveQuestion,
+  onSyncOptionsToGroup = null,
   onUpdateOption,
   onUpdateQuestion,
   q,
@@ -397,6 +403,96 @@ function QuestionCardItem({
               Các phương án / Đáp án lựa chọn ({optionList.length})
             </label>
             <div className="flex items-center gap-1.5">
+              {typeMeta.id === 'mcq' && (
+                <div className="flex flex-wrap items-center gap-1">
+                  {[
+                    {
+                      req: 1,
+                      label: '🔘 Chọn 1 (A–C)',
+                      defaultOpts: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C'],
+                      inst: 'Choose the correct answer.'
+                    },
+                    {
+                      req: 2,
+                      label: '☑️ Chọn 2 (Choose TWO • A–E)',
+                      defaultOpts: [
+                        'A. Lựa chọn A',
+                        'B. Lựa chọn B',
+                        'C. Lựa chọn C',
+                        'D. Lựa chọn D',
+                        'E. Lựa chọn E'
+                      ],
+                      inst: 'Choose TWO correct answers.'
+                    },
+                    {
+                      req: 3,
+                      label: '☑️ Chọn 3 (Choose THREE • A–H)',
+                      defaultOpts: [
+                        'A. Communication Skills',
+                        'B. Data Collection',
+                        'C. Discourse Analysis',
+                        'D. Language and Society',
+                        'E. Phonology',
+                        'F. Psycholinguistics',
+                        'G. Research Methodology',
+                        'H. Social Interaction'
+                      ],
+                      inst: 'Choose THREE correct answers.'
+                    }
+                  ].map(mode => {
+                    const currentReq = Math.max(1, Number(q.requiredSelections) || 1);
+                    const isSelectedMode = currentReq === mode.req;
+                    return (
+                      <button
+                        key={mode.req}
+                        type="button"
+                        onClick={() => {
+                          onUpdateQuestion(q.id, 'requiredSelections', mode.req);
+                          onUpdateQuestion(q.id, 'questionNumber', displayQNum);
+                          onUpdateQuestion(
+                            q.id,
+                            'questionEndNumber',
+                            mode.req > 1 ? displayQNum + mode.req - 1 : displayQNum
+                          );
+                          onUpdateQuestion(q.id, 'instruction', mode.inst);
+                          if (optionList.length < mode.defaultOpts.length) {
+                            const expanded = [...optionList];
+                            for (let k = expanded.length; k < mode.defaultOpts.length; k += 1) {
+                              expanded.push(mode.defaultOpts[k]);
+                            }
+                            onUpdateQuestion(q.id, 'options', expanded);
+                          } else if (mode.req === 1 && optionList.length > 4) {
+                            onUpdateQuestion(q.id, 'options', optionList.slice(0, 3));
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold border transition ${
+                          isSelectedMode
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-blue-500'
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {onSyncOptionsToGroup &&
+                optionList.length >= 2 &&
+                (typeMeta.id === 'matching' ||
+                  typeMeta.id === 'summary_box' ||
+                  typeMeta.id === 'matching_features' ||
+                  typeMeta.id === 'matching_headings' ||
+                  typeMeta.id === 'flowchart_completion') && (
+                  <button
+                    type="button"
+                    onClick={() => onSyncOptionsToGroup(q.id)}
+                    className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-extrabold transition"
+                    title="Sao chép khung đáp án (A, B, C...) của câu này cho toàn bộ các câu cùng dạng trong phần này để gộp thành 1 khung chung chuẩn Cambridge"
+                  >
+                    🔄 Áp dụng Khung Đáp Án này cho cả nhóm
+                  </button>
+                )}
               {typeMeta.id === 'tfng' && (
                 <button
                   type="button"
@@ -869,6 +965,44 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
   );
 }
 
+const CAMBRIDGE_LISTENING_PATTERNS = [
+  {
+    id: 'mcq_single_abc',
+    badge: 'Mẫu 1 • Questions 21–26',
+    title: 'Trắc nghiệm 1 đáp án (A, B, C)',
+    desc: 'Số câu tròn (21) + câu hỏi in đậm + 3 lựa chọn A, B, C chuẩn Cambridge.',
+    accent: 'border-blue-200 dark:border-blue-500/35 bg-blue-50/60 dark:bg-blue-950/25 hover:border-blue-500 text-blue-950 dark:text-blue-100'
+  },
+  {
+    id: 'matching_box_dropdown',
+    badge: 'Mẫu 2 • Questions 11–16',
+    title: 'Nối thông tin có Khung A–C + Ô [ — ▾ ]',
+    desc: 'Khung giải nghĩa A, B, C nằm trên + từng câu bên dưới có ô chọn chữ cái [ — ▾ ].',
+    accent: 'border-indigo-200 dark:border-indigo-500/35 bg-indigo-50/60 dark:bg-indigo-950/25 hover:border-indigo-500 text-indigo-950 dark:text-indigo-100'
+  },
+  {
+    id: 'mcq_multi_three',
+    badge: 'Mẫu 3 • Questions 28–30',
+    title: 'Chọn 2 hoặc 3 đáp án đúng (A–H)',
+    desc: 'Choose TWO / THREE correct answers • Danh sách ô vuông tích chọn A–H.',
+    accent: 'border-violet-200 dark:border-violet-500/35 bg-violet-50/60 dark:bg-violet-950/25 hover:border-violet-500 text-violet-950 dark:text-violet-100'
+  },
+  {
+    id: 'flowchart_box_ah',
+    badge: 'Mẫu 4 • Questions 26–30',
+    title: 'Lưu đồ (Flow-chart) + Hộp từ A–H',
+    desc: 'Bảng từ A–H 2 cột ở trên + các khung bước nối bằng mũi tên ↓ và ô [ — ▾ ].',
+    accent: 'border-amber-200 dark:border-amber-500/35 bg-amber-50/60 dark:bg-amber-950/25 hover:border-amber-500 text-amber-950 dark:text-amber-100'
+  },
+  {
+    id: 'table_completion',
+    badge: 'Mẫu 5 • Questions 1–10',
+    title: 'Hoàn thành Bảng (Table (1)..(10))',
+    desc: 'Bảng kẻ khung đen chuẩn Cambridge, hỗ trợ dấu chấm đầu dòng • và ô điền (1), (2)...',
+    accent: 'border-emerald-200 dark:border-emerald-500/35 bg-emerald-50/60 dark:bg-emerald-950/25 hover:border-emerald-500 text-emerald-950 dark:text-emerald-100'
+  }
+];
+
 /**
  * Shared question authoring & review workspace for Listening and Reading builders.
  * Separates auto-generated (AI image / Cloze) flows from manual question creation via clear tabs
@@ -884,6 +1018,7 @@ export default function SkillQuestionWorkspace({
   groups = [],
   onAddQuestion,
   onApplyAiExtraction,
+  onApplyFlowchartBoxTemplate = null,
   onApplyListeningPdfExtraction = null,
   onApplyReadingPdfExtraction = null,
   onApplyQuickAnswerText,
@@ -892,11 +1027,13 @@ export default function SkillQuestionWorkspace({
   onChangeGroupImage = null,
   onChangeSourceFilter,
   onChangeTab,
+  onInsertCambridgePattern = null,
   onQuickAllocatePassages = null,
   onRemoveQuestion,
   onSetFilterByGroup,
   onSortQuestionsByNumber = null,
   onSyncCloze,
+  onSyncOptionsToGroup = null,
   onUpdateOption,
   onUpdateQuestion,
   questions = [],
@@ -906,6 +1043,8 @@ export default function SkillQuestionWorkspace({
   skill = 'listening',
   sourceFilter = 'all'
 }) {
+  const [showCambridgeLivePreview, setShowCambridgeLivePreview] = useState(false);
+  const [previewAnswers, setPreviewAnswers] = useState({});
   const meta = SKILL_META[skill] || SKILL_META.listening;
   const scopeField = meta.scopeField;
   const scopeLabel = `${meta.groupLabel} #${activeIdx + 1}`;
@@ -965,6 +1104,118 @@ export default function SkillQuestionWorkspace({
     onAddQuestion(questionType);
   };
 
+  const nonClozePreviewQuestions = scopedEntries
+    .map(({ q }) => q)
+    .filter(q => typeof q.blankNum !== 'number');
+
+  const renderCambridgePatternBar = () => {
+    if (!onInsertCambridgePattern) return null;
+    return (
+      <div className="rounded-2xl border border-indigo-200/80 dark:border-indigo-500/30 bg-gradient-to-r from-indigo-50/70 via-sky-50/60 to-teal-50/50 dark:from-indigo-950/30 dark:via-slate-900 dark:to-teal-950/20 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span>Tạo Nhanh Theo 5 Mẫu Giao Diện Thi Máy Cambridge ({scopeLabel})</span>
+            </h4>
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+              Bấm 1 chạm để chèn sẵn khung câu hỏi giống hệt giao diện thi máy IELTS (Trắc nghiệm A–C, Nối khung A–C + ô chọn [ — ▾ ], Chọn 3 đáp án A–H, Lưu đồ hộp từ A–H, Bảng điền từ) rồi sửa chữ theo đề của bạn:
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowCambridgeLivePreview(v => !v)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition inline-flex items-center gap-1.5 ${
+              showCambridgeLivePreview
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/40 hover:border-indigo-500'
+            }`}
+          >
+            {showCambridgeLivePreview ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            <span>{showCambridgeLivePreview ? 'Ẩn Xem Trước Giao Diện Thi' : 'Xem Trước Giao Diện Thi Thật'}</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          {CAMBRIDGE_LISTENING_PATTERNS.map(pat => (
+            <button
+              key={pat.id}
+              type="button"
+              onClick={() => {
+                onInsertCambridgePattern(pat.id);
+                setShowCambridgeLivePreview(true);
+              }}
+              className={`text-left p-3 rounded-xl border transition space-y-1 shadow-2xs ${pat.accent}`}
+            >
+              <div className="text-[10px] font-black uppercase tracking-wider opacity-80">
+                {pat.badge}
+              </div>
+              <div className="text-xs font-extrabold leading-snug">
+                + {pat.title}
+              </div>
+              <p className="text-[11px] opacity-80 leading-snug">
+                {pat.desc}
+              </p>
+            </button>
+          ))}
+        </div>
+
+        {showCambridgeLivePreview && (
+          <div className="rounded-2xl border-2 border-indigo-300 dark:border-indigo-500/50 bg-[#F8FAFC] dark:bg-[#14161D] p-4 sm:p-6 space-y-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[11px] font-extrabold">
+                  LIVE CAMBRIDGE PREVIEW
+                </span>
+                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                  Giao diện hiển thị bên Học sinh của {scopeLabel} (Có thể bấm chọn thử đáp án ngay tại đây)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCambridgeLivePreview(false)}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+              >
+                Đóng xem trước ✕
+              </button>
+            </div>
+
+            {!activeGroup?.clozeText?.trim() && nonClozePreviewQuestions.length === 0 ? (
+              <p className="text-xs text-center text-slate-500 py-4">
+                Chưa có câu hỏi nào trong {scopeLabel}. Hãy bấm 1 trong 5 mẫu phía trên để tạo ngay!
+              </p>
+            ) : (
+              <div className="space-y-6">
+                {activeGroup?.clozeText?.trim() && (
+                  <ClozeNoteSheet
+                    clozeText={activeGroup.clozeText}
+                    questions={questions}
+                    scopeField={scopeField}
+                    scopeIdx={activeIdx}
+                    answers={previewAnswers}
+                    onAnswerChange={(qId, val) =>
+                      setPreviewAnswers(prev => ({ ...prev, [qId]: val }))
+                    }
+                  />
+                )}
+                {nonClozePreviewQuestions.length > 0 && (
+                  <ExamQuestionList
+                    questions={nonClozePreviewQuestions}
+                    answers={previewAnswers}
+                    onAnswerChange={(qId, val) =>
+                      setPreviewAnswers(prev => ({ ...prev, [qId]: val }))
+                    }
+                    scopeType={skill}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderQuestionList = (entries) => (
     <div className="space-y-4">
       {entries.map(({ q, idx }) => (
@@ -974,6 +1225,7 @@ export default function SkillQuestionWorkspace({
           idx={idx}
           meta={meta}
           onRemoveQuestion={onRemoveQuestion}
+          onSyncOptionsToGroup={onSyncOptionsToGroup}
           onUpdateOption={onUpdateOption}
           onUpdateQuestion={onUpdateQuestion}
           q={q}
@@ -1121,6 +1373,8 @@ export default function SkillQuestionWorkspace({
             questions={questions}
             showToast={showToast}
           />
+
+          {renderCambridgePatternBar()}
 
           <QuestionScopeFilterBar
             activeIdx={activeIdx}
@@ -1300,6 +1554,8 @@ export default function SkillQuestionWorkspace({
             showToast={showToast}
           />
 
+          {renderCambridgePatternBar()}
+
           <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1334,6 +1590,7 @@ export default function SkillQuestionWorkspace({
           <ClozeEditorBox
             clozeText={activeGroup?.clozeText || ''}
             groupImageUrl={activeGroup?.imageUrl || ''}
+            onApplyFlowchartBoxTemplate={onApplyFlowchartBoxTemplate}
             onChangeClozeText={onChangeClozeText}
             onChangeGroupImage={onChangeGroupImage}
             onSyncBlanks={onSyncCloze}
@@ -1396,6 +1653,8 @@ export default function SkillQuestionWorkspace({
             questions={questions}
             showToast={showToast}
           />
+
+          {renderCambridgePatternBar()}
 
           <QuestionScopeFilterBar
             activeIdx={activeIdx}

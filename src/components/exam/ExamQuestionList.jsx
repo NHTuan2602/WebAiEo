@@ -144,6 +144,21 @@ export default function ExamQuestionList({
     const multiSelect = questionNeedsMultipleSelections(q);
     const expectedSelectionCount = getRequiredSelectionCount(q);
     const wordLimitHint = String(q.wordLimit || '').trim();
+    const explicitEndNum = Number(q.questionEndNumber);
+    const effectiveEndNum =
+      Number.isFinite(explicitEndNum) && explicitEndNum > displayNum
+        ? explicitEndNum
+        : multiSelect && expectedSelectionCount > 1
+        ? displayNum + expectedSelectionCount - 1
+        : displayNum;
+    const rangeLabel = effectiveEndNum > displayNum ? `${displayNum}–${effectiveEndNum}` : `${displayNum}`;
+    const multiSelectInstruction =
+      q.instruction ||
+      (expectedSelectionCount === 2
+        ? 'Choose TWO correct answers.'
+        : expectedSelectionCount === 3
+        ? 'Choose THREE correct answers.'
+        : `Choose ${expectedSelectionCount} correct answers.`);
 
     return (
       <div
@@ -160,10 +175,15 @@ export default function ExamQuestionList({
             : 'px-0'
         }`}
       >
-        {!insideGroup && q.instruction && (
-          <div className="mb-2 pb-1 border-b border-slate-200 dark:border-[#32353E]">
-            <p className="text-[14px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
-              {formatText(q.instruction)}
+        {!insideGroup && (multiSelect || q.instruction) && (
+          <div className="mb-2.5 pb-1.5 border-b border-slate-200 dark:border-[#32353E] space-y-1">
+            {multiSelect && (
+              <h4 className="text-[15px] sm:text-base font-extrabold text-[#111827] dark:text-white">
+                Questions {rangeLabel}
+              </h4>
+            )}
+            <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
+              {formatText(multiSelect ? multiSelectInstruction : q.instruction)}
             </p>
             {q.hasNB && (
               <p className="text-xs font-extrabold text-amber-700 dark:text-amber-400">
@@ -175,18 +195,20 @@ export default function ExamQuestionList({
 
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-start gap-2.5 min-w-0">
-            <span
-              className={`shrink-0 min-w-[26px] h-[26px] px-1.5 rounded-[3px] text-[13px] font-bold inline-flex items-center justify-center border mt-0.5 ${
-                isActive
-                  ? 'bg-[#2563EB] text-white border-[#2563EB]'
-                  : 'bg-white dark:bg-[#262626] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#4A4A4A]'
-              }`}
-            >
-              {displayNum}
-            </span>
+            {!multiSelect && (
+              <span
+                className={`shrink-0 min-w-[28px] h-[28px] px-1.5 rounded-full text-[13px] font-extrabold inline-flex items-center justify-center border shadow-2xs mt-0.5 ${
+                  isActive
+                    ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                    : 'bg-white dark:bg-[#23252C] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#4A4A4A]'
+                }`}
+              >
+                {displayNum}
+              </span>
+            )}
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                {!insideGroup && q.type && q.type !== 'mcq' && q.type !== 'fill' && q.type !== 'tfng' && (
+                {!insideGroup && !multiSelect && q.type && q.type !== 'mcq' && q.type !== 'fill' && q.type !== 'tfng' && (
                   <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
                     {typeMeta.shortLabel}
                   </span>
@@ -196,9 +218,9 @@ export default function ExamQuestionList({
                     {wordLimitHint}
                   </span>
                 )}
-                {multiSelect && (
+                {insideGroup && multiSelect && (
                   <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
-                    Chọn {expectedSelectionCount} đáp án
+                    Questions {rangeLabel} • Chọn {expectedSelectionCount} đáp án
                   </span>
                 )}
               </div>
@@ -242,7 +264,7 @@ export default function ExamQuestionList({
         )}
 
         {hasChoiceOptions ? (
-          <div className="space-y-1.5 pl-1">
+          <div className={`space-y-2 ${multiSelect ? 'pl-1 pt-1' : 'pl-8 pt-0.5'}`}>
             {optionList.map((opt, optIdx) => {
               const currentAnswer = answers?.[q.id];
               const isSelected = Array.isArray(currentAnswer)
@@ -257,12 +279,12 @@ export default function ExamQuestionList({
               return (
                 <label
                   key={optIdx}
-                  className={`flex items-start gap-2.5 px-2 py-1 rounded-[4px] transition ${
+                  className={`flex items-start gap-3 px-2.5 py-1.5 rounded-md transition ${
                     selectionLimitReached ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
                   } ${
                     isSelected
                       ? 'bg-[#DBEAFE]/80 dark:bg-[#2563EB]/25 text-[#111827] dark:text-white font-semibold'
-                      : 'text-[#1F2937] dark:text-[#E5E7EB] hover:bg-[#F1F5F9]/50 dark:hover:bg-[#232323]'
+                      : 'text-[#1F2937] dark:text-[#E5E7EB] hover:bg-[#F1F5F9]/60 dark:hover:bg-[#232323]'
                   }`}
                 >
                   <input
@@ -271,15 +293,20 @@ export default function ExamQuestionList({
                     value={opt}
                     checked={isSelected}
                     disabled={selectionLimitReached}
-                    onChange={e =>
-                      onAnswerChange?.(
-                        q.id,
-                        multiSelect
-                          ? toggleSelectedOption(currentAnswer, e.target.value)
-                          : e.target.value
-                      )
-                    }
-                    className="mt-1.5 w-4 h-4 accent-[#2563EB] shrink-0"
+                    onChange={e => {
+                      const nextVal = multiSelect
+                        ? toggleSelectedOption(currentAnswer, e.target.value)
+                        : e.target.value;
+                      onAnswerChange?.(q.id, nextVal);
+                      if (Array.isArray(q.linkedQuestionIds) && q.linkedQuestionIds.length > 1) {
+                        q.linkedQuestionIds.forEach(linkedId => {
+                          if (linkedId && linkedId !== q.id) {
+                            onAnswerChange?.(linkedId, nextVal);
+                          }
+                        });
+                      }
+                    }}
+                    className="mt-1 w-4 h-4 accent-[#2563EB] shrink-0"
                   />
                   <span className={`${fontSizeClass}`}>
                     {formatText(opt)}
@@ -289,17 +316,17 @@ export default function ExamQuestionList({
             })}
           </div>
         ) : (
-          <div className="pl-1 pt-1">
+          <div className="pl-8 pt-1">
             <input
               type="text"
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
               autoComplete="off"
-              placeholder={wordLimitHint ? `Câu ${displayNum} (${wordLimitHint})` : `${displayNum}`}
+              placeholder={wordLimitHint ? `(${displayNum}) ${wordLimitHint}` : `(${displayNum})`}
               value={answers?.[q.id] || ''}
               onChange={e => onAnswerChange?.(q.id, e.target.value)}
-              className="w-56 sm:w-72 h-[34px] px-3 rounded-[3px] text-center text-[15px] font-bold transition outline-none border bg-white dark:bg-[#3A3B40] text-[#111827] dark:text-white border-[#767676] dark:border-[#5D5F66] focus:bg-[#FFFDF7] dark:focus:bg-[#23262E] focus:border-[#A16207] dark:focus:border-[#EAB308] placeholder:text-slate-500 dark:placeholder:text-slate-300 placeholder:text-xs placeholder:font-semibold"
+              className="w-56 sm:w-72 h-[34px] px-3 rounded-md text-center text-[15px] font-extrabold transition outline-none border border-dashed bg-[#F1F5F9]/90 dark:bg-[#2A2D36] text-[#111827] dark:text-white border-[#94A3B8] dark:border-[#64748B] focus:border-solid focus:bg-[#FFFDF7] dark:focus:bg-[#23262E] focus:border-[#A16207] dark:focus:border-[#EAB308] placeholder:text-[#111827] dark:placeholder:text-slate-200 placeholder:text-xs placeholder:font-extrabold"
             />
           </div>
         )}
@@ -524,6 +551,7 @@ export default function ExamQuestionList({
           const lastNum = block.items[block.items.length - 1]?.displayNum;
           const groupMeta = getQuestionTypeMeta(block.groupType, scopeType);
           const allowSpacedCodes = optionsUseSpaceSeparatedCodes(block.options);
+          const isFlowchartBoxGroup = block.groupType === 'flowchart_completion';
           const usedByMap = new Map();
           block.items.forEach(({ question: itemQ, displayNum }) => {
             const rawVal = answers?.[itemQ.id] || '';
@@ -555,9 +583,24 @@ export default function ExamQuestionList({
             getStandardGroupInstruction(firstItem, block.options) ||
             'Complete the summary using the list of words, A-I, below.';
 
+          const parsedBoxItems = block.options.map(opt => {
+            const code = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
+            const labelText = code ? stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes }) : opt;
+            return {
+              opt,
+              code: code ? code.toUpperCase() : '',
+              labelText: labelText || opt,
+              usedBy: usedByMap.get(opt) || []
+            };
+          });
+          const useTwoColTable =
+            parsedBoxItems.length >= 6 &&
+            parsedBoxItems.every(item => item.labelText.length <= 28);
+          const halfCount = Math.ceil(parsedBoxItems.length / 2);
+
           return (
-            <div key={block.key} className="space-y-3">
-              <div className="space-y-1 pb-1 border-b border-slate-200 dark:border-[#32353E]">
+            <div key={block.key} className="space-y-3.5">
+              <div className="space-y-1 pb-1.5 border-b border-slate-200 dark:border-[#32353E]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="text-[15px] sm:text-base font-extrabold text-[#111827] dark:text-white">
@@ -567,9 +610,6 @@ export default function ExamQuestionList({
                       {groupMeta.shortLabel}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Bấm từ trong hộp, kéo thả hoặc chọn trực tiếp tại từng câu
-                  </span>
                 </div>
                 {instructionText && (
                   <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
@@ -585,209 +625,310 @@ export default function ExamQuestionList({
                 )}
               </div>
 
-              {block.imageUrl && (
-                <div className="rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#141414] p-3 max-w-2xl">
-                  <img
-                    src={block.imageUrl}
-                    alt={`Hình ảnh câu ${firstNum}–${lastNum}`}
-                    onClick={() => onZoomImage?.(block.imageUrl)}
-                    className="w-full max-h-[380px] object-contain rounded mx-auto cursor-zoom-in"
-                  />
-                </div>
-              )}
+              <div className={block.imageUrl ? 'grid grid-cols-1 md:grid-cols-12 gap-5 items-start' : 'space-y-4'}>
+                {block.imageUrl && (
+                  <div className="md:col-span-5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#141414] p-3 shadow-2xs">
+                    <img
+                      src={block.imageUrl}
+                      alt={`Hình ảnh câu ${firstNum}–${lastNum}`}
+                      onClick={() => onZoomImage?.(block.imageUrl)}
+                      className="w-full max-h-[420px] object-contain rounded mx-auto cursor-zoom-in"
+                    />
+                  </div>
+                )}
 
-              {/* Shared Word Bank Box (rendered ONCE instead of repeating radio buttons per question) */}
-              <div className="rounded-lg border border-slate-300 dark:border-[#3A3D46] bg-slate-50/90 dark:bg-[#1A1C22] p-3.5">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {block.options.map((opt, optIdx) => {
-                    const code = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
-                    const labelText = code ? stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes }) : opt;
-                    const usedBy = usedByMap.get(opt) || [];
-                    const isUsed = usedBy.length > 0;
-                    return (
-                      <button
-                        key={`${opt}-${optIdx}`}
-                        type="button"
-                        draggable
-                        onDragStart={e => {
-                          e.dataTransfer.setData('text/plain', opt);
-                          e.dataTransfer.effectAllowed = 'copy';
-                        }}
-                        onClick={() => handleGroupChipClick(opt)}
-                        className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-md border text-left text-[14px] transition cursor-grab active:cursor-grabbing ${
-                          isUsed
-                            ? 'bg-blue-50/75 dark:bg-[#1E2A40] border-[#2563EB]/60 dark:border-[#60A5FA]/50 text-[#111827] dark:text-white'
-                            : 'bg-white dark:bg-[#23262F] border-slate-200 dark:border-[#373B45] text-[#111827] dark:text-[#F3F4F6] hover:border-[#2563EB] dark:hover:border-[#60A5FA]'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2 min-w-0">
-                          {code && labelText && labelText !== opt ? (
-                            <>
-                              <span className="shrink-0 w-6 h-6 rounded bg-slate-100 dark:bg-[#2F3340] border border-slate-300 dark:border-[#494E5E] text-xs font-extrabold uppercase inline-flex items-center justify-center text-[#111827] dark:text-white">
-                                {code.toUpperCase()}
+                <div className={`${block.imageUrl ? 'md:col-span-7 ' : ''}space-y-4`}>
+                  {/* Shared Cambridge Legend Box (1-column for sentence options A-C, 2-column for compact words A-H) */}
+                  <div className={`mx-auto rounded-xl border border-slate-300 dark:border-[#3A3D46] bg-white dark:bg-[#1A1C22] p-2 shadow-2xs ${useTwoColTable ? 'max-w-md' : 'max-w-xl'}`}>
+                    {useTwoColTable ? (
+                      <table className="w-full border-collapse text-left text-[14px]">
+                        <tbody>
+                          {Array.from({ length: halfCount }).map((_, rowIdx) => {
+                            const leftItem = parsedBoxItems[rowIdx];
+                            const rightItem = parsedBoxItems[rowIdx + halfCount];
+                            return (
+                              <tr
+                                key={`wb-row-${rowIdx}`}
+                                className="border-b last:border-b-0 border-slate-200 dark:border-[#2C2F36]"
+                              >
+                                {[leftItem, rightItem].map((cellItem, colIdx) => {
+                                  if (!cellItem) {
+                                    return <td key={colIdx} className="py-2 px-3" />;
+                                  }
+                                  const isUsed = cellItem.usedBy.length > 0;
+                                  return (
+                                    <td
+                                      key={colIdx}
+                                      draggable
+                                      onDragStart={e => {
+                                        e.dataTransfer.setData('text/plain', cellItem.opt);
+                                        e.dataTransfer.effectAllowed = 'copy';
+                                      }}
+                                      onClick={() => handleGroupChipClick(cellItem.opt)}
+                                      className={`py-2 px-3.5 ${colIdx === 0 ? 'border-r border-slate-200 dark:border-[#2C2F36]' : ''} transition cursor-pointer hover:bg-slate-50 dark:hover:bg-[#23262F] ${
+                                        isUsed ? 'bg-blue-50/60 dark:bg-[#1E2A40]/70' : ''
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="inline-flex items-center gap-3 min-w-0">
+                                          {cellItem.code && (
+                                            <span className="font-extrabold text-[#111827] dark:text-white w-4 shrink-0">
+                                              {cellItem.code}
+                                            </span>
+                                          )}
+                                          <span className="text-[#1F2937] dark:text-[#E5E7EB] font-medium truncate">
+                                            {cellItem.labelText}
+                                          </span>
+                                        </span>
+                                        {isUsed && (
+                                          <span className="shrink-0 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#2563EB] text-white tabular-nums">
+                                            {cellItem.usedBy.join(',')}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="divide-y divide-slate-200 dark:divide-[#2C2F36]">
+                        {parsedBoxItems.map((item, optIdx) => {
+                          const isUsed = item.usedBy.length > 0;
+                          return (
+                            <div
+                              key={`${item.opt}-${optIdx}`}
+                              draggable
+                              onDragStart={e => {
+                                e.dataTransfer.setData('text/plain', item.opt);
+                                e.dataTransfer.effectAllowed = 'copy';
+                              }}
+                              onClick={() => handleGroupChipClick(item.opt)}
+                              className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[14px] transition cursor-pointer hover:bg-slate-50 dark:hover:bg-[#23262F] ${
+                                isUsed ? 'bg-blue-50/60 dark:bg-[#1E2A40]/70' : ''
+                              }`}
+                            >
+                              <span className="flex items-center gap-4 min-w-0">
+                                {item.code && item.labelText !== item.opt ? (
+                                  <>
+                                    <span className="shrink-0 w-5 font-extrabold text-[#111827] dark:text-white">
+                                      {item.code}
+                                    </span>
+                                    <span className="font-medium text-[#1F2937] dark:text-[#E5E7EB]">
+                                      {item.labelText}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="font-semibold text-[#111827] dark:text-white">{item.opt}</span>
+                                )}
                               </span>
-                              <span className="font-medium truncate">{labelText}</span>
-                            </>
-                          ) : (
-                            <span className="font-semibold truncate">{opt}</span>
-                          )}
-                        </span>
-                        {isUsed && (
-                          <span className="shrink-0 text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-[#2563EB] text-white tabular-nums">
-                            {usedBy.join(',')}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                              {isUsed && (
+                                <span className="shrink-0 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#2563EB] text-white tabular-nums">
+                                  {item.usedBy.join(',')}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
-              {/* Clean per-question rows with inline drop/select slot */}
-              <div className="rounded-lg border border-slate-200 dark:border-[#32353E] divide-y divide-slate-200/80 dark:divide-[#2B2E36] bg-white dark:bg-[#141414]">
-                {block.items.map(({ question: q, displayNum }) => {
-                  const isActive = activeQuestionId === q.id;
-                  const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
-                  const isDragOver = dragOverQuestionId === q.id;
-                  const cleanPrompt = stripLeadingQuestionNumber(q.question) || q.question;
-                  const { parts, foundSlot } = splitPromptWithInlineSlot(cleanPrompt);
-                  const rawVal = answers?.[q.id] || '';
-                  const selectedVal = matchChoiceOption(rawVal, block.options) || String(rawVal || '').trim();
+                  {/* Clean per-question rows (Cambridge Matching rows with circular number badge + compact [ — ▾ ] dropdown, OR Flow-chart step boxes with ↓ arrows) */}
+                  <div className={isFlowchartBoxGroup ? 'space-y-1.5 max-w-2xl mx-auto' : 'space-y-2.5'}>
+                    {block.items.map(({ question: q, displayNum }, itemIdx) => {
+                      const isActive = activeQuestionId === q.id;
+                      const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
+                      const isDragOver = dragOverQuestionId === q.id;
+                      const cleanPrompt = stripLeadingQuestionNumber(q.question) || q.question;
+                      const { parts, foundSlot } = splitPromptWithInlineSlot(cleanPrompt);
+                      const rawVal = answers?.[q.id] || '';
+                      const selectedVal = matchChoiceOption(rawVal, block.options) || String(rawVal || '').trim();
 
-                  const slotControl = (
-                    <span
-                      onDragOver={e => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = 'copy';
-                        if (dragOverQuestionId !== q.id) setDragOverQuestionId(q.id);
-                      }}
-                      onDragLeave={() => {
-                        if (dragOverQuestionId === q.id) setDragOverQuestionId(null);
-                      }}
-                      onDrop={e => {
-                        e.preventDefault();
-                        setDragOverQuestionId(null);
-                        const dropped = e.dataTransfer.getData('text/plain');
-                        if (!dropped) return;
-                        const canonical = matchChoiceOption(dropped, block.options) || dropped;
-                        onAnswerChange?.(q.id, canonical);
-                        onSelectQuestion?.(q);
-                      }}
-                      className="inline-flex items-center gap-1 align-baseline mx-1 my-0.5"
-                    >
-                      <select
-                        value={selectedVal}
-                        aria-label={`Câu ${displayNum}`}
-                        onFocus={() => onSelectQuestion?.(q)}
-                        onClick={e => {
-                          e.stopPropagation();
-                          onSelectQuestion?.(q);
-                        }}
-                        onChange={e => {
-                          onAnswerChange?.(q.id, e.target.value);
-                          onSelectQuestion?.(q);
-                        }}
-                        className={`min-w-[140px] max-w-[260px] h-[34px] px-2.5 pr-7 rounded-[4px] text-[14px] font-bold transition outline-none border cursor-pointer ${
-                          isDragOver
-                            ? 'bg-blue-50 dark:bg-blue-500/25 text-[#111827] dark:text-white border-[#2563EB] ring-2 ring-[#2563EB]/50'
-                            : isActive
-                            ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
-                            : selectedVal
-                            ? 'bg-blue-50/70 dark:bg-[#1E2A40] text-[#111827] dark:text-white border-[#2563EB] dark:border-[#60A5FA]'
-                            : 'bg-white dark:bg-[#2D3038] text-[#111827] dark:text-[#E5E7EB] border-[#767676] dark:border-[#5D5F66] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
-                        }`}
-                      >
-                        <option value="">{displayNum} — Chọn từ</option>
-                        {block.options.map((opt, optIdx) => (
-                          <option key={optIdx} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedVal && (
-                        <button
-                          type="button"
-                          onClick={e => {
-                            e.stopPropagation();
-                            onAnswerChange?.(q.id, '');
+                      const slotControl = (
+                        <span
+                          onDragOver={e => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'copy';
+                            if (dragOverQuestionId !== q.id) setDragOverQuestionId(q.id);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverQuestionId === q.id) setDragOverQuestionId(null);
+                          }}
+                          onDrop={e => {
+                            e.preventDefault();
+                            setDragOverQuestionId(null);
+                            const dropped = e.dataTransfer.getData('text/plain');
+                            if (!dropped) return;
+                            const canonical = matchChoiceOption(dropped, block.options) || dropped;
+                            onAnswerChange?.(q.id, canonical);
                             onSelectQuestion?.(q);
                           }}
-                          title={`Xóa đáp án câu ${displayNum}`}
-                          className="p-0.5 rounded text-slate-400 hover:text-rose-500 dark:text-neutral-400 dark:hover:text-rose-400 transition"
+                          className="inline-flex items-center gap-1 align-baseline mx-1 my-0.5"
                         >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </span>
-                  );
-
-                  return (
-                    <div
-                      key={q.id}
-                      ref={el => {
-                        if (el && questionCardRefs?.current) {
-                          questionCardRefs.current[q.id] = el;
-                        }
-                      }}
-                      onClick={() => onSelectQuestion?.(q)}
-                      className={`px-3.5 py-3 transition-colors ${
-                        isActive
-                          ? 'bg-[#EFF6FF]/75 dark:bg-[#1E2430]'
-                          : 'hover:bg-slate-50/70 dark:hover:bg-[#1B1D23]'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          <span
-                            className={`shrink-0 min-w-[26px] h-[26px] px-1.5 rounded-[3px] text-[13px] font-bold inline-flex items-center justify-center border mt-0.5 ${
-                              isActive
-                                ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                          <select
+                            value={selectedVal}
+                            aria-label={`Câu ${displayNum}`}
+                            title={selectedVal || `Chọn đáp án câu ${displayNum}`}
+                            onFocus={() => onSelectQuestion?.(q)}
+                            onClick={e => {
+                              e.stopPropagation();
+                              onSelectQuestion?.(q);
+                            }}
+                            onChange={e => {
+                              onAnswerChange?.(q.id, e.target.value);
+                              onSelectQuestion?.(q);
+                            }}
+                            className={`min-w-[74px] max-w-[200px] h-[36px] px-3 rounded-lg text-[14px] font-extrabold text-center transition outline-none border cursor-pointer ${
+                              isDragOver
+                                ? 'bg-blue-50 dark:bg-blue-500/25 text-[#111827] dark:text-white border-[#2563EB] ring-2 ring-[#2563EB]/50'
+                                : isActive
+                                ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
                                 : selectedVal
-                                ? 'bg-blue-50 dark:bg-blue-500/20 text-[#2563EB] dark:text-blue-300 border-[#2563EB]/40'
-                                : 'bg-white dark:bg-[#262626] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#4A4A4A]'
+                                ? 'bg-blue-50/70 dark:bg-[#1E2A40] text-[#111827] dark:text-white border-[#2563EB] dark:border-[#60A5FA]'
+                                : 'bg-[#F1F5F9] dark:bg-[#252830] text-[#111827] dark:text-[#E5E7EB] border-[#CBD5E1] dark:border-[#4A4D57] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
                             }`}
                           >
-                            {displayNum}
-                          </span>
-                          <div className={`min-w-0 flex-1 ${fontSizeClass} leading-[1.85] text-[#111827] dark:text-[#F3F4F6]`}>
-                            {foundSlot ? (
-                              parts.map((part, partIdx) =>
-                                part.type === 'slot' ? (
-                                  <span key={partIdx}>{slotControl}</span>
+                            <option value="">—</option>
+                            {block.options.map((opt, optIdx) => {
+                              const optCode = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
+                              return (
+                                <option key={optIdx} value={opt}>
+                                  {optCode ? optCode.toUpperCase() : opt}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          {selectedVal && (
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation();
+                                onAnswerChange?.(q.id, '');
+                                onSelectQuestion?.(q);
+                              }}
+                              title={`Xóa đáp án câu ${displayNum}`}
+                              className="p-0.5 rounded text-slate-400 hover:text-rose-500 dark:text-neutral-400 dark:hover:text-rose-400 transition"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </span>
+                      );
+
+                      if (isFlowchartBoxGroup) {
+                        return (
+                          <div key={q.id}>
+                            <div
+                              ref={el => {
+                                if (el && questionCardRefs?.current) {
+                                  questionCardRefs.current[q.id] = el;
+                                }
+                              }}
+                              onClick={() => onSelectQuestion?.(q)}
+                              className={`rounded-md border px-6 py-4 text-center transition-colors shadow-2xs ${
+                                isActive
+                                  ? 'border-[#2563EB] bg-[#EFF6FF]/65 dark:bg-[#1E2430]'
+                                  : 'border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191B21]'
+                              }`}
+                            >
+                              <div className={`${fontSizeClass} leading-[1.85] text-[#111827] dark:text-[#F3F4F6]`}>
+                                {foundSlot ? (
+                                  parts.map((part, partIdx) =>
+                                    part.type === 'slot' ? (
+                                      <span key={partIdx}>{slotControl}</span>
+                                    ) : (
+                                      <span key={partIdx}>{formatText(part.value)}</span>
+                                    )
+                                  )
                                 ) : (
-                                  <span key={partIdx}>{formatText(part.value)}</span>
-                                )
-                              )
-                            ) : (
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                                <span className="font-medium">{formatText(cleanPrompt)}</span>
-                                {slotControl}
+                                  <span>
+                                    <span className="font-medium">{formatText(cleanPrompt)}</span> {slotControl}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {itemIdx < block.items.length - 1 && (
+                              <div className="flex justify-center py-0.5 text-slate-600 dark:text-zinc-300 font-bold text-base select-none">
+                                ↓
                               </div>
                             )}
                           </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={q.id}
+                          ref={el => {
+                            if (el && questionCardRefs?.current) {
+                              questionCardRefs.current[q.id] = el;
+                            }
+                          }}
+                          onClick={() => onSelectQuestion?.(q)}
+                          className={`px-3 py-2 rounded-lg transition-colors ${
+                            isActive
+                              ? 'bg-[#EFF6FF]/75 dark:bg-[#1E2430]'
+                              : 'hover:bg-slate-50/70 dark:hover:bg-[#1B1D23]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <span
+                                className={`shrink-0 min-w-[28px] h-[28px] px-1.5 rounded-full text-[13px] font-extrabold inline-flex items-center justify-center border shadow-2xs ${
+                                  isActive
+                                    ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                                    : selectedVal
+                                    ? 'bg-blue-50 dark:bg-blue-500/20 text-[#2563EB] dark:text-blue-300 border-[#2563EB]/40'
+                                    : 'bg-white dark:bg-[#23252C] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#4A4A4A]'
+                                }`}
+                              >
+                                {displayNum}
+                              </span>
+                              <div className={`min-w-0 flex-1 ${fontSizeClass} leading-[1.7] text-[#111827] dark:text-[#F3F4F6]`}>
+                                {foundSlot ? (
+                                  parts.map((part, partIdx) =>
+                                    part.type === 'slot' ? (
+                                      <span key={partIdx}>{slotControl}</span>
+                                    ) : (
+                                      <span key={partIdx}>{formatText(part.value)}</span>
+                                    )
+                                  )
+                                ) : (
+                                  <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 max-w-xl">
+                                    <span className="font-medium">{formatText(cleanPrompt)}</span>
+                                    {slotControl}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {renderScopeJumpChip(q)}
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  onToggleBookmark?.(q.id);
+                                }}
+                                title={isFlagged ? 'Bỏ đánh dấu câu này' : 'Đánh dấu xem lại'}
+                                className={`p-1 rounded transition ${
+                                  isFlagged
+                                    ? 'text-amber-500 dark:text-amber-400'
+                                    : 'text-slate-400 dark:text-neutral-500 hover:text-amber-500'
+                                }`}
+                              >
+                                <Bookmark className={`w-4 h-4 ${isFlagged ? 'fill-current' : ''}`} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {renderScopeJumpChip(q)}
-                          <button
-                            type="button"
-                            onClick={e => {
-                              e.stopPropagation();
-                              onToggleBookmark?.(q.id);
-                            }}
-                            title={isFlagged ? 'Bỏ đánh dấu câu này' : 'Đánh dấu xem lại'}
-                            className={`p-1 rounded transition ${
-                              isFlagged
-                                ? 'text-amber-500 dark:text-amber-400'
-                                : 'text-slate-400 dark:text-neutral-500 hover:text-amber-500'
-                            }`}
-                          >
-                            <Bookmark className={`w-4 h-4 ${isFlagged ? 'fill-current' : ''}`} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -798,6 +939,7 @@ export default function ExamQuestionList({
           const lastNum = block.items[block.items.length - 1]?.displayNum;
           const groupMeta = getQuestionTypeMeta(block.groupType, scopeType);
           const firstItem = block.items[0]?.question;
+          const isFlowchartGroup = block.groupType === 'flowchart_completion';
           const instructionText =
             block.instruction ||
             getStandardGroupInstruction(firstItem, firstItem?.options);
@@ -846,12 +988,28 @@ export default function ExamQuestionList({
                     )}
                   </div>
                 )}
-                <div className={`${block.imageUrl ? 'md:col-span-7 ' : ''}space-y-3`}>
-                  {block.items.map(({ question: itemQ, displayNum }) =>
-                    renderSingleQuestionCard(itemQ, displayNum, {
-                      insideGroup: true,
-                      groupImageUrl: block.imageUrl || ''
-                    })
+                <div className={`${block.imageUrl ? 'md:col-span-7 ' : ''}${isFlowchartGroup ? 'space-y-1.5 max-w-2xl mx-auto' : 'space-y-3'}`}>
+                  {block.items.map(({ question: itemQ, displayNum }, itemIdx) =>
+                    isFlowchartGroup ? (
+                      <div key={itemQ.id}>
+                        <div className="rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191B21] px-6 py-3 text-center shadow-2xs">
+                          {renderSingleQuestionCard(itemQ, displayNum, {
+                            insideGroup: true,
+                            groupImageUrl: block.imageUrl || ''
+                          })}
+                        </div>
+                        {itemIdx < block.items.length - 1 && (
+                          <div className="flex justify-center py-0.5 text-slate-600 dark:text-zinc-300 font-bold text-base select-none">
+                            ↓
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      renderSingleQuestionCard(itemQ, displayNum, {
+                        insideGroup: true,
+                        groupImageUrl: block.imageUrl || ''
+                      })
+                    )
                   )}
                 </div>
               </div>

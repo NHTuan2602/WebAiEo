@@ -17,35 +17,47 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 • + £250 deposit ({{3}} payment is required)
 • Cost includes use of tables and chairs and also {{4}}`;
 
-const SAMPLE_TABLE_TEMPLATE = `Questions 1-5
+const SAMPLE_TABLE_TEMPLATE = `Questions 1-10
 Complete the table below.
-Write ONE WORD ONLY for each answer.
+Write ONE WORD AND/OR A NUMBER for each answer.
 
-| Physical features | Study findings |
-| --- | --- |
-| Skin/Coat | Provides {{1}} when standing near trees |
-| Eyes | Let them look out for lions |
-| Mouth | Can be used like {{2}} to get leaves |
-| {{3}} | Normal size for such a large animal |
-| Nerves | Slower reaction time because {{4}} need to go farther |`;
+| Name of restaurant | Location | Reason for recommendation | Other comments |
+| --- | --- | --- | --- |
+| The Junction | Greyson Street, near the station | Good for people who are especially keen on {{1}} | • Quite expensive<br>• The {{2}} is a good place for a drink |
+| Paloma | In Bow Street next to the cinema | {{3}} food, good for sharing | • Staff are very friendly<br>• Need to pay £50 deposit<br>• A limited selection of {{4}} food on the menu |
+| The {{5}} | At the top of a {{6}} | • A famous chef<br>• All the {{7}} are very good<br>• Only uses {{8}} ingredients | • Set lunch costs: £ {{9}} per person<br>• Portions probably of {{10}} size |`;
 
 const SAMPLE_FLOWCHART_TEMPLATE = `Questions 26-30
-Complete the flowchart below.
-Write ONE WORD ONLY for each answer.
+Complete the flowchart below. Choose FIVE answers from the box and write the correct letter, A - H, next to Questions 26 - 30.
 
 Choose mice which are all the same {{26}}
 ↓
 Divide the mice into two groups, each with a different {{27}}
 ↓
-Put each group in a separate cage. Feed group B sugar contained in {{28}}
+Put each group in a separate cage.
+Feed group A commercial mouse food.
+Feed group B the same, but also sugar contained in {{28}}
 ↓
+Take measurements using an electronic scale.
 Place them in a weighing chamber to prevent {{29}}
 ↓
 Do all necessary {{30}}`;
 
+export const SAMPLE_FLOWCHART_WORDBOX_OPTIONS = [
+  'A size',
+  'B escape',
+  'C age',
+  'D water',
+  'E cereal',
+  'F calculations',
+  'G changes',
+  'H colour'
+];
+
 export default function ClozeEditorBox({
   clozeText = '',
   groupImageUrl = '',
+  onApplyFlowchartBoxTemplate = null,
   onChangeClozeText,
   onChangeGroupImage = null,
   onSyncBlanks,
@@ -54,7 +66,7 @@ export default function ClozeEditorBox({
   scopeIdx = 0,
   scopeLabel = ''
 }) {
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const textareaRef = useRef(null);
 
   const detectedBlanks = extractBlankNumbers(clozeText);
@@ -108,31 +120,46 @@ export default function ClozeEditorBox({
             <Plus className="w-3.5 h-3.5" /> Chèn {`{{${nextBlankNum}}}`}
           </button>
 
-          {!clozeText.trim() && (
-            <>
-              <button
-                type="button"
-                onClick={() => onChangeClozeText(SAMPLE_CLOZE_TEMPLATE)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 hover:bg-[#EDFFFD] text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 transition flex items-center gap-1"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Mẫu Note
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeClozeText(SAMPLE_TABLE_TEMPLATE)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 hover:bg-indigo-50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 transition flex items-center gap-1"
-              >
-                <Table className="w-3.5 h-3.5" /> Mẫu Bảng
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeClozeText(SAMPLE_FLOWCHART_TEMPLATE)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 hover:bg-amber-50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 transition flex items-center gap-1"
-              >
-                ↓ Mẫu Flow-chart
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              const nextText = clozeText.trim()
+                ? `${clozeText.trim()}\n\n${SAMPLE_CLOZE_TEMPLATE}`
+                : SAMPLE_CLOZE_TEMPLATE;
+              onChangeClozeText(nextText);
+            }}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 hover:bg-[#EDFFFD] text-[#007A7A] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 transition flex items-center gap-1"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> + Mẫu Note
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const nextText = clozeText.trim()
+                ? `${clozeText.trim()}\n\n${SAMPLE_TABLE_TEMPLATE}`
+                : SAMPLE_TABLE_TEMPLATE;
+              onChangeClozeText(nextText);
+            }}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 hover:bg-indigo-50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 transition flex items-center gap-1"
+          >
+            <Table className="w-3.5 h-3.5" /> + Mẫu Bảng (Table)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (onApplyFlowchartBoxTemplate) {
+                onApplyFlowchartBoxTemplate(SAMPLE_FLOWCHART_TEMPLATE, SAMPLE_FLOWCHART_WORDBOX_OPTIONS);
+              } else {
+                const nextText = clozeText.trim()
+                  ? `${clozeText.trim()}\n\n${SAMPLE_FLOWCHART_TEMPLATE}`
+                  : SAMPLE_FLOWCHART_TEMPLATE;
+                onChangeClozeText(nextText);
+              }
+            }}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 hover:bg-amber-50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 transition flex items-center gap-1"
+          >
+            ↓ + Mẫu Flow-chart (Hộp A–H)
+          </button>
 
           {detectedBlanks.length > 0 && (
             <>
