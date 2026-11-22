@@ -45,8 +45,8 @@ export default function VipPromoPopupModal({
       desc: 'Tự tạo phòng đấu trường riêng cùng bạn bè (2–30 người, chia Team), tùy chọn kho từ và số từ mỗi vòng trong suốt 30 ngày.'
     },
     {
-      title: 'Chỉnh Màu Chữ Tên & Thêm Ảnh Bìa Hồ Sơ Cá Nhân',
-      desc: `Tự do chọn màu chữ tên yêu thích (kèm mã màu tự chọn) và miễn phí tải, cắt Ảnh Bìa riêng (trị giá ${coverPriceLabel}/tháng).`
+      title: 'Chỉnh Màu Chữ Tên, Khung Viền Avatar & Ảnh Bìa Hồ Sơ',
+      desc: `Tự do chọn màu chữ tên (kèm mã màu tự chọn), chọn Khung Viền Avatar nổi bật và miễn phí tải, cắt Ảnh Bìa riêng (trị giá ${coverPriceLabel}/tháng).`
     }
   ];
 

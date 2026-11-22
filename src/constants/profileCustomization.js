@@ -118,12 +118,12 @@ export function isStaffOrAdminUser(user) {
   );
 }
 
-export function hasUnlockedAvatarFrame(user, frameId, _nowMs = Date.now()) {
+export function hasUnlockedAvatarFrame(user, frameId, nowMs = Date.now()) {
   if (!frameId || frameId === 'none') return true;
   const frame = AVATAR_FRAMES.find(f => f.id === frameId);
   if (!frame) return false;
-  // Viền avatar màu mè chỉ áp dụng cho Giáo viên & Admin
-  return isStaffOrAdminUser(user);
+  // Khung viền Avatar áp dụng cho Giáo viên, Admin và học viên có Gói Tháng VIP
+  return isStaffOrAdminUser(user) || hasActiveAieoVip(user, nowMs);
 }
 
 export function getVietnamDateKey(ts = Date.now()) {

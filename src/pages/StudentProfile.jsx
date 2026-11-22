@@ -191,7 +191,9 @@ export default function StudentProfile({
     avatarFrameId: 'none',
     studyGoal: '',
     equippedTitleId: 'newbie',
-    showTitleBadge: true
+    showTitleBadge: true,
+    vipRedNameEnabled: true,
+    vipNameColor: 'crimson'
   });
 
   const isTeacherViewer = currentUser?.role === 'teacher';
@@ -256,8 +258,8 @@ export default function StudentProfile({
   const unlockPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
   const aieoVipPriceLabel = formatVndCurrency(normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
   const singleExamPriceLabel = formatVndCurrency(normalizedPayCfg.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND);
-  const combo3PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[0]?.priceVnd ?? 50000);
-  const combo5PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[1]?.priceVnd ?? 70000);
+  const combo3PriceLabel = formatVndCurrency(normalizedPayCfg.realExamCombo3Price ?? REAL_EXAM_COMBOS[0]?.defaultPriceVnd ?? 249000);
+  const combo5PriceLabel = formatVndCurrency(normalizedPayCfg.realExamCombo5Price ?? REAL_EXAM_COMBOS[1]?.defaultPriceVnd ?? 399000);
   const combo8PriceLabel = formatVndCurrency(
     normalizedPayCfg.realExamCombo8Price ?? REAL_EXAM_COMBOS.find(c => c.credits === 8)?.defaultPriceVnd ?? 599000
   );
@@ -265,6 +267,7 @@ export default function StudentProfile({
     normalizedPayCfg.realExamCombo10Price ?? REAL_EXAM_COMBOS.find(c => c.credits === 10)?.defaultPriceVnd ?? 699000
   );
   const studentIsStaff = isStaffOrAdminUser(student);
+  const canUseVipNameAndFrame = studentHasAieoVip || studentIsStaff;
   const studentPurchasedCount = getPurchasedExamCount(student);
   const studentPurchaseTier = resolveExamPurchaseTier(student);
   const studentNextTier = getNextExamPurchaseTier(student);
@@ -287,7 +290,9 @@ export default function StudentProfile({
       avatarFrameId: student.avatarFrameId || 'none',
       studyGoal: student.studyGoal || '',
       equippedTitleId: student.equippedTitleId || titleSummary?.title?.id || 'newbie',
-      showTitleBadge: student.showTitleBadge !== false
+      showTitleBadge: student.showTitleBadge !== false,
+      vipRedNameEnabled: vipVisual.showNameColor,
+      vipNameColor: vipVisual.nameColorValue || 'crimson'
     });
     setShowCustomizeModal(true);
   };
@@ -478,7 +483,7 @@ export default function StudentProfile({
   }
 
   const renderVipAppearanceSwitches = () => {
-    if (!isSelf || (!studentHasAieoVip && !isTargetSystemAdmin) || !handleUpdateUserProfileFields) {
+    if (!isSelf || (!studentHasAieoVip && !studentIsStaff) || !handleUpdateUserProfileFields) {
       return null;
     }
     const {
@@ -505,7 +510,7 @@ export default function StudentProfile({
             <Crown className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
             {vipVisual.canUseNeonCover
               ? 'Tùy Chỉnh Hiển Thị Quản Trị / GV (Màu Chữ Tên · Viền Bìa LED · Nhãn)'
-              : 'Tùy Chỉnh Màu Chữ Tên (Gói Tháng 20k)'}
+              : 'Tùy Chỉnh Hiển Thị VIP (Màu Chữ Tên · Khung Viền Avatar)'}
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             {vipVisual.canUseNeonCover && neonOn && (
@@ -673,38 +678,83 @@ export default function StudentProfile({
           </div>
           )}
 
-          {/* 3. IELTS VIP Badge Toggle */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={tagOn}
-            onClick={() =>
-              saveVipPatch({
-                vipTagEnabled: !tagOn,
-                customToast: !tagOn
-                  ? 'Đã BẬT huy hiệu IELTS VIP bên cạnh tên!'
-                  : 'Đã TẮT huy hiệu IELTS VIP.'
-              })
-            }
-            className="bg-transparent border-0 rounded-none py-3 lg:py-1 lg:pl-5 text-left flex items-center justify-between gap-3 w-full"
-          >
-            <div>
-              <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5] flex items-center gap-1.5">
-                <Crown className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
-                <span>Nhãn IELTS VIP Cạnh Tên</span>
-              </p>
-              <p className="text-xs text-[#475569] dark:text-zinc-400">
-                Hiện huy hiệu IELTS VIP ánh kim bên cạnh tên của bạn
-              </p>
-            </div>
-            <span
-              className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase shrink-0 ${
-                tagOn ? 'bg-[#F59E0B] text-[#09090B]' : 'bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200'
-              }`}
+          {/* 3. Staff Badge Toggle OR VIP Avatar Frame Quick Picker */}
+          {vipVisual.canUseNeonCover ? (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={tagOn}
+              onClick={() =>
+                saveVipPatch({
+                  vipTagEnabled: !tagOn,
+                  customToast: !tagOn
+                    ? 'Đã BẬT huy hiệu Quản Trị / GV bên cạnh tên!'
+                    : 'Đã TẮT huy hiệu bên cạnh tên.'
+                })
+              }
+              className="bg-transparent border-0 rounded-none py-3 lg:py-1 lg:pl-5 text-left flex items-center justify-between gap-3 w-full"
             >
-              {tagOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
-            </span>
-          </button>
+              <div>
+                <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5] flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
+                  <span>Nhãn Quản Trị / GV Cạnh Tên</span>
+                </p>
+                <p className="text-xs text-[#475569] dark:text-zinc-400">
+                  Hiện huy hiệu ánh kim bên cạnh tên của bạn
+                </p>
+              </div>
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase shrink-0 ${
+                  tagOn ? 'bg-[#F59E0B] text-[#09090B]' : 'bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-200'
+                }`}
+              >
+                {tagOn ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+              </span>
+            </button>
+          ) : (
+            <div className="bg-transparent border-0 rounded-none py-3 lg:py-1 lg:pl-5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Chọn Khung Viền Avatar VIP</span>
+                  </p>
+                  <p className="text-xs text-[#475569] dark:text-zinc-400">
+                    Đổi nhanh khung viền Avatar nổi bật trên Hồ sơ, Navbar &amp; BXH
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                {AVATAR_FRAMES.map(frame => {
+                  const selected = (student.avatarFrameId || 'none') === frame.id;
+                  return (
+                    <button
+                      key={frame.id}
+                      type="button"
+                      title={`Khung viền: ${frame.name}`}
+                      onClick={() =>
+                        handleUpdateUserProfileFields(student.username, {
+                          avatarFrameId: frame.id,
+                          customToast:
+                            frame.id === 'none'
+                              ? 'Đã chuyển về viền Avatar mặc định.'
+                              : `Đã trang bị khung viền Avatar "${frame.name}"!`
+                        })
+                      }
+                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-bold transition ${
+                        selected
+                          ? 'border-[#007A7A] bg-[#EDFFFD] dark:bg-zinc-800 dark:border-amber-400 text-[#0F172B] dark:text-white'
+                          : 'border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:border-slate-400'
+                      }`}
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${frame.previewBg}`} />
+                      <span>{frame.name.replace(' VIP', '')}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2486,7 +2536,7 @@ export default function StudentProfile({
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  • Truy cập <b>Luyện Tập Game Từ Vựng</b> (14 kho từ &amp; Collocation) • Quyền <b>Tạo Phòng Luyện Tập Từ Vựng theo Chủ Đề</b> • <b>Chỉnh Màu Chữ Tên</b> • <b>Thêm &amp; Đổi Ảnh Bìa Hồ Sơ</b>.
+                  • Truy cập <b>Luyện Tập Game Từ Vựng</b> (14 kho từ &amp; Collocation) • Quyền <b>Tạo Phòng Luyện Tập Từ Vựng theo Chủ Đề</b> • <b>Chỉnh Màu Chữ Tên</b> • <b>Chọn Khung Viền Avatar</b> • <b>Thêm &amp; Đổi Ảnh Bìa Hồ Sơ</b>.
                 </p>
                 <p className={`text-xs font-bold ${studentHasAieoVip ? 'text-[#0F172B] dark:text-[#FAFAFA]' : 'text-slate-600 dark:text-zinc-300'}`}>
                   {studentHasAieoVip
@@ -3459,7 +3509,13 @@ export default function StudentProfile({
                 );
                 const previewUser = {
                   ...student,
-                  avatarFrameId: customDraft.avatarFrameId
+                  avatarFrameId: canUseVipNameAndFrame ? customDraft.avatarFrameId : 'none',
+                  ...(canUseVipNameAndFrame
+                    ? {
+                        vipRedNameEnabled: Boolean(customDraft.vipRedNameEnabled),
+                        vipNameColor: customDraft.vipNameColor || 'crimson'
+                      }
+                    : {})
                 };
                 return (
                   <div
@@ -3632,13 +3688,30 @@ export default function StudentProfile({
                 )}
               </div>
 
-              {/* Avatar Frame Picker (Staff & Admin only) */}
-              {studentIsStaff && (
+              {/* Avatar Frame Picker (VIP / Giáo viên / Admin) */}
               <div className="space-y-2.5">
-                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                  2. Khung Viền Avatar Nổi Bật (Giáo viên / Admin)
-                </label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    2. Chọn Khung Viền Avatar ({canUseVipNameAndFrame ? 'Đã Mở Khóa VIP' : `Gói Tháng ${aieoVipPriceLabel}`})
+                  </label>
+                  {!canUseVipNameAndFrame && isSelf && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCheckoutModalState({
+                          itemType: 'aieo_vip',
+                          itemId: '',
+                          itemLabel: 'Gói Tháng VIP (1 Tháng)',
+                          itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                        })
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold text-amber-800 dark:text-amber-200 hover:opacity-90"
+                    >
+                      <Crown className="w-3 h-3" /> Mở Khóa VIP ({aieoVipPriceLabel})
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {AVATAR_FRAMES.map(frame => {
                     const active = (customDraft.avatarFrameId || 'none') === frame.id;
                     const frameAllowed = hasUnlockedAvatarFrame(student, frame.id);
@@ -3647,7 +3720,19 @@ export default function StudentProfile({
                         key={frame.id}
                         type="button"
                         onClick={() => {
-                          if (!frameAllowed) return;
+                          if (!frameAllowed) {
+                            if (isSelf) {
+                              setCheckoutModalState({
+                                itemType: 'aieo_vip',
+                                itemId: '',
+                                itemLabel: 'Gói Tháng VIP (1 Tháng)',
+                                itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                              });
+                            } else {
+                              showToast?.('Khung viền Avatar yêu cầu Gói Tháng VIP.', 'info');
+                            }
+                            return;
+                          }
                           setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }));
                         }}
                         className={`relative p-2 rounded-2xl border flex flex-col items-center gap-1.5 transition ${
@@ -3658,9 +3743,9 @@ export default function StudentProfile({
                             : 'border-slate-200 dark:border-zinc-700 hover:border-slate-400'
                         }`}
                       >
-                        {frame.vipOnly && (
-                          <span className="absolute -top-1.5 right-1 px-1.5 py-0.2 rounded-full bg-[#991B1B] text-xs font-semibold text-[#F4F4F5]">
-                            STAFF
+                        {!frameAllowed && frame.id !== 'none' && (
+                          <span className="absolute -top-1.5 right-1 px-1.5 py-0.2 rounded-full bg-[#991B1B] text-[10px] font-semibold text-[#F4F4F5]">
+                            VIP
                           </span>
                         )}
                         <span className={`w-7 h-7 rounded-full ${frame.previewBg} ${frame.id !== 'none' ? frame.ringClass : ''}`} />
@@ -3670,13 +3755,107 @@ export default function StudentProfile({
                   })}
                 </div>
               </div>
-              )}
+
+              {/* VIP Name Color Picker inside Customize Modal */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    3. Chọn Màu Chữ Tên VIP ({canUseVipNameAndFrame ? 'Đã Mở Khóa' : `Gói Tháng ${aieoVipPriceLabel}`})
+                  </label>
+                  {canUseVipNameAndFrame ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomDraft(prev => ({ ...prev, vipRedNameEnabled: !prev.vipRedNameEnabled }))
+                      }
+                      className={`px-2.5 py-1 rounded-full text-xs font-bold transition ${
+                        customDraft.vipRedNameEnabled
+                          ? 'bg-[#F59E0B] text-[#09090B]'
+                          : 'bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                      }`}
+                    >
+                      {customDraft.vipRedNameEnabled ? 'ĐANG BẬT MÀU TÊN' : 'ĐANG TẮT MÀU TÊN'}
+                    </button>
+                  ) : isSelf ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCheckoutModalState({
+                          itemType: 'aieo_vip',
+                          itemId: '',
+                          itemLabel: 'Gói Tháng VIP (1 Tháng)',
+                          itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                        })
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold text-amber-800 dark:text-amber-200"
+                    >
+                      <Lock className="w-3 h-3" /> Mở Khóa VIP ({aieoVipPriceLabel})
+                    </button>
+                  ) : null}
+                </div>
+
+                {canUseVipNameAndFrame ? (
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 flex flex-wrap items-center gap-2.5">
+                    {VIP_NAME_COLORS.map(preset => {
+                      const selected =
+                        Boolean(customDraft.vipRedNameEnabled) &&
+                        (customDraft.vipNameColor || 'crimson') === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          title={`Màu chữ: ${preset.label}`}
+                          onClick={() =>
+                            setCustomDraft(prev => ({
+                              ...prev,
+                              vipRedNameEnabled: true,
+                              vipNameColor: preset.id
+                            }))
+                          }
+                          className={`w-7 h-7 rounded-full transition flex items-center justify-center ${
+                            selected
+                              ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white dark:ring-offset-zinc-900 scale-110'
+                              : 'border border-white/80 dark:border-zinc-700 opacity-85 hover:opacity-100'
+                          }`}
+                          style={{ backgroundColor: preset.swatch }}
+                        >
+                          {selected && <Check className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      );
+                    })}
+                    <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200 cursor-pointer">
+                      <input
+                        type="color"
+                        aria-label="Tự chọn màu chữ tên tùy ý"
+                        value={
+                          String(customDraft.vipNameColor || '').startsWith('#')
+                            ? customDraft.vipNameColor
+                            : (VIP_NAME_COLORS.find(c => c.id === customDraft.vipNameColor)?.swatch || '#E11D48')
+                        }
+                        onChange={e =>
+                          setCustomDraft(prev => ({
+                            ...prev,
+                            vipRedNameEnabled: true,
+                            vipNameColor: e.target.value
+                          }))
+                        }
+                        className="w-4 h-4 rounded border-0 p-0 bg-transparent cursor-pointer"
+                      />
+                      <span>Tự chọn màu</span>
+                    </label>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    Đăng ký Gói Tháng ({aieoVipPriceLabel}/tháng) để tùy chọn màu chữ tên, khung viền Avatar, ảnh bìa và vào luyện tập Game 14 kho từ.
+                  </p>
+                )}
+              </div>
 
               {/* Study Goal / Bio + Student Title Toggle */}
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-zinc-300 mb-1">
-                    3. Khẩu Hiệu / Giới Thiệu Bản Thân
+                    4. Khẩu Hiệu / Giới Thiệu Bản Thân
                   </label>
                   <input
                     type="text"
@@ -3720,9 +3899,23 @@ export default function StudentProfile({
                 onClick={async () => {
                   if (!handleUpdateUserProfileFields || isSavingProfileTheme) return;
                   setIsSavingProfileTheme(true);
-                  const safeDraft = canUseCustomCover
-                    ? customDraft
-                    : { ...customDraft, profileCoverUrl: '' };
+                  const safeDraft = {
+                    ...customDraft,
+                    profileCoverUrl: canUseCustomCover ? customDraft.profileCoverUrl : '',
+                    ...(canUseVipNameAndFrame
+                      ? {
+                          vipRedNameEnabled: Boolean(customDraft.vipRedNameEnabled),
+                          vipNameColor: customDraft.vipNameColor || 'crimson',
+                          vipEffectsCustomizedAt: Date.now()
+                        }
+                      : {
+                          avatarFrameId: 'none'
+                        })
+                  };
+                  if (!canUseVipNameAndFrame) {
+                    delete safeDraft.vipRedNameEnabled;
+                    delete safeDraft.vipNameColor;
+                  }
                   await handleUpdateUserProfileFields(student.username, safeDraft);
                   setIsSavingProfileTheme(false);
                   setShowCustomizeModal(false);

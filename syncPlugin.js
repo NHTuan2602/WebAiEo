@@ -731,7 +731,12 @@ function sanitizeUserForViewer(user, viewer) {
     avatarUrl: user.avatarUrl || '',
     profileBannerId: typeof user.profileBannerId === 'string' && user.profileBannerId ? user.profileBannerId : 'ocean',
     profileCoverUrl: typeof user.profileCoverUrl === 'string' ? user.profileCoverUrl : '',
-    avatarFrameId: isStaffOrAdminUser(user) && typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
+    avatarFrameId:
+      typeof user.avatarFrameId === 'string' &&
+      user.avatarFrameId &&
+      hasUnlockedAvatarFrame(user, user.avatarFrameId)
+        ? user.avatarFrameId
+        : 'none',
     isGuest: Boolean(user.isGuest),
     totalPurchasedExams: getPurchasedExamCount(user),
     equippedTitleId:

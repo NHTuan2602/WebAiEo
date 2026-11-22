@@ -590,7 +590,7 @@ export default function GameArena({
                       ✅ Quyền Tạo Phòng Luyện Tập Từ Vựng theo Chủ Đề
                     </div>
                     <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-200">
-                      ✅ Chỉnh Màu Chữ Tên nổi bật
+                      ✅ Chỉnh Màu Chữ Tên &amp; Chọn Khung Viền Avatar nổi bật
                     </div>
                     <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-200">
                       ✅ Thêm &amp; Đổi Ảnh Bìa Hồ Sơ cá nhân

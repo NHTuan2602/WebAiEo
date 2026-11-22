@@ -11,7 +11,7 @@ export default function UserAvatarBadge({
 }) {
   const initial = user?.name ? user.name[0] : (user?.username ? user.username[0] : 'U');
   const isStaff = isStaffOrAdminUser(user);
-  const frameAllowed = showFrame && isStaff && hasUnlockedAvatarFrame(user, user?.avatarFrameId);
+  const frameAllowed = showFrame && hasUnlockedAvatarFrame(user, user?.avatarFrameId);
   const frameClass = frameAllowed ? (getAvatarFrameById(user?.avatarFrameId)?.ringClass || '') : '';
   const hasVipAura = showFrame && isStaff && Boolean(user?.vipNeonCoverEnabled);
   const auraCls = hasVipAura
