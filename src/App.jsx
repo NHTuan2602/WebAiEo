@@ -8097,7 +8097,7 @@ export default function App() {
         />
       )}
 
-      {activeCelebratingTitles.length > 0 && (
+      {activeCelebratingTitles.length > 0 && !showRealExamPricingModal && !globalCheckoutState && (
         <TitleUnlockedCelebrationModal
           key={activeCelebratingTitles.map(t => t.id).join(',')}
           titles={activeCelebratingTitles}

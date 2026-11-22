@@ -10,6 +10,7 @@ import {
   stripLeadingOptionCode
 } from '../../utils/examHelpers';
 import {
+  getStandardGroupInstruction,
   groupQuestionsForRendering,
   stripLeadingQuestionNumber
 } from '../../utils/examUiHelpers';

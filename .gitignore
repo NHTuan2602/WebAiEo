@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 .data
+.playwright-data
+playwright-report
+test-results
+blob-report
 *.local
 
 # Python
