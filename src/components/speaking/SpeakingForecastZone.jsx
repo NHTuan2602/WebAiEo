@@ -1,17 +1,27 @@
 import { useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   Check,
+  ChevronRight,
   ClipboardPaste,
   Edit3,
   FileText,
+  Folder,
+  FolderOpen,
   FolderPlus,
+  Globe,
+  HardDrive,
+  LayoutGrid,
+  List,
   Loader2,
   Play,
   Plus,
   Search,
+  Share2,
   Shuffle,
   Trash2,
   Upload,
+  Users,
   X
 } from 'lucide-react';
 import {
@@ -20,6 +30,7 @@ import {
   normalizeSpeakingForecastBank,
   parsePastedSpeakingQuestions
 } from '../../constants/speakingForecast';
+import AssignFolderModal from '../modals/AssignFolderModal';
 
 function readPdfAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -30,9 +41,19 @@ function readPdfAsDataUrl(file) {
   });
 }
 
+function getAssignedClassLabels(assignedClassIds = [], classesDb = {}) {
+  if (!Array.isArray(assignedClassIds) || assignedClassIds.length === 0) return [];
+  return assignedClassIds
+    .map(cid => classesDb?.[cid])
+    .filter(Boolean)
+    .map(cls => ({ id: cls.id, name: cls.name }));
+}
+
 export default function SpeakingForecastZone({
   aiApiKey = '',
   aiConfigured = false,
+  bank: bankProp = null,
+  classesDb = {},
   isTeacher = false,
   onSaveBank,
   onStartPracticeTest,
@@ -40,16 +61,21 @@ export default function SpeakingForecastZone({
   speakingForecast = null,
   zoneKey = 'forecast' // 'daily' | 'forecast'
 }) {
-  const bank = useMemo(() => normalizeSpeakingForecastBank(speakingForecast), [speakingForecast]);
+  const bank = useMemo(
+    () => normalizeSpeakingForecastBank(speakingForecast || bankProp),
+    [speakingForecast, bankProp]
+  );
   const zoneData = bank[zoneKey] || bank.forecast;
 
   const [partTab, setPartTab] = useState('part1'); // 'part1' | 'part2' | 'part3' | 'part3_random'
-  const [selectedGroupIdByPart, setSelectedGroupIdByPart] = useState({
-    part1: '',
-    part2: '',
-    part3: ''
+  // null = Drive Folder Grid (all groups in Part); string = opened Group ID
+  const [openedGroupIdByPart, setOpenedGroupIdByPart] = useState({
+    part1: null,
+    part2: null,
+    part3: null
   });
   const [selectedFolderIdByGroup, setSelectedFolderIdByGroup] = useState({});
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [searchQuery, setSearchQuery] = useState('');
 
   // Teacher editing states
@@ -63,19 +89,37 @@ export default function SpeakingForecastZone({
   const [newImportFolderName, setNewImportFolderName] = useState('');
   const [pdfExtracting, setPdfExtracting] = useState(false);
 
+  // Bulk Assign Folder to Classes modal state
+  // { scope: 'part' | 'group' | 'folder', groupId?: string, folderId?: string, label: string, count: number, unit: string, initialClassIds: string[] }
+  const [assignModalTarget, setAssignModalTarget] = useState(null);
+
   // Part 3 Random Practice states
-  const [randomScopeGroupIds, setRandomScopeGroupIds] = useState([]); // empty = all 14 groups
+  const [randomScopeGroupIds, setRandomScopeGroupIds] = useState([]);
   const [randomCount, setRandomCount] = useState(6);
   const [randomSeed, setRandomSeed] = useState(1);
 
   const activePartKey = partTab === 'part3_random' ? 'part3' : partTab;
   const activePartNumber = activePartKey === 'part1' ? 1 : activePartKey === 'part2' ? 2 : 3;
   const groups = Array.isArray(zoneData?.[activePartKey]) ? zoneData[activePartKey] : [];
+  const openedGroupId = openedGroupIdByPart[activePartKey] || null;
 
-  const activeGroup = useMemo(() => {
-    const pickedId = selectedGroupIdByPart[activePartKey];
-    return groups.find(g => g.id === pickedId) || groups[0] || null;
-  }, [groups, selectedGroupIdByPart, activePartKey]);
+  const activeGroup = useMemo(
+    () => (openedGroupId ? groups.find(g => g.id === openedGroupId) || null : null),
+    [groups, openedGroupId]
+  );
+
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter(g => {
+      if (String(g.name || '').toLowerCase().includes(q)) return true;
+      return (g.folders || []).some(
+        f =>
+          String(f.name || '').toLowerCase().includes(q) ||
+          (f.questions || []).some(item => String(item.prompt || '').toLowerCase().includes(q))
+      );
+    });
+  }, [groups, searchQuery]);
 
   const filteredFolders = useMemo(() => {
     const folders = Array.isArray(activeGroup?.folders) ? activeGroup.folders : [];
@@ -83,7 +127,7 @@ export default function SpeakingForecastZone({
     if (!q) return folders;
     return folders.filter(
       f =>
-        f.name.toLowerCase().includes(q) ||
+        String(f.name || '').toLowerCase().includes(q) ||
         (f.questions || []).some(item => String(item.prompt || '').toLowerCase().includes(q))
     );
   }, [activeGroup, searchQuery]);
@@ -117,16 +161,17 @@ export default function SpeakingForecastZone({
     const newGroup = {
       id: `${activePartKey}_g_${Date.now()}`,
       name: `Nhóm ${nextNum}: Chủ đề mới`,
+      assignedClassIds: [],
       folders: [
         {
           id: `${activePartKey}_f_${Date.now()}`,
           name: 'Thư mục mới',
+          assignedClassIds: [],
           questions: []
         }
       ]
     };
     await commitUpdatedGroups(activePartKey, [...groups, newGroup], `Đã thêm ${newGroup.name}!`);
-    setSelectedGroupIdByPart(prev => ({ ...prev, [activePartKey]: newGroup.id }));
     setEditingGroupId(newGroup.id);
     setEditingGroupName(newGroup.name);
   };
@@ -138,7 +183,7 @@ export default function SpeakingForecastZone({
       return;
     }
     const nextGroups = groups.map(g => (g.id === groupId ? { ...g, name: clean } : g));
-    await commitUpdatedGroups(activePartKey, nextGroups, 'Đã đổi tên nhóm!');
+    await commitUpdatedGroups(activePartKey, nextGroups, 'Đã đổi tên thư mục nhóm!');
     setEditingGroupId(null);
   };
 
@@ -148,6 +193,9 @@ export default function SpeakingForecastZone({
       return;
     }
     const nextGroups = groups.filter(g => g.id !== groupId);
+    if (openedGroupId === groupId) {
+      setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: null }));
+    }
     await commitUpdatedGroups(activePartKey, nextGroups, 'Đã xóa nhóm!');
   };
 
@@ -158,6 +206,7 @@ export default function SpeakingForecastZone({
     const newFolder = {
       id: `${activeGroup.id}_f_${Date.now()}`,
       name: `Topic mới #${nextNum}`,
+      assignedClassIds: [],
       questions: []
     };
     const nextGroups = groups.map(g =>
@@ -181,7 +230,7 @@ export default function SpeakingForecastZone({
         ? { ...g, folders: (g.folders || []).map(f => (f.id === folderId ? { ...f, name: clean } : f)) }
         : g
     );
-    await commitUpdatedGroups(activePartKey, nextGroups, 'Đã đổi tên thư mục!');
+    await commitUpdatedGroups(activePartKey, nextGroups, 'Đã đổi tên thư mục con!');
     setEditingFolderId(null);
   };
 
@@ -193,6 +242,50 @@ export default function SpeakingForecastZone({
         : g
     );
     await commitUpdatedGroups(activePartKey, nextGroups, 'Đã xóa thư mục con!');
+  };
+
+  // Bulk Class Assignment for Speaking Part / Group / Subfolder
+  const handleConfirmSpeakingAssign = async ({ assignedClassIds, mode }) => {
+    if (!assignModalTarget) return;
+    const applyIds = (prevIds = []) => {
+      const prev = Array.isArray(prevIds) ? prevIds : [];
+      if (mode === 'add') {
+        return assignedClassIds.length === 0 ? [] : Array.from(new Set([...prev, ...assignedClassIds]));
+      }
+      if (mode === 'remove') {
+        const rem = new Set(assignedClassIds);
+        return prev.filter(id => !rem.has(id));
+      }
+      return assignedClassIds;
+    };
+
+    let nextGroups = groups;
+    if (assignModalTarget.scope === 'part') {
+      nextGroups = groups.map(g => ({ ...g, assignedClassIds: applyIds(g.assignedClassIds) }));
+    } else if (assignModalTarget.scope === 'group') {
+      nextGroups = groups.map(g =>
+        g.id === assignModalTarget.groupId ? { ...g, assignedClassIds: applyIds(g.assignedClassIds) } : g
+      );
+    } else if (assignModalTarget.scope === 'folder') {
+      nextGroups = groups.map(g =>
+        g.id === assignModalTarget.groupId
+          ? {
+              ...g,
+              folders: (g.folders || []).map(f =>
+                f.id === assignModalTarget.folderId
+                  ? { ...f, assignedClassIds: applyIds(f.assignedClassIds) }
+                  : f
+              )
+            }
+          : g
+      );
+    }
+
+    const scopeMsg =
+      assignedClassIds.length > 0
+        ? `Đã giao "${assignModalTarget.label}" cho ${assignedClassIds.length} lớp học!`
+        : `Đã mở "${assignModalTarget.label}" cho tất cả học viên!`;
+    await commitUpdatedGroups(activePartKey, nextGroups, scopeMsg);
   };
 
   // Teacher CRUD: Questions (Paste / PDF / Delete)
@@ -210,6 +303,7 @@ export default function SpeakingForecastZone({
       const createdFolder = {
         id: `${activeGroup.id}_f_${Date.now()}`,
         name: folderName,
+        assignedClassIds: [],
         questions: parsed
       };
       nextGroups = groups.map(g =>
@@ -318,7 +412,6 @@ export default function SpeakingForecastZone({
   const previewRandomPart3Questions = useMemo(() => {
     if (!randomPart3Pool.length) return [];
     const copy = [...randomPart3Pool];
-    // Deterministic-ish shuffle seeded by randomSeed so clicking "Trộn lại" updates preview cleanly
     let s = randomSeed * 9301 + 49297;
     for (let i = copy.length - 1; i > 0; i--) {
       s = (s * 9301 + 49297) % 233280;
@@ -328,16 +421,16 @@ export default function SpeakingForecastZone({
     return copy.slice(0, Math.min(copy.length, Math.max(1, Number(randomCount) || 6)));
   }, [randomPart3Pool, randomCount, randomSeed]);
 
-  const handleStartFolderPractice = () => {
-    if (!activeFolder || !(activeFolder.questions || []).length) {
+  const handleStartFolderPractice = (targetFolder = activeFolder) => {
+    if (!targetFolder || !(targetFolder.questions || []).length) {
       showToast?.('Thư mục này chưa có câu hỏi nào để luyện tập.', 'info');
       return;
     }
     const testPayload = buildTransientSpeakingPracticeTest({
-      title: `${zoneKey === 'daily' ? 'Daily' : 'Forecast'} Part ${activePartNumber}: ${activeFolder.name}`,
+      title: `${zoneKey === 'daily' ? 'Daily' : 'Forecast'} Part ${activePartNumber}: ${targetFolder.name}`,
       partNumber: activePartNumber,
-      topicName: activeFolder.name,
-      questions: activeFolder.questions,
+      topicName: targetFolder.name,
+      questions: targetFolder.questions,
       zone: zoneKey
     });
     onStartPracticeTest?.(testPayload, `part${activePartNumber}`);
@@ -378,15 +471,18 @@ export default function SpeakingForecastZone({
     onStartPracticeTest?.(testPayload, 'part3');
   };
 
+  const zoneTitle = zoneKey === 'daily' ? 'Daily Speaking Drive' : 'Kho Forecast Drive';
+  const partTitleLabel = `Part ${activePartNumber}`;
+
   return (
-    <section className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs space-y-5">
-      {/* Top Bar: Part 1 (6) | Part 2 (4) | Part 3 (14) | Random Part 3 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+    <section className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+      {/* GOOGLE DRIVE TOP BAR: Part Tabs + Mode Pill */}
+      <div className="px-4 sm:px-6 py-3.5 bg-slate-50/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {[
-            { id: 'part1', label: 'Part 1', count: `${(zoneData?.part1 || []).length} nhóm` },
-            { id: 'part2', label: 'Part 2', count: `${(zoneData?.part2 || []).length} nhóm` },
-            { id: 'part3', label: 'Part 3', count: `${(zoneData?.part3 || []).length} nhóm` },
+            { id: 'part1', label: 'Part 1', count: `${(zoneData?.part1 || []).length} thư mục` },
+            { id: 'part2', label: 'Part 2', count: `${(zoneData?.part2 || []).length} thư mục` },
+            { id: 'part3', label: 'Part 3', count: `${(zoneData?.part3 || []).length} thư mục` },
             { id: 'part3_random', label: '🎲 Random Part 3', count: `${randomPart3Pool.length} câu` }
           ].map(tab => {
             const active = partTab === tab.id;
@@ -404,11 +500,15 @@ export default function SpeakingForecastZone({
                     ? tab.id === 'part3_random'
                       ? 'bg-[#007A7A] text-white border-[#007A7A] shadow-sm'
                       : 'bg-[#B91C1C] text-white border-[#B91C1C] shadow-sm'
-                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                    : 'bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400'
                 }`}
               >
                 <span>{tab.label}</span>
-                <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
+                <span
+                  className={`text-[11px] px-1.5 py-0.5 rounded-full ${
+                    active ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400'
+                  }`}
+                >
                   {tab.count}
                 </span>
               </button>
@@ -416,359 +516,724 @@ export default function SpeakingForecastZone({
           })}
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold">
-            Không đếm ngược · Xem câu hỏi · Thu âm lại thoải mái
-          </span>
-        </div>
+        <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold">
+          Không đếm ngược · Xem câu hỏi · Thu âm lại thoải mái
+        </span>
       </div>
 
-      {/* SPECIAL MODE: PART 3 RANDOM PRACTICE */}
-      {partTab === 'part3_random' ? (
-        <div className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <Shuffle className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
-                Luyện Câu Hỏi Random — Speaking Part 3 (14 Nhóm)
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                Chọn 1 hoặc nhiều nhóm bên dưới (hoặc để trống để trộn toàn bộ 14 nhóm), hệ thống sẽ bốc ngẫu nhiên câu hỏi để bạn luyện nói tự do không đếm ngược.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <select
-                value={randomCount}
-                onChange={e => setRandomCount(Number(e.target.value) || 6)}
-                className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold"
-              >
-                {[3, 5, 6, 8, 10, 15, 20].map(n => (
-                  <option key={n} value={n}>{n} câu ngẫu nhiên</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setRandomSeed(s => s + 1)}
-                className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 inline-flex items-center gap-1"
-              >
-                <Shuffle className="w-3.5 h-3.5" /> Trộn lại
-              </button>
-              <button
-                type="button"
-                onClick={handleStartRandomPart3}
-                className="px-4 py-2 rounded-xl bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" /> Bắt đầu luyện Random
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setRandomScopeGroupIds([])}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${
-                randomScopeGroupIds.length === 0
-                  ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              Tất cả ({part3Groups.length} nhóm)
-            </button>
-            {part3Groups.map(g => {
-              const selected = randomScopeGroupIds.includes(g.id);
-              const qCount = (g.folders || []).reduce((s, f) => s + (f.questions?.length || 0), 0);
-              return (
+      {/* DRIVE CONTENT BODY */}
+      <div className="p-4 sm:p-6 space-y-5">
+        {partTab === 'part3_random' ? (
+          /* SPECIAL MODE: PART 3 RANDOM PRACTICE */
+          <div className="space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Shuffle className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
+                  Luyện Câu Hỏi Random — Speaking Part 3 ({part3Groups.length} Nhóm)
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  Chọn 1 hoặc nhiều thư mục bên dưới (hoặc để trống để trộn toàn bộ), hệ thống tự bốc câu hỏi ngẫu nhiên để luyện nói tự do.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <select
+                  value={randomCount}
+                  onChange={e => setRandomCount(Number(e.target.value) || 6)}
+                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                >
+                  {[3, 5, 6, 8, 10, 15, 20].map(n => (
+                    <option key={n} value={n}>{n} câu ngẫu nhiên</option>
+                  ))}
+                </select>
                 <button
-                  key={g.id}
                   type="button"
-                  onClick={() =>
-                    setRandomScopeGroupIds(prev =>
-                      prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
-                    )
-                  }
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition ${
-                    selected
-                      ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400'
-                  }`}
+                  onClick={() => setRandomSeed(s => s + 1)}
+                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 inline-flex items-center gap-1.5"
                 >
-                  {g.name} ({qCount})
+                  <Shuffle className="w-3.5 h-3.5" /> Trộn lại
                 </button>
-              );
-            })}
-          </div>
+                <button
+                  type="button"
+                  onClick={handleStartRandomPart3}
+                  disabled={previewRandomPart3Questions.length === 0}
+                  className="px-4 py-2 rounded-xl bg-[#B91C1C] hover:bg-[#991B1B] disabled:opacity-40 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" /> Bắt đầu Random
+                </button>
+              </div>
+            </div>
 
-          {previewRandomPart3Questions.length === 0 ? (
-            <div className="p-8 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500">
-              Chưa có câu hỏi Part 3 trong nhóm đã chọn. Giáo viên có thể vào tab Part 3 để dán hoặc ném PDF câu hỏi.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {previewRandomPart3Questions.map((q, idx) => (
-                <div
-                  key={`${q.id}-${idx}`}
-                  className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs flex items-start gap-2.5"
-                >
-                  <span className="shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold inline-flex items-center justify-center">
-                    {idx + 1}
-                  </span>
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-[11px] font-bold text-[#007A7A] dark:text-[#1EE1D6] truncate">{q.topic}</p>
-                    <p className="text-xs sm:text-[13px] font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">
-                      {q.prompt}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* STANDARD 3-PART ZONE (Groups Bar + Left Subfolders + Right Question Grid like Image 1) */
-        <div className="space-y-4">
-          {/* Group Selector Strip */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {groups.map(g => {
-              const isSelected = activeGroup?.id === g.id;
-              const qTotal = (g.folders || []).reduce((sum, f) => sum + (f.questions?.length || 0), 0);
-              if (editingGroupId === g.id) {
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setRandomScopeGroupIds([])}
+                className={`px-3 py-2.5 rounded-xl text-xs font-bold border text-left flex items-center gap-2 transition ${
+                  randomScopeGroupIds.length === 0
+                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                    : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                }`}
+              >
+                <Folder className="w-4 h-4 shrink-0" />
+                <span className="truncate">Tất cả {part3Groups.length} nhóm ({randomPart3Pool.length} câu)</span>
+              </button>
+              {part3Groups.map(g => {
+                const selected = randomScopeGroupIds.includes(g.id);
+                const qTotal = (g.folders || []).reduce((acc, f) => acc + (f.questions?.length || 0), 0);
                 return (
-                  <div key={g.id} className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-teal-500">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={editingGroupName}
-                      onChange={e => setEditingGroupName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleRenameGroup(g.id);
-                        if (e.key === 'Escape') setEditingGroupId(null);
-                      }}
-                      className="text-xs font-bold bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 w-44"
-                    />
-                    <button type="button" onClick={() => handleRenameGroup(g.id)} className="text-emerald-600 p-0.5"><Check className="w-3.5 h-3.5" /></button>
-                    <button type="button" onClick={() => setEditingGroupId(null)} className="text-slate-400 p-0.5"><X className="w-3.5 h-3.5" /></button>
-                  </div>
-                );
-              }
-              return (
-                <div
-                  key={g.id}
-                  className={`inline-flex items-center gap-1 rounded-lg border transition ${
-                    isSelected
-                      ? 'bg-[#0F172B] dark:bg-slate-100 text-white dark:text-slate-900 border-[#0F172B] dark:border-slate-100'
-                      : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400'
-                  }`}
-                >
                   <button
+                    key={g.id}
                     type="button"
-                    onClick={() => setSelectedGroupIdByPart(prev => ({ ...prev, [activePartKey]: g.id }))}
-                    className="px-2.5 py-1.5 text-xs font-bold flex items-center gap-1.5"
+                    onClick={() =>
+                      setRandomScopeGroupIds(prev =>
+                        prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
+                      )
+                    }
+                    className={`px-3 py-2.5 rounded-xl text-xs font-bold border text-left flex items-center justify-between gap-2 transition ${
+                      selected
+                        ? 'bg-teal-600 text-white border-teal-600'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-teal-500'
+                    }`}
                   >
-                    <span>{g.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/20 dark:bg-black/10' : 'bg-slate-200/80 dark:bg-slate-800'}`}>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <Folder className={`w-4 h-4 shrink-0 ${selected ? 'text-teal-100' : 'text-amber-500'}`} />
+                      <span className="truncate">{g.name}</span>
+                    </span>
+                    <span className={`text-[11px] shrink-0 px-1.5 py-0.5 rounded-full ${selected ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
                       {qTotal}
                     </span>
                   </button>
-                  {isTeacher && isSelected && (
-                    <span className="inline-flex items-center pr-1.5 gap-0.5">
-                      <button
-                        type="button"
-                        title="Đổi tên nhóm"
-                        onClick={() => {
-                          setEditingGroupId(g.id);
-                          setEditingGroupName(g.name);
-                        }}
-                        className="p-0.5 opacity-80 hover:opacity-100"
-                      >
-                        <Edit3 className="w-3 h-3" />
-                      </button>
-                      {groups.length > 1 && (
-                        <button
-                          type="button"
-                          title="Xóa nhóm"
-                          onClick={() => handleDeleteGroup(g.id)}
-                          className="p-0.5 text-rose-400 hover:text-rose-300"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-            {isTeacher && (
-              <button
-                type="button"
-                onClick={handleAddGroup}
-                className="px-2.5 py-1.5 rounded-lg border border-dashed border-[#007A7A] text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-950/30 text-xs font-extrabold inline-flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" /> Thêm nhóm
-              </button>
+                );
+              })}
+            </div>
+
+            {previewRandomPart3Questions.length === 0 ? (
+              <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500 dark:text-slate-400">
+                Chưa có câu hỏi Part 3 nào trong phạm vi đã chọn.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {previewRandomPart3Questions.map((q, idx) => (
+                  <div
+                    key={`${q.id}_${idx}`}
+                    className="p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-500/20 text-teal-800 dark:text-teal-300 text-xs font-extrabold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        {q.topic}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-relaxed">
+                      {q.prompt}
+                    </p>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-
-          {/* 2-Column Topic Browser & Question Card Grid (Image 1 layout) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* Left Sidebar: Search + Subfolder/Topic List + "+" Create Subfolder */}
-            <div className="lg:col-span-3 space-y-2.5 bg-slate-50/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-3">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Tìm topic hoặc câu hỏi..."
-                  className="w-full pl-8 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-[#007A7A]"
-                />
-              </div>
-
-              {isTeacher && (
+        ) : (
+          /* GOOGLE DRIVE FILE EXPLORER */
+          <>
+            {/* Drive Breadcrumb + Search + View Toggle + Bulk Assign Toolbar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+              {/* Breadcrumb */}
+              <div className="flex items-center flex-wrap gap-1.5 text-xs sm:text-sm font-bold min-w-0">
                 <button
                   type="button"
-                  onClick={handleAddFolder}
-                  className="w-full py-2 px-3 rounded-xl border border-dashed border-[#007A7A] bg-white dark:bg-slate-900 text-[#007A7A] dark:text-[#1EE1D6] hover:bg-[#EDFFFD] dark:hover:bg-teal-950/30 text-xs font-extrabold flex items-center justify-center gap-1.5 transition"
+                  onClick={() => {
+                    setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: null }));
+                    setShowImportPanel(false);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition ${
+                    !activeGroup
+                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
                 >
-                  <FolderPlus className="w-3.5 h-3.5" /> + Tạo thư mục con
+                  <HardDrive className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6]" />
+                  <span>{zoneTitle}</span>
                 </button>
-              )}
+                <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: null }));
+                    setShowImportPanel(false);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg transition ${
+                    !activeGroup
+                      ? 'bg-teal-50 dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6]'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {partTitleLabel} ({groups.length} thư mục)
+                </button>
+                {activeGroup && (
+                  <>
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="px-2.5 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] inline-flex items-center gap-1.5 truncate max-w-[260px]">
+                      <FolderOpen className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{activeGroup.name}</span>
+                    </span>
+                  </>
+                )}
+              </div>
 
-              <div className="space-y-1 max-h-[420px] overflow-y-auto pr-0.5">
-                {filteredFolders.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6">Chưa có thư mục con.</p>
-                ) : (
-                  filteredFolders.map(folder => {
-                    const isSel = activeFolder?.id === folder.id;
-                    if (editingFolderId === folder.id) {
-                      return (
-                        <div key={folder.id} className="flex items-center gap-1 p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[#007A7A]">
-                          <input
-                            type="text"
-                            autoFocus
-                            value={editingFolderName}
-                            onChange={e => setEditingFolderName(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') handleRenameFolder(folder.id);
-                              if (e.key === 'Escape') setEditingFolderId(null);
-                            }}
-                            className="flex-1 min-w-0 text-xs font-bold px-2 py-1 bg-slate-50 dark:bg-slate-800 rounded"
-                          />
-                          <button type="button" onClick={() => handleRenameFolder(folder.id)} className="text-emerald-600 p-1"><Check className="w-3.5 h-3.5" /></button>
-                          <button type="button" onClick={() => setEditingFolderId(null)} className="text-slate-400 p-1"><X className="w-3.5 h-3.5" /></button>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div
-                        key={folder.id}
-                        className={`group flex items-center justify-between gap-1 rounded-xl px-3 py-2 text-xs transition ${
-                          isSel
-                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-extrabold shadow-sm border border-slate-200 dark:border-slate-700'
-                            : 'text-slate-600 dark:text-slate-300 font-semibold hover:bg-white/70 dark:hover:bg-slate-800/60'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            activeGroup &&
-                            setSelectedFolderIdByGroup(prev => ({ ...prev, [activeGroup.id]: folder.id }))
-                          }
-                          className="flex-1 min-w-0 text-left truncate flex items-center justify-between gap-2"
-                        >
-                          <span className="truncate">{folder.name}</span>
-                          <span className="text-[11px] text-slate-400 tabular-nums shrink-0">
-                            {(folder.questions || []).length}
-                          </span>
-                        </button>
-                        {isTeacher && (
-                          <span className="inline-flex items-center gap-0.5 opacity-80 group-hover:opacity-100 shrink-0">
-                            <button
-                              type="button"
-                              title="Đổi tên thư mục"
-                              onClick={() => {
-                                setEditingFolderId(folder.id);
-                                setEditingFolderName(folder.name);
-                              }}
-                              className="p-1 text-slate-400 hover:text-[#007A7A]"
-                            >
-                              <Edit3 className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              title="Xóa thư mục"
-                              onClick={() => handleDeleteFolder(folder.id)}
-                              className="p-1 text-slate-400 hover:text-rose-600"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
+              {/* Right Drive Controls */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 sm:flex-none sm:w-56">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder={activeGroup ? 'Tìm topic hoặc câu hỏi...' : 'Tìm thư mục trong Drive...'}
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#007A7A]"
+                  />
+                </div>
+
+                {!activeGroup && (
+                  <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('grid')}
+                      title="Hiển thị dạng lưới thư mục"
+                      className={`p-2 transition ${
+                        viewMode === 'grid'
+                          ? 'bg-[#007A7A] text-white'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('list')}
+                      title="Hiển thị dạng danh sách"
+                      className={`p-2 transition ${
+                        viewMode === 'list'
+                          ? 'bg-[#007A7A] text-white'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <List className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {isTeacher && !activeGroup && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAssignModalTarget({
+                          scope: 'part',
+                          label: `${zoneTitle} • Toàn bộ ${partTitleLabel}`,
+                          count: groups.length,
+                          unit: 'nhóm',
+                          initialClassIds: []
+                        })
+                      }
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition"
+                      title="Giao toàn bộ các nhóm trong Part này cho 1 hoặc nhiều lớp"
+                    >
+                      <Share2 className="w-3.5 h-3.5" /> Giao Cả {partTitleLabel} Cho Lớp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddGroup}
+                      className="px-3 py-1.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold inline-flex items-center gap-1.5 transition"
+                    >
+                      <FolderPlus className="w-3.5 h-3.5" /> + Tạo Thư Mục
+                    </button>
+                  </>
                 )}
               </div>
             </div>
 
-            {/* Right Main Panel: Selected Topic Header + Bắt đầu + Teacher PDF/Paste + Question Cards Grid */}
-            <div className="lg:col-span-9 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] p-4 sm:p-5 shadow-xs space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white truncate">
-                    {activeFolder?.name || activeGroup?.name || 'Chọn thư mục'}
-                  </h3>
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {(activeFolder?.questions || []).length} câu hỏi
-                  </span>
+            {/* LEVEL 1: GOOGLE DRIVE FOLDER GRID / LIST (ALL GROUPS IN PART) */}
+            {!activeGroup ? (
+              filteredGroups.length === 0 ? (
+                <div className="p-10 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
+                  <Folder className="w-9 h-9 mx-auto text-slate-400" />
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Không tìm thấy thư mục nào phù hợp.
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {searchQuery ? 'Thử xóa từ khóa tìm kiếm để xem toàn bộ thư mục.' : 'Chưa có thư mục nào được giao cho lớp bạn trong mục này.'}
+                  </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {isTeacher && (
+              ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filteredGroups.map(g => {
+                    const folderCount = (g.folders || []).length;
+                    const qCount = (g.folders || []).reduce((sum, f) => sum + (f.questions?.length || 0), 0);
+                    const assignedClasses = getAssignedClassLabels(g.assignedClassIds, classesDb);
+                    const isEditing = editingGroupId === g.id;
+
+                    return (
+                      <div
+                        key={g.id}
+                        className="group rounded-2xl bg-slate-50/75 dark:bg-slate-900/75 hover:bg-white dark:hover:bg-slate-800/90 border border-slate-200 dark:border-slate-800 hover:border-[#007A7A] dark:hover:border-[#1EE1D6] p-4 flex flex-col justify-between gap-3 transition shadow-2xs"
+                      >
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: g.id }))}
+                            className="w-11 h-11 rounded-xl bg-amber-100/90 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition"
+                          >
+                            <Folder className="w-6 h-6 fill-current/25" />
+                          </button>
+
+                          <div className="min-w-0 flex-1">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={editingGroupName}
+                                  onChange={e => setEditingGroupName(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleRenameGroup(g.id);
+                                    if (e.key === 'Escape') setEditingGroupId(null);
+                                  }}
+                                  className="w-full px-2 py-1 rounded-lg bg-white dark:bg-slate-950 border border-[#007A7A] text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRenameGroup(g.id)}
+                                  className="p-1.5 rounded-lg bg-emerald-600 text-white"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: g.id }))}
+                                className="text-left w-full"
+                              >
+                                <p className="text-sm font-extrabold text-slate-900 dark:text-white group-hover:text-[#0F766E] dark:group-hover:text-[#1EE1D6] line-clamp-2 leading-snug">
+                                  {g.name}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                  {folderCount} thư mục con · <b>{qCount}</b> câu hỏi
+                                </p>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Class assignment pills */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {assignedClasses.length === 0 ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              <Globe className="w-3 h-3" /> Tất cả HS
+                            </span>
+                          ) : (
+                            assignedClasses.map(cls => (
+                              <span
+                                key={cls.id}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-500/40"
+                              >
+                                <Users className="w-3 h-3" /> Lớp {cls.name}
+                              </span>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Drive Card Actions */}
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: g.id }))}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold transition"
+                            >
+                              Mở thư mục
+                            </button>
+                            {qCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartGroupRandomPractice(g)}
+                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold inline-flex items-center gap-1 transition"
+                                title="Luyện random câu hỏi trong nhóm này"
+                              >
+                                <Shuffle className="w-3 h-3" /> Random
+                              </button>
+                            )}
+                          </div>
+
+                          {isTeacher && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAssignModalTarget({
+                                    scope: 'group',
+                                    groupId: g.id,
+                                    label: g.name,
+                                    count: folderCount,
+                                    unit: 'thư mục con',
+                                    initialClassIds: g.assignedClassIds || []
+                                  })
+                                }
+                                className="px-2 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 text-xs font-bold inline-flex items-center gap-1 transition"
+                                title="Giao cả thư mục này cho lớp"
+                              >
+                                <Share2 className="w-3.5 h-3.5" /> Giao lớp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingGroupId(g.id);
+                                  setEditingGroupName(g.name);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700"
+                                title="Đổi tên thư mục"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              {groups.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteGroup(g.id)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/20"
+                                  title="Xóa thư mục"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* GOOGLE DRIVE LIST VIEW */
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden divide-y divide-slate-200 dark:divide-slate-800">
+                  <div className="hidden sm:grid sm:grid-cols-12 gap-3 px-4 py-2.5 bg-slate-50 dark:bg-slate-900 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <span className="col-span-5">Tên thư mục</span>
+                    <span className="col-span-2">Nội dung</span>
+                    <span className="col-span-3">Lớp được giao</span>
+                    <span className="col-span-2 text-right">Thao tác</span>
+                  </div>
+                  {filteredGroups.map(g => {
+                    const folderCount = (g.folders || []).length;
+                    const qCount = (g.folders || []).reduce((sum, f) => sum + (f.questions?.length || 0), 0);
+                    const assignedClasses = getAssignedClassLabels(g.assignedClassIds, classesDb);
+                    return (
+                      <div
+                        key={g.id}
+                        className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-3 px-4 py-3 items-center bg-white dark:bg-[#0F172B] hover:bg-slate-50 dark:hover:bg-slate-900/70 transition"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: g.id }))}
+                          className="sm:col-span-5 flex items-center gap-2.5 text-left min-w-0"
+                        >
+                          <Folder className="w-5 h-5 text-amber-500 fill-amber-500/20 shrink-0" />
+                          <span className="text-sm font-bold text-slate-900 dark:text-white truncate hover:text-[#0F766E] dark:hover:text-[#1EE1D6]">
+                            {g.name}
+                          </span>
+                        </button>
+                        <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
+                          {folderCount} mục · {qCount} câu
+                        </div>
+                        <div className="sm:col-span-3 flex flex-wrap gap-1">
+                          {assignedClasses.length === 0 ? (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">Tất cả HS</span>
+                          ) : (
+                            assignedClasses.map(c => (
+                              <span
+                                key={c.id}
+                                className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200"
+                              >
+                                Lớp {c.name}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                        <div className="sm:col-span-2 flex items-center sm:justify-end gap-1">
+                          {isTeacher && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAssignModalTarget({
+                                  scope: 'group',
+                                  groupId: g.id,
+                                  label: g.name,
+                                  count: folderCount,
+                                  unit: 'thư mục con',
+                                  initialClassIds: g.assignedClassIds || []
+                                })
+                              }
+                              className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-bold"
+                            >
+                              Giao lớp
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: g.id }))}
+                            className="px-2.5 py-1 rounded-lg bg-[#007A7A] text-white text-xs font-bold"
+                          >
+                            Mở
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              /* LEVEL 2: INSIDE AN OPENED GROUP FOLDER (SUBFOLDERS + SPACIOUS QUESTION VIEW) */
+              <div className="space-y-5">
+                {/* Group Action Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => setShowImportPanel(v => !v)}
-                      className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-extrabold inline-flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
+                      onClick={() => {
+                        setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: null }));
+                        setShowImportPanel(false);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 inline-flex items-center gap-1.5"
                     >
-                      <ClipboardPaste className="w-3.5 h-3.5 text-[#007A7A]" />
-                      {showImportPanel ? 'Đóng khung nhập' : 'Ném PDF / Copy Câu Hỏi'}
+                      <ArrowLeft className="w-3.5 h-3.5" /> Tất cả thư mục
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleStartGroupRandomPractice(activeGroup)}
-                    className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-extrabold inline-flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
-                    title="Trộn ngẫu nhiên các câu trong nhóm hiện tại"
-                  >
-                    <Shuffle className="w-3.5 h-3.5" /> Random nhóm này
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleStartFolderPractice}
-                    className="px-4 py-2 rounded-xl bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" /> Bắt đầu
-                  </button>
-                </div>
-              </div>
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white truncate">
+                      {activeGroup.name}
+                    </h3>
+                    {(() => {
+                      const clsList = getAssignedClassLabels(activeGroup.assignedClassIds, classesDb);
+                      return clsList.length === 0 ? (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          Tất cả HS
+                        </span>
+                      ) : (
+                        clsList.map(cls => (
+                          <span
+                            key={cls.id}
+                            className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-500/40"
+                          >
+                            Lớp {cls.name}
+                          </span>
+                        ))
+                      );
+                    })()}
+                  </div>
 
-              {/* Teacher Import Drawer: Drop PDF OR Copy-Paste Questions straight into Part/Group */}
-              {isTeacher && showImportPanel && (
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-teal-200 dark:border-teal-800 space-y-3.5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {/* Option A: Drop/Upload PDF */}
-                    <div className="p-3.5 rounded-xl bg-white dark:bg-slate-950 border border-dashed border-slate-300 dark:border-slate-700 space-y-2">
-                      <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                        <FileText className="w-4 h-4 text-rose-600" /> Cách 1: Ném file PDF (AI tự tách Topic &amp; Câu hỏi)
-                      </p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Chọn file PDF đề Speaking Part {activePartNumber} → AI tự chia từng thư mục con và câu hỏi vào nhóm <strong>{activeGroup?.name}</strong>.
-                      </p>
-                      <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold cursor-pointer transition">
-                        {pdfExtracting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                        <span>{pdfExtracting ? 'AI đang đọc PDF...' : 'Chọn file PDF tải lên'}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isTeacher && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAssignModalTarget({
+                              scope: 'group',
+                              groupId: activeGroup.id,
+                              label: activeGroup.name,
+                              count: (activeGroup.folders || []).length,
+                              unit: 'thư mục con',
+                              initialClassIds: activeGroup.assignedClassIds || []
+                            })
+                          }
+                          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5"
+                        >
+                          <Share2 className="w-3.5 h-3.5" /> Giao Nhóm Cho Lớp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowImportPanel(v => !v)}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5 transition ${
+                            showImportPanel
+                              ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                              : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-[#007A7A]'
+                          }`}
+                        >
+                          <Upload className="w-3.5 h-3.5" /> Ném PDF / Copy Câu Hỏi
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleStartGroupRandomPractice(activeGroup)}
+                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 inline-flex items-center gap-1.5"
+                    >
+                      <Shuffle className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> Random nhóm này
+                    </button>
+                  </div>
+                </div>
+
+                {/* Subfolder Drive Chips Row */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Thư mục con / Topics ({filteredFolders.length})
+                    </span>
+                    {isTeacher && (
+                      <button
+                        type="button"
+                        onClick={handleAddFolder}
+                        className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-500/15 hover:bg-teal-100 dark:hover:bg-teal-500/25 border border-teal-200 dark:border-teal-500/40 text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6] inline-flex items-center gap-1 transition"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Tạo thư mục con
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {filteredFolders.map(f => {
+                      const isActive = activeFolder?.id === f.id;
+                      const isEditing = editingFolderId === f.id;
+                      const fClasses = getAssignedClassLabels(f.assignedClassIds, classesDb);
+                      return (
+                        <div
+                          key={f.id}
+                          className={`rounded-xl border px-3 py-2.5 flex items-center justify-between gap-2 transition ${
+                            isActive
+                              ? 'bg-teal-50/90 dark:bg-teal-500/15 border-[#007A7A] dark:border-[#1EE1D6] shadow-2xs'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-400'
+                          }`}
+                        >
+                          {isEditing ? (
+                            <div className="flex items-center gap-1 flex-1">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingFolderName}
+                                onChange={e => setEditingFolderName(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleRenameFolder(f.id);
+                                  if (e.key === 'Escape') setEditingFolderId(null);
+                                }}
+                                className="w-full px-2 py-1 rounded-lg bg-white dark:bg-slate-950 border border-[#007A7A] text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRenameFolder(f.id)}
+                                className="p-1 rounded-lg bg-emerald-600 text-white"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedFolderIdByGroup(prev => ({ ...prev, [activeGroup.id]: f.id }))}
+                              className="flex items-center gap-2.5 text-left min-w-0 flex-1"
+                            >
+                              {isActive ? (
+                                <FolderOpen className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                              ) : (
+                                <Folder className="w-4 h-4 text-amber-500 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                                  {f.name}
+                                </p>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                  {(f.questions || []).length} câu hỏi
+                                  {fClasses.length > 0 ? ` · ${fClasses.map(c => `Lớp ${c.name}`).join(', ')}` : ''}
+                                </p>
+                              </div>
+                            </button>
+                          )}
+
+                          {isTeacher && !isEditing && (
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAssignModalTarget({
+                                    scope: 'folder',
+                                    groupId: activeGroup.id,
+                                    folderId: f.id,
+                                    label: `${activeGroup.name} / ${f.name}`,
+                                    count: (f.questions || []).length,
+                                    unit: 'câu hỏi',
+                                    initialClassIds: f.assignedClassIds || []
+                                  })
+                                }
+                                className="p-1.5 rounded-lg text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20"
+                                title="Giao riêng thư mục con này cho lớp"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingFolderId(f.id);
+                                  setEditingFolderName(f.name);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                title="Đổi tên thư mục con"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFolder(f.id)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600"
+                                title="Xóa thư mục con"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Teacher PDF Drop & Copy-Paste Drawer */}
+                {isTeacher && showImportPanel && (
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 space-y-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-[#0F766E] dark:text-[#1EE1D6] flex items-center gap-1.5">
+                        <FileText className="w-4 h-4" />
+                        Nhập câu hỏi cho {activeGroup.name} (Part {activePartNumber})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowImportPanel(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* PDF Upload / Drop */}
+                      <label className="cursor-pointer rounded-xl border-2 border-dashed border-teal-300 dark:border-teal-600/60 bg-white dark:bg-slate-950/60 hover:border-teal-500 p-4 flex flex-col items-center justify-center text-center gap-2 transition">
+                        {pdfExtracting ? (
+                          <>
+                            <Loader2 className="w-6 h-6 text-[#007A7A] animate-spin" />
+                            <p className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
+                              AI đang đọc PDF &amp; tách thư mục câu hỏi...
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6 text-[#007A7A] dark:text-[#1EE1D6]" />
+                            <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                              Ném / Chọn File PDF Đề Speaking Part {activePartNumber}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              AI tự nhận diện từng Topic thành thư mục con &amp; trích toàn bộ câu hỏi.
+                            </p>
+                          </>
+                        )}
                         <input
                           type="file"
-                          accept=".pdf,application/pdf"
+                          accept="application/pdf,.pdf"
                           disabled={pdfExtracting}
                           className="hidden"
                           onChange={e => {
@@ -778,108 +1243,162 @@ export default function SpeakingForecastZone({
                           }}
                         />
                       </label>
-                    </div>
 
-                    {/* Option B: Copy-Paste text straight in */}
-                    <div className="p-3.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                          <ClipboardPaste className="w-4 h-4 text-[#007A7A]" /> Cách 2: Copy dán thẳng câu hỏi
-                        </p>
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                      {/* Direct Copy-Paste */}
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-extrabold text-slate-700 dark:text-slate-200 inline-flex items-center gap-1">
+                            <ClipboardPaste className="w-3.5 h-3.5 text-[#007A7A]" /> Hoặc Copy-Paste thẳng vào đây:
+                          </span>
+                          <select
+                            value={importMode}
+                            onChange={e => setImportMode(e.target.value)}
+                            className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-white"
+                          >
+                            <option value="append_folder">Thêm vào "{activeFolder?.name || 'thư mục hiện tại'}"</option>
+                            <option value="new_folder">Tạo thư mục con mới</option>
+                          </select>
+                        </div>
+
+                        {importMode === 'new_folder' && (
+                          <input
+                            type="text"
+                            value={newImportFolderName}
+                            onChange={e => setNewImportFolderName(e.target.value)}
+                            placeholder="Tên thư mục con mới (VD: Watches, Dreams...)..."
+                            className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                          />
+                        )}
+
+                        <textarea
+                          rows={4}
+                          value={pasteText}
+                          onChange={e => setPasteText(e.target.value)}
+                          placeholder={
+                            activePartNumber === 2
+                              ? 'Dán Cue Card Part 2 (cách nhau bởi dòng trống):\nDescribe a quiet place you like...\n- Where it is\n- How often you go there'
+                              : 'Dán mỗi câu hỏi 1 dòng:\n1. Do you like wearing watches?\n2. Have you ever received a watch as a gift?'
+                          }
+                          className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#007A7A]"
+                        />
+
+                        <div className="flex justify-end">
                           <button
                             type="button"
-                            onClick={() => setImportMode('append_folder')}
-                            className={`px-2 py-0.5 rounded ${importMode === 'append_folder' ? 'bg-[#007A7A] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
+                            onClick={handleApplyPastedQuestions}
+                            disabled={!pasteText.trim()}
+                            className="px-4 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] disabled:opacity-40 text-white text-xs font-extrabold transition"
                           >
-                            Vào thư mục đang mở
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setImportMode('new_folder')}
-                            className={`px-2 py-0.5 rounded ${importMode === 'new_folder' ? 'bg-[#007A7A] text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
-                          >
-                            + Thư mục mới
+                            + Lưu Câu Hỏi Đã Dán
                           </button>
                         </div>
                       </div>
-                      {importMode === 'new_folder' && (
-                        <input
-                          type="text"
-                          value={newImportFolderName}
-                          onChange={e => setNewImportFolderName(e.target.value)}
-                          placeholder="Tên thư mục con mới (VD: Watches, Old buildings...)"
-                          className="w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold"
-                        />
-                      )}
-                      <textarea
-                        rows={4}
-                        value={pasteText}
-                        onChange={e => setPasteText(e.target.value)}
-                        placeholder={
-                          activePartNumber === 2
-                            ? 'Dán Cue Card Part 2:\nDescribe a quiet place you like...\nYou should say:\n- Where it is\n- How often you go there'
-                            : 'Dán mỗi câu hỏi 1 dòng (tự bỏ số thứ tự 1., 2. hoặc gạch đầu dòng):\n1. Do you like wearing watches?\n2. Have you ever received a watch as a gift?'
-                        }
-                        className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleApplyPastedQuestions}
-                        className="px-3.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold"
-                      >
-                        Lưu câu hỏi vào {importMode === 'new_folder' ? 'thư mục mới' : `"${activeFolder?.name || 'nhóm'}"`}
-                      </button>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* 3-Column Question Cards Grid matching Image 1 */}
-              {!activeFolder || (activeFolder.questions || []).length === 0 ? (
-                <div className="p-10 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-slate-500">
-                  Thư mục này chưa có câu hỏi nào. {isTeacher ? 'Bấm "Ném PDF / Copy Câu Hỏi" ở góc trên để thêm nhanh!' : 'Đợi giáo viên cập nhật câu hỏi cho chủ đề này.'}
-                </div>
-              ) : (
-                <div className={`grid grid-cols-1 ${activePartNumber === 2 ? 'md:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3'} gap-3`}>
-                  {(activeFolder.questions || []).map((q, idx) => (
-                    <div
-                      key={q.id}
-                      className="relative group p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-slate-300 dark:hover:border-slate-600 transition flex items-start gap-2.5"
-                    >
-                      <span className="shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-extrabold inline-flex items-center justify-center mt-0.5">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0 flex-1 space-y-1.5">
-                        <p className="text-xs sm:text-[13px] font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">
-                          {q.prompt}
+                {/* Active Subfolder Question Cards (Spacious 1-2 col Drive Preview) */}
+                {activeFolder && (
+                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-2.5">
+                        <FolderOpen className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
+                        <h4 className="text-lg font-extrabold text-slate-900 dark:text-white">
+                          {activeFolder.name}
+                        </h4>
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {(activeFolder.questions || []).length} câu hỏi
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleStartFolderPractice(activeFolder)}
+                        disabled={!(activeFolder.questions || []).length}
+                        className="px-5 py-2 rounded-xl bg-[#B91C1C] hover:bg-[#991B1B] disabled:opacity-40 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" /> Bắt đầu luyện Topic này
+                      </button>
+                    </div>
+
+                    {(activeFolder.questions || []).length === 0 ? (
+                      <div className="p-8 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                          Thư mục "{activeFolder.name}" chưa có câu hỏi nào.
                         </p>
-                        {Array.isArray(q.bullets) && q.bullets.length > 0 && (
-                          <ul className="list-disc pl-4 space-y-0.5 text-xs text-slate-600 dark:text-slate-400">
-                            {q.bullets.map((b, bIdx) => (
-                              <li key={bIdx}>{b}</li>
-                            ))}
-                          </ul>
+                        {isTeacher && (
+                          <button
+                            type="button"
+                            onClick={() => setShowImportPanel(true)}
+                            className="px-3.5 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold inline-flex items-center gap-1.5"
+                          >
+                            <Upload className="w-3.5 h-3.5" /> Ném PDF hoặc Copy câu hỏi vào ngay
+                          </button>
                         )}
                       </div>
-                      {isTeacher && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteQuestion(q.id)}
-                          title="Xóa câu hỏi này"
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-rose-600 transition shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(activeFolder.questions || []).map((q, qIdx) => (
+                          <div
+                            key={q.id || qIdx}
+                            className="group relative p-4 rounded-xl bg-slate-50/80 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-[#007A7A] transition space-y-2"
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-500/20 text-teal-800 dark:text-teal-300 text-xs font-extrabold flex items-center justify-center shrink-0 mt-0.5">
+                                {qIdx + 1}
+                              </span>
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed flex-1 pr-5">
+                                {q.prompt}
+                              </p>
+                            </div>
+                            {Array.isArray(q.bullets) && q.bullets.length > 0 && (
+                              <ul className="pl-9 space-y-1 text-xs text-slate-600 dark:text-slate-400 list-disc">
+                                {q.bullets.map((b, bIdx) => (
+                                  <li key={bIdx}>{b}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {isTeacher && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQuestion(q.id)}
+                                className="opacity-0 group-hover:opacity-100 absolute top-2.5 right-2.5 p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/20 transition"
+                                title="Xóa câu hỏi này"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Bulk Class Assignment Modal for Speaking Drive Folders */}
+      <AssignFolderModal
+        isOpen={Boolean(assignModalTarget)}
+        folderLabel={assignModalTarget?.label || ''}
+        itemCount={assignModalTarget?.count || 0}
+        itemUnit={assignModalTarget?.unit || 'nhóm'}
+        classesDb={classesDb}
+        initialClassIds={assignModalTarget?.initialClassIds || []}
+        showModeToggle={assignModalTarget?.scope === 'part'}
+        showPublishOption={false}
+        showNotifyOption={false}
+        subtitle={
+          assignModalTarget?.scope === 'part'
+            ? `Giao một lượt toàn bộ ${assignModalTarget.count} thư mục nhóm trong Part ${activePartNumber} cho lớp học.`
+            : 'Chỉ học viên trong lớp được chọn (hoặc Tất cả học viên) mới nhìn thấy thư mục Speaking này.'
+        }
+        onClose={() => setAssignModalTarget(null)}
+        onConfirm={handleConfirmSpeakingAssign}
+      />
     </section>
   );
 }

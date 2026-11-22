@@ -207,6 +207,11 @@ function normalizeQuestionList(rawList = [], fallbackPrefix = 'sq') {
     }));
 }
 
+function normalizeClassIdsField(raw) {
+  if (!Array.isArray(raw)) return [];
+  return Array.from(new Set(raw.map(v => String(v || '').trim()).filter(Boolean))).slice(0, 50);
+}
+
 function normalizeGroupList(rawGroups, defaultGroups, partKey) {
   if (!Array.isArray(rawGroups) || rawGroups.length === 0) {
     return JSON.parse(JSON.stringify(defaultGroups));
@@ -225,15 +230,45 @@ function normalizeGroupList(rawGroups, defaultGroups, partKey) {
           return {
             id: fId,
             name: String(f.name || `Chủ đề ${fIdx + 1}`).trim().slice(0, 120) || `Chủ đề ${fIdx + 1}`,
+            assignedClassIds: normalizeClassIdsField(f.assignedClassIds),
             questions: normalizeQuestionList(f.questions, `${fId}_q`)
           };
         });
       return {
         id: gId,
         name: String(g.name || `Nhóm ${gIdx + 1}`).trim().slice(0, 120) || `Nhóm ${gIdx + 1}`,
+        assignedClassIds: normalizeClassIdsField(g.assignedClassIds),
         folders
       };
     });
+}
+
+export function filterSpeakingForecastForViewer(bank, viewerClassIds = [], isTeacher = false) {
+  const norm = normalizeSpeakingForecastBank(bank);
+  if (isTeacher) return norm;
+  const classSet = new Set(Array.isArray(viewerClassIds) ? viewerClassIds : Array.from(viewerClassIds || []));
+  const canSee = (assigned) => {
+    const ids = normalizeClassIdsField(assigned);
+    if (ids.length === 0) return true;
+    return ids.some(cid => classSet.has(cid));
+  };
+  const filterGroups = (groups) =>
+    (Array.isArray(groups) ? groups : [])
+      .filter(g => canSee(g?.assignedClassIds))
+      .map(g => ({
+        ...g,
+        folders: (Array.isArray(g.folders) ? g.folders : []).filter(f => canSee(f?.assignedClassIds))
+      }));
+  const filterZone = (z) => ({
+    part1: filterGroups(z?.part1),
+    part2: filterGroups(z?.part2),
+    part3: filterGroups(z?.part3)
+  });
+  return {
+    ...norm,
+    daily: filterZone(norm.daily),
+    forecast: filterZone(norm.forecast)
+  };
 }
 
 export function normalizeSpeakingForecastBank(raw = null) {

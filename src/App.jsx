@@ -2582,6 +2582,62 @@ export default function App() {
     return true;
   };
 
+  const handleAssignFolderClasses = async (testIds = [], options = {}) => {
+    if (currentUser?.role !== 'teacher') return false;
+    const cleanTestIds = Array.from(new Set((Array.isArray(testIds) ? testIds : []).map(id => String(id || '').trim()).filter(Boolean)));
+    if (cleanTestIds.length === 0) {
+      showToast('Thư mục này chưa có bài tập nào để giao.', 'info');
+      return false;
+    }
+    const cleanClassIds = Array.from(new Set((Array.isArray(options?.assignedClassIds) ? options.assignedClassIds : []).filter(Boolean)));
+    const mode = ['replace', 'add', 'remove'].includes(options?.mode) ? options.mode : 'replace';
+    const publish = Boolean(options?.publish);
+    const notify = options?.notify !== false;
+    const folderLabel = String(options?.folderLabel || 'Thư mục bài tập').trim();
+    const idSet = new Set(cleanTestIds);
+
+    setTests(prev =>
+      prev.map(t => {
+        if (!t || !idSet.has(t.id)) return t;
+        const prevClasses = Array.isArray(t.assignedClassIds) ? t.assignedClassIds : [];
+        let nextAssigned;
+        if (mode === 'add') {
+          nextAssigned = cleanClassIds.length === 0 ? [] : Array.from(new Set([...prevClasses, ...cleanClassIds]));
+        } else if (mode === 'remove') {
+          const rem = new Set(cleanClassIds);
+          nextAssigned = prevClasses.filter(cid => !rem.has(cid));
+        } else {
+          nextAssigned = cleanClassIds;
+        }
+        return {
+          ...t,
+          assignedClassIds: nextAssigned,
+          ...(publish ? { visibility: 'public' } : {})
+        };
+      })
+    );
+
+    await dispatchSyncAction('ASSIGN_FOLDER_CLASSES', {
+      testIds: cleanTestIds,
+      assignedClassIds: cleanClassIds,
+      mode,
+      publish,
+      notify,
+      folderLabel
+    });
+
+    if (mode === 'remove') {
+      showToast(`Đã gỡ lớp khỏi ${cleanTestIds.length} bài trong "${folderLabel}".`);
+    } else {
+      showToast(
+        cleanClassIds.length > 0
+          ? `Đã giao cả thư mục "${folderLabel}" (${cleanTestIds.length} bài) tới ${cleanClassIds.length} lớp học!`
+          : `Đã mở cả thư mục "${folderLabel}" (${cleanTestIds.length} bài) cho toàn bộ học viên!`
+      );
+    }
+    return true;
+  };
+
   const handleMarkNotificationsRead = (notificationId = 'all') => {
     setNotifications(prev =>
       prev.map(n => (notificationId === 'all' || n.id === notificationId ? { ...n, isRead: true } : n))
@@ -7527,6 +7583,7 @@ export default function App() {
             setView('RESULT_VIEW');
           }}
           onOpenSkillBuilder={(skill, testToEdit = null, subOpts = {}) => openSingleSkillBuilder(skill, testToEdit, [], subOpts)}
+          onAssignFolderClasses={handleAssignFolderClasses}
           onSaveSpeakingForecast={handleSaveSpeakingForecast}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}

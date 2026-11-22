@@ -81,6 +81,7 @@ import {
 } from './src/constants/seedData.js';
 import {
   createDefaultSpeakingForecastBank,
+  filterSpeakingForecastForViewer,
   normalizeSpeakingForecastBank
 } from './src/constants/speakingForecast.js';
 
@@ -2660,7 +2661,7 @@ function getSnapshotForViewer(store, viewer = null) {
     teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
-    speakingForecast: normalizeSpeakingForecastBank(store.speakingForecast),
+    speakingForecast: filterSpeakingForecastForViewer(store.speakingForecast, Array.from(viewerClassSet), false),
     customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
     gamePracticeLeaderboard: (Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : []).filter(entry => {
       if (!entry?.username) return false;
@@ -2702,6 +2703,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'DELETE_CLASS',
     'UPDATE_CLASS_MEMBERS',
     'ASSIGN_TEST_CLASSES',
+    'ASSIGN_FOLDER_CLASSES',
     'DELETE_ATTEMPT',
     'PURGE_ORPHAN_ATTEMPTS',
     'UPSERT_NOTE',
@@ -4294,6 +4296,61 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       break;
     }
 
+    case 'ASSIGN_FOLDER_CLASSES': {
+      const rawIds = Array.isArray(payload.testIds) ? payload.testIds : [];
+      const testIdSet = new Set(rawIds.map(id => String(id || '').trim()).filter(Boolean));
+      if (testIdSet.size === 0) break;
+      const incomingClasses = normalizeClassIdList(payload.assignedClassIds);
+      const mode = ['replace', 'add', 'remove'].includes(payload.mode) ? payload.mode : 'replace';
+      const publish = Boolean(payload.publish);
+      const notify = payload.notify !== false;
+      const folderLabel = String(payload.folderLabel || 'Thư mục bài tập').trim().slice(0, 140);
+      let updatedCount = 0;
+      let firstUpdatedTest = null;
+      store.tests = (store.tests || []).map(t => {
+        if (!t || !testIdSet.has(t.id)) return t;
+        const prevClasses = normalizeClassIdList(t.assignedClassIds);
+        let nextAssigned;
+        if (mode === 'add') {
+          nextAssigned = incomingClasses.length === 0 ? [] : Array.from(new Set([...prevClasses, ...incomingClasses]));
+        } else if (mode === 'remove') {
+          const removeSet = new Set(incomingClasses);
+          nextAssigned = prevClasses.filter(cid => !removeSet.has(cid));
+        } else {
+          nextAssigned = incomingClasses;
+        }
+        const nextVis = publish ? 'public' : (t.visibility || 'public');
+        const nextObj = { ...t, assignedClassIds: nextAssigned, visibility: nextVis };
+        if (!firstUpdatedTest) firstUpdatedTest = nextObj;
+        updatedCount += 1;
+        return nextObj;
+      });
+      if (updatedCount > 0) {
+        if (notify && mode !== 'remove') {
+          const actorName = viewer?.name || viewer?.username || 'Giáo viên';
+          const classNames = incomingClasses
+            .map(cid => store.classes?.[cid]?.name)
+            .filter(Boolean);
+          const scopeLabel = classNames.length > 0 ? `Lớp ${classNames.join(', ')}` : 'toàn bộ học viên';
+          appendStoreNotification(
+            store,
+            {
+              type: firstUpdatedTest?.testMode === 'single_skill' ? 'exercise' : 'exam',
+              title: `📁 Giao thư mục: ${folderLabel}`,
+              message: `${actorName} vừa giao cả thư mục "${folderLabel}" (${updatedCount} bài) cho ${scopeLabel}. Nhấn để mở bài tập ngay!`,
+              testId: firstUpdatedTest?.id || '',
+              targetClassIds: incomingClasses,
+              createdBy: viewer?.username || 'teacher_ielts',
+              createdByName: actorName
+            },
+            viewer
+          );
+        }
+        changed = true;
+      }
+      break;
+    }
+
     case 'CREATE_NOTIFICATION': {
       const item = appendStoreNotification(store, payload, viewer);
       if (item) changed = true;
@@ -5467,6 +5524,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'DELETE_CLASS',
   'UPDATE_CLASS_MEMBERS',
   'ASSIGN_TEST_CLASSES',
+  'ASSIGN_FOLDER_CLASSES',
   'UPSERT_CUSTOM_TITLE',
   'DELETE_CUSTOM_TITLE',
   'GRANT_USER_TITLES',

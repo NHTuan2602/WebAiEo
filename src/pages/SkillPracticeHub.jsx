@@ -5,12 +5,17 @@ import {
   BookOpen,
   Calendar,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Crown,
   Edit,
   EyeOff,
   FileAudio,
   Flame,
+  Folder,
+  FolderOpen,
+  Globe,
+  HardDrive,
   Hash,
   Headphones,
   KeyRound,
@@ -21,6 +26,7 @@ import {
   Play,
   Plus,
   Send,
+  Share2,
   ShieldCheck,
   Sparkles,
   Trophy,
@@ -61,6 +67,7 @@ import {
 } from '../constants/profileCustomization';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 import SpeakingForecastZone from '../components/speaking/SpeakingForecastZone';
+import AssignFolderModal from '../components/modals/AssignFolderModal';
 import VipMemberName from '../components/common/VipMemberName';
 
 export default function SkillPracticeHub({
@@ -71,6 +78,7 @@ export default function SkillPracticeHub({
   classesDb = {},
   currentUser,
   focusedTestId = null,
+  onAssignFolderClasses = null,
   onChangeTab,
   onClearFocusedTest,
   onNotifyMissingDaily,
@@ -116,6 +124,7 @@ export default function SkillPracticeHub({
     });
   };
   const [passwordPromptTarget, setPasswordPromptTarget] = useState(null);
+  const [bulkFolderAssignTarget, setBulkFolderAssignTarget] = useState(null);
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
   const [verifyingRoomPass, setVerifyingRoomPass] = useState(false);
@@ -832,70 +841,212 @@ export default function SkillPracticeHub({
             </p>
           </div>
           {isTeacher && (
-            <button
-              type="button"
-              onClick={() =>
-                onOpenSkillBuilder?.(actualSkill, null, {
-                  writingTaskScope: writingScopeFilter,
-                  dailySubCategory:
-                    activeSubCatFilter !== 'all'
-                      ? activeSubCatFilter
-                      : meta.subCategories[0]?.id || (tabKey === 'writing_task2' ? 'w2_essay' : ''),
-                  dailyFolderName:
-                    isSuperHomeworkTab && selectedDailyFolder !== 'all' && selectedDailyFolder !== '__unfiled__'
-                      ? dailyFolderOptions.find(option => option.folderKey === selectedDailyFolder)?.folderName || ''
-                      : '',
-                  ...(isWritingTask2Tab
-                    ? {
-                        writingTask2Topic: isKnownTask2Topic(selectedWritingTask2Topic) ? selectedWritingTask2Topic : '',
-                        writingTask2QuestionType: isKnownTask2QuestionType(selectedWritingTask2QuestionType)
-                          ? selectedWritingTask2QuestionType
-                          : ''
-                      }
-                    : {})
-                })
-              }
-              className="px-4 py-2.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-2 transition self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" /> Tạo Bài {tabKey === 'writing_task1' ? 'W1' : tabKey === 'writing_task2' ? 'W2' : actualSkill.toUpperCase()}
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              {displayedList.length > 0 && onAssignFolderClasses && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const activeSubLabel =
+                      activeSubCatFilter !== 'all'
+                        ? meta.subCategories.find(s => s.id === activeSubCatFilter)?.label || activeSubCatFilter
+                        : meta.name;
+                    const activeFolderLabel =
+                      isSuperHomeworkTab && selectedDailyFolder !== 'all'
+                        ? dailyFolderOptions.find(o => o.folderKey === selectedDailyFolder)?.folderName || ''
+                        : '';
+                    const label = activeFolderLabel ? `${activeSubLabel} / ${activeFolderLabel}` : activeSubLabel;
+                    setBulkFolderAssignTarget({
+                      label,
+                      testIds: displayedList.map(t => t.id),
+                      initialClassIds: []
+                    });
+                  }}
+                  className="px-3.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition"
+                  title="Giao toàn bộ các bài đang hiển thị trong thư mục này cho lớp"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> Giao Cả Thư Mục ({displayedList.length} bài)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenSkillBuilder?.(actualSkill, null, {
+                    writingTaskScope: writingScopeFilter,
+                    dailySubCategory:
+                      activeSubCatFilter !== 'all'
+                        ? activeSubCatFilter
+                        : meta.subCategories[0]?.id || (tabKey === 'writing_task2' ? 'w2_essay' : ''),
+                    dailyFolderName:
+                      isSuperHomeworkTab && selectedDailyFolder !== 'all' && selectedDailyFolder !== '__unfiled__'
+                        ? dailyFolderOptions.find(option => option.folderKey === selectedDailyFolder)?.folderName || ''
+                        : '',
+                    ...(isWritingTask2Tab
+                      ? {
+                          writingTask2Topic: isKnownTask2Topic(selectedWritingTask2Topic) ? selectedWritingTask2Topic : '',
+                          writingTask2QuestionType: isKnownTask2QuestionType(selectedWritingTask2QuestionType)
+                            ? selectedWritingTask2QuestionType
+                            : ''
+                        }
+                      : {})
+                  })
+                }
+                className="px-4 py-2.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center gap-2 transition"
+              >
+                <Plus className="w-4 h-4" /> Tạo Bài {tabKey === 'writing_task1' ? 'W1' : tabKey === 'writing_task2' ? 'W2' : actualSkill.toUpperCase()}
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Daily Zone Sub-Category Selector Pills (SHW 1-14 / Listening 3 mục / W1 4 dạng) */}
+        {/* Google Drive-Style Folder Explorer for Daily Zone Categories (SHW 1-14 / Listening / W1) */}
         {meta.subCategories.length > 0 && !focusedMatch && (
-          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-2">
-            <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">
-              Chọn phân mục bài tập:
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setActiveSubCatFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                  activeSubCatFilter === 'all'
-                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                    : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                }`}
-              >
-                Tất cả ({list.length})
-              </button>
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5">
+            {/* Drive Breadcrumb Header */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center flex-wrap gap-1 text-xs sm:text-sm font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSubCatFilter('all');
+                    setActiveDailyFolderFilter('all');
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition ${
+                    activeSubCatFilter === 'all'
+                      ? 'bg-teal-50 dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6]'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <HardDrive className="w-4 h-4" />
+                  <span>{meta.name}</span>
+                  <span className="text-[11px] font-semibold opacity-75">({list.length} bài)</span>
+                </button>
+                {activeSubCatFilter !== 'all' && (
+                  <>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => setActiveDailyFolderFilter('all')}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition ${
+                        selectedDailyFolder === 'all'
+                          ? 'bg-teal-50 dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6]'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                      <span>{meta.subCategories.find(s => s.id === activeSubCatFilter)?.label || activeSubCatFilter}</span>
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {activeSubCatFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSubCatFilter('all');
+                    setActiveDailyFolderFilter('all');
+                  }}
+                  className="text-xs font-bold text-[#0F766E] dark:text-[#1EE1D6] hover:underline"
+                >
+                  ← Xem tất cả {meta.subCategories.length} thư mục lớn
+                </button>
+              )}
+            </div>
+
+            {/* Drive Folder Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
               {meta.subCategories.map(sub => {
-                const subCount = list.filter(t => normalizeExamConfig(t).dailySubCategory === sub.id).length;
+                const subTests = list.filter(t => normalizeExamConfig(t).dailySubCategory === sub.id);
+                const subCount = subTests.length;
                 const isSelected = activeSubCatFilter === sub.id;
+                const unionClassIds = Array.from(
+                  new Set(subTests.flatMap(t => normalizeExamConfig(t).assignedClassIds || []))
+                );
+                const assignedClsObjs = getAssignedClassNames(unionClassIds, classesDb);
+                const hasPublicToAll = subCount > 0 && subTests.some(t => (normalizeExamConfig(t).assignedClassIds || []).length === 0);
+
                 return (
-                  <button
+                  <div
                     key={sub.id}
-                    type="button"
-                    onClick={() => setActiveSubCatFilter(sub.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                    className={`rounded-xl border p-3 flex flex-col justify-between gap-2 transition ${
                       isSelected
-                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                        ? 'bg-teal-50/90 dark:bg-teal-500/15 border-[#007A7A] dark:border-[#1EE1D6] ring-1 ring-[#007A7A]/30'
+                        : 'bg-slate-50/75 dark:bg-slate-900/75 border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                     }`}
                   >
-                    {sub.label}{subCount > 0 ? ` (${subCount})` : ''}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubCatFilter(isSelected ? 'all' : sub.id)}
+                      className="flex items-start gap-2.5 text-left w-full"
+                    >
+                      <span
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
+                          isSelected
+                            ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                            : 'bg-amber-100/80 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+                        }`}
+                      >
+                        {isSelected ? <FolderOpen className="w-4 h-4" /> : <Folder className="w-4 h-4 fill-current/20" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                          {sub.label}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {subCount > 0 ? `${subCount} bài tập` : 'Chưa có bài'}
+                        </p>
+                      </div>
+                    </button>
+
+                    <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-800">
+                      <div className="flex flex-wrap items-center gap-1 min-w-0">
+                        {subCount === 0 ? (
+                          <span className="text-[10px] text-slate-400">Trống</span>
+                        ) : assignedClsObjs.length === 0 ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            <Globe className="w-2.5 h-2.5" /> Tất cả
+                          </span>
+                        ) : (
+                          <>
+                            {assignedClsObjs.slice(0, 2).map(cls => (
+                              <span
+                                key={cls.id}
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 truncate max-w-[90px]"
+                              >
+                                {cls.name}
+                              </span>
+                            ))}
+                            {assignedClsObjs.length > 2 && (
+                              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
+                                +{assignedClsObjs.length - 2}
+                              </span>
+                            )}
+                            {hasPublicToAll && (
+                              <span className="text-[10px] text-slate-400">+chung</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {isTeacher && subCount > 0 && onAssignFolderClasses && (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setBulkFolderAssignTarget({
+                              label: `${meta.name} / ${sub.label}`,
+                              testIds: subTests.map(t => t.id),
+                              initialClassIds: unionClassIds
+                            });
+                          }}
+                          className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0 transition"
+                          title={`Giao toàn bộ ${subCount} bài trong ${sub.label} cho lớp`}
+                        >
+                          <Share2 className="w-3 h-3" /> Giao lớp
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -903,39 +1054,80 @@ export default function SkillPracticeHub({
         )}
 
         {isSuperHomeworkTab && dailyFolderOptions.length > 0 && !focusedMatch && (
-          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-2">
-            <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">Bộ bài / thư mục:</p>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                aria-pressed={selectedDailyFolder === 'all'}
-                onClick={() => setActiveDailyFolderFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                  selectedDailyFolder === 'all'
-                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                    : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                }`}
-              >
-                Tất cả ({subFilteredList.length})
-              </button>
+          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300 flex items-center gap-1.5">
+                <Folder className="w-4 h-4 text-amber-500" />
+                Thư mục con / Bộ bài ({dailyFolderOptions.length}):
+              </p>
+              {selectedDailyFolder !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveDailyFolderFilter('all')}
+                  className="text-xs font-bold text-[#0F766E] dark:text-[#1EE1D6] hover:underline"
+                >
+                  Xem tất cả ({subFilteredList.length} bài)
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {dailyFolderOptions.map(option => {
                 const isSelected = selectedDailyFolder === option.folderKey;
+                const folderTests = subFilteredList.filter(test => {
+                  const fn = getDailyFolderName(test);
+                  const sc = normalizeExamConfig(test).dailySubCategory;
+                  const fk = `${sc}:${fn ? fn.normalize('NFKC').toLocaleLowerCase() : '__unfiled__'}`;
+                  return fk === option.folderKey;
+                });
+                const fLabel = option.folderName
+                  ? `${activeSubCatFilter === 'all' ? `${getDailySubCategoryLabel(option.subCategory)} • ` : ''}${option.folderName}`
+                  : `Chưa xếp thư mục${activeSubCatFilter === 'all' ? ` • ${getDailySubCategoryLabel(option.subCategory)}` : ''}`;
+                const unionIds = Array.from(new Set(folderTests.flatMap(t => normalizeExamConfig(t).assignedClassIds || [])));
+
                 return (
-                  <button
+                  <div
                     key={option.folderKey}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => setActiveDailyFolderFilter(option.folderKey)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                    className={`rounded-xl border px-3 py-2.5 flex items-center justify-between gap-2 transition ${
                       isSelected
-                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                        ? 'bg-teal-50 dark:bg-teal-500/15 border-[#007A7A] dark:border-[#1EE1D6]'
+                        : 'bg-slate-50/80 dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                     }`}
                   >
-                    {option.folderName
-                      ? `${activeSubCatFilter === 'all' ? `${getDailySubCategoryLabel(option.subCategory)} • ` : ''}${option.folderName}`
-                      : `Chưa xếp thư mục${activeSubCatFilter === 'all' ? ` • ${getDailySubCategoryLabel(option.subCategory)}` : ''}`} ({option.count})
-                  </button>
+                    <button
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => setActiveDailyFolderFilter(isSelected ? 'all' : option.folderKey)}
+                      className="flex items-center gap-2 text-left min-w-0 flex-1"
+                    >
+                      {isSelected ? (
+                        <FolderOpen className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                      ) : (
+                        <Folder className="w-4 h-4 text-amber-500 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{fLabel}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{option.count} bài</p>
+                      </div>
+                    </button>
+
+                    {isTeacher && folderTests.length > 0 && onAssignFolderClasses && (
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setBulkFolderAssignTarget({
+                            label: fLabel,
+                            testIds: folderTests.map(t => t.id),
+                            initialClassIds: unionIds
+                          });
+                        }}
+                        className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0"
+                        title={`Giao toàn bộ ${folderTests.length} bài trong thư mục này cho lớp`}
+                      >
+                        <Share2 className="w-3 h-3" /> Giao lớp
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -1596,13 +1788,16 @@ export default function SkillPracticeHub({
                 </button>
               </div>
 
-              {/* Structured 3-Part Speaking Zone (Part 1: 6 nhóm · Part 2: 4 nhóm · Part 3: 14 nhóm + Random Part 3) */}
+              {/* Structured 3-Part Speaking Zone (Google Drive Folder Explorer + Bulk Class Assign) */}
               {!focusedSpeakingMatch && (
                 <SpeakingForecastZone
                   zoneKey={activeTab === 'forecast' ? 'forecast' : 'daily'}
+                  speakingForecast={speakingForecast}
                   bank={speakingForecast}
+                  classesDb={classesDb}
                   isTeacher={isTeacher}
                   aiApiKey={aiApiKey}
+                  aiConfigured={aiConfigured}
                   onSaveBank={onSaveSpeakingForecast}
                   onStartPracticeTest={onStartSpeakingPracticeTest}
                   showToast={showToast}
@@ -2203,6 +2398,30 @@ export default function SkillPracticeHub({
           )}
         </main>
       </div>
+
+      {/* Bulk Assign Folder to Classes Modal (Daily Reading / Listening / Writing Folders) */}
+      <AssignFolderModal
+        isOpen={Boolean(bulkFolderAssignTarget)}
+        folderLabel={bulkFolderAssignTarget?.label || ''}
+        itemCount={bulkFolderAssignTarget?.testIds?.length || 0}
+        itemUnit="bài tập"
+        classesDb={classesDb}
+        initialClassIds={bulkFolderAssignTarget?.initialClassIds || []}
+        showModeToggle={true}
+        showPublishOption={true}
+        showNotifyOption={true}
+        onClose={() => setBulkFolderAssignTarget(null)}
+        onConfirm={async ({ assignedClassIds, mode, publish, notify }) => {
+          if (!bulkFolderAssignTarget || !onAssignFolderClasses) return;
+          await onAssignFolderClasses(bulkFolderAssignTarget.testIds, {
+            assignedClassIds,
+            mode,
+            publish,
+            notify,
+            folderLabel: bulkFolderAssignTarget.label
+          });
+        }}
+      />
 
       {/* Modal Nhập Mật Khẩu Phòng Thi Thực Chiến Speaking (Team Sắp Thi) */}
       {passwordPromptTarget && (
