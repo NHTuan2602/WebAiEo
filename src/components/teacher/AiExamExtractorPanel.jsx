@@ -21,6 +21,7 @@ import {
 import {
   convertScreenshotsToIeltsHtml,
   extractExamFromImages,
+  extractListeningExamFromPdf,
   extractReadingExamFromPdf,
   extractReadingExamFromScreenshots
 } from '../../utils/geminiGrader';
@@ -90,6 +91,7 @@ export default function AiExamExtractorPanel({
   aiConfigured = false,
   existingMediaImageUrl,
   onApplyExtraction,
+  onApplyListeningPdfExtraction = null,
   onApplyQuickAnswerText,
   onApplyReadingPdfExtraction = null,
   scopeLabel,
@@ -102,6 +104,8 @@ export default function AiExamExtractorPanel({
   const [answerKeyImages, setAnswerKeyImages] = useState([]);
   const [readingPdfFile, setReadingPdfFile] = useState(null);
   const [replaceWholeReading, setReplaceWholeReading] = useState(true);
+  const [listeningPdfFile, setListeningPdfFile] = useState(null);
+  const [replaceWholeListening, setReplaceWholeListening] = useState(true);
   const [preferCloze, setPreferCloze] = useState(true);
   const [replaceScope, setReplaceScope] = useState(true);
   const [extraInstructions, setExtraInstructions] = useState('');
@@ -312,6 +316,64 @@ export default function AiExamExtractorPanel({
     }
   };
 
+  const handleSelectListeningPdf = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.name?.toLowerCase().endsWith('.pdf')) {
+      setListeningPdfFile(null);
+      setErrorMsg('Chỉ hỗ trợ file .pdf cho chức năng tạo đề Listening từ PDF.');
+      return;
+    }
+    if (file.size > MAX_READING_PDF_BYTES) {
+      setListeningPdfFile(null);
+      setErrorMsg(`PDF quá lớn (${formatFileSize(file.size)}). Hãy dùng file nhỏ hơn 14 MB.`);
+      return;
+    }
+    setErrorMsg('');
+    setLastResultInfo(null);
+    setListeningPdfFile(file);
+  };
+
+  const handleRunListeningPdfExtract = async () => {
+    setErrorMsg('');
+    setLastResultInfo(null);
+    if (!hasGeminiAccess) {
+      setErrorMsg('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước để dùng AI đọc PDF.');
+      return;
+    }
+    if (!listeningPdfFile) {
+      setErrorMsg('Hãy chọn một file PDF đề Listening trước khi chạy AI.');
+      return;
+    }
+
+    setExtracting(true);
+    try {
+      const signature = new TextDecoder().decode(await listeningPdfFile.slice(0, 5).arrayBuffer());
+      if (signature !== '%PDF-') throw new Error('File đã chọn không phải PDF hợp lệ. Hãy chọn lại đề thi.');
+      const extracted = await extractListeningExamFromPdf({
+        apiKey: aiApiKey,
+        pdfDataUrl: await readFileAsDataUrl(listeningPdfFile),
+        fileName: listeningPdfFile.name,
+        extraInstructions
+      });
+      const summary = onApplyListeningPdfExtraction?.(extracted, { replaceAll: replaceWholeListening });
+      if (summary?.cancelled) return;
+      setLastResultInfo({
+        usedModel: extracted.usedModel,
+        questionCount: summary?.questionCount ?? extracted.questionCount,
+        partCount: summary?.partCount ?? extracted.parts.length,
+        answerKeyFound: extracted.answerKeyFound,
+        warnings: Array.isArray(extracted.warnings) ? extracted.warnings : []
+      });
+      showToast?.(`AI đã tạo ${summary?.partCount ?? extracted.parts.length} Part với ${summary?.questionCount ?? extracted.questionCount} câu Listening từ PDF!`);
+    } catch (err) {
+      setErrorMsg(err?.message || 'Không thể phân tích PDF Listening. Hãy kiểm tra file rồi thử lại.');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const handleRunAiExtract = async () => {
     setErrorMsg('');
     setLastResultInfo(null);
@@ -362,12 +424,12 @@ export default function AiExamExtractorPanel({
           </div>
           <h3 className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
             <Bot className="w-5 h-5 text-[#007A7A] dark:text-[#1EE1D6]" />
-            <span>Tạo Đề Tự Động Từ Ảnh{skill === 'reading' ? ' / PDF' : ''} ({scopeLabel})</span>
+            <span>Tạo Đề Tự Động Từ Ảnh / PDF ({scopeLabel})</span>
           </h3>
           <p className="text-xs text-[#314158] dark:text-slate-300 mt-0.5">
             {skill === 'reading'
               ? <>Tải ảnh chụp, dán ảnh bằng <strong>Ctrl+V</strong>, hoặc đưa nguyên file PDF để AI đọc nhiều passage và answer key.</>
-              : <>Tải ảnh chụp hoặc nhấn <strong>Ctrl+V</strong> dán ảnh đề Cambridge/IDP (đục lỗ Note Completion, MCQ, TFNG...). AI sẽ tự tạo mẫu đục lỗ <code>{'{{1}}'}</code> &amp; danh sách câu hỏi chạy được ngay.</>}
+              : <>Tải nguyên file <strong>PDF đề Listening (1–4 Parts + Answer Key)</strong>, tải ảnh chụp, hoặc nhấn <strong>Ctrl+V</strong> dán ảnh đề Cambridge/IDP (Note/Table/Flow-chart, MCQ, Map...). AI tự tạo đục lỗ <code>{'{{1}}'}</code> &amp; danh sách câu hỏi ngay.</>}
           </p>
         </div>
 
@@ -384,6 +446,70 @@ export default function AiExamExtractorPanel({
           <span className={`w-2 h-2 rounded-full ${hasGeminiAccess ? 'bg-[#059271]' : 'bg-rose-500'}`} />
         </button>
       </div>
+
+      {skill === 'listening' && onApplyListeningPdfExtraction && (
+        <section className="rounded-2xl border border-sky-200 dark:border-sky-500/30 bg-sky-50/75 dark:bg-sky-500/10 p-4 sm:p-5 space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sky-200/60 dark:border-sky-500/20 pb-3">
+            <div>
+              <h4 className="flex items-center gap-2 text-sm font-extrabold text-sky-950 dark:text-sky-100">
+                <FileText className="w-4 h-4 text-sky-600 dark:text-sky-300" />
+                <span>Tạo Đề Listening Tự Động Từ File PDF (1–4 Parts · 10–40 Câu)</span>
+              </h4>
+              <p className="mt-0.5 text-xs text-sky-900/80 dark:text-sky-200/80">
+                Tải file PDF đề Cambridge / bài nghe lẻ (có thể kèm Answer Key &amp; Audioscript) để AI tách sẵn từng Part, đục lỗ Note/Table/Flow-chart, MCQ &amp; Map.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <label className="cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-blue-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900">
+              <Upload className="w-4 h-4" />
+              <span>{listeningPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF Listening'}</span>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={handleSelectListeningPdf}
+                className="sr-only"
+                aria-label="Chọn PDF đề IELTS Listening"
+              />
+            </label>
+
+            <div className="min-w-0 flex-1" aria-live="polite">
+              {listeningPdfFile ? (
+                <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={listeningPdfFile.name}>
+                  {listeningPdfFile.name} <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(listeningPdfFile.size)}</span>
+                </p>
+              ) : (
+                <p className="text-xs text-slate-600 dark:text-slate-300">Chọn file PDF đề Listening (1 Part lẻ hoặc Full 4 Parts + Answer Key, tối đa 14 MB).</p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={!listeningPdfFile || extracting}
+              onClick={handleRunListeningPdfExtract}
+              className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                !listeningPdfFile || extracting
+                  ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                  : 'bg-[#007A7A] text-white hover:bg-[#065B5B]'
+              }`}
+            >
+              {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-amber-300" />}
+              {extracting ? 'AI đang đọc PDF Listening…' : 'AI đọc PDF & tạo đề'}
+            </button>
+          </div>
+
+          <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={replaceWholeListening}
+              onChange={e => setReplaceWholeListening(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded accent-blue-600"
+            />
+            <span>Thay toàn bộ câu hỏi Listening hiện có bằng đề trong PDF (vẫn giữ nguyên file MP3 đã tải lên của từng Part nếu có)</span>
+          </label>
+        </section>
+      )}
 
       {skill === 'reading' && onApplyReadingPdfExtraction && (
         <section className="rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-500/10 p-4 sm:p-5 space-y-4">
@@ -924,7 +1050,9 @@ export default function AiExamExtractorPanel({
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>
-              {lastResultInfo.passageCount
+              {lastResultInfo.partCount
+                ? <>Đã tạo <strong>{lastResultInfo.partCount} Part · {lastResultInfo.questionCount} câu hỏi Listening</strong> từ PDF{lastResultInfo.answerKeyFound ? ' và đã đọc answer key' : ''}</>
+                : lastResultInfo.passageCount
                 ? <>Đã tạo <strong>{lastResultInfo.passageCount} passage · {lastResultInfo.questionCount} câu hỏi</strong> từ PDF{lastResultInfo.answerKeyFound ? ' và đã đọc answer key' : ''}</>
                 : <>Đã tự động tạo <strong>{lastResultInfo.questionCount} câu hỏi</strong></>}
               {lastResultInfo.hasCloze ? ' kèm bài Đục lỗ trực tiếp' : ''}

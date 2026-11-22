@@ -496,6 +496,7 @@ export default function SkillQuestionWorkspace({
   groups = [],
   onAddQuestion,
   onApplyAiExtraction,
+  onApplyListeningPdfExtraction = null,
   onApplyReadingPdfExtraction = null,
   onApplyQuickAnswerText,
   onChangeClozeText,
@@ -549,7 +550,7 @@ export default function SkillQuestionWorkspace({
     },
     {
       id: 'ai',
-      label: skill === 'reading' ? 'Tạo Tự Động (AI Ảnh / PDF)' : 'Tạo Tự Động (AI Ảnh)',
+      label: 'Tạo Tự Động (AI Ảnh / PDF)',
       count: aiEntries.length,
       Icon: Bot
     },
@@ -604,7 +605,7 @@ export default function SkillQuestionWorkspace({
             </span>
           </h3>
           <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
-            Chọn đúng tab bên dưới theo cách bạn muốn soạn: <strong>{skill === 'reading' ? 'AI đọc ảnh/PDF' : 'AI đọc ảnh'} / Đục lỗ tự động</strong> hoặc <strong>Tạo bằng tay từng câu</strong>.
+            Chọn đúng tab bên dưới theo cách bạn muốn soạn: <strong>AI đọc ảnh/PDF / Đục lỗ tự động</strong> hoặc <strong>Tạo bằng tay từng câu</strong>.
           </p>
         </div>
 
@@ -811,10 +812,10 @@ export default function SkillQuestionWorkspace({
                   className="text-left p-5 rounded-2xl border-2 border-dashed border-[#007A7A]/40 dark:border-teal-500/40 bg-[#EDFFFD]/60 dark:bg-teal-950/25 hover:border-[#007A7A] transition space-y-2"
                 >
                   <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
-                    <Bot className="w-4 h-4" /> Cách 1: Tự Động Từ Ảnh (AI)
+                    <Bot className="w-4 h-4" /> Cách 1: Tự Động Từ Ảnh / PDF (AI)
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Dán hoặc tải ảnh chụp trang đề thi - AI sẽ tự tạo câu hỏi &amp; đáp án cho bạn.
+                    Tải file PDF đề thi hoặc dán ảnh chụp - AI sẽ tự tạo câu hỏi &amp; đáp án cho bạn.
                   </p>
                 </button>
 
@@ -868,6 +869,7 @@ export default function SkillQuestionWorkspace({
             showToast={showToast}
             onApplyQuickAnswerText={onApplyQuickAnswerText}
             onApplyExtraction={onApplyAiExtraction}
+            onApplyListeningPdfExtraction={onApplyListeningPdfExtraction}
             onApplyReadingPdfExtraction={onApplyReadingPdfExtraction}
           />
 

@@ -97,6 +97,11 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     await page.getByRole('button', { name: /\+ Thực Chiến/i }).first().click();
     await expect(page.getByText(/TÊN ĐỀ THI IELTS|Soạn & Chỉnh Sửa Đề/i).first()).toBeVisible({ timeout: 12_000 });
+    // Verify Listening Builder includes AI PDF extraction section
+    await page.getByRole('button', { name: /2\. Listening/i }).first().click();
+    await page.getByRole('tab', { name: /Tạo Tự Động \(AI Ảnh \/ PDF\)/i }).first().click();
+    await expect(page.getByText(/Tạo Đề Listening Tự Động Từ File PDF/i)).toBeVisible();
+    await expect(page.locator('input[aria-label="Chọn PDF đề IELTS Listening"]')).toBeAttached();
     await assertNoHorizontalOverflow(page, 'Teacher-ExamBuilder');
 
     // Return to Teacher Dashboard (ExamBuilder uses its own back button)

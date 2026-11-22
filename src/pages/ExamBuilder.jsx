@@ -812,6 +812,97 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return { passageCount: importedPassages.length, questionCount };
   };
 
+  const handleApplyListeningPdfExtraction = (extracted, { replaceAll = true } = {}) => {
+    const extractedParts = Array.isArray(extracted?.parts) ? extracted.parts : [];
+    if (extractedParts.length === 0) {
+      showToast?.('PDF chưa có phần Listening để áp dụng.', 'error');
+      return { cancelled: true };
+    }
+
+    const currentTracks = getListeningTracks(testForm.listening);
+    const currentQuestions = Array.isArray(testForm.listening?.questions) ? testForm.listening.questions : [];
+    const hasExistingContent = currentQuestions.length > 0 || currentTracks.some(
+      track => String(track?.clozeText || '').trim() || String(track?.transcript || '').trim()
+    );
+    const shouldReplaceAll = replaceAll || !hasExistingContent;
+    if (
+      shouldReplaceAll &&
+      hasExistingContent &&
+      !window.confirm('Thay toàn bộ chủ đề (Parts) và câu hỏi Listening hiện tại bằng dữ liệu từ PDF? (Các file MP3 đã tải lên theo từng Part vẫn sẽ được giữ lại.)')
+    ) {
+      return { cancelled: true };
+    }
+
+    const stamp = Date.now();
+    const importedTracks = extractedParts.map((part, idx) => {
+      const prevTrack = shouldReplaceAll ? currentTracks[idx] : null;
+      return {
+        id: prevTrack?.id || `ltr_pdf_${stamp}_${idx}`,
+        title: String(part?.title || `Part ${idx + 1}`).trim(),
+        audioUrl: prevTrack?.audioUrl || '',
+        audioFileName: prevTrack?.audioFileName || '',
+        imageUrl: prevTrack?.imageUrl || '',
+        imageFileName: prevTrack?.imageFileName || '',
+        contextText: String(part?.contextText || prevTrack?.contextText || '').trim(),
+        clozeText: String(part?.clozeText || '').trim(),
+        transcript: String(part?.transcript || prevTrack?.transcript || '').trim()
+      };
+    });
+
+    setTestForm(prev => {
+      const previousTracks = getListeningTracks(prev.listening);
+      const trackOffset = shouldReplaceAll ? 0 : previousTracks.length;
+      const nextTracks = shouldReplaceAll
+        ? importedTracks
+        : [...previousTracks, ...importedTracks];
+      const importedQuestions = extractedParts.flatMap((part, partIdx) =>
+        (Array.isArray(part?.questions) ? part.questions : []).map((question, questionIdx) => ({
+          id: `lq_pdf_${stamp}_${partIdx}_${questionIdx}`,
+          type: question.type || 'fill',
+          source: 'ai',
+          ...(typeof question.blankNum === 'number' ? { blankNum: question.blankNum } : {}),
+          ...(typeof question.questionNumber === 'number' ? { questionNumber: question.questionNumber } : {}),
+          ...(typeof question.questionEndNumber === 'number' ? { questionEndNumber: question.questionEndNumber } : {}),
+          ...(question.instruction ? { instruction: question.instruction } : {}),
+          ...(question.hasNB ? { hasNB: true } : {}),
+          trackIdx: trackOffset + partIdx,
+          question: question.question || `${question.blankNum || questionIdx + 1}. Câu hỏi`,
+          options: Array.isArray(question.options) ? question.options : [],
+          wordLimit: String(question.wordLimit || '').trim(),
+          correctAnswer: question.correctAnswer || question.correctAnswers?.[0] || '',
+          ...(question.type === 'mcq'
+            ? { requiredSelections: Math.max(1, Number(question.requiredSelections) || question.correctAnswers?.length || 1) }
+            : {}),
+          ...(Array.isArray(question.correctAnswers) ? { correctAnswers: question.correctAnswers } : {})
+        }))
+      );
+      const listeningQuestions = shouldReplaceAll
+        ? importedQuestions
+        : [...(Array.isArray(prev.listening?.questions) ? prev.listening.questions : []), ...importedQuestions];
+      const firstTrack = nextTracks[0] || {};
+
+      return {
+        ...prev,
+        listening: {
+          ...prev.listening,
+          tracks: nextTracks,
+          audioUrl: firstTrack.audioUrl || prev.listening?.audioUrl || '',
+          transcript: firstTrack.transcript || '',
+          clozeText: firstTrack.clozeText || '',
+          questions: listeningQuestions
+        }
+      };
+    });
+
+    setBuilderListeningIdx(0);
+    const questionCount = extractedParts.reduce(
+      (sum, part) => sum + (Array.isArray(part?.questions) ? part.questions.length : 0),
+      0
+    );
+    showToast?.(`Đã đưa ${importedTracks.length} Part và ${questionCount} câu Listening từ PDF vào đề. Hãy tải file MP3 và rà lại đáp án trước khi lưu.`);
+    return { partCount: importedTracks.length, questionCount };
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -2550,6 +2641,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
             }
+            onApplyListeningPdfExtraction={handleApplyListeningPdfExtraction}
           />
         </div>
         );
