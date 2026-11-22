@@ -57,6 +57,7 @@ import {
   toDatetimeLocalInputValue
 } from '../constants/seedData';
 import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../utils/clozeHelpers';
+import { getQuestionDisplayNumber } from '../utils/examUiHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
 import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
 import SkillQuestionWorkspace from '../components/teacher/SkillQuestionWorkspace';
@@ -616,10 +617,16 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     showToast?.('Đã đồng bộ các ô đục lỗ sang danh sách câu hỏi chấm điểm!');
   };
 
-  const handleQuickAnswerKeyText = (skill, scopeField, scopeIdx, rawText) => {
+  const handleQuickAnswerKeyText = (skill, scopeField, scopeIdx, rawText, opts = {}) => {
     let matchedCount = 0;
     setTestForm(prev => {
-      const result = applyAnswerKeyTextToQuestions(rawText, prev[skill]?.questions || [], scopeField, scopeIdx);
+      const result = applyAnswerKeyTextToQuestions(
+        rawText,
+        prev[skill]?.questions || [],
+        scopeField,
+        scopeIdx,
+        { allScopes: Boolean(opts?.allScopes) }
+      );
       matchedCount = result.matchedCount;
       return {
         ...prev,
@@ -632,8 +639,46 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     if (matchedCount > 0) {
       showToast?.(`Đã tự động điền ${matchedCount} đáp án vào danh sách câu hỏi!`);
     } else {
-      showToast?.('Chưa khớp được số câu nào. Hãy đảm bảo đã có danh sách câu hỏi hoặc viết dạng "1. đáp án".', 'info');
+      showToast?.('Chưa khớp được số câu nào. Hãy đảm bảo đã có danh sách câu hỏi hoặc viết dạng "1. đáp án" / copy từ Excel.', 'info');
     }
+    return matchedCount;
+  };
+
+  const handleAssignImageToQuestionRange = (skill, fromNum, toNum, imageUrl) => {
+    const start = Math.min(Number(fromNum) || 0, Number(toNum) || 0);
+    const end = Math.max(Number(fromNum) || 0, Number(toNum) || 0);
+    if (start <= 0 || end < start) return 0;
+
+    let updatedCount = 0;
+    setTestForm(prev => {
+      const prevQs = Array.isArray(prev[skill]?.questions) ? prev[skill].questions : [];
+      const nextQs = prevQs.map((q, idx) => {
+        const qNum = getQuestionDisplayNumber(q, idx + 1);
+        const qEnd = Number(q?.questionEndNumber) > qNum ? Number(q.questionEndNumber) : qNum;
+        const overlaps = qNum <= end && qEnd >= start;
+        if (!overlaps) return q;
+        updatedCount += 1;
+        return { ...q, imageUrl: imageUrl || '' };
+      });
+      return {
+        ...prev,
+        [skill]: {
+          ...prev[skill],
+          questions: nextQs
+        }
+      };
+    });
+
+    if (updatedCount > 0) {
+      showToast?.(
+        imageUrl
+          ? `Đã gắn hình ảnh vào ${updatedCount} câu (Câu ${start}–${end})! Ảnh sẽ hiển thị ngay cạnh/trên nhóm câu này khi thi.`
+          : `Đã gỡ hình ảnh khỏi ${updatedCount} câu (Câu ${start}–${end}).`
+      );
+    } else {
+      showToast?.(`Không tìm thấy câu hỏi nào trong khoảng Câu ${start}–${end}.`, 'info');
+    }
+    return updatedCount;
   };
 
   const handleApplyAiExtraction = (skill, scopeField, scopeIdx, extracted, { replaceScope = true }) => {
@@ -2637,7 +2682,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             setApiTestState={setApiTestState}
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
-            onApplyQuickAnswerText={txt => handleQuickAnswerKeyText('listening', 'trackIdx', activeIdx, txt)}
+            onApplyQuickAnswerText={(txt, opts) => handleQuickAnswerKeyText('listening', 'trackIdx', activeIdx, txt, opts)}
+            onAssignImageToRange={(fromNum, toNum, imgUrl) => handleAssignImageToQuestionRange('listening', fromNum, toNum, imgUrl)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
             }
@@ -2908,7 +2954,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             setApiTestState={setApiTestState}
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
-            onApplyQuickAnswerText={txt => handleQuickAnswerKeyText('reading', 'passageIdx', activeIdx, txt)}
+            onApplyQuickAnswerText={(txt, opts) => handleQuickAnswerKeyText('reading', 'passageIdx', activeIdx, txt, opts)}
+            onAssignImageToRange={(fromNum, toNum, imgUrl) => handleAssignImageToQuestionRange('reading', fromNum, toNum, imgUrl)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
             }

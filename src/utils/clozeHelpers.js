@@ -1,4 +1,5 @@
 // Helpers for Inline Cloze / Note Completion ("Đục Lỗ") and Question Mapping
+import { matchChoiceOption } from './examHelpers.js';
 
 const BLANK_TOKEN_REGEX = /(\{\{\s*\d+\s*\}\}|\[\s*\d+\s*\]|\(__+\s*\d+\s*__+\))/g;
 const BLANK_NUM_CAPTURE = /(?:\{\{\s*(\d+)\s*\}\}|\[\s*(\d+)\s*\]|\(__+\s*(\d+)\s*__+\))/;
@@ -493,20 +494,103 @@ export function syncClozeBlanksWithQuestions({
   return nextQuestions;
 }
 
+const ANSWER_KEY_TYPE_NOTE_REGEX =
+  /^(?:dạng\s+fill\s+the\s+blank|fill\s+in\s+the\s+blank|multiple\s+choice|mcq|map(?:\s*\/\s*diagram)?|flow[\s-]?chart(?:\s+completion)?|matching(?:\s+\w+)?|table\s+completion|note\s+completion|form\s+completion|summary(?:\s+completion)?|short\s+answer|true\s*\/\s*false\s*\/\s*not\s+given|yes\s*\/\s*no\s*\/\s*not\s+given|tfng|ynng)$/i;
+
+const ANSWER_KEY_HEADER_REGEX =
+  /^(?:stt|no\.?|#|q(?:uestion)?s?|câu|answer(?:\s*key)?|đáp\s*án|rockies\b)/i;
+
+function cleanParsedAnswerValue(rawVal = '') {
+  let clean = String(rawVal || '').trim();
+  if (!clean) return '';
+  // If pasted from Excel/Sheets with trailing tab columns (e.g. "B\tMultiple Choice" or "THREE HOURS\tDẠNG FILL THE BLANK"), keep the answer column only
+  if (clean.includes('\t')) {
+    const cols = clean.split('\t').map(c => c.trim()).filter(Boolean);
+    if (cols.length > 0) clean = cols[0];
+  }
+  // Strip trailing question-type annotations separated by 2+ spaces or pipe
+  const multiSpaceParts = clean.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
+  if (multiSpaceParts.length >= 2 && ANSWER_KEY_TYPE_NOTE_REGEX.test(multiSpaceParts[multiSpaceParts.length - 1])) {
+    clean = multiSpaceParts.slice(0, -1).join(' ');
+  }
+  return clean.trim();
+}
+
 export function parseAnswerKeyText(rawText = '') {
   const lines = String(rawText || '').replace(/\r\n/g, '\n').split('\n');
   const map = new Map();
   let sequentialCursor = 1;
 
   for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
 
-    // Supports: "1. Hills", "1) 250", "Q1: park", "1 - morning", "1 full"
-    const numberedMatch = line.match(/^(?:q(?:uestion)?\s*)?(\d+)\s*[.):\-–]\s*(.+)$/i);
+    // 1. Tab-separated rows (copied directly from Excel / Google Sheets: "1\tTHREE HOURS\tDẠNG FILL THE BLANK")
+    if (raw.includes('\t')) {
+      const cells = raw.split('\t').map(c => c.trim());
+      while (cells.length > 0 && !cells[0]) cells.shift();
+      if (cells.length >= 2) {
+        const firstCell = cells[0];
+        const secondCell = cleanParsedAnswerValue(cells[1]);
+        if (ANSWER_KEY_HEADER_REGEX.test(firstCell) && !/^\d+$/.test(firstCell)) {
+          continue;
+        }
+        const rangeCell = firstCell.match(/^(?:q(?:uestion)?\s*|câu\s*)?(\d+)\s*[-–—&]\s*(\d+)$/i);
+        if (rangeCell && secondCell) {
+          const startNum = Number(rangeCell[1]);
+          const endNum = Number(rangeCell[2]);
+          if (startNum > 0 && endNum >= startNum) {
+            map.set(startNum, secondCell);
+            const parts = secondCell.split(/\s*(?:,|;|\/|&|\band\b|\s+)\s*/i).filter(Boolean);
+            if (parts.length === endNum - startNum + 1) {
+              for (let n = startNum; n <= endNum; n += 1) {
+                map.set(n, parts[n - startNum]);
+              }
+            }
+            sequentialCursor = endNum + 1;
+            continue;
+          }
+        }
+        const singleCell = firstCell.match(/^(?:q(?:uestion)?\s*|câu\s*)?(\d+)[.):]?$/i);
+        if (singleCell && secondCell) {
+          const num = Number(singleCell[1]);
+          if (num > 0) {
+            map.set(num, secondCell);
+            sequentialCursor = num + 1;
+            continue;
+          }
+        }
+      }
+    }
+
+    if (ANSWER_KEY_HEADER_REGEX.test(trimmed) && !/^(?:q(?:uestion)?\s*|câu\s*)?\d+/i.test(trimmed)) {
+      continue;
+    }
+
+    // 2. Range lines: "11-12. B, D" or "11-12: B & D"
+    const rangeMatch = trimmed.match(/^(?:q(?:uestion)?\s*|câu\s*)?(\d+)\s*[-–—]\s*(\d+)\s*[.):\-–]\s*(.+)$/i);
+    if (rangeMatch) {
+      const startNum = Number(rangeMatch[1]);
+      const endNum = Number(rangeMatch[2]);
+      const ans = cleanParsedAnswerValue(rangeMatch[3]);
+      if (startNum > 0 && endNum >= startNum && ans) {
+        map.set(startNum, ans);
+        const parts = ans.split(/\s*(?:,|;|\/|&|\band\b)\s*/i).filter(Boolean);
+        if (parts.length === endNum - startNum + 1) {
+          for (let n = startNum; n <= endNum; n += 1) {
+            map.set(n, parts[n - startNum]);
+          }
+        }
+        sequentialCursor = endNum + 1;
+        continue;
+      }
+    }
+
+    // 3. Supports: "1. Hills", "1) 250", "Q1: park", "Câu 1 - morning"
+    const numberedMatch = trimmed.match(/^(?:q(?:uestion)?\s*|câu\s*)?(\d+)\s*[.):\-–]\s*(.+)$/i);
     if (numberedMatch) {
       const num = Number(numberedMatch[1]);
-      const ans = numberedMatch[2].trim();
+      const ans = cleanParsedAnswerValue(numberedMatch[2]);
       if (num > 0 && ans) {
         map.set(num, ans);
         sequentialCursor = num + 1;
@@ -514,10 +598,11 @@ export function parseAnswerKeyText(rawText = '') {
       continue;
     }
 
-    const spaceMatch = line.match(/^(\d+)\s+(.+)$/);
+    // 4. Space-separated: "1 THREE HOURS" or "11 B"
+    const spaceMatch = trimmed.match(/^(\d+)\s+(.+)$/);
     if (spaceMatch) {
       const num = Number(spaceMatch[1]);
-      const ans = spaceMatch[2].trim();
+      const ans = cleanParsedAnswerValue(spaceMatch[2]);
       if (num > 0 && ans) {
         map.set(num, ans);
         sequentialCursor = num + 1;
@@ -525,15 +610,60 @@ export function parseAnswerKeyText(rawText = '') {
       continue;
     }
 
-    // Bare line fallback -> assign sequentially 1, 2, 3...
-    map.set(sequentialCursor, line);
-    sequentialCursor++;
+    // 5. Bare line fallback -> assign sequentially 1, 2, 3...
+    const bareAns = cleanParsedAnswerValue(trimmed);
+    if (bareAns && !ANSWER_KEY_TYPE_NOTE_REGEX.test(bareAns)) {
+      map.set(sequentialCursor, bareAns);
+      sequentialCursor++;
+    }
   }
 
   return map;
 }
 
-export function applyAnswerKeyTextToQuestions(rawKeyText = '', existingQuestions = [], scopeField, scopeIdx) {
+const TFNG_SHORTHAND_MAP = {
+  T: 'TRUE',
+  F: 'FALSE',
+  NG: 'NOT GIVEN',
+  'N/G': 'NOT GIVEN',
+  NOTGIVEN: 'NOT GIVEN',
+  Y: 'YES',
+  N: 'NO'
+};
+
+function resolveOptionAnswerForQuestion(part, q) {
+  const cleanPart = String(part || '').trim();
+  if (!cleanPart) return '';
+  const options = Array.isArray(q?.options) ? q.options : [];
+  if (options.length === 0) return cleanPart;
+
+  const upperPart = cleanPart.toUpperCase();
+  const expanded = q?.type === 'tfng' ? (TFNG_SHORTHAND_MAP[upperPart] || cleanPart) : cleanPart;
+
+  const canonical = matchChoiceOption(expanded, options) || matchChoiceOption(cleanPart, options);
+  if (canonical) return canonical;
+
+  return (
+    options.find(opt => {
+      const optUp = String(opt || '').trim().toUpperCase();
+      return (
+        optUp === expanded.toUpperCase() ||
+        optUp === upperPart ||
+        optUp.startsWith(`${upperPart}.`) ||
+        optUp.startsWith(`${upperPart})`) ||
+        optUp.startsWith(`${upperPart} `)
+      );
+    }) || (q?.type === 'tfng' ? expanded : cleanPart)
+  );
+}
+
+export function applyAnswerKeyTextToQuestions(
+  rawKeyText = '',
+  existingQuestions = [],
+  scopeField,
+  scopeIdx,
+  { allScopes = false } = {}
+) {
   const keyMap = parseAnswerKeyText(rawKeyText);
   if (keyMap.size === 0) return { updated: existingQuestions, matchedCount: 0 };
 
@@ -541,55 +671,92 @@ export function applyAnswerKeyTextToQuestions(rawKeyText = '', existingQuestions
   let scopedCounter = 0;
   const hasScoped = existingQuestions.some(q => typeof q?.[scopeField] === 'number');
 
-  const updated = existingQuestions.map(q => {
-    const inScope = !hasScoped || typeof q?.[scopeField] !== 'number' || q[scopeField] === scopeIdx;
+  // Auto-expand across all Parts/Passages when teacher pastes keys whose numbers span outside the active Part (e.g. 1–40)
+  const activeScopeNums = new Set();
+  if (!allScopes && hasScoped) {
+    existingQuestions.forEach((q, idx) => {
+      if (typeof q?.[scopeField] === 'number' && q[scopeField] !== scopeIdx) return;
+      const explicitNum = Number(q?.questionNumber);
+      const numMatch = String(q?.question || '').trim().match(/^(?:câu\s*)?(\d+)(?:[.):\s-]|$)/i);
+      const n = Number.isFinite(explicitNum) && explicitNum > 0
+        ? explicitNum
+        : typeof q?.blankNum === 'number'
+        ? q.blankNum
+        : numMatch
+        ? Number(numMatch[1])
+        : idx + 1;
+      activeScopeNums.add(n);
+    });
+  }
+  const keyNumsOutsideActiveScope = !allScopes && hasScoped && Array.from(keyMap.keys()).some(k => !activeScopeNums.has(k));
+  const applyAcrossAllScopes = Boolean(allScopes || keyNumsOutsideActiveScope);
+
+  const updated = existingQuestions.map((q, globalIdx) => {
+    const inScope =
+      applyAcrossAllScopes ||
+      !hasScoped ||
+      typeof q?.[scopeField] !== 'number' ||
+      q[scopeField] === scopeIdx;
     if (!inScope) return q;
     scopedCounter++;
 
-    const numMatch = String(q.question || '').trim().match(/^(?:câu\s*)?(\d+)(?:[.):\s]|$)/i);
-    const numKey = typeof q.blankNum === 'number'
+    const explicitNum = Number(q?.questionNumber);
+    const numMatch = String(q?.question || '').trim().match(/^(?:câu\s*)?(\d+)(?:\s*[-–—]\s*(\d+))?(?:[.):\s]|$)/i);
+    const numKey = Number.isFinite(explicitNum) && explicitNum > 0
+      ? explicitNum
+      : typeof q?.blankNum === 'number' && q.blankNum > 0
       ? q.blankNum
       : numMatch
       ? Number(numMatch[1])
+      : applyAcrossAllScopes
+      ? globalIdx + 1
       : scopedCounter;
 
-    if (!keyMap.has(numKey)) return q;
-    const rawAns = keyMap.get(numKey);
+    const explicitEnd = Number(q?.questionEndNumber);
+    const endKey =
+      Number.isFinite(explicitEnd) && explicitEnd > numKey
+        ? explicitEnd
+        : numMatch?.[2] && Number(numMatch[2]) > numKey
+        ? Number(numMatch[2])
+        : numKey;
+
+    let rawAns = '';
+    if (endKey > numKey) {
+      const rangeValues = [];
+      for (let n = numKey; n <= endKey; n += 1) {
+        if (keyMap.has(n)) rangeValues.push(keyMap.get(n));
+      }
+      if (rangeValues.length > 0) {
+        rawAns = rangeValues.join(', ');
+      }
+    } else if (keyMap.has(numKey)) {
+      rawAns = keyMap.get(numKey);
+    }
+
+    if (!rawAns) return q;
     matchedCount++;
 
-    if ((q.type === 'mcq' || q.type === 'tfng') && Array.isArray(q.options) && q.options.length > 0) {
-      const rawParts = q.type === 'mcq'
-        ? rawAns.split(/\s*(?:,|;|\/|&|\band\b)\s*/i).filter(Boolean)
+    const options = Array.isArray(q?.options) ? q.options : [];
+    if (options.length > 0) {
+      const isMcq = q.type === 'mcq';
+      const rawParts = isMcq
+        ? rawAns.split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(p => p.trim()).filter(Boolean)
         : [rawAns];
-      const tfngAliasMap = {
-        T: 'TRUE',
-        F: 'FALSE',
-        NG: 'NOT GIVEN',
-        'N/G': 'NOT GIVEN',
-        NOTGIVEN: 'NOT GIVEN',
-        Y: 'YES',
-        N: 'NO'
+      const matchedAnswers = Array.from(
+        new Set(rawParts.map(part => resolveOptionAnswerForQuestion(part, q)).filter(Boolean))
+      );
+      if (isMcq) {
+        return {
+          ...q,
+          correctAnswers: matchedAnswers,
+          correctAnswer: matchedAnswers[0] || '',
+          requiredSelections: Math.max(1, Number(q.requiredSelections) || 1, matchedAnswers.length)
+        };
+      }
+      return {
+        ...q,
+        correctAnswer: matchedAnswers[0] || rawAns
       };
-      const matchedAnswers = rawParts.map(part => {
-        const partNorm = part.trim().toUpperCase();
-        const expandedTfng = q.type === 'tfng' ? (tfngAliasMap[partNorm] || partNorm) : partNorm;
-        return (
-          q.options.find(
-            opt =>
-              String(opt).trim().toUpperCase() === expandedTfng ||
-              String(opt).trim().toUpperCase() === partNorm ||
-              String(opt).trim().toUpperCase().startsWith(`${partNorm}.`)
-          ) || (q.type === 'tfng' ? expandedTfng : part)
-        );
-      });
-      return q.type === 'mcq'
-        ? {
-            ...q,
-            correctAnswers: matchedAnswers,
-            correctAnswer: matchedAnswers[0] || '',
-            requiredSelections: Math.max(1, matchedAnswers.length)
-          }
-        : { ...q, correctAnswer: matchedAnswers[0] || rawAns };
     }
 
     return { ...q, correctAnswer: rawAns };

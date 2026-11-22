@@ -97,14 +97,33 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     await page.getByRole('button', { name: /\+ Thực Chiến/i }).first().click();
     await expect(page.getByText(/TÊN ĐỀ THI IELTS|Soạn & Chỉnh Sửa Đề/i).first()).toBeVisible({ timeout: 12_000 });
-    // Verify Listening Builder includes AI PDF extraction section
+    // Verify Listening Builder includes AI PDF extraction + side-by-side Answer Key panel & range image tool
     await page.getByRole('button', { name: /2\. Listening/i }).first().click();
     await page.getByRole('tab', { name: /Tạo Tự Động \(AI Ảnh \/ PDF\)/i }).first().click();
-    await expect(page.getByText(/Tạo Đề Listening Tự Động Từ File PDF/i)).toBeVisible();
+    await expect(page.getByText(/Tạo Đề Listening Tự Động Từ File PDF \+ Bảng Đáp Án/i)).toBeVisible();
     await expect(page.locator('input[aria-label="Chọn PDF đề IELTS Listening"]')).toBeAttached();
+    await expect(page.locator('input[aria-label="Tải ảnh hoặc PDF bảng đáp án Listening"]')).toBeAttached();
+    await expect(page.locator('textarea[aria-label="Nhập hoặc dán bảng đáp án Listening"]')).toBeVisible();
+
+    // Add 1 MCQ question, paste Excel-style TSV answer key ("1\tB\tMultiple Choice"), verify checkbox checks & RangeImageAssignPanel appears
+    await page.getByRole('tab', { name: /Tạo Bằng Tay/i }).first().click();
+    await page.getByRole('button', { name: /Multiple Choice/i }).first().click();
+    await expect(page.getByText(/Gắn Hình Bản Đồ \(Map\) \/ Lưu Đồ \(Flow-chart\) Cho Nhóm Câu/i)).toBeVisible();
+    await page.getByRole('tab', { name: /Tạo Tự Động \(AI Ảnh \/ PDF\)/i }).first().click();
+    await page.locator('textarea[aria-label="Nhập hoặc dán bảng đáp án Listening"]').fill('1\tB\tMultiple Choice\n2\tB\tMultiple Choice');
+    await page.getByRole('button', { name: /Điền Key \(1–40\)/i }).first().click();
+    await page.getByRole('tab', { name: /Tất Cả Câu Hỏi/i }).first().click();
+    await expect(page.locator('label', { hasText: /B\. University admission requirements/i }).locator('input[type="checkbox"]')).toBeChecked();
+    await expect(page.locator('label', { hasText: /B\. Đáp án B/i }).locator('input[type="checkbox"]')).toBeChecked();
+
+    // Also confirm Reading Builder has side-by-side PDF + Answer Key panel
+    await page.getByRole('button', { name: /3\. Reading/i }).first().click();
+    await page.getByRole('tab', { name: /Tạo Tự Động \(AI Ảnh \/ PDF\)/i }).first().click();
+    await expect(page.locator('input[aria-label="Tải ảnh hoặc PDF bảng đáp án Reading"]')).toBeAttached();
     await assertNoHorizontalOverflow(page, 'Teacher-ExamBuilder');
 
-    // Return to Teacher Dashboard (ExamBuilder uses its own back button)
+    // Return to Teacher Dashboard (accept unsaved-draft confirmation cleanly)
+    page.once('dialog', d => d.accept());
     await page.getByRole('button', { name: /Quay Lại Bảng Điều Khiển Giáo Viên|Quản Trị GV/i }).first().click();
     await expect(page.getByRole('heading', { name: /Quản Lý & Giảng Dạy/i })).toBeVisible();
 

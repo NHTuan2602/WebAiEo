@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import {
   convertScreenshotsToIeltsHtml,
+  extractAnswerKeyFromMedia,
   extractExamFromImages,
   extractListeningExamFromPdf,
   extractReadingExamFromPdf,
@@ -106,6 +107,10 @@ export default function AiExamExtractorPanel({
   const [replaceWholeReading, setReplaceWholeReading] = useState(true);
   const [listeningPdfFile, setListeningPdfFile] = useState(null);
   const [replaceWholeListening, setReplaceWholeListening] = useState(true);
+  const [pdfAnswerKeyImages, setPdfAnswerKeyImages] = useState([]);
+  const [pdfAnswerKeyPdfFile, setPdfAnswerKeyPdfFile] = useState(null);
+  const [pdfAnswerKeyText, setPdfAnswerKeyText] = useState('');
+  const [extractingAnswerKeyOnly, setExtractingAnswerKeyOnly] = useState(false);
   const [preferCloze, setPreferCloze] = useState(true);
   const [replaceScope, setReplaceScope] = useState(true);
   const [extraInstructions, setExtraInstructions] = useState('');
@@ -277,6 +282,91 @@ export default function AiExamExtractorPanel({
     setReadingPdfFile(file);
   };
 
+  const handleSelectPdfAnswerKeyFiles = async (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (files.length === 0) return;
+    setErrorMsg('');
+
+    const pdfCandidate = files.find(f => f.name?.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf');
+    if (pdfCandidate) {
+      if (pdfCandidate.size > MAX_READING_PDF_BYTES) {
+        setErrorMsg(`File PDF đáp án quá lớn (${formatFileSize(pdfCandidate.size)}). Hãy dùng file nhỏ hơn 14 MB.`);
+      } else {
+        setPdfAnswerKeyPdfFile(pdfCandidate);
+        showToast?.(`Đã đính kèm PDF đáp án: ${pdfCandidate.name}`, 'info');
+      }
+    }
+
+    const imageFiles = files.filter(f => f.type?.startsWith('image/'));
+    if (imageFiles.length > 0) {
+      await appendImageFiles(imageFiles, setPdfAnswerKeyImages);
+    }
+
+    const textFile = files.find(f => /\.(txt|csv|tsv)$/i.test(f.name || ''));
+    if (textFile) {
+      try {
+        const txt = await textFile.text();
+        if (txt.trim()) {
+          setPdfAnswerKeyText(prev => (prev.trim() ? `${prev.trim()}\n${txt.trim()}` : txt.trim()));
+          showToast?.(`Đã nạp nội dung đáp án từ ${textFile.name}!`, 'info');
+        }
+      } catch (_err) {}
+    }
+  };
+
+  const handleApplyPdfAnswerKeyNow = async () => {
+    setErrorMsg('');
+    const hasText = Boolean(pdfAnswerKeyText.trim());
+    const hasImages = pdfAnswerKeyImages.length > 0;
+    const hasPdf = Boolean(pdfAnswerKeyPdfFile);
+
+    if (!hasText && !hasImages && !hasPdf) {
+      setErrorMsg('Hãy dán danh sách đáp án (từ Excel/Text), dán ảnh (Ctrl+V), hoặc tải file Ảnh/PDF bảng đáp án trước.');
+      return;
+    }
+
+    if (hasText && !hasImages && !hasPdf) {
+      onApplyQuickAnswerText?.(pdfAnswerKeyText, { allScopes: true });
+      return;
+    }
+
+    if (!hasGeminiAccess) {
+      if (hasText) {
+        onApplyQuickAnswerText?.(pdfAnswerKeyText, { allScopes: true });
+        return;
+      }
+      setErrorMsg('Chưa cấu hình Google Gemini API Key để AI đọc ảnh/PDF bảng đáp án. Bạn vẫn có thể copy–paste text trực tiếp từ Excel!');
+      return;
+    }
+
+    setExtractingAnswerKeyOnly(true);
+    try {
+      const docs = [];
+      if (pdfAnswerKeyPdfFile) {
+        const sig = new TextDecoder().decode(await pdfAnswerKeyPdfFile.slice(0, 5).arrayBuffer());
+        if (sig !== '%PDF-') throw new Error('File PDF đáp án không hợp lệ.');
+        docs.push(await readFileAsDataUrl(pdfAnswerKeyPdfFile));
+      }
+      const parsedKey = await extractAnswerKeyFromMedia({
+        apiKey: aiApiKey,
+        images: pdfAnswerKeyImages.map(i => i.dataUrl),
+        documents: docs,
+        extraText: pdfAnswerKeyText
+      });
+      const combinedText = pdfAnswerKeyText.trim()
+        ? `${parsedKey.keyText}\n${pdfAnswerKeyText.trim()}`
+        : parsedKey.keyText;
+      setPdfAnswerKeyText(parsedKey.keyText);
+      onApplyQuickAnswerText?.(combinedText, { allScopes: true });
+      showToast?.(`AI đã đọc ${parsedKey.count} đáp án từ ảnh/PDF và tự động điền vào đề!`);
+    } catch (err) {
+      setErrorMsg(err?.message || 'Không thể đọc bảng đáp án từ ảnh/PDF. Hãy thử ảnh rõ nét hơn hoặc copy–paste từ Excel.');
+    } finally {
+      setExtractingAnswerKeyOnly(false);
+    }
+  };
+
   const handleRunReadingPdfExtract = async () => {
     setErrorMsg('');
     setLastResultInfo(null);
@@ -293,10 +383,19 @@ export default function AiExamExtractorPanel({
     try {
       const signature = new TextDecoder().decode(await readingPdfFile.slice(0, 5).arrayBuffer());
       if (signature !== '%PDF-') throw new Error('File đã chọn không phải PDF hợp lệ. Hãy chọn lại đề thi.');
+      let answerKeyPdfDataUrl = '';
+      if (pdfAnswerKeyPdfFile) {
+        const keySig = new TextDecoder().decode(await pdfAnswerKeyPdfFile.slice(0, 5).arrayBuffer());
+        if (keySig !== '%PDF-') throw new Error('File PDF bảng đáp án không hợp lệ.');
+        answerKeyPdfDataUrl = await readFileAsDataUrl(pdfAnswerKeyPdfFile);
+      }
       const extracted = await extractReadingExamFromPdf({
         apiKey: aiApiKey,
         pdfDataUrl: await readFileAsDataUrl(readingPdfFile),
         fileName: readingPdfFile.name,
+        answerKeyImages: pdfAnswerKeyImages.map(i => i.dataUrl),
+        answerKeyPdfDataUrl,
+        answerKeyText: pdfAnswerKeyText,
         extraInstructions
       });
       const summary = onApplyReadingPdfExtraction?.(extracted, { replaceAll: replaceWholeReading });
@@ -351,10 +450,19 @@ export default function AiExamExtractorPanel({
     try {
       const signature = new TextDecoder().decode(await listeningPdfFile.slice(0, 5).arrayBuffer());
       if (signature !== '%PDF-') throw new Error('File đã chọn không phải PDF hợp lệ. Hãy chọn lại đề thi.');
+      let answerKeyPdfDataUrl = '';
+      if (pdfAnswerKeyPdfFile) {
+        const keySig = new TextDecoder().decode(await pdfAnswerKeyPdfFile.slice(0, 5).arrayBuffer());
+        if (keySig !== '%PDF-') throw new Error('File PDF bảng đáp án không hợp lệ.');
+        answerKeyPdfDataUrl = await readFileAsDataUrl(pdfAnswerKeyPdfFile);
+      }
       const extracted = await extractListeningExamFromPdf({
         apiKey: aiApiKey,
         pdfDataUrl: await readFileAsDataUrl(listeningPdfFile),
         fileName: listeningPdfFile.name,
+        answerKeyImages: pdfAnswerKeyImages.map(i => i.dataUrl),
+        answerKeyPdfDataUrl,
+        answerKeyText: pdfAnswerKeyText,
         extraInstructions
       });
       const summary = onApplyListeningPdfExtraction?.(extracted, { replaceAll: replaceWholeListening });
@@ -448,66 +556,203 @@ export default function AiExamExtractorPanel({
       </div>
 
       {skill === 'listening' && onApplyListeningPdfExtraction && (
-        <section className="rounded-2xl border border-sky-200 dark:border-sky-500/30 bg-sky-50/75 dark:bg-sky-500/10 p-4 sm:p-5 space-y-3.5">
+        <section className="rounded-2xl border border-sky-200 dark:border-sky-500/30 bg-sky-50/75 dark:bg-sky-500/10 p-4 sm:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sky-200/60 dark:border-sky-500/20 pb-3">
             <div>
               <h4 className="flex items-center gap-2 text-sm font-extrabold text-sky-950 dark:text-sky-100">
                 <FileText className="w-4 h-4 text-sky-600 dark:text-sky-300" />
-                <span>Tạo Đề Listening Tự Động Từ File PDF (1–4 Parts · 10–40 Câu)</span>
+                <span>Tạo Đề Listening Tự Động Từ File PDF + Bảng Đáp Án (1–4 Parts · 10–40 Câu)</span>
               </h4>
               <p className="mt-0.5 text-xs text-sky-900/80 dark:text-sky-200/80">
-                Tải file PDF đề Cambridge / bài nghe lẻ (có thể kèm Answer Key &amp; Audioscript) để AI tách sẵn từng Part, đục lỗ Note/Table/Flow-chart, MCQ &amp; Map.
+                Bỏ file PDF đề thi bên trái và ảnh chụp / file PDF / bảng đáp án copy từ Excel ở ô bên phải — AI tự ghép đáp án chính xác vào đủ 40 câu.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <label className="cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-blue-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900">
-              <Upload className="w-4 h-4" />
-              <span>{listeningPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF Listening'}</span>
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                onChange={handleSelectListeningPdf}
-                className="sr-only"
-                aria-label="Chọn PDF đề IELTS Listening"
-              />
-            </label>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+            {/* Left box: Exam PDF */}
+            <div className="rounded-xl border border-sky-200/90 dark:border-sky-500/30 bg-white dark:bg-slate-900/90 p-3.5 space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-sky-400" />
+                    1. File PDF Đề Listening
+                  </span>
+                  {listeningPdfFile && (
+                    <button
+                      type="button"
+                      onClick={() => setListeningPdfFile(null)}
+                      className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                    >
+                      Gỡ file
+                    </button>
+                  )}
+                </div>
 
-            <div className="min-w-0 flex-1" aria-live="polite">
-              {listeningPdfFile ? (
-                <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={listeningPdfFile.name}>
-                  {listeningPdfFile.name} <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(listeningPdfFile.size)}</span>
-                </p>
-              ) : (
-                <p className="text-xs text-slate-600 dark:text-slate-300">Chọn file PDF đề Listening (1 Part lẻ hoặc Full 4 Parts + Answer Key, tối đa 14 MB).</p>
-              )}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <label className="cursor-pointer inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white transition hover:bg-blue-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{listeningPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF Listening'}</span>
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={handleSelectListeningPdf}
+                      className="sr-only"
+                      aria-label="Chọn PDF đề IELTS Listening"
+                    />
+                  </label>
+                  <div className="min-w-0 flex-1" aria-live="polite">
+                    {listeningPdfFile ? (
+                      <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={listeningPdfFile.name}>
+                        {listeningPdfFile.name}{' '}
+                        <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(listeningPdfFile.size)}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-600 dark:text-slate-300">PDF 1 Part lẻ hoặc Full 4 Parts (tối đa 14 MB).</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <input
+                  type="checkbox"
+                  checked={replaceWholeListening}
+                  onChange={e => setReplaceWholeListening(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded accent-blue-600"
+                />
+                <span>Thay toàn bộ câu hỏi hiện có bằng đề trong PDF (vẫn giữ file MP3 đã tải lên của từng Part)</span>
+              </label>
             </div>
 
+            {/* Right box: Side-by-side Answer Key uploader (Image / PDF / Copy-Paste Excel) */}
+            <div
+              tabIndex={0}
+              onPaste={e => handlePasteZone(e, setPdfAnswerKeyImages)}
+              className="rounded-xl border border-emerald-200/90 dark:border-emerald-500/30 bg-white dark:bg-slate-900/90 p-3.5 space-y-2.5 focus:outline-none focus:ring-2 focus:ring-[#059271]"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-extrabold text-[#059271] dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  2. Bảng Đáp Án (Ảnh / PDF / Copy từ Excel)
+                </span>
+                {(pdfAnswerKeyImages.length > 0 || pdfAnswerKeyPdfFile || pdfAnswerKeyText.trim()) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPdfAnswerKeyImages([]);
+                      setPdfAnswerKeyPdfFile(null);
+                      setPdfAnswerKeyText('');
+                    }}
+                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                  >
+                    Xóa tất cả
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="cursor-pointer inline-flex items-center gap-1.5 bg-[#ECFDF5] dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-[#059271] dark:text-emerald-300 border border-[#9FF5E1] dark:border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-xl transition">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>
+                    Tải Ảnh / PDF Đáp Án
+                    {pdfAnswerKeyImages.length + (pdfAnswerKeyPdfFile ? 1 : 0) > 0
+                      ? ` (${pdfAnswerKeyImages.length + (pdfAnswerKeyPdfFile ? 1 : 0)})`
+                      : ''}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,.pdf,.txt,.csv,.tsv"
+                    multiple
+                    onChange={handleSelectPdfAnswerKeyFiles}
+                    className="sr-only"
+                    aria-label="Tải ảnh hoặc PDF bảng đáp án Listening"
+                  />
+                </label>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  hoặc bấm ô này rồi <kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border font-mono text-[10px]">Ctrl+V</kbd> dán ảnh Excel
+                </span>
+              </div>
+
+              {(pdfAnswerKeyImages.length > 0 || pdfAnswerKeyPdfFile) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {pdfAnswerKeyPdfFile && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                      <FileText className="w-3.5 h-3.5" />
+                      <span className="max-w-[150px] truncate">{pdfAnswerKeyPdfFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setPdfAnswerKeyPdfFile(null)}
+                        className="text-rose-600 dark:text-rose-400 hover:opacity-80"
+                        title="Gỡ PDF đáp án"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {pdfAnswerKeyImages.map((img, idx) => (
+                    <div key={img.id} className="relative w-14 h-11 rounded-lg overflow-hidden border border-emerald-300 dark:border-emerald-600">
+                      <img src={img.dataUrl} alt={`Đáp án ${idx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setPdfAnswerKeyImages(prev => prev.filter(p => p.id !== img.id))}
+                        className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-rose-600 text-white"
+                        title="Gỡ ảnh đáp án"
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2 items-start">
+                <textarea
+                  rows={2}
+                  value={pdfAnswerKeyText}
+                  onChange={e => setPdfAnswerKeyText(e.target.value)}
+                  placeholder={'Copy thẳng cột đáp án từ Excel hoặc gõ:\n1. THREE HOURS\n11. B\n15. I'}
+                  aria-label="Nhập hoặc dán bảng đáp án Listening"
+                  className="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#059271] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={extractingAnswerKeyOnly || extracting || (!pdfAnswerKeyText.trim() && pdfAnswerKeyImages.length === 0 && !pdfAnswerKeyPdfFile)}
+                  onClick={handleApplyPdfAnswerKeyNow}
+                  className={`px-3 py-2 rounded-xl text-xs font-extrabold transition shrink-0 inline-flex items-center gap-1.5 ${
+                    extractingAnswerKeyOnly || extracting || (!pdfAnswerKeyText.trim() && pdfAnswerKeyImages.length === 0 && !pdfAnswerKeyPdfFile)
+                      ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                      : 'bg-[#059271] hover:bg-emerald-700 text-white'
+                  }`}
+                  title="Tự động điền đáp án vào toàn bộ 1–40 câu hỏi đã có sẵn trong đề"
+                >
+                  {extractingAnswerKeyOnly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                  <span>{extractingAnswerKeyOnly ? 'Đang đọc...' : 'Điền Key (1–40)'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <span className="text-[11px] font-semibold text-sky-900/80 dark:text-sky-200/80">
+              {pdfAnswerKeyImages.length > 0 || pdfAnswerKeyPdfFile || pdfAnswerKeyText.trim()
+                ? '✅ Đã có bảng đáp án đính kèm — AI sẽ tự động ghép đáp án vào đủ các câu MCQ / Map / Flow-chart / Điền từ.'
+                : 'Mẹo: Nếu file PDF chưa có trang Answer Key, hãy dán ảnh Excel hoặc copy danh sách đáp án ở ô bên phải.'}
+            </span>
             <button
               type="button"
               disabled={!listeningPdfFile || extracting}
               onClick={handleRunListeningPdfExtract}
-              className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+              className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2 text-xs font-extrabold transition shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 !listeningPdfFile || extracting
                   ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
                   : 'bg-[#007A7A] text-white hover:bg-[#065B5B]'
               }`}
             >
               {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-amber-300" />}
-              {extracting ? 'AI đang đọc PDF Listening…' : 'AI đọc PDF & tạo đề'}
+              {extracting ? 'AI đang đọc PDF Listening & ghép đáp án…' : 'AI đọc PDF & tạo đề'}
             </button>
           </div>
-
-          <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-            <input
-              type="checkbox"
-              checked={replaceWholeListening}
-              onChange={e => setReplaceWholeListening(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded accent-blue-600"
-            />
-            <span>Thay toàn bộ câu hỏi Listening hiện có bằng đề trong PDF (vẫn giữ nguyên file MP3 đã tải lên của từng Part nếu có)</span>
-          </label>
         </section>
       )}
 
@@ -517,10 +762,10 @@ export default function AiExamExtractorPanel({
             <div>
               <h4 className="flex items-center gap-2 text-sm font-extrabold text-indigo-950 dark:text-indigo-100">
                 <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
-                <span>Tạo Toàn Bộ Đề Reading (3 Passages + 40 Câu)</span>
+                <span>Tạo Toàn Bộ Đề Reading (3 Passages + 40 Câu) + Bảng Đáp Án</span>
               </h4>
               <p className="mt-0.5 text-xs text-indigo-900/80 dark:text-indigo-200/80">
-                Hỗ trợ tải file PDF có sẵn hoặc tự động ghép hàng loạt ảnh chụp web cuộn 2 cột thành PDF chuẩn Cambridge.
+                Hỗ trợ tải file PDF đề thi kèm ảnh/PDF/Excel bảng đáp án bên cạnh, hoặc ghép ảnh chụp web cuộn 2 cột thành PDF chuẩn Cambridge.
               </p>
             </div>
 
@@ -554,54 +799,191 @@ export default function AiExamExtractorPanel({
           </div>
 
           {readingSourceTab === 'pdf' ? (
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <label className="cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-900">
-                  <Upload className="w-4 h-4" />
-                  <span>{readingPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF'}</span>
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={handleSelectReadingPdf}
-                    className="sr-only"
-                    aria-label="Chọn PDF đề IELTS Reading"
-                  />
-                </label>
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                {/* Left box: Reading Exam PDF */}
+                <div className="rounded-xl border border-indigo-200/90 dark:border-indigo-500/30 bg-white dark:bg-slate-900/90 p-3.5 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        1. File PDF Đề Reading
+                      </span>
+                      {readingPdfFile && (
+                        <button
+                          type="button"
+                          onClick={() => setReadingPdfFile(null)}
+                          className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                        >
+                          Gỡ file
+                        </button>
+                      )}
+                    </div>
 
-                <div className="min-w-0 flex-1" aria-live="polite">
-                  {readingPdfFile ? (
-                    <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={readingPdfFile.name}>
-                      {readingPdfFile.name} <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(readingPdfFile.size)}</span>
-                    </p>
-                  ) : (
-                    <p className="text-xs text-slate-600 dark:text-slate-300">Chọn file PDF có đầy đủ 3 passage, câu hỏi và answer key (tối đa 14 MB).</p>
-                  )}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <label className="cursor-pointer inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{readingPdfFile ? 'Chọn PDF khác' : 'Chọn đề PDF Reading'}</span>
+                        <input
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          onChange={handleSelectReadingPdf}
+                          className="sr-only"
+                          aria-label="Chọn PDF đề IELTS Reading"
+                        />
+                      </label>
+                      <div className="min-w-0 flex-1" aria-live="polite">
+                        {readingPdfFile ? (
+                          <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100" title={readingPdfFile.name}>
+                            {readingPdfFile.name}{' '}
+                            <span className="font-medium text-slate-500 dark:text-slate-400">· {formatFileSize(readingPdfFile.size)}</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-slate-600 dark:text-slate-300">PDF 1–3 Passages + câu hỏi (tối đa 14 MB).</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={replaceWholeReading}
+                      onChange={e => setReplaceWholeReading(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded accent-indigo-600"
+                    />
+                    <span>Thay toàn bộ Reading hiện có bằng đề trong PDF</span>
+                  </label>
                 </div>
 
+                {/* Right box: Side-by-side Answer Key uploader */}
+                <div
+                  tabIndex={0}
+                  onPaste={e => handlePasteZone(e, setPdfAnswerKeyImages)}
+                  className="rounded-xl border border-emerald-200/90 dark:border-emerald-500/30 bg-white dark:bg-slate-900/90 p-3.5 space-y-2.5 focus:outline-none focus:ring-2 focus:ring-[#059271]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold text-[#059271] dark:text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      2. Bảng Đáp Án (Ảnh / PDF / Copy từ Excel)
+                    </span>
+                    {(pdfAnswerKeyImages.length > 0 || pdfAnswerKeyPdfFile || pdfAnswerKeyText.trim()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPdfAnswerKeyImages([]);
+                          setPdfAnswerKeyPdfFile(null);
+                          setPdfAnswerKeyText('');
+                        }}
+                        className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                      >
+                        Xóa tất cả
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-1.5 bg-[#ECFDF5] dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-[#059271] dark:text-emerald-300 border border-[#9FF5E1] dark:border-emerald-500/30 text-xs font-bold px-3 py-1.5 rounded-xl transition">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>
+                        Tải Ảnh / PDF Đáp Án
+                        {pdfAnswerKeyImages.length + (pdfAnswerKeyPdfFile ? 1 : 0) > 0
+                          ? ` (${pdfAnswerKeyImages.length + (pdfAnswerKeyPdfFile ? 1 : 0)})`
+                          : ''}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf,.pdf,.txt,.csv,.tsv"
+                        multiple
+                        onChange={handleSelectPdfAnswerKeyFiles}
+                        className="sr-only"
+                        aria-label="Tải ảnh hoặc PDF bảng đáp án Reading"
+                      />
+                    </label>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      hoặc bấm ô này rồi <kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border font-mono text-[10px]">Ctrl+V</kbd> dán ảnh Excel
+                    </span>
+                  </div>
+
+                  {(pdfAnswerKeyImages.length > 0 || pdfAnswerKeyPdfFile) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {pdfAnswerKeyPdfFile && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                          <FileText className="w-3.5 h-3.5" />
+                          <span className="max-w-[150px] truncate">{pdfAnswerKeyPdfFile.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setPdfAnswerKeyPdfFile(null)}
+                            className="text-rose-600 dark:text-rose-400 hover:opacity-80"
+                            title="Gỡ PDF đáp án"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      )}
+                      {pdfAnswerKeyImages.map((img, idx) => (
+                        <div key={img.id} className="relative w-14 h-11 rounded-lg overflow-hidden border border-emerald-300 dark:border-emerald-600">
+                          <img src={img.dataUrl} alt={`Đáp án ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setPdfAnswerKeyImages(prev => prev.filter(p => p.id !== img.id))}
+                            className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-rose-600 text-white"
+                            title="Gỡ ảnh đáp án"
+                          >
+                            <Trash2 className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 items-start">
+                    <textarea
+                      rows={2}
+                      value={pdfAnswerKeyText}
+                      onChange={e => setPdfAnswerKeyText(e.target.value)}
+                      placeholder={'Copy thẳng cột đáp án từ Excel hoặc gõ:\n1. TRUE\n2. FALSE\n3. NOT GIVEN'}
+                      aria-label="Nhập hoặc dán bảng đáp án Reading"
+                      className="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#059271] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={extractingAnswerKeyOnly || extracting || (!pdfAnswerKeyText.trim() && pdfAnswerKeyImages.length === 0 && !pdfAnswerKeyPdfFile)}
+                      onClick={handleApplyPdfAnswerKeyNow}
+                      className={`px-3 py-2 rounded-xl text-xs font-extrabold transition shrink-0 inline-flex items-center gap-1.5 ${
+                        extractingAnswerKeyOnly || extracting || (!pdfAnswerKeyText.trim() && pdfAnswerKeyImages.length === 0 && !pdfAnswerKeyPdfFile)
+                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                          : 'bg-[#059271] hover:bg-emerald-700 text-white'
+                      }`}
+                      title="Tự động điền đáp án vào toàn bộ 1–40 câu hỏi đã có sẵn trong đề"
+                    >
+                      {extractingAnswerKeyOnly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      <span>{extractingAnswerKeyOnly ? 'Đang đọc...' : 'Điền Key (1–40)'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <span className="text-[11px] font-semibold text-indigo-900/80 dark:text-indigo-200/80">
+                  {pdfAnswerKeyImages.length > 0 || pdfAnswerKeyPdfFile || pdfAnswerKeyText.trim()
+                    ? '✅ Đã có bảng đáp án đính kèm — AI sẽ tự động ghép đáp án chuẩn xác vào đủ 1–40 câu.'
+                    : 'Mẹo: Nếu PDF chưa kèm Answer Key, dán ảnh/PDF đáp án hoặc copy danh sách đáp án ở ô bên phải.'}
+                </span>
                 <button
                   type="button"
                   disabled={!readingPdfFile || extracting}
                   onClick={handleRunReadingPdfExtract}
-                  className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+                  className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2 text-xs font-extrabold transition shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                     !readingPdfFile || extracting
                       ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
                       : 'bg-[#007A7A] text-white hover:bg-[#065B5B]'
                   }`}
                 >
                   {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-amber-300" />}
-                  {extracting ? 'AI đang đọc toàn bộ PDF…' : 'AI đọc PDF & tạo đề'}
+                  {extracting ? 'AI đang đọc toàn bộ PDF & ghép đáp án…' : 'AI đọc PDF & tạo đề'}
                 </button>
               </div>
-
-              <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={replaceWholeReading}
-                  onChange={e => setReplaceWholeReading(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded accent-indigo-600"
-                />
-                <span>Thay toàn bộ Reading hiện có bằng đề trong PDF</span>
-              </label>
             </div>
           ) : (
             <div className="space-y-3.5">

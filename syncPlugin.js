@@ -6653,7 +6653,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             }
           }
         });
-        const documents = Array.isArray(body?.documents) ? body.documents.slice(0, 1) : [];
+        const documents = Array.isArray(body?.documents) ? body.documents.slice(0, 2) : [];
         documents.forEach(document => {
           if (
             typeof document === 'object' &&

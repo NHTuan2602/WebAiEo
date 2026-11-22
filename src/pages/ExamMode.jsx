@@ -1020,6 +1020,7 @@ export default function ExamMode({
                           }}
                           onPassageTextSelect={handlePassageTextSelect}
                           onToggleBookmark={toggleBookmarkQuestion}
+                          onZoomImage={setZoomedReadingImg}
                           questions={allReadingQs}
                           renderText={renderHighlightRuns}
                           scopeField="passageIdx"
@@ -1138,6 +1139,7 @@ export default function ExamMode({
                         }}
                         onPassageTextSelect={handlePassageTextSelect}
                         onToggleBookmark={toggleBookmarkQuestion}
+                        onZoomImage={setZoomedReadingImg}
                         questions={allListeningQs}
                         renderText={renderHighlightRuns}
                         scopeField="trackIdx"
@@ -1199,6 +1201,7 @@ export default function ExamMode({
                   }}
                   onPassageTextSelect={handlePassageTextSelect}
                   onToggleBookmark={toggleBookmarkQuestion}
+                  onZoomImage={setZoomedReadingImg}
                   questions={allListeningQs}
                   renderText={renderHighlightRuns}
                   scopeField="trackIdx"

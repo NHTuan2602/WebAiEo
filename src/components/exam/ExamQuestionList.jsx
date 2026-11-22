@@ -128,7 +128,7 @@ export default function ExamQuestionList({
     return null;
   };
 
-  const renderSingleQuestionCard = (q, displayNum, { insideGroup = false } = {}) => {
+  const renderSingleQuestionCard = (q, displayNum, { insideGroup = false, groupImageUrl = '' } = {}) => {
     const isActive = activeQuestionId === q.id;
     const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
     const cleanPrompt = formatInlineBlankPlaceholders(stripLeadingQuestionNumber(q.question) || q.question);
@@ -227,7 +227,7 @@ export default function ExamQuestionList({
           </div>
         </div>
 
-        {!insideGroup && q.imageUrl && (
+        {q.imageUrl && (!insideGroup || q.imageUrl !== groupImageUrl) && (
           <div className="mb-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2.5 max-w-2xl">
             <img
               src={q.imageUrl}
@@ -814,9 +814,31 @@ export default function ExamQuestionList({
                   </div>
                 )}
               </div>
+              {block.imageUrl && (
+                <div className="rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#141414] p-3 max-w-2xl">
+                  <img
+                    src={block.imageUrl}
+                    alt={`Bản đồ / Sơ đồ câu ${firstNum}–${lastNum}`}
+                    onClick={() => onZoomImage?.(block.imageUrl)}
+                    className="w-full max-h-[420px] object-contain rounded mx-auto cursor-zoom-in"
+                  />
+                  {onZoomImage && (
+                    <button
+                      type="button"
+                      onClick={() => onZoomImage(block.imageUrl)}
+                      className="mt-2 mx-auto block text-xs font-bold text-[#2563EB] hover:underline"
+                    >
+                      Bấm vào ảnh để phóng to bản đồ / sơ đồ
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="space-y-3">
                 {block.items.map(({ question: itemQ, displayNum }) =>
-                  renderSingleQuestionCard(itemQ, displayNum, { insideGroup: true })
+                  renderSingleQuestionCard(itemQ, displayNum, {
+                    insideGroup: true,
+                    groupImageUrl: block.imageUrl || ''
+                  })
                 )}
               </div>
             </div>

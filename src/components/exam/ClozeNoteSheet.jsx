@@ -56,6 +56,7 @@ export default function ClozeNoteSheet({
   onBlankFocus,
   onPassageTextSelect,
   onToggleBookmark,
+  onZoomImage = null,
   questions = [],
   readOnlyPreview = false,
   renderText = null,
@@ -95,6 +96,8 @@ export default function ClozeNoteSheet({
         }
       });
     });
+
+    const sectionImageUrl = sectionBlankLinks.find(item => item.linkedQ?.imageUrl)?.linkedQ?.imageUrl || '';
 
     const filteredLines = sharedWordBoxOptions.length > 0
       ? sectionLines.filter(line => !isRedundantOptionBoxLine(line, sharedWordBoxOptions))
@@ -576,6 +579,26 @@ export default function ClozeNoteSheet({
                   Write {linkedWordLimit} from the passage for each answer.
                 </span>
               </div>
+            )}
+          </div>
+        )}
+
+        {sectionImageUrl && (
+          <div className="rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#141414] p-3 max-w-2xl">
+            <img
+              src={sectionImageUrl}
+              alt="Bản đồ / Lưu đồ / Sơ đồ câu hỏi"
+              onClick={() => onZoomImage?.(sectionImageUrl)}
+              className={`w-full max-h-[420px] object-contain rounded mx-auto ${onZoomImage ? 'cursor-zoom-in' : ''}`}
+            />
+            {onZoomImage && (
+              <button
+                type="button"
+                onClick={() => onZoomImage(sectionImageUrl)}
+                className="mt-2 mx-auto block text-xs font-bold text-[#2563EB] hover:underline"
+              >
+                Bấm vào ảnh để phóng to bản đồ / sơ đồ
+              </button>
             )}
           </div>
         )}
