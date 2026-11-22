@@ -120,7 +120,10 @@ export default function SpeakingExamRoom({
 
   useEffect(() => {
     examStartedAtRef.current = Date.now();
-  }, [selectedTestId]);
+    setCurrentIdx(0);
+    setRecordingsByQid({});
+    setPart2Notes('');
+  }, [activeTest?.id]);
 
   const stopMeterLoop = () => {
     if (meterRafRef.current) {

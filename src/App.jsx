@@ -68,7 +68,8 @@ import {
   buildPracticeRoundQueues,
   buildDefaultQuestionFields,
   getActiveTeamIds,
-  pickBalancedTeamId
+  pickBalancedTeamId,
+  matchRound4TypingAnswer
 } from './utils/examHelpers';
 import {
   testGeminiApiConnection,
@@ -1342,6 +1343,7 @@ export default function App() {
   const [gameCombo, setGameCombo] = useState(0);
   const [gameWordIdx, setGameWordIdx] = useState(0);
   const [gameTypedProgress, setGameTypedProgress] = useState(0);
+  const [gameRound4Input, setGameRound4Input] = useState('');
   const [gameSubState, setGameSubState] = useState(() => initialNav.gameSubState || 'JOIN'); // 'JOIN' | 'LOBBY' | 'COUNTDOWN' | 'PLAYING' | 'TRANSITION' | 'GAMEOVER'
   const [gameOutcome, setGameOutcome] = useState(null); // 'VICTORY' | 'LOST' | null
   const [gameTimeLeft, setGameTimeLeft] = useState(GAME_ROUND_TIME_LIMITS[1]);
@@ -6541,7 +6543,7 @@ export default function App() {
 
     pushGameParticles(px, py, '#fb7185', 16);
     const roundHint = rt.round === 3
-      ? 'Hãy đọc kỹ yêu cầu Đồng nghĩa / Trái nghĩa / Định nghĩa!'
+      ? 'Hãy đọc kỹ yêu cầu Đồng nghĩa / Trái nghĩa / Ngữ cảnh!'
       : 'Hãy nhìn kỹ nghĩa tiếng Việt & bắn mục tiêu đúng!';
     handleGameLifeLoss(`❌ Chọn nhầm "${choiceLabel}"! ${roundHint}`, false);
     return false;
@@ -6559,10 +6561,100 @@ export default function App() {
     resolveGameChoiceAttempt(choiceText, isCorrect);
   };
 
-  // Handle continuous typing attack in Round 2 (Full Word Boss) & Round 4 (Collocation Boss)
+  // Round 4: live typing feedback & Boss HP update (supports multiple accepted typing answers)
+  const handleRound4InputChange = (nextVal) => {
+    const rt = gameRuntimeRef.current;
+    const prevLen = String(rt.round4TypedText || '').length;
+    const cleanNext = String(nextVal ?? '');
+    rt.round4TypedText = cleanNext;
+    setGameRound4Input(cleanNext);
+
+    if (rt.subState !== 'PLAYING' || rt.round !== 4 || !rt.activeQuestion || rt.questionResolved) return;
+    const q = rt.activeQuestion;
+    const accepted = Array.isArray(q.v4Answers) && q.v4Answers.length > 0
+      ? q.v4Answers
+      : [q.v4Display || q.collocation || q.word];
+    const evalRes = matchRound4TypingAnswer(cleanNext, accepted);
+    rt.round4MatchRatio = evalRes.matchRatio;
+
+    if (cleanNext.length > prevLen) {
+      playSound('type_hit');
+      const canvas = canvasRef.current;
+      const w = canvas?.width || 800;
+      const h = canvas?.height || 460;
+      const hitX = w / 2 + (Math.random() * 44 - 22);
+      const hitY = Math.max(60, h * 0.28);
+      homingLasersRef.current.push({
+        x: w / 2,
+        y: h - 42,
+        targetX: hitX,
+        targetY: hitY,
+        color: '#f43f5e',
+        progress: 0
+      });
+      pushGameParticles(hitX, hitY, '#fb7185', 5);
+    }
+  };
+
+  const handleSubmitRound4Answer = (submittedText) => {
+    const rt = gameRuntimeRef.current;
+    if (rt.subState !== 'PLAYING' || rt.round !== 4 || !rt.activeQuestion || rt.questionResolved || rt.paused) return;
+    const rawTyped = String(submittedText ?? rt.round4TypedText ?? '').trim();
+    if (!rawTyped) return;
+
+    const q = rt.activeQuestion;
+    const accepted = Array.isArray(q.v4Answers) && q.v4Answers.length > 0
+      ? q.v4Answers
+      : [q.v4Display || q.collocation || q.word];
+    const evalRes = matchRound4TypingAnswer(rawTyped, accepted);
+
+    if (evalRes.matched) {
+      rt.questionResolved = true;
+      rt.round4MatchRatio = 1;
+      rt.round4TypedText = '';
+      setGameRound4Input('');
+
+      const limitSec = Math.max(1, rt.timeLimit || 32);
+      const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
+      const reactionMs = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
+      const speedBonus = Math.round(remainRatio * 140);
+      const feverMult = rt.combo >= 3 ? 2 : 1;
+      const totalGain = (260 + rt.combo * 25 + speedBonus) * feverMult;
+      const nextScore = rt.score + totalGain;
+      const nextCombo = rt.combo + 1;
+
+      rt.score = nextScore;
+      rt.combo = nextCombo;
+      setGameScore(nextScore);
+      setGameCombo(nextCombo);
+
+      const canvas = canvasRef.current;
+      const w = canvas?.width || 800;
+      const h = canvas?.height || 460;
+      pushGameParticles(w / 2, Math.max(80, h * 0.3), feverMult > 1 ? '#fbbf24' : '#f43f5e', 36);
+      playSound('word_clear');
+      speakWord(evalRes.matchedAnswer || q.v4Display || q.word);
+      triggerGameToast(
+        `💥 HẠ GỤC BOSS! "${evalRes.matchedAnswer}" +${totalGain}đ${speedBonus > 0 ? ` (⚡+${speedBonus})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+        true
+      );
+      handleWordCleared(true, nextScore, nextCombo, {
+        questionKey: `4:${q.word}`,
+        word: q.word,
+        reactionMs
+      });
+    } else {
+      playSound('wrong');
+      rt.combo = 0;
+      setGameCombo(0);
+      triggerGameToast(`❌ "${rawTyped}" chưa khớp đáp án! Kiểm tra chính tả hoặc bấm Gợi ý (-15đ).`, false);
+    }
+  };
+
+  // Handle continuous typing attack in Round 2 (Full Word Boss)
   const handleGameTypingInput = (char) => {
     const rt = gameRuntimeRef.current;
-    if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 4) || !rt.activeQuestion || rt.questionResolved) return;
+    if (rt.subState !== 'PLAYING' || rt.round !== 2 || !rt.activeQuestion || rt.questionResolved) return;
 
     const q = rt.activeQuestion;
     const target = getGameTypingTarget(q, rt.round);
@@ -6585,21 +6677,19 @@ export default function App() {
         y: h - 42,
         targetX: hitX,
         targetY: hitY,
-        color: rt.round === 4 ? '#f43f5e' : '#10b981',
+        color: '#10b981',
         progress: 0
       });
-      pushGameParticles(hitX, hitY, rt.round === 4 ? '#fb7185' : '#34d399', 6);
+      pushGameParticles(hitX, hitY, '#34d399', 6);
 
       if (nextProgress >= target.length) {
         rt.questionResolved = true;
-        const limitSec = Math.max(1, rt.timeLimit || (rt.round === 4 ? 32 : 25));
+        const limitSec = Math.max(1, rt.timeLimit || 25);
         const remainRatio = Math.max(0, Math.min(1, timeRemainingFloatRef.current / limitSec));
         const reactionMs = Math.max(200, Math.round((limitSec - timeRemainingFloatRef.current) * 1000));
-        const speedBonus = Math.round(remainRatio * (rt.round === 4 ? 140 : 120));
+        const speedBonus = Math.round(remainRatio * 120);
         const feverMult = rt.combo >= 3 ? 2 : 1;
-        const bonus = rt.round === 4 ? 260 : 200;
-        const streakBonus = rt.combo * 25;
-        const totalGain = (bonus + streakBonus + speedBonus) * feverMult;
+        const totalGain = (200 + rt.combo * 25 + speedBonus) * feverMult;
         const nextScore = rt.score + totalGain;
         const nextCombo = rt.combo + 1;
 
@@ -6608,12 +6698,11 @@ export default function App() {
         setGameScore(nextScore);
         setGameCombo(nextCombo);
 
-        pushGameParticles(w / 2, Math.max(80, h * 0.3), feverMult > 1 ? '#fbbf24' : (rt.round === 4 ? '#f43f5e' : '#34d399'), rt.round === 4 ? 36 : 26);
+        pushGameParticles(w / 2, Math.max(80, h * 0.3), feverMult > 1 ? '#fbbf24' : '#34d399', 26);
         playSound('word_clear');
-        speakWord(rt.round === 4 ? (q.v4Display || q.collocation || q.word) : q.word);
-        const clearedLabel = rt.round === 4 ? `"${q.v4Display || q.collocation}"` : `${q.word} (${q.ipa})`;
+        speakWord(q.word);
         triggerGameToast(
-          `${rt.round === 4 ? '💥 HẠ GỤC BOSS COLLOCATION!' : '🎯 Chính xác!'} ${clearedLabel} +${totalGain}đ${speedBonus > 0 ? ` (⚡+${speedBonus})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
+          `🎯 Chính xác! ${q.word} (${q.ipa}) +${totalGain}đ${speedBonus > 0 ? ` (⚡+${speedBonus})` : ''}${feverMult > 1 ? ' 🔥 FEVER x2!' : ''}`,
           true
         );
         handleWordCleared(true, nextScore, nextCombo, {
@@ -6633,6 +6722,27 @@ export default function App() {
   const handleGameHint = () => {
     const rt = gameRuntimeRef.current;
     if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 4) || !rt.activeQuestion || rt.paused) return;
+
+    if (rt.round === 4) {
+      const q = rt.activeQuestion;
+      const primaryAns = String(q.v4Answers?.[0] || q.v4Display || q.collocation || q.word || '').trim();
+      if (!primaryAns) return;
+      const currentVal = String(rt.round4TypedText || '');
+      let matchPrefix = 0;
+      const lowCur = currentVal.toLowerCase();
+      const lowTarget = primaryAns.toLowerCase();
+      while (matchPrefix < lowCur.length && matchPrefix < lowTarget.length && lowCur[matchPrefix] === lowTarget[matchPrefix]) {
+        matchPrefix += 1;
+      }
+      const nextStepLen = Math.min(primaryAns.length, matchPrefix + Math.max(3, Math.ceil(primaryAns.length * 0.25)));
+      const hinted = primaryAns.slice(0, nextStepLen);
+      const nextScore = Math.max(0, rt.score - 15);
+      rt.score = nextScore;
+      setGameScore(nextScore);
+      handleRound4InputChange(hinted);
+      return;
+    }
+
     const nextChar = getGameTypingTarget(rt.activeQuestion, rt.round)[rt.typedProgress];
     if (!nextChar) return;
     const nextScore = Math.max(0, rt.score - 15);
@@ -6703,6 +6813,9 @@ export default function App() {
     timeRemainingFloatRef.current = limit;
     gameRuntimeRef.current.timeLimit = limit;
     gameRuntimeRef.current.questionResolved = false;
+    gameRuntimeRef.current.round4TypedText = '';
+    gameRuntimeRef.current.round4MatchRatio = 0;
+    setGameRound4Input('');
 
     wordTimerRef.current = setInterval(() => {
       const rt = gameRuntimeRef.current;
@@ -6732,21 +6845,24 @@ export default function App() {
 
     const handleKeyDown = (e) => {
       const rt = gameRuntimeRef.current;
+      const activeTag = document.activeElement?.tagName;
+      const isFormInputFocused = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
       if (e.code === 'Tab' && rt.activeQuestion) {
         e.preventDefault();
         const phraseToSpeak = rt.round === 4
-          ? (rt.activeQuestion.v4Display || getGameTypingTarget(rt.activeQuestion, 4) || rt.activeQuestion.word)
+          ? String(rt.activeQuestion.v4Question || '').replace(/_{3,}/g, ' blank ')
           : rt.activeQuestion.word;
         speakWord(phraseToSpeak);
         return;
       }
+      if (isFormInputFocused) return;
       if (e.code === 'Digit2') {
         e.preventDefault();
         handleUseFreezePowerup();
         return;
       }
       if (rt.paused) return;
-      if (rt.round === 2 || rt.round === 4) {
+      if (rt.round === 2) {
         if (e.code === 'Digit1') {
           e.preventDefault();
           handleGameHint();
@@ -7141,17 +7257,22 @@ export default function App() {
         const endBossY = Math.max(startBossY + 35, height - 118);
         const bossY = startBossY + elapsedRatio * (endBossY - startBossY);
 
-        // Compute Boss HP based on remaining untyped letters
+        // Compute Boss HP based on remaining untyped letters (R2) or live typing match ratio (R4)
         const targetPhrase = getGameTypingTarget(rt.activeQuestion, rt.round);
-        let totalAlpha = 0;
-        let typedAlpha = 0;
-        for (let k = 0; k < targetPhrase.length; k++) {
-          if (/^[A-Z]$/.test(targetPhrase[k])) {
-            totalAlpha += 1;
-            if (k < rt.typedProgress) typedAlpha += 1;
+        let hpRatio = 1;
+        if (isCollocationBoss) {
+          hpRatio = Math.max(0, 1 - (Number(rt.round4MatchRatio) || 0));
+        } else {
+          let totalAlpha = 0;
+          let typedAlpha = 0;
+          for (let k = 0; k < targetPhrase.length; k++) {
+            if (/^[A-Z]$/.test(targetPhrase[k])) {
+              totalAlpha += 1;
+              if (k < rt.typedProgress) typedAlpha += 1;
+            }
           }
+          hpRatio = totalAlpha > 0 ? Math.max(0, (totalAlpha - typedAlpha) / totalAlpha) : 1;
         }
-        const hpRatio = totalAlpha > 0 ? Math.max(0, (totalAlpha - typedAlpha) / totalAlpha) : 1;
 
         // Update active homing laser targets
         lasers.forEach(hl => {
@@ -7242,15 +7363,21 @@ export default function App() {
         ctx.fillStyle = remainRatio > 0.4 ? (isDark ? '#22d3ee' : '#007a7a') : '#f59e0b';
         ctx.fillRect(-barW / 2, hpBarY + barH + 2, barW * remainRatio, 4);
 
-        // Full-phrase masked target label below Boss
-        let masked = '';
-        for (let k = 0; k < targetPhrase.length; k++) {
-          const ch = targetPhrase[k];
-          if (ch === ' ') masked += '   ';
-          else if (k < rt.typedProgress || !/^[A-Z]$/.test(ch)) masked += ch + ' ';
-          else masked += '_ ';
+        // Label below Boss (R2: masked letters; R4: live typed phrase or Boss Typing prompt)
+        let label = '';
+        if (isCollocationBoss) {
+          const typedPreview = String(rt.round4TypedText || '').trim();
+          label = typedPreview ? typedPreview.slice(0, 42) : 'GÕ ĐÁP ÁN & ENTER';
+        } else {
+          let masked = '';
+          for (let k = 0; k < targetPhrase.length; k++) {
+            const ch = targetPhrase[k];
+            if (ch === ' ') masked += '   ';
+            else if (k < rt.typedProgress || !/^[A-Z]$/.test(ch)) masked += ch + ' ';
+            else masked += '_ ';
+          }
+          label = masked.trim();
         }
-        const label = masked.trim();
         ctx.font = `bold ${label.length > 26 ? 11 : 13}px "JetBrains Mono", monospace`;
         const lblW = Math.min(width - 24, Math.max(110, ctx.measureText(label).width + 22));
         ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.94)' : 'rgba(255, 255, 255, 0.97)';
@@ -7734,6 +7861,7 @@ export default function App() {
           gameTimeLimit={gameTimeLimit}
           gameToast={gameToast}
           gameTypedProgress={gameTypedProgress}
+          gameRound4Input={gameRound4Input}
           gameWordIdx={gameWordIdx}
           handleChangeAccessory={handleChangeAccessory}
           handleChangeAnimal={handleChangeAnimal}
@@ -7745,6 +7873,8 @@ export default function App() {
           handleGameChoiceSelect={handleGameChoiceSelect}
           handleGameHint={handleGameHint}
           handleGameTypingInput={handleGameTypingInput}
+          handleRound4InputChange={handleRound4InputChange}
+          handleSubmitRound4Answer={handleSubmitRound4Answer}
           handleKickLobbyPlayer={handleKickLobbyPlayer}
           handleLeaveGameLobby={handleLeaveGameLobby}
           handleSaveHostRoomSettings={handleSaveHostRoomSettings}

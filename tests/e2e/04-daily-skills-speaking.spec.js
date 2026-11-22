@@ -102,9 +102,16 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
     await page.locator('aside').getByRole('button', { name: /1\. Daily Speaking/i }).first().click();
 
     // Start from Speaking Drive folder or Daily Speaking test card
+    let expectedDriveQuestionSnippet = '';
     const openFirstSpeakingFolder = page.getByRole('button', { name: /Mở thư mục/i }).first();
     if (await openFirstSpeakingFolder.isVisible({ timeout: 3000 }).catch(() => false)) {
       await openFirstSpeakingFolder.click();
+      // Grab the first real question displayed inside this Speaking Drive topic folder
+      const firstQCard = page.locator('div.grid > div').filter({ hasText: /\?/ }).first();
+      if (await firstQCard.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const rawTxt = (await firstQCard.innerText()).replace(/^\d+\s*/, '').trim();
+        expectedDriveQuestionSnippet = rawTxt.slice(0, 32);
+      }
       const startDriveSpeakingBtn = page.getByRole('button', { name: /Bắt đầu luyện Topic này/i }).first();
       await expect(startDriveSpeakingBtn).toBeVisible();
       await startDriveSpeakingBtn.click();
@@ -128,6 +135,14 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
     // Enter Active Speaking Interview stage
     await page.getByRole('button', { name: /Bắt Đầu Thi Speaking Ngay/i }).click();
     await expect(page.getByRole('button', { name: /Bắt Đầu Trả Lời & Ghi Âm/i })).toBeVisible();
+
+    // Regression guard: Speaking Drive MUST render the selected folder's actual questions, NEVER fallback Hometown!
+    if (expectedDriveQuestionSnippet) {
+      await expect(page.getByText(expectedDriveQuestionSnippet, { exact: false }).first()).toBeVisible({
+        timeout: 8_000
+      });
+      await expect(page.getByText(/Where is your hometown and what do you like most/i)).toHaveCount(0);
+    }
 
     // Record audio for ~1.3s using fake mic stream and stop
     await page.getByRole('button', { name: /Bắt Đầu Trả Lời & Ghi Âm/i }).click();

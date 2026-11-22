@@ -11,7 +11,9 @@ import {
   Copy,
   Crown,
   DoorOpen,
+  Edit,
   Heart,
+  Keyboard,
   Lightbulb,
   Lock,
   MessageSquare,
@@ -55,6 +57,7 @@ import {
   computeRoomTeamStandings,
   getActiveTeamIds,
   getSpeedAdjustedTimeLimit,
+  matchRound4TypingAnswer,
   normalizeRoomObject,
   parseRawVocabText
 } from '../utils/examHelpers';
@@ -106,6 +109,7 @@ export default function GameArena({
   gameTimeLimit,
   gameToast,
   gameTypedProgress,
+  gameRound4Input = '',
   gameWordIdx,
   handleChangeAccessory,
   handleChangeAnimal,
@@ -117,6 +121,8 @@ export default function GameArena({
   handleGameChoiceSelect,
   handleGameHint,
   handleGameTypingInput,
+  handleRound4InputChange,
+  handleSubmitRound4Answer,
   handleKickLobbyPlayer,
   handleLeaveGameLobby,
   handleSaveHostRoomSettings,
@@ -626,13 +632,13 @@ export default function GameArena({
             <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5">
               <div className="text-center space-y-1.5">
                 <span className="text-xs font-bold uppercase tracking-widest text-[#0F766E] dark:text-[#1EE1D6] bg-indigo-50 dark:bg-teal-500/20 border border-indigo-200 dark:border-[#007A7A]/40 px-3 py-1 rounded-full">
-                  4 Vòng Chuẩn IELTS: V1 Bắn Nghĩa • V2 Gõ Full • V3 Đồng/Trái/Định Nghĩa • V4 Gõ Collocation Diệt Boss
+                  4 Vòng Chuẩn IELTS: V1 Bắn Nghĩa • V2 Gõ Full • V3 Đồng/Trái Nghĩa &amp; MCQ • V4 Đọc Câu &amp; Gõ Đáp Án
                 </span>
                 <h1 className="text-2xl font-extrabold text-[#0F172B] dark:text-white pt-1">
-                  Luyện Tập Game 14 Kho Từ &amp; Collocation
+                  Luyện Tập Game 14 Kho Từ &amp; Câu Hỏi
                 </h1>
                 <p className="text-xs text-[#475569] dark:text-slate-400 max-w-lg mx-auto">
-                  Chọn 1 trong <b>14 kho từ + Collocation</b> hoặc kho tự tạo, chọn số lượng từ (không giới hạn 8 từ) hoặc tích chọn trực tiếp các từ muốn làm ngay!
+                  Chọn 1 trong <b>14 kho từ</b> hoặc kho tự tạo, chọn số lượng từ hoặc tích chọn trực tiếp các câu muốn luyện ngay!
                 </p>
               </div>
 
@@ -675,9 +681,23 @@ export default function GameArena({
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white/90 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
                       <div className="sm:col-span-1">
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                          Chọn Kho Từ (14 Kho + Tự Tạo)
-                        </label>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                            Chọn Kho Từ (14 Kho + Tự Tạo)
+                          </label>
+                          {isTeacher && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomVocabInput(chosenRawVocab);
+                                setShowVocabModal(true);
+                              }}
+                              className="text-[11px] font-extrabold text-[#007A7A] dark:text-[#1EE1D6] hover:underline inline-flex items-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" /> Soạn / Sửa Kho
+                            </button>
+                          )}
+                        </div>
                         <select
                           value={practiceTopicId}
                           onChange={e => {
@@ -839,8 +859,8 @@ export default function GameArena({
                         {[
                           { r: 1, title: 'V1: Bắn Nghĩa', desc: 'Từ ↔ Nghĩa' },
                           { r: 2, title: 'V2: Gõ Từ Full', desc: 'Chính tả đầy đủ' },
-                          { r: 3, title: 'V3: Đồng/Trái/ĐN', desc: 'Linh hoạt từ vựng' },
-                          { r: 4, title: 'V4: Gõ Collocation', desc: 'Gõ liên tục diệt Boss' }
+                          { r: 3, title: 'V3: Đồng / Trái Nghĩa', desc: 'Đồng nghĩa · Trái nghĩa · MCQ' },
+                          { r: 4, title: 'V4: Đọc Câu & Gõ', desc: 'Hiện câu hỏi → Gõ đáp án' }
                         ].map(item => (
                           <button
                             key={item.r}
@@ -1214,9 +1234,10 @@ export default function GameArena({
                     setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
                     setShowVocabModal(true);
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition"
+                  data-testid="lobby-edit-vocab-btn"
+                  className="px-3.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition inline-flex items-center gap-1.5 shadow-sm"
                 >
-                  Kho Từ ({roomVocabCount})
+                  <Edit className="w-3.5 h-3.5" /> Soạn / Sửa Bộ Câu Hỏi ({roomVocabCount})
                 </button>
                 {isTeacher && (
                   !hasStudentsInLobby ? (
@@ -2671,10 +2692,13 @@ export default function GameArena({
               Màn 4
             </button>
             <button
-              onClick={() => setShowVocabModal(true)}
+              onClick={() => {
+                setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
+                setShowVocabModal(true);
+              }}
               className="bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 px-2.5 py-1 rounded font-bold transition"
             >
-              Sửa Kho Từ
+              Soạn Bộ Câu Hỏi
             </button>
           </div>
         )}
@@ -2699,8 +2723,8 @@ export default function GameArena({
                   : gameRound === 2
                   ? 'VÒNG 2/4: GÕ TỪ FULL'
                   : gameRound === 3
-                  ? 'VÒNG 3/4: ĐỒNG · TRÁI NGHĨA · ĐN'
-                  : 'VÒNG 4/4: GÕ COLLOCATION DIỆT BOSS'}
+                  ? 'VÒNG 3/4: ĐỒNG · TRÁI NGHĨA'
+                  : 'VÒNG 4/4: ĐỌC CÂU & GÕ ĐÁP ÁN'}
               </span>
               <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-transparent px-2 py-1 rounded-lg text-[#334155] dark:text-slate-300 text-xs">
                 Từ: {gameWordIdx + 1}/{gameQueues[gameRound]?.length || 1}
@@ -2763,20 +2787,20 @@ export default function GameArena({
                     : gameRound === 2
                     ? `Nghe & gõ đủ từ đầy đủ (GÕ FULL - ${gameTimeLimit}s)`
                     : gameRound === 3
-                    ? `${activeQuestion.v3Badge || 'ĐỒNG · TRÁI NGHĨA · ĐỊNH NGHĨA'} - Bắn hoặc bấm đáp án (${gameTimeLimit}s)`
-                    : `BOSS COLLOCATION - GÕ LIÊN TỤC TẤN CÔNG DIỆT YÊU QUÁI (${gameTimeLimit}s)`}
+                    ? `${activeQuestion.v3Badge || 'ĐỒNG · TRÁI NGHĨA'} - Bắn hoặc bấm đáp án (${gameTimeLimit}s)`
+                    : `TYPING DIỆT BOSS - ĐỌC CÂU HỎI & GÕ ĐÁP ÁN (${gameTimeLimit}s)`}
                 </span>
                 <button
                   onClick={() =>
                     speakWord(
                       gameRound === 4
-                        ? (activeQuestion.v4Display || activeQuestion.v4Target || activeQuestion.word)
+                        ? String(activeQuestion.v4Question || '').replace(/_{3,}/g, ' blank ')
                         : activeQuestion.word
                     )
                   }
                   className="bg-[#EDFFFD] hover:bg-[#D5FBF7] dark:bg-cyan-500/20 dark:hover:bg-cyan-500/30 text-[#007A7A] dark:text-cyan-300 border border-[#B5F5F1] dark:border-transparent px-2.5 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition"
                 >
-                  <Volume2 className="w-3.5 h-3.5" /> Nghe (TAB)
+                  <Volume2 className="w-3.5 h-3.5" /> {gameRound === 4 ? 'Đọc Câu (TAB)' : 'Nghe (TAB)'}
                 </button>
                 <button
                   type="button"
@@ -2794,28 +2818,30 @@ export default function GameArena({
                 {(gameRound === 2 || gameRound === 4) && (
                   <>
                     <button
+                      type="button"
                       onClick={handleGameHint}
                       className="bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-transparent px-2.5 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition"
                     >
                       <Lightbulb className="w-3 h-3" /> Gợi ý (-15đ)
                     </button>
-                    <button
-                      onClick={() => setShowMobileKeyboard(v => !v)}
-                      className="bg-[#F8FAFC] hover:bg-[#F1F5F9] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#334155] dark:text-slate-300 border border-slate-200 dark:border-transparent px-2 py-0.5 rounded text-xs font-bold transition"
-                    >
-                      {showMobileKeyboard ? 'Ẩn phím' : 'Phím ảo'}
-                    </button>
+                    {gameRound === 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowMobileKeyboard(v => !v)}
+                        className="bg-[#F8FAFC] hover:bg-[#F1F5F9] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#334155] dark:text-slate-300 border border-slate-200 dark:border-transparent px-2 py-0.5 rounded text-xs font-bold transition"
+                      >
+                        {showMobileKeyboard ? 'Ẩn phím' : 'Phím ảo'}
+                      </button>
+                    )}
                   </>
                 )}
               </div>
 
-              <p className="text-sm sm:text-base font-bold text-[#0F172B] dark:text-white leading-snug">
-                {gameRound === 3
-                  ? activeQuestion.v3Question
-                  : gameRound === 4
-                  ? activeQuestion.v4Question
-                  : activeQuestion.prompt}
-              </p>
+              {gameRound !== 4 && (
+                <p className="text-sm sm:text-base font-bold text-[#0F172B] dark:text-white leading-snug">
+                  {gameRound === 3 ? activeQuestion.v3Question : activeQuestion.prompt}
+                </p>
+              )}
 
               {/* Clickable Choice Cards ONLY for V3 (Syn/Ant/Def) synced seamlessly with Shooter */}
               {gameRound === 3 && (() => {
@@ -2873,47 +2899,61 @@ export default function GameArena({
                 </div>
               )}
 
-              {/* Continuous Typing Attack Boss HP Bar + Word-Grouped Collocation Boxes for Round 4 */}
+              {/* Round 4: Fill-in-the-Blank Question Prompt + Multi-Answer Typing Box + Boss HP Bar */}
               {gameRound === 4 && (() => {
-                const rawTarget = String(activeQuestion.v4Target || activeQuestion.v4Display || activeQuestion.word || '')
-                  .trim()
-                  .replace(/\s+/g, ' ')
-                  .toUpperCase();
-                let totalAlpha = 0;
-                let typedAlpha = 0;
-                for (let k = 0; k < rawTarget.length; k++) {
-                  if (/^[A-Z]$/.test(rawTarget[k])) {
-                    totalAlpha += 1;
-                    if (k < gameTypedProgress) typedAlpha += 1;
-                  }
-                }
-                const hpPct = totalAlpha > 0 ? Math.max(0, Math.round(((totalAlpha - typedAlpha) / totalAlpha) * 100)) : 100;
-
-                // Group indices into words separated by spaces for readable wrapping
-                const wordGroups = [];
-                let currentGroup = [];
-                for (let k = 0; k < rawTarget.length; k++) {
-                  if (rawTarget[k] === ' ') {
-                    if (currentGroup.length > 0) wordGroups.push(currentGroup);
-                    currentGroup = [];
-                  } else {
-                    currentGroup.push({ char: rawTarget[k], idx: k });
-                  }
-                }
-                if (currentGroup.length > 0) wordGroups.push(currentGroup);
+                const acceptedList = Array.isArray(activeQuestion.v4Answers) && activeQuestion.v4Answers.length > 0
+                  ? activeQuestion.v4Answers
+                  : [activeQuestion.v4Display || activeQuestion.collocation || activeQuestion.word];
+                const evalRes = matchRound4TypingAnswer(gameRound4Input, acceptedList);
+                const hpPct = Math.max(0, Math.round((1 - (evalRes.matchRatio || 0)) * 100));
+                const sentenceParts = String(activeQuestion.v4Question || '').split(/(_{3,})/);
+                const showMeaningSub =
+                  activeQuestion.v4HintMeaning &&
+                  !String(activeQuestion.v4Question || '').includes(activeQuestion.v4HintMeaning);
 
                 return (
-                  <div className="mt-2 space-y-2">
-                    <div className="max-w-md mx-auto">
+                  <div className="mt-1.5 space-y-2.5">
+                    {/* Sentence Question Prompt with highlighted inline blank */}
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-left sm:text-center">
+                      <p className="text-sm sm:text-base font-bold text-[#0F172B] dark:text-white leading-relaxed">
+                        {sentenceParts.map((part, pIdx) =>
+                          /^_{3,}$/.test(part) ? (
+                            <span
+                              key={pIdx}
+                              className="inline-block mx-1 px-2.5 py-0.5 rounded-lg border-b-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono text-xs sm:text-sm font-black align-baseline min-w-[96px] text-center"
+                            >
+                              {gameRound4Input.trim() || '____________'}
+                            </span>
+                          ) : (
+                            <span key={pIdx}>{part}</span>
+                          )
+                        )}
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2 mt-1.5">
+                        {showMeaningSub && (
+                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            💡 Gợi ý nghĩa: {activeQuestion.v4HintMeaning}
+                          </span>
+                        )}
+                        {acceptedList.length > 1 && (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-emerald-700 dark:text-emerald-300 text-[11px] font-extrabold">
+                            Chấp nhận {acceptedList.length} đáp án tương đương
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Boss HP Bar */}
+                    <div className="max-w-lg mx-auto">
                       <div className="flex items-center justify-between text-xs font-extrabold mb-1">
                         <span className="text-rose-600 dark:text-rose-400">
-                          ⚔️ Máu Boss Collocation: {hpPct}%
+                          ⚔️ Máu Boss Typing: {hpPct}%
                         </span>
                         <span className="text-slate-500 dark:text-slate-400 font-mono">
-                          Đã bắn {typedAlpha}/{totalAlpha} ký tự • {wordGroups.length} từ
+                          {evalRes.matched ? '✅ Khớp đáp án! Nhấn Enter để hạ gục!' : 'Gõ đáp án rồi nhấn Enter'}
                         </span>
                       </div>
-                      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                         <div
                           className={`h-full transition-all duration-150 ${
                             hpPct > 50 ? 'bg-rose-600' : hpPct > 25 ? 'bg-amber-500' : 'bg-emerald-500'
@@ -2923,38 +2963,48 @@ export default function GameArena({
                       </div>
                     </div>
 
-                    <div className="flex justify-center items-center gap-x-3 gap-y-1.5 flex-wrap">
-                      {wordGroups.map((group, gIdx) => (
-                        <div key={gIdx} className="inline-flex items-center gap-0.5 sm:gap-1">
-                          {group.map(({ char, idx }) => {
-                            const isAlpha = /^[A-Z]$/.test(char);
-                            const isTyped = idx < gameTypedProgress || !isAlpha;
-                            const isCurrent = idx === gameTypedProgress;
-                            const displayChar = isTyped ? char : '_';
-                            return (
-                              <div
-                                key={idx}
-                                className={`w-6 h-7 sm:w-7 sm:h-8 rounded-md flex items-center justify-center font-mono font-bold text-xs sm:text-sm transition-all ${
-                                  isTyped
-                                    ? 'bg-rose-600 text-white border border-rose-500 scale-105'
-                                    : isCurrent
-                                    ? 'bg-amber-50 dark:bg-slate-800 text-[#0F172B] dark:text-white border-2 border-rose-500 dark:border-rose-400 shadow-sm'
-                                    : 'bg-[#F8FAFC]/70 dark:bg-slate-900 text-[#475569] dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                                }`}
-                              >
-                                {displayChar}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
+                    {/* Real Typing Input Box + Submit Button */}
+                    <form
+                      onSubmit={e => {
+                        e.preventDefault();
+                        handleSubmitRound4Answer?.(gameRound4Input);
+                      }}
+                      className="max-w-xl mx-auto flex items-center gap-2"
+                    >
+                      <div className="relative flex-1">
+                        <Keyboard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          autoFocus
+                          autoComplete="off"
+                          spellCheck="false"
+                          disabled={gamePaused}
+                          data-testid="game-round4-input"
+                          value={gameRound4Input}
+                          onChange={e => handleRound4InputChange?.(e.target.value)}
+                          placeholder="Gõ từ / cụm từ cần điền vào chỗ trống rồi nhấn Enter..."
+                          className={`w-full pl-9 pr-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border-2 text-sm font-bold text-[#0F172B] dark:text-white focus:outline-none transition ${
+                            evalRes.matched
+                              ? 'border-emerald-500 ring-2 ring-emerald-500/25'
+                              : 'border-rose-400/80 dark:border-rose-500/60 focus:border-[#007A7A] dark:focus:border-cyan-400'
+                          }`}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={gamePaused || !gameRound4Input.trim()}
+                        data-testid="game-round4-submit-btn"
+                        className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs sm:text-sm font-extrabold shadow-sm inline-flex items-center gap-1.5 shrink-0 transition"
+                      >
+                        <Zap className="w-4 h-4" /> Bắn Boss
+                      </button>
+                    </form>
                   </div>
                 );
               })()}
 
-              {/* Optional On-Screen Keyboard (Round 2 & Round 4) */}
-              {(gameRound === 2 || gameRound === 4) && showMobileKeyboard && gameSubState === 'PLAYING' && (
+              {/* Optional On-Screen Keyboard (Round 2) */}
+              {gameRound === 2 && showMobileKeyboard && gameSubState === 'PLAYING' && (
                 <div className="mt-2.5 space-y-1">
                   {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map(rowStr => (
                     <div key={rowStr} className="flex justify-center gap-1">

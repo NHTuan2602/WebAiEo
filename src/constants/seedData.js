@@ -587,9 +587,23 @@ export const normalizeTestHashtags = (rawHashtags) => {
 export const normalizeSpeakingSection = (rawSpeaking = {}) => {
   const def = createDefaultSpeakingSection();
   const s = rawSpeaking && typeof rawSpeaking === 'object' ? rawSpeaking : {};
-  const p1 = s.part1 && typeof s.part1 === 'object' ? s.part1 : {};
-  const p2 = s.part2 && typeof s.part2 === 'object' ? s.part2 : {};
-  const p3 = s.part3 && typeof s.part3 === 'object' ? s.part3 : {};
+  // Defensively accept legacy array shape for part1/part2/part3 as well as structured object shape
+  const p1 = Array.isArray(s.part1)
+    ? { enabled: s.part1.length > 0, topic: s.part1[0]?.topic || def.part1.topic, questions: s.part1 }
+    : (s.part1 && typeof s.part1 === 'object' ? s.part1 : {});
+  const p2 = Array.isArray(s.part2)
+    ? {
+        enabled: s.part2.length > 0,
+        title: s.part2[0]?.topic || def.part2.title,
+        cueCardPrompt: s.part2[0]?.prompt || '',
+        bullets: Array.isArray(s.part2[0]?.bullets) ? s.part2[0].bullets : [],
+        followUpQuestion: s.part2[0]?.hint || '',
+        questions: s.part2
+      }
+    : (s.part2 && typeof s.part2 === 'object' ? s.part2 : {});
+  const p3 = Array.isArray(s.part3)
+    ? { enabled: s.part3.length > 0, topic: s.part3[0]?.topic || def.part3.topic, questions: s.part3 }
+    : (s.part3 && typeof s.part3 === 'object' ? s.part3 : {});
 
   const cleanRoomPassword = String(s.roomPassword || '');
   const hasRoomPassword = Boolean(s.hasRoomPassword || cleanRoomPassword.trim().length > 0);
@@ -608,6 +622,8 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
     hashtags: normalizeTestHashtags(s.hashtags),
     disableAiTts: Boolean(s.disableAiTts),
     hidePromptTextWhenAudio: Boolean(s.hidePromptTextWhenAudio),
+    noCountdown: Boolean(s.noCountdown),
+    allowRerecord: s.allowRerecord !== false,
     isForecast: Boolean(s.isForecast),
     autoAiGrade: s.autoAiGrade !== false,
     part1SpeakSec: Math.max(15, Number(s.part1SpeakSec ?? def.part1SpeakSec) || 45),
@@ -620,6 +636,7 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
       questions: Array.isArray(p1.questions)
         ? p1.questions.map((q, idx) => ({
             id: q?.id || `sp1_${idx + 1}`,
+            topic: String(q?.topic || '').trim(),
             prompt: String(q?.prompt || '').trim(),
             hint: String(q?.hint || '').trim(),
             audioUrl: String(q?.audioUrl || '').trim(),
@@ -636,7 +653,18 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
         : def.part2.bullets,
       followUpQuestion: String(p2.followUpQuestion ?? ''),
       audioUrl: String(p2.audioUrl || '').trim(),
-      audioFileName: String(p2.audioFileName || '').trim()
+      audioFileName: String(p2.audioFileName || '').trim(),
+      questions: Array.isArray(p2.questions)
+        ? p2.questions.map((q, idx) => ({
+            id: q?.id || `sp2_${idx + 1}`,
+            topic: String(q?.topic || '').trim(),
+            prompt: String(q?.prompt || '').trim(),
+            bullets: Array.isArray(q?.bullets) ? q.bullets.map(b => String(b || '').trim()).filter(Boolean) : [],
+            hint: String(q?.hint || '').trim(),
+            audioUrl: String(q?.audioUrl || '').trim(),
+            audioFileName: String(q?.audioFileName || '').trim()
+          }))
+        : []
     },
     part3: {
       enabled: p3.enabled !== false,
@@ -644,6 +672,7 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
       questions: Array.isArray(p3.questions)
         ? p3.questions.map((q, idx) => ({
             id: q?.id || `sp3_${idx + 1}`,
+            topic: String(q?.topic || '').trim(),
             prompt: String(q?.prompt || '').trim(),
             hint: String(q?.hint || '').trim(),
             audioUrl: String(q?.audioUrl || '').trim(),
@@ -666,7 +695,7 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
           id: q.id || `sp1_${idx + 1}`,
           part: 1,
           partLabel: 'Part 1',
-          topic: sp.part1.topic || 'Part 1 Interview',
+          topic: q.topic || sp.part1.topic || 'Part 1 Interview',
           prompt: q.prompt || '',
           bullets: [],
           hint: q.hint || '',
@@ -678,24 +707,41 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
       });
   }
 
-  if (
-    (partFilter === 'all' || partFilter === 'part2') &&
-    sp.part2.enabled &&
-    Boolean(String(sp.part2.cueCardPrompt || sp.part2.title || sp.part2.audioUrl || '').trim())
-  ) {
-    items.push({
-      id: 'sp2_cuecard',
-      part: 2,
-      partLabel: 'Part 2 Cue Card',
-      topic: sp.part2.title || 'Individual Long Turn',
-      prompt: sp.part2.cueCardPrompt || sp.part2.title || '',
-      bullets: (sp.part2.bullets || []).filter(Boolean),
-      hint: sp.part2.followUpQuestion ? `Câu hỏi phụ gợi ý: ${sp.part2.followUpQuestion}` : '',
-      audioUrl: sp.part2.audioUrl || '',
-      audioFileName: sp.part2.audioFileName || '',
-      prepSec: sp.part2PrepSec,
-      speakSec: sp.part2SpeakSec
-    });
+  if ((partFilter === 'all' || partFilter === 'part2') && sp.part2.enabled) {
+    const multiPart2 = (sp.part2.questions || []).filter(q =>
+      Boolean(String(q.prompt || '').trim() || String(q.audioUrl || '').trim())
+    );
+    if (multiPart2.length > 0) {
+      multiPart2.forEach((q, idx) => {
+        items.push({
+          id: q.id || (idx === 0 ? 'sp2_cuecard' : `sp2_cuecard_${idx + 1}`),
+          part: 2,
+          partLabel: 'Part 2 Cue Card',
+          topic: q.topic || sp.part2.title || 'Individual Long Turn',
+          prompt: q.prompt || '',
+          bullets: (q.bullets || []).filter(Boolean),
+          hint: q.hint ? `Câu hỏi phụ gợi ý: ${q.hint}` : '',
+          audioUrl: q.audioUrl || sp.part2.audioUrl || '',
+          audioFileName: q.audioFileName || sp.part2.audioFileName || '',
+          prepSec: sp.noCountdown ? 0 : sp.part2PrepSec,
+          speakSec: sp.part2SpeakSec
+        });
+      });
+    } else if (Boolean(String(sp.part2.cueCardPrompt || sp.part2.title || sp.part2.audioUrl || '').trim())) {
+      items.push({
+        id: 'sp2_cuecard',
+        part: 2,
+        partLabel: 'Part 2 Cue Card',
+        topic: sp.part2.title || 'Individual Long Turn',
+        prompt: sp.part2.cueCardPrompt || sp.part2.title || '',
+        bullets: (sp.part2.bullets || []).filter(Boolean),
+        hint: sp.part2.followUpQuestion ? `Câu hỏi phụ gợi ý: ${sp.part2.followUpQuestion}` : '',
+        audioUrl: sp.part2.audioUrl || '',
+        audioFileName: sp.part2.audioFileName || '',
+        prepSec: sp.noCountdown ? 0 : sp.part2PrepSec,
+        speakSec: sp.part2SpeakSec
+      });
+    }
   }
 
   if ((partFilter === 'all' || partFilter === 'part3') && sp.part3.enabled) {
@@ -706,7 +752,7 @@ export const getSpeakingQuestionItems = (rawSpeaking, partFilter = 'all') => {
           id: q.id || `sp3_${idx + 1}`,
           part: 3,
           partLabel: 'Part 3 Discussion',
-          topic: sp.part3.topic || 'Two-way Discussion',
+          topic: q.topic || sp.part3.topic || 'Two-way Discussion',
           prompt: q.prompt || '',
           bullets: [],
           hint: q.hint || '',

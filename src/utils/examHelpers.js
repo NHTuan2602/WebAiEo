@@ -503,7 +503,7 @@ function buildDefaultLexicalCollocation(word, example = '') {
     return lowerW;
   }
   const cleanEx = String(example || '').trim();
-  if (cleanEx) {
+  if (cleanEx && !cleanEx.startsWith('Ghi nhớ cách dùng từ')) {
     const words = cleanEx.replace(/[.,!?;:"'()]/g, '').split(/\s+/).filter(Boolean);
     const idx = words.findIndex(w => w.toLowerCase() === lowerW);
     if (idx !== -1) {
@@ -513,7 +513,181 @@ function buildDefaultLexicalCollocation(word, example = '') {
       if (phrase.split(/\s+/).length >= 2) return phrase;
     }
   }
-  return `effectively apply ${lowerW}`;
+  return lowerW || `effectively apply ${lowerW}`;
+}
+
+export function normalizeRound4AnswerText(val) {
+  return String(val || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?;:'"()[\]{}]/g, '')
+    .replace(/[-–—_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function extractAcceptedRound4Answers(item) {
+  const rawList = [];
+  if (Array.isArray(item?.v4AcceptedAnswers)) {
+    item.v4AcceptedAnswers.forEach(a => rawList.push(a));
+  }
+  if (rawList.length === 0 && typeof item?.collocation === 'string' && item.collocation.trim()) {
+    item.collocation.split(/\s*;;\s*|\s*\/\s*/).forEach(part => {
+      if (part.trim()) rawList.push(part.trim());
+    });
+  }
+  if (rawList.length === 0 && item?.answer) {
+    rawList.push(item.answer);
+  }
+  if (rawList.length === 0 && item?.word) {
+    rawList.push(String(item.word).toLowerCase());
+  }
+  const seen = new Set();
+  const deduped = [];
+  rawList.forEach(entry => {
+    const clean = String(entry || '').trim().replace(/\s+/g, ' ');
+    const norm = normalizeRound4AnswerText(clean);
+    if (!clean || !norm || seen.has(norm)) return;
+    seen.add(norm);
+    deduped.push(clean);
+  });
+  return deduped;
+}
+
+export function buildAutoV4BlankSentence(item) {
+  const customSentence = String(item?.v4CustomSentence || '').trim();
+  if (customSentence) return customSentence;
+
+  const accepted = extractAcceptedRound4Answers(item);
+  const primaryAns = accepted[0] || String(item?.word || '').trim().toLowerCase();
+  const exampleText = String(item?.example || '').trim();
+  const isRealExample = exampleText.length > 0 && !exampleText.startsWith('Ghi nhớ cách dùng từ');
+
+  if (isRealExample) {
+    const candidates = [
+      ...accepted,
+      String(item?.word || '').trim()
+    ].filter(Boolean);
+    for (const cand of candidates) {
+      const escaped = cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+      const regex = new RegExp(`\\b${escaped}[a-z]*\\b`, 'i');
+      if (regex.test(exampleText)) {
+        return exampleText.replace(regex, '____________');
+      }
+    }
+  }
+
+  const promptText = String(item?.prompt || '').trim();
+  const wordCount = primaryAns ? primaryAns.split(/\s+/).filter(Boolean).length : 1;
+  if (promptText) {
+    return `Điền ${wordCount > 1 ? `cụm từ (${wordCount} từ)` : 'từ vựng'} tiếng Anh có nghĩa là "${promptText}" vào chỗ trống: ____________`;
+  }
+  return 'Điền từ / cụm từ tiếng Anh chính xác vào chỗ trống: ____________';
+}
+
+export function matchRound4TypingAnswer(typedText, acceptedAnswers = []) {
+  const normTyped = normalizeRound4AnswerText(typedText);
+  const candidates = (Array.isArray(acceptedAnswers) ? acceptedAnswers : [acceptedAnswers])
+    .map(ans => String(ans || '').trim())
+    .filter(Boolean);
+
+  if (candidates.length === 0) {
+    return { matched: false, matchedAnswer: '', bestCandidate: '', matchRatio: 0 };
+  }
+
+  let bestCandidate = candidates[0];
+  let bestRatio = 0;
+
+  for (const cand of candidates) {
+    const normCand = normalizeRound4AnswerText(cand);
+    if (!normCand) continue;
+    if (normTyped && normTyped === normCand) {
+      return { matched: true, matchedAnswer: cand, bestCandidate: cand, matchRatio: 1 };
+    }
+    if (normTyped) {
+      let prefixLen = 0;
+      const maxLen = Math.min(normTyped.length, normCand.length);
+      while (prefixLen < maxLen && normTyped[prefixLen] === normCand[prefixLen]) {
+        prefixLen += 1;
+      }
+      const ratio = normCand.length > 0 ? Math.min(0.95, prefixLen / normCand.length) : 0;
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestCandidate = cand;
+      }
+    }
+  }
+
+  return { matched: false, matchedAnswer: '', bestCandidate, matchRatio: bestRatio };
+}
+
+export function serializeVocabItemsToRawText(items = []) {
+  const list = Array.isArray(items) ? items : [];
+  return list
+    .map((item, idx) => {
+      if (!item || typeof item !== 'object') return '';
+      const cleanWord = String(item.word || '').trim().toUpperCase();
+      const cleanPrompt = String(item.prompt || '').trim();
+      const cleanIpa = String(item.ipa || '').trim();
+      const cleanExample = String(item.example || '').trim();
+      const cleanSyn = String(item.syn || '').trim().toUpperCase();
+      const cleanAnt = String(item.ant || '').trim().toUpperCase();
+      const v3CustomMode = item.v3CustomMode === 'mcq' ? 'mcq' : 'syn_ant';
+      const v3CustomQuestion = String(item.v3CustomQuestion || '').trim();
+      const v3CustomChoices = Array.isArray(item.v3CustomChoices)
+        ? item.v3CustomChoices.map(c => String(c || '').trim()).filter(Boolean)
+        : [];
+      const v3CustomAnswer = String(item.v3CustomAnswer || '').trim();
+      const v4CustomSentence = String(item.v4CustomSentence || '').trim();
+      const v4AcceptedAnswers = extractAcceptedRound4Answers(item);
+      const timeSec = Math.max(0, Math.min(120, Math.round(Number(item.timeSec) || 0)));
+
+      const effectiveWord =
+        cleanWord ||
+        (v3CustomAnswer ? v3CustomAnswer.toUpperCase() : '') ||
+        (v4AcceptedAnswers[0] ? v4AcceptedAnswers[0].toUpperCase() : '') ||
+        `ITEM_${idx + 1}`;
+      const effectivePrompt = cleanPrompt || v4CustomSentence || v3CustomQuestion || effectiveWord;
+
+      const needsJson =
+        v3CustomMode === 'mcq' ||
+        Boolean(v3CustomQuestion) ||
+        v3CustomChoices.length > 0 ||
+        Boolean(v4CustomSentence) ||
+        v4AcceptedAnswers.length > 1 ||
+        timeSec > 0 ||
+        [effectiveWord, effectivePrompt, cleanIpa, cleanExample, cleanSyn, cleanAnt, v4AcceptedAnswers[0] || '']
+          .some(s => String(s).includes('|') || String(s).includes('\n'));
+
+      if (needsJson) {
+        const payload = {
+          id: item.id || `gq_${idx + 1}`,
+          word: effectiveWord,
+          prompt: effectivePrompt,
+          ...(cleanIpa ? { ipa: cleanIpa } : {}),
+          ...(cleanExample ? { example: cleanExample } : {}),
+          ...(cleanSyn ? { syn: cleanSyn } : {}),
+          ...(cleanAnt ? { ant: cleanAnt } : {}),
+          ...(v3CustomMode === 'mcq' ? { v3CustomMode: 'mcq' } : {}),
+          ...(v3CustomQuestion ? { v3CustomQuestion } : {}),
+          ...(v3CustomChoices.length > 0 ? { v3CustomChoices } : {}),
+          ...(v3CustomAnswer ? { v3CustomAnswer } : {}),
+          ...(v4CustomSentence ? { v4CustomSentence } : {}),
+          ...(v4AcceptedAnswers.length > 0 ? { v4AcceptedAnswers } : {}),
+          ...(timeSec > 0 ? { timeSec } : {})
+        };
+        return `@QJSON:${JSON.stringify(payload)}`;
+      }
+
+      const primaryColloc = v4AcceptedAnswers[0] || String(item.collocation || '').trim();
+      const cols = [effectiveWord, effectivePrompt, cleanIpa, cleanExample, cleanSyn, cleanAnt, primaryColloc];
+      while (cols.length > 2 && !cols[cols.length - 1]) {
+        cols.pop();
+      }
+      return cols.join(' | ');
+    })
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function parseRawVocabText(rawText, seedStr = null) {
@@ -521,36 +695,141 @@ export function parseRawVocabText(rawText, seedStr = null) {
   const parsedItems = [];
   const seenWords = new Set();
 
-  lines.forEach(line => {
+  lines.forEach((line, lineIdx) => {
+    if (line.startsWith('@QJSON:')) {
+      try {
+        const obj = JSON.parse(line.slice(7));
+        if (!obj || typeof obj !== 'object') return;
+        const v4Answers = extractAcceptedRound4Answers(obj);
+        const v3Choices = Array.isArray(obj.v3CustomChoices)
+          ? obj.v3CustomChoices.map(c => String(c || '').trim()).filter(Boolean)
+          : [];
+        const v3Answer = String(obj.v3CustomAnswer || v3Choices[0] || '').trim();
+        const rawWord = String(obj.word || v3Answer || v4Answers[0] || '').trim().toUpperCase();
+        const cleanPrompt = String(obj.prompt || obj.v4CustomSentence || obj.v3CustomQuestion || rawWord).trim();
+        if (!rawWord) return;
+        const dict = VOCAB_LEXICAL_RELATIONS[rawWord] || null;
+        const cleanExample = String(obj.example || '').trim();
+        const exampleText = cleanExample || `Ghi nhớ cách dùng từ "${rawWord}" trong bài thi IELTS.`;
+        const cleanSyn = String(obj.syn || '').trim().toUpperCase();
+        const cleanAnt = String(obj.ant || '').trim().toUpperCase();
+        const primaryColloc = v4Answers[0] || String(obj.collocation || '').trim() || dict?.collocation || buildDefaultLexicalCollocation(rawWord, exampleText);
+        const finalV4Answers = v4Answers.length > 0 ? v4Answers : [primaryColloc];
+        const v3Mode = obj.v3CustomMode === 'mcq' || (obj.v3CustomQuestion && v3Choices.length >= 2) ? 'mcq' : 'syn_ant';
+
+        parsedItems.push({
+          id: String(obj.id || `gq_${lineIdx + 1}`),
+          word: rawWord,
+          prompt: cleanPrompt,
+          ipa: String(obj.ipa || '').trim(),
+          example: exampleText,
+          syn: cleanSyn || dict?.syn || '',
+          ant: cleanAnt || dict?.ant || '',
+          def: String(obj.def || '').trim() || dict?.def || `Relating accurately to: ${cleanPrompt}`,
+          collocation: primaryColloc,
+          v3CustomMode: v3Mode,
+          v3CustomQuestion: String(obj.v3CustomQuestion || '').trim(),
+          v3CustomChoices: v3Choices,
+          v3CustomAnswer: v3Answer,
+          v4CustomSentence: String(obj.v4CustomSentence || '').trim(),
+          v4AcceptedAnswers: finalV4Answers,
+          timeSec: Math.max(0, Math.min(120, Math.round(Number(obj.timeSec) || 0))),
+          distractors: [],
+          synDistractors: [],
+          antDistractors: [],
+          defDistractors: [],
+          collocationDistractors: []
+        });
+      } catch (_err) {
+        // Ignore malformed JSON line safely
+      }
+      return;
+    }
+
     let parts;
     if (line.includes('|')) parts = line.split('|');
     else if (line.includes('\t')) parts = line.split('\t');
     else if (line.includes(';')) parts = line.split(';');
     else if (line.includes(':')) parts = line.split(':');
+    else if (/\s+[-–—]\s+/.test(line)) parts = line.split(/\s+[-–—]\s+/);
     else return;
 
-    const cleanWord = (parts[0] || '').trim().toUpperCase();
-    const cleanPrompt = (parts[1] || '').trim();
+    const firstCol = (parts[0] || '').trim();
+    const secondCol = (parts[1] || '').trim();
+
+    // Shortcut support: "Sentence with ____ | answer1 ;; answer2"
+    if (/_{3,}/.test(firstCol) && secondCol) {
+      const answers = secondCol.split(/\s*;;\s*|\s*\/\s*/).map(s => s.trim()).filter(Boolean);
+      const primaryAns = answers[0] || secondCol;
+      const cleanWord = primaryAns.toUpperCase();
+      const dict = VOCAB_LEXICAL_RELATIONS[cleanWord] || null;
+      const cleanPrompt = (parts[2] || '').trim() || firstCol;
+      const pipeSyn = (parts[3] || '').trim().toUpperCase();
+      const pipeAnt = (parts[4] || '').trim().toUpperCase();
+      parsedItems.push({
+        id: `gq_${lineIdx + 1}`,
+        word: cleanWord,
+        prompt: cleanPrompt,
+        ipa: '',
+        example: firstCol.replace(/_{3,}/, primaryAns),
+        syn: pipeSyn || dict?.syn || '',
+        ant: pipeAnt || dict?.ant || '',
+        def: dict?.def || cleanPrompt,
+        collocation: primaryAns,
+        v3CustomMode: 'syn_ant',
+        v3CustomQuestion: '',
+        v3CustomChoices: [],
+        v3CustomAnswer: '',
+        v4CustomSentence: firstCol,
+        v4AcceptedAnswers: answers.length > 0 ? answers : [primaryAns],
+        timeSec: 0,
+        distractors: [],
+        synDistractors: [],
+        antDistractors: [],
+        defDistractors: [],
+        collocationDistractors: []
+      });
+      return;
+    }
+
+    const cleanWord = firstCol.toUpperCase();
+    const cleanPrompt = secondCol;
     const cleanIpa = (parts[2] || '').trim();
     const cleanExample = (parts[3] || '').trim();
     const pipeSyn = (parts[4] || '').trim().toUpperCase();
     const pipeAnt = (parts[5] || '').trim().toUpperCase();
     const pipeColloc = (parts[6] || '').trim();
-    const pipeDef = (parts[7] || '').trim();
+    const pipeCol8 = (parts[7] || '').trim();
 
     if (cleanWord && cleanPrompt && !seenWords.has(cleanWord)) {
       seenWords.add(cleanWord);
       const dict = VOCAB_LEXICAL_RELATIONS[cleanWord] || null;
       const exampleText = cleanExample || `Ghi nhớ cách dùng từ "${cleanWord}" trong bài thi IELTS.`;
+      const multiColloc = pipeColloc
+        ? pipeColloc.split(/\s*;;\s*/).map(s => s.trim()).filter(Boolean)
+        : [];
+      const primaryColloc = multiColloc[0] || dict?.collocation || buildDefaultLexicalCollocation(cleanWord, exampleText);
+      const v4AcceptedAnswers = multiColloc.length > 0 ? multiColloc : [primaryColloc];
+      const v4CustomSentence = /_{3,}/.test(pipeCol8) ? pipeCol8 : '';
+      const pipeDef = v4CustomSentence ? '' : pipeCol8;
+
       parsedItems.push({
+        id: `gq_${lineIdx + 1}`,
         word: cleanWord,
         prompt: cleanPrompt,
         ipa: cleanIpa || '',
         example: exampleText,
-        syn: pipeSyn || dict?.syn || cleanWord,
+        syn: pipeSyn || dict?.syn || '',
         ant: pipeAnt || dict?.ant || '',
         def: pipeDef || dict?.def || `Relating accurately to: ${cleanPrompt}`,
-        collocation: pipeColloc || dict?.collocation || buildDefaultLexicalCollocation(cleanWord, exampleText),
+        collocation: primaryColloc,
+        v3CustomMode: 'syn_ant',
+        v3CustomQuestion: '',
+        v3CustomChoices: [],
+        v3CustomAnswer: '',
+        v4CustomSentence,
+        v4AcceptedAnswers,
+        timeSec: 0,
         distractors: [],
         synDistractors: [],
         antDistractors: [],
@@ -569,7 +848,7 @@ export function parseRawVocabText(rawText, seedStr = null) {
   parsedItems.forEach((item, idx) => {
     const orderList = (pool, tag) =>
       seedStr
-        ? shuffleArrayWithSeed(pool, `${seedStr}:${tag}:${item.word}`)
+        ? shuffleArrayWithSeed(pool, `${seedStr}:${tag}:${item.word}:${idx}`)
         : [...pool].sort(() => Math.random() - 0.5);
 
     let wordPool = allWords.filter(w => w !== item.word);
@@ -1019,11 +1298,44 @@ export function normalizeRoomObject(room, pinKey, now = Date.now()) {
   };
 }
 
-function decorateV3Question(item, idx, seedStr) {
-  const modes = item.ant ? ['syn', 'ant', 'def'] : ['syn', 'def'];
-  const mode = modes[idx % modes.length];
-  if (mode === 'ant' && item.ant) {
-    const choices = shuffleArrayWithSeed([item.ant, ...(item.antDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}`);
+export function decorateV3Question(item, idx, seedStr) {
+  const customChoices = Array.isArray(item?.v3CustomChoices)
+    ? item.v3CustomChoices.map(c => String(c || '').trim()).filter(Boolean)
+    : [];
+  const customQ = String(item?.v3CustomQuestion || '').trim();
+  const customAns = String(item?.v3CustomAnswer || '').trim();
+
+  // Teacher-authored 4-choice contextual MCQ (Screenshot 4 style)
+  if ((item?.v3CustomMode === 'mcq' || customQ) && customChoices.length >= 2 && customAns) {
+    const ensuredChoices = customChoices.some(c => c.toLowerCase() === customAns.toLowerCase())
+      ? customChoices
+      : [customAns, ...customChoices].slice(0, 4);
+    const shuffled = shuffleArrayWithSeed(ensuredChoices, `${seedStr}:v3mcq:${item.word}:${idx}`);
+    return {
+      ...item,
+      v3Mode: 'mcq',
+      v3Badge: 'TRẮC NGHIỆM NGỮ CẢNH (MCQ)',
+      v3Question: customQ || `Chọn từ phù hợp nhất cho nghĩa "${item.prompt}"`,
+      v3Target: customAns,
+      v3Choices: shuffled
+    };
+  }
+
+  // Round 3 is strictly Synonym / Antonym (Đồng nghĩa / Trái nghĩa)
+  const hasValidSyn = Boolean(item?.syn && item.syn.trim().toUpperCase() !== String(item?.word || '').trim().toUpperCase());
+  const hasValidAnt = Boolean(item?.ant && item.ant.trim().toUpperCase() !== String(item?.word || '').trim().toUpperCase());
+
+  let mode = 'syn';
+  if (hasValidSyn && hasValidAnt) {
+    mode = idx % 2 === 0 ? 'syn' : 'ant';
+  } else if (hasValidAnt) {
+    mode = 'ant';
+  } else {
+    mode = 'syn';
+  }
+
+  if (mode === 'ant' && hasValidAnt) {
+    const choices = shuffleArrayWithSeed([item.ant, ...(item.antDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}:${idx}`);
     return {
       ...item,
       v3Mode: 'ant',
@@ -1033,8 +1345,9 @@ function decorateV3Question(item, idx, seedStr) {
       v3Choices: choices
     };
   }
-  if (mode === 'syn' && item.syn && item.syn !== item.word) {
-    const choices = shuffleArrayWithSeed([item.syn, ...(item.synDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}`);
+
+  if (hasValidSyn) {
+    const choices = shuffleArrayWithSeed([item.syn, ...(item.synDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}:${idx}`);
     return {
       ...item,
       v3Mode: 'syn',
@@ -1044,28 +1357,30 @@ function decorateV3Question(item, idx, seedStr) {
       v3Choices: choices
     };
   }
-  const choices = shuffleArrayWithSeed([item.def, ...(item.defDistractors || []).slice(0, 3)], `${seedStr}:v3c:${item.word}`);
+
+  // Fallback if custom item has neither syn nor ant filled yet: match target word from meaning prompt
+  const fallbackChoices = shuffleArrayWithSeed([item.word, ...(item.distractors || []).slice(0, 3)], `${seedStr}:v3fb:${item.word}:${idx}`);
   return {
     ...item,
-    v3Mode: 'def',
-    v3Badge: 'ĐỊNH NGHĨA ANH–ANH (DEFINITION)',
-    v3Question: `Chọn định nghĩa tiếng Anh đúng cho "${item.word}"`,
-    v3Target: item.def,
-    v3Choices: choices
+    v3Mode: 'syn',
+    v3Badge: 'ĐỒNG NGHĨA · TỪ VỰNG',
+    v3Question: `Chọn từ tiếng Anh tương ứng với nghĩa: "${item.prompt}"`,
+    v3Target: item.word,
+    v3Choices: fallbackChoices
   };
 }
 
 export function decorateV4Question(item) {
-  const cleanColloc = String(item?.collocation || item?.answer || item?.word || '').trim();
-  const baseWord = String(item?.word || cleanColloc).trim();
-  const promptText = String(item?.prompt || '').trim();
+  const acceptedAnswers = extractAcceptedRound4Answers(item);
+  const primaryAns = acceptedAnswers[0] || String(item?.collocation || item?.word || '').trim();
+  const sentencePrompt = buildAutoV4BlankSentence({ ...item, v4AcceptedAnswers: acceptedAnswers });
   return {
     ...item,
-    v4Question: promptText
-      ? `Gõ cụm COLLOCATION chuẩn IELTS của từ "${baseWord}" (${promptText}) để bắn laser tiêu diệt Boss!`
-      : `Gõ cụm COLLOCATION chuẩn IELTS "${baseWord}" để bắn laser tiêu diệt Boss!`,
-    v4Target: cleanColloc.toUpperCase(),
-    v4Display: cleanColloc
+    v4Question: sentencePrompt,
+    v4Answers: acceptedAnswers.length > 0 ? acceptedAnswers : [primaryAns],
+    v4Target: primaryAns.toUpperCase(),
+    v4Display: primaryAns,
+    v4HintMeaning: String(item?.prompt || '').trim()
   };
 }
 

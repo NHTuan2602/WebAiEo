@@ -97,4 +97,80 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await studentContext.close();
     }
   });
+
+  test('Teacher uses visual Game Question Bank editor (Add/Delete/Syn-Ant/Multi-Answer R4) and plays Round 4 typing', async ({
+    page,
+    healthGuard
+  }) => {
+    const soloPin = '554433';
+    const soloPass = 'e2egame';
+    const soloRoomName = 'Phòng Test Visual Bank E2E';
+
+    await loginViaUI(page, E2E_CREDENTIALS.teacher.username, E2E_CREDENTIALS.teacher.password);
+    await page.getByRole('button', { name: /Phòng Game PIN/i }).first().click();
+
+    // Create a clean solo teacher room (no students -> Sandbox allowed)
+    await page.getByRole('button', { name: /Tạo Phòng Mới/i }).first().click();
+    const modalForm = page.locator('form').filter({ hasText: /Tạo Phòng Đấu Từ Vựng Mới/i });
+    await modalForm.locator('input[placeholder*="Phòng Ôn Từ Vựng"]').fill(soloRoomName);
+    await modalForm.locator('input[placeholder*="6 số ngẫu nhiên"]').fill(soloPin);
+    await modalForm.locator('input[placeholder="ielts"]').fill(soloPass);
+    await modalForm.getByRole('button', { name: /Tạo Phòng & Mở Lobby/i }).click();
+
+    await expect(page.getByText(soloRoomName).first()).toBeVisible({ timeout: 12_000 });
+
+    // Open the new Blooket/Quizizz-style visual Question Bank Editor
+    await page.getByTestId('lobby-edit-vocab-btn').click();
+    await expect(page.getByTestId('game-vocab-bank-modal')).toBeVisible({ timeout: 8_000 });
+
+    // Clear all existing items safely (2-click confirm) so Round 4 deterministically serves our exact test question
+    await page.getByRole('button', { name: /Xóa hết/i }).click();
+    await page.getByRole('button', { name: 'Xóa', exact: true }).click();
+
+    // Add 1 visual question card with Round 3 Syn/Ant + Round 4 sentence-blank + 2 accepted typing answers
+    await page.getByTestId('game-bank-add-btn').click();
+    await expect(page.getByTestId('game-card-editor-form')).toBeVisible();
+    await page.getByTestId('card-input-word').fill('FRAMEWORK');
+    await page.getByTestId('card-input-prompt').fill('khuôn khổ toàn cầu thống nhất');
+    await page.getByTestId('card-input-syn').fill('STRUCTURE');
+    await page.getByTestId('card-input-ant').fill('CHAOS');
+    await page
+      .getByTestId('card-input-v4-sentence')
+      .fill('The lack of a ____________ often hinders coordinated international action.');
+    await page.getByTestId('card-input-v4-answer-0').fill('unified global framework');
+    await page.getByTestId('card-add-v4-answer-btn').click();
+    await page.getByTestId('card-input-v4-answer-1').fill('cohesive global strategy');
+    await page.getByTestId('card-save-btn').click();
+
+    // Verify visual card renders both accepted green typing pills & Syn/Ant badges
+    await expect(page.getByTestId('game-question-card-0')).toBeVisible();
+    await expect(page.getByText('unified global framework').first()).toBeVisible();
+    await expect(page.getByText('cohesive global strategy').first()).toBeVisible();
+    await expect(page.getByText(/Đồng nghĩa: STRUCTURE/i).first()).toBeVisible();
+
+    // Save question bank to room
+    await page.getByTestId('game-bank-save-room-btn').click();
+    await expect(page.getByTestId('game-vocab-bank-modal')).toHaveCount(0);
+
+    // Launch Sandbox -> Jump to Màn 3 (verify strictly Synonym/Antonym) -> Jump to Màn 4 (verify Sentence + Typing input!)
+    await page.getByRole('button', { name: /Chơi Thử GV/i }).first().click();
+    await page.getByRole('button', { name: 'Màn 3', exact: true }).click();
+    await expect(page.getByText(/ĐỒNG NGHĨA|TRÁI NGHĨA/i).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText(/ĐỊNH NGHĨA ANH/i)).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Màn 4', exact: true }).click();
+    await expect(page.getByText(/The lack of a/i).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText(/Chấp nhận 2 đáp án tương đương/i)).toBeVisible();
+
+    // Type the 2nd accepted answer into Round 4 typing box and submit -> Boss defeated -> VICTORY screen!
+    const r4Input = page.getByTestId('game-round4-input');
+    await expect(r4Input).toBeVisible();
+    await r4Input.fill('cohesive global strategy');
+    await page.getByTestId('game-round4-submit-btn').click();
+
+    await expect(page.getByText(/HẠ GỤC BOSS|HOÀN THÀNH|CHIẾN THẮNG|VICTORY|TỔNG ĐIỂM/i).first()).toBeVisible({
+      timeout: 10_000
+    });
+    healthGuard.assertHealthy('game-visual-bank-and-round4');
+  });
 });

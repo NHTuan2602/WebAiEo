@@ -410,6 +410,9 @@ export function buildTransientSpeakingPracticeTest({
     }));
 
   const pNum = Number(partNumber) || 1;
+  const firstQ = cleanQs[0] || {};
+  const resolvedTopic = topicName || firstQ.topic || title;
+
   return {
     id: id || `sp_zone_${zone}_p${pNum}_${Date.now()}`,
     title,
@@ -423,9 +426,24 @@ export function buildTransientSpeakingPracticeTest({
       hidePromptTextWhenAudio: false,
       noCountdown: true,
       allowRerecord: true,
-      part1: pNum === 1 ? cleanQs : [],
-      part2: pNum === 2 ? cleanQs : [],
-      part3: pNum === 3 ? cleanQs : []
+      part1: {
+        enabled: pNum === 1 && cleanQs.length > 0,
+        topic: resolvedTopic,
+        questions: pNum === 1 ? cleanQs : []
+      },
+      part2: {
+        enabled: pNum === 2 && cleanQs.length > 0,
+        title: firstQ.topic || resolvedTopic,
+        cueCardPrompt: pNum === 2 ? (firstQ.prompt || '') : '',
+        bullets: pNum === 2 && Array.isArray(firstQ.bullets) ? firstQ.bullets : [],
+        followUpQuestion: pNum === 2 ? (firstQ.hint || '') : '',
+        questions: pNum === 2 ? cleanQs : []
+      },
+      part3: {
+        enabled: pNum === 3 && cleanQs.length > 0,
+        topic: resolvedTopic,
+        questions: pNum === 3 ? cleanQs : []
+      }
     }
   };
 }
