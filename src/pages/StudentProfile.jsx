@@ -60,6 +60,7 @@ import {
   AIEO_VIP_PRICE_VND,
   AVATAR_FRAMES,
   DEFAULT_EXAM_PRICE_VND,
+  EXAM_PURCHASE_TIERS,
   MIN_DONATE_AMOUNT_VND,
   PROFILE_BANNERS,
   REAL_EXAM_COMBOS,
@@ -68,13 +69,17 @@ import {
   buildVietQrImageUrl,
   formatRemainingSubscriptionText,
   formatVndCurrency,
+  getNextExamPurchaseTier,
   getProfileBannerById,
+  getPurchasedExamCount,
   getRealExamCredits,
   hasActiveAieoVip,
   hasCustomCoverPermission,
   hasUnlockedAvatarFrame,
+  isStaffOrAdminUser,
   isSyncMediaUrl,
   normalizePaymentConfig,
+  resolveExamPurchaseTier,
   resolveStudentTitleSummary,
   resolveUserVipNameVisual,
   resolveVisibleTitleBadge
@@ -253,7 +258,16 @@ export default function StudentProfile({
   const singleExamPriceLabel = formatVndCurrency(normalizedPayCfg.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND);
   const combo3PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[0]?.priceVnd ?? 50000);
   const combo5PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[1]?.priceVnd ?? 70000);
-  const combo10PriceLabel = formatVndCurrency(REAL_EXAM_COMBOS[2]?.priceVnd ?? 150000);
+  const combo8PriceLabel = formatVndCurrency(
+    normalizedPayCfg.realExamCombo8Price ?? REAL_EXAM_COMBOS.find(c => c.credits === 8)?.defaultPriceVnd ?? 599000
+  );
+  const combo10PriceLabel = formatVndCurrency(
+    normalizedPayCfg.realExamCombo10Price ?? REAL_EXAM_COMBOS.find(c => c.credits === 10)?.defaultPriceVnd ?? 699000
+  );
+  const studentIsStaff = isStaffOrAdminUser(student);
+  const studentPurchasedCount = getPurchasedExamCount(student);
+  const studentPurchaseTier = resolveExamPurchaseTier(student);
+  const studentNextTier = getNextExamPurchaseTier(student);
   const coverRemainingText = student.customCoverExpiresAt > Date.now()
     ? formatRemainingSubscriptionText(student.customCoverExpiresAt)
     : '';
@@ -489,10 +503,12 @@ export default function StudentProfile({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-1.5">
             <Crown className="w-4 h-4 text-slate-700 dark:text-zinc-200" />
-            Tùy Chỉnh Hiển Thị IELTS VIP (Màu Chữ Tên · Viền Bìa Neon · Nhãn IELTS VIP)
+            {vipVisual.canUseNeonCover
+              ? 'Tùy Chỉnh Hiển Thị Quản Trị / GV (Màu Chữ Tên · Viền Bìa LED · Nhãn)'
+              : 'Tùy Chỉnh Màu Chữ Tên (Gói Tháng 20k)'}
           </p>
           <div className="flex items-center gap-3 flex-wrap">
-            {neonOn && (
+            {vipVisual.canUseNeonCover && neonOn && (
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 inline-flex items-center gap-1.5">
                 <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${neonCoverMeta.swatchClass}`} />
                 <span>Viền Bìa: {neonCoverMeta.name}</span>
@@ -504,7 +520,7 @@ export default function StudentProfile({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-zinc-800 pt-1">
+        <div className={`grid grid-cols-1 ${vipVisual.canUseNeonCover ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-zinc-800 pt-1`}>
           {/* 1. Custom VIP Name Text Color */}
           <div className="bg-transparent border-0 rounded-none py-3 lg:py-1 lg:pr-5 space-y-2.5">
             <button
@@ -592,7 +608,8 @@ export default function StudentProfile({
             </div>
           </div>
 
-          {/* 2. Neon Cover Border */}
+          {/* 2. Neon Cover Border (Staff / Admin ONLY) */}
+          {vipVisual.canUseNeonCover && (
           <div className="bg-transparent border-0 rounded-none py-3 lg:py-1 lg:px-5 space-y-2.5">
             <button
               type="button"
@@ -654,6 +671,7 @@ export default function StudentProfile({
               })}
             </div>
           </div>
+          )}
 
           {/* 3. IELTS VIP Badge Toggle */}
           <button
@@ -982,7 +1000,7 @@ export default function StudentProfile({
             />
           )}
 
-          {canEditTargetInfo && (
+          {canEditTargetInfo && !currentUser?.isGuest && (
             <div className="absolute bottom-3 right-3 sm:bottom-3.5 sm:right-4 z-10 flex flex-wrap items-center justify-end gap-2">
               {isSelf && !studentHasCoverPermission && (
                 <button
@@ -2428,11 +2446,21 @@ export default function StudentProfile({
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  • <b>Đề lẻ Thực Chiến:</b> {singleExamPriceLabel}/đề • <b>Combo 3 Đề:</b> {combo3PriceLabel} • <b>Combo 5 Đề:</b> {combo5PriceLabel} • <b>Combo 10 Đề:</b> {combo10PriceLabel} (dùng mở bất kỳ đề Thực Chiến 4 kỹ năng L · R · W · S nào).
+                  • <b>Đề lẻ:</b> {singleExamPriceLabel}/đề • <b>3 Đề:</b> {combo3PriceLabel} • <b>5 Đề:</b> {combo5PriceLabel} • <b>8 Đề:</b> {combo8PriceLabel} • <b>10 Đề:</b> {combo10PriceLabel}.
                 </p>
                 <p className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7]">
-                  ✓ Đang có {studentRealExamCredits} lượt Combo · Đã mở {(student.purchasedTestIds || []).length} đề Thực Chiến
+                  ✓ Đang có {studentRealExamCredits} lượt · Tổng đã nạp {studentPurchasedCount} đề
+                  {studentPurchaseTier
+                    ? ` · Hạng ${studentPurchaseTier.label}`
+                    : studentNextTier
+                    ? ` · Còn ${studentNextTier.minExams - studentPurchasedCount} đề lên ${studentNextTier.label}`
+                    : ''}
                 </p>
+                {studentNextTier && (
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Mốc tiếp theo: <b>{studentNextTier.label}</b> ({studentNextTier.minExams} đề) · Cao nhất: <b>{EXAM_PURCHASE_TIERS[EXAM_PURCHASE_TIERS.length - 1].label}</b> (60 đề)
+                  </p>
+                )}
               </div>
               {isSelf && (
                 <button
@@ -2445,19 +2473,20 @@ export default function StudentProfile({
               )}
             </div>
 
-            {/* Card 2: Gói IELTS VIP (80k / 1 tháng) */}
+            {/* Card 2: Gói Tháng 20k (hidden for Guest accounts) */}
+            {!currentUser?.isGuest && (
             <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:px-5 flex flex-col justify-between gap-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-black text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
-                    <Crown className="w-4 h-4 text-amber-500" /> Gói IELTS VIP
+                    <Crown className="w-4 h-4 text-amber-500" /> Gói Tháng Game &amp; Hồ Sơ
                   </span>
                   <span className="text-xs font-semibold text-[#09090B] bg-[#F59E0B] px-2.5 py-0.5 rounded-full whitespace-nowrap">
                     {aieoVipPriceLabel}/1 tháng
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  • <b>Ảnh Avatar Động (.GIF/.WebP)</b> • Đổi <b>Màu Chữ Tên</b> &amp; Nhãn <b>IELTS VIP</b> • <b>Viền Bìa &amp; Thẻ LED Neon</b> + Miễn phí <b>Ảnh Nền Cá Nhân</b> • <b>3 Khung Avatar Neon VIP</b> • Tạo phòng Game bạn bè vô hạn • Danh hiệu <b>👑 IELTS VIP</b>.
+                  • Truy cập <b>Luyện Tập Game Từ Vựng</b> (14 kho từ &amp; Collocation) • Quyền <b>Tạo Phòng Luyện Tập Từ Vựng theo Chủ Đề</b> • <b>Chỉnh Màu Chữ Tên</b> • <b>Thêm &amp; Đổi Ảnh Bìa Hồ Sơ</b>.
                 </p>
                 <p className={`text-xs font-bold ${studentHasAieoVip ? 'text-[#0F172B] dark:text-[#FAFAFA]' : 'text-slate-600 dark:text-zinc-300'}`}>
                   {studentHasAieoVip
@@ -2485,8 +2514,10 @@ export default function StudentProfile({
                 </button>
               )}
             </div>
+            )}
 
-            {/* Card 3: Ảnh Nền Riêng (5k / 1 tháng) */}
+            {/* Card 3: Ảnh Nền Riêng (5k / 1 tháng - hidden for Guest accounts) */}
+            {!currentUser?.isGuest && (
             <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:pl-5 flex flex-col justify-between gap-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -2539,9 +2570,10 @@ export default function StudentProfile({
                 </button>
               )}
             </div>
+            )}
           </div>
 
-          {renderVipAppearanceSwitches()}
+          {!currentUser?.isGuest && renderVipAppearanceSwitches()}
         </div>
       )}
 
@@ -2978,7 +3010,8 @@ export default function StudentProfile({
         </>
       )}
 
-      {/* SECTION 4: THÀNH TÍCH ĐẤU TRƯỜNG TỪ VỰNG CHICKEN INVADERS (Flat 3-Col Layout) */}
+      {/* SECTION 4: THÀNH TÍCH ĐẤU TRƯỜNG TỪ VỰNG CHICKEN INVADERS (hidden for Guest accounts) */}
+      {!currentUser?.isGuest && (
       <div className={`${profileCardCls} p-6 sm:p-8`}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-[#E2E8F0] dark:border-zinc-800">
           <div>
@@ -3025,6 +3058,7 @@ export default function StudentProfile({
           </div>
         </div>
       </div>
+      )}
       </div>
 
       {/* Modal: Bảng Danh Hiệu & Cách Đạt Được (Học viên, Giáo viên & Quản trị) */}
@@ -3598,10 +3632,11 @@ export default function StudentProfile({
                 )}
               </div>
 
-              {/* Avatar Frame Picker */}
+              {/* Avatar Frame Picker (Staff & Admin only) */}
+              {studentIsStaff && (
               <div className="space-y-2.5">
                 <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                  2. Khung Viền Avatar Nổi Bật
+                  2. Khung Viền Avatar Nổi Bật (Giáo viên / Admin)
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {AVATAR_FRAMES.map(frame => {
@@ -3612,10 +3647,7 @@ export default function StudentProfile({
                         key={frame.id}
                         type="button"
                         onClick={() => {
-                          if (!frameAllowed) {
-                            showToast?.(`Khung Avatar Neon thuộc đặc quyền Gói IELTS VIP (${aieoVipPriceLabel}/1 tháng)!`, 'info');
-                            return;
-                          }
+                          if (!frameAllowed) return;
                           setCustomDraft(prev => ({ ...prev, avatarFrameId: frame.id }));
                         }}
                         className={`relative p-2 rounded-2xl border flex flex-col items-center gap-1.5 transition ${
@@ -3628,7 +3660,7 @@ export default function StudentProfile({
                       >
                         {frame.vipOnly && (
                           <span className="absolute -top-1.5 right-1 px-1.5 py-0.2 rounded-full bg-[#991B1B] text-xs font-semibold text-[#F4F4F5]">
-                            VIP
+                            STAFF
                           </span>
                         )}
                         <span className={`w-7 h-7 rounded-full ${frame.previewBg} ${frame.id !== 'none' ? frame.ringClass : ''}`} />
@@ -3638,6 +3670,7 @@ export default function StudentProfile({
                   })}
                 </div>
               </div>
+              )}
 
               {/* Study Goal / Bio + Student Title Toggle */}
               <div className="space-y-3">

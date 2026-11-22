@@ -80,6 +80,7 @@ export default function ExamQuestionList({
   onSwitchScope,
   onTextSelect = null,
   onToggleBookmark,
+  onZoomImage = null,
   questionCardRefs,
   questions = [],
   renderText = null,
@@ -225,6 +226,20 @@ export default function ExamQuestionList({
           </div>
         </div>
 
+        {!insideGroup && q.imageUrl && (
+          <div className="mb-3 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2.5 max-w-2xl">
+            <img
+              src={q.imageUrl}
+              alt={`Hình ảnh câu ${displayNum}`}
+              onClick={e => {
+                e.stopPropagation();
+                onZoomImage?.(q.imageUrl);
+              }}
+              className="w-full max-h-80 object-contain rounded mx-auto cursor-zoom-in"
+            />
+          </div>
+        )}
+
         {hasChoiceOptions ? (
           <div className="space-y-1.5 pl-1">
             {optionList.map((opt, optIdx) => {
@@ -335,7 +350,27 @@ export default function ExamQuestionList({
                 )}
               </div>
 
-              <div className="rounded-lg border border-[#CBD5E1] dark:border-[#343434] overflow-x-auto bg-white dark:bg-[#141414]">
+              <div className={block.imageUrl ? 'grid grid-cols-1 xl:grid-cols-12 gap-4 items-start' : ''}>
+                {block.imageUrl && (
+                  <div className="xl:col-span-5 rounded-lg border border-[#CBD5E1] dark:border-[#343434] bg-white dark:bg-[#141414] p-3">
+                    <img
+                      src={block.imageUrl}
+                      alt={`Bản đồ / Sơ đồ câu ${firstNum}–${lastNum}`}
+                      onClick={() => onZoomImage?.(block.imageUrl)}
+                      className="w-full max-h-[420px] object-contain rounded mx-auto cursor-zoom-in"
+                    />
+                    {onZoomImage && (
+                      <button
+                        type="button"
+                        onClick={() => onZoomImage(block.imageUrl)}
+                        className="mt-2 mx-auto block text-xs font-bold text-[#2563EB] hover:underline"
+                      >
+                        Bấm vào ảnh để phóng to bản đồ / sơ đồ
+                      </button>
+                    )}
+                  </div>
+                )}
+              <div className={`${block.imageUrl ? 'xl:col-span-7 ' : ''}rounded-lg border border-[#CBD5E1] dark:border-[#343434] overflow-x-auto bg-white dark:bg-[#141414]`}>
                 <table className="w-full border-collapse text-left min-w-[480px]">
                   <thead>
                     <tr className="bg-[#2563EB] text-white">
@@ -466,6 +501,7 @@ export default function ExamQuestionList({
                   </tbody>
                 </table>
               </div>
+              </div>
             </div>
           );
         }
@@ -535,6 +571,17 @@ export default function ExamQuestionList({
                   </div>
                 )}
               </div>
+
+              {block.imageUrl && (
+                <div className="rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#141414] p-3 max-w-2xl">
+                  <img
+                    src={block.imageUrl}
+                    alt={`Hình ảnh câu ${firstNum}–${lastNum}`}
+                    onClick={() => onZoomImage?.(block.imageUrl)}
+                    className="w-full max-h-[380px] object-contain rounded mx-auto cursor-zoom-in"
+                  />
+                </div>
+              )}
 
               {/* Shared Word Bank Box (rendered ONCE instead of repeating radio buttons per question) */}
               <div className="rounded-lg border border-slate-300 dark:border-[#3A3D46] bg-slate-50/90 dark:bg-[#1A1C22] p-3.5">

@@ -40,9 +40,10 @@ export default function SpeakingExamRoom({
   selectedTestId,
   showToast,
   speakingUnlockTokens = {},
-  tests = []
+  tests = [],
+  transientTest = null
 }) {
-  const activeTest = tests.find(t => t.id === selectedTestId);
+  const activeTest = transientTest || tests.find(t => t.id === selectedTestId);
   const cfg = normalizeExamConfig(activeTest);
   const spMeta = normalizeSpeakingSection(activeTest?.speaking);
   const isTeacher = currentUser?.role === 'teacher';
@@ -604,7 +605,8 @@ export default function SpeakingExamRoom({
     recordTimerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - recordStartedAtRef.current) / 1000);
       setRecordElapsedSec(elapsed);
-      if (elapsed >= maxSec) {
+      // Daily & Forecast mode: không đếm ngược / không cắt ngang ghi âm
+      if (isExamRoomMode && elapsed >= maxSec) {
         stopCurrentRecording();
         showToast?.(`Đã hết thời gian câu ${currentIdx + 1} (${maxSec}s) - tự động lưu ghi âm!`, 'info');
       }
@@ -790,7 +792,11 @@ export default function SpeakingExamRoom({
   const teacherAudioCount = items.filter(it => Boolean(it.audioUrl)).length;
   const allHaveTeacherAudio = items.length > 0 && teacherAudioCount === items.length;
   const hasTeacherAudioAny = teacherAudioCount > 0;
-  const hideQuestionTextNow = Boolean(currentItem?.audioUrl && (spMeta.hidePromptTextWhenAudio || !currentItem.prompt));
+  // Thực Chiến: ẩn hoàn toàn chữ câu hỏi, chỉ nghe AI đọc rồi tự ghi âm sau 3s, không được ghi âm lại.
+  // Daily & Forecast: hiển thị đầy đủ câu hỏi, không đếm ngược, cho phép thu âm lại thoải mái.
+  const hideQuestionTextNow = isExamRoomMode
+    ? !isTeacher
+    : Boolean(currentItem?.audioUrl && spMeta.hidePromptTextWhenAudio && !currentItem.prompt);
   const currentRec = currentItem ? recordingsByQid[currentItem.id] : null;
   const maxAllowedSec = currentItem?.speakSec || 45;
   const remainingSpeakSec = Math.max(0, maxAllowedSec - recordElapsedSec);
@@ -1124,11 +1130,15 @@ export default function SpeakingExamRoom({
             <div className="space-y-3">
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-snug">
                 {hideQuestionTextNow
-                  ? '🎧 Hãy nghe kỹ file ghi âm câu hỏi của Giáo viên ở trên, sau đó bấm Micro để trả lời lại!'
+                  ? (isSpeakingPrompt
+                      ? '🎧 Giám khảo AI đang đọc câu hỏi — Hãy tập trung lắng nghe!'
+                      : autoRecordCountdown !== null
+                      ? `🎙️ Chuẩn bị trả lời — Tự bật ghi âm sau ${autoRecordCountdown} giây...`
+                      : '🎧 Chế độ Thực Chiến: Không hiển thị văn bản câu hỏi. Nghe AI đọc câu hỏi và trả lời trực tiếp.')
                   : currentItem.prompt}
               </h2>
 
-              {Array.isArray(currentItem.bullets) && currentItem.bullets.length > 0 && (
+              {!hideQuestionTextNow && Array.isArray(currentItem.bullets) && currentItem.bullets.length > 0 && (
                 <div className="p-4 sm:p-5 rounded-2xl bg-white/80 dark:bg-[#23222D] border border-slate-200 dark:border-slate-700 space-y-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-[#475569] dark:text-slate-400">
                     You should say:
@@ -1226,9 +1236,13 @@ export default function SpeakingExamRoom({
                 <div className="flex items-center gap-3 text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
                   <Clock className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" />
                   <span>
-                    {isRecording
-                      ? `Đang nói: ${formatSecs(recordElapsedSec)} (còn ${formatSecs(remainingSpeakSec)})`
-                      : `Giới hạn câu: ${formatSecs(maxAllowedSec)}`}
+                    {isExamRoomMode
+                      ? isRecording
+                        ? `Đang nói: ${formatSecs(recordElapsedSec)} (còn ${formatSecs(remainingSpeakSec)})`
+                        : `Giới hạn câu: ${formatSecs(maxAllowedSec)}`
+                      : isRecording
+                      ? `Đang ghi âm: ${formatSecs(recordElapsedSec)} (Không đếm ngược)`
+                      : 'Tự do (Không đếm ngược · Được thu lại)'}
                   </span>
                 </div>
               </div>

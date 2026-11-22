@@ -5,6 +5,7 @@ import {
   Camera,
   Check,
   CheckCircle,
+  CheckSquare,
   ChevronLeft,
   Clock,
   Copy,
@@ -12,6 +13,7 @@ import {
   DoorOpen,
   Heart,
   Lightbulb,
+  Lock,
   MessageSquare,
   Moon,
   Pause,
@@ -25,6 +27,7 @@ import {
   ShieldCheck,
   Shuffle,
   Snowflake,
+  Square,
   Sun,
   Target,
   Trash2,
@@ -65,6 +68,7 @@ import {
   canCreateFriendRoomNow,
   formatVndCurrency,
   getFriendRoomTicketCredits,
+  hasGamePracticeAccess,
   hasVipFriendRoomAccess,
   normalizePaymentConfig,
   resolveUserVipNameVisual,
@@ -82,6 +86,7 @@ export default function GameArena({
   currentRoomPin,
   currentUser,
   customTitles = [],
+  customVocabTopics = [],
   dailyRankTitles = null,
   darkMode = false,
   freezeCharges,
@@ -179,7 +184,12 @@ export default function GameArena({
   const [entryZone, setEntryZone] = useState('live'); // 'live' | 'practice'
   const [practiceTopicId, setPracticeTopicId] = useState('core');
   const [practiceSpeed, setPracticeSpeed] = useState('normal');
+  const [practiceRoundSize, setPracticeRoundSize] = useState(0); // 0 = tất cả từ trong kho
+  const [practiceSelectedWords, setPracticeSelectedWords] = useState([]);
+  const [showPracticeWordPicker, setShowPracticeWordPicker] = useState(false);
+  const [showLobbyWordPicker, setShowLobbyWordPicker] = useState(false);
   const isTeacher = currentUser?.role === 'teacher';
+  const canAccessPracticeGame = isTeacher || hasGamePracticeAccess(currentUser);
   const activePin = joinedRoomPin || currentRoomPin;
   const room = normalizeRoomObject(roomsDb[activePin], activePin, lobbyNowTick);
   const isFriendVipRoom = room.roomMode === 'friend_vip';
@@ -560,129 +570,306 @@ export default function GameArena({
           </div>
 
           {entryZone === 'practice' ? (
+            !canAccessPracticeGame ? (
+              <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-amber-300 dark:border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5 text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-300 flex items-center justify-center">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <div className="space-y-2 max-w-lg mx-auto">
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white">
+                    Khu Tự Luyện Tập Game Từ Vựng (14 Kho + Collocation)
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 leading-relaxed">
+                    Đăng ký <b>Gói Tháng ({aieoVipPriceLabel}/tháng)</b> để mở khóa toàn bộ quyền lợi:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left text-xs pt-2">
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-200">
+                      ✅ Luyện Tập Game Từ Vựng (14 kho + Collocation &amp; chọn từ làm luôn)
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-200">
+                      ✅ Quyền Tạo Phòng Luyện Tập Từ Vựng theo Chủ Đề
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-200">
+                      ✅ Chỉnh Màu Chữ Tên nổi bật
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-200">
+                      ✅ Thêm &amp; Đổi Ảnh Bìa Hồ Sơ cá nhân
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenCheckoutModal?.({
+                        itemType: 'aieo_vip',
+                        itemId: '',
+                        itemLabel: 'Gói Tháng Game & Hồ Sơ (1 Tháng)',
+                        itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                      })
+                    }
+                    className="px-6 py-3 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-sm font-extrabold inline-flex items-center gap-2 shadow-md transition"
+                  >
+                    <Crown className="w-4 h-4 text-amber-300" />
+                    <span>Mở Khóa Gói Tháng ({aieoVipPriceLabel}/tháng)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryZone('live')}
+                    className="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                  >
+                    Quay lại Phòng Đấu Live của Giáo Viên
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5">
               <div className="text-center space-y-1.5">
                 <span className="text-xs font-bold uppercase tracking-widest text-[#0F766E] dark:text-[#1EE1D6] bg-indigo-50 dark:bg-teal-500/20 border border-indigo-200 dark:border-[#007A7A]/40 px-3 py-1 rounded-full">
                   4 Vòng Chuẩn IELTS: V1 Bắn Nghĩa • V2 Gõ Full • V3 Đồng/Trái/Định Nghĩa • V4 Gõ Collocation Diệt Boss
                 </span>
                 <h1 className="text-2xl font-extrabold text-[#0F172B] dark:text-white pt-1">
-                  Tập Luyện 1 Mình (Miễn Phí) &amp; BXH Lớp
+                  Luyện Tập Game 14 Kho Từ &amp; Collocation
                 </h1>
                 <p className="text-xs text-[#475569] dark:text-slate-400 max-w-lg mx-auto">
-                  Học viên tự do luyện tập 1 mình miễn phí bất cứ lúc nào - hoặc đăng ký <b>Gói IELTS VIP</b> để tự tạo phòng riêng đua Top trực tiếp cùng bạn bè!
+                  Chọn 1 trong <b>14 kho từ + Collocation</b> hoặc kho tự tạo, chọn số lượng từ (không giới hạn 8 từ) hoặc tích chọn trực tiếp các từ muốn làm ngay!
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/90 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                    Chọn Chủ Đề Từ Vựng
-                  </label>
-                  <select
-                    value={practiceTopicId}
-                    onChange={e => setPracticeTopicId(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
-                  >
-                    <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
-                    {Object.entries(VOCAB_PRESETS || {}).map(([key, preset]) => (
-                      <option key={key} value={key}>
-                        📚 {preset.label}
-                      </option>
-                    ))}
-                    {roomVocabCount > 0 && (
-                      <option value="room_custom">🏫 Bộ từ Phòng Đấu #{activePin} ({roomVocabCount} từ)</option>
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                    Chọn Tốc Độ Luyện Tập
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { id: 'relaxed', label: 'Thư giãn (+6s)' },
-                      { id: 'normal', label: 'Chuẩn' },
-                      { id: 'turbo', label: 'Siêu tốc (-5s)' }
-                    ].map(sp => (
-                      <button
-                        key={sp.id}
-                        type="button"
-                        onClick={() => setPracticeSpeed(sp.id)}
-                        className={`px-2 py-2.5 rounded-xl text-xs font-extrabold border transition ${
-                          practiceSpeed === sp.id
-                            ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                            : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        {sp.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
               {(() => {
+                const isCustomTopic = String(practiceTopicId).startsWith('custom:');
+                const customTopicObj = isCustomTopic
+                  ? (customVocabTopics || []).find(t => `custom:${t.id}` === practiceTopicId)
+                  : null;
                 const selectedPreset = VOCAB_PRESETS?.[practiceTopicId];
                 const chosenTopicLabel =
                   practiceTopicId === 'room_custom'
                     ? `Phòng #${activePin}`
+                    : customTopicObj
+                    ? customTopicObj.label
                     : selectedPreset?.label || 'IELTS Core Academic';
                 const chosenRawVocab =
                   practiceTopicId === 'room_custom'
                     ? (room.rawVocab || DEFAULT_VOCAB_TEXT)
+                    : customTopicObj
+                    ? customTopicObj.text
                     : selectedPreset?.text || DEFAULT_VOCAB_TEXT;
-                return (
-                  <div className="space-y-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        initPracticeGameCampaign?.({
-                          topicId: practiceTopicId,
-                          topicLabel: chosenTopicLabel,
-                          rawVocab: chosenRawVocab,
-                          speedMode: practiceSpeed,
-                          startRound: 1,
-                          singleRoundOnly: false
-                        })
-                      }
-                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#007A7A] to-[#0F766E] hover:opacity-95 text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2 transition"
-                    >
-                      <Play className="w-4 h-4 fill-current" /> BẮT ĐẦU TỰ LUYỆN ĐỦ 4 VÒNG (V1 → V4)
-                    </button>
+                const bankItems = parseRawVocabText(chosenRawVocab);
+                const validSelectedWords = practiceSelectedWords.filter(w =>
+                  bankItems.some(it => it.word === w)
+                );
+                const effectiveRoundSize =
+                  validSelectedWords.length > 0
+                    ? validSelectedWords.length
+                    : practiceRoundSize > 0
+                    ? Math.min(bankItems.length, practiceRoundSize)
+                    : bankItems.length;
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {[
-                        { r: 1, title: 'V1: Bắn Nghĩa', desc: 'Từ ↔ Nghĩa' },
-                        { r: 2, title: 'V2: Gõ Từ Full', desc: 'Chính tả đầy đủ' },
-                        { r: 3, title: 'V3: Đồng/Trái/ĐN', desc: 'Linh hoạt từ vựng' },
-                        { r: 4, title: 'V4: Gõ Collocation', desc: 'Gõ liên tục diệt Boss' }
-                      ].map(item => (
-                        <button
-                          key={item.r}
-                          type="button"
-                          onClick={() =>
-                            initPracticeGameCampaign?.({
-                              topicId: practiceTopicId,
-                              topicLabel: chosenTopicLabel,
-                              rawVocab: chosenRawVocab,
-                              speedMode: practiceSpeed,
-                              startRound: item.r,
-                              singleRoundOnly: true
-                            })
-                          }
-                          className="p-2.5 rounded-xl bg-white dark:bg-slate-950/75 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 text-left transition"
+                const toggleWordSelection = (word) => {
+                  setPracticeSelectedWords(prev =>
+                    prev.includes(word) ? prev.filter(w => w !== word) : [...prev, word]
+                  );
+                };
+
+                return (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white/90 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                      <div className="sm:col-span-1">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                          Chọn Kho Từ (14 Kho + Tự Tạo)
+                        </label>
+                        <select
+                          value={practiceTopicId}
+                          onChange={e => {
+                            setPracticeTopicId(e.target.value);
+                            setPracticeSelectedWords([]);
+                          }}
+                          className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
                         >
-                          <span className="block text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
-                            {item.title}
-                          </span>
-                          <span className="block text-xs text-[#475569] dark:text-slate-400">
-                            {item.desc}
+                          <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
+                          {Object.entries(VOCAB_PRESETS || {}).map(([key, preset]) => (
+                            <option key={key} value={key}>
+                              📚 {preset.label}
+                            </option>
+                          ))}
+                          {(customVocabTopics || []).map(t => (
+                            <option key={t.id} value={`custom:${t.id}`}>
+                              ⭐ {t.label}
+                            </option>
+                          ))}
+                          {roomVocabCount > 0 && (
+                            <option value="room_custom">🏫 Bộ từ Phòng Đấu #{activePin} ({roomVocabCount} từ)</option>
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                          Số Từ Mỗi Vòng ({bankItems.length} từ có sẵn)
+                        </label>
+                        <select
+                          value={practiceRoundSize}
+                          onChange={e => setPracticeRoundSize(Number(e.target.value) || 0)}
+                          disabled={validSelectedWords.length > 0}
+                          className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white disabled:opacity-60"
+                        >
+                          <option value={0}>Tất cả ({bankItems.length} từ)</option>
+                          {[4, 8, 12, 16, 20, 30, 50, 100].map(n => (
+                            <option key={n} value={n}>{n} từ / vòng</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                          Tốc Độ Luyện Tập
+                        </label>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { id: 'relaxed', label: 'Chậm' },
+                            { id: 'normal', label: 'Chuẩn' },
+                            { id: 'turbo', label: 'Nhanh' }
+                          ].map(sp => (
+                            <button
+                              key={sp.id}
+                              type="button"
+                              onClick={() => setPracticeSpeed(sp.id)}
+                              className={`px-2 py-2.5 rounded-xl text-xs font-extrabold border transition ${
+                                practiceSpeed === sp.id
+                                  ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                                  : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              {sp.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Interactive Word Picker: Chọn từ làm luôn */}
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3.5 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPracticeWordPicker(v => !v)}
+                          className="text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6] inline-flex items-center gap-1.5 hover:underline"
+                        >
+                          <CheckSquare className="w-4 h-4" />
+                          <span>
+                            {showPracticeWordPicker ? 'Ẩn danh sách chọn từ' : 'Chọn từ làm luôn'} (
+                            {validSelectedWords.length > 0
+                              ? `Đã chọn ${validSelectedWords.length}/${bankItems.length} từ`
+                              : `Sẽ chơi ${effectiveRoundSize}/${bankItems.length} từ`}
+                            )
                           </span>
                         </button>
-                      ))}
+                        {showPracticeWordPicker && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setPracticeSelectedWords(bankItems.map(i => i.word))}
+                              className="font-bold text-teal-700 dark:text-teal-300 hover:underline"
+                            >
+                              Chọn hết ({bankItems.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPracticeSelectedWords([])}
+                              className="font-bold text-slate-500 hover:underline"
+                            >
+                              Bỏ chọn
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {showPracticeWordPicker && (
+                        <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto pt-1">
+                          {bankItems.map(item => {
+                            const checked = validSelectedWords.includes(item.word);
+                            const isColloc = item.word.includes(' ');
+                            return (
+                              <button
+                                key={item.word}
+                                type="button"
+                                onClick={() => toggleWordSelection(item.word)}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border inline-flex items-center gap-1.5 transition ${
+                                  checked
+                                    ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                                    : isColloc
+                                    ? 'bg-purple-50 dark:bg-purple-500/15 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-500/40 hover:border-purple-400'
+                                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                                }`}
+                                title={item.prompt}
+                              >
+                                {checked ? <CheckSquare className="w-3.5 h-3.5 shrink-0" /> : <Square className="w-3.5 h-3.5 shrink-0 opacity-60" />}
+                                <span>{item.word}</span>
+                                <span className={`text-[10px] font-medium truncate max-w-[110px] ${checked ? 'text-teal-100' : 'text-slate-400'}`}>
+                                  · {item.prompt}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
+
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          initPracticeGameCampaign?.({
+                            topicId: practiceTopicId,
+                            topicLabel: chosenTopicLabel,
+                            rawVocab: chosenRawVocab,
+                            roundSize: effectiveRoundSize,
+                            selectedWords: validSelectedWords,
+                            speedMode: practiceSpeed,
+                            startRound: 1,
+                            singleRoundOnly: false
+                          })
+                        }
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#007A7A] to-[#0F766E] hover:opacity-95 text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2 transition"
+                      >
+                        <Play className="w-4 h-4 fill-current" /> BẮT ĐẦU TỰ LUYỆN ĐỦ 4 VÒNG ({effectiveRoundSize} từ/vòng)
+                      </button>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { r: 1, title: 'V1: Bắn Nghĩa', desc: 'Từ ↔ Nghĩa' },
+                          { r: 2, title: 'V2: Gõ Từ Full', desc: 'Chính tả đầy đủ' },
+                          { r: 3, title: 'V3: Đồng/Trái/ĐN', desc: 'Linh hoạt từ vựng' },
+                          { r: 4, title: 'V4: Gõ Collocation', desc: 'Gõ liên tục diệt Boss' }
+                        ].map(item => (
+                          <button
+                            key={item.r}
+                            type="button"
+                            onClick={() =>
+                              initPracticeGameCampaign?.({
+                                topicId: practiceTopicId,
+                                topicLabel: chosenTopicLabel,
+                                rawVocab: chosenRawVocab,
+                                roundSize: effectiveRoundSize,
+                                selectedWords: validSelectedWords,
+                                speedMode: practiceSpeed,
+                                startRound: item.r,
+                                singleRoundOnly: true
+                              })
+                            }
+                            className="p-2.5 rounded-xl bg-white dark:bg-slate-950/75 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 text-left transition"
+                          >
+                            <span className="block text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
+                              {item.title}
+                            </span>
+                            <span className="block text-xs text-[#475569] dark:text-slate-400">
+                              {item.desc}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 );
               })()}
 
@@ -731,6 +918,7 @@ export default function GameArena({
                 )}
               </div>
             </div>
+            )
           ) : (
           <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-[0_18px_45px_-18px_rgba(15,23,42,0.14)] dark:shadow-2xl">
             <div className="flex flex-col items-center text-center mb-5">
@@ -1138,8 +1326,8 @@ export default function GameArena({
                       onChange={e => setHostRoomDraft(prev => ({ ...prev, roundSize: Number(e.target.value) }))}
                       className="w-full px-2 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-[#334155] rounded-lg text-xs font-semibold text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                     >
-                      {[2, 3, 4, 5, 6, 8].map(num => (
-                        <option key={num} value={num}>{num}</option>
+                      {[2, 4, 6, 8, 10, 12, 16, 20, 30, 50, 100, 200].map(num => (
+                        <option key={num} value={num}>{num === 200 ? 'Tất cả' : num}</option>
                       ))}
                     </select>
                   </div>
@@ -1166,6 +1354,77 @@ export default function GameArena({
                     </button>
                   </div>
                   <div className="sm:col-span-12 flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200/80 dark:border-slate-800">
+                    {(() => {
+                      const roomVocabList = parseRawVocabText(room.rawVocab || DEFAULT_VOCAB_TEXT);
+                      const draftSelected = Array.isArray(hostRoomDraft.selectedWords)
+                        ? hostRoomDraft.selectedWords
+                        : (room.selectedWords || []);
+                      const toggleDraftWord = (word) => {
+                        setHostRoomDraft(prev => {
+                          const cur = Array.isArray(prev.selectedWords) ? prev.selectedWords : (room.selectedWords || []);
+                          const next = cur.includes(word) ? cur.filter(w => w !== word) : [...cur, word];
+                          return { ...prev, selectedWords: next };
+                        });
+                      };
+                      return (
+                        <div className="w-full mb-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowLobbyWordPicker(v => !v)}
+                              className="text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6] inline-flex items-center gap-1.5 hover:underline"
+                            >
+                              <CheckSquare className="w-3.5 h-3.5" />
+                              <span>
+                                {showLobbyWordPicker ? 'Ẩn chọn từ phòng đấu' : 'Chọn từ làm luôn cho phòng'} (
+                                {draftSelected.length > 0 ? `Đã chọn ${draftSelected.length}/${roomVocabList.length} từ` : `Ngẫu nhiên ${hostRoomDraft.roundSize || 4} từ/vòng`})
+                              </span>
+                            </button>
+                            {showLobbyWordPicker && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setHostRoomDraft(prev => ({ ...prev, selectedWords: roomVocabList.map(i => i.word) }))}
+                                  className="font-bold text-teal-700 dark:text-teal-300 hover:underline"
+                                >
+                                  Chọn hết ({roomVocabList.length})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setHostRoomDraft(prev => ({ ...prev, selectedWords: [] }))}
+                                  className="font-bold text-slate-500 hover:underline"
+                                >
+                                  Dùng theo số lượng
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {showLobbyWordPicker && (
+                            <div className="mt-2 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                              {roomVocabList.map(item => {
+                                const checked = draftSelected.includes(item.word);
+                                return (
+                                  <button
+                                    key={item.word}
+                                    type="button"
+                                    onClick={() => toggleDraftWord(item.word)}
+                                    className={`px-2 py-1 rounded-lg text-[11px] font-bold border inline-flex items-center gap-1 transition ${
+                                      checked
+                                        ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                                    }`}
+                                    title={item.prompt}
+                                  >
+                                    {checked ? <CheckSquare className="w-3 h-3 shrink-0" /> : <Square className="w-3 h-3 shrink-0 opacity-60" />}
+                                    <span>{item.word}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div className="flex flex-wrap items-center gap-3">
                       <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#475569] dark:text-slate-300">
                         <span>Tối đa:</span>

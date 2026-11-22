@@ -29,7 +29,7 @@ export default function VipPromoPopupModal({
     };
   }, []);
 
-  if (!currentUser || currentUser.role === 'teacher') return null;
+  if (!currentUser || currentUser.role === 'teacher' || currentUser.isGuest) return null;
 
   const cfg = normalizePaymentConfig(paymentConfig || {});
   const vipPriceLabel = formatVndCurrency(cfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
@@ -37,16 +37,16 @@ export default function VipPromoPopupModal({
 
   const vipPerks = [
     {
-      title: 'Tự Do Đổi Màu Chữ Tên + Huy Hiệu IELTS VIP',
-      desc: 'Chọn màu chữ bất kỳ từ bảng màu VIP & mã Hex riêng + huy hiệu IELTS VIP nổi bật trên Navbar, Hồ sơ & BXH.'
+      title: 'Truy Cập Luyện Tập Game Từ Vựng (14 Kho Từ + Collocation)',
+      desc: 'Luyện tập Game từ vựng cá nhân theo 14 chủ đề IELTS & Collocation, chọn số lượng từ tùy ý không giới hạn.'
     },
     {
-      title: 'Viền Bìa & Thẻ LED Neon Nhiều Màu + Ảnh Avatar Động',
-      desc: `Đặt Avatar động (.GIF / .WebP), 6 hiệu ứng LED Neon nhiều màu, miễn phí tải Ảnh Bìa Riêng (${coverPriceLabel}/1 tháng) & 3 Khung Avatar Neon VIP.`
+      title: 'Quyền Tạo Phòng Luyện Tập Từ Vựng Theo Chủ Đề',
+      desc: 'Tự tạo phòng đấu trường riêng cùng bạn bè (2–30 người, chia Team), tùy chọn kho từ và số từ mỗi vòng trong suốt 30 ngày.'
     },
     {
-      title: 'Tạo Phòng Đấu Trường Riêng Cùng Bạn Bè + Danh Hiệu VIP',
-      desc: 'Tùy chỉnh 2-30 người, chia 2-4 Team thi đấu không giới hạn suốt 1 tháng (30 ngày) & đeo danh hiệu 👑 IELTS VIP.'
+      title: 'Chỉnh Màu Chữ Tên & Thêm Ảnh Bìa Hồ Sơ Cá Nhân',
+      desc: `Tự do chọn màu chữ tên yêu thích (kèm mã màu tự chọn) và miễn phí tải, cắt Ảnh Bìa riêng (trị giá ${coverPriceLabel}/tháng).`
     }
   ];
 

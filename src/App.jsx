@@ -41,6 +41,10 @@ import {
   normalizeSpeakingSection,
   DEFAULT_ROOMS
 } from './constants/seedData';
+import {
+  createDefaultSpeakingForecastBank,
+  normalizeSpeakingForecastBank
+} from './constants/speakingForecast';
 import { drawAnimalSpaceshipCanvas } from './utils/animalRenderer';
 import {
   calculateAutoBand,
@@ -1317,6 +1321,8 @@ export default function App() {
       return [];
     }
   });
+  const [speakingForecast, setSpeakingForecast] = useState(() => createDefaultSpeakingForecastBank());
+  const [transientSpeakingTest, setTransientSpeakingTest] = useState(null);
 
   // ==========================================
   // GAME ARENA STATE & REFS
@@ -1633,6 +1639,10 @@ export default function App() {
       const validTopics = snap.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
       skipNextVocabTopicsBroadcastRef.current = true;
       setCustomVocabTopics(prev => (JSON.stringify(prev) === JSON.stringify(validTopics) ? prev : validTopics));
+    }
+    if (snap.speakingForecast && typeof snap.speakingForecast === 'object') {
+      const normBank = normalizeSpeakingForecastBank(snap.speakingForecast);
+      setSpeakingForecast(prev => (JSON.stringify(prev) === JSON.stringify(normBank) ? prev : normBank));
     }
     if ('supportAdminProfile' in snap) {
       setSupportAdminProfile(prev => (JSON.stringify(prev) === JSON.stringify(snap.supportAdminProfile) ? prev : snap.supportAdminProfile));
@@ -2143,7 +2153,8 @@ export default function App() {
         pin: r.pin || currentRoomPin,
         name: r.name || `Phòng Từ Vựng #${currentRoomPin}`,
         pass: r.pass ?? 'ielts',
-        roundSize: Math.max(2, Math.min(8, Number(r.roundSize) || 4)),
+        roundSize: Math.max(1, Math.min(200, Number(r.roundSize) || 4)),
+        selectedWords: Array.isArray(r.selectedWords) ? r.selectedWords : [],
         speedMode: ['relaxed', 'normal', 'turbo'].includes(r.speedMode) ? r.speedMode : 'normal',
         shufflePerPlayer: Boolean(r.shufflePerPlayer),
         maxPlayers: Math.max(2, Math.min(30, Number(r.maxPlayers || 30))),
@@ -2151,6 +2162,15 @@ export default function App() {
       });
     }
   }, [currentRoomPin]);
+
+  // Enforce strict Guest isolation across views
+  useEffect(() => {
+    if (currentUser?.isGuest && currentUser.role !== 'teacher') {
+      if (['SKILL_HUB', 'GAME_ARENA', 'SPEAKING_MODE', 'TEACHER_DASHBOARD', 'EXAM_BUILDER'].includes(view)) {
+        setView('HOME');
+      }
+    }
+  }, [currentUser?.isGuest, currentUser?.role, view]);
 
   // Persist active navigation view & context so F5 / browser lag restores the exact page
   useEffect(() => {
@@ -2823,6 +2843,11 @@ export default function App() {
   });
 
   const openStudentGamePortal = () => {
+    if (currentUser?.isGuest && currentUser.role !== 'teacher') {
+      showToast('Tài khoản Khách chỉ được phép mua và thi Đề Thực Chiến & Mock Test.', 'error');
+      setView('HOME');
+      return;
+    }
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
     clearInterval(lobbyCountdownTimerRef.current);
@@ -3047,7 +3072,10 @@ export default function App() {
     const newPin = (hostRoomDraft.pin || '').trim() || oldPin;
     const newName = (hostRoomDraft.name || '').trim() || `Phòng Từ Vựng #${newPin}`;
     const newPass = (hostRoomDraft.pass || '').trim() || 'ielts';
-    const cleanRoundSize = Math.max(2, Math.min(8, Number(hostRoomDraft.roundSize) || 4));
+    const cleanRoundSize = Math.max(1, Math.min(200, Number(hostRoomDraft.roundSize) || 4));
+    const cleanSelectedWords = Array.isArray(hostRoomDraft.selectedWords)
+      ? hostRoomDraft.selectedWords.map(w => String(w || '').trim().toUpperCase()).filter(Boolean).slice(0, 200)
+      : [];
     const cleanSpeedMode = ['relaxed', 'normal', 'turbo'].includes(hostRoomDraft.speedMode) ? hostRoomDraft.speedMode : 'normal';
     const cleanShufflePerPlayer = Boolean(hostRoomDraft.shufflePerPlayer);
     const cleanMaxPlayers = Math.max(2, Math.min(30, Number(hostRoomDraft.maxPlayers || 30)));
@@ -3090,6 +3118,7 @@ export default function App() {
           name: newName,
           pass: newPass,
           roundSize: cleanRoundSize,
+          selectedWords: cleanSelectedWords,
           speedMode: cleanSpeedMode,
           shufflePerPlayer: cleanShufflePerPlayer,
           maxPlayers: cleanMaxPlayers,
@@ -3112,6 +3141,7 @@ export default function App() {
       name: newName,
       pass: newPass,
       roundSize: cleanRoundSize,
+      selectedWords: cleanSelectedWords,
       speedMode: cleanSpeedMode,
       shufflePerPlayer: cleanShufflePerPlayer,
       maxPlayers: cleanMaxPlayers,
@@ -3125,6 +3155,7 @@ export default function App() {
         name: newName,
         pass: newPass,
         roundSize: cleanRoundSize,
+        selectedWords: cleanSelectedWords,
         speedMode: cleanSpeedMode,
         shufflePerPlayer: cleanShufflePerPlayer,
         maxPlayers: cleanMaxPlayers,
@@ -3602,7 +3633,8 @@ export default function App() {
       status: 'LOBBY',
       maxPlayers: cleanMaxPlayers,
       teamCount: cleanTeamCount,
-      roundSize: Math.max(2, Math.min(8, Number(newRoomForm.roundSize) || 4)),
+      roundSize: Math.max(1, Math.min(200, Number(newRoomForm.roundSize) || 4)),
+      selectedWords: [],
       speedMode: ['relaxed', 'normal', 'turbo'].includes(newRoomForm.speedMode) ? newRoomForm.speedMode : 'normal',
       shufflePerPlayer: Boolean(newRoomForm.shufflePerPlayer),
       startedAt: null,
@@ -3934,6 +3966,43 @@ export default function App() {
       setShowVipPromoModal(false);
       setShowRealExamPricingModal(true);
     }
+  };
+
+  const handleGuestRegistered = (data) => {
+    if (!data?.user) return;
+    authEpochRef.current += 1;
+    bootSessionCheckedRef.current = true;
+    lastSyncVersionRef.current = -1;
+    const guestUser = normalizeBrandTeacherUser(data.user);
+    if (data.snapshot) {
+      applyRemoteSnapshotData.current?.(data.snapshot);
+    }
+    clearNavSession();
+    setSelectedTestId(null);
+    setSelectedAttemptId(null);
+    setSelectedProfileStudent(null);
+    resetActiveGameSession();
+    currentUserRef.current = guestUser;
+    setCurrentUser(guestUser);
+    setSyncHydrated(true);
+    setView('HOME');
+    setShowVipPromoModal(false);
+    setShowRealExamPricingModal(true);
+    showToast(`Chào mừng Tài khoản Khách ${guestUser.name || guestUser.username}! Bạn có thể chọn mua Đề Thực Chiến & Mock Test ngay.`);
+  };
+
+  const handleSaveSpeakingForecast = (nextBank) => {
+    const normalized = normalizeSpeakingForecastBank(nextBank);
+    setSpeakingForecast(normalized);
+    dispatchSyncAction('UPSERT_SPEAKING_FORECAST', { bank: normalized });
+  };
+
+  const handleStartSpeakingPracticeTest = (practiceTestObj, partMode = 'full') => {
+    if (!practiceTestObj) return;
+    setTransientSpeakingTest(practiceTestObj);
+    setSelectedTestId(practiceTestObj.id);
+    setSpeakingPartMode(partMode || 'full');
+    setView('SPEAKING_MODE');
   };
 
   const handleLogout = () => {
@@ -5913,6 +5982,8 @@ export default function App() {
     topicId = 'core',
     topicLabel = 'IELTS Core Academic',
     rawVocab = DEFAULT_VOCAB_TEXT,
+    roundSize = 200,
+    selectedWords = [],
     speedMode = 'normal',
     startRound = 1,
     singleRoundOnly = false
@@ -5924,7 +5995,8 @@ export default function App() {
 
     const queues = buildPracticeRoundQueues({
       rawVocab: rawVocab || DEFAULT_VOCAB_TEXT,
-      roundSize: 4,
+      roundSize: Math.max(1, Math.min(200, Number(roundSize) || 200)),
+      selectedWords: Array.isArray(selectedWords) ? selectedWords : [],
       seedStr: `practice:${currentUser?.username || 'guest'}:${Date.now()}`
     });
     const validRound = [1, 2, 3, 4].includes(Number(startRound)) ? Number(startRound) : 1;
@@ -7169,6 +7241,11 @@ export default function App() {
     ? (dailySpeakingCompliance.myPendingDailyTests?.length || 0)
     : 0;
   const openSpeakingDaily = () => {
+    if (currentUser?.isGuest && currentUser.role !== 'teacher') {
+      showToast('Tài khoản Khách chỉ được phép mua và thi Đề Thực Chiến & Mock Test.', 'error');
+      setView('HOME');
+      return;
+    }
     setFocusedTestId(null);
     setSkillHubTab('speaking_daily');
     setView('SKILL_HUB');
@@ -7369,6 +7446,7 @@ export default function App() {
           authForm={authForm}
           darkMode={darkMode}
           handleAuthSubmit={handleAuthSubmit}
+          onGuestRegistered={handleGuestRegistered}
           onPasswordRecovered={handleSyncRememberedPassword}
           onRemoveRememberedLogin={handleRemoveRememberedLogin}
           onSelectRememberedLogin={handleSelectRememberedLogin}
@@ -7425,6 +7503,7 @@ export default function App() {
       {view === 'SKILL_HUB' && (
         <SkillPracticeHub
           activeTab={skillHubTab}
+          aiApiKey={aiApiKey}
           aiConfigured={Boolean(aiApiKey?.trim() || aiConfigured)}
           attempts={attempts}
           classesDb={classesDb}
@@ -7448,12 +7527,18 @@ export default function App() {
             setView('RESULT_VIEW');
           }}
           onOpenSkillBuilder={(skill, testToEdit = null, subOpts = {}) => openSingleSkillBuilder(skill, testToEdit, [], subOpts)}
+          onSaveSpeakingForecast={handleSaveSpeakingForecast}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}
-          onStartSpeakingExam={(testId, partMode = 'full') => startExam(testId, partMode)}
+          onStartSpeakingExam={(testId, partMode = 'full') => {
+            setTransientSpeakingTest(null);
+            startExam(testId, partMode);
+          }}
+          onStartSpeakingPracticeTest={handleStartSpeakingPracticeTest}
           paymentConfig={paymentConfig}
           serverClockOffsetMs={serverClockOffsetMs}
           showToast={showToast}
+          speakingForecast={speakingForecast}
           examUnlockTokens={examUnlockTokens}
           speakingUnlockTokens={speakingUnlockTokens}
           tests={tests}
@@ -7468,11 +7553,13 @@ export default function App() {
           dispatchSyncAction={dispatchSyncAction}
           onAttemptCreated={newAtt => setAttempts(prev => [newAtt, ...prev])}
           onExitSpeaking={() => {
+            setTransientSpeakingTest(null);
             setSelectedTestId(null);
             setView('SKILL_HUB');
           }}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onViewResult={attId => {
+            setTransientSpeakingTest(null);
             setSelectedAttemptId(attId);
             setPreviousView('SKILL_HUB');
             setResultReviewTab('speaking');
@@ -7483,6 +7570,7 @@ export default function App() {
           showToast={showToast}
           speakingUnlockTokens={speakingUnlockTokens}
           tests={tests}
+          transientTest={transientSpeakingTest}
         />
       )}
 
@@ -7545,6 +7633,7 @@ export default function App() {
           currentRoomPin={currentRoomPin}
           currentUser={currentUser}
           customTitles={customTitles}
+          customVocabTopics={customVocabTopics}
           dailyRankTitles={dailyRankTitles}
           darkMode={darkMode}
           freezeCharges={freezeCharges}

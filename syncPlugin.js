@@ -49,6 +49,7 @@ import {
   computeDailyLeaderboardTitleHolders,
   formatVndCurrency,
   getFriendRoomTicketCredits,
+  getPurchasedExamCount,
   getRealExamComboMeta,
   getRealExamCredits,
   getTestPurchasePriceVnd,
@@ -56,11 +57,13 @@ import {
   getVietnamDateKey,
   hasCustomCoverPermission,
   hasAnimatedAvatarPermission,
+  hasGamePracticeAccess,
   hasSkillPracticeAccess,
   hasTestPurchaseAccess,
   hasUnlockedAvatarFrame,
   hasVipFriendRoomAccess,
   isAnimatedDataUrl,
+  isStaffOrAdminUser,
   isSyncMediaUrl,
   isWebpBufferAnimated,
   normalizePaymentConfig,
@@ -76,6 +79,10 @@ import {
   DEFAULT_ROOMS,
   DEFAULT_TEACHER_NOTES
 } from './src/constants/seedData.js';
+import {
+  createDefaultSpeakingForecastBank,
+  normalizeSpeakingForecastBank
+} from './src/constants/speakingForecast.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -724,7 +731,9 @@ function sanitizeUserForViewer(user, viewer) {
     avatarUrl: user.avatarUrl || '',
     profileBannerId: typeof user.profileBannerId === 'string' && user.profileBannerId ? user.profileBannerId : 'ocean',
     profileCoverUrl: typeof user.profileCoverUrl === 'string' ? user.profileCoverUrl : '',
-    avatarFrameId: typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
+    avatarFrameId: isStaffOrAdminUser(user) && typeof user.avatarFrameId === 'string' && user.avatarFrameId ? user.avatarFrameId : 'none',
+    isGuest: Boolean(user.isGuest),
+    totalPurchasedExams: getPurchasedExamCount(user),
     equippedTitleId:
       typeof user.equippedTitleId === 'string' && user.equippedTitleId
         ? user.equippedTitleId
@@ -763,11 +772,11 @@ function sanitizeUserForViewer(user, viewer) {
       return (isVip || isSa) && user.vipTagEnabled !== undefined ? Boolean(user.vipTagEnabled) : isVip;
     })(),
     vipNeonCoverEnabled: (() => {
-      const isVip = Number(user.aieoVipExpiresAt) > Date.now();
+      const isStaff = isStaffOrAdminUser(user);
+      if (!isStaff) return false;
       const isSa = Boolean(user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME);
-      if (isVip && !user.vipEffectsCustomizedAt) return true;
-      if (user.vipNeonCoverEnabled !== undefined) return (isVip || isSa) && Boolean(user.vipNeonCoverEnabled);
-      return isVip || (isSa && Boolean(user.vipRedNameEnabled || user.vipTagEnabled));
+      if (user.vipNeonCoverEnabled !== undefined) return Boolean(user.vipNeonCoverEnabled);
+      return isSa && Boolean(user.vipRedNameEnabled || user.vipTagEnabled);
     })(),
     vipNeonCoverColor: normalizeVipNeonCoverColor(user.vipNeonCoverColor || 'aurora_rgb'),
     ...(user.vipEffectsCustomizedAt ? { vipEffectsCustomizedAt: Number(user.vipEffectsCustomizedAt) || 0 } : {}),
@@ -969,21 +978,23 @@ function evaluateObjectiveScoresForAttempt(test, answers = {}) {
 
   if (cfgMode !== 'single_skill' || focusSkill === 'listening') {
     const qs = Array.isArray(test.listening?.questions) ? test.listening.questions : [];
-    const raw = qs.reduce((acc, q) => (isObjectiveAnswerCorrectServer(q, answers?.[q.id]) ? acc + 1 : acc), 0);
+    const raw = qs.reduce((acc, q) => acc + getObjectiveAnswerScore(q, answers?.[q.id]), 0);
+    const total = qs.reduce((acc, q) => acc + getObjectiveAnswerMaxScore(q), 0);
     scores.listening = {
       raw,
-      total: qs.length,
-      band: calculateAutoBandServer(raw, qs.length, 'listening')
+      total,
+      band: calculateAutoBandServer(raw, total, 'listening')
     };
   }
 
   if (cfgMode !== 'single_skill' || focusSkill === 'reading') {
     const qs = Array.isArray(test.reading?.questions) ? test.reading.questions : [];
-    const raw = qs.reduce((acc, q) => (isObjectiveAnswerCorrectServer(q, answers?.[q.id]) ? acc + 1 : acc), 0);
+    const raw = qs.reduce((acc, q) => acc + getObjectiveAnswerScore(q, answers?.[q.id]), 0);
+    const total = qs.reduce((acc, q) => acc + getObjectiveAnswerMaxScore(q), 0);
     scores.reading = {
       raw,
-      total: qs.length,
-      band: calculateAutoBandServer(raw, qs.length, 'reading')
+      total,
+      band: calculateAutoBandServer(raw, total, 'reading')
     };
   }
 
@@ -1079,7 +1090,10 @@ export function normalizeServerRoom(raw = {}, pinKey = '', now = Date.now()) {
     status: raw?.status === 'PLAYING' || raw?.status === 'ENDED' ? raw.status : 'LOBBY',
     maxPlayers,
     teamCount,
-    roundSize: Number.isFinite(rawRoundSize) && rawRoundSize >= 2 ? Math.min(8, Math.round(rawRoundSize)) : 4,
+    roundSize: Number.isFinite(rawRoundSize) && rawRoundSize >= 1 ? Math.min(200, Math.round(rawRoundSize)) : 4,
+    selectedWords: Array.isArray(raw?.selectedWords)
+      ? raw.selectedWords.map(w => String(w || '').trim().toUpperCase()).filter(Boolean).slice(0, 200)
+      : [],
     speedMode: ['relaxed', 'normal', 'turbo'].includes(raw?.speedMode) ? raw.speedMode : 'normal',
     shufflePerPlayer: Boolean(raw?.shufflePerPlayer),
     startedAt: raw?.startedAt || null,
@@ -1181,6 +1195,7 @@ function createInitialStore(audioDir = '', mediaDir = '') {
     teacherNotes: {},
     users: {},
     customVocabTopics: [],
+    speakingForecast: createDefaultSpeakingForecastBank(),
     customTitles: [],
     gamePracticeLeaderboard: [],
     adminFeedbacks: [],
@@ -1496,6 +1511,20 @@ function externalizeTestMedia(store, testObj) {
         lChanged = true;
       }
     }
+    if (Array.isArray(nextL.questions)) {
+      let lqChanged = false;
+      const nextLq = nextL.questions.map(q => {
+        if (q && typeof q.imageUrl === 'string' && q.imageUrl.startsWith('data:')) {
+          const r = externalizeDataUrl(store, q.imageUrl);
+          if (r.changed) { lqChanged = true; return { ...q, imageUrl: r.url }; }
+        }
+        return q;
+      });
+      if (lqChanged) {
+        nextL.questions = nextLq;
+        lChanged = true;
+      }
+    }
     if (lChanged) {
       ensureClone().listening = nextL;
       changed = true;
@@ -1521,6 +1550,20 @@ function externalizeTestMedia(store, testObj) {
       });
       if (passagesChanged) {
         nextR.passages = nextPassages;
+        rChanged = true;
+      }
+    }
+    if (Array.isArray(nextR.questions)) {
+      let rqChanged = false;
+      const nextRq = nextR.questions.map(q => {
+        if (q && typeof q.imageUrl === 'string' && q.imageUrl.startsWith('data:')) {
+          const r = externalizeDataUrl(store, q.imageUrl);
+          if (r.changed) { rqChanged = true; return { ...q, imageUrl: r.url }; }
+        }
+        return q;
+      });
+      if (rqChanged) {
+        nextR.questions = nextRq;
         rChanged = true;
       }
     }
@@ -1705,6 +1748,9 @@ function applyParsedStoreSnapshot(store, parsed) {
   }
   if (Array.isArray(parsed.customVocabTopics)) {
     store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+  }
+  if (parsed.speakingForecast && typeof parsed.speakingForecast === 'object') {
+    store.speakingForecast = normalizeSpeakingForecastBank(parsed.speakingForecast);
   }
   if (Array.isArray(parsed.customTitles)) {
     store.customTitles = parsed.customTitles.filter(t => t?.id && t?.label).slice(0, 60);
@@ -2326,6 +2372,7 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: {},
       users: {},
       customVocabTopics: [],
+      speakingForecast: null,
       customTitles: [],
       gamePracticeLeaderboard: [],
       dailyRankTitles: null,
@@ -2407,6 +2454,7 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: store.teacherNotes || {},
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
+      speakingForecast: normalizeSpeakingForecastBank(store.speakingForecast),
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
       gamePracticeLeaderboard: Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : [],
       dailyRankTitles: globalDailyRankTitles,
@@ -2414,6 +2462,64 @@ function getSnapshotForViewer(store, viewer = null) {
       ...adminFields,
       notifications,
       sentNotifications
+    };
+  }
+
+  // Strict Guest view: ONLY public Thực Chiến & Mock Test exams + own attempts; hide Daily, Forecast, Game, Classes, Peers, Titles
+  if (viewer.isGuest) {
+    const myGuestAttempts = (store.attempts || [])
+      .filter(a => a && (a.studentId === viewer.username || a.studentUsername === viewer.username))
+      .map(att => sanitizeAttemptForStudentViewer(att));
+    const guestSubmittedIds = new Set(myGuestAttempts.map(a => a.testId).filter(Boolean));
+    const guestTests = (store.tests || [])
+      .filter(t => {
+        if (!t || (t.visibility || 'public') === 'private') return false;
+        if (t.testMode === 'single_skill') return false;
+        const assigned = normalizeClassIdList(t.assignedClassIds);
+        if (assigned.length > 0) return false;
+        return true;
+      })
+      .map(t => {
+        const canSeeKeys = Boolean(t?.allowViewAnswers) && guestSubmittedIds.has(t.id);
+        const safeTest = canSeeKeys ? { ...t } : stripAnswerKeysFromTest(t);
+        const rawExamPass = String(safeTest?.examPassword || '').trim();
+        const sanitizedExamTest = {
+          ...safeTest,
+          examPassword: '',
+          hasExamPassword: Boolean(safeTest?.hasExamPassword || rawExamPass.length > 0)
+        };
+        if (sanitizedExamTest?.speaking && typeof sanitizedExamTest.speaking === 'object') {
+          const rawPass = String(sanitizedExamTest.speaking.roomPassword || '').trim();
+          return {
+            ...sanitizedExamTest,
+            speaking: {
+              ...sanitizedExamTest.speaking,
+              roomPassword: '',
+              hasRoomPassword: Boolean(sanitizedExamTest.speaking.hasRoomPassword || rawPass.length > 0)
+            }
+          };
+        }
+        return sanitizedExamTest;
+      });
+    const selfClean = sanitizedUsers[viewer.username] ? { [viewer.username]: sanitizedUsers[viewer.username] } : {};
+    return {
+      ...basePayload,
+      deletedUserIds: [],
+      rooms: {},
+      classes: {},
+      tests: guestTests,
+      attempts: myGuestAttempts,
+      teacherNotes: {},
+      users: selfClean,
+      customVocabTopics: [],
+      speakingForecast: null,
+      customTitles: [],
+      gamePracticeLeaderboard: [],
+      dailyRankTitles: null,
+      paymentConfig: getPublicPaymentConfigSummary(store),
+      ...adminFields,
+      notifications,
+      sentNotifications: []
     };
   }
 
@@ -2546,6 +2652,7 @@ function getSnapshotForViewer(store, viewer = null) {
     teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
+    speakingForecast: normalizeSpeakingForecastBank(store.speakingForecast),
     customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
     gamePracticeLeaderboard: (Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : []).filter(entry => {
       if (!entry?.username) return false;
@@ -2592,6 +2699,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'UPSERT_NOTE',
     'UPSERT_VOCAB_TOPIC',
     'DELETE_VOCAB_TOPIC',
+    'UPSERT_SPEAKING_FORECAST',
     'SET_AI_CONFIG',
     'CREATE_NOTIFICATION',
     'DELETE_NOTIFICATION'
@@ -2614,6 +2722,24 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       return { allowed: false, status: 403, error: 'Chỉ Giáo viên mới có quyền thực hiện thao tác này.' };
     }
     return { allowed: true };
+  }
+
+  if (!isTeacher && viewer.isGuest) {
+    const guestAllowedActions = new Set([
+      'UPSERT_ATTEMPT',
+      'UPSERT_USER',
+      'REDEEM_REAL_EXAM_CREDIT',
+      'REQUEST_COVER_UNLOCK',
+      'MARK_NOTIFICATIONS_READ',
+      'DISMISS_NOTIFICATIONS'
+    ]);
+    if (!guestAllowedActions.has(type)) {
+      return {
+        allowed: false,
+        status: 403,
+        error: 'Tài khoản Khách chỉ được phép mua và làm Đề Thực Chiến & Mock Test.'
+      };
+    }
   }
 
   switch (type) {
@@ -2829,6 +2955,18 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
 
     case 'REQUEST_COVER_UNLOCK': {
       const me = store.users?.[viewer.username] || viewer;
+      if (!isTeacher && viewer.isGuest) {
+        const isAllowedGuestReq =
+          payload?.itemType === 'test' ||
+          Boolean(getRealExamComboMeta(payload?.itemType, store.paymentConfig));
+        if (!isAllowedGuestReq) {
+          return {
+            allowed: false,
+            status: 403,
+            error: 'Tài khoản Khách chỉ được phép mua Đề Thực Chiến và Mock Test.'
+          };
+        }
+      }
       if (payload?.itemType === 'title') {
         const titleId = String(payload?.itemId || '').trim();
         const paidTitle = PAID_SHOP_TITLES.find(t => t.id === titleId);
@@ -2894,6 +3032,13 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         }
         const test = (store.tests || []).find(t => t.id === att.testId);
         const viewerRecord = store.users?.[viewer.username] || viewer;
+        if (viewer.isGuest && test && test.testMode === 'single_skill') {
+          return {
+            allowed: false,
+            status: 403,
+            error: 'Tài khoản Khách không có quyền truy cập Daily Zone — chỉ được phép làm Đề Thực Chiến & Mock Test.'
+          };
+        }
         if (test && !existingAtt && !hasTestPurchaseAccess(viewerRecord, test)) {
           const priceLabel = formatVndCurrency(getTestPurchasePriceVnd(test));
           return {
@@ -3060,6 +3205,14 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
       const targetUname = payload?.username;
       if (!isTeacher && targetUname && targetUname !== viewer.username) {
         return { allowed: false, status: 403, error: 'Không thể gửi điểm luyện tập dưới tên người khác.' };
+      }
+      const viewerRecord = store.users?.[viewer.username] || viewer;
+      if (!isTeacher && !hasGamePracticeAccess(viewerRecord)) {
+        return {
+          allowed: false,
+          status: 403,
+          error: `Vui lòng đăng ký Gói Tháng (${formatVndCurrency(store.paymentConfig?.aieoVipPrice ?? AIEO_VIP_PRICE_VND)}/tháng) để vào Luyện Tập Game Từ Vựng.`
+        };
       }
       return { allowed: true };
     }
@@ -4349,12 +4502,17 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         const testId = String(payload?.testId || '').trim();
         if (testId) {
           const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
+          const alreadyOwned = prevTests.includes(testId);
           const nextTests = active
             ? Array.from(new Set([...prevTests, testId]))
             : prevTests.filter(id => id !== testId);
+          const nextTotalPurchased = active && !alreadyOwned
+            ? getPurchasedExamCount(targetUser) + 1
+            : getPurchasedExamCount(targetUser);
           store.users[targetKey] = {
             ...targetUser,
             purchasedTestIds: nextTests,
+            totalPurchasedExams: nextTotalPurchased,
             ...(active && targetUser.subscriptionRequested?.itemId === testId ? { subscriptionRequested: null } : {})
           };
           if (active && targetUser.role !== 'teacher') {
@@ -4379,9 +4537,13 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         const addCount = comboMeta ? comboMeta.credits : Math.max(1, Math.floor(Number(payload?.credits) || 1));
         const currCredits = getRealExamCredits(targetUser);
         const nextCredits = active ? currCredits + addCount : Math.max(0, currCredits - addCount);
+        const nextTotalPurchased = active
+          ? getPurchasedExamCount(targetUser) + addCount
+          : getPurchasedExamCount(targetUser);
         store.users[targetKey] = {
           ...targetUser,
           realExamCredits: nextCredits,
+          totalPurchasedExams: nextTotalPurchased,
           ...(active &&
           (targetUser.subscriptionRequested?.itemType === kind ||
             Boolean(getRealExamComboMeta(targetUser.subscriptionRequested?.itemType, store.paymentConfig)))
@@ -4706,7 +4868,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'UPDATE_PAYMENT_CONFIG': {
-      const normalizedCfg = normalizePaymentConfig({ ...(payload?.paymentConfig || payload || {}), pricingSchemaVersion: 2 });
+      const normalizedCfg = normalizePaymentConfig({ ...(payload?.paymentConfig || payload || {}), pricingSchemaVersion: 3 });
       store.paymentConfig = externalizePaymentConfigMedia(store, normalizedCfg).config;
       changed = true;
       break;
@@ -4979,6 +5141,13 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         store.customVocabTopics = filtered;
         changed = true;
       }
+      break;
+    }
+
+    case 'UPSERT_SPEAKING_FORECAST': {
+      const nextBank = normalizeSpeakingForecastBank(payload?.bank || payload?.speakingForecast || payload);
+      store.speakingForecast = nextBank;
+      changed = true;
       break;
     }
 
@@ -5301,6 +5470,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'CONFIRM_PAYMENT_TRANSACTION',
   'DELETE_PAYMENT_TRANSACTION',
   'UPDATE_PAYMENT_CONFIG',
+  'UPSERT_SPEAKING_FORECAST',
   'SEED_DEFAULTS'
 ]);
 
@@ -5529,6 +5699,90 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(JSON.stringify({ ok: false, error: err?.message || 'Đăng nhập thất bại.' }));
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl === '/auth/register-guest') {
+      try {
+        const body = await readJsonBody(req);
+        const ip = getClientIp(req);
+        if (!checkRateLimit(store._rateLimits, `reg_guest:${ip}`, 10, 10 * 60 * 1000)) {
+          sendJsonResponse(res, 429, {
+            ok: false,
+            error: 'Bạn thao tác đăng ký quá nhanh. Vui lòng đợi vài phút rồi thử lại.'
+          });
+          return;
+        }
+        const rawUsername = normalizeUsernameKey(body?.username || '');
+        const cleanName = String(body?.name || '').trim().slice(0, 80);
+        const password = String(body?.password || '').trim();
+        if (!rawUsername || rawUsername.length < 3 || rawUsername.length > 32 || !/^[a-zA-Z0-9_.-]+$/.test(rawUsername)) {
+          sendJsonResponse(res, 400, {
+            ok: false,
+            error: 'Tên đăng nhập phải dài 3–32 ký tự và chỉ gồm chữ, số, dấu gạch dưới (_), chấm (.) hoặc gạch ngang (-).'
+          });
+          return;
+        }
+        if (password.length < 4 || password.length > 128) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Mật khẩu phải dài ít nhất 4 ký tự.' });
+          return;
+        }
+        const existingKey = findUserKeyInStore(store, rawUsername);
+        if (existingKey || rawUsername.toLowerCase() === SUPER_ADMIN_USERNAME.toLowerCase()) {
+          sendJsonResponse(res, 409, {
+            ok: false,
+            error: 'Tên đăng nhập này đã có người sử dụng. Vui lòng chọn tên khác hoặc đăng nhập.'
+          });
+          return;
+        }
+        const nowMs = Date.now();
+        const guestUser = {
+          username: rawUsername,
+          name: cleanName || rawUsername,
+          role: 'student',
+          isGuest: true,
+          targetBand: 6.5,
+          passwordHash: hashPassword(password),
+          tokenVersion: 1,
+          createdAt: nowMs,
+          purchasedTestIds: [],
+          realExamCredits: 0,
+          totalPurchasedExams: 0
+        };
+        store.users[rawUsername] = guestUser;
+        recordUserLoginDay(store, guestUser);
+        store.version += 1;
+        store._localMutated = true;
+        if (onFlush) onFlush(store);
+        else onChanged?.(store);
+        scheduleBroadcast(50);
+
+        const sid = crypto.randomBytes(8).toString('hex');
+        const token = signToken(
+          {
+            username: guestUser.username,
+            role: guestUser.role,
+            isSuperAdmin: false,
+            tokenVersion: 1,
+            sid,
+            exp: nowMs + SESSION_TTL_MS
+          },
+          store._authSecret
+        );
+        res.setHeader('Set-Cookie', buildSessionCookieHeader(req, token, SESSION_TTL_MS / 1000));
+        sendJsonResponse(
+          res,
+          200,
+          {
+            ok: true,
+            user: sanitizeUserForViewer(guestUser, guestUser),
+            snapshot: getSnapshotForViewer(store, guestUser)
+          },
+          req
+        );
+      } catch (err) {
+        sendJsonResponse(res, 400, { ok: false, error: err?.message || 'Đăng ký tài khoản khách thất bại.' });
       }
       return;
     }
@@ -6062,7 +6316,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const rawCfg = body?.paymentConfig || body || {};
         store.paymentConfig = externalizePaymentConfigMedia(
           store,
-          normalizePaymentConfig({ ...rawCfg, pricingSchemaVersion: 2 })
+          normalizePaymentConfig({ ...rawCfg, pricingSchemaVersion: 3 })
         ).config;
         const prevSec = store.paymentSecrets && typeof store.paymentSecrets === 'object'
           ? store.paymentSecrets
@@ -6204,6 +6458,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const isRoomTicketOrder = rawType === 'room_ticket';
         const isDonateOrder = rawType === 'donate';
         const comboMeta = getRealExamComboMeta(rawType, cfg);
+        if (viewerUser?.isGuest && viewerUser.role !== 'teacher' && !isTestOrder && !comboMeta) {
+          sendJsonResponse(res, 403, {
+            ok: false,
+            error: 'Tài khoản Khách chỉ được phép mua Đề Thực Chiến và Mock Test.'
+          });
+          return;
+        }
         const itemType = isTitleOrder
           ? 'title'
           : isTestOrder
@@ -6619,10 +6880,15 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             );
           } else if (matchedOrder.itemType === 'test' && matchedOrder.itemId) {
             const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
+            const alreadyOwned = prevTests.includes(matchedOrder.itemId);
             const nextTests = Array.from(new Set([...prevTests, matchedOrder.itemId]));
+            const nextTotalPurchased = alreadyOwned
+              ? getPurchasedExamCount(targetUser)
+              : getPurchasedExamCount(targetUser) + 1;
             store.users[targetKey] = {
               ...targetUser,
               purchasedTestIds: nextTests,
+              totalPurchasedExams: nextTotalPurchased,
               ...(targetUser.subscriptionRequested?.itemId === matchedOrder.itemId ? { subscriptionRequested: null } : {})
             };
             appendStoreNotification(
@@ -6640,9 +6906,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           } else if (Boolean(getRealExamComboMeta(matchedOrder.itemType, store.paymentConfig))) {
             const comboFulfilled = getRealExamComboMeta(matchedOrder.itemType, store.paymentConfig);
             const nextCredits = getRealExamCredits(targetUser) + comboFulfilled.credits;
+            const nextTotalPurchased = getPurchasedExamCount(targetUser) + comboFulfilled.credits;
             store.users[targetKey] = {
               ...targetUser,
               realExamCredits: nextCredits,
+              totalPurchasedExams: nextTotalPurchased,
               ...(targetUser.subscriptionRequested?.itemType === matchedOrder.itemType ? { subscriptionRequested: null } : {})
             };
             appendStoreNotification(

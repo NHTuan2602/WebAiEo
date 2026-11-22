@@ -107,6 +107,7 @@ export default function GlobalModals({
   const [showNewTopicForm, setShowNewTopicForm] = useState(false);
   const [newTopicLabel, setNewTopicLabel] = useState('');
   const [newTopicText, setNewTopicText] = useState('');
+  const [collocationPasteInput, setCollocationPasteInput] = useState('');
   const [avatarCropState, setAvatarCropState] = useState(null);
   const [gifAvatarLinkInput, setGifAvatarLinkInput] = useState('');
 
@@ -575,8 +576,8 @@ export default function GlobalModals({
                   onChange={e => setNewRoomForm(prev => ({ ...prev, roundSize: Number(e.target.value) }))}
                   className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
-                  {[2, 3, 4, 5, 6, 8].map(n => (
-                    <option key={n} value={n}>{n} từ / vòng</option>
+                  {[2, 4, 6, 8, 10, 12, 16, 20, 30, 50, 100, 200].map(n => (
+                    <option key={n} value={n}>{n === 200 ? 'Tất cả từ trong kho' : `${n} từ / vòng`}</option>
                   ))}
                 </select>
               </div>
@@ -728,19 +729,20 @@ export default function GlobalModals({
             </button>
           </div>
 
-          {/* Quick-Load IELTS Topic Presets + Teacher Custom Topics + Add "+" Button */}
+          {/* Quick-Load 14 IELTS Topic Presets + Teacher Custom Topics + Add "+" Button */}
           <div className="mb-3">
             <p className="text-xs font-bold text-[#475569] dark:text-slate-400 mb-1.5">
-              Nạp nhanh bộ từ vựng mẫu theo chủ đề IELTS:
+              14 Kho Từ Vựng &amp; Collocation IELTS chuẩn (bấm để nạp nhanh hoặc nối thêm):
             </p>
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 max-h-36 overflow-y-auto p-2 rounded-xl bg-slate-50/80 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
               {Object.entries(VOCAB_PRESETS).map(([presetKey, preset]) => (
                 <button
                   key={presetKey}
                   type="button"
                   onClick={() => {
                     setCustomVocabInput(preset.text);
-                    showToast(`Đã nạp bộ từ vựng "${preset.label}"! Bấm Lưu để áp dụng.`);
+                    if (preset.collocationText) setCollocationPasteInput(preset.collocationText);
+                    showToast(`Đã nạp ${preset.label} (kèm Collocation)! Bấm Lưu để áp dụng.`);
                   }}
                   className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-500/15 hover:bg-purple-100 dark:hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 text-xs font-bold transition"
                 >
@@ -909,12 +911,48 @@ export default function GlobalModals({
           </div>
 
           <textarea
-            rows={9}
+            rows={7}
             value={customVocabInput}
             onChange={e => setCustomVocabInput(e.target.value)}
-            className="w-full p-3 font-mono text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none mb-4"
-            placeholder="TỪ | Nghĩa tiếng Việt | /Phiên âm/ | Ví dụ câu..."
+            className="w-full p-3 font-mono text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none mb-3"
+            placeholder="Dán Từ vựng & Collocation: TỪ / COLLOCATION | Nghĩa tiếng Việt | /Phiên âm/ | Ví dụ câu..."
           />
+
+          {/* Dedicated Collocation Copy-Paste Box */}
+          <div className="mb-4 p-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-700/50 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200">
+                ⚡ Ô Dán Nhanh Collocations (VD: CARBON FOOTPRINT | Dấu chân carbon)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const cleanCol = collocationPasteInput
+                    .split(/\r?\n/)
+                    .map(l => l.trim())
+                    .filter(Boolean)
+                    .join('\n');
+                  if (!cleanCol) {
+                    showToast('Vui lòng dán ít nhất 1 dòng Collocation trước khi ghép!', 'error');
+                    return;
+                  }
+                  setCustomVocabInput(prev => (prev.trim() ? `${prev.trim()}\n${cleanCol}` : cleanCol));
+                  setCollocationPasteInput('');
+                  showToast('Đã ghép danh sách Collocation vào bộ từ của phòng!');
+                }}
+                className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition"
+              >
+                + Ghép Collocation Vào Kho Từ
+              </button>
+            </div>
+            <textarea
+              rows={3}
+              value={collocationPasteInput}
+              onChange={e => setCollocationPasteInput(e.target.value)}
+              className="w-full p-2.5 font-mono text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-indigo-200 dark:border-indigo-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              placeholder={'MAKE A DECISION | Đưa ra quyết định | | Careful research helps make a decision.\nCARBON FOOTPRINT | Dấu chân carbon'}
+            />
+          </div>
 
           <div className="flex justify-between items-center flex-wrap gap-2">
             <button

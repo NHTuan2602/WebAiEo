@@ -33,6 +33,7 @@ export default function AuthScreen({
   authForm,
   darkMode,
   handleAuthSubmit,
+  onGuestRegistered = null,
   onPasswordRecovered,
   onRemoveRememberedLogin,
   onSelectRememberedLogin,
@@ -46,7 +47,12 @@ export default function AuthScreen({
   showAuthPass,
   showToast
 }) {
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'forgot'
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'guest' | 'forgot'
+  const [guestName, setGuestName] = useState('');
+  const [guestUsername, setGuestUsername] = useState('');
+  const [guestPassword, setGuestPassword] = useState('');
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestError, setGuestError] = useState('');
   const [forgotUsername, setForgotUsername] = useState('');
   const [forgotStep, setForgotStep] = useState('username'); // 'username' | 'otp' | 'unlinked' | 'not_found'
   const [forgotMaskedEmail, setForgotMaskedEmail] = useState('');
@@ -66,6 +72,45 @@ export default function AuthScreen({
     }, 1000);
     return () => clearInterval(t);
   }, [forgotCooldown]);
+
+  const handleGuestRegisterSubmit = async (e) => {
+    e.preventDefault();
+    if (guestLoading) return;
+    setGuestError('');
+    const cleanName = String(guestName || '').trim();
+    const cleanUser = String(guestUsername || '').trim().replace(/^@+/, '');
+    const cleanPass = String(guestPassword || '').trim();
+    if (!cleanName) {
+      setGuestError('Vui lòng nhập họ tên hiển thị.');
+      return;
+    }
+    if (cleanUser.length < 3) {
+      setGuestError('Tên đăng nhập phải dài ít nhất 3 ký tự (chữ không dấu hoặc số).');
+      return;
+    }
+    if (cleanPass.length < 4) {
+      setGuestError('Mật khẩu phải dài ít nhất 4 ký tự.');
+      return;
+    }
+    setGuestLoading(true);
+    try {
+      const res = await fetch('/api/sync/auth/register-guest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: cleanName, username: cleanUser, password: cleanPass })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok || !data?.user) {
+        setGuestError(data?.error || 'Không thể tạo tài khoản khách. Vui lòng thử lại.');
+        return;
+      }
+      onGuestRegistered?.(data);
+    } catch {
+      setGuestError('Lỗi kết nối tới máy chủ. Vui lòng thử lại.');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const openForgotPasswordMode = () => {
     setAuthMode('forgot');
@@ -545,20 +590,133 @@ export default function AuthScreen({
                       <ArrowLeft className="w-3.5 h-3.5" /> Quay lại Đăng nhập
                     </button>
                   </div>
+                ) : authMode === 'guest' ? (
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white">
+                          Tài Khoản Khách
+                        </h2>
+                        <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-400 mt-1">
+                          Tạo nhanh tài khoản khách để mua &amp; thi <b>Đề Thực Chiến 4 Kỹ Năng</b> và <b>Mock Test Định Kỳ</b>.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setAuthMode('login')}
+                        className="py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-700 transition"
+                      >
+                        Đăng Nhập Học Viên
+                      </button>
+                      <button
+                        type="button"
+                        className="py-2 rounded-lg bg-[#007A7A] text-white shadow-sm"
+                      >
+                        Đăng Ký Khách
+                      </button>
+                    </div>
+
+                    <div className="px-3.5 py-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                      Tài khoản Khách chỉ hiển thị <b>Đề Thực Chiến &amp; Mock Test</b> để mua và dự thi (không truy cập Daily Zone, Đấu Trường hay danh sách lớp nội bộ).
+                    </div>
+
+                    {guestError && (
+                      <div className="p-3 bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 rounded-lg text-xs text-[#B91C1C] dark:text-rose-300 font-bold flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{guestError}</span>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleGuestRegisterSubmit} className="space-y-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">
+                          Họ và tên *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={guestName}
+                          onChange={e => setGuestName(e.target.value)}
+                          placeholder="VD: Nguyễn Minh Anh"
+                          className="w-full px-3.5 py-2.5 bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-[#0F172B] dark:text-slate-100 focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">
+                          Tên đăng nhập (viết liền không dấu) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          value={guestUsername}
+                          onChange={e => setGuestUsername(e.target.value)}
+                          placeholder="VD: khach_minhanh"
+                          className="w-full px-3.5 py-2.5 bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-[#0F172B] dark:text-slate-100 focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">
+                          Mật khẩu *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={guestPassword}
+                          onChange={e => setGuestPassword(e.target.value)}
+                          placeholder="Tối thiểu 4 ký tự..."
+                          className="w-full px-3.5 py-2.5 bg-[#F8FAFC] dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-[#0F172B] dark:text-slate-100 focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={guestLoading}
+                        className="w-full bg-[#007A7A] hover:bg-[#065B5B] text-white font-bold py-3 rounded-lg transition shadow-sm flex items-center justify-center gap-2 text-sm disabled:opacity-60"
+                      >
+                        {guestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                        <span>{guestLoading ? 'Đang tạo tài khoản...' : 'Tạo Tài Khoản Khách & Xem Đề'}</span>
+                      </button>
+                    </form>
+                  </div>
                 ) : (
                   <>
-                <div className="flex items-start justify-between gap-3 mb-5">
+                <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
                     <h2 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white">
                       Đăng nhập tài khoản
                     </h2>
                     <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-400 mt-1">
-                      Truy cập hệ thống bằng tài khoản do Giáo viên tạo và cấp.
+                      Đăng nhập bằng tài khoản học viên hoặc tạo Tài khoản Khách mua đề thi thử.
                     </p>
                   </div>
                   <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-[#065F46] dark:text-emerald-300 bg-[#D1FAE5] dark:bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-500/30">
                     <ShieldCheck className="w-3.5 h-3.5" /> Bảo mật
                   </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 p-1 mb-4 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                  <button
+                    type="button"
+                    className="py-2 rounded-lg bg-[#007A7A] text-white shadow-sm"
+                  >
+                    Đăng Nhập Học Viên
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('guest');
+                      setGuestError('');
+                      setAuthError?.('');
+                    }}
+                    className="py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-700 transition"
+                  >
+                    Tài Khoản Khách (Mua Đề)
+                  </button>
                 </div>
 
                 {/* Teacher-Managed Accounts Notice */}

@@ -2539,6 +2539,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onUpdateOption={(qId, optIdx, val) => updateOptionInSkill('listening', qId, optIdx, val)}
             onRemoveQuestion={qId => removeQuestionFromSkill('listening', qId)}
             onChangeClozeText={val => updateListeningTrackField(activeIdx, { clozeText: val })}
+            onChangeGroupImage={val => updateListeningTrackField(activeIdx, { imageUrl: val, imageFileName: val ? 'Uploaded Image' : '' })}
             onSyncCloze={() => handleSyncClozeQuestions('listening', 'trackIdx', activeIdx, activeTrack?.clozeText || '')}
             aiApiKey={aiApiKey}
             aiConfigured={aiConfigured}
@@ -2808,6 +2809,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onUpdateOption={(qId, optIdx, val) => updateOptionInSkill('reading', qId, optIdx, val)}
             onRemoveQuestion={qId => removeQuestionFromSkill('reading', qId)}
             onChangeClozeText={val => updateReadingPassageField(activeIdx, { clozeText: val })}
+            onChangeGroupImage={val => updateReadingPassageField(activeIdx, { imageUrl: val, imageFileName: val ? 'Uploaded Image' : '' })}
             onSyncCloze={() => handleSyncClozeQuestions('reading', 'passageIdx', activeIdx, activePassage?.clozeText || '')}
             aiApiKey={aiApiKey}
             aiConfigured={aiConfigured}

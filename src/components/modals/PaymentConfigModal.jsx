@@ -27,6 +27,7 @@ import {
   PERIODIC_MOCK_PRICE_VND,
   REAL_EXAM_COMBO_3_PRICE_VND,
   REAL_EXAM_COMBO_5_PRICE_VND,
+  REAL_EXAM_COMBO_8_PRICE_VND,
   REAL_EXAM_COMBO_10_PRICE_VND,
   VIETQR_BANK_OPTIONS,
   formatVndCurrency,
@@ -532,6 +533,23 @@ export default function PaymentConfigModal({
                       onChange={e => setDraft(prev => ({
                         ...prev,
                         realExamCombo5Price: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
+                      }))}
+                      className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      📦 Combo 8 Đề Thực Chiến
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000000}
+                      step={1000}
+                      value={draft.realExamCombo8Price ?? REAL_EXAM_COMBO_8_PRICE_VND}
+                      onChange={e => setDraft(prev => ({
+                        ...prev,
+                        realExamCombo8Price: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
                       }))}
                       className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-red-200 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
                     />

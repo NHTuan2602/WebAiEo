@@ -176,14 +176,17 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
         }
       }
       if (j - i >= 2) {
+        const groupItems = questions.slice(i, j);
+        const groupImageUrl = groupItems.find(item => item?.imageUrl)?.imageUrl || '';
         groups.push({
           kind: 'wordBoxGroup',
           key: `wordbox-${q.id}`,
           groupType: 'summary_box',
           options: opts,
+          imageUrl: groupImageUrl,
           instruction: q.instruction || getStandardGroupInstruction(q, opts),
           hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
-          items: questions.slice(i, j).map((item, idx) => ({
+          items: groupItems.map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
           }))
@@ -230,14 +233,17 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
       }
 
       if (j - i >= 3) {
+        const groupItems = questions.slice(i, j);
+        const groupImageUrl = groupItems.find(item => item?.imageUrl)?.imageUrl || '';
         groups.push({
           kind: 'matrix',
           key: `matrix-${q.id}`,
           groupType: q.type,
           options: effectiveMatrixOpts,
+          imageUrl: groupImageUrl,
           instruction: q.instruction || getStandardGroupInstruction(q, effectiveMatrixOpts),
           hasNB: Boolean(q.hasNB || isMatchingInfoType || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
-          items: questions.slice(i, j).map((item, idx) => ({
+          items: groupItems.map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
           }))
@@ -262,14 +268,17 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
         }
       }
       if (j - i >= 2) {
+        const groupItems = questions.slice(i, j);
+        const groupImageUrl = groupItems.find(item => item?.imageUrl)?.imageUrl || '';
         groups.push({
           kind: 'wordBoxGroup',
           key: `wordbox-${q.id}`,
           groupType: q.type,
           options: opts,
+          imageUrl: groupImageUrl,
           instruction: q.instruction || getStandardGroupInstruction(q, opts),
           hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
-          items: questions.slice(i, j).map((item, idx) => ({
+          items: groupItems.map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
           }))
@@ -291,13 +300,16 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
         }
       }
       if (j - i >= 2) {
+        const groupItems = questions.slice(i, j);
+        const groupImageUrl = groupItems.find(item => item?.imageUrl)?.imageUrl || '';
         groups.push({
           kind: 'questionGroup',
           key: `qgroup-${q.id}`,
           groupType: q.type,
+          imageUrl: groupImageUrl,
           instruction: q.instruction || getStandardGroupInstruction(q, opts),
           hasNB: Boolean(q.hasNB || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
-          items: questions.slice(i, j).map((item, idx) => ({
+          items: groupItems.map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
           }))

@@ -475,7 +475,10 @@ export function shuffleArrayWithSeed(items, seedStr) {
 }
 
 function buildDefaultLexicalCollocation(word, example = '') {
-  const lowerW = String(word || '').toLowerCase();
+  const lowerW = String(word || '').trim().toLowerCase();
+  if (lowerW.includes(' ') && lowerW.split(/\s+/).filter(Boolean).length >= 2) {
+    return lowerW;
+  }
   const cleanEx = String(example || '').trim();
   if (cleanEx) {
     const words = cleanEx.replace(/[.,!?;:"'()]/g, '').split(/\s+/).filter(Boolean);
@@ -976,7 +979,10 @@ export function normalizeRoomObject(room, pinKey, now = Date.now()) {
     status: room?.status || 'LOBBY',
     maxPlayers,
     teamCount,
-    roundSize: Math.max(2, Math.min(8, Number(room?.roundSize) || 4)),
+    roundSize: Math.max(1, Math.min(200, Number(room?.roundSize) || 4)),
+    selectedWords: Array.isArray(room?.selectedWords)
+      ? room.selectedWords.map(w => String(w || '').trim().toUpperCase()).filter(Boolean).slice(0, 200)
+      : [],
     speedMode: ['relaxed', 'normal', 'turbo'].includes(room?.speedMode) ? room.speedMode : 'normal',
     shufflePerPlayer: Boolean(room?.shufflePerPlayer),
     startedAt: room?.startedAt || null,
@@ -1046,19 +1052,22 @@ export function buildSeededRoundQueues(roomInput, pinKey = '', username = '', fa
   const seed = room.shufflePerPlayer
     ? `${baseSeed}:player:${String(username || 'guest')}`
     : `${baseSeed}:shared`;
-  const vocabList = parseRawVocabText(room.rawVocab || fallbackVocab, seed);
-  if (vocabList.length === 0) {
+  const fullVocabList = parseRawVocabText(room.rawVocab || fallbackVocab, seed);
+  const selectedSet = new Set((room.selectedWords || []).map(w => String(w || '').trim().toUpperCase()).filter(Boolean));
+  const vocabList = selectedSet.size > 0
+    ? fullVocabList.filter(item => selectedSet.has(String(item.word || '').toUpperCase()))
+    : fullVocabList;
+  const effectivePool = vocabList.length > 0 ? vocabList : fullVocabList;
+  if (effectivePool.length === 0) {
     return { 1: [], 2: [], 3: [], 4: [] };
   }
-  const desiredPerRound = Math.max(2, Math.min(8, Number(room.roundSize) || 4));
+  const desiredPerRound = selectedSet.size > 0
+    ? Math.min(200, effectivePool.length)
+    : Math.max(1, Math.min(200, Number(room.roundSize) || 4));
   const pickRoundSlice = (roundNum) => {
-    const shuffled = shuffleArrayWithSeed(vocabList, `${seed}:r${roundNum}`);
-    const takeCount = Math.min(desiredPerRound, Math.max(2, shuffled.length));
-    const list = [];
-    for (let i = 0; i < takeCount; i++) {
-      list.push(shuffled[i % shuffled.length]);
-    }
-    return list;
+    const shuffled = shuffleArrayWithSeed(effectivePool, `${seed}:r${roundNum}`);
+    const takeCount = Math.min(desiredPerRound, shuffled.length);
+    return shuffled.slice(0, takeCount);
   };
 
   return {
@@ -1069,21 +1078,26 @@ export function buildSeededRoundQueues(roomInput, pinKey = '', username = '', fa
   };
 }
 
-export function buildPracticeRoundQueues({ rawVocab = DEFAULT_VOCAB_TEXT, roundSize = 4, seedStr = '' } = {}) {
+export function buildPracticeRoundQueues({ rawVocab = DEFAULT_VOCAB_TEXT, roundSize = 4, selectedWords = [], seedStr = '' } = {}) {
   const seed = seedStr || `practice:${Date.now()}`;
-  const vocabList = parseRawVocabText(rawVocab || DEFAULT_VOCAB_TEXT, seed);
-  if (vocabList.length === 0) {
+  const fullVocabList = parseRawVocabText(rawVocab || DEFAULT_VOCAB_TEXT, seed);
+  const selectedSet = new Set(
+    (Array.isArray(selectedWords) ? selectedWords : []).map(w => String(w || '').trim().toUpperCase()).filter(Boolean)
+  );
+  const filtered = selectedSet.size > 0
+    ? fullVocabList.filter(item => selectedSet.has(String(item.word || '').toUpperCase()))
+    : fullVocabList;
+  const effectivePool = filtered.length > 0 ? filtered : fullVocabList;
+  if (effectivePool.length === 0) {
     return { 1: [], 2: [], 3: [], 4: [] };
   }
-  const desiredPerRound = Math.max(2, Math.min(8, Number(roundSize) || 4));
+  const desiredPerRound = selectedSet.size > 0
+    ? Math.min(200, effectivePool.length)
+    : Math.max(1, Math.min(200, Number(roundSize) || effectivePool.length));
   const pickRoundSlice = (roundNum) => {
-    const shuffled = shuffleArrayWithSeed(vocabList, `${seed}:r${roundNum}`);
-    const takeCount = Math.min(desiredPerRound, Math.max(2, shuffled.length));
-    const list = [];
-    for (let i = 0; i < takeCount; i++) {
-      list.push(shuffled[i % shuffled.length]);
-    }
-    return list;
+    const shuffled = shuffleArrayWithSeed(effectivePool, `${seed}:r${roundNum}`);
+    const takeCount = Math.min(desiredPerRound, shuffled.length);
+    return shuffled.slice(0, takeCount);
   };
   return {
     1: pickRoundSlice(1),

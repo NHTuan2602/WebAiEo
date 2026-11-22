@@ -893,8 +893,17 @@ Convert the visual exam sheet accurately into structured JSON without missing te
 
 RULES FOR INLINE CLOZE / NOTE / FORM / SUMMARY COMPLETION ("Đục Lỗ"):
 - ${preferCloze ? 'Whenever the exam has Note Completion, Form Completion, Table/Flowchart Completion, Summary Fill-in-the-blank (No Box), OR Summary Completion with a Word Box (e.g. "Complete the summary using the list of words, A-I, below"):' : 'If the exam contains inline Note/Form/Summary Completion (with or without a Word Box):'}
-  1. Preserve the EXACT instruction header (e.g. "Questions 1-10\\nComplete the notes below.\\nWrite ONE WORD AND/OR A NUMBER for each answer." or "Questions 32-36\\nComplete the summary using the list of words, A-I, below."), the bold title (e.g. "**The Discovery of Johnston's Diaries**"), section subheadings, Example lines, and the COMPLETE unbroken paragraph/bullet text. NEVER truncate sentences after a blank!
-  2. Replace EVERY answer gap in "clozeText" with the exact token "{{N}}" where N is the question number (example: "Most valuable of all for today's gardeners at Hidcote were {{33}} revealing how the garden changed in the course of the year."). Keep ALL surrounding words before AND after every blank intact!
+  1. Preserve the EXACT instruction header (e.g. "Questions 1-10\\nComplete the notes below.\\nWrite ONE WORD AND/OR A NUMBER for each answer." or "Questions 32-36\\nComplete the summary using the list of words, A-I, below."), the bold title (e.g. "**The Discovery of Johnston's Diaries**"), section subheadings ("### Subheading"), italic Example lines ("*Example: ...*"), and the COMPLETE unbroken paragraph/bullet/table/flowchart text. NEVER truncate sentences after a blank!
+  2. FORMAT RULES BY LAYOUT TYPE (CRITICAL — DO NOT FLATTEN TABLES OR NOTES):
+     - **Table Completion**: MUST be formatted as a valid newline-separated Markdown pipe table with ONE row per line! Example:
+       | Physical features | Study findings |
+       | --- | --- |
+       | Skin/Coat | Provides {{8}} when standing near trees |
+       | Mouth | Can be used like {{9}} to get leaves |
+       If a single table cell has multiple bullet points, separate them with "<br>• " inside that cell (e.g. "| • A famous chef<br>• All the {{7}} are very good |"). NEVER put two table rows on the same line!
+     - **Flow-chart Completion**: Put each flowchart box on its own line separated by a standalone arrow line "\\n↓\\n". If there is an A-H Word Box, put options in "options" and use "type": "summary_box".
+     - **Note / Form Completion**: Put EVERY field/label/bullet on its own line separated by "\\n" (e.g. "Current address: {{1}} Road, Island Bay\\nBooking number: {{2}}").
+  3. Replace EVERY answer gap in "clozeText" with the exact token "{{N}}" where N is the question number (example: "Most valuable of all for today's gardeners at Hidcote were {{33}} revealing how the garden changed in the course of the year."). Keep ALL surrounding words before AND after every blank intact!
   3. For Summary Completion WITH a Word Box (A-I, etc.):
      - Do NOT duplicate the A-I word list as raw text inside "clozeText" (the UI renders the interactive Word Box automatically from "options").
      - Create one entry in "questions" per blank with "type": "summary_box", "blankNum": N, "question": "N. <complete sentence with ____ (NOT raw {{N}})>", "options": ["A drawings", "B plantings", ...] (exact full list from the box), and "correctAnswer" set to the matching option string from "options" (e.g. "H future" if the key says "H").
@@ -1130,7 +1139,10 @@ DOCUMENT HANDLING:
 - Copy exact correct answers from the answer key when it exists, including acceptable alternatives. Also list every answer-key entry in the top-level answerKey array by its printed question number. If no answer key is present, answer only when the passage clearly supports it; leave correctAnswer empty when uncertain.
 - Question numbers in IELTS Reading run continuously across passages (typically Passage 1 = 1-13, Passage 2 = 14-26, Passage 3 = 27-40). Never restart numbering at 1 for a later passage, and never output two questions with the same number.
 - For inline Note/Form/Table/Flow-chart/Summary completion (BOTH without a word box AND with a word box A-I):
-  1. Preserve the COMPLETE unbroken instruction text (e.g. "Questions 18-21\\nComplete the summary below.\\nWrite ONE WORD ONLY from the passage for each answer."), bold title (e.g. "**The Discovery of Johnston's Diaries**"), and full paragraph/bullet text in clozeText, replacing each answer gap with {{N}} using its original question number. NEVER cut off words after a blank — every sentence must be complete from start to finish!
+  1. Preserve the COMPLETE unbroken instruction text (e.g. "Questions 18-21\\nComplete the summary below.\\nWrite ONE WORD ONLY from the passage for each answer."), bold title (e.g. "**The Discovery of Johnston's Diaries**"), and full paragraph/bullet/table/flowchart text in clozeText, replacing each answer gap with {{N}} using its original question number. NEVER cut off words after a blank — every sentence must be complete from start to finish!
+     - **Table Completion**: MUST output a real newline-separated Markdown pipe table (one row per line: "| Header 1 | Header 2 |\\n| --- | --- |\\n| Row 1 | Text {{8}} text |"). For multi-bullet cells use "<br>• " inside the cell. NEVER flatten table rows onto a single line!
+     - **Flow-chart Completion**: Separate consecutive flowchart step boxes with "\\n↓\\n".
+     - **Note / Form Completion**: Keep each note field/bullet on its own "\\n" line (use "### Subheading" and "*Example: ...*").
   2. For Summary Completion WITH a Word Box (e.g. "Complete the summary using the list of words, A-I, below"):
      - Keep the full summary paragraph with {{N}} gaps in clozeText (do NOT repeat the A-I word box as plain text inside clozeText because the UI builds the interactive Word Box from options).
      - Put each blank in the passage's questions array with "type": "summary_box", "questionNumber": N, "blankNum": N, "options": ["A drawings", "B plantings", ...] (the full word list from the box), "question": "N. <complete sentence containing ____ (NOT raw {{N}})>", and "correctAnswer" set to the matching option string from options.
@@ -1290,8 +1302,11 @@ Extract the complete IELTS Reading section into structured JSON.
 - Identify every passage boundary (e.g. R1/Passage 1, R2/Passage 2, R3/Passage 3).
 - Extract full passage text into "passageText" and title into "title".
 - Extract all questions into each passage's "questions" array.
-- For inline Note/Form/Summary completion (BOTH without a word box AND with a word box A-I):
+- For inline Note/Form/Table/Flow-chart/Summary completion (BOTH without a word box AND with a word box A-I):
   1. Put the complete unbroken text in "clozeText" with {{N}} placeholders for every gap.
+     - For Table Completion: MUST output a newline-separated Markdown pipe table ("| Col 1 | Col 2 |\\n| --- | --- |\\n| ... | ... {{8}} ... |"), NEVER flatten table rows onto one line! Use "<br>• " for multi-bullet cells.
+     - For Flow-chart Completion: separate each step box with "\\n↓\\n".
+     - For Note Completion: put each field/bullet on its own "\\n" line.
   2. For Summary with Word Box (A-I), set type "summary_box", blankNum N, options [all words from box], question "N. <sentence with ____>".
   3. For Note/Summary without Word Box, set type "fill", blankNum N.
 - For Matching Information ("Which paragraph contains the following information?"): set type "matching_information", options ["A", "B", "C", "D", "E", "F"...].

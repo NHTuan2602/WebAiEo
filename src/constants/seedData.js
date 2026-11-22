@@ -84,7 +84,18 @@ export const FALLBACK_LEXICAL_POOL = {
 
 export const VOCAB_PRESETS = {
   environment: {
-    label: 'Môi trường & Khí hậu',
+    label: 'Kho 1 • Môi trường & Khí hậu',
+    vocabText: `SUSTAINABLE | Bền vững, không gây cạn kiệt tài nguyên | /səˈsteɪ.nə.bəl/ | Sustainable energy sources reduce long-term carbon emissions.
+BIODIVERSITY | Đa dạng sinh học | /ˌbaɪ.əʊ.daɪˈvɜː.sə.ti/ | Deforestation poses a severe threat to global biodiversity.
+ECOSYSTEM | Hệ sinh thái | /ˈiː.kəʊ.sɪs.təm/ | Plastic pollution disrupts fragile marine ecosystems.
+EMISSION | Khí thải, sự phát thải | /iˈmɪʃ.ən/ | Governments agreed to cut greenhouse gas emissions by 2030.
+CONTAMINATE | Làm ô nhiễm, làm nhiễm bẩn | /kənˈtæm.ɪ.neɪt/ | Industrial waste can easily contaminate local drinking water.
+CONSERVATION | Sự bảo tồn thiên nhiên | /ˌkɒn.səˈveɪ.ʃən/ | Wildlife conservation programs help endangered species recover.
+DEPLETE | Làm cạn kiệt, rút cạn | /dɪˈpliːt/ | Overfishing continues to deplete global fish stocks.
+RENEWABLE | Có thể tái tạo | /rɪˈnjuː.ə.bəl/ | Solar and wind power are rapidly growing renewable resources.`,
+    collocationText: `CARBON FOOTPRINT | Dấu chân carbon (lượng khí thải) | | Reducing meat consumption lowers an individual's carbon footprint.
+CLIMATE MITIGATION | Giảm thiểu biến đổi khí hậu | | Reforestation plays a vital role in climate mitigation.
+FOSSIL FUELS | Nhiên liệu hóa thạch | | Rapid transition away from fossil fuels is essential.`,
     text: `SUSTAINABLE | Bền vững, không gây cạn kiệt tài nguyên | /səˈsteɪ.nə.bəl/ | Sustainable energy sources reduce long-term carbon emissions.
 BIODIVERSITY | Đa dạng sinh học | /ˌbaɪ.əʊ.daɪˈvɜː.sə.ti/ | Deforestation poses a severe threat to global biodiversity.
 ECOSYSTEM | Hệ sinh thái | /ˈiː.kəʊ.sɪs.təm/ | Plastic pollution disrupts fragile marine ecosystems.
@@ -92,10 +103,24 @@ EMISSION | Khí thải, sự phát thải | /iˈmɪʃ.ən/ | Governments agreed 
 CONTAMINATE | Làm ô nhiễm, làm nhiễm bẩn | /kənˈtæm.ɪ.neɪt/ | Industrial waste can easily contaminate local drinking water.
 CONSERVATION | Sự bảo tồn thiên nhiên | /ˌkɒn.səˈveɪ.ʃən/ | Wildlife conservation programs help endangered species recover.
 DEPLETE | Làm cạn kiệt, rút cạn | /dɪˈpliːt/ | Overfishing continues to deplete global fish stocks.
-RENEWABLE | Có thể tái tạo | /rɪˈnjuː.ə.bəl/ | Solar and wind power are rapidly growing renewable resources.`
+RENEWABLE | Có thể tái tạo | /rɪˈnjuː.ə.bəl/ | Solar and wind power are rapidly growing renewable resources.
+CARBON FOOTPRINT | Dấu chân carbon (lượng khí thải) | | Reducing meat consumption lowers an individual's carbon footprint.
+CLIMATE MITIGATION | Giảm thiểu biến đổi khí hậu | | Reforestation plays a vital role in climate mitigation.
+FOSSIL FUELS | Nhiên liệu hóa thạch | | Rapid transition away from fossil fuels is essential.`
   },
   technology: {
-    label: 'Công nghệ & AI',
+    label: 'Kho 2 • Công nghệ & AI',
+    vocabText: `AUTOMATION | Tự động hóa | /ˌɔː.təˈmeɪ.ʃən/ | Factory automation improves efficiency but reshapes labor markets.
+ALGORITHM | Thuật toán | /ˈæl.ɡə.rɪ.ðəm/ | Social media platforms rely on algorithms to personalize feeds.
+DISRUPTIVE | Mang tính đột phá, làm thay đổi cuộc chơi | /dɪsˈrʌp.tɪv/ | Generative AI has proved to be a disruptive innovation.
+OBSOLETE | Lỗi thời, không còn được dùng | /ˌɒb.səlˈiːt/ | Smartphones rendered many standalone cameras obsolete.
+CYBERSECURITY | An ninh mạng | /ˌsaɪ.bə.sɪˈkjʊə.rə.ti/ | Banks invest heavily in cybersecurity to protect customer data.
+CONNECTIVITY | Khả năng kết nối mạng | /ˌkɒn.ekˈtɪv.ə.ti/ | High-speed connectivity enables remote work across rural regions.
+INNOVATE | Đổi mới, sáng tạo | /ˈɪn.ə.veɪt/ | Startups must constantly innovate to survive fierce competition.
+SYNTHETIC | Tổng hợp, nhân tạo | /sɪnˈθet.ɪk/ | Synthetic data helps train models without compromising privacy.`,
+    collocationText: `CUTTING-EDGE TECHNOLOGY | Công nghệ tiên tiến hàng đầu | | Hospitals adopt cutting-edge technology for early diagnosis.
+DIGITAL DIVIDE | Khoảng cách số | | Affordable internet helps bridge the digital divide.
+DATA PRIVACY | Quyền riêng tư dữ liệu | | Stricter laws are required to safeguard data privacy.`,
     text: `AUTOMATION | Tự động hóa | /ˌɔː.təˈmeɪ.ʃən/ | Factory automation improves efficiency but reshapes labor markets.
 ALGORITHM | Thuật toán | /ˈæl.ɡə.rɪ.ðəm/ | Social media platforms rely on algorithms to personalize feeds.
 DISRUPTIVE | Mang tính đột phá, làm thay đổi cuộc chơi | /dɪsˈrʌp.tɪv/ | Generative AI has proved to be a disruptive innovation.
@@ -103,10 +128,24 @@ OBSOLETE | Lỗi thời, không còn được dùng | /ˌɒb.səlˈiːt/ | Smart
 CYBERSECURITY | An ninh mạng | /ˌsaɪ.bə.sɪˈkjʊə.rə.ti/ | Banks invest heavily in cybersecurity to protect customer data.
 CONNECTIVITY | Khả năng kết nối mạng | /ˌkɒn.ekˈtɪv.ə.ti/ | High-speed connectivity enables remote work across rural regions.
 INNOVATE | Đổi mới, sáng tạo | /ˈɪn.ə.veɪt/ | Startups must constantly innovate to survive fierce competition.
-SYNTHETIC | Tổng hợp, nhân tạo | /sɪnˈθet.ɪk/ | Synthetic data helps train models without compromising privacy.`
+SYNTHETIC | Tổng hợp, nhân tạo | /sɪnˈθet.ɪk/ | Synthetic data helps train models without compromising privacy.
+CUTTING-EDGE TECHNOLOGY | Công nghệ tiên tiến hàng đầu | | Hospitals adopt cutting-edge technology for early diagnosis.
+DIGITAL DIVIDE | Khoảng cách số | | Affordable internet helps bridge the digital divide.
+DATA PRIVACY | Quyền riêng tư dữ liệu | | Stricter laws are required to safeguard data privacy.`
   },
   education: {
-    label: 'Giáo dục & Nghiên cứu',
+    label: 'Kho 3 • Giáo dục & Nghiên cứu',
+    vocabText: `CURRICULUM | Chương trình giảng dạy | /kəˈrɪk.jə.ləm/ | Digital literacy should be integrated into the school curriculum.
+PEDAGOGY | Phương pháp sư phạm | /ˈped.ə.ɡɒdʒ.i/ | Interactive pedagogy encourages active student participation.
+LITERACY | Trình độ đọc viết / kiến thức nền | /ˈlɪt.ər.ə.si/ | Financial literacy empowers young adults to manage savings.
+EMPIRICAL | Dựa trên thực nghiệm, bằng chứng | /ɪmˈpɪr.ɪ.kəl/ | Policy reforms should be backed by empirical evidence.
+CRITICAL | Mang tính phản biện, then chốt | /ˈkrɪt.ɪ.kəl/ | Universities aim to foster critical thinking skills.
+SCHOLARLY | Mang tính học thuật | /ˈskɒl.ə.li/ | Citations are mandatory in scholarly research papers.
+MENTORSHIP | Sự cố vấn, hướng dẫn | /ˈmen.tɔː.ʃɪp/ | Peer mentorship reduces dropout rates among first-year students.
+APTITUDE | Năng khiếu, khả năng tiếp thu | /ˈæp.tɪ.tjuːd/ | Admission tests evaluate analytical aptitude alongside memory.`,
+    collocationText: `LIFELONG LEARNING | Học tập suốt đời | | Rapid career shifts make lifelong learning indispensable.
+ACADEMIC ACHIEVEMENT | Thành tích học thuật | | Parental encouragement boosts students' academic achievement.
+HIGHER EDUCATION | Giáo dục đại học | | Scholarships expand access to higher education.`,
     text: `CURRICULUM | Chương trình giảng dạy | /kəˈrɪk.jə.ləm/ | Digital literacy should be integrated into the school curriculum.
 PEDAGOGY | Phương pháp sư phạm | /ˈped.ə.ɡɒdʒ.i/ | Interactive pedagogy encourages active student participation.
 LITERACY | Trình độ đọc viết / kiến thức nền | /ˈlɪt.ər.ə.si/ | Financial literacy empowers young adults to manage savings.
@@ -114,10 +153,24 @@ EMPIRICAL | Dựa trên thực nghiệm, bằng chứng | /ɪmˈpɪr.ɪ.kəl/ | 
 CRITICAL | Mang tính phản biện, then chốt | /ˈkrɪt.ɪ.kəl/ | Universities aim to foster critical thinking skills.
 SCHOLARLY | Mang tính học thuật | /ˈskɒl.ə.li/ | Citations are mandatory in scholarly research papers.
 MENTORSHIP | Sự cố vấn, hướng dẫn | /ˈmen.tɔː.ʃɪp/ | Peer mentorship reduces dropout rates among first-year students.
-APTITUDE | Năng khiếu, khả năng tiếp thu | /ˈæp.tɪ.tjuːd/ | Admission tests evaluate analytical aptitude alongside memory.`
+APTITUDE | Năng khiếu, khả năng tiếp thu | /ˈæp.tɪ.tjuːd/ | Admission tests evaluate analytical aptitude alongside memory.
+LIFELONG LEARNING | Học tập suốt đời | | Rapid career shifts make lifelong learning indispensable.
+ACADEMIC ACHIEVEMENT | Thành tích học thuật | | Parental encouragement boosts students' academic achievement.
+HIGHER EDUCATION | Giáo dục đại học | | Scholarships expand access to higher education.`
   },
   health: {
-    label: 'Y tế & Đời sống',
+    label: 'Kho 4 • Y tế & Đời sống',
+    vocabText: `SEDENTARY | Ít vận động, ngồi nhiều | /ˈsed.ən.tər.i/ | A sedentary lifestyle increases the risk of heart disease.
+PREVALENT | Phổ biến, thịnh hành rộng rãi | /ˈprev.əl.ənt/ | Burnout has become increasingly prevalent among office workers.
+IMMUNITY | Hệ miễn dịch, khả năng miễn nhiễm | /ɪˈmjuː.nə.ti/ | Balanced nutrition supports natural immunity against illness.
+WELLBEING | Sức khỏe toàn diện & hạnh phúc | /ˈwel.biː.ɪŋ/ | Green urban parks significantly improve resident wellbeing.
+NUTRITION | Dinh dưỡng | /njuːˈtrɪʃ.ən/ | Poor nutrition affects both physical growth and concentration.
+CHRONIC | Mãn tính, kéo dài | /ˈkrɒn.ɪk/ | Stress is a major contributor to chronic sleep disorders.
+THERAPEUTIC | Mang tính trị liệu, chữa lành | /ˌθer.əˈpjuː.tɪk/ | Gardening offers strong therapeutic benefits for mental health.
+SANITATION | Hệ thống vệ sinh công cộng | /ˌsæn.ɪˈteɪ.ʃən/ | Clean sanitation drastically lowers waterborne infections.`,
+    collocationText: `PREVENTIVE HEALTHCARE | Y tế dự phòng | | Investing in preventive healthcare cuts long-term hospital costs.
+MENTAL RESILIENCE | Sức bền tinh thần | | Mindfulness exercises build mental resilience under pressure.
+BALANCED DIET | Chế độ ăn cân bằng | | A balanced diet prevents micronutrient deficiencies.`,
     text: `SEDENTARY | Ít vận động, ngồi nhiều | /ˈsed.ən.tər.i/ | A sedentary lifestyle increases the risk of heart disease.
 PREVALENT | Phổ biến, thịnh hành rộng rãi | /ˈprev.əl.ənt/ | Burnout has become increasingly prevalent among office workers.
 IMMUNITY | Hệ miễn dịch, khả năng miễn nhiễm | /ɪˈmjuː.nə.ti/ | Balanced nutrition supports natural immunity against illness.
@@ -125,7 +178,220 @@ WELLBEING | Sức khỏe toàn diện & hạnh phúc | /ˈwel.biː.ɪŋ/ | Green
 NUTRITION | Dinh dưỡng | /njuːˈtrɪʃ.ən/ | Poor nutrition affects both physical growth and concentration.
 CHRONIC | Mãn tính, kéo dài | /ˈkrɒn.ɪk/ | Stress is a major contributor to chronic sleep disorders.
 THERAPEUTIC | Mang tính trị liệu, chữa lành | /ˌθer.əˈpjuː.tɪk/ | Gardening offers strong therapeutic benefits for mental health.
-SANITATION | Hệ thống vệ sinh công cộng | /ˌsæn.ɪˈteɪ.ʃən/ | Clean sanitation drastically lowers waterborne infections.`
+SANITATION | Hệ thống vệ sinh công cộng | /ˌsæn.ɪˈteɪ.ʃən/ | Clean sanitation drastically lowers waterborne infections.
+PREVENTIVE HEALTHCARE | Y tế dự phòng | | Investing in preventive healthcare cuts long-term hospital costs.
+MENTAL RESILIENCE | Sức bền tinh thần | | Mindfulness exercises build mental resilience under pressure.
+BALANCED DIET | Chế độ ăn cân bằng | | A balanced diet prevents micronutrient deficiencies.`
+  },
+  economy: {
+    label: 'Kho 5 • Kinh tế & Tài chính',
+    vocabText: `INFLATION | Lạm phát | /ɪnˈfleɪ.ʃən/ | Rising inflation erodes household purchasing power.
+SUBSIDY | Trợ cấp của chính phủ | /ˈsʌb.sɪ.di/ | Agricultural subsidies help stabilize local food prices.
+PROSPERITY | Sự thịnh vượng | /prɒsˈper.ə.ti/ | Trade openness often drives long-term economic prosperity.
+RECESSION | Suy thoái kinh tế | /rɪˈseʃ.ən/ | Small businesses struggle to survive a prolonged recession.
+ENTREPRENEUR | Doanh nhân khởi nghiệp | /ˌɒn.trə.prəˈnɜːr/ | Young entrepreneurs bring fresh solutions to legacy industries.
+FISCAL | Thuộc tài khóa, ngân sách | /ˈfɪs.kəl/ | Sound fiscal discipline prevents sovereign debt crises.`,
+    collocationText: `ECONOMIC GROWTH | Tăng trưởng kinh tế | | Infrastructure upgrades accelerate sustainable economic growth.
+COST OF LIVING | Chi phí sinh hoạt | | Urban dwellers face an escalating cost of living.
+DISPOSABLE INCOME | Thu nhập khả dụng | | Higher disposable income fuels consumer spending.`,
+    text: `INFLATION | Lạm phát | /ɪnˈfleɪ.ʃən/ | Rising inflation erodes household purchasing power.
+SUBSIDY | Trợ cấp của chính phủ | /ˈsʌb.sɪ.di/ | Agricultural subsidies help stabilize local food prices.
+PROSPERITY | Sự thịnh vượng | /prɒsˈper.ə.ti/ | Trade openness often drives long-term economic prosperity.
+RECESSION | Suy thoái kinh tế | /rɪˈseʃ.ən/ | Small businesses struggle to survive a prolonged recession.
+ENTREPRENEUR | Doanh nhân khởi nghiệp | /ˌɒn.trə.prəˈnɜːr/ | Young entrepreneurs bring fresh solutions to legacy industries.
+FISCAL | Thuộc tài khóa, ngân sách | /ˈfɪs.kəl/ | Sound fiscal discipline prevents sovereign debt crises.
+ECONOMIC GROWTH | Tăng trưởng kinh tế | | Infrastructure upgrades accelerate sustainable economic growth.
+COST OF LIVING | Chi phí sinh hoạt | | Urban dwellers face an escalating cost of living.
+DISPOSABLE INCOME | Thu nhập khả dụng | | Higher disposable income fuels consumer spending.`
+  },
+  society: {
+    label: 'Kho 6 • Xã hội & Cộng đồng',
+    vocabText: `DEMOGRAPHIC | Nhân khẩu học | /ˌdem.əˈɡræf.ɪk/ | Aging populations represent a major demographic shift.
+INEQUALITY | Sự bất bình đẳng | /ˌɪn.ɪˈkwɒl.ə.ti/ | Equitable education narrows socioeconomic inequality.
+COHESION | Sự gắn kết xã hội | /kəʊˈhiː.ʒən/ | Community festivals strengthen neighborhood cohesion.
+WELFARE | Phúc lợi xã hội | /ˈwel.feər/ | Robust welfare systems protect vulnerable citizens.
+DISPARITY | Sự chênh lệch, cách biệt | /dɪˈspær.ə.ti/ | Regional income disparity drives rural-to-urban migration.
+ALTRUISM | Lòng vị tha | /ˈæl.tru.ɪ.zəm/ | Volunteer initiatives foster genuine altruism among youth.`,
+    collocationText: `SOCIAL MOBILITY | Dịch chuyển xã hội | | Quality public schooling enhances upward social mobility.
+GENERATION GAP | Khoảng cách thế hệ | | Open dialogue helps bridge the generation gap.
+CIVIC ENGAGEMENT | Sự tham gia cộng đồng | | Youth programs inspire stronger civic engagement.`,
+    text: `DEMOGRAPHIC | Nhân khẩu học | /ˌdem.əˈɡræf.ɪk/ | Aging populations represent a major demographic shift.
+INEQUALITY | Sự bất bình đẳng | /ˌɪn.ɪˈkwɒl.ə.ti/ | Equitable education narrows socioeconomic inequality.
+COHESION | Sự gắn kết xã hội | /kəʊˈhiː.ʒən/ | Community festivals strengthen neighborhood cohesion.
+WELFARE | Phúc lợi xã hội | /ˈwel.feər/ | Robust welfare systems protect vulnerable citizens.
+DISPARITY | Sự chênh lệch, cách biệt | /dɪˈspær.ə.ti/ | Regional income disparity drives rural-to-urban migration.
+ALTRUISM | Lòng vị tha | /ˈæl.tru.ɪ.zəm/ | Volunteer initiatives foster genuine altruism among youth.
+SOCIAL MOBILITY | Dịch chuyển xã hội | | Quality public schooling enhances upward social mobility.
+GENERATION GAP | Khoảng cách thế hệ | | Open dialogue helps bridge the generation gap.
+CIVIC ENGAGEMENT | Sự tham gia cộng đồng | | Youth programs inspire stronger civic engagement.`
+  },
+  urbanization: {
+    label: 'Kho 7 • Đô thị hóa & Giao thông',
+    vocabText: `INFRASTRUCTURE | Cơ sở hạ tầng | /ˈɪn.frə.strʌk.tʃər/ | Aging transport infrastructure struggles with peak-hour demand.
+CONGESTION | Sự tắc nghẽn giao thông | /kənˈdʒes.tʃən/ | Metro expansion significantly alleviates traffic congestion.
+METROPOLITAN | Thuộc đô thị lớn | /ˌmet.rəˈpɒl.ɪ.tən/ | Metropolitan areas attract multinational headquarters.
+COMMUTER | Người đi làm hằng ngày | /kəˈmjuː.tər/ | Reliable rail lines save commuters hours each week.
+GENTRIFICATION | Sự chỉnh trang đô thị | /ˌdʒen.trɪ.fɪˈkeɪ.ʃən/ | Rapid gentrification can displace long-standing residents.
+SPRAWL | Sự mở rộng đô thị tràn lan | /sprɔːl/ | Unchecked urban sprawl encroaches on fertile farmland.`,
+    collocationText: `PUBLIC TRANSIT | Giao thông công cộng | | Affordable public transit cuts inner-city air pollution.
+AFFORDABLE HOUSING | Nhà ở giá phải chăng | | Cities must prioritize affordable housing for young workers.
+URBAN PLANNING | Quy hoạch đô thị | | Smart urban planning balances density with green spaces.`,
+    text: `INFRASTRUCTURE | Cơ sở hạ tầng | /ˈɪn.frə.strʌk.tʃər/ | Aging transport infrastructure struggles with peak-hour demand.
+CONGESTION | Sự tắc nghẽn giao thông | /kənˈdʒes.tʃən/ | Metro expansion significantly alleviates traffic congestion.
+METROPOLITAN | Thuộc đô thị lớn | /ˌmet.rəˈpɒl.ɪ.tən/ | Metropolitan areas attract multinational headquarters.
+COMMUTER | Người đi làm hằng ngày | /kəˈmjuː.tər/ | Reliable rail lines save commuters hours each week.
+GENTRIFICATION | Sự chỉnh trang đô thị | /ˌdʒen.trɪ.fɪˈkeɪ.ʃən/ | Rapid gentrification can displace long-standing residents.
+SPRAWL | Sự mở rộng đô thị tràn lan | /sprɔːl/ | Unchecked urban sprawl encroaches on fertile farmland.
+PUBLIC TRANSIT | Giao thông công cộng | | Affordable public transit cuts inner-city air pollution.
+AFFORDABLE HOUSING | Nhà ở giá phải chăng | | Cities must prioritize affordable housing for young workers.
+URBAN PLANNING | Quy hoạch đô thị | | Smart urban planning balances density with green spaces.`
+  },
+  crime_law: {
+    label: 'Kho 8 • Pháp luật & An ninh',
+    vocabText: `DETERRENT | Biện pháp răn đe | /dɪˈter.ənt/ | Swift law enforcement acts as an effective deterrent.
+REHABILITATION | Cải tạo, phục hồi nhân phẩm | /ˌriː.ə.bɪl.ɪˈteɪ.ʃən/ | Vocational training supports offender rehabilitation.
+LEGISLATION | Luật pháp, đạo luật | /ˌledʒ.ɪˈsleɪ.ʃən/ | Comprehensive legislation regulates online fraud.
+SURVEILLANCE | Sự giám sát | /səˈveɪ.ləns/ | Public surveillance cameras spark privacy debates.
+VERDICT | Phán quyết của tòa | /ˈvɜː.dɪkt/ | The jury reached a unanimous verdict after deliberation.
+JUVENILE | Vị thành niên | /ˈdʒuː.və.naɪl/ | Early mentoring lowers juvenile delinquency rates.`,
+    collocationText: `LAW ENFORCEMENT | Thực thi pháp luật | | Transparent law enforcement builds public trust.
+CRIME PREVENTION | Phòng chống tội phạm | | Well-lit streets contribute directly to crime prevention.
+COMMUNITY SERVICE | Lao động công ích | | Minor offenses are often punished with community service.`,
+    text: `DETERRENT | Biện pháp răn đe | /dɪˈter.ənt/ | Swift law enforcement acts as an effective deterrent.
+REHABILITATION | Cải tạo, phục hồi nhân phẩm | /ˌriː.ə.bɪl.ɪˈteɪ.ʃən/ | Vocational training supports offender rehabilitation.
+LEGISLATION | Luật pháp, đạo luật | /ˌledʒ.ɪˈsleɪ.ʃən/ | Comprehensive legislation regulates online fraud.
+SURVEILLANCE | Sự giám sát | /səˈveɪ.ləns/ | Public surveillance cameras spark privacy debates.
+VERDICT | Phán quyết của tòa | /ˈvɜː.dɪkt/ | The jury reached a unanimous verdict after deliberation.
+JUVENILE | Vị thành niên | /ˈdʒuː.və.naɪl/ | Early mentoring lowers juvenile delinquency rates.
+LAW ENFORCEMENT | Thực thi pháp luật | | Transparent law enforcement builds public trust.
+CRIME PREVENTION | Phòng chống tội phạm | | Well-lit streets contribute directly to crime prevention.
+COMMUNITY SERVICE | Lao động công ích | | Minor offenses are often punished with community service.`
+  },
+  media_culture: {
+    label: 'Kho 9 • Truyền thông & Văn hóa',
+    vocabText: `CREDIBLE | Đáng tin cậy | /ˈkred.ə.bəl/ | Readers should cross-check news against credible sources.
+CENSORSHIP | Sự kiểm duyệt | /ˈsen.sə.ʃɪp/ | Excessive censorship restricts constructive public debate.
+HERITAGE | Di sản văn hóa | /ˈher.ɪ.tɪdʒ/ | Historic districts preserve national cultural heritage.
+PROPAGANDA | Sự tuyên truyền thiên lệch | /ˌprɒp.əˈɡæn.də/ | Media literacy helps citizens spot subtle propaganda.
+BIAS | Định kiến, sự thiên vị | /ˈbaɪ.əs/ | Objective journalists strive to minimize personal bias.
+AUTHENTIC | Đích thực, nguyên bản | /ɔːˈθen.tɪk/ | Travelers seek authentic local culinary experiences.`,
+    collocationText: `MASS MEDIA | Truyền thông đại chúng | | Mass media shapes public perception of global crises.
+CULTURAL IDENTITY | Bản sắc văn hóa | | Traditional arts reinforce shared cultural identity.
+FAKE NEWS | Tin giả | | Fact-checking tools help curb the spread of fake news.`,
+    text: `CREDIBLE | Đáng tin cậy | /ˈkred.ə.bəl/ | Readers should cross-check news against credible sources.
+CENSORSHIP | Sự kiểm duyệt | /ˈsen.sə.ʃɪp/ | Excessive censorship restricts constructive public debate.
+HERITAGE | Di sản văn hóa | /ˈher.ɪ.tɪdʒ/ | Historic districts preserve national cultural heritage.
+PROPAGANDA | Sự tuyên truyền thiên lệch | /ˌprɒp.əˈɡæn.də/ | Media literacy helps citizens spot subtle propaganda.
+BIAS | Định kiến, sự thiên vị | /ˈbaɪ.əs/ | Objective journalists strive to minimize personal bias.
+AUTHENTIC | Đích thực, nguyên bản | /ɔːˈθen.tɪk/ | Travelers seek authentic local culinary experiences.
+MASS MEDIA | Truyền thông đại chúng | | Mass media shapes public perception of global crises.
+CULTURAL IDENTITY | Bản sắc văn hóa | | Traditional arts reinforce shared cultural identity.
+FAKE NEWS | Tin giả | | Fact-checking tools help curb the spread of fake news.`
+  },
+  work_career: {
+    label: 'Kho 10 • Công việc & Sự nghiệp',
+    vocabText: `PRODUCTIVITY | Năng suất lao động | /ˌprɒd.ʌkˈtɪv.ə.ti/ | Flexible schedules often enhance employee productivity.
+REMUNERATION | Thù lao, đãi ngộ | /rɪˌmjuː.nəˈreɪ.ʃən/ | Fair remuneration helps companies retain top talent.
+DELEGATE | Ủy quyền, giao phó | /ˈdel.ɪ.ɡeɪt/ | Effective managers know how to delegate routine tasks.
+BURNOUT | Kiệt sức vì công việc | /ˈbɜːn.aʊt/ | Constant overtime leads rapidly to professional burnout.
+PROFICIENCY | Sự thành thạo | /prəˈfɪʃ.ən.si/ | Language proficiency opens doors to global careers.
+ADAPTABILITY | Khả năng thích nghi | /əˌdæp.təˈbɪl.ə.ti/ | Adaptability is prized in fast-evolving tech sectors.`,
+    collocationText: `WORK-LIFE BALANCE | Cân bằng công việc - cuộc sống | | Remote options support a healthier work-life balance.
+CAREER ADVANCEMENT | Thăng tiến sự nghiệp | | Continuous upskilling speeds up career advancement.
+JOB SATISFACTION | Sự hài lòng với công việc | | Meaningful feedback strongly boosts job satisfaction.`,
+    text: `PRODUCTIVITY | Năng suất lao động | /ˌprɒd.ʌkˈtɪv.ə.ti/ | Flexible schedules often enhance employee productivity.
+REMUNERATION | Thù lao, đãi ngộ | /rɪˌmjuː.nəˈreɪ.ʃən/ | Fair remuneration helps companies retain top talent.
+DELEGATE | Ủy quyền, giao phó | /ˈdel.ɪ.ɡeɪt/ | Effective managers know how to delegate routine tasks.
+BURNOUT | Kiệt sức vì công việc | /ˈbɜːn.aʊt/ | Constant overtime leads rapidly to professional burnout.
+PROFICIENCY | Sự thành thạo | /prəˈfɪʃ.ən.si/ | Language proficiency opens doors to global careers.
+ADAPTABILITY | Khả năng thích nghi | /əˌdæp.təˈbɪl.ə.ti/ | Adaptability is prized in fast-evolving tech sectors.
+WORK-LIFE BALANCE | Cân bằng công việc - cuộc sống | | Remote options support a healthier work-life balance.
+CAREER ADVANCEMENT | Thăng tiến sự nghiệp | | Continuous upskilling speeds up career advancement.
+JOB SATISFACTION | Sự hài lòng với công việc | | Meaningful feedback strongly boosts job satisfaction.`
+  },
+  travel_tourism: {
+    label: 'Kho 11 • Du lịch & Khám phá',
+    vocabText: `ITINERARY | Lịch trình chuyến đi | /aɪˈtɪn.ər.ər.i/ | A flexible itinerary leaves room for spontaneous detours.
+ECOTOURISM | Du lịch sinh thái | /ˈiː.kəʊˌtʊə.rɪ.zəm/ | Responsible ecotourism funds local wildlife reserves.
+HOSPITALITY | Lòng hiếu khách / ngành dịch vụ | /ˌhɒs.pɪˈtæl.ə.ti/ | Coastal cities thrive on a strong hospitality industry.
+OVERTOURISM | Quá tải du lịch | /ˌəʊ.vəˈtʊə.rɪ.zəm/ | Overtourism places heavy strain on fragile landmarks.
+SCENIC | Có phong cảnh tuyệt đẹp | /ˈsiː.nɪk/ | The coastal railway follows a remarkably scenic route.
+EXCURSION | Chuyến dã ngoại ngắn | /ɪkˈskɜː.ʒən/ | Visitors booked a guided excursion to the coral island.`,
+    collocationText: `TOURIST DESTINATION | Điểm đến du lịch | | Nha Trang has become a premier tourist destination.
+CULTURAL EXCHANGE | Giao lưu văn hóa | | International travel encourages meaningful cultural exchange.
+LOCAL ECONOMY | Kinh tế địa phương | | Sustainable tourism creates steady revenue for the local economy.`,
+    text: `ITINERARY | Lịch trình chuyến đi | /aɪˈtɪn.ər.ər.i/ | A flexible itinerary leaves room for spontaneous detours.
+ECOTOURISM | Du lịch sinh thái | /ˈiː.kəʊˌtʊə.rɪ.zəm/ | Responsible ecotourism funds local wildlife reserves.
+HOSPITALITY | Lòng hiếu khách / ngành dịch vụ | /ˌhɒs.pɪˈtæl.ə.ti/ | Coastal cities thrive on a strong hospitality industry.
+OVERTOURISM | Quá tải du lịch | /ˌəʊ.vəˈtʊə.rɪ.zəm/ | Overtourism places heavy strain on fragile landmarks.
+SCENIC | Có phong cảnh tuyệt đẹp | /ˈsiː.nɪk/ | The coastal railway follows a remarkably scenic route.
+EXCURSION | Chuyến dã ngoại ngắn | /ɪkˈskɜː.ʒən/ | Visitors booked a guided excursion to the coral island.
+TOURIST DESTINATION | Điểm đến du lịch | | Nha Trang has become a premier tourist destination.
+CULTURAL EXCHANGE | Giao lưu văn hóa | | International travel encourages meaningful cultural exchange.
+LOCAL ECONOMY | Kinh tế địa phương | | Sustainable tourism creates steady revenue for the local economy.`
+  },
+  science_space: {
+    label: 'Kho 12 • Khoa học & Vũ trụ',
+    vocabText: `HYPOTHESIS | Giả thuyết khoa học | /haɪˈpɒθ.ə.sɪs/ | Controlled trials are designed to test a clear hypothesis.
+BREAKTHROUGH | Bước đột phá | /ˈbreɪk.θruː/ | Battery chemistry saw a major breakthrough this decade.
+COSMIC | Thuộc vũ trụ | /ˈkɒz.mɪk/ | Space telescopes capture faint cosmic radiation.
+GENETICS | Di truyền học | /dʒəˈnet.ɪks/ | Advances in genetics enable personalized medicine.
+SATELLITE | Vệ tinh | /ˈsæt.əl.aɪt/ | Weather satellites give early warnings of typhoons.
+SPECIMEN | Mẫu vật nghiên cứu | /ˈspes.ə.mɪn/ | Marine biologists collected rare deep-sea specimens.`,
+    collocationText: `SCIENTIFIC INQUIRY | Nghiên cứu khoa học | | Curiosity is the engine behind all scientific inquiry.
+SPACE EXPLORATION | Thám hiểm không gian | | Space exploration yields spin-off technologies for Earth.
+CLIMATE MODEL | Mô hình khí hậu | | Supercomputers run high-resolution climate models.`,
+    text: `HYPOTHESIS | Giả thuyết khoa học | /haɪˈpɒθ.ə.sɪs/ | Controlled trials are designed to test a clear hypothesis.
+BREAKTHROUGH | Bước đột phá | /ˈbreɪk.θruː/ | Battery chemistry saw a major breakthrough this decade.
+COSMIC | Thuộc vũ trụ | /ˈkɒz.mɪk/ | Space telescopes capture faint cosmic radiation.
+GENETICS | Di truyền học | /dʒəˈnet.ɪks/ | Advances in genetics enable personalized medicine.
+SATELLITE | Vệ tinh | /ˈsæt.əl.aɪt/ | Weather satellites give early warnings of typhoons.
+SPECIMEN | Mẫu vật nghiên cứu | /ˈspes.ə.mɪn/ | Marine biologists collected rare deep-sea specimens.
+SCIENTIFIC INQUIRY | Nghiên cứu khoa học | | Curiosity is the engine behind all scientific inquiry.
+SPACE EXPLORATION | Thám hiểm không gian | | Space exploration yields spin-off technologies for Earth.
+CLIMATE MODEL | Mô hình khí hậu | | Supercomputers run high-resolution climate models.`
+  },
+  art_history: {
+    label: 'Kho 13 • Nghệ thuật & Lịch sử',
+    vocabText: `AESTHETIC | Thuộc thẩm mỹ | /esˈθet.ɪk/ | Public plazas combine practical utility with aesthetic appeal.
+ARTIFACT | Cổ vật, hiện vật lịch sử | /ˈɑː.tɪ.fækt/ | Museums carefully restore fragile archaeological artifacts.
+PATRONAGE | Sự bảo trợ nghệ thuật | /ˈpæt.rə.nɪdʒ/ | Public patronage sustains independent symphony orchestras.
+CHRONICLE | Biên niên sử / ghi chép lịch sử | /ˈkrɒn.ɪ.kəl/ | Ancient inscriptions chronicle dynastic trade routes.
+AVANT-GARDE | Tiên phong, cách tân | /ˌæv.ɒ̃ˈɡɑːd/ | Avant-garde cinema challenges conventional storytelling.
+MONUMENT | Tượng đài, di tích lịch sử | /ˈmɒn.jə.mənt/ | Stone monuments require shielding from acid rain.`,
+    collocationText: `ARTISTIC EXPRESSION | Biểu đạt nghệ thuật | | Freedom of artistic expression enriches civic life.
+HISTORICAL PRESERVATION | Bảo tồn lịch sử | | Strict zoning laws uphold historical preservation.
+CREATIVE INDUSTRY | Công nghiệp sáng tạo | | Film and design power the modern creative industry.`,
+    text: `AESTHETIC | Thuộc thẩm mỹ | /esˈθet.ɪk/ | Public plazas combine practical utility with aesthetic appeal.
+ARTIFACT | Cổ vật, hiện vật lịch sử | /ˈɑː.tɪ.fækt/ | Museums carefully restore fragile archaeological artifacts.
+PATRONAGE | Sự bảo trợ nghệ thuật | /ˈpæt.rə.nɪdʒ/ | Public patronage sustains independent symphony orchestras.
+CHRONICLE | Biên niên sử / ghi chép lịch sử | /ˈkrɒn.ɪ.kəl/ | Ancient inscriptions chronicle dynastic trade routes.
+AVANT-GARDE | Tiên phong, cách tân | /ˌæv.ɒ̃ˈɡɑːd/ | Avant-garde cinema challenges conventional storytelling.
+MONUMENT | Tượng đài, di tích lịch sử | /ˈmɒn.jə.mənt/ | Stone monuments require shielding from acid rain.
+ARTISTIC EXPRESSION | Biểu đạt nghệ thuật | | Freedom of artistic expression enriches civic life.
+HISTORICAL PRESERVATION | Bảo tồn lịch sử | | Strict zoning laws uphold historical preservation.
+CREATIVE INDUSTRY | Công nghiệp sáng tạo | | Film and design power the modern creative industry.`
+  },
+  globalization: {
+    label: 'Kho 14 • Toàn cầu hóa & Hội nhập',
+    vocabText: `INTERDEPENDENT | Phụ thuộc lẫn nhau | /ˌɪn.tə.dɪˈpen.dənt/ | Modern supply chains make economies deeply interdependent.
+HOMOGENIZATION | Sự đồng hóa văn hóa | /həˌmɒdʒ.ə.naɪˈzeɪ.ʃən/ | Critics warn that global chains cause cultural homogenization.
+MULTILATERAL | Đa phương | /ˌmʌl.tiˈlæt.ər.əl/ | Multilateral treaties coordinate cross-border climate targets.
+TARIFF | Thuế quan xuất nhập khẩu | /ˈtær.ɪf/ | Lowering tariffs stimulates international trade volume.
+MIGRATION | Sự di cư | /maɪˈɡreɪ.ʃən/ | Skilled migration fills critical workforce shortages.
+SOVEREIGNTY | Chủ quyền quốc gia | /ˈsɒv.rən.ti/ | Trade accords balance cooperation with national sovereignty.`,
+    collocationText: `GLOBAL SUPPLY CHAIN | Chuỗi cung ứng toàn cầu | | Disruptions at one port ripple across the global supply chain.
+CROSS-BORDER COOPERATION | Hợp tác xuyên biên giới | | Pandemics demand swift cross-border cooperation.
+MULTICULTURAL SOCIETY | Xã hội đa văn hóa | | Respectful dialogue sustains a vibrant multicultural society.`,
+    text: `INTERDEPENDENT | Phụ thuộc lẫn nhau | /ˌɪn.tə.dɪˈpen.dənt/ | Modern supply chains make economies deeply interdependent.
+HOMOGENIZATION | Sự đồng hóa văn hóa | /həˌmɒdʒ.ə.naɪˈzeɪ.ʃən/ | Critics warn that global chains cause cultural homogenization.
+MULTILATERAL | Đa phương | /ˌmʌl.tiˈlæt.ər.əl/ | Multilateral treaties coordinate cross-border climate targets.
+TARIFF | Thuế quan xuất nhập khẩu | /ˈtær.ɪf/ | Lowering tariffs stimulates international trade volume.
+MIGRATION | Sự di cư | /maɪˈɡreɪ.ʃən/ | Skilled migration fills critical workforce shortages.
+SOVEREIGNTY | Chủ quyền quốc gia | /ˈsɒv.rən.ti/ | Trade accords balance cooperation with national sovereignty.
+GLOBAL SUPPLY CHAIN | Chuỗi cung ứng toàn cầu | | Disruptions at one port ripple across the global supply chain.
+CROSS-BORDER COOPERATION | Hợp tác xuyên biên giới | | Pandemics demand swift cross-border cooperation.
+MULTICULTURAL SOCIETY | Xã hội đa văn hóa | | Respectful dialogue sustains a vibrant multicultural society.`
   }
 };
 

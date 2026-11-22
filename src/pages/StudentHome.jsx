@@ -213,21 +213,25 @@ export default function StudentHome({
                     <span>{firstTestHasDraft ? 'Tiếp Tục Bài Đang Làm' : 'Thi Thực Chiến Ngay'}</span>
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('speaking_daily') : setView('SKILL_HUB'))}
-                  className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
-                >
-                  <Mic className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
-                  <span>Daily Zone ({singleSkillCount})</span>
-                </button>
-                <button
-                  onClick={openStudentGamePortal}
-                  className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
-                >
-                  <Gamepad2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
-                  <span>Đấu Trường Từ Vựng</span>
-                </button>
+                {!currentUser?.isGuest && (
+                  <button
+                    type="button"
+                    onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('speaking_daily') : setView('SKILL_HUB'))}
+                    className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
+                  >
+                    <Mic className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
+                    <span>Daily Zone ({singleSkillCount})</span>
+                  </button>
+                )}
+                {!currentUser?.isGuest && (
+                  <button
+                    onClick={openStudentGamePortal}
+                    className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
+                  >
+                    <Gamepad2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
+                    <span>Đấu Trường Từ Vựng</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -355,15 +359,17 @@ export default function StudentHome({
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
-              <Sparkles className="w-5 h-5" />
+          {!currentUser?.isGuest && (
+            <div className="bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Bài tập Daily Zone</p>
+                <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{singleSkillCount}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Bài tập Daily Zone</p>
-              <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums">{singleSkillCount}</p>
-            </div>
-          </div>
+          )}
 
           <div className="bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center gap-4">
             <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
@@ -375,23 +381,25 @@ export default function StudentHome({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={openStudentGamePortal}
-            className="text-left bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-zinc-600 transition"
-          >
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
-                <Gamepad2 className="w-5 h-5" />
+          {!currentUser?.isGuest && (
+            <button
+              type="button"
+              onClick={openStudentGamePortal}
+              className="text-left bg-white dark:bg-[#18181B] rounded-lg p-5 border border-slate-200 dark:border-zinc-800 flex items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-zinc-600 transition"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-11 h-11 rounded-lg bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7] flex items-center justify-center shrink-0 border border-slate-200 dark:border-zinc-700">
+                  <Gamepad2 className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Kỷ lục Game lớp</p>
+                  <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums truncate">
+                    {bestGameScore > 0 ? `${bestGameScore}đ` : 'Chơi ngay'}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm text-[#475569] dark:text-zinc-400 font-semibold">Kỷ lục Game lớp</p>
-                <p className="text-2xl font-extrabold text-[#0F172B] dark:text-[#FAFAFA] tabular-nums truncate">
-                  {bestGameScore > 0 ? `${bestGameScore}đ` : 'Chơi ngay'}
-                </p>
-              </div>
-            </div>
-          </button>
+            </button>
+          )}
         </div>
         )}
 
@@ -434,9 +442,9 @@ export default function StudentHome({
                 items={[
                   { id: 'real_exam', label: `Thực Chiến Thi Thật (${realExamTests.length})` },
                   { id: 'periodic_mock', label: `Mock Test Định Kỳ (${periodicMockTests.length})` },
-                  { id: 'daily_zone', label: `Daily Zone (${singleSkillCount})` }
+                  ...(!currentUser?.isGuest ? [{ id: 'daily_zone', label: `Daily Zone (${singleSkillCount})` }] : [])
                 ]}
-                activeId={storefrontTab}
+                activeId={currentUser?.isGuest && storefrontTab === 'daily_zone' ? 'real_exam' : storefrontTab}
                 onSelect={setStorefrontTab}
                 tone="teal"
                 ariaLabel="Phân mục đề thi IELTS"
@@ -771,7 +779,17 @@ export default function StudentHome({
                           <span>
                             {latestAttempt.teacherGraded
                               ? `Đã thi (1/1) · Xem Điểm (Band ${latestAttempt.overallBand})`
-                              : 'Đã nộp (1/1) · Ms. Như Đang Check'}
+                              : (() => {
+                                  const lb = latestAttempt.scores?.listening?.band;
+                                  const rb = latestAttempt.scores?.reading?.band;
+                                  const lrLabel = [
+                                    typeof lb === 'number' ? `Nghe ${lb}` : '',
+                                    typeof rb === 'number' ? `Đọc ${rb}` : ''
+                                  ].filter(Boolean).join(' · ');
+                                  return lrLabel
+                                    ? `Đã nộp (1/1) · ${lrLabel} (W/S chờ duyệt)`
+                                    : 'Đã nộp (1/1) · Xem Điểm Đọc/Nghe';
+                                })()}
                           </span>
                         </button>
                       ) : canUseComboCredit ? (
@@ -866,7 +884,7 @@ export default function StudentHome({
                               onClick={onOpenRealExamPricing}
                               className="w-full font-semibold py-2 rounded-lg text-xs transition bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-[#0F766E] dark:text-teal-400 hover:bg-slate-50 dark:hover:bg-zinc-800"
                             >
-                              Hoặc mua Combo tiết kiệm (3 / 5 / 10 đề) →
+                              Hoặc mua Combo tiết kiệm (3 / 5 / 8 / 10 đề) →
                             </button>
                           )}
                         </div>
@@ -960,10 +978,14 @@ export default function StudentHome({
                         </td>
                         <td className="px-4 py-4 text-sm text-[#475569] dark:text-zinc-400 whitespace-nowrap">{att.submittedAt}</td>
                         <td className="px-4 py-4 text-center font-bold text-[#0F172B] dark:text-zinc-100 tabular-nums">
-                          {canShowApprovedScore ? (att.scores?.listening?.band ?? '-') : '-'}
+                          {typeof att.scores?.listening?.band === 'number'
+                            ? att.scores.listening.band
+                            : '-'}
                         </td>
                         <td className="px-4 py-4 text-center font-bold text-[#0F172B] dark:text-zinc-100 tabular-nums">
-                          {canShowApprovedScore ? (att.scores?.reading?.band ?? '-') : '-'}
+                          {typeof att.scores?.reading?.band === 'number'
+                            ? att.scores.reading.band
+                            : '-'}
                         </td>
                         <td className="px-4 py-4 text-center">
                           {canShowApprovedScore && att.scores?.writing?.overallBand !== null && att.scores?.writing?.overallBand !== undefined ? (
@@ -1032,8 +1054,8 @@ export default function StudentHome({
           </div>
         </section>
 
-        {/* Class Members Directory Strip (clean academic view without VIP/game neon effects) */}
-        {(Object.keys(usersDb || {}).length > 0 || supportAdminProfile) && (
+        {/* Class Members Directory Strip (hidden for Guest accounts) */}
+        {!currentUser?.isGuest && (Object.keys(usersDb || {}).length > 0 || supportAdminProfile) && (
           <section>
             <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-lg p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">

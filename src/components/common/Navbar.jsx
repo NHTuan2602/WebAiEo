@@ -90,43 +90,49 @@ export default function Navbar({
       ? 'TEACHER_DASHBOARD'
       : view;
 
+  const isGuest = Boolean(currentUser?.isGuest && !isTeacher);
+
   const desktopNavItems = [
     {
       id: 'HOME',
-      label: 'Đề Thi',
+      label: isGuest ? 'Đề Thực Chiến & Mock' : 'Đề Thi',
       icon: <BookOpen className="w-3.5 h-3.5 shrink-0" />,
       onClick: () => setView('HOME')
     },
-    {
-      id: 'SKILL_HUB',
-      label: 'Daily Zone',
-      icon: <Mic className="w-3.5 h-3.5 shrink-0" />,
-      onClick: () => setView('SKILL_HUB'),
-      badge:
-        !isTeacher && dailySpeakingPendingCount > 0 ? (
-          <span
-            onClick={e => {
-              if (onOpenSpeakingDaily) {
-                e.stopPropagation();
-                onOpenSpeakingDaily();
-              }
-            }}
-            className="px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-300 text-xs font-bold"
-            title={`Bạn còn ${dailySpeakingPendingCount} bài Speaking Daily chưa hoàn thành hôm nay`}
-          >
-            {dailySpeakingPendingCount} Daily
-          </span>
-        ) : null
-    },
-    {
-      id: 'GAME_ARENA',
-      label: 'Đấu Trường',
-      icon: <Gamepad2 className="w-3.5 h-3.5 shrink-0" />,
-      onClick: openStudentGamePortal
-    },
+    ...(!isGuest
+      ? [
+          {
+            id: 'SKILL_HUB',
+            label: 'Daily Zone',
+            icon: <Mic className="w-3.5 h-3.5 shrink-0" />,
+            onClick: () => setView('SKILL_HUB'),
+            badge:
+              !isTeacher && dailySpeakingPendingCount > 0 ? (
+                <span
+                  onClick={e => {
+                    if (onOpenSpeakingDaily) {
+                      e.stopPropagation();
+                      onOpenSpeakingDaily();
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-300 text-xs font-bold"
+                  title={`Bạn còn ${dailySpeakingPendingCount} bài Speaking Daily chưa hoàn thành hôm nay`}
+                >
+                  {dailySpeakingPendingCount} Daily
+                </span>
+              ) : null
+          },
+          {
+            id: 'GAME_ARENA',
+            label: 'Đấu Trường',
+            icon: <Gamepad2 className="w-3.5 h-3.5 shrink-0" />,
+            onClick: openStudentGamePortal
+          }
+        ]
+      : []),
     {
       id: 'STUDENT_PROFILE',
-      label: 'Hồ Sơ Lớp',
+      label: isGuest ? 'Tài Khoản Khách' : 'Hồ Sơ Lớp',
       icon: <UserCheck className="w-3.5 h-3.5 shrink-0" />,
       onClick: goToOwnProfile
     },
@@ -455,28 +461,32 @@ export default function Navbar({
           onClick={() => setView('HOME')}
           className={mobileTabCls(view === 'HOME')}
         >
-          <BookOpen className="w-3.5 h-3.5" /> Đề Thi
+          <BookOpen className="w-3.5 h-3.5" /> {isGuest ? 'Đề Thực Chiến & Mock' : 'Đề Thi'}
         </button>
-        <button
-          type="button"
-          onClick={() => setView('SKILL_HUB')}
-          className={mobileTabCls(view === 'SKILL_HUB' || view === 'SPEAKING_MODE')}
-        >
-          <Mic className="w-3.5 h-3.5" /> Daily Zone
-        </button>
-        <button
-          type="button"
-          onClick={openStudentGamePortal}
-          className={mobileTabCls(view === 'GAME_ARENA')}
-        >
-          <Gamepad2 className="w-3.5 h-3.5" /> Đấu Trường
-        </button>
+        {!isGuest && (
+          <button
+            type="button"
+            onClick={() => setView('SKILL_HUB')}
+            className={mobileTabCls(view === 'SKILL_HUB' || view === 'SPEAKING_MODE')}
+          >
+            <Mic className="w-3.5 h-3.5" /> Daily Zone
+          </button>
+        )}
+        {!isGuest && (
+          <button
+            type="button"
+            onClick={openStudentGamePortal}
+            className={mobileTabCls(view === 'GAME_ARENA')}
+          >
+            <Gamepad2 className="w-3.5 h-3.5" /> Đấu Trường
+          </button>
+        )}
         <button
           type="button"
           onClick={goToOwnProfile}
           className={mobileTabCls(view === 'STUDENT_PROFILE')}
         >
-          <UserCheck className="w-3.5 h-3.5" /> Hồ Sơ Lớp
+          <UserCheck className="w-3.5 h-3.5" /> {isGuest ? 'Tài Khoản Khách' : 'Hồ Sơ Lớp'}
         </button>
         {isTeacher && (
           <button

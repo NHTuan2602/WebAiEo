@@ -98,14 +98,21 @@ export default function RealExamPricingModal({
                 So với giá lẻ {formatVndCurrency(singleExamPrice)}/đề
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               {REAL_EXAM_COMBOS.map((combo, idx) => {
                 const comboPrice = Number(cfg[combo.priceKey]) > 0 ? Number(cfg[combo.priceKey]) : combo.defaultPriceVnd;
                 const normalPrice = singleExamPrice * combo.credits;
                 const savedAmount = Math.max(0, normalPrice - comboPrice);
                 const perTestRounded = Math.round(comboPrice / combo.credits / 100) * 100;
-                const badgeText = idx === 1 ? 'Phổ biến' : idx === 2 ? 'Tiết kiệm nhất' : 'Khởi động';
-                const isPopular = idx === 1;
+                const badgeText =
+                  combo.credits === 3
+                    ? 'Hạng Classic'
+                    : combo.credits === 5
+                    ? 'Phổ biến · Standard'
+                    : combo.credits === 8
+                    ? 'Ưu đãi mạnh'
+                    : 'Tiết kiệm nhất · Plus';
+                const isPopular = idx === 1 || combo.credits === 5;
 
                 return (
                   <div
@@ -206,10 +213,10 @@ export default function RealExamPricingModal({
             <div className="p-4 space-y-1">
               <p className="text-xs font-extrabold text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#0F766E] dark:text-teal-400 shrink-0" />
-                <span>Cách Dùng Lượt Combo (3 / 5 / 10 Đề)</span>
+                <span>Cách Dùng Lượt Combo (3 / 5 / 8 / 10 Đề)</span>
               </p>
               <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
-                Lượt hiển thị ngay cạnh tên bạn. Khi mở đề Thực Chiến nào, hệ thống sẽ <strong>thông báo xác nhận và trừ 1 lượt</strong>.
+                Lượt hiển thị ngay cạnh tên bạn. Mỗi đề nạp sẽ tích lũy nâng hạng cạnh tên từ <strong>Classic (3)</strong> → <strong>Standard (5)</strong> → <strong>Plus (10)</strong> → <strong>Advanced (15)</strong> → <strong>Premier (20)</strong> → <strong>Signature (25)</strong> → <strong>Elite (30)</strong> → <strong>Prestige (40)</strong> → <strong>Royal (45)</strong> → <strong>Imperial (60 đề)</strong>.
               </p>
             </div>
           </div>

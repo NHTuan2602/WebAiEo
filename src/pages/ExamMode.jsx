@@ -1052,6 +1052,7 @@ export default function ExamMode({
                         onSwitchScope={pIdx => switchPartIndex(pIdx, 'reading')}
                         onTextSelect={handlePassageTextSelect}
                         onToggleBookmark={toggleBookmarkQuestion}
+                        onZoomImage={setZoomedReadingImg}
                         questionCardRefs={questionCardRefs}
                         questions={block.questions}
                         renderText={renderHighlightRuns}
@@ -1163,6 +1164,7 @@ export default function ExamMode({
                         onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
                         onTextSelect={handlePassageTextSelect}
                         onToggleBookmark={toggleBookmarkQuestion}
+                        onZoomImage={setZoomedReadingImg}
                         questionCardRefs={questionCardRefs}
                         questions={standaloneListeningQs}
                         renderText={renderHighlightRuns}
@@ -1223,6 +1225,7 @@ export default function ExamMode({
                   onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
                   onTextSelect={handlePassageTextSelect}
                   onToggleBookmark={toggleBookmarkQuestion}
+                  onZoomImage={setZoomedReadingImg}
                   questionCardRefs={questionCardRefs}
                   questions={standaloneListeningQs}
                   renderText={renderHighlightRuns}

@@ -60,10 +60,12 @@ import {
   resolveUserVipNameVisual
 } from '../constants/profileCustomization';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
+import SpeakingForecastZone from '../components/speaking/SpeakingForecastZone';
 import VipMemberName from '../components/common/VipMemberName';
 
 export default function SkillPracticeHub({
   activeTab = 'speaking',
+  aiApiKey = '',
   aiConfigured = false,
   attempts = [],
   classesDb = {},
@@ -76,12 +78,15 @@ export default function SkillPracticeHub({
   onOpenFullExamCatalog,
   onOpenResult,
   onOpenSkillBuilder,
+  onSaveSpeakingForecast = null,
   onSpeakingRoomUnlocked,
   onStartSingleSkillExam,
   onStartSpeakingExam,
+  onStartSpeakingPracticeTest = null,
   paymentConfig = null,
   serverClockOffsetMs = 0,
   showToast,
+  speakingForecast = null,
   examUnlockTokens = {},
   speakingUnlockTokens = {},
   tests = [],
@@ -1285,7 +1290,7 @@ export default function SkillPracticeHub({
                             <div className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs flex flex-wrap items-center justify-between gap-2">
                               <span className="font-bold text-[#0F766E] dark:text-teal-300">
                                 {latestScoreObj && latestScoreObj.total > 0
-                                  ? `Lần #${usedCount}: Đúng ${latestScoreObj.raw}/${latestScoreObj.total} câu • ${formatDurationVi(latestMyAttempt.durationSeconds)}`
+                                  ? `Lần #${usedCount}: Band ${latestScoreObj.band ?? latestMyAttempt.overallBand ?? 0} (${latestScoreObj.raw}/${latestScoreObj.total} câu) • ${formatDurationVi(latestMyAttempt.durationSeconds)}`
                                   : latestMyAttempt.teacherGraded
                                   ? `Lần #${usedCount}: Ms. Như đã duyệt (Band ${latestMyAttempt.overallBand}) • ${formatDurationVi(latestMyAttempt.durationSeconds)}`
                                   : `Lần #${usedCount}: Ms. Như đang check • ${formatDurationVi(latestMyAttempt.durationSeconds)}`}
@@ -1522,7 +1527,7 @@ export default function SkillPracticeHub({
                   className="px-3 py-1.5 rounded-lg bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-bold transition inline-flex items-center gap-1.5"
                 >
                   <Crown className="w-3.5 h-3.5 text-amber-200" />
-                  <span>IELTS VIP ({formatVndCurrency(payCfg.aieoVipPrice)}/1 tháng) - Viền Neon, Màu Chữ &amp; Tạo Phòng</span>
+                  <span>Gói Tháng ({formatVndCurrency(payCfg.aieoVipPrice)}/tháng) - Game Từ Vựng, Tạo Phòng, Màu Chữ &amp; Ảnh Bìa</span>
                 </button>
               )}
             </div>
@@ -1590,6 +1595,19 @@ export default function SkillPracticeHub({
                   </div>
                 </button>
               </div>
+
+              {/* Structured 3-Part Speaking Zone (Part 1: 6 nhóm · Part 2: 4 nhóm · Part 3: 14 nhóm + Random Part 3) */}
+              {!focusedSpeakingMatch && (
+                <SpeakingForecastZone
+                  zoneKey={activeTab === 'forecast' ? 'forecast' : 'daily'}
+                  bank={speakingForecast}
+                  isTeacher={isTeacher}
+                  aiApiKey={aiApiKey}
+                  onSaveBank={onSaveSpeakingForecast}
+                  onStartPracticeTest={onStartSpeakingPracticeTest}
+                  showToast={showToast}
+                />
+              )}
 
               {/* Daily Compliance Alert Strip for Students OR Teacher Missing Tracker */}
               {!isTeacher && dailyCompliance.myPendingDailyTests.length > 0 && (

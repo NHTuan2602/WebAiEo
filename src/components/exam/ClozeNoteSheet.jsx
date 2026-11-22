@@ -101,10 +101,35 @@ export default function ClozeNoteSheet({
       : sectionLines;
 
     const firstBodyIdx = filteredLines.findIndex(
-      l => l.kind === 'heading' || l.kind === 'bullet' || l.segments.some(seg => seg.type === 'blank')
+      l =>
+        l.kind === 'table' ||
+        l.kind === 'flowArrow' ||
+        l.kind === 'example' ||
+        l.kind === 'heading' ||
+        l.kind === 'bullet' ||
+        l.kind === 'noteLine' ||
+        l.segments.some(seg => seg.type === 'blank')
     );
     const preambleLines = firstBodyIdx > 0 ? filteredLines.slice(0, firstBodyIdx) : [];
     const boxLines = firstBodyIdx > 0 ? filteredLines.slice(firstBodyIdx) : filteredLines;
+
+    const preambleJoined = preambleLines.map(getLinePlainText).join(' ').toLowerCase();
+    const hasTableBlock = boxLines.some(l => l.kind === 'table');
+    const hasFlowArrow = boxLines.some(l => l.kind === 'flowArrow');
+    const isFlowchartSection = hasFlowArrow || /flow[\s-]?chart/i.test(preambleJoined);
+    const isNoteSection = !hasTableBlock && !isFlowchartSection && (
+      /complete the notes|complete the form/i.test(preambleJoined) ||
+      boxLines.some(l => l.kind === 'example' || l.kind === 'noteLine' || l.kind === 'heading')
+    );
+    const sectionKindLabel = hasTableBlock
+      ? 'Table Completion'
+      : isFlowchartSection
+      ? 'Flow-chart Completion'
+      : isNoteSection
+      ? 'Note Completion'
+      : sharedWordBoxOptions.length > 0
+      ? 'Summary Completion (Box)'
+      : 'Summary Completion';
 
     const blankNumbers = sectionBlankLinks
       .map(item => Number(item.blankNum))
@@ -224,17 +249,17 @@ export default function ClozeNoteSheet({
                   onAnswerChange?.(qId, e.target.value);
                   onBlankFocus?.(seg.blankNum, qId);
                 }}
-                className={`min-w-[138px] max-w-[240px] h-[34px] px-2.5 pr-7 rounded-[4px] text-[14px] font-bold transition-all outline-none border cursor-pointer ${
+                className={`min-w-[82px] max-w-[220px] h-[34px] px-2.5 pr-7 rounded-md text-[14px] font-bold transition-all outline-none border cursor-pointer ${
                   isDragOver
                     ? 'bg-blue-50 dark:bg-blue-500/25 text-[#111827] dark:text-white border-[#2563EB] ring-2 ring-[#2563EB]/50'
                     : isActive
                     ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
                     : resolvedChoiceVal
                     ? 'bg-blue-50/70 dark:bg-[#1E2A40] text-[#111827] dark:text-white border-[#2563EB] dark:border-[#60A5FA]'
-                    : 'bg-white dark:bg-[#2D3038] text-[#111827] dark:text-[#E5E7EB] border-[#767676] dark:border-[#5D5F66] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
+                    : 'bg-[#F1F5F9] dark:bg-[#2D3038] text-[#111827] dark:text-[#E5E7EB] border-[#CBD5E1] dark:border-[#5D5F66] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
                 }`}
               >
-                <option value="">{seg.blankNum} — Chọn từ</option>
+                <option value="">{isFlowchartSection ? '—' : `(${seg.blankNum}) —`}</option>
                 {optionList.map((opt, optIdx) => (
                   <option key={optIdx} value={opt}>
                     {opt}
@@ -287,20 +312,20 @@ export default function ClozeNoteSheet({
               autoComplete="off"
               readOnly={readOnlyPreview}
               value={resolvedChoiceVal}
-              placeholder={String(seg.blankNum)}
+              placeholder={`(${seg.blankNum})`}
               aria-label={`Câu ${seg.blankNum}`}
               onFocus={() => onBlankFocus?.(seg.blankNum, qId)}
               onChange={e => {
                 if (readOnlyPreview || !qId) return;
                 onAnswerChange?.(qId, e.target.value);
               }}
-              className={`w-32 sm:w-44 h-[34px] px-2.5 rounded-[3px] text-center text-[15px] font-bold transition-all outline-none border ${
+              className={`w-28 sm:w-36 h-[32px] px-2.5 rounded-md text-center text-[14px] font-bold transition-all outline-none border ${
                 isActive
                   ? 'bg-[#FFFDF7] dark:bg-[#23262E] text-[#111827] dark:text-white border-[#A16207] dark:border-[#EAB308] ring-1 ring-[#CA8A04]/45'
                   : resolvedChoiceVal
                   ? 'bg-white dark:bg-[#2A2F3D] text-[#111827] dark:text-white border-[#2563EB] dark:border-[#60A5FA]'
-                  : 'bg-white dark:bg-[#3A3B40] text-[#111827] dark:text-white border-[#767676] dark:border-[#5D5F66] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
-              } placeholder:text-[#111827] dark:placeholder:text-[#E5E7EB] placeholder:font-bold`}
+                  : 'bg-[#F1F5F9]/90 dark:bg-[#2E313A] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#525662] hover:border-[#64748B] dark:hover:border-[#9CA3AF]'
+              } placeholder:text-[#475569] dark:placeholder:text-[#CBD5E1] placeholder:font-bold`}
             />
             {!readOnlyPreview && onToggleBookmark && qId && (
               <button
@@ -324,6 +349,69 @@ export default function ClozeNoteSheet({
       if (line.kind === 'spacer') {
         return <div key={line.id} className="h-2" />;
       }
+      if (line.kind === 'flowArrow') {
+        return (
+          <div key={line.id} className="flex justify-center py-0.5 text-slate-500 dark:text-zinc-400 font-bold text-base select-none">
+            ↓
+          </div>
+        );
+      }
+      if (line.kind === 'table') {
+        return (
+          <div key={line.id} className="overflow-x-auto rounded-md border border-slate-400 dark:border-zinc-600 bg-white dark:bg-[#14161B] my-2">
+            <table className="w-full border-collapse text-left">
+              {line.hasHeader && line.headerRow && (
+                <thead>
+                  <tr className="bg-[#F1F5F9] dark:bg-[#1F232C] border-b border-slate-400 dark:border-zinc-600">
+                    {line.headerRow.cells.map((cellLines, cIdx) => (
+                      <th
+                        key={cIdx}
+                        className="py-3 px-3.5 text-[14px] font-extrabold text-[#111827] dark:text-white border-r last:border-r-0 border-slate-300 dark:border-zinc-600 align-middle text-center"
+                      >
+                        {cellLines.map((cl, lIdx) => (
+                          <div key={lIdx}>{renderSegments(cl.segments)}</div>
+                        ))}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody>
+                {(line.bodyRows || []).map((row, rIdx) => (
+                  <tr
+                    key={row.id ?? rIdx}
+                    className="border-b last:border-b-0 border-slate-300 dark:border-zinc-700 align-top"
+                  >
+                    {row.cells.map((cellLines, cIdx) => (
+                      <td
+                        key={cIdx}
+                        className={`py-3 px-3.5 border-r last:border-r-0 border-slate-300 dark:border-zinc-700 ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.85]`}
+                      >
+                        {cellLines.length === 0 ? (
+                          <span>&nbsp;</span>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {cellLines.map((cl, lIdx) =>
+                              cl.isBullet ? (
+                                <div key={lIdx} className="flex items-start gap-2">
+                                  <span className="mt-1.5 text-[13px] leading-none text-slate-700 dark:text-zinc-300 shrink-0">•</span>
+                                  <div className="flex-1">{renderSegments(cl.segments)}</div>
+                                </div>
+                              ) : (
+                                <div key={lIdx}>{renderSegments(cl.segments)}</div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
       if (line.kind === 'groupHeader') {
         return (
           <div key={line.id} className="flex flex-wrap items-center gap-2 pt-2 pb-1 border-b border-slate-200 dark:border-[#32353E]">
@@ -331,7 +419,7 @@ export default function ClozeNoteSheet({
               {renderSegments(line.segments)}
             </h4>
             <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
-              {sharedWordBoxOptions.length > 0 ? 'Summary Completion (Box)' : 'Summary Completion'}
+              {sectionKindLabel}
             </span>
           </div>
         );
@@ -345,11 +433,18 @@ export default function ClozeNoteSheet({
           </div>
         );
       }
+      if (line.kind === 'example') {
+        return (
+          <p key={line.id} className={`${fontSizeClass} italic text-slate-700 dark:text-zinc-300 leading-[1.8]`}>
+            {renderSegments(line.segments)}
+          </p>
+        );
+      }
       if (line.kind === 'heading') {
         return (
           <h4
             key={line.id}
-            className="text-[16px] font-bold text-center text-[#111827] dark:text-white pt-2 pb-1"
+            className="text-[16px] font-bold text-center text-[#111827] dark:text-white pt-1.5 pb-1"
           >
             {renderSegments(line.segments)}
           </h4>
@@ -357,24 +452,61 @@ export default function ClozeNoteSheet({
       }
       if (line.kind === 'subheading') {
         return (
-          <h5 key={line.id} className="text-[16px] font-bold text-[#111827] dark:text-white pt-1.5">
+          <h5 key={line.id} className="text-[15px] font-extrabold text-[#111827] dark:text-white pt-2">
             {renderSegments(line.segments)}
           </h5>
         );
       }
+      if (line.kind === 'noteLine') {
+        if (isFlowchartSection) {
+          return (
+            <div
+              key={line.id}
+              className={`rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#191B21] px-5 py-3.5 text-center ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.9] shadow-2xs`}
+            >
+              {renderSegments(line.segments)}
+            </div>
+          );
+        }
+        return (
+          <div key={line.id} className={`${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[2.05] py-0.5`}>
+            {renderSegments(line.segments)}
+          </div>
+        );
+      }
       if (line.kind === 'bullet') {
+        if (isFlowchartSection) {
+          return (
+            <div
+              key={line.id}
+              className={`rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#191B21] px-5 py-3.5 text-center ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.9] shadow-2xs`}
+            >
+              {renderSegments(line.segments)}
+            </div>
+          );
+        }
         return (
           <div
             key={line.id}
-            className={`flex items-start gap-2.5 ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[2.1] pl-0.5`}
+            className={`flex items-start gap-2.5 ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[2.05] pl-0.5`}
           >
             <span className="mt-2.5 text-[14px] leading-none text-[#111827] dark:text-[#D1D5DB] shrink-0">•</span>
-            <div className="flex-1 leading-[2.1]">{renderSegments(line.segments)}</div>
+            <div className="flex-1 leading-[2.05]">{renderSegments(line.segments)}</div>
+          </div>
+        );
+      }
+      if (isFlowchartSection && line.segments.some(s => s.type === 'blank')) {
+        return (
+          <div
+            key={line.id}
+            className={`rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#191B21] px-5 py-3.5 text-center ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.9] shadow-2xs`}
+          >
+            {renderSegments(line.segments)}
           </div>
         );
       }
       return (
-        <p key={line.id} className={`${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[2.1]`}>
+        <p key={line.id} className={`${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[2.05]`}>
           {renderSegments(line.segments)}
         </p>
       );
@@ -389,7 +521,7 @@ export default function ClozeNoteSheet({
                 {questionRangeLabel}
               </h4>
               <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
-                {sharedWordBoxOptions.length > 0 ? 'Summary Completion (Box)' : 'Summary Completion'}
+                {sectionKindLabel}
               </span>
             </div>
             <p className="text-[15px] font-semibold text-[#1F2937] dark:text-[#E5E7EB]">
@@ -418,7 +550,7 @@ export default function ClozeNoteSheet({
                       {renderSegments(line.segments)}
                     </h4>
                     <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
-                      {sharedWordBoxOptions.length > 0 ? 'Summary Completion (Box)' : 'Summary Completion'}
+                      {sectionKindLabel}
                     </span>
                   </div>
                 );
@@ -512,12 +644,39 @@ export default function ClozeNoteSheet({
 
         <div
           className={
-            readOnlyPreview
-              ? 'rounded-lg border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191919] p-4 sm:p-6 space-y-2'
+            hasTableBlock
+              ? 'space-y-2'
+              : isFlowchartSection
+              ? 'space-y-1.5 max-w-2xl mx-auto'
+              : isNoteSection || readOnlyPreview
+              ? 'rounded-xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191919] p-4 sm:p-6 space-y-2 shadow-2xs'
               : 'space-y-1.5'
           }
         >
-          {boxLines.map(renderLine)}
+          {boxLines.map((line, lIdx) => {
+            const rendered = renderLine(line);
+            const nextLine = boxLines[lIdx + 1];
+            const needsAutoArrow =
+              isFlowchartSection &&
+              !hasFlowArrow &&
+              line.kind !== 'spacer' &&
+              line.kind !== 'heading' &&
+              line.kind !== 'subheading' &&
+              nextLine &&
+              nextLine.kind !== 'spacer' &&
+              nextLine.kind !== 'flowArrow';
+            if (needsAutoArrow) {
+              return (
+                <div key={`fc-wrap-${line.id}`}>
+                  {rendered}
+                  <div className="flex justify-center py-0.5 text-slate-500 dark:text-zinc-400 font-bold text-base select-none">
+                    ↓
+                  </div>
+                </div>
+              );
+            }
+            return rendered;
+          })}
         </div>
       </div>
     );

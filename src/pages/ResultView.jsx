@@ -85,6 +85,8 @@ export default function ResultView({
   const targetTestCfg = targetTest ? normalizeExamConfig(targetTest) : null;
   const isTeacher = currentUser?.role === 'teacher';
   const canShowApprovedScores = isTeacher || Boolean(attempt.teacherGraded);
+  // Phần Đọc (Reading) & Nghe (Listening) luôn hiển thị điểm Band & số câu đúng ngay lập tức (cả Thực Chiến & Daily)
+  const canShowObjectiveScores = true;
   const isAllowedByTeacher = Boolean(targetTest?.allowViewAnswers);
   const canShowCorrectAnswers = isTeacher || isAllowedByTeacher;
 
@@ -431,13 +433,40 @@ export default function ResultView({
             </p>
           </div>
 
-          <div className="bg-[#0F172B] dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[170px] shadow border border-slate-800 dark:border-slate-700">
-            <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">BAND TỔNG OVERALL</p>
-            <p className={`font-extrabold mt-1 ${canShowApprovedScores && attempt.overallBand !== null && attempt.overallBand !== undefined ? 'text-4xl text-[#1EE1D6]' : 'text-base sm:text-lg text-amber-300'}`}>
-              {canShowApprovedScores && attempt.overallBand !== null && attempt.overallBand !== undefined
-                ? attempt.overallBand
-                : 'Ms. Như đang check'}
+          <div className="bg-[#0F172B] dark:bg-slate-800 text-white rounded-2xl p-4 text-center min-w-[185px] shadow border border-slate-800 dark:border-slate-700">
+            <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">
+              {isSingleSkill && (focusSkill === 'reading' || focusSkill === 'listening')
+                ? `BAND ${focusSkill.toUpperCase()}`
+                : 'BAND TỔNG OVERALL'}
             </p>
+            {(() => {
+              const singleObjBand =
+                isSingleSkill && focusSkill === 'reading'
+                  ? (attempt.scores?.reading?.band ?? attempt.overallBand)
+                  : isSingleSkill && focusSkill === 'listening'
+                  ? (attempt.scores?.listening?.band ?? attempt.overallBand)
+                  : null;
+              if (singleObjBand !== null && singleObjBand !== undefined) {
+                return <p className="font-extrabold mt-1 text-4xl text-[#1EE1D6] tabular-nums">{singleObjBand}</p>;
+              }
+              if (canShowApprovedScores && attempt.overallBand !== null && attempt.overallBand !== undefined) {
+                return <p className="font-extrabold mt-1 text-4xl text-[#1EE1D6] tabular-nums">{attempt.overallBand}</p>;
+              }
+              const lBand = attempt.scores?.listening?.band;
+              const rBand = attempt.scores?.reading?.band;
+              return (
+                <div className="mt-1 space-y-1">
+                  <p className="font-extrabold text-sm sm:text-base text-amber-300">W/S: Ms. Như đang check</p>
+                  {(typeof lBand === 'number' || typeof rBand === 'number') && (
+                    <p className="text-xs font-extrabold text-[#1EE1D6] tabular-nums">
+                      {typeof lBand === 'number' ? `Nghe ${lBand}` : ''}
+                      {typeof lBand === 'number' && typeof rBand === 'number' ? ' · ' : ''}
+                      {typeof rBand === 'number' ? `Đọc ${rBand}` : ''}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -602,7 +631,7 @@ export default function ResultView({
                   )}
                 </div>
                 <div>
-                  {canShowApprovedScores ? (
+                  {canShowObjectiveScores ? (
                     <span className="text-2xl font-black tabular-nums text-[#007A7A] dark:text-[#1EE1D6]">
                       {attempt.scores?.listening?.band ?? 0}
                     </span>
@@ -614,7 +643,7 @@ export default function ResultView({
                 </div>
               </div>
               <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
-                {canShowApprovedScores
+                {canShowObjectiveScores
                   ? <>Đúng: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.listening?.raw || 0}</span> / {attempt.scores?.listening?.total || 0} câu</>
                   : 'Ms. Như đang check và sẽ trả kết quả'}
               </p>
@@ -640,7 +669,7 @@ export default function ResultView({
                   )}
                 </div>
                 <div>
-                  {canShowApprovedScores ? (
+                  {canShowObjectiveScores ? (
                     <span className="text-2xl font-black tabular-nums text-[#1447E6] dark:text-blue-400">
                       {attempt.scores?.reading?.band ?? 0}
                     </span>
@@ -652,7 +681,7 @@ export default function ResultView({
                 </div>
               </div>
               <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
-                {canShowApprovedScores
+                {canShowObjectiveScores
                   ? <>Đúng: <span className="font-bold text-slate-800 dark:text-zinc-100">{attempt.scores?.reading?.raw || 0}</span> / {attempt.scores?.reading?.total || 0} câu</>
                   : 'Ms. Như đang check và sẽ trả kết quả'}
               </p>

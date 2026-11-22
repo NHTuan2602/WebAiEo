@@ -108,14 +108,22 @@ export const AVATAR_FRAMES = [
   }
 ];
 
-export function hasUnlockedAvatarFrame(user, frameId, nowMs = Date.now()) {
-  const frame = AVATAR_FRAMES.find(f => f.id === frameId);
-  if (!frame || !frame.vipOnly) return true;
+export function isStaffOrAdminUser(user) {
   if (!user || typeof user !== 'object') return false;
-  if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s' || user.role === 'teacher') {
-    return true;
-  }
-  return Number(user.aieoVipExpiresAt) > nowMs;
+  return Boolean(
+    user.isSuperAdmin ||
+    user.isSystemAdmin ||
+    user.username === 'tuanpro123s' ||
+    user.role === 'teacher'
+  );
+}
+
+export function hasUnlockedAvatarFrame(user, frameId, _nowMs = Date.now()) {
+  if (!frameId || frameId === 'none') return true;
+  const frame = AVATAR_FRAMES.find(f => f.id === frameId);
+  if (!frame) return false;
+  // Viền avatar màu mè chỉ áp dụng cho Giáo viên & Admin
+  return isStaffOrAdminUser(user);
 }
 
 export function getVietnamDateKey(ts = Date.now()) {
@@ -2585,11 +2593,12 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
 export const SUBSCRIPTION_DURATION_DAYS = 30;
 export const SUBSCRIPTION_DURATION_MS = SUBSCRIPTION_DURATION_DAYS * 24 * 60 * 60 * 1000;
 export const SKILL_PASS_PRICE_VND = 0; // Daily Zone mở cho học viên theo Team/Pass lớp
-export const DEFAULT_EXAM_PRICE_VND = 20000; // 1 đề lẻ Thực Chiến Thi Thật: 20.000đ
+export const DEFAULT_EXAM_PRICE_VND = 100000; // 1 đề lẻ Thực Chiến Thi Thật: 100.000đ
 export const PERIODIC_MOCK_PRICE_VND = 300000; // Mock Test Định Kỳ (3 tháng/lần): 300.000đ
-export const REAL_EXAM_COMBO_3_PRICE_VND = 50000; // Combo 3 đề Thực Chiến: 50.000đ
-export const REAL_EXAM_COMBO_5_PRICE_VND = 70000; // Combo 5 đề Thực Chiến: 70.000đ
-export const REAL_EXAM_COMBO_10_PRICE_VND = 150000; // Combo 10 đề Thực Chiến: 150.000đ
+export const REAL_EXAM_COMBO_3_PRICE_VND = 249000; // Combo 3 đề Thực Chiến: 249.000đ
+export const REAL_EXAM_COMBO_5_PRICE_VND = 399000; // Combo 5 đề Thực Chiến: 399.000đ
+export const REAL_EXAM_COMBO_8_PRICE_VND = 599000; // Combo 8 đề Thực Chiến: 599.000đ
+export const REAL_EXAM_COMBO_10_PRICE_VND = 699000; // Combo 10 đề Thực Chiến: 699.000đ
 export const FRIEND_ROOM_TICKET_PRICE_VND = 5000;
 export const AIEO_VIP_PRICE_VND = 20000;
 
@@ -2605,7 +2614,7 @@ export const REAL_EXAM_COMBOS = [
     label: 'Combo 3 Đề',
     fullLabel: 'Combo 3 Đề Thực Chiến Thi Thật',
     shortLabel: 'Combo 3 đề',
-    savingNote: 'Tiết kiệm 10.000đ'
+    savingNote: 'Tiết kiệm 51.000đ'
   },
   {
     id: 'exam_combo_5',
@@ -2618,7 +2627,20 @@ export const REAL_EXAM_COMBOS = [
     label: 'Combo 5 Đề',
     fullLabel: 'Combo 5 Đề Thực Chiến Thi Thật',
     shortLabel: 'Combo 5 đề',
-    savingNote: 'Tiết kiệm 30.000đ'
+    savingNote: 'Tiết kiệm 101.000đ'
+  },
+  {
+    id: 'exam_combo_8',
+    itemType: 'exam_combo_8',
+    credits: 8,
+    defaultPrice: REAL_EXAM_COMBO_8_PRICE_VND,
+    defaultPriceVnd: REAL_EXAM_COMBO_8_PRICE_VND,
+    priceKey: 'realExamCombo8Price',
+    priceField: 'realExamCombo8Price',
+    label: 'Combo 8 Đề',
+    fullLabel: 'Combo 8 Đề Thực Chiến Thi Thật',
+    shortLabel: 'Combo 8 đề',
+    savingNote: 'Tiết kiệm 201.000đ'
   },
   {
     id: 'exam_combo_10',
@@ -2631,9 +2653,122 @@ export const REAL_EXAM_COMBOS = [
     label: 'Combo 10 Đề',
     fullLabel: 'Combo 10 Đề Thực Chiến Thi Thật',
     shortLabel: 'Combo 10 đề',
-    savingNote: 'Tiết kiệm 50.000đ'
+    savingNote: 'Tiết kiệm 301.000đ'
   }
 ];
+
+/** 10 bậc hạng thành viên theo tổng số đề Thực Chiến đã nạp (từ màu thường lên màu VIP). */
+export const EXAM_PURCHASE_TIERS = [
+  {
+    id: 'classic',
+    label: 'Classic',
+    minExams: 3,
+    isVipVisual: false,
+    showCrown: false,
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-600'
+  },
+  {
+    id: 'standard',
+    label: 'Standard',
+    minExams: 5,
+    isVipVisual: false,
+    showCrown: false,
+    badgeClass: 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950/70 dark:text-sky-200 dark:border-sky-600/60'
+  },
+  {
+    id: 'plus',
+    label: 'Plus',
+    minExams: 10,
+    isVipVisual: false,
+    showCrown: false,
+    badgeClass: 'bg-teal-100 text-teal-800 border-teal-400 dark:bg-teal-950/70 dark:text-teal-200 dark:border-teal-500/60'
+  },
+  {
+    id: 'advanced',
+    label: 'Advanced',
+    minExams: 15,
+    isVipVisual: false,
+    showCrown: false,
+    badgeClass: 'bg-indigo-600 text-white border-indigo-400 shadow-xs'
+  },
+  {
+    id: 'premier',
+    label: 'Premier',
+    minExams: 20,
+    isVipVisual: true,
+    showCrown: false,
+    badgeClass: 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-300 shadow-xs'
+  },
+  {
+    id: 'signature',
+    label: 'Signature',
+    minExams: 25,
+    isVipVisual: true,
+    showCrown: false,
+    badgeClass: 'bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white border-pink-300 shadow-xs'
+  },
+  {
+    id: 'elite',
+    label: 'Elite',
+    minExams: 30,
+    isVipVisual: true,
+    showCrown: true,
+    badgeClass: 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-300 shadow-sm'
+  },
+  {
+    id: 'prestige',
+    label: 'Prestige',
+    minExams: 40,
+    isVipVisual: true,
+    showCrown: true,
+    badgeClass: 'bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 text-white border-amber-300 shadow-sm'
+  },
+  {
+    id: 'royal',
+    label: 'Royal',
+    minExams: 45,
+    isVipVisual: true,
+    showCrown: true,
+    badgeClass: 'bg-gradient-to-r from-purple-700 via-fuchsia-600 to-amber-400 text-white border-amber-300 shadow-md'
+  },
+  {
+    id: 'imperial',
+    label: 'Imperial',
+    minExams: 60,
+    isVipVisual: true,
+    showCrown: true,
+    badgeClass: 'vip-paid-badge vip-paid-vip bg-gradient-to-r from-zinc-900 via-red-700 to-amber-500 text-amber-100 border-amber-300 shadow-md'
+  }
+];
+
+export function getPurchasedExamCount(user) {
+  if (!user || typeof user !== 'object') return 0;
+  const tracked = Math.max(0, Math.floor(Number(user.totalPurchasedExams) || 0));
+  const unlockedCount = Array.isArray(user.purchasedTestIds) ? user.purchasedTestIds.length : 0;
+  const creditsCount = Math.max(0, Math.floor(Number(user.realExamCredits) || 0));
+  return Math.max(tracked, unlockedCount + creditsCount);
+}
+
+export function resolveExamPurchaseTier(user) {
+  const count = getPurchasedExamCount(user);
+  let matched = null;
+  for (const tier of EXAM_PURCHASE_TIERS) {
+    if (count >= tier.minExams) matched = tier;
+  }
+  return matched;
+}
+
+export function getNextExamPurchaseTier(user) {
+  const count = getPurchasedExamCount(user);
+  return EXAM_PURCHASE_TIERS.find(tier => count < tier.minExams) || null;
+}
+
+export function hasGamePracticeAccess(user, nowMs = Date.now()) {
+  if (!user || typeof user !== 'object') return false;
+  if (user.isGuest) return false;
+  if (isStaffOrAdminUser(user)) return true;
+  return Number(user.aieoVipExpiresAt) > nowMs;
+}
 
 export function getRealExamComboMeta(itemType, paymentConfig = null) {
   const found = REAL_EXAM_COMBOS.find(c => c.id === String(itemType || '').trim());
@@ -2718,13 +2853,10 @@ export function hasActivePaidTitlePermission(user, titleId, nowMs = Date.now()) 
   return exp > 0 ? exp > nowMs : true;
 }
 
-export function hasPaidTitleVisualPerk(user, nowMs = Date.now()) {
+export function hasPaidTitleVisualPerk(user, _nowMs = Date.now()) {
   if (!user || typeof user !== 'object') return false;
-  const eqId = String(user.equippedTitleId || '').trim();
-  const paidIds = new Set(['vip_thieu_gia', 'vip_manh_thuong_quan', 'vip_dai_gia', 'vip_ty_phu', 'aieo_vip']);
-  if (paidIds.has(eqId) && hasActivePaidTitlePermission(user, eqId, nowMs)) return true;
-  if (Number(user.aieoVipExpiresAt) > nowMs && eqId !== 'newbie' && user.showTitleBadge !== false) return eqId === 'aieo_vip';
-  return false;
+  // Viền aura phát sáng quanh avatar chỉ áp dụng cho Giáo viên & Admin
+  return isStaffOrAdminUser(user);
 }
 
 export const VIP_NAME_COLORS = [
@@ -2905,27 +3037,33 @@ export function resolveUserVipNameVisual(user, nowMs = Date.now()) {
     };
   }
   const isSuperAdmin = Boolean(user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s');
+  const isStaff = isStaffOrAdminUser(user);
   const vipExpiresAt = Number(user.aieoVipExpiresAt) || 0;
   const hasAieoVip = vipExpiresAt > nowMs;
-  const canToggleEffects = hasAieoVip || isSuperAdmin;
+  const canToggleEffects = hasAieoVip || isStaff;
   const defaultWhenActive = hasAieoVip;
   const showNameColor = canToggleEffects && (user.vipRedNameEnabled !== undefined ? Boolean(user.vipRedNameEnabled) : defaultWhenActive);
   const nameColorValue = normalizeVipNameColor(user.vipNameColor || 'crimson');
   const nameColorMeta = getVipNameColorMeta(nameColorValue);
-  const showVipTag = canToggleEffects && (user.vipTagEnabled !== undefined ? Boolean(user.vipTagEnabled) : defaultWhenActive);
-  const defaultNeonWhenActive = hasAieoVip || (isSuperAdmin && Boolean(user.vipRedNameEnabled || user.vipTagEnabled));
-  const showNeonCover = canToggleEffects && (user.vipNeonCoverEnabled !== undefined ? Boolean(user.vipNeonCoverEnabled) : defaultNeonWhenActive);
+  const purchaseTier = resolveExamPurchaseTier(user);
+  const showVipTag = Boolean(purchaseTier) || (isStaff && (user.vipTagEnabled !== undefined ? Boolean(user.vipTagEnabled) : false));
+  // Viền LED bìa chỉ dành riêng cho Giáo viên & Admin
+  const defaultNeonWhenActive = isSuperAdmin && Boolean(user.vipRedNameEnabled || user.vipTagEnabled);
+  const showNeonCover = isStaff && (user.vipNeonCoverEnabled !== undefined ? Boolean(user.vipNeonCoverEnabled) : defaultNeonWhenActive);
   const neonCoverColor = normalizeVipNeonCoverColor(user.vipNeonCoverColor || 'aurora_rgb');
   const neonCoverMeta = getVipNeonCoverMeta(neonCoverColor);
   return {
     isSuperAdmin,
+    isStaff,
     hasAieoVip,
     canToggleEffects,
+    canUseNeonCover: isStaff,
     showRedName: showNameColor,
     showNameColor,
     nameColorValue,
     nameColorMeta,
     showVipTag,
+    purchaseTier,
     showNeonCover,
     neonCoverColor,
     neonCoverMeta,
@@ -3363,16 +3501,23 @@ export function normalizePaymentConfig(raw = {}) {
   const skillPassPrice = clampVnd(obj.skillPassPrice, SKILL_PASS_PRICE_VND);
   let defaultExamPriceVnd = clampVnd(obj.defaultExamPriceVnd, DEFAULT_EXAM_PRICE_VND);
   const periodicMockPrice = clampVnd(obj.periodicMockPrice ?? obj.periodicMockPriceVnd, PERIODIC_MOCK_PRICE_VND);
-  const realExamCombo3Price = clampVnd(obj.realExamCombo3Price ?? obj.combo3ExamPriceVnd, REAL_EXAM_COMBO_3_PRICE_VND);
-  const realExamCombo5Price = clampVnd(obj.realExamCombo5Price ?? obj.combo5ExamPriceVnd, REAL_EXAM_COMBO_5_PRICE_VND);
-  const realExamCombo10Price = clampVnd(obj.realExamCombo10Price ?? obj.combo10ExamPriceVnd, REAL_EXAM_COMBO_10_PRICE_VND);
+  let realExamCombo3Price = clampVnd(obj.realExamCombo3Price ?? obj.combo3ExamPriceVnd, REAL_EXAM_COMBO_3_PRICE_VND);
+  let realExamCombo5Price = clampVnd(obj.realExamCombo5Price ?? obj.combo5ExamPriceVnd, REAL_EXAM_COMBO_5_PRICE_VND);
+  let realExamCombo8Price = clampVnd(obj.realExamCombo8Price ?? obj.combo8ExamPriceVnd, REAL_EXAM_COMBO_8_PRICE_VND);
+  let realExamCombo10Price = clampVnd(obj.realExamCombo10Price ?? obj.combo10ExamPriceVnd, REAL_EXAM_COMBO_10_PRICE_VND);
   const friendRoomTicketPrice = clampVnd(obj.friendRoomTicketPrice, FRIEND_ROOM_TICKET_PRICE_VND);
   let aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
 
-  // Auto-migrate legacy persisted defaults (15k single test -> 20k, 80k VIP -> 20k) once
+  // Auto-migrate legacy persisted defaults to schema v3 (100k / 249k / 399k / 599k / 699k)
   if (rawSchemaVersion < 2) {
     if (defaultExamPriceVnd === 15000) defaultExamPriceVnd = DEFAULT_EXAM_PRICE_VND;
     if (aieoVipPrice === 80000) aieoVipPrice = AIEO_VIP_PRICE_VND;
+  }
+  if (rawSchemaVersion < 3) {
+    if (defaultExamPriceVnd === 20000 || defaultExamPriceVnd === 15000) defaultExamPriceVnd = DEFAULT_EXAM_PRICE_VND;
+    if (realExamCombo3Price === 50000) realExamCombo3Price = REAL_EXAM_COMBO_3_PRICE_VND;
+    if (realExamCombo5Price === 70000 || realExamCombo5Price === 75000) realExamCombo5Price = REAL_EXAM_COMBO_5_PRICE_VND;
+    if (realExamCombo10Price === 150000) realExamCombo10Price = REAL_EXAM_COMBO_10_PRICE_VND;
   }
 
   const bankCode = String(obj.bankCode || '')
@@ -3413,13 +3558,14 @@ export function normalizePaymentConfig(raw = {}) {
   });
 
   return {
-    pricingSchemaVersion: 2,
+    pricingSchemaVersion: 3,
     coverUnlockPrice,
     skillPassPrice,
     defaultExamPriceVnd,
     periodicMockPrice,
     realExamCombo3Price,
     realExamCombo5Price,
+    realExamCombo8Price,
     realExamCombo10Price,
     friendRoomTicketPrice,
     aieoVipPrice,

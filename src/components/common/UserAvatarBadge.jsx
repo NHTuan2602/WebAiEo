@@ -1,5 +1,5 @@
 import React from 'react';
-import { getAvatarFrameById, hasPaidTitleVisualPerk, hasUnlockedAvatarFrame } from '../../constants/profileCustomization';
+import { getAvatarFrameById, hasUnlockedAvatarFrame, isStaffOrAdminUser } from '../../constants/profileCustomization';
 
 export default function UserAvatarBadge({
   user,
@@ -10,9 +10,10 @@ export default function UserAvatarBadge({
   showFrame = true
 }) {
   const initial = user?.name ? user.name[0] : (user?.username ? user.username[0] : 'U');
-  const frameAllowed = showFrame && hasUnlockedAvatarFrame(user, user?.avatarFrameId);
+  const isStaff = isStaffOrAdminUser(user);
+  const frameAllowed = showFrame && isStaff && hasUnlockedAvatarFrame(user, user?.avatarFrameId);
   const frameClass = frameAllowed ? (getAvatarFrameById(user?.avatarFrameId)?.ringClass || '') : '';
-  const hasVipAura = showFrame && hasPaidTitleVisualPerk(user);
+  const hasVipAura = showFrame && isStaff && Boolean(user?.vipNeonCoverEnabled);
   const auraCls = hasVipAura
     ? (frameClass ? 'vip-avatar-aura' : 'vip-avatar-aura ring-2 ring-amber-400 dark:ring-amber-300')
     : '';

@@ -63,9 +63,88 @@ function cleanParagraphText(text = '') {
     .trim();
 }
 
+function isMarkdownTableSeparatorLine(line = '') {
+  const clean = String(line || '').trim().replace(/^\|/, '').replace(/\|$/, '').trim();
+  if (!clean) return false;
+  return clean.split('|').every(cell => /^:?-{2,}:?$/.test(cell.trim()));
+}
+
+function splitPipeRowCells(line = '') {
+  const trimmed = String(line || '').trim().replace(/^\|/, '').replace(/\|$/, '');
+  return trimmed.split('|').map(cell => cell.trim());
+}
+
+function parseCellLines(cellText = '') {
+  const normalized = String(cellText || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/\s+•\s+/g, '\n• ')
+    .trim();
+  if (!normalized) return [];
+  return normalized.split('\n').map(raw => {
+    const t = raw.trim();
+    const isBullet = /^[•\-*]\s+/.test(t);
+    const body = isBullet ? t.replace(/^[•\-*]\s+/, '') : t;
+    return { isBullet, segments: splitLineIntoClozeSegments(body) };
+  }).filter(item => item.segments.length > 0);
+}
+
+/** Auto-split single-line flattened AI pipe tables (e.g. "Col1 | Col2 Row1 | Val {{8}} Row2 | Val") into rows. */
+function expandFlattenedPipeLine(line = '') {
+  const trimmed = String(line || '').trim();
+  const pipeCount = (trimmed.match(/\|/g) || []).length;
+  if (pipeCount < 2) return [trimmed];
+  // If already a normal 1-row markdown table "| A | B | C |" with leading & trailing pipes and no repeated inner headers, keep single row
+  if (trimmed.startsWith('|') && trimmed.endsWith('|')) return [trimmed];
+  // Heuristic: only split if there are >= 3 pipes and text resembles repeated "Label | Body" pairs on one line
+  if (pipeCount < 3) return [trimmed];
+  const parts = trimmed.split('|').map(p => p.trim());
+  // For 2-column flattened tables: parts = [H1, "H2 Row1Key", "Row1Val Row2Key", ..., LastVal]
+  // Keep original if unsure, otherwise split when segments clearly start a new capitalized row label
+  const rows = [];
+  if (parts.length >= 4) {
+    let col0 = parts[0];
+    for (let i = 1; i < parts.length - 1; i++) {
+      const mid = parts[i];
+      // Look for transition from previous value (ending with sentence/word/blank) into a short capitalized label before the next '|'
+      const splitMatch = mid.match(/^(.+?)\s+([A-Z][A-Za-z0-9/() -]{1,34})$/);
+      if (splitMatch) {
+        rows.push(`${col0} | ${splitMatch[1].trim()}`);
+        col0 = splitMatch[2].trim();
+      } else {
+        // Fallback: cannot safely split, return as single multi-column row
+        return [trimmed];
+      }
+    }
+    rows.push(`${col0} | ${parts[parts.length - 1]}`);
+    if (rows.length >= 2) return rows;
+  }
+  return [trimmed];
+}
+
+function looksLikeStandaloneNoteLine(trimmed = '', prevRawText = '') {
+  if (!trimmed) return false;
+  if (/^example\b/i.test(trimmed)) return true;
+  if (/^[A-Za-z0-9][A-Za-z0-9 /()'-]{1,42}:\s*/.test(trimmed)) return true;
+  if (/^\(\d+\)|^\d+\s*[.)]/.test(trimmed)) return true;
+  // Previous line already looks like a discrete key: value note field -> don't glue next line onto it
+  if (prevRawText && /^[A-Za-z0-9][A-Za-z0-9 /()'-]{1,42}:\s*/.test(prevRawText)) return true;
+  return false;
+}
+
 export function parseClozeLines(clozeText = '') {
   if (!clozeText) return [];
-  const rawLines = String(clozeText).replace(/\r\n/g, '\n').split('\n');
+  const rawInputLines = String(clozeText).replace(/\r\n/g, '\n').split('\n');
+  const rawLines = [];
+  for (const rl of rawInputLines) {
+    const t = rl.trim();
+    if (t.includes('|') && !isMarkdownTableSeparatorLine(t)) {
+      const expanded = expandFlattenedPipeLine(t);
+      rawLines.push(...expanded);
+    } else {
+      rawLines.push(rl);
+    }
+  }
+
   const parsedItems = [];
 
   for (let lineIdx = 0; lineIdx < rawLines.length; lineIdx++) {
@@ -74,6 +153,31 @@ export function parseClozeLines(clozeText = '') {
     if (!trimmed) {
       parsedItems.push({ id: lineIdx, kind: 'spacer', segments: [] });
       continue;
+    }
+
+    // Flowchart connector arrow line: "↓", "⬇", "->", "-->", "v"
+    if (/^(?:↓|⬇|▼|->|-->|=>)$/.test(trimmed)) {
+      parsedItems.push({ id: lineIdx, kind: 'flowArrow', segments: [] });
+      continue;
+    }
+
+    // Markdown / Pipe table row
+    if (trimmed.includes('|')) {
+      if (isMarkdownTableSeparatorLine(trimmed)) {
+        parsedItems.push({ id: lineIdx, kind: 'tableSep', segments: [] });
+        continue;
+      }
+      const rawCells = splitPipeRowCells(trimmed);
+      if (rawCells.length >= 2) {
+        parsedItems.push({
+          id: lineIdx,
+          kind: 'tableRow',
+          rawCells,
+          cells: rawCells.map(parseCellLines),
+          segments: splitLineIntoClozeSegments(trimmed)
+        });
+        continue;
+      }
     }
 
     // Markdown bold heading: **HIRING A PUBLIC ROOM** or clean heading without blanks
@@ -92,6 +196,18 @@ export function parseClozeLines(clozeText = '') {
         id: lineIdx,
         kind: 'subheading',
         segments: splitLineIntoClozeSegments(trimmed.replace(/^#{2,3}\s+/, ''))
+      });
+      continue;
+    }
+
+    // Italic / Example line: "*Example: ...*" or "Example: ..."
+    const italicExampleMatch = trimmed.match(/^\*(Example[:\s].*)\*$/i);
+    if (italicExampleMatch || /^Example\s*:/i.test(trimmed) || /^Example$/i.test(trimmed)) {
+      const cleanEx = italicExampleMatch ? italicExampleMatch[1].trim() : trimmed;
+      parsedItems.push({
+        id: lineIdx,
+        kind: 'example',
+        segments: splitLineIntoClozeSegments(cleanEx)
       });
       continue;
     }
@@ -143,16 +259,84 @@ export function parseClozeLines(clozeText = '') {
     });
   }
 
-  // Merge consecutive 'paragraph' lines into unified prose paragraphs with natural reflow
+  // Group consecutive tableRow / tableSep items into structured 'table' blocks,
+  // and keep discrete Note lines separate while naturally reflowing running summary prose.
   const mergedLines = [];
   let currentParagraph = null;
+  let idx = 0;
 
-  for (const item of parsedItems) {
+  const flushParagraph = () => {
+    if (!currentParagraph) return;
+    const cleaned = cleanParagraphText(currentParagraph.rawText);
+    mergedLines.push({
+      id: currentParagraph.id,
+      kind: currentParagraph.isNoteLine ? 'noteLine' : 'paragraph',
+      segments: splitLineIntoClozeSegments(cleaned)
+    });
+    currentParagraph = null;
+  };
+
+  while (idx < parsedItems.length) {
+    const item = parsedItems[idx];
+
+    if (item.kind === 'tableRow' || item.kind === 'tableSep') {
+      flushParagraph();
+      const rows = [];
+      const startId = item.id;
+      let explicitHeaderSep = false;
+      while (idx < parsedItems.length && (parsedItems[idx].kind === 'tableRow' || parsedItems[idx].kind === 'tableSep')) {
+        if (parsedItems[idx].kind === 'tableSep') {
+          if (rows.length === 1) explicitHeaderSep = true;
+        } else {
+          rows.push(parsedItems[idx]);
+        }
+        idx++;
+      }
+      if (rows.length >= 2) {
+        const colCount = Math.max(...rows.map(r => r.cells.length));
+        const normalizedRows = rows.map(r => {
+          const padded = [...r.cells];
+          while (padded.length < colCount) padded.push([]);
+          return { id: r.id, cells: padded };
+        });
+        const firstRowHasBlank = normalizedRows[0].cells.some(cLines =>
+          cLines.some(cl => cl.segments.some(seg => seg.type === 'blank'))
+        );
+        const hasHeader = explicitHeaderSep || !firstRowHasBlank;
+        const allSegments = rows.flatMap(r => r.segments);
+        mergedLines.push({
+          id: startId,
+          kind: 'table',
+          hasHeader,
+          headerRow: hasHeader ? normalizedRows[0] : null,
+          bodyRows: hasHeader ? normalizedRows.slice(1) : normalizedRows,
+          segments: allSegments
+        });
+      } else if (rows.length === 1) {
+        mergedLines.push({
+          id: rows[0].id,
+          kind: 'noteLine',
+          segments: rows[0].segments
+        });
+      }
+      continue;
+    }
+
     if (item.kind === 'paragraph') {
+      const standalone = looksLikeStandaloneNoteLine(item.rawText, currentParagraph?.rawText || '');
       if (!currentParagraph) {
         currentParagraph = {
           id: item.id,
           kind: 'paragraph',
+          isNoteLine: standalone,
+          rawText: item.rawText
+        };
+      } else if (standalone) {
+        flushParagraph();
+        currentParagraph = {
+          id: item.id,
+          kind: 'paragraph',
+          isNoteLine: true,
           rawText: item.rawText
         };
       } else {
@@ -166,29 +350,16 @@ export function parseClozeLines(clozeText = '') {
           currentParagraph.rawText = prevText.trimEnd() + ' ' + nextText;
         }
       }
-    } else {
-      if (currentParagraph) {
-        const cleaned = cleanParagraphText(currentParagraph.rawText);
-        mergedLines.push({
-          id: currentParagraph.id,
-          kind: 'paragraph',
-          segments: splitLineIntoClozeSegments(cleaned)
-        });
-        currentParagraph = null;
-      }
-      mergedLines.push(item);
+      idx++;
+      continue;
     }
+
+    flushParagraph();
+    mergedLines.push(item);
+    idx++;
   }
 
-  if (currentParagraph) {
-    const cleaned = cleanParagraphText(currentParagraph.rawText);
-    mergedLines.push({
-      id: currentParagraph.id,
-      kind: 'paragraph',
-      segments: splitLineIntoClozeSegments(cleaned)
-    });
-  }
-
+  flushParagraph();
   return mergedLines;
 }
 
