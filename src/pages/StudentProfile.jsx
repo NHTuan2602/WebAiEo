@@ -414,16 +414,34 @@ export default function StudentProfile({
   const totalGradedByTeacher = attempts.filter(a => a.teacherGraded).length;
   const totalActiveRooms = Object.keys(roomsDb || {}).length;
 
-  const handleBackNavigation = () => {
-    if (previousView && !['AUTH', 'EXAM_MODE', 'STUDENT_PROFILE'].includes(previousView)) {
-      if (!isTeacherViewer && ['TEACHER_DASHBOARD', 'EXAM_BUILDER'].includes(previousView)) {
-        setView('HOME');
-        return;
+  const [originHubView, setOriginHubView] = useState(() =>
+    ['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME'].includes(previousView)
+      ? previousView
+      : (isTeacherViewer ? 'TEACHER_DASHBOARD' : 'HOME')
+  );
+  useEffect(() => {
+    if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME'].includes(previousView)) {
+      if (!isTeacherViewer && previousView === 'TEACHER_DASHBOARD') {
+        setOriginHubView('HOME');
+      } else {
+        setOriginHubView(previousView);
       }
-      setView(previousView);
-      return;
     }
-    setView(isTeacherViewer ? 'TEACHER_DASHBOARD' : 'HOME');
+  }, [previousView, isTeacherViewer]);
+
+  const effectiveBackView =
+    !isTeacherViewer && originHubView === 'TEACHER_DASHBOARD'
+      ? 'HOME'
+      : originHubView || (isTeacherViewer ? 'TEACHER_DASHBOARD' : 'HOME');
+  const effectiveBackLabel =
+    effectiveBackView === 'TEACHER_DASHBOARD'
+      ? 'Quay Lại Quản Trị Giáo Viên'
+      : effectiveBackView === 'SKILL_HUB'
+      ? 'Quay Lại Daily Zone'
+      : 'Quay Lại Phòng Luyện Đề';
+
+  const handleBackNavigation = () => {
+    setView(effectiveBackView);
   };
 
   const newFeedbacksCount = adminFeedbacks.filter(f => f.status === 'new').length;
@@ -776,7 +794,7 @@ export default function StudentProfile({
           className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-zinc-200 bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 px-3.5 py-2 rounded-[6px] border border-slate-200 dark:border-zinc-700 transition"
         >
           <ChevronLeft className="w-4 h-4" />
-          {isTeacherViewer ? 'Quay Lại Quản Trị Giáo Viên' : 'Quay Lại Phòng Luyện Đề'}
+          {effectiveBackLabel}
         </button>
 
         <div className="flex flex-wrap items-center gap-2">

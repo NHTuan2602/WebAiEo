@@ -57,7 +57,7 @@ import {
   toDatetimeLocalInputValue
 } from '../constants/seedData';
 import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../utils/clozeHelpers';
-import { getQuestionDisplayNumber } from '../utils/examUiHelpers';
+import { getQuestionDisplayNumber, sortClozeTextSectionsByBlankNumber } from '../utils/examUiHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
 import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
 import SkillQuestionWorkspace from '../components/teacher/SkillQuestionWorkspace';
@@ -80,6 +80,7 @@ export default function ExamBuilder({
   handleReadingImageUpload,
   handleSaveTestBuilder,
   handleWritingTask1ImageUpload,
+  previousView = 'TEACHER_DASHBOARD',
   removeQuestionFromSkill,
   setApiTestState,
   setBuilderListeningIdx,
@@ -249,6 +250,16 @@ export default function ExamBuilder({
     }
   }, [sessionKey, testForm]);
 
+  const builderBackView = ['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME'].includes(previousView)
+    ? previousView
+    : 'TEACHER_DASHBOARD';
+  const builderBackLabel =
+    builderBackView === 'SKILL_HUB'
+      ? 'Quay Lại Daily Zone'
+      : builderBackView === 'HOME'
+      ? 'Quay Lại Phòng Luyện Đề'
+      : 'Quay Lại Bảng Điều Khiển Giáo Viên';
+
   const handleExitBuilder = () => {
     const hasUnsavedChanges =
       initialSnapshotRef.current.key === sessionKey &&
@@ -261,7 +272,7 @@ export default function ExamBuilder({
     }
     clearBuilderDraft(currentUser?.username);
     setEditingTest(null);
-    setView('TEACHER_DASHBOARD');
+    setView(builderBackView);
   };
 
   const handleLoadSampleTemplate = () => {
@@ -681,14 +692,70 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return updatedCount;
   };
 
+  const sortQuestionsListByNumber = (questionsList = [], scopeField = 'trackIdx') => {
+    return [...(Array.isArray(questionsList) ? questionsList : [])]
+      .map((q, idx) => ({
+        q,
+        idx,
+        scopeVal: typeof q?.[scopeField] === 'number' ? q[scopeField] : 0,
+        qNum: getQuestionDisplayNumber(q, idx + 1)
+      }))
+      .sort((a, b) => a.scopeVal - b.scopeVal || a.qNum - b.qNum || a.idx - b.idx)
+      .map(item => item.q);
+  };
+
+  const handleSortSkillQuestionsByNumber = (skill) => {
+    const scopeField = skill === 'reading' ? 'passageIdx' : 'trackIdx';
+    setTestForm(prev => {
+      const currentQs = prev[skill]?.questions || [];
+      const sortedQs = sortQuestionsListByNumber(currentQs, scopeField);
+      if (skill === 'listening') {
+        const tracks = getListeningTracks(prev.listening).map(tr => ({
+          ...tr,
+          clozeText: sortClozeTextSectionsByBlankNumber(tr.clozeText || '')
+        }));
+        const first = tracks[0] || {};
+        return {
+          ...prev,
+          listening: {
+            ...prev.listening,
+            tracks,
+            clozeText: first.clozeText || '',
+            questions: sortedQs
+          }
+        };
+      }
+      const passages = getReadingPassages(prev.reading).map(p => ({
+        ...p,
+        clozeText: sortClozeTextSectionsByBlankNumber(p.clozeText || '')
+      }));
+      const first = passages[0] || {};
+      return {
+        ...prev,
+        reading: {
+          ...prev.reading,
+          passages,
+          clozeText: first.clozeText || '',
+          questions: sortedQs
+        }
+      };
+    });
+    showToast?.('Đã sắp xếp toàn bộ câu hỏi & phần đục lỗ theo đúng thứ tự số câu (1 → 40)!');
+  };
+
   const handleApplyAiExtraction = (skill, scopeField, scopeIdx, extracted, { replaceScope = true }) => {
     const stampedQuestions = (extracted.questions || []).map((q, idx) => ({
       id: `${skill[0]}q_ai_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
       type: q.type || 'fill',
       source: 'ai',
       ...(typeof q.blankNum === 'number' ? { blankNum: q.blankNum } : {}),
+      ...(typeof q.questionNumber === 'number' ? { questionNumber: q.questionNumber } : {}),
+      ...(typeof q.questionEndNumber === 'number' ? { questionEndNumber: q.questionEndNumber } : {}),
+      ...(q.wordLimit ? { wordLimit: q.wordLimit } : {}),
+      ...(q.instruction ? { instruction: q.instruction } : {}),
+      ...(q.hasNB ? { hasNB: true } : {}),
       [scopeField]: scopeIdx,
-      question: q.question || `${q.blankNum || idx + 1}. Câu hỏi`,
+      question: q.question || `${q.questionNumber || q.blankNum || idx + 1}. Câu hỏi`,
       options: q.options || [],
       correctAnswer: q.correctAnswer || q.correctAnswers?.[0] || '',
       requiredSelections: q.type === 'mcq' ? Math.max(1, q.correctAnswers?.length || 1) : 1,
@@ -705,10 +772,25 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           })
         : currentQs;
 
+      const resolveNextClozeText = (existingCloze = '') => {
+        if (extracted.clozeText === undefined) return sortClozeTextSectionsByBlankNumber(existingCloze);
+        const newCloze = String(extracted.clozeText || '').trim();
+        if (replaceScope) return sortClozeTextSectionsByBlankNumber(newCloze);
+        const oldCloze = String(existingCloze || '').trim();
+        const combined = [oldCloze, newCloze].filter(Boolean).join('\n\n');
+        return sortClozeTextSectionsByBlankNumber(combined);
+      };
+
+      const activeExistingCloze =
+        skill === 'listening'
+          ? (getListeningTracks(prev.listening)[scopeIdx]?.clozeText || '')
+          : (getReadingPassages(prev.reading)[scopeIdx]?.clozeText || '');
+      const effectiveClozeText = resolveNextClozeText(activeExistingCloze);
+
       let mergedQs = [...retainedQs, ...stampedQuestions];
-      if (extracted.clozeText) {
+      if (effectiveClozeText) {
         mergedQs = syncClozeBlanksWithQuestions({
-          clozeText: extracted.clozeText,
+          clozeText: effectiveClozeText,
           existingQuestions: mergedQs,
           scopeField,
           scopeIdx,
@@ -716,6 +798,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           defaultSource: 'ai'
         });
       }
+      mergedQs = sortQuestionsListByNumber(mergedQs, scopeField);
 
       if (skill === 'listening') {
         const tracks = getListeningTracks(prev.listening);
@@ -724,9 +807,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             ? {
                 ...tr,
                 title: extracted.title || tr.title,
-                clozeText: extracted.clozeText !== undefined
-                  ? (extracted.clozeText || (replaceScope ? '' : tr.clozeText))
-                  : tr.clozeText
+                clozeText: effectiveClozeText
               }
             : tr
         );
@@ -749,9 +830,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               ...p,
               title: extracted.title || p.title,
               passageText: extracted.passageText || p.passageText,
-              clozeText: extracted.clozeText !== undefined
-                ? (extracted.clozeText || (replaceScope ? '' : p.clozeText))
-                : p.clozeText
+              clozeText: effectiveClozeText
             }
           : p
       );
@@ -956,7 +1035,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onClick={handleExitBuilder}
             className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm"
           >
-            <ChevronLeft className="w-4 h-4" /> Quay Lại Bảng Điều Khiển Giáo Viên
+            <ChevronLeft className="w-4 h-4" /> {builderBackLabel}
           </button>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
             {(() => {
@@ -2688,6 +2767,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
               handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
             }
             onApplyListeningPdfExtraction={handleApplyListeningPdfExtraction}
+            onSortQuestionsByNumber={() => handleSortSkillQuestionsByNumber('listening')}
           />
         </div>
         );
@@ -2961,6 +3041,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             }
             onApplyReadingPdfExtraction={handleApplyReadingPdfExtraction}
             onQuickAllocatePassages={() => setShowPassageSplitModal(true)}
+            onSortQuestionsByNumber={() => handleSortSkillQuestionsByNumber('reading')}
           />
         </div>
         );

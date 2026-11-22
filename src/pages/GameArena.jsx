@@ -158,6 +158,7 @@ export default function GameArena({
   onOpenCheckoutModal = null,
   openMemberProfile,
   paymentConfig = null,
+  previousView = '',
   roomJoinError,
   roomJoinForm,
   roomsDb,
@@ -245,7 +246,10 @@ export default function GameArena({
     clearInterval(wordTimerRef.current);
     clearInterval(lobbyCountdownTimerRef.current);
     setLobbyCountdown(null);
-    setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
+    const targetBack = ['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(previousView)
+      ? previousView
+      : (isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
+    setView(targetBack);
   };
 
   const themeToggleButton = setDarkMode ? (

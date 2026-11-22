@@ -79,6 +79,7 @@ export default function SkillPracticeHub({
   currentUser,
   focusedTestId = null,
   onAssignFolderClasses = null,
+  onBackToTeacherDashboard = null,
   onChangeTab,
   onClearFocusedTest,
   onNotifyMissingDaily,
@@ -1604,12 +1605,22 @@ export default function SkillPracticeHub({
               </div>
 
               <div className={`${sidebarOpenMobile ? 'block' : 'hidden'} lg:block space-y-1.5`}>
+                {isTeacher && onBackToTeacherDashboard && (
+                  <button
+                    type="button"
+                    onClick={onBackToTeacherDashboard}
+                    className="w-full px-3 py-2 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-2.5 transition"
+                  >
+                    <ArrowLeft className="w-4 h-4 shrink-0" />
+                    <span>Quay Lại Quản Trị GV</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onOpenFullExamCatalog}
                   className="w-full px-3 py-2.5 rounded-lg text-xs font-bold text-[#0F766E] dark:text-teal-300 bg-[#EDFFFD] dark:bg-teal-950/30 hover:opacity-90 border border-[#B5F5F1] dark:border-teal-800 flex items-center gap-2.5 transition"
                 >
-                  <ArrowLeft className="w-4 h-4 shrink-0" />
+                  {isTeacher ? <BookOpen className="w-4 h-4 shrink-0" /> : <ArrowLeft className="w-4 h-4 shrink-0" />}
                   <span>Thực Chiến Thi Thật 4KN</span>
                 </button>
 

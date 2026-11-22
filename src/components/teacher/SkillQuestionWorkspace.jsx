@@ -782,6 +782,7 @@ export default function SkillQuestionWorkspace({
   onQuickAllocatePassages = null,
   onRemoveQuestion,
   onSetFilterByGroup,
+  onSortQuestionsByNumber = null,
   onSyncCloze,
   onUpdateOption,
   onUpdateQuestion,
@@ -975,6 +976,16 @@ export default function SkillQuestionWorkspace({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {onSortQuestionsByNumber && questions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={onSortQuestionsByNumber}
+                  className="px-3 py-2 rounded-xl text-xs font-extrabold bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition flex items-center gap-1.5"
+                  title="Sắp xếp toàn bộ câu hỏi và phần đục lỗ theo đúng số thứ tự 1 → 40"
+                >
+                  <span>⇅ Sắp xếp đúng thứ tự (1→40)</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onChangeTab('ai')}

@@ -81,6 +81,7 @@ import { KeyRound, Lock, X } from 'lucide-react';
 import { roundSpeakingBand } from './utils/speakingAiEngine';
 import { speakWord, playSound } from './utils/mediaHelpers';
 import { syncClozeBlanksWithQuestions } from './utils/clozeHelpers';
+import { getQuestionDisplayNumber, sortClozeTextSectionsByBlankNumber } from './utils/examUiHelpers';
 import {
   buildInitialExamState,
   loadExamDraft,
@@ -2911,6 +2912,9 @@ export default function App() {
     clearInterval(lobbyCountdownTimerRef.current);
     setLobbyCountdown(null);
     setRoomJoinError('');
+    if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(view)) {
+      setPreviousView(view);
+    }
 
     if (currentUser?.role === 'teacher') {
       handleTeacherOpenLobby(currentRoomPin);
@@ -3060,6 +3064,9 @@ export default function App() {
     clearInterval(wordTimerRef.current);
     clearInterval(lobbyCountdownTimerRef.current);
     setLobbyCountdown(null);
+    if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(view)) {
+      setPreviousView(view);
+    }
 
     const targetPin = pin || currentRoomPin;
     setCurrentRoomPin(targetPin);
@@ -3429,7 +3436,10 @@ export default function App() {
     setJoinedRoomPin(null);
     setGameSubState('JOIN');
     gameRuntimeRef.current.subState = 'JOIN';
-    setView(currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME');
+    const targetBack = ['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(previousView)
+      ? previousView
+      : (currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME');
+    setView(targetBack);
   };
 
   const updateLobbyPilotCustomization = (patch) => {
@@ -4057,6 +4067,9 @@ export default function App() {
 
   const handleStartSpeakingPracticeTest = (practiceTestObj, partMode = 'full') => {
     if (!practiceTestObj) return;
+    if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(view)) {
+      setPreviousView(view);
+    }
     setTransientSpeakingTest(practiceTestObj);
     setSelectedTestId(practiceTestObj.id);
     setSpeakingPartMode(partMode || 'full');
@@ -4225,6 +4238,9 @@ export default function App() {
     stopExamAudio();
     setShowSubmitConfirmModal(false);
     setSelectedTestId(testId);
+    if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(view)) {
+      setPreviousView(view);
+    }
 
     if (cfg.testMode === 'single_skill' && cfg.focusSkill === 'speaking') {
       setSpeakingPartMode(partModeOverride || 'full');
@@ -4292,7 +4308,10 @@ export default function App() {
       clearExamDraft(currentUser?.username, exitingTestId);
     }
     setSelectedTestId(null);
-    setView(isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
+    const targetBack = ['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(previousView)
+      ? previousView
+      : (isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
+    setView(targetBack);
     if (!isTeacher) {
       showToast('Đã lưu nháp bài làm! Bấm "Tiếp Tục Bài Đang Làm" để làm tiếp bất kỳ lúc nào.', 'info');
     }
@@ -4521,16 +4540,15 @@ export default function App() {
         setAttempts(prev => (prev.some(a => a.id === newAttempt.id) ? prev : [newAttempt, ...prev]));
       }
       setSelectedAttemptId(newAttempt.id);
+      const validOriginView = ['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(previousView)
+        ? previousView
+        : null;
       if (cfg.testMode === 'single_skill' && cfg.focusSkill) {
         setResultReviewTab(cfg.focusSkill);
-        if (currentUser?.role !== 'teacher') {
-          setPreviousView('SKILL_HUB');
-        }
+        setPreviousView(validOriginView || 'SKILL_HUB');
       } else {
         setResultReviewTab('listening');
-        if (currentUser?.role !== 'teacher') {
-          setPreviousView('HOME');
-        }
+        setPreviousView(validOriginView || (currentUser?.role === 'teacher' ? 'TEACHER_DASHBOARD' : 'HOME'));
       }
       setView('RESULT_VIEW');
 
@@ -5477,6 +5495,9 @@ export default function App() {
         speaking: createDefaultSpeakingSection()
       });
     }
+    if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME'].includes(view)) {
+      setPreviousView(view);
+    }
     setBuilderTab(initialTab || 'general');
     setView('EXAM_BUILDER');
   };
@@ -5485,6 +5506,9 @@ export default function App() {
     if (testToEdit) {
       openExamBuilder(testToEdit, skill || 'general');
       return;
+    }
+    if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME'].includes(view)) {
+      setPreviousView(view);
     }
     setEditingTest(null);
     setBuilderListeningIdx(0);
@@ -5783,10 +5807,27 @@ export default function App() {
       showToast('Giờ bắt đầu mở đề phải sớm hơn Hạn chót nộp bài!', 'error');
       return;
     }
-    const tracks = getListeningTracks(testForm.listening);
+    const tracks = getListeningTracks(testForm.listening).map(tr => ({
+      ...tr,
+      clozeText: sortClozeTextSectionsByBlankNumber(tr.clozeText || '')
+    }));
     const firstTrack = tracks[0] || {};
-    const passages = getReadingPassages(testForm.reading);
+    const passages = getReadingPassages(testForm.reading).map(ps => ({
+      ...ps,
+      clozeText: sortClozeTextSectionsByBlankNumber(ps.clozeText || '')
+    }));
     const firstPassage = passages[0] || {};
+
+    const sortQuestionsByScopeAndNumber = (list, scopeField) =>
+      [...(Array.isArray(list) ? list : [])]
+        .map((q, idx) => ({
+          q,
+          idx,
+          scopeVal: typeof q?.[scopeField] === 'number' ? q[scopeField] : 0,
+          qNum: getQuestionDisplayNumber(q, idx + 1)
+        }))
+        .sort((a, b) => a.scopeVal - b.scopeVal || a.qNum - b.qNum || a.idx - b.idx)
+        .map(item => item.q);
 
     let syncedListeningQs = Array.isArray(testForm.listening?.questions) ? [...testForm.listening.questions] : [];
     tracks.forEach((tr, idx) => {
@@ -5800,6 +5841,7 @@ export default function App() {
         });
       }
     });
+    syncedListeningQs = sortQuestionsByScopeAndNumber(syncedListeningQs, 'trackIdx');
 
     let syncedReadingQs = Array.isArray(testForm.reading?.questions) ? [...testForm.reading.questions] : [];
     passages.forEach((ps, idx) => {
@@ -5813,6 +5855,7 @@ export default function App() {
         });
       }
     });
+    syncedReadingQs = sortQuestionsByScopeAndNumber(syncedReadingQs, 'passageIdx');
 
     const rawSp = normalizeSpeakingSection(testForm.speaking);
     const mergedSpeakingPass =
@@ -5905,7 +5948,10 @@ export default function App() {
     clearBuilderDraft(currentUser?.username);
     setEditingTest(null);
     setTeacherHubTab(cfg.testMode === 'single_skill' ? 'skill_exercises' : 'tests');
-    setView('TEACHER_DASHBOARD');
+    const returnAfterSaveView = ['SKILL_HUB', 'HOME', 'TEACHER_DASHBOARD'].includes(previousView)
+      ? previousView
+      : 'TEACHER_DASHBOARD';
+    setView(returnAfterSaveView);
   };
 
   // ==========================================
@@ -7735,6 +7781,7 @@ export default function App() {
           }}
           onOpenSkillBuilder={(skill, testToEdit = null, subOpts = {}) => openSingleSkillBuilder(skill, testToEdit, [], subOpts)}
           onAssignFolderClasses={handleAssignFolderClasses}
+          onBackToTeacherDashboard={() => setView('TEACHER_DASHBOARD')}
           onSaveSpeakingForecast={handleSaveSpeakingForecast}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}
@@ -7763,13 +7810,18 @@ export default function App() {
           onExitSpeaking={() => {
             setTransientSpeakingTest(null);
             setSelectedTestId(null);
-            setView('SKILL_HUB');
+            const targetBack = ['SKILL_HUB', 'TEACHER_DASHBOARD', 'HOME', 'STUDENT_PROFILE'].includes(previousView)
+              ? previousView
+              : 'SKILL_HUB';
+            setView(targetBack);
           }}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onViewResult={attId => {
             setTransientSpeakingTest(null);
             setSelectedAttemptId(attId);
-            setPreviousView('SKILL_HUB');
+            if (!['SKILL_HUB', 'TEACHER_DASHBOARD', 'HOME', 'STUDENT_PROFILE'].includes(previousView)) {
+              setPreviousView('SKILL_HUB');
+            }
             setResultReviewTab('speaking');
             setView('RESULT_VIEW');
           }}
@@ -7910,6 +7962,7 @@ export default function App() {
           onOpenCheckoutModal={openGlobalCheckoutModal}
           openMemberProfile={openMemberProfile}
           paymentConfig={paymentConfig}
+          previousView={previousView}
           roomJoinError={roomJoinError}
           roomJoinForm={roomJoinForm}
           roomsDb={roomsDb}
@@ -8103,6 +8156,7 @@ export default function App() {
           handleReadingImageUpload={handleReadingImageUpload}
           handleSaveTestBuilder={handleSaveTestBuilder}
           handleWritingTask1ImageUpload={handleWritingTask1ImageUpload}
+          previousView={previousView}
           removeQuestionFromSkill={removeQuestionFromSkill}
           setApiTestState={setApiTestState}
           setBuilderListeningIdx={setBuilderListeningIdx}

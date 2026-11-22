@@ -197,6 +197,22 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await assertNoHorizontalOverflow(page, 'StudentProfile-Dark');
     await themeBtn.click();
 
+    // 6. Verify Teacher Back buttons across StudentProfile -> TeacherDashboard -> Daily Zone -> ExamBuilder -> Daily Zone -> TeacherDashboard
+    await page.getByRole('button', { name: /Quay Lại Quản Trị Giáo Viên/i }).first().click();
+    await expect(page.getByRole('heading', { name: /Quản Lý & Giảng Dạy/i })).toBeVisible();
+
+    await page.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
+    await expect(page.getByText(/DAILY ZONE/i).first()).toBeVisible();
+
+    await page.getByRole('button', { name: /Tạo Bài Daily Mới/i }).first().click();
+    const backToDailyBtn = page.getByRole('button', { name: /Quay Lại Daily Zone/i }).first();
+    await expect(backToDailyBtn).toBeVisible();
+    await backToDailyBtn.click();
+    await expect(page.getByText(/DAILY ZONE/i).first()).toBeVisible();
+
+    await page.getByRole('button', { name: /Quay Lại Quản Trị GV/i }).first().click();
+    await expect(page.getByRole('heading', { name: /Quản Lý & Giảng Dạy/i })).toBeVisible();
+
     healthGuard.assertHealthy('teacher-admin-grading-profile');
   });
 });

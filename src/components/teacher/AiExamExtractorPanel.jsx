@@ -227,7 +227,9 @@ export default function AiExamExtractorPanel({
   };
 
   const appendImageFiles = async (fileList, setter) => {
-    const files = Array.from(fileList || []).filter(f => f.type?.startsWith('image/'));
+    const files = Array.from(fileList || [])
+      .filter(f => f.type?.startsWith('image/'))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
     if (files.length === 0) return;
     setErrorMsg('');
     try {
@@ -242,6 +244,16 @@ export default function AiExamExtractorPanel({
     } catch (err) {
       setErrorMsg(err?.message || 'Lỗi xử lý ảnh tải lên.');
     }
+  };
+
+  const moveQuestionImage = (idx, dir) => {
+    setQuestionImages(prev => {
+      const targetIdx = idx + dir;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+      return next;
+    });
   };
 
   const handlePasteZone = (e, setter) => {
@@ -1250,9 +1262,31 @@ export default function AiExamExtractorPanel({
               {questionImages.map((img, idx) => (
                 <div key={img.id} className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 aspect-[4/3]">
                   <img src={img.dataUrl} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 text-xs font-bold bg-black/70 text-white px-1.5 py-0.5 rounded">
+                  <span className="absolute bottom-1 left-1 text-xs font-bold bg-black/75 text-white px-1.5 py-0.5 rounded">
                     #{idx + 1}
                   </span>
+                  {questionImages.length > 1 && (
+                    <div className="absolute bottom-1 right-1 flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => moveQuestionImage(idx, -1)}
+                        className="px-1.5 py-0.5 rounded bg-black/75 hover:bg-black text-white text-[10px] font-black disabled:opacity-30"
+                        title="Đưa ảnh này lên trước"
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === questionImages.length - 1}
+                        onClick={() => moveQuestionImage(idx, 1)}
+                        className="px-1.5 py-0.5 rounded bg-black/75 hover:bg-black text-white text-[10px] font-black disabled:opacity-30"
+                        title="Đưa ảnh này ra sau"
+                      >
+                        →
+                      </button>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => setQuestionImages(prev => prev.filter(p => p.id !== img.id))}

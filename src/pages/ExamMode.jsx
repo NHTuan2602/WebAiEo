@@ -36,6 +36,7 @@ import { extractBlankNumbers, isInlineClozeQuestion } from '../utils/clozeHelper
 import { getWordCount } from '../utils/examHelpers';
 import {
   buildScopedNavParts,
+  buildListeningDisplayBlocks,
   buildReadingDisplayBlocks,
   getQuestionDisplayNumber,
   getQuestionRangeText,
@@ -200,10 +201,12 @@ export default function ExamMode({
   const activeTrackPlayKey = getListeningAudioKey(activeTrack, safeTrackIdx);
   const allListeningQs = activeTest.listening?.questions || [];
   const hasScopedListeningQs = allListeningQs.some(q => typeof q.trackIdx === 'number');
-  const displayedListeningQs =
-    listeningTracks.length > 1 && hasScopedListeningQs && !examState.showAllListeningQs
-      ? allListeningQs.filter(q => typeof q.trackIdx !== 'number' || q.trackIdx === safeTrackIdx)
-      : allListeningQs;
+  const listeningDisplayBlocks = buildListeningDisplayBlocks({
+    tracks: listeningTracks,
+    questions: allListeningQs,
+    activeTrackIdx: safeTrackIdx,
+    showAll: Boolean(examState.showAllListeningQs)
+  });
 
   const formatTime = (seconds) => {
     const safeSec = Math.max(0, Math.floor(seconds || 0));
@@ -240,13 +243,6 @@ export default function ExamMode({
   const w2Words = getWordCount(examState.answers.w2);
   const task1MinWords = activeTest.writing?.task1?.minWords || 150;
   const task2MinWords = activeTest.writing?.task2?.minWords || 250;
-
-  const activeListeningCloze = activeTrack?.clozeText || '';
-  const listeningClozeSet = new Set(extractBlankNumbers(activeListeningCloze));
-  const standaloneListeningQs = displayedListeningQs.filter(q => {
-    const num = typeof q.blankNum === 'number' ? q.blankNum : getQuestionDisplayNumber(q, 0);
-    return !(isInlineClozeQuestion(q) && num > 0 && listeningClozeSet.has(num));
-  });
 
   const listeningNeedsLeftPane = Boolean(activeTrack?.imageUrl || activeTrack?.contextText);
 
@@ -1119,61 +1115,88 @@ export default function ExamMode({
               right={
                 <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
-                    {activeListeningCloze.trim() && (
-                      <ClozeNoteSheet
-                        activeBlankNum={activeBlankNum}
-                        answers={examState.answers}
-                        bookmarkedQuestions={bookmarkedQuestions}
-                        clozeText={activeListeningCloze}
-                        fontSizeClass={fontSizeClass}
-                        inputRefs={blankInputRefs}
-                        onAnswerChange={(qId, val) =>
-                          setExamState(prev => ({
-                            ...prev,
-                            answers: { ...prev.answers, [qId]: val }
-                          }))
-                        }
-                        onBlankFocus={(num, qId) => {
-                          setActiveBlankNum(num);
-                          if (qId) setActiveQuestionId(qId);
-                        }}
-                        onPassageTextSelect={handlePassageTextSelect}
-                        onToggleBookmark={toggleBookmarkQuestion}
-                        onZoomImage={setZoomedReadingImg}
-                        questions={allListeningQs}
-                        renderText={renderHighlightRuns}
-                        scopeField="trackIdx"
-                        scopeIdx={safeTrackIdx}
-                      />
-                    )}
-                    {standaloneListeningQs.length > 0 && (
-                      <ExamQuestionList
-                        activeQuestionId={activeQuestionId}
-                        answers={examState.answers}
-                        baseOffset={listeningBaseOffset}
-                        bookmarkedQuestions={bookmarkedQuestions}
-                        fontSizeClass={fontSizeClass}
-                        onAnswerChange={(qId, val) =>
-                          setExamState(prev => ({
-                            ...prev,
-                            answers: { ...prev.answers, [qId]: val }
-                          }))
-                        }
-                        onSelectQuestion={q => {
-                          setActiveQuestionId(q.id);
-                          setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
-                        }}
-                        onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
-                        onTextSelect={handlePassageTextSelect}
-                        onToggleBookmark={toggleBookmarkQuestion}
-                        onZoomImage={setZoomedReadingImg}
-                        questionCardRefs={questionCardRefs}
-                        questions={standaloneListeningQs}
-                        renderText={renderHighlightRuns}
-                        scopeLabelPrefix="Part"
-                        scopeType="listening"
-                        showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
-                      />
+                    {listeningDisplayBlocks.map(block => {
+                      if (block.kind === 'trackHeading') {
+                        return (
+                          <div
+                            key={block.key}
+                            className="rounded-lg border border-[#E5E7EB] dark:border-[#2E2E2E] bg-[#F8FAFC] dark:bg-[#181818] px-3.5 py-2 text-xs font-extrabold uppercase tracking-wider text-[#1F2937] dark:text-[#E5E7EB]"
+                          >
+                            {block.title}
+                          </div>
+                        );
+                      }
+                      if (block.kind === 'cloze') {
+                        return (
+                          <ClozeNoteSheet
+                            key={block.key}
+                            activeBlankNum={activeBlankNum}
+                            answers={examState.answers}
+                            bookmarkedQuestions={bookmarkedQuestions}
+                            clozeText={block.clozeText}
+                            fontSizeClass={fontSizeClass}
+                            inputRefs={blankInputRefs}
+                            onAnswerChange={(qId, val) =>
+                              setExamState(prev => ({
+                                ...prev,
+                                answers: { ...prev.answers, [qId]: val }
+                              }))
+                            }
+                            onBlankFocus={(num, qId) => {
+                              setActiveBlankNum(num);
+                              if (qId) setActiveQuestionId(qId);
+                              if (block.trackIdx !== safeTrackIdx) {
+                                setExamState(prev => ({ ...prev, listeningTrackIdx: block.trackIdx }));
+                              }
+                            }}
+                            onPassageTextSelect={handlePassageTextSelect}
+                            onToggleBookmark={toggleBookmarkQuestion}
+                            onZoomImage={setZoomedReadingImg}
+                            questions={allListeningQs}
+                            renderText={renderHighlightRuns}
+                            scopeField="trackIdx"
+                            scopeIdx={block.trackIdx}
+                          />
+                        );
+                      }
+                      return (
+                        <ExamQuestionList
+                          key={block.key}
+                          activeQuestionId={activeQuestionId}
+                          answers={examState.answers}
+                          baseOffset={block.baseOffset}
+                          bookmarkedQuestions={bookmarkedQuestions}
+                          fontSizeClass={fontSizeClass}
+                          onAnswerChange={(qId, val) =>
+                            setExamState(prev => ({
+                              ...prev,
+                              answers: { ...prev.answers, [qId]: val }
+                            }))
+                          }
+                          onSelectQuestion={q => {
+                            setActiveQuestionId(q.id);
+                            setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
+                            if (typeof q?.trackIdx === 'number' && q.trackIdx !== safeTrackIdx) {
+                              setExamState(prev => ({ ...prev, listeningTrackIdx: q.trackIdx }));
+                            }
+                          }}
+                          onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
+                          onTextSelect={handlePassageTextSelect}
+                          onToggleBookmark={toggleBookmarkQuestion}
+                          onZoomImage={setZoomedReadingImg}
+                          questionCardRefs={questionCardRefs}
+                          questions={block.questions}
+                          renderText={renderHighlightRuns}
+                          scopeLabelPrefix="Part"
+                          scopeType="listening"
+                          showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
+                        />
+                      );
+                    })}
+                    {listeningDisplayBlocks.length === 0 && (
+                      <p className="text-xs text-slate-500 dark:text-neutral-400 text-center py-8">
+                        Chưa có câu hỏi gắn cho Part {safeTrackIdx + 1}.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1181,62 +1204,85 @@ export default function ExamMode({
             />
           ) : (
             <div className="w-full px-1 sm:px-2 py-1 space-y-6 flex-1 overflow-y-auto cd-exam-scroll text-left">
-              {activeListeningCloze.trim() && (
-                <ClozeNoteSheet
-                  activeBlankNum={activeBlankNum}
-                  answers={examState.answers}
-                  bookmarkedQuestions={bookmarkedQuestions}
-                  clozeText={activeListeningCloze}
-                  fontSizeClass={fontSizeClass}
-                  inputRefs={blankInputRefs}
-                  onAnswerChange={(qId, val) =>
-                    setExamState(prev => ({
-                      ...prev,
-                      answers: { ...prev.answers, [qId]: val }
-                    }))
-                  }
-                  onBlankFocus={(num, qId) => {
-                    setActiveBlankNum(num);
-                    if (qId) setActiveQuestionId(qId);
-                  }}
-                  onPassageTextSelect={handlePassageTextSelect}
-                  onToggleBookmark={toggleBookmarkQuestion}
-                  onZoomImage={setZoomedReadingImg}
-                  questions={allListeningQs}
-                  renderText={renderHighlightRuns}
-                  scopeField="trackIdx"
-                  scopeIdx={safeTrackIdx}
-                />
-              )}
-              {standaloneListeningQs.length > 0 ? (
-                <ExamQuestionList
-                  activeQuestionId={activeQuestionId}
-                  answers={examState.answers}
-                  baseOffset={listeningBaseOffset}
-                  bookmarkedQuestions={bookmarkedQuestions}
-                  fontSizeClass={fontSizeClass}
-                  onAnswerChange={(qId, val) =>
-                    setExamState(prev => ({
-                      ...prev,
-                      answers: { ...prev.answers, [qId]: val }
-                    }))
-                  }
-                  onSelectQuestion={q => {
-                    setActiveQuestionId(q.id);
-                    setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
-                  }}
-                  onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
-                  onTextSelect={handlePassageTextSelect}
-                  onToggleBookmark={toggleBookmarkQuestion}
-                  onZoomImage={setZoomedReadingImg}
-                  questionCardRefs={questionCardRefs}
-                  questions={standaloneListeningQs}
-                  renderText={renderHighlightRuns}
-                  scopeLabelPrefix="Part"
-                  scopeType="listening"
-                  showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
-                />
-              ) : !activeListeningCloze.trim() ? (
+              {listeningDisplayBlocks.map(block => {
+                if (block.kind === 'trackHeading') {
+                  return (
+                    <div
+                      key={block.key}
+                      className="rounded-lg border border-[#E5E7EB] dark:border-[#2E2E2E] bg-[#F8FAFC] dark:bg-[#181818] px-3.5 py-2 text-xs font-extrabold uppercase tracking-wider text-[#1F2937] dark:text-[#E5E7EB]"
+                    >
+                      {block.title}
+                    </div>
+                  );
+                }
+                if (block.kind === 'cloze') {
+                  return (
+                    <ClozeNoteSheet
+                      key={block.key}
+                      activeBlankNum={activeBlankNum}
+                      answers={examState.answers}
+                      bookmarkedQuestions={bookmarkedQuestions}
+                      clozeText={block.clozeText}
+                      fontSizeClass={fontSizeClass}
+                      inputRefs={blankInputRefs}
+                      onAnswerChange={(qId, val) =>
+                        setExamState(prev => ({
+                          ...prev,
+                          answers: { ...prev.answers, [qId]: val }
+                        }))
+                      }
+                      onBlankFocus={(num, qId) => {
+                        setActiveBlankNum(num);
+                        if (qId) setActiveQuestionId(qId);
+                        if (block.trackIdx !== safeTrackIdx) {
+                          setExamState(prev => ({ ...prev, listeningTrackIdx: block.trackIdx }));
+                        }
+                      }}
+                      onPassageTextSelect={handlePassageTextSelect}
+                      onToggleBookmark={toggleBookmarkQuestion}
+                      onZoomImage={setZoomedReadingImg}
+                      questions={allListeningQs}
+                      renderText={renderHighlightRuns}
+                      scopeField="trackIdx"
+                      scopeIdx={block.trackIdx}
+                    />
+                  );
+                }
+                return (
+                  <ExamQuestionList
+                    key={block.key}
+                    activeQuestionId={activeQuestionId}
+                    answers={examState.answers}
+                    baseOffset={block.baseOffset}
+                    bookmarkedQuestions={bookmarkedQuestions}
+                    fontSizeClass={fontSizeClass}
+                    onAnswerChange={(qId, val) =>
+                      setExamState(prev => ({
+                        ...prev,
+                        answers: { ...prev.answers, [qId]: val }
+                      }))
+                    }
+                    onSelectQuestion={q => {
+                      setActiveQuestionId(q.id);
+                      setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
+                      if (typeof q?.trackIdx === 'number' && q.trackIdx !== safeTrackIdx) {
+                        setExamState(prev => ({ ...prev, listeningTrackIdx: q.trackIdx }));
+                      }
+                    }}
+                    onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
+                    onTextSelect={handlePassageTextSelect}
+                    onToggleBookmark={toggleBookmarkQuestion}
+                    onZoomImage={setZoomedReadingImg}
+                    questionCardRefs={questionCardRefs}
+                    questions={block.questions}
+                    renderText={renderHighlightRuns}
+                    scopeLabelPrefix="Part"
+                    scopeType="listening"
+                    showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
+                  />
+                );
+              })}
+              {listeningDisplayBlocks.length === 0 ? (
                 <p className="text-xs text-slate-500 dark:text-neutral-400 text-center py-8">
                   Chưa có câu hỏi gắn cho Part {safeTrackIdx + 1}.
                 </p>

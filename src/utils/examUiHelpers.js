@@ -470,6 +470,111 @@ export function buildScopedNavParts({
   return parts;
 }
 
+/**
+ * Split a raw clozeText template into ordered section chunks by question range headers
+ * ("Questions 14-18", "Section 2", "Part 2") or whenever blank numbers jump across
+ * standalone non-cloze questions (e.g. blanks 1..10 then 14..18 with MCQ 11..13 in between).
+ */
+export function splitClozeTextIntoOrderedChunks(clozeText = '', standaloneNumsSet = new Set()) {
+  const raw = String(clozeText || '').replace(/\r\n/g, '\n').trim();
+  if (!raw) return [];
+  const lines = raw.split('\n');
+
+  const isSectionHeaderLine = (line) => {
+    const clean = String(line || '').trim().replace(/^[#*>-]+\s*/, '').trim();
+    return (
+      /^Questions?\s+\d+/i.test(clean) ||
+      /^(?:Section|Part)\s+\d+\b/i.test(clean)
+    );
+  };
+
+  const rawChunks = [];
+  let currentLines = [];
+  let currentBlanks = [];
+  let lastBlankLineIdx = -1;
+
+  const pushCurrentChunk = (linesToPush) => {
+    const text = linesToPush.join('\n').trim();
+    if (!text) return;
+    const blanks = extractBlankNumbers(text);
+    rawChunks.push({ text, blanks });
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineBlanks = extractBlankNumbers(line);
+
+    if (currentBlanks.length > 0 && isSectionHeaderLine(line) && lineBlanks.length === 0) {
+      // If the previous line was a standalone "Section N" / "Part N" header with no blanks after it, keep it with this new header
+      const trailingLines = lastBlankLineIdx >= 0 ? currentLines.slice(lastBlankLineIdx + 1) : [];
+      const bodyLines = lastBlankLineIdx >= 0 ? currentLines.slice(0, lastBlankLineIdx + 1) : currentLines;
+      pushCurrentChunk(bodyLines);
+      currentLines = [...trailingLines, line];
+      currentBlanks = [];
+      lastBlankLineIdx = -1;
+      continue;
+    }
+
+    if (currentBlanks.length > 0 && lineBlanks.length > 0) {
+      const prevMax = Math.max(...currentBlanks);
+      const prevMin = Math.min(...currentBlanks);
+      const nextMin = Math.min(...lineBlanks);
+      const jumpsOverStandalone = Array.from(standaloneNumsSet).some(
+        qNum => Number.isFinite(qNum) && qNum > prevMax && qNum < nextMin
+      );
+      const goesBackward = nextMin < prevMin;
+
+      if (jumpsOverStandalone || goesBackward) {
+        const trailingPreamble = lastBlankLineIdx >= 0 ? currentLines.slice(lastBlankLineIdx + 1) : [];
+        const bodyLines = lastBlankLineIdx >= 0 ? currentLines.slice(0, lastBlankLineIdx + 1) : currentLines;
+        pushCurrentChunk(bodyLines);
+        currentLines = [...trailingPreamble, line];
+        currentBlanks = [...lineBlanks];
+        lastBlankLineIdx = currentLines.length - 1;
+        continue;
+      }
+    }
+
+    currentLines.push(line);
+    if (lineBlanks.length > 0) {
+      currentBlanks.push(...lineBlanks);
+      lastBlankLineIdx = currentLines.length - 1;
+    }
+  }
+
+  if (currentLines.length > 0) {
+    pushCurrentChunk(currentLines);
+  }
+
+  // Merge any orphan text-only chunk into its neighbor so no instruction/heading is ever lost
+  const mergedChunks = [];
+  for (let i = 0; i < rawChunks.length; i++) {
+    const chunk = rawChunks[i];
+    if (chunk.blanks.length === 0 && mergedChunks.length > 0) {
+      const prev = mergedChunks[mergedChunks.length - 1];
+      prev.text = `${prev.text}\n${chunk.text}`.trim();
+    } else if (chunk.blanks.length === 0 && i + 1 < rawChunks.length) {
+      rawChunks[i + 1].text = `${chunk.text}\n${rawChunks[i + 1].text}`.trim();
+    } else {
+      mergedChunks.push({
+        clozeText: chunk.text,
+        blanks: chunk.blanks,
+        displayNum: chunk.blanks.length > 0 ? Math.min(...chunk.blanks) : Number.POSITIVE_INFINITY,
+        originalChunkIdx: i
+      });
+    }
+  }
+
+  return mergedChunks.sort((a, b) => a.displayNum - b.displayNum || a.originalChunkIdx - b.originalChunkIdx);
+}
+
+/** Sort sections inside a clozeText string in ascending order of their {{N}} blank numbers. */
+export function sortClozeTextSectionsByBlankNumber(clozeText = '') {
+  const chunks = splitClozeTextIntoOrderedChunks(clozeText);
+  if (chunks.length <= 1) return String(clozeText || '').trim();
+  return chunks.map(c => c.clozeText).join('\n\n');
+}
+
 /** Build the visible Reading question stream, interleaving cloze sheets by their printed question numbers. */
 export function buildReadingDisplayBlocks({
   passages = [],
@@ -549,32 +654,54 @@ export function buildReadingDisplayBlocks({
       .sort((a, b) => a.displayNum - b.displayNum || a.originalIdx - b.originalIdx);
     const clozeText = String(safePassages[passageIdx]?.clozeText || '').trim();
     const clozeNumbers = new Set(extractBlankNumbers(clozeText));
-    const items = [];
-
-    if (clozeText) {
-      const firstClozeNum = clozeNumbers.size ? Math.min(...clozeNumbers) : Number.POSITIVE_INFINITY;
-      items.push({ kind: 'cloze', passageIdx, clozeText, displayNum: firstClozeNum });
-    }
+    const standaloneQuestions = [];
+    const standaloneNumsSet = new Set();
 
     numberedQuestions.forEach(item => {
+      const blankOrDisplayNum = typeof item.question?.blankNum === 'number' ? item.question.blankNum : item.displayNum;
       const isRenderedInCloze =
         isInlineClozeQuestion(item.question) &&
-        clozeNumbers.has(item.displayNum);
+        clozeNumbers.has(blankOrDisplayNum);
       if (!isRenderedInCloze) {
-        items.push({
-          kind: 'question',
-          passageIdx,
-          question: item.question,
-          displayNum: item.displayNum,
-          baseOffset: item.baseOffset,
-          originalIdx: item.originalIdx
-        });
+        standaloneQuestions.push(item);
+        standaloneNumsSet.add(item.displayNum);
       }
+    });
+
+    const items = [];
+    if (clozeText) {
+      const clozeChunks = splitClozeTextIntoOrderedChunks(clozeText, standaloneNumsSet);
+      clozeChunks.forEach((chunk, chunkIdx) => {
+        items.push({
+          kind: 'cloze',
+          passageIdx,
+          clozeText: chunk.clozeText,
+          displayNum: chunk.displayNum,
+          chunkIdx
+        });
+      });
+    }
+
+    standaloneQuestions.forEach(item => {
+      items.push({
+        kind: 'question',
+        passageIdx,
+        question: item.question,
+        displayNum: item.displayNum,
+        baseOffset: item.baseOffset,
+        originalIdx: item.originalIdx
+      });
     });
 
     items.sort((a, b) =>
       a.displayNum - b.displayNum ||
-      (a.kind === 'cloze' ? -1 : b.kind === 'cloze' ? 1 : a.originalIdx - b.originalIdx)
+      (a.kind === 'cloze' && b.kind === 'cloze'
+        ? (a.chunkIdx || 0) - (b.chunkIdx || 0)
+        : a.kind === 'cloze'
+        ? -1
+        : b.kind === 'cloze'
+        ? 1
+        : a.originalIdx - b.originalIdx)
     );
 
     if (showAll && safePassages.length > 1 && items.length > 0) {
@@ -607,11 +734,140 @@ export function buildReadingDisplayBlocks({
       flushQuestions();
       blocks.push({
         ...item,
-        key: `passage-cloze-${passageIdx}-${item.displayNum}`
+        key: `passage-cloze-${passageIdx}-${item.displayNum}-${item.chunkIdx || 0}`
       });
     });
     flushQuestions();
     fallbackOffset += passageQuestions.length;
+  });
+
+  return blocks;
+}
+
+/**
+ * Build the visible Listening question stream, splitting multi-section cloze sheets
+ * and interleaving non-cloze questions (MCQ, Matching, Map/Diagram) in exact 1..40 numerical order.
+ */
+export function buildListeningDisplayBlocks({
+  tracks = [],
+  questions = [],
+  activeTrackIdx = 0,
+  showAll = false
+}) {
+  const safeTracks = Array.isArray(tracks) ? tracks : [];
+  const safeQuestions = Array.isArray(questions) ? questions : [];
+  const hasScopedQuestions = safeQuestions.some(q => typeof q?.trackIdx === 'number');
+  const trackIndices = showAll
+    ? safeTracks.map((_, idx) => idx)
+    : [Math.max(0, Math.min(activeTrackIdx, Math.max(0, safeTracks.length - 1)))];
+  const blocks = [];
+  let fallbackOffset = showAll || !hasScopedQuestions
+    ? 0
+    : safeQuestions.filter(q => typeof q?.trackIdx === 'number' && q.trackIdx < trackIndices[0]).length;
+
+  trackIndices.forEach(trackIdx => {
+    const trackQuestions = safeQuestions.filter(q => {
+      if (typeof q?.trackIdx === 'number') return q.trackIdx === trackIdx;
+      if (hasScopedQuestions) return trackIdx === 0;
+      return showAll ? trackIdx === 0 : true;
+    });
+
+    const numberedQuestions = trackQuestions
+      .map((question, idx) => ({
+        question,
+        originalIdx: idx,
+        displayNum: getQuestionDisplayNumber(question, fallbackOffset + idx + 1),
+        baseOffset: fallbackOffset + idx
+      }))
+      .sort((a, b) => a.displayNum - b.displayNum || a.originalIdx - b.originalIdx);
+
+    const clozeText = String(safeTracks[trackIdx]?.clozeText || '').trim();
+    const clozeNumbers = new Set(extractBlankNumbers(clozeText));
+    const standaloneQuestions = [];
+    const standaloneNumsSet = new Set();
+
+    numberedQuestions.forEach(item => {
+      const blankOrDisplayNum = typeof item.question?.blankNum === 'number' ? item.question.blankNum : item.displayNum;
+      const isRenderedInCloze =
+        isInlineClozeQuestion(item.question) &&
+        clozeNumbers.has(blankOrDisplayNum);
+      if (!isRenderedInCloze) {
+        standaloneQuestions.push(item);
+        standaloneNumsSet.add(item.displayNum);
+      }
+    });
+
+    const items = [];
+    if (clozeText) {
+      const clozeChunks = splitClozeTextIntoOrderedChunks(clozeText, standaloneNumsSet);
+      clozeChunks.forEach((chunk, chunkIdx) => {
+        items.push({
+          kind: 'cloze',
+          trackIdx,
+          clozeText: chunk.clozeText,
+          displayNum: chunk.displayNum,
+          chunkIdx
+        });
+      });
+    }
+
+    standaloneQuestions.forEach(item => {
+      items.push({
+        kind: 'question',
+        trackIdx,
+        question: item.question,
+        displayNum: item.displayNum,
+        baseOffset: item.baseOffset,
+        originalIdx: item.originalIdx
+      });
+    });
+
+    items.sort((a, b) =>
+      a.displayNum - b.displayNum ||
+      (a.kind === 'cloze' && b.kind === 'cloze'
+        ? (a.chunkIdx || 0) - (b.chunkIdx || 0)
+        : a.kind === 'cloze'
+        ? -1
+        : b.kind === 'cloze'
+        ? 1
+        : a.originalIdx - b.originalIdx)
+    );
+
+    if (showAll && safeTracks.length > 1 && items.length > 0) {
+      blocks.push({
+        kind: 'trackHeading',
+        key: `track-heading-${trackIdx}`,
+        trackIdx,
+        title: String(safeTracks[trackIdx]?.title || `Part ${trackIdx + 1}`)
+      });
+    }
+
+    let pendingQuestions = [];
+    const flushQuestions = () => {
+      if (pendingQuestions.length === 0) return;
+      blocks.push({
+        kind: 'questions',
+        key: `track-questions-${trackIdx}-${pendingQuestions[0].question.id || pendingQuestions[0].displayNum}`,
+        trackIdx,
+        questions: pendingQuestions.map(item => item.question),
+        baseOffset: pendingQuestions[0].baseOffset
+      });
+      pendingQuestions = [];
+    };
+
+    items.forEach(item => {
+      if (item.kind === 'question') {
+        pendingQuestions.push(item);
+        return;
+      }
+      flushQuestions();
+      blocks.push({
+        ...item,
+        key: `track-cloze-${trackIdx}-${item.displayNum}-${item.chunkIdx || 0}`
+      });
+    });
+    flushQuestions();
+    fallbackOffset += trackQuestions.length;
   });
 
   return blocks;

@@ -7,6 +7,7 @@ import {
   roundDownIeltsHalfBand,
   roundWholeBand
 } from './examHelpers.js';
+import { sortClozeTextSectionsByBlankNumber } from './examUiHelpers.js';
 import { extractBlankNumbers, isInlineClozeQuestion, parseAnswerKeyText } from './clozeHelpers.js';
 import { buildAnswerKeyMap, repairReadingPdfNumbering } from './readingNumberRepair.js';
 
@@ -923,7 +924,8 @@ RULES FOR READING PASSAGES & TITLES:
 - If ${skillLabel} includes a reading passage in the image(s), extract the full readable passage text cleanly into "passageText" (with paragraph breaks) and the title into "title". If not present, leave "passageText": "".
 - For Listening, extract a clean concise topic title into "title" (if visible in image), and put any non-cloze context notes in "contextText" if helpful.
 
-RULES FOR CORRECT ANSWERS ("correctAnswer"):
+RULES FOR CORRECT ANSWERS ("correctAnswer") & STRICT NUMERICAL ORDERING:
+- QUESTION ORDERING (CRITICAL): Even if the user uploaded multiple images in reverse or mixed order, you MUST sort ALL sections in "clozeText" and ALL items in "questions" strictly in ascending numerical order by their printed question number (1, 2, 3 ... 40). Every item in "questions" MUST include "questionNumber": N (its printed integer number).
 - ${hasAnswerKeyImages ? 'You MUST match answers carefully from the Answer Key image(s) provided at the end! If alternative acceptable answers are shown in the key (e.g. "15 / fifteen" or "(the) park"), format them using " | " or exact key.' : skill === 'reading' ? 'If the full reading passage text is visible in the image(s), carefully solve each question accurately and populate "correctAnswer"; otherwise leave "correctAnswer": "".' : 'Do NOT guess or invent answers for Listening gaps if no Answer Key image is provided; set "correctAnswer": "" cleanly unless an answer is explicitly printed on the sheet.'}
 ${extraInstructions ? `\nADDITIONAL TEACHER NOTES:\n${extraInstructions}` : ''}
 
@@ -969,8 +971,14 @@ Return ONLY strictly valid JSON matching this schema:
         ? []
         : parsedOpts;
 
+    const printedNum =
+      parsePrintedReadingQuestionNumber(q?.questionNumber) ||
+      parsePrintedReadingQuestionNumber(q?.blankNum) ||
+      parsePrintedReadingQuestionNumber(q?.question);
     const blankNum = Number.isFinite(Number(q?.blankNum)) && Number(q.blankNum) > 0
       ? Number(q.blankNum)
+      : (type === 'fill' || type === 'summary_box' || type === 'summary_nobox') && printedNum?.start
+      ? printedNum.start
       : undefined;
 
     const rawCorrectAnswer = Array.isArray(q?.correctAnswer)
@@ -992,19 +1000,26 @@ Return ONLY strictly valid JSON matching this schema:
 
     return {
       blankNum,
+      ...(printedNum?.start ? { questionNumber: printedNum.start } : {}),
+      ...(printedNum?.end && printedNum.end > printedNum.start ? { questionEndNumber: printedNum.end } : {}),
       type,
-      question: String(q?.question || `${blankNum || idx + 1}. Câu hỏi`).trim(),
+      question: String(q?.question || `${printedNum?.start || blankNum || idx + 1}. Câu hỏi`).trim(),
       options,
       wordLimit: String(q?.wordLimit || '').trim(),
+      ...(q?.instruction ? { instruction: String(q.instruction).trim() } : {}),
       correctAnswer: normalizedCorrectAnswers[0] || '',
-      ...(type === 'mcq' ? { correctAnswers: normalizedCorrectAnswers } : {})
+      ...(type === 'mcq' ? { correctAnswers: normalizedCorrectAnswers } : {}),
+      _sortNum: printedNum?.start || blankNum || (idx + 1),
+      _origIdx: idx
     };
-  });
+  })
+    .sort((a, b) => a._sortNum - b._sortNum || a._origIdx - b._origIdx)
+    .map(({ _sortNum, _origIdx, ...cleanQ }) => cleanQ);
 
   return {
     title: String(parsed?.title || '').trim(),
     passageText: String(parsed?.passageText || '').trim(),
-    clozeText: String(parsed?.clozeText || '').trim(),
+    clozeText: sortClozeTextSectionsByBlankNumber(String(parsed?.clozeText || '').trim()),
     questions: normalizedQuestions,
     usedModel
   };
