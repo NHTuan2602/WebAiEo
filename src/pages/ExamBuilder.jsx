@@ -655,35 +655,110 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return matchedCount;
   };
 
-  const handleAssignImageToQuestionRange = (skill, fromNum, toNum, imageUrl) => {
+  const handleAssignImageToQuestionRange = (skill, fromNum, toNum, imageUrl, options = {}) => {
     const start = Math.min(Number(fromNum) || 0, Number(toNum) || 0);
     const end = Math.max(Number(fromNum) || 0, Number(toNum) || 0);
     if (start <= 0 || end < start) return 0;
 
+    const convertToMapMatrix = Boolean(options?.convertToMapMatrix && imageUrl);
+    const maxLetterChar = String(options?.maxLetter || 'I').trim().toUpperCase().charCodeAt(0);
+    const safeMaxCode = Number.isFinite(maxLetterChar) && maxLetterChar >= 68 && maxLetterChar <= 76 ? maxLetterChar : 73; // 'I'
+    const letterOptions = [];
+    for (let code = 65; code <= safeMaxCode; code += 1) {
+      letterOptions.push(String.fromCharCode(code));
+    }
+    const lastLetter = letterOptions[letterOptions.length - 1] || 'I';
+    const rangeText = start === end ? `${start}` : `${start}–${end}`;
+
+    const stripRangeTokensFromCloze = (text = '') => {
+      if (!text || !convertToMapMatrix) return text;
+      return String(text)
+        .split('\n')
+        .filter(line => {
+          const matches = [...line.matchAll(/\{\{\s*(\d+)\s*\}\}/g)];
+          if (matches.length === 0) return true;
+          return !matches.every(m => {
+            const n = Number(m[1]);
+            return n >= start && n <= end;
+          });
+        })
+        .map(line =>
+          line.replace(/\{\{\s*(\d+)\s*\}\}/g, (full, digits) => {
+            const n = Number(digits);
+            return n >= start && n <= end ? `(${n})` : full;
+          })
+        )
+        .join('\n');
+    };
+
     let updatedCount = 0;
     setTestForm(prev => {
-      const prevQs = Array.isArray(prev[skill]?.questions) ? prev[skill].questions : [];
+      const prevSkill = prev[skill] || {};
+      const prevQs = Array.isArray(prevSkill.questions) ? prevSkill.questions : [];
       const nextQs = prevQs.map((q, idx) => {
         const qNum = getQuestionDisplayNumber(q, idx + 1);
         const qEnd = Number(q?.questionEndNumber) > qNum ? Number(q.questionEndNumber) : qNum;
         const overlaps = qNum <= end && qEnd >= start;
         if (!overlaps) return q;
         updatedCount += 1;
-        return { ...q, imageUrl: imageUrl || '' };
+        if (!convertToMapMatrix) {
+          return { ...q, imageUrl: imageUrl || '' };
+        }
+        const existingAns = String(q.correctAnswer || '').trim();
+        const matchedLetter = letterOptions.find(l => l.toLowerCase() === existingAns.toLowerCase()) || existingAns;
+        const nextQ = {
+          ...q,
+          type: 'map_diagram',
+          imageUrl: imageUrl || '',
+          options: letterOptions,
+          requiredSelections: 1,
+          questionNumber: qNum,
+          questionEndNumber: qNum,
+          instruction: `Label the map below. Choose the correct letter, A–${lastLetter}, next to questions ${rangeText}.`,
+          wordLimit: 'CHỌN CHỮ CÁI TRÊN BẢN ĐỒ',
+          correctAnswer: matchedLetter,
+          correctAnswers: matchedLetter ? [matchedLetter] : []
+        };
+        delete nextQ.blankNum;
+        return nextQ;
       });
+
+      const nextSkill = {
+        ...prevSkill,
+        questions: nextQs
+      };
+      if (convertToMapMatrix) {
+        if (typeof nextSkill.clozeText === 'string' && nextSkill.clozeText) {
+          nextSkill.clozeText = stripRangeTokensFromCloze(nextSkill.clozeText);
+        }
+        if (Array.isArray(nextSkill.tracks)) {
+          nextSkill.tracks = nextSkill.tracks.map(tr =>
+            typeof tr?.clozeText === 'string' && tr.clozeText
+              ? { ...tr, clozeText: stripRangeTokensFromCloze(tr.clozeText) }
+              : tr
+          );
+        }
+        if (Array.isArray(nextSkill.passages)) {
+          nextSkill.passages = nextSkill.passages.map(p =>
+            typeof p?.clozeText === 'string' && p.clozeText
+              ? { ...p, clozeText: stripRangeTokensFromCloze(p.clozeText) }
+              : p
+          );
+        }
+      }
+
       return {
         ...prev,
-        [skill]: {
-          ...prev[skill],
-          questions: nextQs
-        }
+        [skill]: nextSkill
       };
     });
 
     if (updatedCount > 0) {
       showToast?.(
         imageUrl
-          ? `Đã gắn hình ảnh vào ${updatedCount} câu (Câu ${start}–${end})! Ảnh sẽ hiển thị ngay cạnh/trên nhóm câu này khi thi.`
+          ? convertToMapMatrix
+            ? `Đã gắn bản đồ & chuyển ${updatedCount} câu (Câu ${start}–${end}) sang Bảng Chọn Chữ Cái A–${lastLetter} chuẩn Cambridge!`
+            : `Đã gắn hình ảnh vào ${updatedCount} câu (Câu ${start}–${end})! Ảnh sẽ hiển thị bên trái nhóm câu này khi thi.`
           : `Đã gỡ hình ảnh khỏi ${updatedCount} câu (Câu ${start}–${end}).`
       );
     } else {
@@ -2762,7 +2837,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
             onApplyQuickAnswerText={(txt, opts) => handleQuickAnswerKeyText('listening', 'trackIdx', activeIdx, txt, opts)}
-            onAssignImageToRange={(fromNum, toNum, imgUrl) => handleAssignImageToQuestionRange('listening', fromNum, toNum, imgUrl)}
+            onAssignImageToRange={(fromNum, toNum, imgUrl, opts) => handleAssignImageToQuestionRange('listening', fromNum, toNum, imgUrl, opts)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
             }
@@ -3035,7 +3110,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             setShowApiKeyModal={setShowApiKeyModal}
             showToast={showToast}
             onApplyQuickAnswerText={(txt, opts) => handleQuickAnswerKeyText('reading', 'passageIdx', activeIdx, txt, opts)}
-            onAssignImageToRange={(fromNum, toNum, imgUrl) => handleAssignImageToQuestionRange('reading', fromNum, toNum, imgUrl)}
+            onAssignImageToRange={(fromNum, toNum, imgUrl, opts) => handleAssignImageToQuestionRange('reading', fromNum, toNum, imgUrl, opts)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
             }

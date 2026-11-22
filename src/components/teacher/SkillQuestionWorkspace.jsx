@@ -424,14 +424,41 @@ function QuestionCardItem({
                 <button
                   type="button"
                   onClick={() => {
-                    const fallbackOpts = ['A', 'B', 'C', 'D', 'E', 'F'];
+                    const fallbackOpts = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
                     onUpdateQuestion(q.id, 'options', fallbackOpts);
                     if (!q.correctAnswer) onUpdateQuestion(q.id, 'correctAnswer', fallbackOpts[0]);
                   }}
                   className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-xs font-extrabold text-indigo-800 dark:text-indigo-300"
                 >
-                  + Dùng Hộp Lựa Chọn (A–F)
+                  + Dùng Bảng Chữ Cái (A–I)
                 </button>
+              )}
+              {(typeMeta.id === 'map_diagram' || typeMeta.id === 'matching' || typeMeta.id === 'diagram_label') && (
+                <div className="flex items-center gap-1">
+                  {['F', 'G', 'H', 'I', 'J'].map(maxL => {
+                    const codeMax = maxL.charCodeAt(0);
+                    const presetOpts = [];
+                    for (let c = 65; c <= codeMax; c += 1) presetOpts.push(String.fromCharCode(c));
+                    const isCurrent =
+                      optionList.length === presetOpts.length &&
+                      optionList.every((o, idx) => String(o || '').trim().toUpperCase() === presetOpts[idx]);
+                    return (
+                      <button
+                        key={maxL}
+                        type="button"
+                        onClick={() => onUpdateQuestion(q.id, 'options', presetOpts)}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold border transition ${
+                          isCurrent
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-indigo-500'
+                        }`}
+                        title={`Đặt cột chữ cái A–${maxL}`}
+                      >
+                        A–{maxL}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
               {optionList.length < 12 && typeMeta.id !== 'tfng' && (
                 <button
@@ -540,6 +567,8 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
   const [fromNum, setFromNum] = useState('10');
   const [toNum, setToNum] = useState('15');
   const [draftImageUrl, setDraftImageUrl] = useState('');
+  const [convertToMapMatrix, setConvertToMapMatrix] = useState(true);
+  const [maxLetter, setMaxLetter] = useState('I');
   const [open, setOpen] = useState(false);
 
   if (!onAssignImageToRange || !Array.isArray(questions) || questions.length === 0) return null;
@@ -550,18 +579,27 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
     const n = getQuestionDisplayNumber(q, idx + 1);
     if (q?.imageUrl) {
       const list = seenImg.get(q.imageUrl) || [];
-      list.push(n);
+      list.push({ num: n, type: q.type, options: q.options });
       seenImg.set(q.imageUrl, list);
     }
   });
-  seenImg.forEach((nums, url) => {
+  seenImg.forEach((entries, url) => {
+    const nums = entries.map(e => e.num);
     const minN = Math.min(...nums);
     const maxN = Math.max(...nums);
+    const isAlreadyMapMatrix = entries.every(
+      e =>
+        (e.type === 'map_diagram' || e.type === 'diagram_label' || e.type === 'matching') &&
+        Array.isArray(e.options) &&
+        e.options.length >= 3 &&
+        e.options.every(o => /^[A-L]$/i.test(String(o || '').trim()))
+    );
     existingVisualGroups.push({
       url,
       label: minN === maxN ? `Câu ${minN}` : `Câu ${minN}–${maxN}`,
       minN,
-      maxN
+      maxN,
+      isAlreadyMapMatrix
     });
   });
 
@@ -595,7 +633,10 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
       showToast?.('Hãy tải ảnh lên hoặc nhấn Ctrl+V dán ảnh Bản đồ / Lưu đồ trước!', 'error');
       return;
     }
-    onAssignImageToRange(start, end, draftImageUrl);
+    onAssignImageToRange(start, end, draftImageUrl, {
+      convertToMapMatrix,
+      maxLetter
+    });
     setDraftImageUrl('');
   };
 
@@ -606,10 +647,10 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
           <ImageIcon className="w-4 h-4 text-sky-600 dark:text-sky-300 shrink-0" />
           <div className="min-w-0">
             <h4 className="text-xs sm:text-sm font-extrabold text-sky-950 dark:text-sky-100">
-              Gắn Hình Bản Đồ (Map) / Lưu Đồ (Flow-chart) Cho Nhóm Câu (VD: Câu 10–15, 15–20)
+              Gắn Hình Bản Đồ (Map) / Lưu Đồ (Flow-chart) Cho Nhóm Câu (Bảng Chọn A–I Chuẩn Cambridge)
             </h4>
             <p className="text-[11px] text-sky-900/80 dark:text-sky-200/80">
-              Dán (Ctrl+V) hoặc tải 1 tấm ảnh Map/Diagram rồi chọn khoảng câu hỏi — ảnh sẽ hiển thị đúng ngay tại nhóm câu đó khi học sinh thi!
+              Dán (Ctrl+V) hoặc tải 1 tấm ảnh Map/Diagram rồi chọn khoảng câu — hiển thị chuẩn giao diện 2 cột Cambridge (Bản đồ bên trái + Bảng chọn A–I bên phải)!
             </p>
           </div>
         </div>
@@ -628,10 +669,29 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
           {existingVisualGroups.map((g, gIdx) => (
             <div
               key={gIdx}
-              className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-500/35 text-xs font-bold text-slate-800 dark:text-slate-100"
+              className="inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-500/35 text-xs font-bold text-slate-800 dark:text-slate-100"
             >
               <img src={g.url} alt={g.label} className="w-7 h-5 rounded object-cover border border-slate-200" />
               <span>{g.label}</span>
+              {g.isAlreadyMapMatrix ? (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[10px] font-extrabold">
+                  ✓ Bảng Map A–I
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAssignImageToRange(g.minN, g.maxN, g.url, {
+                      convertToMapMatrix: true,
+                      maxLetter: 'I'
+                    })
+                  }
+                  className="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-extrabold transition"
+                  title={`Chuyển ${g.label} sang giao diện Bảng Chọn Chữ Cái Bản Đồ A–I nằm bên phải ảnh`}
+                >
+                  🗺️ Đổi sang Bảng Map A–I
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onAssignImageToRange(g.minN, g.maxN, '')}
@@ -680,7 +740,7 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
             </div>
             <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
               {[
-                { label: '10–15', a: '10', b: '15' },
+                { label: '11–13', a: '11', b: '13' },
                 { label: '11–15', a: '11', b: '15' },
                 { label: '15–20', a: '15', b: '20' },
                 { label: '26–30', a: '26', b: '30' }
@@ -698,6 +758,57 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200">
+                Kiểu hiển thị bên Học sinh:
+              </span>
+              <button
+                type="button"
+                onClick={() => setConvertToMapMatrix(true)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition ${
+                  convertToMapMatrix
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                }`}
+              >
+                🗺️ Bảng Chọn Chữ Cái Bản Đồ A–{maxLetter} bên phải ảnh (Chuẩn Cambridge)
+              </button>
+              <button
+                type="button"
+                onClick={() => setConvertToMapMatrix(false)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition ${
+                  !convertToMapMatrix
+                    ? 'bg-sky-600 text-white border-sky-600'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                }`}
+              >
+                📋 Giữ nguyên dạng câu hiện tại (Đặt ảnh bên trái)
+              </button>
+            </div>
+            {convertToMapMatrix && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  Các cột chữ cái trên bản đồ:
+                </span>
+                {['F', 'G', 'H', 'I', 'J'].map(letter => (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => setMaxLetter(letter)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-extrabold border transition ${
+                      maxLetter === letter
+                        ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                        : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    A–{letter}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
@@ -738,7 +849,9 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
                   onClick={handleApply}
                   className="px-4 py-2 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold shadow-xs transition"
                 >
-                  Gắn Ảnh Vào Câu {fromNum}–{toNum}
+                  {convertToMapMatrix
+                    ? `Gắn Ảnh & Tạo Bảng Map A–${maxLetter} (Câu ${fromNum}–${toNum})`
+                    : `Gắn Ảnh Vào Câu ${fromNum}–${toNum}`}
                 </button>
                 <button
                   type="button"

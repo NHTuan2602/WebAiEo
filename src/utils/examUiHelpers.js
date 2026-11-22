@@ -63,6 +63,11 @@ export function getStandardGroupInstruction(question, options = []) {
   if (type === 'correct_ending') {
     return 'Complete each sentence with the correct ending from the list below.';
   }
+  if (type === 'map_diagram' || type === 'diagram_label') {
+    const firstOpt = Array.isArray(options) && options.length > 0 ? options[0] : 'A';
+    const lastOpt = Array.isArray(options) && options.length > 1 ? options[options.length - 1] : 'I';
+    return `Label the map below. Choose the correct letter, ${firstOpt}–${lastOpt}, next to each question.`;
+  }
   return '';
 }
 
@@ -197,18 +202,26 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
     }
 
     // 2. Compact matching-matrix grid table (A-I, i-viii)
+    const isMapDiagramType =
+      q?.type === 'map_diagram' ||
+      q?.type === 'diagram_label' ||
+      (Boolean(q?.imageUrl) && !opts.length && /^[A-J]$/i.test(String(q?.correctAnswer || '').trim()));
     const isMatchingInfoType =
-      q?.type === 'matching_information' ||
-      q?.type === 'matching_info' ||
-      (q?.type === 'matching' && (!opts.length || isShortMatrixOptionList(opts)));
+      !isMapDiagramType &&
+      (q?.type === 'matching_information' ||
+        q?.type === 'matching_info' ||
+        (q?.type === 'matching' && (!opts.length || isShortMatrixOptionList(opts))));
     const effectiveMatrixOpts =
       opts.length > 0
         ? opts
+        : isMapDiagramType
+        ? ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
         : isMatchingInfoType
         ? ['A', 'B', 'C', 'D', 'E', 'F']
         : [];
     const signature =
-      (MATRIX_ELIGIBLE_TYPES.has(q?.type) || isMatchingInfoType) && isShortMatrixOptionList(effectiveMatrixOpts)
+      (MATRIX_ELIGIBLE_TYPES.has(q?.type) || isMapDiagramType || isMatchingInfoType) &&
+      isShortMatrixOptionList(effectiveMatrixOpts)
         ? effectiveMatrixOpts.join('||')
         : null;
     if (signature) {
@@ -216,14 +229,22 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
       while (j < questions.length) {
         const nextQ = questions[j];
         const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()).filter(Boolean) : [];
+        const nextIsMapDiagram =
+          nextQ?.type === 'map_diagram' ||
+          nextQ?.type === 'diagram_label' ||
+          (Boolean(nextQ?.imageUrl) && !nextOpts.length && /^[A-J]$/i.test(String(nextQ?.correctAnswer || '').trim()));
         const nextEffectiveOpts =
           nextOpts.length > 0
             ? nextOpts
-            : isMatchingInfoType && (nextQ?.type === 'matching_information' || nextQ?.type === 'matching_info' || nextQ?.type === 'matching')
+            : (isMapDiagramType || nextIsMapDiagram) &&
+              (nextIsMapDiagram || nextQ?.imageUrl === q?.imageUrl)
+            ? ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
+            : isMatchingInfoType &&
+              (nextQ?.type === 'matching_information' || nextQ?.type === 'matching_info' || nextQ?.type === 'matching')
             ? ['A', 'B', 'C', 'D', 'E', 'F']
             : [];
         if (
-          (MATRIX_ELIGIBLE_TYPES.has(nextQ?.type) || isMatchingInfoType) &&
+          (MATRIX_ELIGIBLE_TYPES.has(nextQ?.type) || nextIsMapDiagram || isMatchingInfoType) &&
           nextEffectiveOpts.join('||') === signature
         ) {
           j++;
@@ -232,17 +253,25 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
         }
       }
 
-      if (j - i >= 3) {
-        const groupItems = questions.slice(i, j);
-        const groupImageUrl = groupItems.find(item => item?.imageUrl)?.imageUrl || '';
+      const groupItems = questions.slice(i, j);
+      const groupImageUrl = groupItems.find(item => item?.imageUrl)?.imageUrl || '';
+      const minMatrixGroupSize = isMapDiagramType || Boolean(groupImageUrl) ? 2 : 3;
+
+      if (j - i >= minMatrixGroupSize || (isMapDiagramType && Boolean(groupImageUrl) && j - i >= 1)) {
+        const resolvedGroupType = isMapDiagramType ? 'map_diagram' : q.type;
         groups.push({
           kind: 'matrix',
           key: `matrix-${q.id}`,
-          groupType: q.type,
+          groupType: resolvedGroupType,
           options: effectiveMatrixOpts,
           imageUrl: groupImageUrl,
-          instruction: q.instruction || getStandardGroupInstruction(q, effectiveMatrixOpts),
-          hasNB: Boolean(q.hasNB || isMatchingInfoType || /NB\b/i.test(q.instruction || '') || /NB\b/i.test(q.question || '')),
+          instruction: q.instruction || getStandardGroupInstruction({ ...q, type: resolvedGroupType }, effectiveMatrixOpts),
+          hasNB: Boolean(
+            q.hasNB ||
+              (!isMapDiagramType && isMatchingInfoType) ||
+              /NB\b/i.test(q.instruction || '') ||
+              /NB\b/i.test(q.question || '')
+          ),
           items: groupItems.map((item, idx) => ({
             question: item,
             displayNum: getQuestionDisplayNumber(item, baseOffset + i + idx + 1)
@@ -288,12 +317,17 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
       }
     }
 
-    // 4. Consecutive questions of the same type (e.g. 2+ tfng questions or 2+ mcq questions sharing option style)
-    if (q?.type === 'tfng' || q?.type === 'mcq') {
+    // 4. Consecutive questions of the same type (e.g. 2+ tfng/mcq questions) OR sharing the same attached diagram imageUrl
+    if (q?.type === 'tfng' || q?.type === 'mcq' || Boolean(q?.imageUrl)) {
       let j = i + 1;
       while (j < questions.length) {
         const nextQ = questions[j];
-        if (nextQ?.type === q.type) {
+        const sameSharedImage = Boolean(q?.imageUrl && nextQ?.imageUrl === q.imageUrl);
+        const sameGroupableType =
+          (q?.type === 'tfng' || q?.type === 'mcq') &&
+          nextQ?.type === q.type &&
+          (!q?.imageUrl || nextQ?.imageUrl === q.imageUrl);
+        if (sameSharedImage || sameGroupableType) {
           j++;
         } else {
           break;

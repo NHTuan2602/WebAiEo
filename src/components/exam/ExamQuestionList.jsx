@@ -314,24 +314,36 @@ export default function ExamQuestionList({
           const firstNum = block.items[0]?.displayNum;
           const lastNum = block.items[block.items.length - 1]?.displayNum;
           const groupMeta = getQuestionTypeMeta(block.groupType || 'matching_information', scopeType);
+          const isMapDiagram =
+            block.groupType === 'map_diagram' ||
+            block.groupType === 'diagram_label' ||
+            (scopeType === 'listening' && Boolean(block.imageUrl));
           const isMatchingInfo =
-            block.groupType === 'matching_information' ||
-            block.groupType === 'matching_info' ||
-            block.groupType === 'matching' ||
-            (Array.isArray(block.options) && block.options.every(opt => /^[A-I]$/i.test(opt)));
+            !isMapDiagram &&
+            (block.groupType === 'matching_information' ||
+              block.groupType === 'matching_info' ||
+              (scopeType === 'reading' &&
+                Array.isArray(block.options) &&
+                block.options.every(opt => /^[A-I]$/i.test(opt))));
+          const firstOpt = block.options?.[0] || 'A';
+          const lastOpt = block.options?.[block.options.length - 1] || 'I';
+          const rangeLabel = firstNum === lastNum ? `${firstNum}` : `${firstNum}–${lastNum}`;
+          const defaultMapInstruction = `Label the map below. Choose the correct letter, ${firstOpt}–${lastOpt}, next to questions ${rangeLabel}.`;
           const instructionText =
             block.instruction ||
-            (isMatchingInfo
+            (isMapDiagram
+              ? defaultMapInstruction
+              : isMatchingInfo
               ? 'Which paragraph contains the following information?'
               : getStandardGroupInstruction(block.items[0]?.question, block.options));
           const showNB = Boolean(block.hasNB || isMatchingInfo);
 
           return (
-            <div key={block.key} className="space-y-2.5">
-              <div className="space-y-1.5 pb-1 border-b border-slate-200 dark:border-[#32353E]">
+            <div key={block.key} className="space-y-3">
+              <div className="space-y-1.5 pb-1.5 border-b border-slate-200 dark:border-[#32353E]">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-[15px] sm:text-base font-extrabold text-[#111827] dark:text-white">
-                    Questions {firstNum}–{lastNum}
+                    Questions {rangeLabel}
                   </h4>
                   <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/35">
                     {groupMeta.shortLabel}
@@ -351,14 +363,14 @@ export default function ExamQuestionList({
                 )}
               </div>
 
-              <div className={block.imageUrl ? 'grid grid-cols-1 xl:grid-cols-12 gap-4 items-start' : ''}>
+              <div className={block.imageUrl ? 'grid grid-cols-1 md:grid-cols-12 gap-5 items-start' : ''}>
                 {block.imageUrl && (
-                  <div className="xl:col-span-5 rounded-lg border border-[#CBD5E1] dark:border-[#343434] bg-white dark:bg-[#141414] p-3">
+                  <div className="md:col-span-5 rounded-xl border border-[#CBD5E1] dark:border-[#343434] bg-white dark:bg-[#141414] p-3 shadow-2xs">
                     <img
                       src={block.imageUrl}
-                      alt={`Bản đồ / Sơ đồ câu ${firstNum}–${lastNum}`}
+                      alt={`Bản đồ / Sơ đồ câu ${rangeLabel}`}
                       onClick={() => onZoomImage?.(block.imageUrl)}
-                      className="w-full max-h-[420px] object-contain rounded mx-auto cursor-zoom-in"
+                      className="w-full max-h-[460px] object-contain rounded mx-auto cursor-zoom-in"
                     />
                     {onZoomImage && (
                       <button
@@ -371,137 +383,137 @@ export default function ExamQuestionList({
                     )}
                   </div>
                 )}
-              <div className={`${block.imageUrl ? 'xl:col-span-7 ' : ''}rounded-lg border border-[#CBD5E1] dark:border-[#343434] overflow-x-auto bg-white dark:bg-[#141414]`}>
-                <table className="w-full border-collapse text-left min-w-[480px]">
-                  <thead>
-                    <tr className="bg-[#2563EB] text-white">
-                      <th className="py-2.5 px-3 text-xs font-bold border-r border-blue-500/40 min-w-[220px]">
-                        Statement
-                      </th>
-                      {block.options.map(opt => (
-                        <th
-                          key={opt}
-                          className="py-2.5 px-2 text-center text-xs font-extrabold border-r last:border-r-0 border-blue-500/40 w-9"
-                        >
-                          {opt}
+                <div className={`${block.imageUrl ? 'md:col-span-7 ' : ''}rounded-xl border border-[#CBD5E1] dark:border-[#343434] overflow-x-auto bg-white dark:bg-[#141414] shadow-2xs`}>
+                  <table className="w-full border-collapse text-left min-w-[460px]">
+                    <thead>
+                      <tr className="bg-[#F8FAFC] dark:bg-[#1E2028] text-[#111827] dark:text-white border-b border-[#CBD5E1] dark:border-[#343434]">
+                        <th className="py-2.5 px-3.5 text-[13px] font-extrabold border-r border-[#E2E8F0] dark:border-[#2C2C2C] min-w-[180px]">
+                          Question
                         </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {block.items.map(({ question: q, displayNum }) => {
-                      const isActive = activeQuestionId === q.id;
-                      const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
-                      const selectedVal = answers?.[q.id] || '';
-                      const cleanPrompt = stripLeadingQuestionNumber(q.question) || q.question;
+                        {block.options.map(opt => (
+                          <th
+                            key={opt}
+                            className="py-2.5 px-2 text-center text-[13px] font-extrabold border-r last:border-r-0 border-[#E2E8F0] dark:border-[#2C2C2C] w-9"
+                          >
+                            {opt}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {block.items.map(({ question: q, displayNum }) => {
+                        const isActive = activeQuestionId === q.id;
+                        const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
+                        const selectedVal = answers?.[q.id] || '';
+                        const cleanPrompt = stripLeadingQuestionNumber(q.question) || q.question;
 
-                      return (
-                        <tr
-                          key={q.id}
-                          ref={el => {
-                            if (el && questionCardRefs?.current) {
-                              questionCardRefs.current[q.id] = el;
-                            }
-                          }}
-                          onClick={() => onSelectQuestion?.(q)}
-                          className={`border-t border-[#E2E8F0] dark:border-[#2C2C2C] transition-colors ${
-                            isActive
-                              ? 'bg-[#EFF6FF]/80 dark:bg-[#1E2430]'
-                              : 'hover:bg-slate-50 dark:hover:bg-[#1B1B1B]'
-                          }`}
-                        >
-                          <td className="py-3 px-3 border-r border-[#E2E8F0] dark:border-[#2C2C2C] align-top">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-start gap-2.5 min-w-0">
-                                <span
-                                  className={`shrink-0 min-w-[26px] h-6 px-1.5 rounded text-xs font-extrabold inline-flex items-center justify-center border ${
-                                    isActive
-                                      ? 'bg-[#2563EB] text-white border-[#2563EB]'
-                                      : 'bg-slate-100 dark:bg-[#262626] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#404040]'
-                                  }`}
-                                >
-                                  {displayNum}
-                                </span>
-                                <span className={`${fontSizeClass} leading-snug text-[#1F2937] dark:text-[#E5E7EB] font-medium`}>
-                                  {formatText(cleanPrompt)}
-                                </span>
+                        return (
+                          <tr
+                            key={q.id}
+                            ref={el => {
+                              if (el && questionCardRefs?.current) {
+                                questionCardRefs.current[q.id] = el;
+                              }
+                            }}
+                            onClick={() => onSelectQuestion?.(q)}
+                            className={`border-t border-[#E2E8F0] dark:border-[#2C2C2C] transition-colors ${
+                              isActive
+                                ? 'bg-[#EFF6FF]/80 dark:bg-[#1E2430]'
+                                : 'hover:bg-slate-50 dark:hover:bg-[#1B1B1B]'
+                            }`}
+                          >
+                            <td className="py-3 px-3.5 border-r border-[#E2E8F0] dark:border-[#2C2C2C] align-middle">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span
+                                    className={`shrink-0 min-w-[26px] h-6 px-1.5 rounded text-xs font-extrabold inline-flex items-center justify-center border ${
+                                      isActive
+                                        ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                                        : 'bg-slate-100 dark:bg-[#262626] text-[#111827] dark:text-white border-[#CBD5E1] dark:border-[#404040]'
+                                    }`}
+                                  >
+                                    {displayNum}
+                                  </span>
+                                  <span className={`${fontSizeClass} leading-snug text-[#1F2937] dark:text-[#E5E7EB] font-medium`}>
+                                    {formatText(cleanPrompt)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {renderScopeJumpChip(q)}
+                                  <button
+                                    type="button"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      onToggleBookmark?.(q.id);
+                                    }}
+                                    title={isFlagged ? 'Bỏ đánh dấu câu này' : 'Đánh dấu xem lại'}
+                                    className={`p-1 rounded transition ${
+                                      isFlagged
+                                        ? 'text-amber-500 dark:text-amber-400'
+                                        : 'text-slate-400 dark:text-neutral-500 hover:text-amber-500'
+                                    }`}
+                                  >
+                                    <Bookmark className={`w-4 h-4 ${isFlagged ? 'fill-current' : ''}`} />
+                                  </button>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {renderScopeJumpChip(q)}
-                                <button
-                                  type="button"
+                              {questionNeedsMultipleSelections(q) && (
+                                <p className="mt-1 pl-9 text-xs font-bold text-amber-700 dark:text-amber-300">
+                                  Chọn {getRequiredSelectionCount(q)} đáp án
+                                </p>
+                              )}
+                            </td>
+                            {block.options.map(opt => {
+                              const multiSelect = questionNeedsMultipleSelections(q);
+                              const checked = Array.isArray(selectedVal)
+                                ? selectedVal.includes(opt)
+                                : selectedVal === opt;
+                              const selectionCount = Array.isArray(selectedVal)
+                                ? selectedVal.length
+                                : selectedVal
+                                ? 1
+                                : 0;
+                              const selectionLimitReached = multiSelect && !checked && selectionCount >= getRequiredSelectionCount(q);
+                              return (
+                                <td
+                                  key={opt}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    onToggleBookmark?.(q.id);
+                                    onSelectQuestion?.(q);
+                                    if (selectionLimitReached) return;
+                                    onAnswerChange?.(
+                                      q.id,
+                                      multiSelect ? toggleSelectedOption(selectedVal, opt) : opt
+                                    );
                                   }}
-                                  title={isFlagged ? 'Bỏ đánh dấu câu này' : 'Đánh dấu xem lại'}
-                                  className={`p-1 rounded transition ${
-                                    isFlagged
-                                      ? 'text-amber-500 dark:text-amber-400'
-                                      : 'text-slate-400 dark:text-neutral-500 hover:text-amber-500'
+                                  className={`py-3 px-1.5 text-center border-r last:border-r-0 border-[#E2E8F0] dark:border-[#2C2C2C] transition ${
+                                    selectionLimitReached ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                                  } ${
+                                    checked ? 'bg-blue-50/70 dark:bg-blue-500/15' : 'hover:bg-slate-100/70 dark:hover:bg-white/5'
                                   }`}
                                 >
-                                  <Bookmark className={`w-4 h-4 ${isFlagged ? 'fill-current' : ''}`} />
-                                </button>
-                              </div>
-                            </div>
-                            {questionNeedsMultipleSelections(q) && (
-                              <p className="mt-1 pl-9 text-xs font-bold text-amber-700 dark:text-amber-300">
-                                Chọn {getRequiredSelectionCount(q)} đáp án
-                              </p>
-                            )}
-                          </td>
-                          {block.options.map(opt => {
-                            const multiSelect = questionNeedsMultipleSelections(q);
-                            const checked = Array.isArray(selectedVal)
-                              ? selectedVal.includes(opt)
-                              : selectedVal === opt;
-                            const selectionCount = Array.isArray(selectedVal)
-                              ? selectedVal.length
-                              : selectedVal
-                              ? 1
-                              : 0;
-                            const selectionLimitReached = multiSelect && !checked && selectionCount >= getRequiredSelectionCount(q);
-                            return (
-                              <td
-                                key={opt}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  onSelectQuestion?.(q);
-                                  if (selectionLimitReached) return;
-                                  onAnswerChange?.(
-                                    q.id,
-                                    multiSelect ? toggleSelectedOption(selectedVal, opt) : opt
-                                  );
-                                }}
-                                className={`py-2.5 px-1.5 text-center border-r last:border-r-0 border-[#E2E8F0] dark:border-[#2C2C2C] transition ${
-                                  selectionLimitReached ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                                } ${
-                                  checked ? 'bg-blue-50/70 dark:bg-blue-500/15' : 'hover:bg-slate-100/70 dark:hover:bg-white/5'
-                                }`}
-                              >
-                                <span
-                                  className={`inline-flex w-4 h-4 ${multiSelect ? 'rounded-sm' : 'rounded-full'} items-center justify-center border transition ${
-                                    checked
-                                      ? 'border-[#2563EB] dark:border-[#60A5FA] bg-[#2563EB] dark:bg-[#3B82F6]'
-                                      : 'border-slate-400 dark:border-neutral-500 bg-transparent'
-                                  }`}
-                                >
-                                  {checked && (
-                                    <span
-                                      className={`w-1.5 h-1.5 ${multiSelect ? 'rounded-[1px]' : 'rounded-full'} bg-white`}
-                                    />
-                                  )}
-                                </span>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                  <span
+                                    className={`inline-flex w-[18px] h-[18px] ${multiSelect ? 'rounded-sm' : 'rounded-full'} items-center justify-center border-2 transition ${
+                                      checked
+                                        ? 'border-[#2563EB] dark:border-[#60A5FA] bg-[#2563EB] dark:bg-[#3B82F6]'
+                                        : 'border-slate-300 dark:border-neutral-500 bg-transparent'
+                                    }`}
+                                  >
+                                    {checked && (
+                                      <span
+                                        className={`w-2 h-2 ${multiSelect ? 'rounded-[1px]' : 'rounded-full'} bg-white`}
+                                      />
+                                    )}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -814,32 +826,34 @@ export default function ExamQuestionList({
                   </div>
                 )}
               </div>
-              {block.imageUrl && (
-                <div className="rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-[#141414] p-3 max-w-2xl">
-                  <img
-                    src={block.imageUrl}
-                    alt={`Bản đồ / Sơ đồ câu ${firstNum}–${lastNum}`}
-                    onClick={() => onZoomImage?.(block.imageUrl)}
-                    className="w-full max-h-[420px] object-contain rounded mx-auto cursor-zoom-in"
-                  />
-                  {onZoomImage && (
-                    <button
-                      type="button"
-                      onClick={() => onZoomImage(block.imageUrl)}
-                      className="mt-2 mx-auto block text-xs font-bold text-[#2563EB] hover:underline"
-                    >
-                      Bấm vào ảnh để phóng to bản đồ / sơ đồ
-                    </button>
+              <div className={block.imageUrl ? 'grid grid-cols-1 md:grid-cols-12 gap-5 items-start' : ''}>
+                {block.imageUrl && (
+                  <div className="md:col-span-5 rounded-xl border border-[#CBD5E1] dark:border-[#343434] bg-white dark:bg-[#141414] p-3 shadow-2xs">
+                    <img
+                      src={block.imageUrl}
+                      alt={`Bản đồ / Sơ đồ câu ${firstNum}–${lastNum}`}
+                      onClick={() => onZoomImage?.(block.imageUrl)}
+                      className="w-full max-h-[460px] object-contain rounded mx-auto cursor-zoom-in"
+                    />
+                    {onZoomImage && (
+                      <button
+                        type="button"
+                        onClick={() => onZoomImage(block.imageUrl)}
+                        className="mt-2 mx-auto block text-xs font-bold text-[#2563EB] hover:underline"
+                      >
+                        Bấm vào ảnh để phóng to bản đồ / sơ đồ
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className={`${block.imageUrl ? 'md:col-span-7 ' : ''}space-y-3`}>
+                  {block.items.map(({ question: itemQ, displayNum }) =>
+                    renderSingleQuestionCard(itemQ, displayNum, {
+                      insideGroup: true,
+                      groupImageUrl: block.imageUrl || ''
+                    })
                   )}
                 </div>
-              )}
-              <div className="space-y-3">
-                {block.items.map(({ question: itemQ, displayNum }) =>
-                  renderSingleQuestionCard(itemQ, displayNum, {
-                    insideGroup: true,
-                    groupImageUrl: block.imageUrl || ''
-                  })
-                )}
               </div>
             </div>
           );

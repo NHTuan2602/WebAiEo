@@ -140,7 +140,7 @@ export const LISTENING_QUESTION_TYPES = [
   { id: 'flowchart_completion', label: '2. Flow-chart Completion (Hoàn thành lưu đồ)', shortLabel: 'Flow-chart', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS' },
   { id: 'mcq', label: '3. Multiple Choice (Trắc nghiệm)', shortLabel: 'Multiple Choice', answerKind: 'choice', defaultOptions: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C'] },
   { id: 'matching', label: '4. Matching (Nối thông tin A–H)', shortLabel: 'Matching', answerKind: 'choice', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F'] },
-  { id: 'map_diagram', label: '5. Map / Plan / Diagram Labelling (Dán nhãn bản đồ)', shortLabel: 'Map / Diagram', answerKind: 'hybrid', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], wordLimit: 'CHỌN CHỮ CÁI TRÊN BẢN ĐỒ' },
+  { id: 'map_diagram', label: '5. Map / Plan / Diagram Labelling (Dán nhãn bản đồ A–I)', shortLabel: 'Map / Diagram', answerKind: 'hybrid', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'], wordLimit: 'CHỌN CHỮ CÁI TRÊN BẢN ĐỒ' },
   { id: 'short_answer', label: '6. Short Answer Questions (Trả lời câu hỏi ngắn)', shortLabel: 'Short Answer', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS AND/OR A NUMBER' }
 ];
 
