@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <linearGradient id="skArmor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="45%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="skBone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="70%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="skCape" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b91c1c"/>
+      <stop offset="55%" stop-color="#7f1d1d"/>
+      <stop offset="100%" stop-color="#450a0a"/>
+    </linearGradient>
+    <linearGradient id="skBlade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="45%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Tattered Crimson Cape -->
+  <path d="M180 105 Q248 135 272 238 L244 226 L232 252 L205 232 L188 260 L172 195 Z" fill="url(#skCape)" stroke="#1e293b" stroke-width="3"/>
+  <!-- Cursed Broadsword (held forward facing left) -->
+  <g transform="translate(88 158) rotate(-32)">
+    <polygon points="-8,-115 0,-138 8,-115 6,8 -6,8" fill="url(#skBlade)" stroke="#0f172a" stroke-width="2.5"/>
+    <path d="M-2,-110 L0,-122 L2,-110 L1,-4 L-1,-4 Z" fill="#f8fafc" opacity="0.65"/>
+    <path d="M-7,-62 L-2,-56 L-7,-50 Z" fill="#0f172a"/>
+    <rect x="-24" y="6" width="48" height="9" rx="4" fill="#b45309" stroke="#1e293b" stroke-width="2"/>
+    <rect x="-5" y="15" width="10" height="24" rx="3" fill="#451a03" stroke="#0f172a" stroke-width="2"/>
+    <circle cx="0" cy="42" r="7" fill="#d97706" stroke="#1e293b" stroke-width="2"/>
+  </g>
+  <!-- Legs & Armored Greaves -->
+  <path d="M144 218 L128 282 L106 286 L112 296 L142 296 L158 224 Z" fill="url(#skArmor)" stroke="#0f172a" stroke-width="3"/>
+  <path d="M174 218 L194 282 L176 292 L212 296 L216 284 L192 216 Z" fill="url(#skArmor)" stroke="#0f172a" stroke-width="3"/>
+  <!-- Exposed Bone Knees -->
+  <ellipse cx="144" cy="248" rx="8" ry="6" fill="url(#skBone)" stroke="#334155" stroke-width="2"/>
+  <ellipse cx="186" cy="248" rx="8" ry="6" fill="url(#skBone)" stroke="#334155" stroke-width="2"/>
+  <!-- Ribcage & Torso Breastplate -->
+  <path d="M132 122 L194 122 L188 214 L138 214 Z" fill="url(#skArmor)" stroke="#0f172a" stroke-width="3"/>
+  <path d="M144 148 Q163 142 182 148 M145 162 Q163 156 181 162 M147 176 Q163 170 179 176" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <path d="M163 136 L163 196" stroke="#94a3b8" stroke-width="3"/>
+  <!-- Belt & Tassets -->
+  <rect x="135" y="198" width="56" height="14" rx="4" fill="#78350f" stroke="#0f172a" stroke-width="2.5"/>
+  <rect x="155" y="196" width="16" height="18" rx="3" fill="#f59e0b" stroke="#0f172a" stroke-width="2"/>
+  <!-- Spiked Iron Pauldrons -->
+  <path d="M114 122 Q128 96 154 114 L144 142 Q122 142 114 122 Z" fill="url(#skArmor)" stroke="#0f172a" stroke-width="3"/>
+  <polygon points="122,108 106,88 134,104" fill="#cbd5e1" stroke="#0f172a" stroke-width="2"/>
+  <path d="M174 114 Q202 96 218 126 Q206 144 182 142 Z" fill="url(#skArmor)" stroke="#0f172a" stroke-width="3"/>
+  <polygon points="204,108 224,90 194,104" fill="#cbd5e1" stroke="#0f172a" stroke-width="2"/>
+  <!-- Skeletal Sword Arm -->
+  <path d="M126 138 L92 162 L98 174 L136 150 Z" fill="url(#skBone)" stroke="#0f172a" stroke-width="2.5"/>
+  <!-- Battle-Worn Kite Shield (Right side) -->
+  <path d="M186 146 L236 140 L238 196 Q216 226 196 232 Q180 206 186 146 Z" fill="url(#skArmor)" stroke="#0f172a" stroke-width="3"/>
+  <path d="M196 154 L228 150 L228 192 Q212 214 202 218 Q192 198 196 154 Z" fill="#7f1d1d" stroke="#f59e0b" stroke-width="2.5"/>
+  <path d="M212 158 L212 206 M198 178 L225 178" stroke="#fbbf24" stroke-width="3.5"/>
+  <!-- Skull & Horned Iron Crown Helmet -->
+  <g transform="translate(156 84)">
+    <ellipse cx="0" cy="0" rx="28" ry="30" fill="url(#skBone)" stroke="#0f172a" stroke-width="3"/>
+    <path d="M-20 18 L-16 32 L12 32 L16 18 Z" fill="url(#skBone)" stroke="#0f172a" stroke-width="2.5"/>
+    <path d="M-10 22 L-10 31 M-2 22 L-2 31 M6 22 L6 31" stroke="#1e293b" stroke-width="2"/>
+    <!-- Dark Helmet Brow & Horns -->
+    <path d="M-30 -6 Q-28 -36 2 -36 Q30 -34 30 -4 L22 2 L10 -12 L-14 -12 L-24 2 Z" fill="url(#skArmor)" stroke="#0f172a" stroke-width="3"/>
+    <path d="M-22 -24 Q-44 -42 -36 -60 Q-26 -42 -12 -30 Z" fill="#cbd5e1" stroke="#0f172a" stroke-width="2.5"/>
+    <path d="M22 -24 Q44 -42 36 -60 Q26 -42 12 -30 Z" fill="#cbd5e1" stroke="#0f172a" stroke-width="2.5"/>
+    <!-- Glowing Crimson Eye Sockets -->
+    <ellipse cx="-11" cy="2" rx="7" ry="6" fill="#090d16"/>
+    <ellipse cx="5" cy="2" rx="6" ry="5" fill="#090d16"/>
+    <circle cx="-11" cy="2" r="10" fill="url(#eyeGlow)"/>
+    <circle cx="5" cy="2" r="9" fill="url(#eyeGlow)"/>
+    <circle cx="-11" cy="2" r="3" fill="#fef08a"/>
+    <circle cx="5" cy="2" r="2.5" fill="#fef08a"/>
+    <!-- Nasal cavity -->
+    <polygon points="-5,10 -2,16 -8,16" fill="#0f172a"/>
+  </g>
+</svg>

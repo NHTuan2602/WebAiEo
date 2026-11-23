@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <linearGradient id="lichRobe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6b21a8"/>
+      <stop offset="50%" stop-color="#3b0764"/>
+      <stop offset="100%" stop-color="#0f0720"/>
+    </linearGradient>
+    <linearGradient id="lichTrim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <radialGradient id="arcaneOrb" cx="45%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#f43f5e"/>
+      <stop offset="68%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#7e22ce" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lichAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#4c1d95" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Swirling Arcane Aura -->
+  <ellipse cx="166" cy="170" rx="115" ry="118" fill="url(#lichAura)"/>
+  <!-- Obsidian Skull Staff (held left) -->
+  <g transform="translate(82 162) rotate(-10)">
+    <rect x="-5" y="-110" width="10" height="240" rx="4" fill="#1e1b4b" stroke="#090d16" stroke-width="2.5"/>
+    <!-- Curved Staff Prongs -->
+    <path d="M-4 -105 C-32 -118 -34 -148 -14 -156 C-18 -138 -12 -124 0 -116 Z" fill="#475569" stroke="#090d16" stroke-width="2.5"/>
+    <path d="M4 -105 C32 -118 34 -148 14 -156 C18 -138 12 -124 0 -116 Z" fill="#475569" stroke="#090d16" stroke-width="2.5"/>
+    <!-- Glowing Crimson-Violet Arcane Orb -->
+    <circle cx="0" cy="-136" r="28" fill="url(#arcaneOrb)"/>
+    <circle cx="0" cy="-136" r="12" fill="#fda4af"/>
+    <!-- Mini Skull Crest -->
+    <circle cx="0" cy="-104" r="11" fill="#e2e8f0" stroke="#090d16" stroke-width="2"/>
+    <circle cx="-4" cy="-104" r="2.5" fill="#e11d48"/>
+    <circle cx="4" cy="-104" r="2.5" fill="#e11d48"/>
+  </g>
+  <!-- Hovering Tattered Necromancer Robe -->
+  <path d="M128 112 L212 112 L248 268 L218 250 L204 286 L176 262 L152 294 L132 258 L102 276 Z" fill="url(#lichRobe)" stroke="#090d16" stroke-width="3.5"/>
+  <!-- Gold Runic Mantle & Shoulder Spikes -->
+  <path d="M112 114 Q170 84 228 118 L212 152 Q170 132 128 152 Z" fill="#1e1b4b" stroke="url(#lichTrim)" stroke-width="3.5"/>
+  <path d="M158 142 L176 142 L182 246 L152 246 Z" fill="#1e1b4b" stroke="url(#lichTrim)" stroke-width="2.5"/>
+  <!-- Glowing Purple Runes down Sash -->
+  <path d="M167 162 L160 174 L174 174 Z M167 194 L160 206 L174 206 Z M167 224 L160 236 L174 236 Z" fill="#e879f9"/>
+  <!-- Skeletal Casting Hands -->
+  <path d="M124 148 L88 168 L94 182 L134 162 Z" fill="#e2e8f0" stroke="#090d16" stroke-width="2.5"/>
+  <path d="M214 146 L252 178 L240 190 L204 162 Z" fill="#e2e8f0" stroke="#090d16" stroke-width="2.5"/>
+  <!-- Floating Dark Magic Orb in Right Hand -->
+  <circle cx="256" cy="168" r="22" fill="url(#arcaneOrb)"/>
+  <!-- Deep Shadowed Hood & Glowing Lich Crown -->
+  <g transform="translate(168 78)">
+    <path d="M-40 34 Q-44 -28 0 -46 Q44 -28 40 34 Q18 16 -40 34 Z" fill="url(#lichRobe)" stroke="url(#lichTrim)" stroke-width="3.5"/>
+    <!-- Dark Void Face -->
+    <ellipse cx="-4" cy="4" rx="22" ry="26" fill="#05030a"/>
+    <!-- Crown Spikes -->
+    <polygon points="-22,-22 -30,-48 -10,-28" fill="url(#lichTrim)" stroke="#090d16" stroke-width="2"/>
+    <polygon points="0,-28 0,-56 10,-28" fill="url(#lichTrim)" stroke="#090d16" stroke-width="2"/>
+    <polygon points="22,-22 30,-48 10,-28" fill="url(#lichTrim)" stroke="#090d16" stroke-width="2"/>
+    <!-- Fierce Glowing Eyes -->
+    <ellipse cx="-12" cy="0" rx="6" ry="3.5" fill="#f43f5e"/>
+    <ellipse cx="6" cy="0" rx="6" ry="3.5" fill="#f43f5e"/>
+    <circle cx="-12" cy="0" r="2" fill="#fef08a"/>
+    <circle cx="6" cy="0" r="2" fill="#fef08a"/>
+    <!-- Skeletal Jaw Hint -->
+    <path d="M-12 16 L6 16 M-8 14 L-8 20 M-2 14 L-2 20 M4 14 L4 20" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+</svg>

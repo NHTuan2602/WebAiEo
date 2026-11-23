@@ -282,6 +282,14 @@ export default function GameArena({
         onBackToGameHub={() => setArenaGameMode('hub')}
         onBackToSpaceMode={() => setArenaGameMode('space_shooter')}
         onExitArena={exitGame}
+        onOpenVocabManager={
+          isTeacher
+            ? (selectedRawVocab) => {
+                setCustomVocabInput(selectedRawVocab || room.rawVocab || DEFAULT_VOCAB_TEXT);
+                setShowVocabModal(true);
+              }
+            : null
+        }
         onSyncKnightResult={onSyncKnightResult}
         roomPin={activePin}
         roomRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
@@ -581,16 +589,29 @@ export default function GameArena({
 
           <div className="flex items-center gap-2 text-xs flex-wrap">
             {isTeacher && (
-              <button
-                type="button"
-                onClick={() => {
-                  setArenaGameMode('space_shooter');
-                  setShowCreateRoomModal(true);
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
-              >
-                <Plus className="w-3.5 h-3.5" /> Tạo Phòng Mới
-              </button>
+              <>
+                <button
+                  type="button"
+                  data-testid="hub-open-vocab-manager-btn"
+                  onClick={() => {
+                    setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
+                    setShowVocabModal(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
+                >
+                  <Edit className="w-3.5 h-3.5" /> Quản Lý Bộ Câu Hỏi (GV)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setArenaGameMode('space_shooter');
+                    setShowCreateRoomModal(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Tạo Phòng Mới
+                </button>
+              </>
             )}
             {themeToggleButton}
             <span
@@ -692,8 +713,17 @@ export default function GameArena({
                 </div>
 
                 <div className="flex items-center gap-4 bg-slate-950/80 border border-rose-500/25 rounded-2xl p-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-600 to-amber-500 border-2 border-amber-300 flex items-center justify-center text-3xl shadow-md shrink-0">
-                    ⚔️
+                  <div className="w-20 h-16 rounded-2xl bg-gradient-to-br from-slate-900 via-[#2a0c1d] to-slate-950 border-2 border-amber-400/60 flex items-center justify-center relative overflow-hidden shadow-md shrink-0">
+                    <img
+                      src="/assets/knight-rpg/knight_arthur.png"
+                      alt="Hiệp Sĩ Arthur"
+                      className="w-11 h-11 object-contain -mr-2 z-10 drop-shadow-[0_2px_6px_rgba(56,189,248,0.65)]"
+                    />
+                    <img
+                      src="/assets/knight-rpg/ancient_dragon.png"
+                      alt="Rồng Hắc Ám"
+                      className="w-12 h-12 object-contain -ml-1 drop-shadow-[0_2px_8px_rgba(244,63,94,0.75)]"
+                    />
                   </div>
                   <div className="space-y-1">
                     <h2 className="text-xl font-black text-white">
@@ -706,15 +736,15 @@ export default function GameArena({
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa nhân vật mới (<b>Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura, Nữ Pháp Sư Selena</b>), ngẫu nhiên nhặt <b>🗝️ Chìa Khóa Hồi Sinh</b> trên đường để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
+                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa <b>7 nhân vật Nam &amp; Nữ</b> chân thực (<b>Valkyrie Freya, Kiếm Khách Tomoe, Pháp Sư Selena, Nữ Hoàng Long Tộc...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-amber-200 font-bold">
-                    🪙 Đánh quái rớt Vàng • Mở khóa 6 Skin Nam &amp; Nữ
+                    🪙 Đánh quái rớt Vàng • 7 Nhân Vật Nam &amp; Nữ
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-sky-200 font-bold">
-                    🗝️ Nhặt Chìa Khóa trên đường để Hồi Sinh
+                    🗝️ Tỉ lệ hiếm rớt Chìa Khóa khi hạ quái
                   </div>
                 </div>
               </div>
@@ -801,7 +831,7 @@ export default function GameArena({
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                Đánh hạ quái vật rớt 🪙 Tiền Vàng &amp; ngẫu nhiên nhặt 🗝️ Chìa Khóa Hồi Sinh trên đường, mở khóa Nữ Chiến Binh Valkyrie / Nữ Kiếm Khách Sakura &amp; né Skill Tất Sát (Final Smash) của Rồng!
+                Đánh hạ quái vật rớt 🪙 Tiền Vàng &amp; tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh từ quái, mở khóa 7 nhân vật Nam/Nữ chân thực &amp; né Skill Tất Sát (Final Smash) của Rồng!
               </p>
             </div>
             <button

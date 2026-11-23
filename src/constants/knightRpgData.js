@@ -15,6 +15,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     priceGold: 0,
     weaponName: 'Thánh Kiếm Excalibur',
     passiveText: 'Cân bằng công thủ • Mặc định sở hữu',
+    spriteUrl: '/assets/knight-rpg/knight_arthur.png',
     goldBonusPct: 0,
     keyDropBonusPct: 0,
     bonusTimeSec: 0,
@@ -35,9 +36,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     rarity: 'Hiếm',
     priceGold: 120,
     weaponName: 'Song Kiếm Thiên Vũ',
-    passiveText: '+15% Vàng rơi ra khi hạ quái',
+    passiveText: '+15% Vàng & +2% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
+    spriteUrl: '/assets/knight-rpg/valkyrie_freya.png',
     goldBonusPct: 15,
-    keyDropBonusPct: 4,
+    keyDropBonusPct: 2,
     bonusTimeSec: 0,
     armorPrimary: '#ec4899',
     armorSecondary: '#fbcfe8',
@@ -56,9 +58,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     rarity: 'Sử Thi',
     priceGold: 260,
     weaponName: 'Katana Hoa Anh Đào',
-    passiveText: '+25% Vàng rơi ra & +8% tỉ lệ rơi Chìa Khóa',
+    passiveText: '+25% Vàng & +3% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
+    spriteUrl: '/assets/knight-rpg/samurai_tomoe.png',
     goldBonusPct: 25,
-    keyDropBonusPct: 8,
+    keyDropBonusPct: 3,
     bonusTimeSec: 0,
     armorPrimary: '#e11d48',
     armorSecondary: '#fda4af',
@@ -77,9 +80,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     rarity: 'Sử Thi',
     priceGold: 420,
     weaponName: 'Quyền Trượng Ngân Hà',
-    passiveText: '+3 giây suy nghĩ mỗi câu & +20% Vàng',
+    passiveText: '+3 giây suy nghĩ mỗi câu, +20% Vàng & +2% rớt Chìa Khóa',
+    spriteUrl: '/assets/knight-rpg/mage_selena.png',
     goldBonusPct: 20,
-    keyDropBonusPct: 5,
+    keyDropBonusPct: 2,
     bonusTimeSec: 3,
     armorPrimary: '#8b5cf6',
     armorSecondary: '#ddd6fe',
@@ -98,9 +102,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     rarity: 'Sử Thi',
     priceGold: 560,
     weaponName: 'Huyết Ảnh Song Đao',
-    passiveText: '+30% Vàng rơi ra & chém chí mạng tốc độ cao',
+    passiveText: '+30% Vàng, +3% rớt Chìa Khóa & chém chí mạng tốc độ cao',
+    spriteUrl: '/assets/knight-rpg/assassin_kael.png',
     goldBonusPct: 30,
-    keyDropBonusPct: 6,
+    keyDropBonusPct: 3,
     bonusTimeSec: 0,
     armorPrimary: '#1e293b',
     armorSecondary: '#ef4444',
@@ -119,9 +124,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     rarity: 'Huyền Thoại',
     priceGold: 780,
     weaponName: 'Đại Kiếm Plasma Neon',
-    passiveText: '+35% Vàng, +10% rơi Chìa Khóa & +2 giây mỗi câu',
+    passiveText: '+35% Vàng, +4% rớt Chìa Khóa khi hạ quái & +2 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/cyber_nova.png',
     goldBonusPct: 35,
-    keyDropBonusPct: 10,
+    keyDropBonusPct: 4,
     bonusTimeSec: 2,
     armorPrimary: '#06b6d4',
     armorSecondary: '#f43f5e',
@@ -140,9 +146,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     rarity: 'Thần Thoại',
     priceGold: 1100,
     weaponName: 'Long Vương Hỏa Kiếm',
-    passiveText: '+50% Vàng rơi ra, +15% rơi Chìa Khóa & +3 giây gặp Boss Rồng',
+    passiveText: '+50% Vàng, +6% rớt Chìa Khóa khi hạ quái & +3 giây gặp Boss Rồng',
+    spriteUrl: '/assets/knight-rpg/dragon_empress.png',
     goldBonusPct: 50,
-    keyDropBonusPct: 15,
+    keyDropBonusPct: 6,
     bonusTimeSec: 3,
     armorPrimary: '#f59e0b',
     armorSecondary: '#fef08a',
@@ -160,55 +167,143 @@ export const KNIGHT_MONSTER_STAGES = [
     round: 1,
     stageTitle: 'Ải 1/4: Rừng Slime & Goblin',
     shortTitle: 'Ải 1: Slime & Goblin',
-    mechanicLabel: 'Đánh Quái Rớt Tiền Vàng (🪙) • Ngẫu Nhiên Nhặt Chìa Khóa Hồi Sinh Trên Đường',
-    questionDesc: 'Đọc nghĩa tiếng Việt → Chọn đúng chiêu kiếm từ tiếng Anh khớp nghĩa để chém hạ Slime & Goblin làm văng Tiền Vàng (🪙)!',
+    goldPerKill: 26,
+    mechanicLabel: 'Đánh Hạ Quái Rớt Tiền Vàng (🪙) • Tỉ Lệ Hiếm Rớt 🗝️ Chìa Khóa Hồi Sinh',
+    questionDesc: 'Đọc nghĩa tiếng Việt → Chọn đúng chiêu kiếm từ tiếng Anh khớp nghĩa để chém hạ Slime & Goblin làm văng Tiền Vàng (🪙) và có cơ hội hiếm rớt 🗝️ Chìa Khóa!',
     monsters: [
-      { id: 'slime_blue', name: 'Slime Thủy Tinh', color: '#38bdf8', eyeColor: '#0f172a', goldBase: 22 },
-      { id: 'slime_king', name: 'Vua Slime Lục Bảo', color: '#10b981', eyeColor: '#064e3b', goldBase: 26 },
-      { id: 'goblin_scout', name: 'Goblin Rừng Xanh', color: '#84cc16', eyeColor: '#7f1d1d', goldBase: 30 }
+      {
+        id: 'slime_blue',
+        name: 'Slime Thủy Tinh',
+        color: '#38bdf8',
+        eyeColor: '#0f172a',
+        goldBase: 22,
+        keyDropChance: 0.05,
+        spriteUrl: '/assets/knight-rpg/slime_blue.png'
+      },
+      {
+        id: 'slime_king',
+        name: 'Vua Slime Lục Bảo',
+        color: '#10b981',
+        eyeColor: '#064e3b',
+        goldBase: 26,
+        keyDropChance: 0.06,
+        spriteUrl: '/assets/knight-rpg/slime_king.png'
+      },
+      {
+        id: 'goblin_scout',
+        name: 'Goblin Rừng Xanh',
+        color: '#84cc16',
+        eyeColor: '#7f1d1d',
+        goldBase: 30,
+        keyDropChance: 0.07,
+        spriteUrl: '/assets/knight-rpg/goblin_scout.png'
+      }
     ]
   },
   {
     round: 2,
     stageTitle: 'Ải 2/4: Pháo Đài Kỵ Sĩ Xương & Orc',
     shortTitle: 'Ải 2: Skeleton & Orc',
-    mechanicLabel: 'Gõ Chữ Liên Hoàn Kiếm Phá Giáp Quái Rớt Tiền Vàng (🪙)',
-    questionDesc: 'Gõ từng chữ cái tiếng Anh chính xác để tung liên hoàn kiếm phá vỡ giáp sắt của Skeleton & Orc, hạ quái rớt Tiền Vàng!',
+    goldPerKill: 40,
+    mechanicLabel: 'Gõ Chữ Liên Hoàn Kiếm Phá Giáp Quái Rớt Vàng (🪙) & 🗝️ Hiếm',
+    questionDesc: 'Gõ từng chữ cái tiếng Anh chính xác để tung liên hoàn kiếm phá vỡ giáp sắt của Skeleton & Orc, hạ quái rớt Tiền Vàng & tỉ lệ hiếm rớt 🗝️ Chìa Khóa!',
     monsters: [
-      { id: 'skeleton_knight', name: 'Kỵ Sĩ Xương Cổ Đại', color: '#94a3b8', eyeColor: '#ef4444', goldBase: 35 },
-      { id: 'orc_berserker', name: 'Orc Cuồng Nộ Giáp Sắt', color: '#d97706', eyeColor: '#fef08a', goldBase: 45 }
+      {
+        id: 'skeleton_knight',
+        name: 'Kỵ Sĩ Xương Cổ Đại',
+        color: '#94a3b8',
+        eyeColor: '#ef4444',
+        goldBase: 35,
+        keyDropChance: 0.08,
+        spriteUrl: '/assets/knight-rpg/skeleton_knight.svg'
+      },
+      {
+        id: 'orc_berserker',
+        name: 'Orc Cuồng Nộ Giáp Sắt',
+        color: '#d97706',
+        eyeColor: '#fef08a',
+        goldBase: 45,
+        keyDropChance: 0.09,
+        spriteUrl: '/assets/knight-rpg/orc_berserker.svg'
+      }
     ]
   },
   {
     round: 3,
     stageTitle: 'Ải 3/4: Tháp Pháp Sư Hắc Ám',
     shortTitle: 'Ải 3: Golem & Dark Mage',
-    mechanicLabel: 'Phản Đòn Cầu Phép Đồng Nghĩa / Trái Nghĩa Hạ Quái Rớt Tiền (🪙)',
-    questionDesc: 'Chọn đúng cầu phép thuật (Đồng nghĩa / Trái nghĩa / Ngữ cảnh) để phản đòn phép hạ Pháp Sư Hắc Ám & thu Tiền Vàng!',
+    goldPerKill: 52,
+    mechanicLabel: 'Phản Đòn Cầu Phép Đồng Nghĩa / Trái Nghĩa Hạ Quái Rớt Vàng & 🗝️ Hiếm',
+    questionDesc: 'Chọn đúng cầu phép thuật (Đồng nghĩa / Trái nghĩa / Ngữ cảnh) để phản đòn phép hạ Golem & Pháp Sư Hắc Ám, thu Tiền Vàng & cơ hội rớt 🗝️ Chìa Khóa!',
     monsters: [
-      { id: 'stone_golem', name: 'Golem Đá Hộ Pháp', color: '#64748b', eyeColor: '#38bdf8', goldBase: 48 },
-      { id: 'dark_lich', name: 'Pháp Sư Hắc Ám Lich', color: '#9333ea', eyeColor: '#f43f5e', goldBase: 55 }
+      {
+        id: 'stone_golem',
+        name: 'Golem Đá Hộ Pháp',
+        color: '#64748b',
+        eyeColor: '#38bdf8',
+        goldBase: 48,
+        keyDropChance: 0.1,
+        spriteUrl: '/assets/knight-rpg/stone_golem.png'
+      },
+      {
+        id: 'dark_lich',
+        name: 'Pháp Sư Hắc Ám Lich',
+        color: '#9333ea',
+        eyeColor: '#f43f5e',
+        goldBase: 55,
+        keyDropChance: 0.11,
+        spriteUrl: '/assets/knight-rpg/dark_lich.svg'
+      }
     ]
   },
   {
     round: 4,
     stageTitle: 'Ải 4/4 — BOSS CUỐI: Rồng Hắc Ám Cổ Đại',
     shortTitle: 'Ải 4: Boss Rồng Hắc Ám',
+    goldPerKill: 110,
     mechanicLabel: 'Đọc Câu Gõ Từ Đồ Long • Rồng Tất Sát (Final Smash) Khi Hết Giờ',
-    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng & nổ kho báu Tiền Vàng! Gõ sai bị Rồng khè lửa phản công — quá thời gian Rồng sẽ tung Skill Tất Sát Kết Liễu!',
+    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng & nổ kho báu Tiền Vàng + tỉ lệ rớt 🗝️ cao nhất! Gõ sai bị Rồng khè lửa phản công — quá giờ Rồng tung Skill Tất Sát!',
     monsters: [
-      { id: 'ancient_dragon', name: 'BOSS CUỐI: RỒNG HẮC ÁM IGNIS-REX', color: '#e11d48', eyeColor: '#fde047', goldBase: 110, isDragonBoss: true }
+      {
+        id: 'ancient_dragon',
+        name: 'BOSS CUỐI: RỒNG HẮC ÁM IGNIS-REX',
+        color: '#e11d48',
+        eyeColor: '#fde047',
+        goldBase: 110,
+        keyDropChance: 0.18,
+        isDragonBoss: true,
+        spriteUrl: '/assets/knight-rpg/ancient_dragon.png'
+      }
     ]
   }
 ];
 
 export const REVIVE_KEY_GOLD_PRICE = 100;
 
+export function computeMonsterGoldDrop(monster, skin, combo = 0) {
+  const baseGold = Math.max(1, Number(monster?.goldBase) || (monster?.isDragonBoss ? 110 : 25));
+  const skinMult = 1 + Math.max(0, Number(skin?.goldBonusPct) || 0) / 100;
+  const comboGold = Math.min(40, Math.max(0, Number(combo) || 0) * 5);
+  return Math.round((baseGold + comboGold) * skinMult);
+}
+
+export function computeMonsterKeyDropChance(monster, skin) {
+  const rawBase = Number(monster?.keyDropChance);
+  const baseChance = Number.isFinite(rawBase)
+    ? rawBase
+    : monster?.isDragonBoss
+    ? 0.18
+    : 0.06;
+  const skinBonus = Math.min(0.08, Math.max(0, Number(skin?.keyDropBonusPct) || 0) / 100);
+  return Math.min(0.35, Math.max(0.02, baseChance + skinBonus));
+}
+
 export function normalizeKnightRpgProfile(raw = {}) {
   const obj = raw && typeof raw === 'object' ? raw : {};
   const rawGold = obj.gold === undefined || obj.gold === null ? 150 : Number(obj.gold);
   const gold = Math.max(0, Math.min(9_999_999, Math.floor(Number.isFinite(rawGold) ? rawGold : 150)));
-  const keys = Math.max(0, Math.min(999, Math.floor(Number(obj.keys) ?? 1)));
+  const rawKeys = obj.keys === undefined || obj.keys === null ? 1 : Number(obj.keys);
+  const keys = Math.max(0, Math.min(999, Math.floor(Number.isFinite(rawKeys) ? rawKeys : 1)));
   const rawSkins = Array.isArray(obj.unlockedSkins) ? obj.unlockedSkins.map(String) : [];
   const validSkinIds = new Set(KNIGHT_CHARACTER_SKINS.map(s => s.id));
   const unlockedSkins = Array.from(

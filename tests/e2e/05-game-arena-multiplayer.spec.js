@@ -161,17 +161,45 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('lobby-switch-to-knight-game-btn').first().click();
     await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
 
-    // Open Character Skin Shop (Male & Female skins + Revive Keys)
+    // Teacher can open the Question Bank Manager directly from Knight & Dragon RPG
+    await expect(page.getByTestId('knight-open-vocab-manager-btn')).toBeVisible();
+    await page.getByTestId('knight-open-vocab-manager-btn').click();
+    await expect(page.getByTestId('game-vocab-bank-modal')).toBeVisible({ timeout: 8_000 });
+    await page.getByTestId('game-vocab-bank-modal').getByRole('button', { name: /Đóng/i }).first().click();
+    await expect(page.getByTestId('game-vocab-bank-modal')).toHaveCount(0);
+
+    // Open Character Skin Shop (7 distinct illustrated Male & Female skins + Revive Keys)
     await page.getByTestId('open-knight-shop-btn').click();
     await expect(page.getByTestId('knight-skin-shop-modal')).toBeVisible();
     await expect(page.getByText(/Nữ Chiến Binh Valkyrie Freya/i)).toBeVisible();
     await expect(page.getByText(/Nữ Kiếm Khách Anh Đào Tomoe/i)).toBeVisible();
+    const loadedSkinSprites = await page.getByTestId('knight-skin-shop-modal').locator('img').evaluateAll(imgs =>
+      imgs.filter(img => img.complete && img.naturalWidth > 0).length
+    );
+    expect(loadedSkinSprites).toBeGreaterThanOrEqual(7);
     await page.getByTestId('buy-revive-key-with-gold-btn').click();
     await page.getByTestId('knight-skin-shop-modal').getByRole('button').first().click();
+
+    // Launch Stage 3 (Golem & Dark Mage) briefly to confirm zero NaN/undefined and monster-kill key drop percentage
+    await page.getByTestId('start-knight-stage-3').click();
+    const lootPillS3 = page.getByTestId('knight-loot-info-pill');
+    await expect(lootPillS3).toBeVisible({ timeout: 8_000 });
+    const lootTextS3 = await lootPillS3.textContent();
+    expect(lootTextS3).not.toMatch(/NaN|undefined|trên đường/i);
+    expect(lootTextS3).toMatch(/Rớt \+\d+ Vàng/i);
+    expect(lootTextS3).toMatch(/Tỉ lệ rớt Chìa Khóa: \d+%/i);
+
+    // Return to Knight Hub via switching round -> re-enter Knight Hub cleanly or jump back
+    await page.getByTestId('knight-back-to-hub-btn').click();
+    await page.getByTestId('switch-to-knight-game-btn').click();
+    await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
 
     // Launch Stage 4 Final Dragon Boss and test Dragon damage / typing combat
     await page.getByTestId('start-knight-stage-4').click();
     await expect(page.getByTestId('knight-dragon-boss-input')).toBeVisible({ timeout: 8_000 });
+    const lootTextS4 = await page.getByTestId('knight-loot-info-pill').textContent();
+    expect(lootTextS4).not.toMatch(/NaN|undefined|trên đường/i);
+    expect(lootTextS4).toMatch(/Rớt \+\d+ Vàng/i);
     await page.getByTestId('knight-dragon-boss-input').fill('cohesive global strategy');
     await page.getByTestId('knight-dragon-boss-submit').click();
 

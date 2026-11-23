@@ -1,29 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  BookOpen,
   ChevronLeft,
   Clock,
   Coins,
-  Crown,
   Flame,
-  Heart,
   KeyRound,
   Keyboard,
   Lightbulb,
-  Play,
   RefreshCw,
-  Shield,
   ShoppingBag,
   Snowflake,
   Sparkles,
   Swords,
-  Trophy,
-  Volume2,
-  Zap
+  Volume2
 } from 'lucide-react';
 import {
   KNIGHT_CHARACTER_SKINS,
   KNIGHT_MONSTER_STAGES,
   REVIVE_KEY_GOLD_PRICE,
+  computeMonsterGoldDrop,
+  computeMonsterKeyDropChance,
   loadLocalKnightRpgProfile,
   saveLocalKnightRpgProfile
 } from '../../constants/knightRpgData';
@@ -45,6 +42,13 @@ function skipNonAlphaIndex(word, startIdx = 0) {
   return idx;
 }
 
+const ALL_SPRITE_URLS = Array.from(
+  new Set([
+    ...KNIGHT_CHARACTER_SKINS.map(s => s.spriteUrl).filter(Boolean),
+    ...KNIGHT_MONSTER_STAGES.flatMap(st => st.monsters.map(m => m.spriteUrl)).filter(Boolean)
+  ])
+);
+
 export default function KnightDragonGame({
   currentUser,
   customVocabTopics = [],
@@ -54,12 +58,14 @@ export default function KnightDragonGame({
   onBackToGameHub,
   onBackToSpaceMode,
   onExitArena,
+  onOpenVocabManager = null,
   onSyncKnightResult,
   roomPin = '',
   roomRawVocab = '',
   showToast
 }) {
   const username = currentUser?.username || 'guest';
+  const isTeacher = currentUser?.role === 'teacher';
   const [rpgProfile, setRpgProfile] = useState(() =>
     loadLocalKnightRpgProfile(username, currentUser)
   );
@@ -95,16 +101,18 @@ export default function KnightDragonGame({
   const canvasRef = useRef(null);
   const timerRef = useRef(null);
   const animRef = useRef(null);
+  const spriteImagesRef = useRef(new Map());
   const runtimeRef = useRef({
     lane: 1,
     heroAttackAnim: 0,
+    monsterAttackAnim: 0,
     monsterHitAnim: 0,
     knightHurtAnim: 0,
     dragonFireAnim: 0,
     finalSmashAnim: 0,
     roadOffset: 0,
     droppedCoins: [],
-    pathKeyDrop: null,
+    droppedKeys: [],
     floatingTexts: [],
     particles: [],
     timeRemainingFloat: 22,
@@ -115,6 +123,18 @@ export default function KnightDragonGame({
     matchState: 'HUB'
   });
 
+  // Preload all 15 RPG Hero & Monster sprites into memory for smooth 60 FPS canvas rendering
+  useEffect(() => {
+    const cache = spriteImagesRef.current;
+    ALL_SPRITE_URLS.forEach(url => {
+      if (cache.has(url)) return;
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
+      cache.set(url, img);
+    });
+  }, []);
+
   const activeSkin =
     KNIGHT_CHARACTER_SKINS.find(s => s.id === rpgProfile.equippedSkin) ||
     KNIGHT_CHARACTER_SKINS[0];
@@ -122,6 +142,11 @@ export default function KnightDragonGame({
     KNIGHT_MONSTER_STAGES.find(s => s.round === round) || KNIGHT_MONSTER_STAGES[0];
   const currentMonster =
     stageMeta.monsters[wordIdx % stageMeta.monsters.length] || stageMeta.monsters[0];
+
+  const expectedMonsterGold = computeMonsterGoldDrop(currentMonster, activeSkin, combo);
+  const expectedKeyDropPct = Math.round(
+    computeMonsterKeyDropChance(currentMonster, activeSkin) * 100
+  );
 
   const updateAndPersistProfile = (updater) => {
     setRpgProfile(prev => {
@@ -157,7 +182,7 @@ export default function KnightDragonGame({
       xRatio,
       yRatio,
       alpha: 1,
-      vy: -1.4
+      vy: -1.35
     });
   };
 
@@ -170,28 +195,43 @@ export default function KnightDragonGame({
         yRatio,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        radius: 2.5 + Math.random() * 3.5,
+        radius: 2.2 + Math.random() * 3.4,
         color,
         alpha: 1
       });
     }
   };
 
-  // Physical Gold Coins burst ONLY out of slain/struck monsters (never picked up like Subway Surfers)
+  // Physical Gold Coins burst ONLY out of struck/slain monsters
   const spawnMonsterCoinDrops = (coinCount = 8) => {
     const coins = runtimeRef.current.droppedCoins || [];
     for (let i = 0; i < coinCount; i += 1) {
       coins.push({
         id: `${Date.now()}_${i}_${Math.random()}`,
-        xRatio: 0.7 + (Math.random() - 0.5) * 0.08,
-        yRatio: 0.45 + (Math.random() - 0.5) * 0.06,
-        vx: -2.2 - Math.random() * 2.8,
-        vy: -3.5 - Math.random() * 3.2,
+        xRatio: 0.72 + (Math.random() - 0.5) * 0.08,
+        yRatio: 0.5 + (Math.random() - 0.5) * 0.08,
+        vx: -2.0 - Math.random() * 2.8,
+        vy: -3.8 - Math.random() * 3.0,
         age: 0,
         alpha: 1
       });
     }
     runtimeRef.current.droppedCoins = coins;
+  };
+
+  // Rare Revive Key (🗝️) physically bursts ONLY out of slain monsters on a low drop roll
+  const spawnMonsterKeyDrop = () => {
+    const keys = runtimeRef.current.droppedKeys || [];
+    keys.push({
+      id: `${Date.now()}_key_${Math.random()}`,
+      xRatio: 0.72,
+      yRatio: 0.44,
+      vx: -2.4,
+      vy: -5.2,
+      age: 0,
+      alpha: 1
+    });
+    runtimeRef.current.droppedKeys = keys;
   };
 
   const showQuickBanner = (text, kind = 'success') => {
@@ -246,9 +286,11 @@ export default function KnightDragonGame({
     runtimeRef.current.round = rNum;
     runtimeRef.current.matchState = 'PLAYING';
     runtimeRef.current.droppedCoins = [];
-    // Only Revive Keys (🗝️) randomly spawn along the path to be picked up (Subway Surfers revive key style)
-    runtimeRef.current.pathKeyDrop =
-      Math.random() < 0.65 ? { xRatio: 0.85, collected: false } : null;
+    runtimeRef.current.droppedKeys = [];
+    runtimeRef.current.dragonFireAnim = 0;
+    runtimeRef.current.monsterAttackAnim = 0;
+    runtimeRef.current.heroAttackAnim = 0;
+    runtimeRef.current.finalSmashAnim = 0;
     setupQuestionClock(rNum, firstQ);
 
     if (firstQ) {
@@ -321,12 +363,8 @@ export default function KnightDragonGame({
   };
 
   const rewardMonsterKill = (isDragonBoss = false) => {
-    const baseGold = currentMonster?.goldBase || (isDragonBoss ? 110 : 25);
-    const skinMult = 1 + (Number(activeSkin.goldBonusPct) || 0) / 100;
-    const comboGold = Math.min(40, combo * 5);
-    const goldGain = Math.round((baseGold + comboGold) * skinMult);
-
-    const keyChance = (isDragonBoss ? 0.55 : 0.2) + (Number(activeSkin.keyDropBonusPct) || 0) / 100;
+    const goldGain = computeMonsterGoldDrop(currentMonster, activeSkin, combo);
+    const keyChance = computeMonsterKeyDropChance(currentMonster, activeSkin);
     const droppedKey = Math.random() < keyChance ? 1 : 0;
 
     setSessionGoldEarned(prev => prev + goldGain);
@@ -351,11 +389,9 @@ export default function KnightDragonGame({
     spawnMonsterCoinDrops(isDragonBoss ? 14 : 7);
     spawnFloatingText(`+${goldGain} 🪙 Vàng Rớt Từ Quái!`, '#fbbf24', 0.68, 0.34);
     if (droppedKey > 0) {
-      spawnFloatingText(`+1 🗝️ Nhặt Chìa Khóa Hồi Sinh Trên Đường!`, '#38bdf8', 0.5, 0.24);
-    }
-    // Randomly spawn a rare Revive Key on the road ahead for the next monster step
-    if (Math.random() < 0.38) {
-      runtimeRef.current.pathKeyDrop = { xRatio: 0.86, collected: false };
+      spawnMonsterKeyDrop();
+      spawnBurstParticles(0.72, 0.44, '#38bdf8', 24);
+      spawnFloatingText('+1 🗝️ Quái Rớt Chìa Khóa Hồi Sinh (Hiếm)!', '#38bdf8', 0.56, 0.22);
     }
     return { goldGain, droppedKey };
   };
@@ -365,8 +401,12 @@ export default function KnightDragonGame({
     setCombo(0);
     playSound('wrong');
     runtimeRef.current.knightHurtAnim = 1;
-    runtimeRef.current.dragonFireAnim = 1;
-    spawnBurstParticles(0.5, 0.72, '#ef4444', 24);
+    if (round === 4 || isTimeoutOnDragon) {
+      runtimeRef.current.dragonFireAnim = 1;
+    } else {
+      runtimeRef.current.monsterAttackAnim = 1;
+    }
+    spawnBurstParticles(0.25, 0.66, '#ef4444', 22);
 
     if (activeQ) {
       recordWordAttempt(activeQ, round, false);
@@ -436,7 +476,7 @@ export default function KnightDragonGame({
     return () => clearInterval(timerRef.current);
   }, [matchState, round, wordIdx, activeQ]);
 
-  // Choice handler for Wave 1 (Slime/Goblin Rune Shields) & Wave 3 (Dark Mage Spell Orbs)
+  // Choice handler for Wave 1 (Slime/Goblin Rune Shields) & Wave 3 (Golem/Dark Lich Spell Orbs)
   const handleSelectRuneChoice = (choiceText) => {
     if (matchState !== 'PLAYING' || !activeQ) return;
     const targetAnswer = round === 1 ? activeQ.word : round === 3 ? activeQ.v3Target : '';
@@ -448,7 +488,7 @@ export default function KnightDragonGame({
       runtimeRef.current.monsterHitAnim = 1;
       playSound('word_clear');
       speakWord(activeQ.word);
-      spawnBurstParticles(0.72, 0.45, activeSkin.slashColor || '#38bdf8', 28);
+      spawnBurstParticles(0.73, 0.52, activeSkin.slashColor || '#38bdf8', 28);
 
       const remainRatio = Math.max(
         0,
@@ -465,14 +505,14 @@ export default function KnightDragonGame({
       recordWordAttempt(activeQ, round, true);
       showQuickBanner(
         `⚔️ Chém hạ ${currentMonster.name}! +${gain}đ • Quái rớt +${goldGain} 🪙 Vàng${
-          droppedKey ? ' • 🗝️ Phát hiện 1 Chìa Khóa Hồi Sinh trên đường!' : ''
+          droppedKey ? ' • 🗝️ Quái rớt 1 Chìa Khóa Hồi Sinh (Hiếm)!' : ''
         }`,
         'success'
       );
       advanceToNextMonsterOrStage(nextScore);
     } else {
       triggerDragonFinalSmashOrLifeLoss(
-        `💥 Chém trượt khiên "${choiceText}"! ${currentMonster.name} phản đòn (-1 ❤️)!`,
+        `💥 Chém trượt "${choiceText}"! ${currentMonster.name} phản đòn (-1 ❤️)!`,
         false
       );
     }
@@ -489,7 +529,7 @@ export default function KnightDragonGame({
       playSound('type_hit');
       runtimeRef.current.heroAttackAnim = 0.85;
       runtimeRef.current.monsterHitAnim = 0.7;
-      spawnBurstParticles(0.72, 0.45, activeSkin.slashColor || '#fbbf24', 10);
+      spawnBurstParticles(0.73, 0.52, activeSkin.slashColor || '#fbbf24', 10);
       spawnMonsterCoinDrops(2);
 
       const nextProg = skipNonAlphaIndex(target, typedProgress + 1);
@@ -511,7 +551,7 @@ export default function KnightDragonGame({
         recordWordAttempt(activeQ, 2, true);
         showQuickBanner(
           `🗡️ Phá giáp hạ gục ${currentMonster.name} ("${activeQ.word}")! +${gain}đ • +${goldGain} 🪙${
-            droppedKey ? ' • +1 🗝️ Chìa Khóa!' : ''
+            droppedKey ? ' • +1 🗝️ Chìa Khóa Hiếm!' : ''
           }`,
           'success'
         );
@@ -519,13 +559,13 @@ export default function KnightDragonGame({
       }
     } else {
       triggerDragonFinalSmashOrLifeLoss(
-        `❌ Gõ sai chữ "${char}"! ${currentMonster.name} vung rìu phản công (-1 ❤️)!`,
+        `❌ Gõ sai chữ "${char}"! ${currentMonster.name} vung vũ khí phản công (-1 ❤️)!`,
         false
       );
     }
   };
 
-  // Wave 4: Dragon Boss typing (each correct letter slashes Dragon HP; wrong letter or wrong submit triggers Dragon Fire Counter!)
+  // Wave 4: Dragon Boss typing (each correct letter slashes Dragon HP; wrong letter/submit triggers Dragon Fire Counter!)
   const handleWave4InputChange = (nextVal) => {
     if (matchState !== 'PLAYING' || round !== 4 || !activeQ) return;
     const prevVal = round4Input;
@@ -544,13 +584,12 @@ export default function KnightDragonGame({
         playSound('type_hit');
         runtimeRef.current.heroAttackAnim = 0.9;
         runtimeRef.current.monsterHitAnim = 0.8;
-        spawnBurstParticles(0.5, 0.28, activeSkin.slashColor || '#fbbf24', 12);
+        spawnBurstParticles(0.72, 0.42, activeSkin.slashColor || '#fbbf24', 12);
       } else {
-        // Wrong letter typed against Dragon -> Dragon scorches Knight with fire counter-breath!
         playSound('wrong');
         runtimeRef.current.dragonFireAnim = 0.85;
         runtimeRef.current.knightHurtAnim = 0.6;
-        spawnFloatingText('🔥 Rồng Khè Lửa Phản Đòn!', '#ef4444', 0.5, 0.62);
+        spawnFloatingText('🔥 Rồng Khè Lửa Phản Đòn!', '#fb7185', 0.48, 0.56);
       }
     }
   };
@@ -573,7 +612,7 @@ export default function KnightDragonGame({
       runtimeRef.current.round4MatchRatio = 1;
       playSound('word_clear');
       speakWord(evalRes.matchedAnswer || activeQ.v4Display || activeQ.word);
-      spawnBurstParticles(0.5, 0.28, '#fde047', 42);
+      spawnBurstParticles(0.72, 0.42, '#fde047', 42);
 
       const remainRatio = Math.max(
         0,
@@ -587,14 +626,14 @@ export default function KnightDragonGame({
       recordWordAttempt(activeQ, 4, true);
       showQuickBanner(
         `🐉 ĐỒ LONG TRẢM! Hạ gục Rồng Hắc Ám ("${evalRes.matchedAnswer}")! +${gain}đ • +${goldGain} 🪙 Vàng${
-          droppedKey ? ' • +1 🗝️ Chìa Khóa!' : ''
+          droppedKey ? ' • +1 🗝️ Chìa Khóa Hiếm!' : ''
         }`,
         'success'
       );
       advanceToNextMonsterOrStage(nextScore);
     } else {
       triggerDragonFinalSmashOrLifeLoss(
-        `🔥 "${rawTyped}" chưa đúng! Rồng Hắc Ám quất đuôi & phun lửa phản công (-1 ❤️)!`,
+        `🔥 "${rawTyped}" chưa đúng! Rồng Hắc Ám khè lửa phản công (-1 ❤️)!`,
         false
       );
     }
@@ -629,7 +668,7 @@ export default function KnightDragonGame({
     showQuickBanner('❄️ Băng Phong Kiếm: Đóng băng quái vật +8 giây!', 'success');
   };
 
-  // Subway Surfers Revive Mechanic (Use Keys or Buy Keys with Gold)
+  // Revive Mechanic (Use rare Monster-dropped Keys or Gold)
   const reviveKeyCost = reviveUsedCount + 1;
   const reviveGoldCost = reviveKeyCost * REVIVE_KEY_GOLD_PRICE;
 
@@ -647,8 +686,9 @@ export default function KnightDragonGame({
     setMatchState('PLAYING');
     runtimeRef.current.matchState = 'PLAYING';
     runtimeRef.current.finalSmashAnim = 0;
+    runtimeRef.current.dragonFireAnim = 0;
     setupQuestionClock(round, activeQ);
-    spawnBurstParticles(0.5, 0.7, '#fde047', 35);
+    spawnBurstParticles(0.25, 0.68, '#fde047', 35);
     showQuickBanner(
       `🗝️ HỒI SINH THÀNH CÔNG (-${reviveKeyCost} Chìa Khóa)! Đầy 3 ❤️ & Reset thời gian!`,
       'success'
@@ -669,8 +709,9 @@ export default function KnightDragonGame({
     setMatchState('PLAYING');
     runtimeRef.current.matchState = 'PLAYING';
     runtimeRef.current.finalSmashAnim = 0;
+    runtimeRef.current.dragonFireAnim = 0;
     setupQuestionClock(round, activeQ);
-    spawnBurstParticles(0.5, 0.7, '#fbbf24', 35);
+    spawnBurstParticles(0.25, 0.68, '#fbbf24', 35);
     showQuickBanner(
       `🪙 ĐÃ MUA MẠNG HỒI SINH (-${reviveGoldCost} Vàng)! Đầy 3 ❤️ & Tiếp tục chiến đấu!`,
       'success'
@@ -698,7 +739,7 @@ export default function KnightDragonGame({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [matchState, round, activeQ, typedProgress, score, combo]);
 
-  // 60 FPS Side-Scrolling RPG Monster Battle & Physical Monster Coin Drop Canvas Loop
+  // 60 FPS Fantasy RPG Illustrated Sprite Duel & Volumetric VFX Canvas Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
@@ -706,49 +747,232 @@ export default function KnightDragonGame({
 
     const render = () => {
       const parent = canvas.parentElement;
-      const w = (canvas.width = Math.max(320, parent?.clientWidth || 760));
-      const h = (canvas.height = Math.max(230, parent?.clientHeight || 300));
+      const w = (canvas.width = Math.max(320, parent?.clientWidth || 780));
+      const h = (canvas.height = Math.max(248, parent?.clientHeight || 288));
       const rt = runtimeRef.current;
-
-      // 1. Sky / Dungeon Backdrop
+      const now = Date.now();
       const isDragonStage = round === 4;
+      const groundY = h * 0.81;
+
+      // 1. Atmospheric Fantasy Sky Backdrop per Stage Biome
       const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
       if (isDragonStage) {
-        bgGrad.addColorStop(0, '#1e0510');
-        bgGrad.addColorStop(0.55, '#3b0718');
-        bgGrad.addColorStop(1, '#0f172a');
+        bgGrad.addColorStop(0, '#16040d');
+        bgGrad.addColorStop(0.5, '#3b0918');
+        bgGrad.addColorStop(0.82, '#5c1218');
+        bgGrad.addColorStop(1, '#12070c');
       } else if (round === 3) {
-        bgGrad.addColorStop(0, '#1e1b4b');
-        bgGrad.addColorStop(0.6, '#311042');
-        bgGrad.addColorStop(1, '#0f172a');
+        bgGrad.addColorStop(0, '#120c2c');
+        bgGrad.addColorStop(0.55, '#2b144d');
+        bgGrad.addColorStop(1, '#0c0d1f');
+      } else if (round === 2) {
+        bgGrad.addColorStop(0, '#0b1222');
+        bgGrad.addColorStop(0.58, '#1e293b');
+        bgGrad.addColorStop(1, '#090e18');
       } else {
-        bgGrad.addColorStop(0, '#0f172a');
-        bgGrad.addColorStop(0.55, '#1e293b');
-        bgGrad.addColorStop(1, '#090d16');
+        bgGrad.addColorStop(0, '#09152a');
+        bgGrad.addColorStop(0.55, '#132a47');
+        bgGrad.addColorStop(1, '#09131e');
       }
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, w, h);
 
-      // 2. Side-Scrolling RPG Stone Bridge & Dungeon Pillars
-      const groundY = h * 0.78;
+      // Twinkling stars
       ctx.save();
-      // Distant castle / dungeon pillars
-      for (let pIdx = 0; pIdx < 5; pIdx += 1) {
-        const px = ((pIdx * 190 - rt.roadOffset * 120) % (w + 180) + (w + 180)) % (w + 180) - 90;
-        ctx.fillStyle = isDragonStage ? 'rgba(136, 19, 55, 0.22)' : 'rgba(30, 41, 59, 0.45)';
-        ctx.fillRect(px, h * 0.16, 36, groundY - h * 0.16);
-        // Torch glow on pillar
+      for (let s = 0; s < 26; s += 1) {
+        const sx = ((s * 97.3) % 100) / 100 * w;
+        const sy = ((s * 43.7) % 52) / 100 * h;
+        const twinkle = 0.25 + 0.65 * Math.abs(Math.sin(now * 0.0018 + s * 1.7));
+        ctx.fillStyle = isDragonStage
+          ? `rgba(253, 186, 116, ${twinkle * 0.6})`
+          : `rgba(226, 232, 240, ${twinkle * 0.85})`;
         ctx.beginPath();
-        ctx.arc(px + 18, h * 0.36, 8, 0, Math.PI * 2);
-        ctx.fillStyle = isDragonStage ? 'rgba(251, 113, 133, 0.45)' : 'rgba(251, 191, 36, 0.38)';
+        ctx.arc(sx, sy, s % 5 === 0 ? 1.8 : 1.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Moon / Volcanic Eclipse with soft atmospheric halo
+      const moonX = w * 0.16;
+      const moonY = h * 0.23;
+      const moonGlow = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, 68);
+      if (isDragonStage) {
+        moonGlow.addColorStop(0, 'rgba(251, 146, 60, 0.55)');
+        moonGlow.addColorStop(0.45, 'rgba(225, 29, 72, 0.24)');
+        moonGlow.addColorStop(1, 'rgba(225, 29, 72, 0)');
+      } else if (round === 3) {
+        moonGlow.addColorStop(0, 'rgba(192, 132, 252, 0.45)');
+        moonGlow.addColorStop(0.5, 'rgba(139, 92, 246, 0.18)');
+        moonGlow.addColorStop(1, 'rgba(139, 92, 246, 0)');
+      } else {
+        moonGlow.addColorStop(0, 'rgba(186, 230, 253, 0.42)');
+        moonGlow.addColorStop(0.5, 'rgba(56, 189, 248, 0.14)');
+        moonGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      }
+      ctx.fillStyle = moonGlow;
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, 68, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, 18, 0, Math.PI * 2);
+      ctx.fillStyle = isDragonStage ? '#fb7185' : round === 3 ? '#ddd6fe' : '#e0f2fe';
+      ctx.fill();
+      if (isDragonStage) {
+        ctx.beginPath();
+        ctx.arc(moonX + 3, moonY - 1, 14, 0, Math.PI * 2);
+        ctx.fillStyle = '#1f0610';
         ctx.fill();
       }
 
-      // Stone Battlefield Ground Floor
-      ctx.fillStyle = isDragonStage ? '#27121b' : '#1e293b';
+      // 2. Parallax Distant Mountain Ridges & Gothic Castle / Volcanic Spires
+      ctx.save();
+      const mountainShift = (rt.roadOffset * 28) % 240;
+      ctx.fillStyle = isDragonStage
+        ? 'rgba(42, 7, 17, 0.85)'
+        : round === 3
+        ? 'rgba(24, 14, 48, 0.82)'
+        : 'rgba(15, 28, 46, 0.82)';
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      for (let x = -240; x <= w + 240; x += 120) {
+        const px = x - mountainShift;
+        ctx.lineTo(px + 30, groundY - 58);
+        ctx.lineTo(px + 65, groundY - (isDragonStage ? 92 : 76));
+        ctx.lineTo(px + 100, groundY - 46);
+      }
+      ctx.lineTo(w, groundY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Distant Castle Silhouette on mid-horizon
+      const castleX = w * 0.49;
+      ctx.fillStyle = isDragonStage ? 'rgba(30, 6, 14, 0.9)' : 'rgba(15, 23, 42, 0.86)';
+      ctx.fillRect(castleX - 44, groundY - 78, 88, 78);
+      ctx.fillRect(castleX - 58, groundY - 102, 22, 102);
+      ctx.fillRect(castleX + 36, groundY - 96, 22, 96);
+      ctx.beginPath();
+      ctx.moveTo(castleX - 62, groundY - 102);
+      ctx.lineTo(castleX - 47, groundY - 126);
+      ctx.lineTo(castleX - 32, groundY - 102);
+      ctx.moveTo(castleX + 32, groundY - 96);
+      ctx.lineTo(castleX + 47, groundY - 118);
+      ctx.lineTo(castleX + 62, groundY - 96);
+      ctx.fill();
+      // Glowing castle windows
+      ctx.fillStyle = isDragonStage ? 'rgba(251, 146, 60, 0.65)' : 'rgba(253, 224, 71, 0.55)';
+      ctx.fillRect(castleX - 50, groundY - 86, 5, 10);
+      ctx.fillRect(castleX + 44, groundY - 82, 5, 10);
+      ctx.fillRect(castleX - 10, groundY - 56, 6, 11);
+      ctx.fillRect(castleX + 8, groundY - 56, 6, 11);
+      ctx.restore();
+
+      // 3. Midground Stone Bridge Pillars & Flickering Animated Torches
+      ctx.save();
+      const pillarSpacing = 195;
+      for (let pIdx = 0; pIdx < 6; pIdx += 1) {
+        const span = w + pillarSpacing;
+        const px = ((pIdx * pillarSpacing - rt.roadOffset * 95) % span + span) % span - 95;
+        // Stone column
+        ctx.fillStyle = isDragonStage
+          ? 'rgba(54, 15, 24, 0.65)'
+          : round === 3
+          ? 'rgba(42, 24, 74, 0.58)'
+          : 'rgba(30, 41, 59, 0.58)';
+        ctx.fillRect(px, h * 0.14, 30, groundY - h * 0.14);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.fillRect(px, h * 0.14, 4, groundY - h * 0.14);
+
+        // Animated Torch radial light cone
+        const flicker = Math.sin(now * 0.015 + pIdx * 2.1) * 3.5;
+        const tx = px + 15;
+        const ty = h * 0.42;
+        const torchGrad = ctx.createRadialGradient(tx, ty, 2, tx, ty, 36 + flicker);
+        if (isDragonStage) {
+          torchGrad.addColorStop(0, 'rgba(254, 215, 170, 0.9)');
+          torchGrad.addColorStop(0.3, 'rgba(249, 115, 22, 0.45)');
+          torchGrad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        } else if (round === 3) {
+          torchGrad.addColorStop(0, 'rgba(240, 171, 252, 0.85)');
+          torchGrad.addColorStop(0.3, 'rgba(168, 85, 247, 0.35)');
+          torchGrad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+        } else {
+          torchGrad.addColorStop(0, 'rgba(254, 240, 138, 0.85)');
+          torchGrad.addColorStop(0.32, 'rgba(245, 158, 11, 0.36)');
+          torchGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        }
+        ctx.fillStyle = torchGrad;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 36 + flicker, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Flame core
+        ctx.beginPath();
+        ctx.arc(tx, ty, 4.5 + flicker * 0.18, 0, Math.PI * 2);
+        ctx.fillStyle = round === 3 ? '#e879f9' : '#fde047';
+        ctx.fill();
+      }
+
+      // Ambient floating fireflies / volcanic embers
+      for (let m = 0; m < 16; m += 1) {
+        const mx = ((m * 73 + now * (isDragonStage ? 0.018 : 0.01)) % w);
+        const my = isDragonStage
+          ? groundY - ((m * 41 + now * 0.032) % (groundY * 0.85))
+          : h * 0.24 + ((m * 37) % (groundY * 0.52)) + Math.sin(now * 0.003 + m) * 10;
+        const mAlpha = 0.25 + 0.55 * Math.abs(Math.sin(now * 0.004 + m * 1.4));
+        ctx.fillStyle = isDragonStage
+          ? `rgba(251, 146, 60, ${mAlpha})`
+          : round === 3
+          ? `rgba(192, 132, 252, ${mAlpha})`
+          : `rgba(52, 211, 153, ${mAlpha * 0.85})`;
+        ctx.beginPath();
+        ctx.arc(mx, my, isDragonStage ? 2.1 : 1.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 4. Textured Stone Cobblestone Battlefield Ground
+      ctx.save();
+      const groundGrad = ctx.createLinearGradient(0, groundY, 0, h);
+      if (isDragonStage) {
+        groundGrad.addColorStop(0, '#301119');
+        groundGrad.addColorStop(1, '#12060a');
+      } else if (round === 3) {
+        groundGrad.addColorStop(0, '#22183b');
+        groundGrad.addColorStop(1, '#0d091c');
+      } else {
+        groundGrad.addColorStop(0, '#1e2c42');
+        groundGrad.addColorStop(1, '#0b1220');
+      }
+      ctx.fillStyle = groundGrad;
       ctx.fillRect(0, groundY, w, h - groundY);
-      ctx.strokeStyle = isDragonStage ? '#f43f5e' : '#38bdf8';
-      ctx.lineWidth = 2.5;
+
+      // Scrolling stone slab seams
+      ctx.strokeStyle = isDragonStage ? 'rgba(244, 63, 94, 0.22)' : 'rgba(148, 163, 184, 0.16)';
+      ctx.lineWidth = 1.2;
+      const tileW = 64;
+      const tileShift = (rt.roadOffset * 120) % tileW;
+      for (let tx = -tileW; tx <= w + tileW; tx += tileW) {
+        const sx = tx - tileShift;
+        ctx.beginPath();
+        ctx.moveTo(sx, groundY);
+        ctx.lineTo(sx - 18, h);
+        ctx.stroke();
+      }
+
+      // Glowing magma pulse beneath floor in Stage 4
+      if (isDragonStage) {
+        const lavaPulse = 0.35 + 0.25 * Math.sin(now * 0.005);
+        const lavaGlow = ctx.createLinearGradient(0, groundY - 6, 0, groundY + 14);
+        lavaGlow.addColorStop(0, `rgba(249, 115, 22, ${lavaPulse})`);
+        lavaGlow.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        ctx.fillStyle = lavaGlow;
+        ctx.fillRect(0, groundY - 6, w, 20);
+      }
+
+      // Crisp illuminated ground rim line
+      ctx.strokeStyle = isDragonStage ? '#fb7185' : round === 3 ? '#a855f7' : '#38bdf8';
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, groundY);
       ctx.lineTo(w, groundY);
@@ -756,62 +980,24 @@ export default function KnightDragonGame({
       ctx.restore();
 
       if (rt.matchState === 'PLAYING') {
-        rt.roadOffset = (rt.roadOffset + 0.004) % 10;
+        rt.roadOffset = (rt.roadOffset + 0.0038) % 10;
       }
 
-      // 3. Rare Revive Key (🗝️) randomly discovered on the adventure path (NOT gold coins)
-      if (rt.pathKeyDrop && !rt.pathKeyDrop.collected && rt.matchState === 'PLAYING') {
-        rt.pathKeyDrop.xRatio -= 0.0025;
-        const keyX = rt.pathKeyDrop.xRatio * w;
-        const keyY = groundY - 24 + Math.sin(Date.now() * 0.008) * 5;
-
-        ctx.save();
-        ctx.translate(keyX, keyY);
-        ctx.beginPath();
-        ctx.arc(0, 0, 14, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#38bdf8';
-        ctx.stroke();
-        ctx.font = 'bold 14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🗝️', 0, 0);
-        ctx.restore();
-
-        // Collected when reaching the Knight
-        if (rt.pathKeyDrop.xRatio <= 0.27) {
-          rt.pathKeyDrop.collected = true;
-          rt.pathKeyDrop = null;
-          setSessionKeysEarned(k => k + 1);
-          updateAndPersistProfile(prev => ({
-            ...prev,
-            keys: (prev.keys || 0) + 1,
-            keysCollected: (prev.keysCollected || 0) + 1
-          }));
-          spawnBurstParticles(0.24, 0.68, '#38bdf8', 16);
-          spawnFloatingText('+1 🗝️ Nhặt Chìa Khóa Hồi Sinh trên đường!', '#38bdf8', 0.32, 0.58);
-        }
-      }
-
-      // 4. Physical Gold Coins (🪙) bursting ONLY out of hit/slain Monsters and flying into Knight's pouch
+      // 5. Physical Gold Coins (🪙) bursting from slain/struck Monsters into Knight's pouch
       for (let i = (rt.droppedCoins || []).length - 1; i >= 0; i -= 1) {
         const coin = rt.droppedCoins[i];
         coin.age += 1;
         if (coin.age < 24) {
-          // Burst out of monster & bounce on stone ground
           coin.xRatio += coin.vx / w;
           coin.yRatio += coin.vy / h;
-          coin.vy += 0.28; // gravity
-          if (coin.yRatio >= 0.74) {
-            coin.yRatio = 0.74;
+          coin.vy += 0.28;
+          if (coin.yRatio >= 0.78) {
+            coin.yRatio = 0.78;
             coin.vy = -Math.abs(coin.vy) * 0.45;
           }
         } else {
-          // Magnet-fly into Knight's Gold Pouch (xRatio = 0.24, yRatio = 0.68)
-          coin.xRatio += (0.24 - coin.xRatio) * 0.16;
-          coin.yRatio += (0.68 - coin.yRatio) * 0.16;
+          coin.xRatio += (0.23 - coin.xRatio) * 0.16;
+          coin.yRatio += (0.64 - coin.yRatio) * 0.16;
         }
 
         const cx = coin.xRatio * w;
@@ -819,30 +1005,94 @@ export default function KnightDragonGame({
         ctx.save();
         ctx.translate(cx, cy);
         ctx.beginPath();
-        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
         ctx.fillStyle = '#fbbf24';
         ctx.fill();
         ctx.lineWidth = 1.8;
         ctx.strokeStyle = '#fef08a';
         ctx.stroke();
-        ctx.font = 'bold 11px sans-serif';
+        ctx.font = 'bold 10px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#0f172a';
-        ctx.fillText('🪙', 0, 0);
+        ctx.fillText('🪙', 0, 0.5);
         ctx.restore();
 
-        if (coin.age >= 24 && Math.hypot(coin.xRatio - 0.24, coin.yRatio - 0.68) < 0.035) {
+        if (coin.age >= 24 && Math.hypot(coin.xRatio - 0.23, coin.yRatio - 0.64) < 0.04) {
           rt.droppedCoins.splice(i, 1);
         } else if (coin.age > 95) {
           rt.droppedCoins.splice(i, 1);
         }
       }
 
-      // 5. Draw Monster / Dragon Boss on the Right Side of Battlefield
-      const monsterX = w * 0.72 + Math.sin(Date.now() * 0.0035) * (isDragonStage ? 22 : 12);
-      const monsterY = (isDragonStage ? Math.max(76, h * 0.44) : groundY - 30) + (rt.monsterHitAnim > 0 ? -10 : 0);
+      // 6. Rare Revive Keys (🗝️) bursting ONLY out of slain monsters & flying to Knight
+      for (let i = (rt.droppedKeys || []).length - 1; i >= 0; i -= 1) {
+        const kItem = rt.droppedKeys[i];
+        kItem.age += 1;
+        if (kItem.age < 30) {
+          kItem.xRatio += kItem.vx / w;
+          kItem.yRatio += kItem.vy / h;
+          kItem.vy += 0.26;
+          if (kItem.yRatio >= 0.76) {
+            kItem.yRatio = 0.76;
+            kItem.vy = -Math.abs(kItem.vy) * 0.55;
+          }
+        } else {
+          kItem.xRatio += (0.23 - kItem.xRatio) * 0.14;
+          kItem.yRatio += (0.62 - kItem.yRatio) * 0.14;
+        }
+
+        const kx = kItem.xRatio * w;
+        const ky = kItem.yRatio * h;
+        ctx.save();
+        ctx.translate(kx, ky);
+        const halo = ctx.createRadialGradient(0, 0, 4, 0, 0, 22);
+        halo.addColorStop(0, 'rgba(56, 189, 248, 0.75)');
+        halo.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(14, 165, 233, 0.35)';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#7dd3fc';
+        ctx.stroke();
+
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🗝️', 0, 1);
+        ctx.restore();
+
+        if (kItem.age >= 30 && Math.hypot(kItem.xRatio - 0.23, kItem.yRatio - 0.62) < 0.045) {
+          rt.droppedKeys.splice(i, 1);
+        } else if (kItem.age > 115) {
+          rt.droppedKeys.splice(i, 1);
+        }
+      }
+
+      // Compute Combat Positions & Animation Timers
+      const heroAttackSin = Math.sin(rt.heroAttackAnim * Math.PI);
+      const monsterAttackSin = Math.sin(rt.monsterAttackAnim * Math.PI);
+      const heroLungeX = heroAttackSin * Math.min(92, w * 0.13);
+      const heroHurtShiftX = -rt.knightHurtAnim * 18;
+      const heroBaseX = w * 0.23 + heroLungeX + heroHurtShiftX;
+
+      const monsterLungeX = -monsterAttackSin * Math.min(92, w * 0.13);
+      const monsterRecoilX = rt.monsterHitAnim * 16;
+      const monsterIdleSway = Math.sin(now * 0.0028) * (isDragonStage ? 8 : 5);
+      const monsterX = w * 0.75 + monsterLungeX + monsterRecoilX + monsterIdleSway;
+
+      // Decay animation timers
+      if (rt.heroAttackAnim > 0) rt.heroAttackAnim = Math.max(0, rt.heroAttackAnim - 0.055);
+      if (rt.monsterAttackAnim > 0) rt.monsterAttackAnim = Math.max(0, rt.monsterAttackAnim - 0.055);
       if (rt.monsterHitAnim > 0) rt.monsterHitAnim = Math.max(0, rt.monsterHitAnim - 0.06);
+      if (rt.knightHurtAnim > 0) rt.knightHurtAnim = Math.max(0, rt.knightHurtAnim - 0.065);
+      if (rt.dragonFireAnim > 0) rt.dragonFireAnim = Math.max(0, rt.dragonFireAnim - 0.042);
 
       // Compute Monster HP ratio
       let monsterHpRatio = 1;
@@ -853,211 +1103,280 @@ export default function KnightDragonGame({
         monsterHpRatio = Math.max(0, (len - rt.typedProgress) / len);
       }
 
+      // 7. Draw Real Illustrated Monster / Ancient Dragon Boss Sprite
+      const monsterImg = spriteImagesRef.current.get(currentMonster?.spriteUrl);
+      const monsterDrawH = isDragonStage
+        ? Math.min(202, h * 0.74)
+        : Math.min(144, h * 0.56);
+      const mAspect =
+        monsterImg && monsterImg.complete && monsterImg.naturalHeight > 0
+          ? monsterImg.naturalWidth / monsterImg.naturalHeight
+          : isDragonStage
+          ? 1.16
+          : 1.0;
+      const monsterDrawW = monsterDrawH * mAspect;
+      const isFloatingMonster = isDragonStage || currentMonster?.id === 'dark_lich';
+      const monsterBobY = isFloatingMonster
+        ? Math.sin(now * 0.0042) * 6 - 6
+        : Math.sin(now * 0.005) * 2.5;
+      const monsterTopY = groundY + 6 - monsterDrawH + monsterBobY - rt.monsterHitAnim * 6;
+      const monsterCenterY = monsterTopY + monsterDrawH * 0.5;
+
+      // Soft dark contact shadow under monster
       ctx.save();
-      ctx.translate(monsterX, monsterY);
-      if (isDragonStage) {
-        // Giant Ancient Dragon Boss
-        const wingFlap = Math.sin(Date.now() * 0.01) * 14;
-        ctx.fillStyle = '#9f1239';
-        ctx.beginPath();
-        ctx.moveTo(-20, -5);
-        ctx.lineTo(-82, -32 + wingFlap);
-        ctx.lineTo(-64, 18 + wingFlap * 0.5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(20, -5);
-        ctx.lineTo(82, -32 + wingFlap);
-        ctx.lineTo(64, 18 + wingFlap * 0.5);
-        ctx.closePath();
-        ctx.fill();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
+      ctx.beginPath();
+      ctx.ellipse(monsterX, groundY + 3, monsterDrawW * 0.36, isDragonStage ? 11 : 8, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-        ctx.fillStyle = rt.monsterHitAnim > 0 ? '#ffffff' : '#e11d48';
-        ctx.beginPath();
-        ctx.arc(0, 0, 34, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#fbbf24';
-        ctx.stroke();
+      // Subtle atmospheric aura behind Monster
+      const mAura = ctx.createRadialGradient(
+        monsterX,
+        monsterCenterY,
+        10,
+        monsterX,
+        monsterCenterY,
+        monsterDrawH * 0.62
+      );
+      mAura.addColorStop(
+        0,
+        isDragonStage ? 'rgba(244, 63, 94, 0.34)' : `${currentMonster?.color || '#10b981'}38`
+      );
+      mAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = mAura;
+      ctx.beginPath();
+      ctx.arc(monsterX, monsterCenterY, monsterDrawH * 0.62, 0, Math.PI * 2);
+      ctx.fill();
 
-        ctx.fillStyle = '#fbbf24';
-        ctx.beginPath();
-        ctx.moveTo(-18, -26);
-        ctx.lineTo(-32, -48);
-        ctx.lineTo(-8, -32);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(18, -26);
-        ctx.lineTo(32, -48);
-        ctx.lineTo(8, -32);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = '#fde047';
-        ctx.beginPath();
-        ctx.arc(-11, -6, 5, 0, Math.PI * 2);
-        ctx.arc(11, -6, 5, 0, Math.PI * 2);
-        ctx.fill();
+      if (monsterImg && monsterImg.complete && monsterImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.translate(monsterX, monsterTopY + monsterDrawH);
+        const breatheScaleY = 1 + Math.sin(now * 0.0045) * 0.018;
+        ctx.scale(1, breatheScaleY);
+        if (rt.monsterAttackAnim > 0) {
+          ctx.rotate(-monsterAttackSin * 0.1);
+        }
+        ctx.drawImage(monsterImg, -monsterDrawW / 2, -monsterDrawH, monsterDrawW, monsterDrawH);
+        ctx.restore();
       } else {
-        const rSize = round === 1 ? 24 : 28;
-        ctx.fillStyle = rt.monsterHitAnim > 0 ? '#ffffff' : (currentMonster?.color || '#10b981');
+        // Brief loading fallback silhouette
+        ctx.fillStyle = currentMonster?.color || '#10b981';
         ctx.beginPath();
-        ctx.arc(0, 0, rSize, 0, Math.PI * 2);
+        ctx.arc(monsterX, monsterCenterY, 30, 0, Math.PI * 2);
         ctx.fill();
-        ctx.lineWidth = 2.5;
+      }
+
+      // Crisp white-gold impact flash star when monster is struck
+      if (rt.monsterHitAnim > 0.25) {
+        ctx.save();
+        ctx.translate(monsterX - monsterDrawW * 0.06, monsterCenterY);
+        ctx.globalAlpha = Math.min(1, rt.monsterHitAnim);
         ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
-
-        ctx.fillStyle = currentMonster?.eyeColor || '#0f172a';
+        ctx.shadowColor = activeSkin.slashColor || '#38bdf8';
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
-        ctx.arc(-8, -4, 4, 0, Math.PI * 2);
-        ctx.arc(8, -4, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(-26, -24);
+        ctx.lineTo(26, 24);
+        ctx.moveTo(22, -26);
+        ctx.lineTo(-22, 26);
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // Monster Name, HP Bar & Gold Drop Tag
-      const hpW = isDragonStage ? 154 : 112;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-      ctx.fillRect(-hpW / 2, -56, hpW, 8);
-      ctx.fillStyle = isDragonStage ? '#f43f5e' : '#10b981';
-      ctx.fillRect(-hpW / 2, -56, hpW * monsterHpRatio, 8);
+      // Monster Nameplate + HP Bar (clamped cleanly inside viewport, NEVER undefined!)
+      const hpW = isDragonStage ? 186 : 138;
+      const plateX = Math.min(w - hpW / 2 - 14, Math.max(hpW / 2 + 14, monsterX));
+      const plateY = Math.max(24, monsterTopY - 12);
+      const labelText = `${currentMonster?.name || 'Quái Vật'} (+${expectedMonsterGold} 🪙)`;
+
       ctx.font = 'bold 11px sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${currentMonster?.name || 'Quái Vật'} (+${stageMeta.goldPerKill} 🪙)`, 0, -63);
-      ctx.restore();
-
-      // 6. Draw Knight / Female Hero on the Left Side of Battlefield
-      const attackLungeX = rt.heroAttackAnim > 0 ? 58 * rt.heroAttackAnim : 0;
-      const heroBaseX = w * 0.24 + attackLungeX;
-      const heroY = groundY - 22;
-      if (rt.heroAttackAnim > 0) rt.heroAttackAnim = Math.max(0, rt.heroAttackAnim - 0.08);
-      if (rt.knightHurtAnim > 0) rt.knightHurtAnim = Math.max(0, rt.knightHurtAnim - 0.07);
-
-      // Dragon Fire Breath Counter-Attack / Final Smash Beam
-      if (rt.dragonFireAnim > 0 || rt.finalSmashAnim > 0) {
-        if (rt.dragonFireAnim > 0) rt.dragonFireAnim = Math.max(0, rt.dragonFireAnim - 0.05);
-        ctx.save();
-        const beamGrad = ctx.createLinearGradient(monsterX, monsterY, heroBaseX, heroY);
-        beamGrad.addColorStop(0, '#fde047');
-        beamGrad.addColorStop(0.5, '#f97316');
-        beamGrad.addColorStop(1, '#e11d48');
-        ctx.strokeStyle = beamGrad;
-        ctx.lineWidth = rt.finalSmashAnim > 0 ? 44 : 18;
-        ctx.beginPath();
-        ctx.moveTo(monsterX, monsterY + 18);
-        ctx.lineTo(heroBaseX, heroY);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Hero Sword Slash Wave toward Monster
-      if (rt.heroAttackAnim > 0.15) {
-        ctx.save();
-        ctx.strokeStyle = activeSkin.slashColor || '#38bdf8';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.moveTo(heroBaseX, heroY - 16);
-        ctx.lineTo(monsterX, monsterY + 10);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(monsterX, monsterY, 36, -0.8, 0.8);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Draw Hero Sprite (Cape, Hair/Headgear for Male/Female skins, Armor, Glowing Sword)
-      ctx.save();
-      ctx.translate(heroBaseX, heroY);
-
-      // Cape
-      ctx.fillStyle = activeSkin.capeColor || '#1d4ed8';
+      const labelW = Math.max(hpW + 16, ctx.measureText(labelText).width + 20);
+      ctx.fillStyle = 'rgba(9, 13, 24, 0.84)';
       ctx.beginPath();
-      ctx.moveTo(-14, -6);
-      ctx.lineTo(14, -6);
-      ctx.lineTo(20, 22);
-      ctx.lineTo(-20, 22);
-      ctx.closePath();
+      ctx.roundRect(plateX - labelW / 2, plateY - 15, labelW, 20, 8);
       ctx.fill();
-
-      // Female Long Hair / Twin-tails / Ponytail behind head
-      if (activeSkin.hairStyle === 'long_flowing') {
-        ctx.fillStyle = activeSkin.hairColor || '#fde047';
-        ctx.beginPath();
-        ctx.ellipse(0, -10, 18, 22, 0, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (activeSkin.hairStyle === 'twin_tails') {
-        ctx.fillStyle = activeSkin.hairColor || '#c084fc';
-        ctx.beginPath();
-        ctx.ellipse(-16, -12, 6, 16, 0.35, 0, Math.PI * 2);
-        ctx.ellipse(16, -12, 6, 16, -0.35, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (activeSkin.hairStyle === 'high_ponytail') {
-        ctx.fillStyle = activeSkin.hairColor || '#1e293b';
-        ctx.beginPath();
-        ctx.ellipse(12, -26, 7, 14, -0.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Armor Body
-      ctx.fillStyle = rt.knightHurtAnim > 0 ? '#ef4444' : (activeSkin.armorPrimary || '#3b82f6');
-      ctx.beginPath();
-      ctx.roundRect(-13, -8, 26, 24, 6);
-      ctx.fill();
-      ctx.strokeStyle = activeSkin.armorSecondary || '#93c5fd';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = isDragonStage ? 'rgba(244, 63, 94, 0.55)' : 'rgba(148, 163, 184, 0.35)';
+      ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Head
-      ctx.fillStyle = '#fde68a';
+      ctx.fillStyle = isDragonStage ? '#fecdd3' : '#f8fafc';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labelText, plateX, plateY - 5);
+
+      // Gradient HP Bar
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
       ctx.beginPath();
-      ctx.arc(0, -18, 11, 0, Math.PI * 2);
+      ctx.roundRect(plateX - hpW / 2, plateY + 8, hpW, 8, 4);
+      ctx.fill();
+      const hpGrad = ctx.createLinearGradient(plateX - hpW / 2, 0, plateX + hpW / 2, 0);
+      if (isDragonStage) {
+        hpGrad.addColorStop(0, '#e11d48');
+        hpGrad.addColorStop(1, '#f97316');
+      } else {
+        hpGrad.addColorStop(0, '#10b981');
+        hpGrad.addColorStop(1, '#34d399');
+      }
+      ctx.fillStyle = hpGrad;
+      if (monsterHpRatio > 0) {
+        ctx.beginPath();
+        ctx.roundRect(plateX - hpW / 2, plateY + 8, Math.max(6, hpW * monsterHpRatio), 8, 4);
+        ctx.fill();
+      }
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(plateX - hpW / 2, plateY + 8, hpW, 8, 4);
+      ctx.stroke();
+      ctx.restore();
+
+      // 8. Draw Real Illustrated Playable Hero Sprite on the Left Side
+      const heroImg = spriteImagesRef.current.get(activeSkin.spriteUrl);
+      const heroDrawH = Math.min(142, h * 0.55);
+      const hAspect =
+        heroImg && heroImg.complete && heroImg.naturalHeight > 0
+          ? heroImg.naturalWidth / heroImg.naturalHeight
+          : 1.0;
+      const heroDrawW = heroDrawH * hAspect;
+      const heroBobY = Math.sin(now * 0.0055) * 2.2;
+      const heroTopY = groundY + 6 - heroDrawH + heroBobY;
+      const heroCenterY = heroTopY + heroDrawH * 0.5;
+
+      ctx.save();
+      // Ground contact shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
+      ctx.beginPath();
+      ctx.ellipse(heroBaseX, groundY + 3, heroDrawW * 0.34, 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Headgear (Valkyrie wings, Dragon horns, Star tiara, Knight visor)
-      if (activeSkin.headgear === 'valkyrie_wings') {
-        ctx.fillStyle = '#fef08a';
-        ctx.beginPath();
-        ctx.moveTo(-11, -22);
-        ctx.lineTo(-24, -32);
-        ctx.lineTo(-10, -16);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(11, -22);
-        ctx.lineTo(24, -32);
-        ctx.lineTo(10, -16);
-        ctx.fill();
-      } else if (activeSkin.headgear === 'dragon_horns') {
-        ctx.fillStyle = '#fbbf24';
-        ctx.beginPath();
-        ctx.moveTo(-8, -27);
-        ctx.lineTo(-16, -40);
-        ctx.lineTo(-3, -28);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(8, -27);
-        ctx.lineTo(16, -40);
-        ctx.lineTo(3, -28);
-        ctx.fill();
+      // Subtle weapon/class aura glow behind hero
+      const hAura = ctx.createRadialGradient(
+        heroBaseX,
+        heroCenterY,
+        8,
+        heroBaseX,
+        heroCenterY,
+        heroDrawH * 0.58
+      );
+      hAura.addColorStop(
+        0,
+        rt.knightHurtAnim > 0.25 ? 'rgba(239, 68, 68, 0.45)' : `${activeSkin.bladeColor || '#38bdf8'}36`
+      );
+      hAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = hAura;
+      ctx.beginPath();
+      ctx.arc(heroBaseX, heroCenterY, heroDrawH * 0.58, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (heroImg && heroImg.complete && heroImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.translate(heroBaseX, heroTopY + heroDrawH);
+        const hScaleY = 1 + Math.sin(now * 0.0055) * 0.016;
+        ctx.scale(1, hScaleY);
+        if (rt.heroAttackAnim > 0) {
+          ctx.rotate(heroAttackSin * 0.09);
+        } else if (rt.knightHurtAnim > 0) {
+          ctx.rotate(-rt.knightHurtAnim * 0.08);
+        }
+        ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
+        ctx.restore();
       } else {
-        ctx.fillStyle = activeSkin.armorSecondary || '#93c5fd';
-        ctx.fillRect(-10, -29, 20, 6);
+        ctx.fillStyle = activeSkin.armorPrimary || '#3b82f6';
+        ctx.beginPath();
+        ctx.arc(heroBaseX, heroCenterY, 26, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 9. Crisp RPG Combat VFX (Crescent Sword Slash / Monster Claw Strike / Volumetric Dragon Fire Breath)
+      // 9a. Hero Crescent Energy Slash Wave
+      if (rt.heroAttackAnim > 0.06) {
+        const progress = 1 - rt.heroAttackAnim;
+        const slashX = heroBaseX + 26 + (monsterX - heroBaseX - 36) * Math.min(1, progress * 1.25);
+        const slashY = heroCenterY + (monsterCenterY - heroCenterY) * progress;
+        ctx.save();
+        ctx.translate(slashX, slashY);
+        ctx.globalAlpha = Math.min(1, rt.heroAttackAnim * 1.4);
+        ctx.shadowColor = activeSkin.slashColor || '#38bdf8';
+        ctx.shadowBlur = 18;
+
+        // Outer glowing crescent moon arc
+        ctx.fillStyle = activeSkin.slashColor || '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(0, 0, 38, -Math.PI * 0.44, Math.PI * 0.44);
+        ctx.quadraticCurveTo(10, 0, Math.cos(-Math.PI * 0.44) * 38, Math.sin(-Math.PI * 0.44) * 38);
+        ctx.closePath();
+        ctx.fill();
+
+        // Bright white inner razor edge
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(3, 0, 34, -Math.PI * 0.38, Math.PI * 0.38);
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // Glowing Sword in Right Hand
-      ctx.save();
-      ctx.translate(16, -4);
-      ctx.rotate(rt.heroAttackAnim > 0 ? -0.9 : -0.25);
-      ctx.fillStyle = activeSkin.bladeColor || '#38bdf8';
-      ctx.fillRect(-2.5, -34, 5, 32);
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(-7, -4, 14, 4);
-      ctx.restore();
+      // 9b. Regular Monster Claw / Arcane Counter-Attack Slash (Stages 1–3 ONLY)
+      if (rt.monsterAttackAnim > 0.06 && !isDragonStage) {
+        ctx.save();
+        ctx.translate(heroBaseX, heroCenterY);
+        ctx.globalAlpha = Math.min(1, rt.monsterAttackAnim * 1.3);
+        const strikeColor = round === 3 ? '#c084fc' : '#f43f5e';
+        ctx.strokeStyle = strikeColor;
+        ctx.shadowColor = strikeColor;
+        ctx.shadowBlur = 14;
+        ctx.lineCap = 'round';
+        // 3 diagonal claw marks slashing over Hero
+        [-14, 0, 14].forEach((offset, idx) => {
+          ctx.lineWidth = idx === 1 ? 4.5 : 3;
+          ctx.beginPath();
+          ctx.moveTo(26 + offset, -26 + offset * 0.5);
+          ctx.quadraticCurveTo(offset * 0.4, offset * 0.2, -26 + offset, 26 + offset * 0.5);
+          ctx.stroke();
+        });
+        // Expanding shockwave ring
+        const ringR = 18 + (1 - rt.monsterAttackAnim) * 44;
+        ctx.strokeStyle = 'rgba(251, 113, 133, 0.55)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
 
-      ctx.restore();
+      // 9c. Volumetric Dragon Fire Breath Cone (Stage 4 Boss Dragon ONLY — ZERO solid rectangle!)
+      if ((rt.dragonFireAnim > 0.05 || rt.finalSmashAnim > 0.05) && isDragonStage) {
+        const intensity = rt.finalSmashAnim > 0 ? 1 : rt.dragonFireAnim;
+        const mouthX = monsterX - monsterDrawW * 0.21;
+        const mouthY = monsterTopY + monsterDrawH * 0.34;
+        const targetX = heroBaseX;
+        const targetY = heroCenterY;
+        const puffCount = rt.finalSmashAnim > 0 ? 32 : 22;
 
-      // 6. Particles & Floating Loot Text
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let f = 0; f < puffCount; f += 1) {
+          const t = (f + ((now * 0.024) % 1)) / puffCount;
+          const wobble = Math.sin(now * 0.025 + f * 1.4) * (6 + t * 14);
+          const fx = mouthX + (targetX - mouthX) * t;
+          const fy = mouthY + (targetY - mouthY) * t + wobble;
+          const radius = (rt.finalSmashAnim > 0 ? 14 : 9) + t * (rt.finalSmashAnim > 0 ? 34 : 20);
+          const fGrad = ctx.createRadialGradient(fx, fy, 1, fx, fy, radius);
+          fGrad.addColorStop(0, `rgba(254, 249, 195, ${0.82 * intensity * (1 - t * 0.25)})`);
+          fGrad.addColorStop(0.35, `rgba(249, 115, 22, ${0.65 * intensity * (1 - t * 0.2)})`);
+          fGrad.addColorStop(0.75, `rgba(225, 29, 72, ${0.35 * intensity * (1 - t * 0.25)})`);
+          fGrad.addColorStop(1, 'rgba(225, 29, 72, 0)');
+          ctx.fillStyle = fGrad;
+          ctx.beginPath();
+          ctx.arc(fx, fy, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // 10. Particles & Floating Combat / Loot Texts
       for (let i = rt.particles.length - 1; i >= 0; i -= 1) {
         const p = rt.particles[i];
         p.xRatio += p.vx / w;
@@ -1079,7 +1398,7 @@ export default function KnightDragonGame({
       for (let i = rt.floatingTexts.length - 1; i >= 0; i -= 1) {
         const ft = rt.floatingTexts[i];
         ft.yRatio += ft.vy / h;
-        ft.alpha -= 0.022;
+        ft.alpha -= 0.02;
         if (ft.alpha <= 0) {
           rt.floatingTexts.splice(i, 1);
           continue;
@@ -1087,8 +1406,11 @@ export default function KnightDragonGame({
         ctx.save();
         ctx.globalAlpha = Math.max(0, ft.alpha);
         ctx.font = 'bold 13px sans-serif';
-        ctx.fillStyle = ft.color;
         ctx.textAlign = 'center';
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(9, 13, 24, 0.9)';
+        ctx.strokeText(ft.text, ft.xRatio * w, ft.yRatio * h);
+        ctx.fillStyle = ft.color;
         ctx.fillText(ft.text, ft.xRatio * w, ft.yRatio * h);
         ctx.restore();
       }
@@ -1100,7 +1422,7 @@ export default function KnightDragonGame({
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [round, wordIdx, activeQ, activeSkin]);
+  }, [round, wordIdx, activeQ, activeSkin, expectedMonsterGold, currentMonster]);
 
   const handleBuyOrEquipSkin = (skin) => {
     const isUnlocked = rpgProfile.unlockedSkins.includes(skin.id);
@@ -1167,7 +1489,7 @@ export default function KnightDragonGame({
       data-testid="knight-dragon-game-root"
       className="min-h-[100dvh] w-full bg-[#090D16] text-white flex flex-col select-none relative overflow-x-hidden"
     >
-      {/* Top Bar: Switch Game Mode + Gold / Revive Keys Inventory + Character Skin Shop */}
+      {/* Top Bar: Switch Game Mode + Teacher Question Bank + Gold / Revive Keys + Character Skin Shop */}
       <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 flex-wrap z-30">
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -1204,6 +1526,19 @@ export default function KnightDragonGame({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Teacher Question Bank Manager Button */}
+          {isTeacher && onOpenVocabManager && (
+            <button
+              type="button"
+              data-testid="knight-open-vocab-manager-btn"
+              onClick={() => onOpenVocabManager(resolveSelectedRawVocab())}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-400/50 text-white text-xs font-extrabold shadow-sm transition"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Quản Lý Bộ Đề / Ra Đề (GV)</span>
+            </button>
+          )}
+
           {/* Gold Balance */}
           <div
             data-testid="knight-gold-badge"
@@ -1217,7 +1552,7 @@ export default function KnightDragonGame({
           <div
             data-testid="knight-keys-badge"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 border border-sky-400/40 text-sky-300 text-xs font-black"
-            title="Chìa Khóa Hồi Sinh (Nhặt ngẫu nhiên trên đường hoặc đổi bằng Vàng để mua mạng khi thua giống Subway Surfers)"
+            title="Chìa Khóa Hồi Sinh (Tỉ lệ hiếm rớt khi hạ quái hoặc đổi bằng Vàng để hồi sinh khi thua)"
           >
             <KeyRound className="w-3.5 h-3.5 text-sky-400" />
             <span>{rpgProfile.keys || 0} 🗝️ Chìa Khóa</span>
@@ -1236,7 +1571,7 @@ export default function KnightDragonGame({
         </div>
       </header>
 
-      {/* HUB SCREEN: Stage Select, Hero Preview & Topic Selector */}
+      {/* HUB SCREEN: Stage Select, Illustrated Hero Preview, Monster Roster & Topic Selector */}
       {matchState === 'HUB' && (
         <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-5">
           <div className="rounded-3xl border border-rose-500/35 bg-gradient-to-br from-slate-900 via-[#1a1025] to-slate-900 p-5 sm:p-7 shadow-2xl space-y-5">
@@ -1249,47 +1584,63 @@ export default function KnightDragonGame({
                   Hiệp Sĩ Diệt Rồng — Đấu Trường Từ Vựng RPG
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                  Đánh hạ quái <b>Slime, Goblin, Orc &amp; Boss Rồng Hắc Ám</b> để quái rớt ra <b>🪙 Tiền Vàng</b> tích lũy mua nhân vật mới (<b>Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura, Nữ Pháp Sư Selena</b>), ngẫu nhiên nhặt <b>🗝️ Chìa Khóa Hồi Sinh</b> trên đường để mua mạng khi thua (giống Subway Surfers) và chém hạ Rồng trước khi Rồng tung <b>Skill Tất Sát Kết Liễu (Final Smash)</b>!
+                  Đánh hạ quái <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để quái rớt ra <b>🪙 Tiền Vàng</b> tích lũy mua nhân vật mới (<b>Valkyrie Freya, Kiếm Khách Tomoe, Pháp Sư Selena, Nữ Hoàng Long Tộc...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
                 </p>
               </div>
 
-              {/* Active Hero Card */}
-              <div className="shrink-0 rounded-2xl border border-pink-500/40 bg-slate-950/80 p-3.5 flex items-center gap-3.5">
+              {/* Active Hero Showcase Card with Real Illustrated Sprite */}
+              <div className="shrink-0 rounded-2xl border border-pink-500/40 bg-slate-950/90 p-3 flex items-center gap-3.5 shadow-lg">
                 <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black border-2 shadow-md"
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center border-2 p-1 shadow-inner relative overflow-hidden shrink-0"
                   style={{
-                    backgroundColor: activeSkin.armorPrimary,
+                    background: `radial-gradient(circle at 50% 45%, ${activeSkin.bladeColor}33, #090d16 80%)`,
                     borderColor: activeSkin.armorSecondary
                   }}
                 >
-                  {activeSkin.gender === 'Nữ' ? '👩‍🎤' : '⚔️'}
+                  <img
+                    src={activeSkin.spriteUrl}
+                    alt={activeSkin.name}
+                    className="w-full h-full object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.75)]"
+                  />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 max-w-[205px]">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-black text-white truncate">{activeSkin.name}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-extrabold">
+                    <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-extrabold shrink-0">
                       {activeSkin.genderBadge}
                     </span>
                   </div>
-                  <p className="text-[11px] text-amber-300 font-bold mt-0.5">{activeSkin.weaponName}</p>
-                  <p className="text-[11px] text-slate-400">{activeSkin.passiveText}</p>
+                  <p className="text-[11px] text-amber-300 font-bold mt-0.5 truncate">{activeSkin.weaponName}</p>
+                  <p className="text-[11px] text-slate-400 leading-snug line-clamp-2">{activeSkin.passiveText}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowShopModal(true)}
-                  className="px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-extrabold transition shrink-0"
+                  className="px-3 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-extrabold transition shrink-0"
                 >
                   Đổi Skin
                 </button>
               </div>
             </div>
 
-            {/* Vocab Topic & Speed Configuration */}
+            {/* Vocab Topic & Speed Configuration + Teacher Quick Question Bank Link */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  Chọn Kho Từ Vựng Chiến Đấu ({bankItemsCount} từ)
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-300">
+                    Chọn Kho Từ Vựng ({bankItemsCount} từ)
+                  </label>
+                  {isTeacher && onOpenVocabManager && (
+                    <button
+                      type="button"
+                      data-testid="knight-hub-manage-vocab-btn"
+                      onClick={() => onOpenVocabManager(resolveSelectedRawVocab())}
+                      className="text-[11px] font-extrabold text-emerald-300 hover:text-emerald-200 underline underline-offset-2 transition"
+                    >
+                      + Tạo / Sửa bộ đề
+                    </button>
+                  )}
+                </div>
                 <select
                   value={topicId}
                   onChange={e => setTopicId(e.target.value)}
@@ -1365,34 +1716,63 @@ export default function KnightDragonGame({
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 hover:opacity-95 text-slate-950 font-black text-sm sm:text-base shadow-xl flex items-center justify-center gap-2 transition"
               >
                 <Swords className="w-5 h-5" />
-                <span>XUẤT CHinh ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG HẮC ÁM</span>
+                <span>XUẤT CHINH ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG HẮC ÁM</span>
               </button>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {KNIGHT_MONSTER_STAGES.map(st => (
-                  <button
-                    key={st.round}
-                    type="button"
-                    data-testid={`start-knight-stage-${st.round}`}
-                    onClick={() => startKnightCampaign(st.round, true)}
-                    className={`p-3.5 rounded-2xl border text-left transition space-y-1 ${
-                      st.round === 4
-                        ? 'bg-rose-950/40 hover:bg-rose-900/50 border-rose-500/50 text-rose-100'
-                        : 'bg-slate-950/80 hover:bg-slate-900 border-slate-800 hover:border-amber-500/50 text-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-black text-amber-400">{st.shortTitle}</span>
-                      {st.round === 4 && (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black">
-                          FINAL BOSS
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] font-bold text-slate-200">{st.mechanicLabel}</p>
-                    <p className="text-[11px] text-slate-400 leading-snug">{st.questionDesc}</p>
-                  </button>
-                ))}
+                {KNIGHT_MONSTER_STAGES.map(st => {
+                  const stageKeyMinPct = Math.round(
+                    computeMonsterKeyDropChance(st.monsters[0], activeSkin) * 100
+                  );
+                  return (
+                    <button
+                      key={st.round}
+                      type="button"
+                      data-testid={`start-knight-stage-${st.round}`}
+                      onClick={() => startKnightCampaign(st.round, true)}
+                      className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2 ${
+                        st.round === 4
+                          ? 'bg-rose-950/45 hover:bg-rose-900/55 border-rose-500/50 text-rose-100'
+                          : 'bg-slate-950/85 hover:bg-slate-900 border-slate-800 hover:border-amber-500/50 text-slate-100'
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className="text-xs font-black text-amber-400">{st.shortTitle}</span>
+                          {st.round === 4 ? (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black">
+                              FINAL BOSS
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[10px] font-bold">
+                              🗝️ {stageKeyMinPct}%+
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Real Illustrated Monster Roster Preview */}
+                        <div className="flex items-center justify-center gap-2 py-1.5 px-2 rounded-xl bg-slate-900/80 border border-slate-800/90">
+                          {st.monsters.map(m => (
+                            <div key={m.id} className="flex flex-col items-center gap-0.5" title={m.name}>
+                              <img
+                                src={m.spriteUrl}
+                                alt={m.name}
+                                className={
+                                  st.round === 4
+                                    ? 'w-20 h-16 object-contain drop-shadow-[0_4px_10px_rgba(244,63,94,0.65)]'
+                                    : 'w-12 h-12 object-contain drop-shadow-[0_3px_6px_rgba(0,0,0,0.6)]'
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="text-[11px] font-bold text-slate-200">{st.mechanicLabel}</p>
+                        <p className="text-[11px] text-slate-400 leading-snug">{st.questionDesc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1469,16 +1849,21 @@ export default function KnightDragonGame({
           </div>
 
           {/* Side-Scrolling RPG Monster Duel Canvas */}
-          <div className="relative h-56 sm:h-64 w-full rounded-2xl border border-slate-800 overflow-hidden shadow-2xl bg-slate-950 shrink-0">
+          <div className="relative h-64 sm:h-72 w-full rounded-2xl border border-slate-800 overflow-hidden shadow-2xl bg-slate-950 shrink-0">
             <canvas ref={canvasRef} className="w-full h-full block" />
 
-            {/* Monster Gold Drop & Path Key Drop Info Pill */}
-            <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 z-20 text-[11px] font-bold text-slate-200">
+            {/* Monster Gold & Rare Key Drop Info Pill (computed cleanly — never undefined / NaN) */}
+            <div
+              data-testid="knight-loot-info-pill"
+              className="absolute bottom-2 right-2.5 flex items-center gap-2 bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-1.5 z-20 text-[11px] font-bold text-slate-200 backdrop-blur-xs"
+            >
               <span className="text-amber-300">
-                🪙 Hạ {currentMonster?.name}: Rớt +{stageMeta.goldPerKill + (Number(activeSkin.bonusGoldPerKill) || 0)} Vàng
+                🪙 Hạ {currentMonster?.name}: Rớt +{expectedMonsterGold} Vàng
               </span>
               <span className="text-slate-600">•</span>
-              <span className="text-sky-300">🗝️ Chìa khóa hồi sinh: Ngẫu nhiên trên đường</span>
+              <span className="text-sky-300">
+                🗝️ Tỉ lệ rớt Chìa Khóa: {expectedKeyDropPct}%
+              </span>
             </div>
 
             {bannerAlert && (
@@ -1549,7 +1934,7 @@ export default function KnightDragonGame({
                           key={`${cText}-${idx}`}
                           type="button"
                           data-testid={`knight-choice-${idx}`}
-                          onClick={() => handleSelectRuneChoice(cText, idx)}
+                          onClick={() => handleSelectRuneChoice(cText)}
                           className="p-3 rounded-xl bg-slate-950 hover:bg-rose-500/20 border border-slate-700 hover:border-rose-400 text-left flex items-center gap-3 transition group"
                         >
                           <span className="w-7 h-7 rounded-lg bg-rose-600 group-hover:bg-amber-400 group-hover:text-slate-950 text-white text-xs font-black flex items-center justify-center shrink-0">
@@ -1678,7 +2063,7 @@ export default function KnightDragonGame({
         </div>
       )}
 
-      {/* SUBWAY SURFERS STYLE "SAVE ME / MUA MẠNG HỒI SINH BẰNG CHÌA KHÓA" MODAL */}
+      {/* REVIVE PROMPT MODAL (USE RARE MONSTER-DROPPED KEYS OR GOLD) */}
       {matchState === 'REVIVE_PROMPT' && (
         <div
           data-testid="knight-revive-modal"
@@ -1696,7 +2081,7 @@ export default function KnightDragonGame({
                 Dùng Chìa Khóa Hồi Sinh Ngay?
               </h2>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Giống như Subway Surfers, bạn có thể dùng <b>🗝️ Chìa Khóa Hồi Sinh</b> nhặt được trên đường (hoặc dùng <b>🪙 Vàng</b>) để hồi đầy <b>3 ❤️</b> và chiến đấu tiếp ngay tại con quái này!
+                Bạn có thể dùng <b>🗝️ Chìa Khóa Hồi Sinh</b> rớt ra từ quái (hoặc dùng <b>🪙 Vàng</b>) để hồi đầy <b>3 ❤️</b> và chiến đấu tiếp ngay tại con quái này!
               </p>
             </div>
 
@@ -1786,7 +2171,7 @@ export default function KnightDragonGame({
               TỔNG KẾT HÀNH TRÌNH HIỆP SĨ
             </h2>
             <p className="text-xs text-slate-300">
-              Điểm trận này: <b className="text-amber-300 text-base">{score} điểm</b> • Nhặt được: <b className="text-amber-400">+{sessionGoldEarned} 🪙 Vàng</b> &amp; <b className="text-sky-300">+{sessionKeysEarned} 🗝️ Chìa Khóa</b>
+              Điểm trận này: <b className="text-amber-300 text-base">{score} điểm</b> • Chiến lợi phẩm quái rớt: <b className="text-amber-400">+{sessionGoldEarned} 🪙 Vàng</b> &amp; <b className="text-sky-300">+{sessionKeysEarned} 🗝️ Chìa Khóa</b>
             </p>
             <div className="grid grid-cols-2 gap-2.5 bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-xs">
               <div>
@@ -1828,21 +2213,21 @@ export default function KnightDragonGame({
         </div>
       )}
 
-      {/* CHARACTER SKIN SHOP MODAL (MALE & FEMALE HEROES + BUY REVIVE KEYS) */}
+      {/* CHARACTER SKIN SHOP MODAL (7 DISTINCT ILLUSTRATED MALE & FEMALE HEROES + BUY REVIVE KEYS) */}
       {showShopModal && (
         <div
           data-testid="knight-skin-shop-modal"
           className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
         >
-          <div className="max-w-3xl w-full rounded-3xl border border-pink-500/40 bg-slate-900 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="max-w-4xl w-full rounded-3xl border border-pink-500/40 bg-slate-900 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-3">
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-pink-400" />
-                  <span>Cửa Hàng Nhân Vật &amp; Skin Hiệp Sĩ (Nam / Nữ)</span>
+                  <span>Cửa Hàng Nhân Vật &amp; Skin Hiệp Sĩ (7 Nhân Vật Nam / Nữ)</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Tích vàng từ đánh quái Slime, Goblin, Orc và Rồng để mở khóa Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura, Nữ Pháp Sư Selena...
+                  Tích vàng từ đánh quái Slime, Goblin, Skeleton, Orc, Golem và Rồng để mở khóa nhân vật độc bản với ngoại hình, vũ khí &amp; kỹ năng riêng biệt.
                 </p>
               </div>
               <button
@@ -1870,8 +2255,8 @@ export default function KnightDragonGame({
               </button>
             </div>
 
-            {/* Character Skins Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Character Skins Grid with Real Illustrated Hero Portraits */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {KNIGHT_CHARACTER_SKINS.map(skin => {
                 const unlocked = rpgProfile.unlockedSkins.includes(skin.id);
                 const equipped = rpgProfile.equippedSkin === skin.id;
@@ -1884,20 +2269,24 @@ export default function KnightDragonGame({
                         ? 'bg-pink-950/35 border-pink-400 ring-1 ring-pink-400/40'
                         : unlocked
                         ? 'bg-slate-950/90 border-slate-700'
-                        : 'bg-slate-950/60 border-slate-800'
+                        : 'bg-slate-950/65 border-slate-800'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-center gap-3.5">
                       <div
-                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black border-2 shrink-0"
+                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl flex items-center justify-center border-2 p-1.5 shrink-0 relative overflow-hidden shadow-lg"
                         style={{
-                          backgroundColor: skin.armorPrimary,
-                          borderColor: skin.armorSecondary
+                          background: `radial-gradient(circle at 50% 45%, ${skin.bladeColor}40, #090d16 78%)`,
+                          borderColor: equipped ? '#f472b6' : skin.armorSecondary
                         }}
                       >
-                        {skin.gender === 'Nữ' ? '👩‍🎤' : '⚔️'}
+                        <img
+                          src={skin.spriteUrl}
+                          alt={skin.name}
+                          className="w-full h-full object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.8)]"
+                        />
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs sm:text-sm font-black text-white">{skin.name}</span>
                           <span
@@ -1913,17 +2302,17 @@ export default function KnightDragonGame({
                             {skin.rarity}
                           </span>
                         </div>
-                        <p className="text-xs font-bold text-amber-300 mt-0.5">
+                        <p className="text-xs font-bold text-amber-300">
                           🗡️ {skin.weaponName}
                         </p>
-                        <p className="text-[11px] text-slate-300 mt-0.5">{skin.passiveText}</p>
+                        <p className="text-[11px] text-slate-300 leading-snug">{skin.passiveText}</p>
                       </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleBuyOrEquipSkin(skin)}
-                      className={`w-full py-2 rounded-xl text-xs font-black transition ${
+                      className={`w-full py-2.5 rounded-xl text-xs font-black transition ${
                         equipped
                           ? 'bg-emerald-500 text-slate-950'
                           : unlocked
