@@ -244,8 +244,6 @@ export default function ExamMode({
   const task1MinWords = activeTest.writing?.task1?.minWords || 150;
   const task2MinWords = activeTest.writing?.task2?.minWords || 250;
 
-  const listeningNeedsLeftPane = Boolean(activeTrack?.imageUrl || activeTrack?.contextText);
-
   const toggleBookmarkQuestion = (qId) => {
     if (!qId) return;
     setExamState(prev => {
@@ -1076,139 +1074,41 @@ export default function ExamMode({
         )}
 
         {/* ============================================================
-            2. LISTENING WORKSPACE (Resizable Split if diagram/context exists)
+            2. LISTENING WORKSPACE (Single Full-Width Cambridge CD Layout — Never Split-Screen)
            ============================================================ */}
-        {examState.skill === 'listening' &&
-          (listeningNeedsLeftPane ? (
-            <SplitResizableWorkspace
-              splitPercent={splitPercent}
-              onChangeSplit={setSplitPercent}
-              left={
-                <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
-                  <div className="px-5 pt-4 pb-3 border-b border-[#E5E7EB] dark:border-[#292929] shrink-0">
-                    <h3 className="font-extrabold text-[#111827] dark:text-white text-base">
-                      {activeTrack?.title || `Part ${safeTrackIdx + 1}`}
-                    </h3>
+        {examState.skill === 'listening' && (
+          <div className="w-full px-1 sm:px-2 py-1 space-y-5 flex-1 overflow-y-auto cd-exam-scroll text-left">
+            {(activeTrack?.imageUrl || String(activeTrack?.contextText || '').trim()) && (
+              <div
+                onMouseUp={handlePassageTextSelect}
+                data-exam-copy-source="true"
+                className="rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] px-4 py-3 space-y-3 select-text"
+              >
+                {String(activeTrack?.contextText || '').trim() && (
+                  <div className={`text-[#1F2937] dark:text-[#EDEDED] font-semibold whitespace-pre-line ${fontSizeClass}`}>
+                    {renderHighlightRuns(activeTrack.contextText)}
                   </div>
-                  <div
-                    onMouseUp={handlePassageTextSelect}
-                    data-exam-copy-source="true"
-                    className={`flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-4 select-text text-[#1F2937] dark:text-[#EDEDED] whitespace-pre-line ${fontSizeClass}`}
-                  >
-                    {activeTrack?.imageUrl && (
-                      <div className="rounded-lg overflow-hidden border border-[#CBD5E1] dark:border-[#3A3A3A] bg-white p-2.5">
-                        <img
-                          src={activeTrack.imageUrl}
-                          alt={`Listening Map ${safeTrackIdx + 1}`}
-                          onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
-                          className="w-full max-h-[48vh] object-contain rounded mx-auto cursor-zoom-in"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
-                          className="mt-2 mx-auto flex items-center gap-1.5 text-xs font-bold text-[#2563EB] hover:underline"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> Phóng to bản đồ / sơ đồ
-                        </button>
-                      </div>
-                    )}
-                    {renderHighlightRuns(activeTrack?.contextText || '')}
+                )}
+                {activeTrack?.imageUrl && (
+                  <div className="rounded-lg overflow-hidden border border-[#CBD5E1] dark:border-[#3A3A3A] bg-white p-2.5 max-w-2xl">
+                    <img
+                      src={activeTrack.imageUrl}
+                      alt={`Listening Map ${safeTrackIdx + 1}`}
+                      onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                      className="w-full max-h-[42vh] object-contain rounded mx-auto cursor-zoom-in"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setZoomedReadingImg(activeTrack.imageUrl)}
+                      className="mt-2 mx-auto flex items-center gap-1.5 text-xs font-bold text-[#2563EB] hover:underline"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Phóng to bản đồ / sơ đồ
+                    </button>
                   </div>
-                </div>
-              }
-              right={
-                <div className="h-full rounded-lg border border-slate-200 dark:border-[#323232] bg-white dark:bg-[#141414] flex flex-col overflow-hidden">
-                  <div className="flex-1 overflow-y-auto cd-exam-scroll px-5 py-4 space-y-5">
-                    {listeningDisplayBlocks.map(block => {
-                      if (block.kind === 'trackHeading') {
-                        return (
-                          <div
-                            key={block.key}
-                            className="rounded-lg border border-[#E5E7EB] dark:border-[#2E2E2E] bg-[#F8FAFC] dark:bg-[#181818] px-3.5 py-2 text-xs font-extrabold uppercase tracking-wider text-[#1F2937] dark:text-[#E5E7EB]"
-                          >
-                            {block.title}
-                          </div>
-                        );
-                      }
-                      if (block.kind === 'cloze') {
-                        return (
-                          <ClozeNoteSheet
-                            key={block.key}
-                            activeBlankNum={activeBlankNum}
-                            answers={examState.answers}
-                            bookmarkedQuestions={bookmarkedQuestions}
-                            clozeText={block.clozeText}
-                            fontSizeClass={fontSizeClass}
-                            inputRefs={blankInputRefs}
-                            onAnswerChange={(qId, val) =>
-                              setExamState(prev => ({
-                                ...prev,
-                                answers: { ...prev.answers, [qId]: val }
-                              }))
-                            }
-                            onBlankFocus={(num, qId) => {
-                              setActiveBlankNum(num);
-                              if (qId) setActiveQuestionId(qId);
-                              if (block.trackIdx !== safeTrackIdx) {
-                                setExamState(prev => ({ ...prev, listeningTrackIdx: block.trackIdx }));
-                              }
-                            }}
-                            onPassageTextSelect={handlePassageTextSelect}
-                            onToggleBookmark={toggleBookmarkQuestion}
-                            onZoomImage={setZoomedReadingImg}
-                            questions={allListeningQs}
-                            renderText={renderHighlightRuns}
-                            scopeField="trackIdx"
-                            scopeIdx={block.trackIdx}
-                          />
-                        );
-                      }
-                      return (
-                        <ExamQuestionList
-                          key={block.key}
-                          activeQuestionId={activeQuestionId}
-                          answers={examState.answers}
-                          baseOffset={block.baseOffset}
-                          bookmarkedQuestions={bookmarkedQuestions}
-                          fontSizeClass={fontSizeClass}
-                          onAnswerChange={(qId, val) =>
-                            setExamState(prev => ({
-                              ...prev,
-                              answers: { ...prev.answers, [qId]: val }
-                            }))
-                          }
-                          onSelectQuestion={q => {
-                            setActiveQuestionId(q.id);
-                            setActiveBlankNum(typeof q.blankNum === 'number' ? q.blankNum : null);
-                            if (typeof q?.trackIdx === 'number' && q.trackIdx !== safeTrackIdx) {
-                              setExamState(prev => ({ ...prev, listeningTrackIdx: q.trackIdx }));
-                            }
-                          }}
-                          onSwitchScope={tIdx => switchPartIndex(tIdx, 'listening')}
-                          onTextSelect={handlePassageTextSelect}
-                          onToggleBookmark={toggleBookmarkQuestion}
-                          onZoomImage={setZoomedReadingImg}
-                          questionCardRefs={questionCardRefs}
-                          questions={block.questions}
-                          renderText={renderHighlightRuns}
-                          scopeLabelPrefix="Part"
-                          scopeType="listening"
-                          showScopeBadge={examState.showAllListeningQs && listeningTracks.length > 1}
-                        />
-                      );
-                    })}
-                    {listeningDisplayBlocks.length === 0 && (
-                      <p className="text-xs text-slate-500 dark:text-neutral-400 text-center py-8">
-                        Chưa có câu hỏi gắn cho Part {safeTrackIdx + 1}.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              }
-            />
-          ) : (
-            <div className="w-full px-1 sm:px-2 py-1 space-y-6 flex-1 overflow-y-auto cd-exam-scroll text-left">
-              {listeningDisplayBlocks.map(block => {
+                )}
+              </div>
+            )}
+            {listeningDisplayBlocks.map(block => {
                 if (block.kind === 'trackHeading') {
                   return (
                     <div
@@ -1292,7 +1192,7 @@ export default function ExamMode({
                 </p>
               ) : null}
             </div>
-          ))}
+          )}
 
         {/* ============================================================
             3. WRITING WORKSPACE (Single-Task Split Pane matching Screenshots 4 & 5)
