@@ -7960,6 +7960,37 @@ export default function App() {
           myAnimalId={myAnimalId}
           myCrewColor={myCrewColor}
           onOpenCheckoutModal={openGlobalCheckoutModal}
+          onSyncKnightResult={payload => {
+            if (!currentUser?.username) return;
+            if (payload?.knightRpgProfile) {
+              setCurrentUser(prev =>
+                prev
+                  ? {
+                      ...prev,
+                      knightRpgProfile: payload.knightRpgProfile
+                    }
+                  : prev
+              );
+              setUsersDb(prev => ({
+                ...prev,
+                [currentUser.username]: {
+                  ...(prev[currentUser.username] || currentUser),
+                  knightRpgProfile: payload.knightRpgProfile
+                }
+              }));
+            }
+            dispatchSyncAction('SUBMIT_PRACTICE_GAME_SCORE', {
+              username: currentUser.username,
+              topicId: payload?.topicId || 'core',
+              topicLabel: payload?.topicLabel || 'IELTS Core Academic',
+              mode: payload?.mode || 'knight_full_4',
+              gameType: 'knight_rpg',
+              score: Number(payload?.score) || 0,
+              passedCount: Number(payload?.passedCount) || 0,
+              totalCount: Math.max(1, Number(payload?.totalCount) || 1),
+              knightRpgProfile: payload?.knightRpgProfile || null
+            });
+          }}
           openMemberProfile={openMemberProfile}
           paymentConfig={paymentConfig}
           previousView={previousView}

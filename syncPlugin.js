@@ -3379,7 +3379,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         return { allowed: false, status: 403, error: 'Không thể gửi điểm luyện tập dưới tên người khác.' };
       }
       const viewerRecord = store.users?.[viewer.username] || viewer;
-      if (!isTeacher && !hasGamePracticeAccess(viewerRecord)) {
+      const isKnightRpgSync = payload?.gameType === 'knight_rpg' || Boolean(payload?.knightRpgProfile);
+      if (!isTeacher && !isKnightRpgSync && !hasGamePracticeAccess(viewerRecord)) {
         return {
           allowed: false,
           status: 403,
@@ -3517,6 +3518,13 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       roomCreateCredits: getFriendRoomTicketCredits(prevUser),
       realExamCredits: getRealExamCredits(prevUser),
       subscriptionRequested: prevUser.subscriptionRequested || null,
+      knightRpgProfile:
+        rawUser.knightRpgProfile && typeof rawUser.knightRpgProfile === 'object'
+          ? {
+              ...(prevUser.knightRpgProfile || {}),
+              ...rawUser.knightRpgProfile
+            }
+          : (prevUser.knightRpgProfile || null),
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
       emailVerifiedAt: prevUser.emailVerifiedAt || null
@@ -5487,22 +5495,36 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const topicId = String(payload?.topicId || 'core').trim().slice(0, 60);
       const topicLabel = String(payload?.topicLabel || 'IELTS Core').trim().slice(0, 80);
       const mode = String(payload?.mode || 'full_4').trim().slice(0, 32);
+      const gameType = payload?.gameType === 'knight_rpg' || mode.startsWith('knight') ? 'knight_rpg' : 'space_shooter';
       const passedCount = Math.max(0, Math.min(200, Math.round(Number(payload?.passedCount) || 0)));
       const totalCount = Math.max(1, Math.min(200, Math.round(Number(payload?.totalCount) || 1)));
       const accuracyPct = Math.min(100, Math.max(0, Math.round((passedCount / totalCount) * 100)));
       const nowMs = Date.now();
+      if (payload?.knightRpgProfile && typeof payload.knightRpgProfile === 'object') {
+        const uKey = findUserKeyInStore(store, viewer.username) || viewer.username;
+        if (store.users?.[uKey]) {
+          store.users[uKey] = {
+            ...store.users[uKey],
+            knightRpgProfile: {
+              ...(store.users[uKey].knightRpgProfile || {}),
+              ...payload.knightRpgProfile
+            }
+          };
+        }
+      }
       const list = Array.isArray(store.gamePracticeLeaderboard) ? [...store.gamePracticeLeaderboard] : [];
       const existingIdx = list.findIndex(
-        e => e.username === viewer.username && e.topicId === topicId && e.mode === mode
+        e => e.username === viewer.username && e.topicId === topicId && e.mode === mode && (e.gameType || 'space_shooter') === gameType
       );
       const bestScore = existingIdx >= 0 ? Math.max(Number(list[existingIdx].score) || 0, cleanScore) : cleanScore;
       const bestAccuracy = existingIdx >= 0
         ? (cleanScore >= (Number(list[existingIdx].score) || 0) ? accuracyPct : list[existingIdx].accuracyPct)
         : accuracyPct;
       const nextEntry = {
-        id: existingIdx >= 0 ? list[existingIdx].id : `gpr_${viewer.username}_${topicId}_${mode}`,
+        id: existingIdx >= 0 ? list[existingIdx].id : `gpr_${viewer.username}_${gameType}_${topicId}_${mode}`,
         username: viewer.username,
         name: viewer.name || viewer.username,
+        gameType,
         topicId,
         topicLabel,
         mode,

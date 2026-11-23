@@ -152,6 +152,35 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('game-bank-save-room-btn').click();
     await expect(page.getByTestId('game-vocab-bank-modal')).toHaveCount(0);
 
+    // Switch to the new Knight & Dragon RPG Game inside Zone Đấu Trường
+    await page.getByTestId('lobby-switch-to-knight-game-btn').first().click();
+    await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
+
+    // Open Character Skin Shop (Male & Female skins + Revive Keys)
+    await page.getByTestId('open-knight-shop-btn').click();
+    await expect(page.getByTestId('knight-skin-shop-modal')).toBeVisible();
+    await expect(page.getByText(/Nữ Chiến Binh Valkyrie Freya/i)).toBeVisible();
+    await expect(page.getByText(/Nữ Kiếm Khách Anh Đào Tomoe/i)).toBeVisible();
+    await page.getByTestId('buy-revive-key-with-gold-btn').click();
+    await page.getByTestId('knight-skin-shop-modal').getByRole('button').first().click();
+
+    // Launch Stage 4 Final Dragon Boss and test Dragon damage / typing combat
+    await page.getByTestId('start-knight-stage-4').click();
+    await expect(page.getByTestId('knight-dragon-boss-input')).toBeVisible({ timeout: 8_000 });
+    await page.getByTestId('knight-dragon-boss-input').fill('cohesive global strategy');
+    await page.getByTestId('knight-dragon-boss-submit').click();
+
+    // Confirm Dragon Boss defeated -> Knight Summary Overlay appears -> return to Knight Hub
+    await expect(page.getByText(/TỔNG KẾT HÀNH TRÌNH HIỆP SĨ/i)).toBeVisible({ timeout: 8_000 });
+    const celebrationDialog = page.locator('[aria-labelledby="title-unlock-celebration-heading"]');
+    if (await celebrationDialog.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await celebrationDialog.getByRole('button').first().click();
+    }
+    await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
+
+    // Switch back to Space Shooter Arena to verify Màn 3 & Màn 4 Sandbox
+    await page.getByTestId('switch-to-space-game-btn').click();
+
     // Launch Sandbox -> Jump to Màn 3 (verify strictly Synonym/Antonym) -> Jump to Màn 4 (verify Sentence + Typing input!)
     await page.getByRole('button', { name: /Chơi Thử GV/i }).first().click();
     await page.getByRole('button', { name: 'Màn 3', exact: true }).click();

@@ -480,13 +480,24 @@ export const DAILY_RANK_BOARDS = [
   },
   {
     id: 'game',
-    label: 'BXH Đấu Trường Từ Vựng',
-    shortLabel: 'Game Arena',
+    label: 'BXH Đấu Trường Phi Thuyền',
+    shortLabel: 'Game Phi Thuyền',
     priority: 6,
     ranks: [
       { rank: 1, id: 'daily_top1_game', label: 'Đế Vương Đấu Trường (Top 1)', icon: '⚡' },
       { rank: 2, id: 'daily_top2_game', label: 'Phó Tướng Đấu Trường (Top 2)', icon: '🥈' },
       { rank: 3, id: 'daily_top3_game', label: 'Chiến Tướng Đấu Trường (Top 3)', icon: '🥉' }
+    ]
+  },
+  {
+    id: 'knight_game',
+    label: 'BXH Hiệp Sĩ Diệt Rồng',
+    shortLabel: 'Hiệp Sĩ RPG',
+    priority: 6.5,
+    ranks: [
+      { rank: 1, id: 'daily_top1_knight', label: 'Đệ Nhất Đồ Long (Top 1)', icon: '🐉' },
+      { rank: 2, id: 'daily_top2_knight', label: 'Thánh Kiếm Á Quân (Top 2)', icon: '⚔️' },
+      { rank: 3, id: 'daily_top3_knight', label: 'Kỵ Sĩ Quý Quân (Top 3)', icon: '🛡️' }
     ]
   }
 ];
@@ -531,10 +542,10 @@ function buildDailyRankTitleEntry(board, rankSpec) {
     dailyRankBoard: board.id,
     dailyRankBoardLabel: board.label,
     dailyRankPosition: rank,
-    conditionText: `Đứng Top #${rank} trên ${board.label} trong ngày hôm nay (giờ VN). Hiệu lực 1 ngày (đến 23:59), độc quyền 1 người/hạng & mỗi học viên tối đa 1 danh hiệu BXH/ngày (không trùng lặp).`,
+    conditionText: `Đứng Top #${rank} trên ${board.label} khi chốt BXH cuối ngày (23:59 giờ VN). Danh hiệu được tổng kết và trao vào 00:00 ngày hôm sau (hiệu lực suốt ngày hôm sau đến 23:59), độc quyền 1 người/hạng & mỗi học viên tối đa 1 danh hiệu BXH/ngày.`,
     ...styleByRank,
     isUnlocked: () => false,
-    getProgress: () => ({ pct: 0, text: `Đua Top #${rank} ${board.shortLabel} hôm nay` })
+    getProgress: () => ({ pct: 0, text: `Đua Top #${rank} ${board.shortLabel} (Chốt 23:59 & trao vào ngày hôm sau)` })
   };
 }
 
@@ -565,7 +576,10 @@ export function computeDailyLeaderboardTitleHolders({
   usersDb = null,
   nowMs = Date.now()
 } = {}) {
-  const { dateKey, endMs } = getVietnamDayBoundsMs(nowMs);
+  const { dateKey, startMs, endMs } = getVietnamDayBoundsMs(nowMs);
+  // Daily Top 1/2/3 titles are settled from the PREVIOUS completed day (00:00–23:59 yesterday)
+  // and awarded for the entire next day ("đến ngày hôm sau mới tặng chứ ko phải ai top 1 2 3 là tặng liền").
+  const { dateKey: settledDateKey } = getVietnamDayBoundsMs(startMs - 86_400_000);
   const safeAttempts = Array.isArray(attempts) ? attempts : [];
   const safePractice = Array.isArray(gamePracticeLeaderboard) ? gamePracticeLeaderboard : [];
 
@@ -581,250 +595,276 @@ export function computeDailyLeaderboardTitleHolders({
     return fallbackName || uname;
   };
 
-  // Aggregate per board for today (Vietnam calendar day)
-  const boardMaps = {
-    overall: new Map(),
-    reading: new Map(),
-    listening: new Map(),
-    writing: new Map(),
-    speaking: new Map(),
-    game: new Map()
-  };
-
-  const recordExamBoardEntry = (boardId, uname, name, band, accuracy, durationSec, tsMs) => {
-    if (!uname || isExcludedStaffForDailyRank(uname, usersDb)) return;
-    if (!Number.isFinite(band) || band < 0) return;
-    const key = uname.toLowerCase();
-    const map = boardMaps[boardId];
-    const prev = map.get(key) || {
-      username: uname,
-      name: getDisplayName(uname, name),
-      bestBand: -1,
-      totalBand: 0,
-      count: 0,
-      bestAccuracy: -1,
-      bestDuration: Number.POSITIVE_INFINITY,
-      earliestAtMs: tsMs
+  const evaluateForTargetDateKey = (targetDateKey) => {
+    const boardMaps = {
+      overall: new Map(),
+      reading: new Map(),
+      listening: new Map(),
+      writing: new Map(),
+      speaking: new Map(),
+      game: new Map(),
+      knight_game: new Map()
     };
-    const nextCount = prev.count + 1;
-    const nextTotal = prev.totalBand + band;
-    const betterScore =
-      band > prev.bestBand ||
-      (band === prev.bestBand && accuracy > prev.bestAccuracy) ||
-      (band === prev.bestBand && accuracy === prev.bestAccuracy && durationSec < prev.bestDuration);
-    map.set(key, {
-      username: prev.username,
-      name: prev.name || getDisplayName(uname, name),
-      bestBand: betterScore ? band : prev.bestBand,
-      totalBand: nextTotal,
-      count: nextCount,
-      bestAccuracy: betterScore ? accuracy : prev.bestAccuracy,
-      bestDuration: betterScore ? durationSec : prev.bestDuration,
-      earliestAtMs: betterScore ? tsMs : Math.min(prev.earliestAtMs, tsMs)
-    });
-  };
 
-  safeAttempts.forEach(att => {
-    if (!att || typeof att !== 'object') return;
-    const tsMs = parseAttemptTimestampMs(att);
-    if (!tsMs || getVietnamDateKey(tsMs) !== dateKey) return;
-    const uname = String(att.studentId || att.studentUsername || '').trim();
-    if (!uname) return;
-    const dur = Number(att.durationSeconds) > 0 ? Number(att.durationSeconds) : Number.POSITIVE_INFINITY;
-
-    if (att.testMode === 'single_skill') {
-      const sk = String(att.focusSkill || '').trim();
-      if (sk === 'reading') {
-        const band = typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.reading?.band);
-        const raw = Number(att.scores?.reading?.raw) || 0;
-        const total = Number(att.scores?.reading?.total) || 0;
-        const acc = total > 0 ? raw / total : 0;
-        if (Number.isFinite(band)) {
-          recordExamBoardEntry('reading', uname, att.studentName, band, acc, dur, tsMs);
-        }
-      } else if (sk === 'listening') {
-        const band = typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.listening?.band);
-        const raw = Number(att.scores?.listening?.raw) || 0;
-        const total = Number(att.scores?.listening?.total) || 0;
-        const acc = total > 0 ? raw / total : 0;
-        if (Number.isFinite(band)) {
-          recordExamBoardEntry('listening', uname, att.studentName, band, acc, dur, tsMs);
-        }
-      } else if (sk === 'writing') {
-        if (att.teacherGraded === false) return;
-        const band =
-          typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.writing?.overallBand);
-        if (Number.isFinite(band)) {
-          recordExamBoardEntry('writing', uname, att.studentName, band, 0, dur, tsMs);
-        }
-      } else if (sk === 'speaking') {
-        const hasBand =
-          typeof att.overallBand === 'number' || typeof att.scores?.speaking?.band === 'number';
-        if (!hasBand) return;
-        if (att.teacherGraded === false && typeof att.scores?.speaking?.band !== 'number') return;
-        const band =
-          typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.speaking?.band);
-        if (Number.isFinite(band)) {
-          recordExamBoardEntry('speaking', uname, att.studentName, band, 0, dur, tsMs);
-        }
-      }
-    } else {
-      if (att.teacherGraded === false) return;
-      const band = typeof att.overallBand === 'number' ? att.overallBand : NaN;
-      if (Number.isFinite(band)) {
-        recordExamBoardEntry('overall', uname, att.studentName, band, 0, dur, tsMs);
-      }
-    }
-  });
-
-  // Game Arena today (Solo Practice Leaderboard + Room scores updated today)
-  const recordGameEntry = (uname, name, scoreVal, accPct, tsMs) => {
-    if (!uname || isExcludedStaffForDailyRank(uname, usersDb)) return;
-    const score = Number(scoreVal) || 0;
-    if (score <= 0) return;
-    const key = uname.toLowerCase();
-    const prev = boardMaps.game.get(key);
-    const acc = Number.isFinite(Number(accPct)) ? Number(accPct) : 0;
-    if (
-      !prev ||
-      score > prev.bestScore ||
-      (score === prev.bestScore && acc > prev.bestAccuracy) ||
-      (score === prev.bestScore && acc === prev.bestAccuracy && tsMs < prev.earliestAtMs)
-    ) {
-      boardMaps.game.set(key, {
+    const recordExamBoardEntry = (boardId, uname, name, band, accuracy, durationSec, tsMs) => {
+      if (!uname || isExcludedStaffForDailyRank(uname, usersDb)) return;
+      if (!Number.isFinite(band) || band < 0) return;
+      const key = uname.toLowerCase();
+      const map = boardMaps[boardId];
+      if (!map) return;
+      const prev = map.get(key) || {
         username: uname,
         name: getDisplayName(uname, name),
-        bestScore: score,
-        bestAccuracy: acc,
+        bestBand: -1,
+        totalBand: 0,
+        count: 0,
+        bestAccuracy: -1,
+        bestDuration: Number.POSITIVE_INFINITY,
         earliestAtMs: tsMs
-      });
-    }
-  };
-
-  safePractice.forEach(entry => {
-    if (!entry?.username) return;
-    const tsMs = Number(entry.updatedAtMs) || 0;
-    if (!tsMs || getVietnamDateKey(tsMs) !== dateKey) return;
-    const scoreVal = Number(entry.lastScore) > 0 ? Math.max(Number(entry.lastScore), Number(entry.score) || 0) : Number(entry.score) || 0;
-    recordGameEntry(entry.username, entry.name, scoreVal, entry.accuracyPct, tsMs);
-  });
-
-  Object.values(roomsDb || {}).forEach(room => {
-    if (!room || typeof room !== 'object') return;
-    const roomTs = Number(room.finishedAtMs || room.updatedAtMs || room.lastUpdatedAt) || 0;
-    const checkPlayerMap = playerMap => {
-      if (!playerMap || typeof playerMap !== 'object') return;
-      Object.entries(playerMap).forEach(([uname, p]) => {
-        if (!p || typeof p !== 'object') return;
-        const pTs = Number(p.updatedAtMs || p.finishedAtMs || roomTs) || 0;
-        if (!pTs || getVietnamDateKey(pTs) !== dateKey) return;
-        recordGameEntry(p.username || uname, p.name || uname, p.score, p.accuracyPct ?? 0, pTs);
+      };
+      const nextCount = prev.count + 1;
+      const nextTotal = prev.totalBand + band;
+      const betterScore =
+        band > prev.bestBand ||
+        (band === prev.bestBand && accuracy > prev.bestAccuracy) ||
+        (band === prev.bestBand && accuracy === prev.bestAccuracy && durationSec < prev.bestDuration);
+      map.set(key, {
+        username: prev.username,
+        name: prev.name || getDisplayName(uname, name),
+        bestBand: betterScore ? band : prev.bestBand,
+        totalBand: nextTotal,
+        count: nextCount,
+        bestAccuracy: betterScore ? accuracy : prev.bestAccuracy,
+        bestDuration: betterScore ? durationSec : prev.bestDuration,
+        earliestAtMs: betterScore ? tsMs : Math.min(prev.earliestAtMs, tsMs)
       });
     };
-    checkPlayerMap(room.players);
-    checkPlayerMap(room.liveMatch);
-  });
 
-  // Sort each board deterministically (zero ties!)
-  const boardRankings = {};
-  const candidates = [];
+    safeAttempts.forEach(att => {
+      if (!att || typeof att !== 'object') return;
+      const tsMs = parseAttemptTimestampMs(att);
+      if (!tsMs || getVietnamDateKey(tsMs) !== targetDateKey) return;
+      const uname = String(att.studentId || att.studentUsername || '').trim();
+      if (!uname) return;
+      const dur = Number(att.durationSeconds) > 0 ? Number(att.durationSeconds) : Number.POSITIVE_INFINITY;
 
-  DAILY_RANK_BOARDS.forEach(board => {
-    const entries = Array.from(boardMaps[board.id].values());
-    if (board.id === 'game') {
-      entries.sort(
-        (a, b) =>
-          b.bestScore - a.bestScore ||
-          b.bestAccuracy - a.bestAccuracy ||
-          a.earliestAtMs - b.earliestAtMs ||
-          a.username.localeCompare(b.username)
-      );
-    } else {
-      entries.sort((a, b) => {
-        const avgA = a.count > 0 ? a.totalBand / a.count : 0;
-        const avgB = b.count > 0 ? b.totalBand / b.count : 0;
-        return (
-          b.bestBand - a.bestBand ||
-          avgB - avgA ||
-          b.bestAccuracy - a.bestAccuracy ||
-          a.bestDuration - b.bestDuration ||
-          a.earliestAtMs - b.earliestAtMs ||
-          a.username.localeCompare(b.username)
-        );
-      });
-    }
-
-    const top3 = entries.slice(0, 3).map((row, idx) => {
-      const rank = idx + 1;
-      const rankSpec = board.ranks[idx];
-      const metricLabel =
-        board.id === 'game'
-          ? `${Number(row.bestScore || 0).toLocaleString('vi-VN')} điểm`
-          : `Band ${Number(row.bestBand || 0).toFixed(1)}`;
-      return {
-        board: board.id,
-        boardLabel: board.label,
-        boardShortLabel: board.shortLabel,
-        boardPriority: board.priority,
-        rank,
-        titleId: rankSpec.id,
-        username: row.username,
-        name: row.name || row.username,
-        metricLabel,
-        scoreValue: board.id === 'game' ? row.bestScore : row.bestBand,
-        dateKey,
-        expiresAtMs: endMs
-      };
+      if (att.testMode === 'single_skill') {
+        const sk = String(att.focusSkill || '').trim();
+        if (sk === 'reading') {
+          const band = typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.reading?.band);
+          const raw = Number(att.scores?.reading?.raw) || 0;
+          const total = Number(att.scores?.reading?.total) || 0;
+          const acc = total > 0 ? raw / total : 0;
+          if (Number.isFinite(band)) {
+            recordExamBoardEntry('reading', uname, att.studentName, band, acc, dur, tsMs);
+          }
+        } else if (sk === 'listening') {
+          const band = typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.listening?.band);
+          const raw = Number(att.scores?.listening?.raw) || 0;
+          const total = Number(att.scores?.listening?.total) || 0;
+          const acc = total > 0 ? raw / total : 0;
+          if (Number.isFinite(band)) {
+            recordExamBoardEntry('listening', uname, att.studentName, band, acc, dur, tsMs);
+          }
+        } else if (sk === 'writing') {
+          if (att.teacherGraded === false) return;
+          const band =
+            typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.writing?.overallBand);
+          if (Number.isFinite(band)) {
+            recordExamBoardEntry('writing', uname, att.studentName, band, 0, dur, tsMs);
+          }
+        } else if (sk === 'speaking') {
+          const hasBand =
+            typeof att.overallBand === 'number' || typeof att.scores?.speaking?.band === 'number';
+          if (!hasBand) return;
+          if (att.teacherGraded === false && typeof att.scores?.speaking?.band !== 'number') return;
+          const band =
+            typeof att.overallBand === 'number' ? att.overallBand : Number(att.scores?.speaking?.band);
+          if (Number.isFinite(band)) {
+            recordExamBoardEntry('speaking', uname, att.studentName, band, 0, dur, tsMs);
+          }
+        }
+      } else {
+        if (att.teacherGraded === false) return;
+        const band = typeof att.overallBand === 'number' ? att.overallBand : NaN;
+        if (Number.isFinite(band)) {
+          recordExamBoardEntry('overall', uname, att.studentName, band, 0, dur, tsMs);
+        }
+      }
     });
 
-    boardRankings[board.id] = top3;
-    candidates.push(...top3);
-  });
-
-  // Strictly non-duplicate allocation:
-  // 1) Higher rank always takes precedence (#1 > #2 > #3)
-  // 2) Within same rank, higher score/band & board priority takes precedence
-  // 3) Each titleId is awarded to AT MOST 1 student (1-of-1 exclusivity)
-  // 4) Each student receives AT MOST 1 Daily BXH title on a given day (no hoarding/duplicates!)
-  candidates.sort(
-    (a, b) =>
-      a.rank - b.rank ||
-      a.boardPriority - b.boardPriority ||
-      (Number(b.scoreValue) || 0) - (Number(a.scoreValue) || 0) ||
-      a.username.localeCompare(b.username)
-  );
-
-  const byTitleId = {};
-  const byUsername = {};
-  const assignedUsers = new Set();
-
-  candidates.forEach(cand => {
-    const uLower = cand.username.toLowerCase();
-    if (byTitleId[cand.titleId]) return;
-    if (assignedUsers.has(uLower)) return;
-    assignedUsers.add(uLower);
-    const record = {
-      titleId: cand.titleId,
-      board: cand.board,
-      boardLabel: cand.boardLabel,
-      boardShortLabel: cand.boardShortLabel,
-      rank: cand.rank,
-      username: cand.username,
-      name: cand.name,
-      metricLabel: cand.metricLabel,
-      dateKey: cand.dateKey,
-      expiresAtMs: cand.expiresAtMs
+    const recordGameBoardEntry = (boardId, uname, name, scoreVal, accPct, tsMs) => {
+      if (!uname || isExcludedStaffForDailyRank(uname, usersDb)) return;
+      const score = Number(scoreVal) || 0;
+      if (score <= 0) return;
+      const map = boardMaps[boardId];
+      if (!map) return;
+      const key = uname.toLowerCase();
+      const prev = map.get(key);
+      const acc = Number.isFinite(Number(accPct)) ? Number(accPct) : 0;
+      if (
+        !prev ||
+        score > prev.bestScore ||
+        (score === prev.bestScore && acc > prev.bestAccuracy) ||
+        (score === prev.bestScore && acc === prev.bestAccuracy && tsMs < prev.earliestAtMs)
+      ) {
+        map.set(key, {
+          username: uname,
+          name: getDisplayName(uname, name),
+          bestScore: score,
+          bestAccuracy: acc,
+          earliestAtMs: tsMs
+        });
+      }
     };
-    byTitleId[cand.titleId] = record;
-    byUsername[uLower] = record;
-  });
+
+    safePractice.forEach(entry => {
+      if (!entry?.username) return;
+      const tsMs = Number(entry.updatedAtMs) || 0;
+      if (!tsMs || getVietnamDateKey(tsMs) !== targetDateKey) return;
+      const scoreVal =
+        Number(entry.lastScore) > 0
+          ? Math.max(Number(entry.lastScore), Number(entry.score) || 0)
+          : Number(entry.score) || 0;
+      const isKnightEntry =
+        entry.gameType === 'knight_rpg' ||
+        String(entry.mode || '').toLowerCase().startsWith('knight');
+      recordGameBoardEntry(
+        isKnightEntry ? 'knight_game' : 'game',
+        entry.username,
+        entry.name,
+        scoreVal,
+        entry.accuracyPct,
+        tsMs
+      );
+    });
+
+    Object.values(roomsDb || {}).forEach(room => {
+      if (!room || typeof room !== 'object') return;
+      const roomTs = Number(room.finishedAtMs || room.updatedAtMs || room.lastUpdatedAt) || 0;
+      const checkPlayerMap = playerMap => {
+        if (!playerMap || typeof playerMap !== 'object') return;
+        Object.entries(playerMap).forEach(([uname, p]) => {
+          if (!p || typeof p !== 'object') return;
+          const pTs = Number(p.updatedAtMs || p.finishedAtMs || roomTs) || 0;
+          if (!pTs || getVietnamDateKey(pTs) !== targetDateKey) return;
+          const boardId =
+            p.gameType === 'knight_rpg' || room.gameType === 'knight_rpg' ? 'knight_game' : 'game';
+          recordGameBoardEntry(boardId, p.username || uname, p.name || uname, p.score, p.accuracyPct ?? 0, pTs);
+        });
+      };
+      checkPlayerMap(room.players);
+      checkPlayerMap(room.liveMatch);
+    });
+
+    const boardRankings = {};
+    const candidates = [];
+
+    DAILY_RANK_BOARDS.forEach(board => {
+      const entries = Array.from((boardMaps[board.id] || new Map()).values());
+      if (board.id === 'game' || board.id === 'knight_game') {
+        entries.sort(
+          (a, b) =>
+            b.bestScore - a.bestScore ||
+            b.bestAccuracy - a.bestAccuracy ||
+            a.earliestAtMs - b.earliestAtMs ||
+            a.username.localeCompare(b.username)
+        );
+      } else {
+        entries.sort((a, b) => {
+          const avgA = a.count > 0 ? a.totalBand / a.count : 0;
+          const avgB = b.count > 0 ? b.totalBand / b.count : 0;
+          return (
+            b.bestBand - a.bestBand ||
+            avgB - avgA ||
+            b.bestAccuracy - a.bestAccuracy ||
+            a.bestDuration - b.bestDuration ||
+            a.earliestAtMs - b.earliestAtMs ||
+            a.username.localeCompare(b.username)
+          );
+        });
+      }
+
+      const isGameBoard = board.id === 'game' || board.id === 'knight_game';
+      const top3 = entries.slice(0, 3).map((row, idx) => {
+        const rank = idx + 1;
+        const rankSpec = board.ranks[idx];
+        const metricLabel = isGameBoard
+          ? `${Number(row.bestScore || 0).toLocaleString('vi-VN')} điểm`
+          : `Band ${Number(row.bestBand || 0).toFixed(1)}`;
+        return {
+          board: board.id,
+          boardLabel: board.label,
+          boardShortLabel: board.shortLabel,
+          boardPriority: board.priority,
+          rank,
+          titleId: rankSpec.id,
+          username: row.username,
+          name: row.name || row.username,
+          metricLabel,
+          scoreValue: isGameBoard ? row.bestScore : row.bestBand,
+          dateKey,
+          settledFromDateKey: targetDateKey,
+          expiresAtMs: endMs
+        };
+      });
+
+      boardRankings[board.id] = top3;
+      candidates.push(...top3);
+    });
+
+    candidates.sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        a.boardPriority - b.boardPriority ||
+        (Number(b.scoreValue) || 0) - (Number(a.scoreValue) || 0) ||
+        a.username.localeCompare(b.username)
+    );
+
+    const byTitleId = {};
+    const byUsername = {};
+    const assignedUsers = new Set();
+
+    candidates.forEach(cand => {
+      const uLower = cand.username.toLowerCase();
+      if (byTitleId[cand.titleId]) return;
+      if (assignedUsers.has(uLower)) return;
+      assignedUsers.add(uLower);
+      const record = {
+        titleId: cand.titleId,
+        board: cand.board,
+        boardLabel: cand.boardLabel,
+        boardShortLabel: cand.boardShortLabel,
+        rank: cand.rank,
+        username: cand.username,
+        name: cand.name,
+        metricLabel: cand.metricLabel,
+        dateKey: cand.dateKey,
+        settledFromDateKey: cand.settledFromDateKey,
+        expiresAtMs: cand.expiresAtMs
+      };
+      byTitleId[cand.titleId] = record;
+      byUsername[uLower] = record;
+    });
+
+    return { byTitleId, byUsername, boardRankings };
+  };
+
+  // Settled yesterday winners receive the actual title today:
+  const settledResult = evaluateForTargetDateKey(settledDateKey);
+  // Live today rankings are tracked for "Đang tạm dẫn hôm nay -> trao vào ngày mai" display:
+  const liveTodayResult = evaluateForTargetDateKey(dateKey);
 
   return {
     dateKey,
+    settledDateKey,
     expiresAtMs: endMs,
-    byTitleId,
-    byUsername,
-    boardRankings
+    byTitleId: settledResult.byTitleId,
+    byUsername: settledResult.byUsername,
+    boardRankings: settledResult.boardRankings,
+    liveTodayByTitleId: liveTodayResult.byTitleId,
+    liveTodayByUsername: liveTodayResult.byUsername,
+    liveTodayBoardRankings: liveTodayResult.boardRankings
   };
 }
 
@@ -969,6 +1009,109 @@ export const STUDENT_TITLES = [
     getProgress: (stats) => ({
       pct: Math.min(100, Math.round((stats.bestGameScore / 700) * 100)),
       text: `${Math.min(stats.bestGameScore, 700)}/700 điểm Game`
+    })
+  },
+  {
+    id: 'knight_slime_hunter',
+    label: 'Tân Binh Diệt Slime',
+    icon: '🗡️',
+    tier: 'Hiệp Sĩ RPG',
+    difficulty: 'Dễ',
+    conditionText: 'Hạ gục ít nhất 5 quái vật (Slime / Goblin / Orc) trong game Hiệp Sĩ Diệt Rồng.',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50',
+    heroBadgeClass: 'bg-emerald-500/30 text-emerald-100 border-emerald-300/60',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/50',
+    isUnlocked: (stats) => stats.knightMonstersSlain >= 5 || stats.knightBestScore >= 500,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((Math.max(stats.knightMonstersSlain, Math.floor(stats.knightBestScore / 100)) / 5) * 100)),
+      text: `${Math.min(5, Math.max(stats.knightMonstersSlain, Math.floor(stats.knightBestScore / 100)))}/5 quái Slime/Goblin`
+    })
+  },
+  {
+    id: 'knight_goblin_slayer',
+    label: 'Khắc Tinh Goblin',
+    icon: '⚔️',
+    tier: 'Hiệp Sĩ RPG',
+    difficulty: 'Bình Thường',
+    conditionText: 'Hạ gục ít nhất 20 quái vật hoặc đạt 1.200+ điểm trong game Hiệp Sĩ Diệt Rồng.',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400/50',
+    heroBadgeClass: 'bg-amber-500/30 text-amber-100 border-amber-300/60',
+    gameBadgeClass: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/25 dark:text-amber-200 dark:border-amber-400/50',
+    isUnlocked: (stats) => stats.knightMonstersSlain >= 20 || stats.knightBestScore >= 1200,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.max(Math.round((stats.knightMonstersSlain / 20) * 100), Math.round((stats.knightBestScore / 1200) * 100))),
+      text: `${Math.min(stats.knightMonstersSlain, 20)}/20 quái (${Math.min(stats.knightBestScore, 1200)}/1200đ)`
+    })
+  },
+  {
+    id: 'knight_key_finder',
+    label: 'Thợ Săn Chìa Khóa Hồi Sinh',
+    icon: '🗝️',
+    tier: 'Hiệp Sĩ RPG',
+    difficulty: 'Bình Thường',
+    conditionText: 'Nhặt được hoặc tích lũy từ 3 Chìa Khóa Hồi Sinh trở lên trên đường hành hiệp.',
+    badgeClass: 'bg-yellow-50 text-yellow-800 border-yellow-400 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-400/55',
+    heroBadgeClass: 'bg-yellow-500/30 text-yellow-100 border-yellow-300/70',
+    gameBadgeClass: 'bg-yellow-100 text-yellow-900 border-yellow-400 dark:bg-yellow-500/25 dark:text-yellow-200 dark:border-yellow-400/55',
+    isUnlocked: (stats) => stats.knightKeysCollected >= 3,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.knightKeysCollected / 3) * 100)),
+      text: `${Math.min(stats.knightKeysCollected, 3)}/3 Chìa Khóa Hồi Sinh`
+    })
+  },
+  {
+    id: 'knight_hero_collector',
+    label: 'Nhà Sưu Tập Anh Hùng',
+    icon: '👗',
+    tier: 'Hiệp Sĩ RPG',
+    difficulty: 'Khó',
+    conditionText: 'Tích vàng đánh quái để mở khóa ít nhất 2 nhân vật / skin mới (Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura...) trong Cửa Hàng Hiệp Sĩ.',
+    badgeClass: 'bg-pink-50 text-pink-800 border-pink-300 dark:bg-pink-500/20 dark:text-pink-200 dark:border-pink-400/55',
+    heroBadgeClass: 'bg-pink-500/30 text-pink-100 border-pink-300/70',
+    gameBadgeClass: 'bg-pink-100 text-pink-900 border-pink-300 dark:bg-pink-500/25 dark:text-pink-200 dark:border-pink-400/55',
+    isUnlocked: (stats) => stats.knightUnlockedSkinsCount >= 2,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.knightUnlockedSkinsCount / 2) * 100)),
+      text: `${Math.min(stats.knightUnlockedSkinsCount, 2)}/2 nhân vật đã mở khóa`
+    })
+  },
+  {
+    id: 'knight_dragon_slayer',
+    label: 'Dũng Sĩ Đồ Long',
+    icon: '🐉',
+    tier: 'Hiệp Sĩ RPG',
+    difficulty: 'Khó',
+    conditionText: 'Đánh bại Boss Cuối Rồng Hắc Ám Cổ Đại ít nhất 1 lần trong game Hiệp Sĩ Diệt Rồng.',
+    badgeClass: 'bg-rose-50 text-rose-800 border-rose-400 dark:bg-rose-500/25 dark:text-rose-200 dark:border-rose-400/65',
+    heroBadgeClass: 'bg-gradient-to-r from-rose-500/40 to-amber-500/40 text-amber-100 border-amber-300/80',
+    gameBadgeClass: 'bg-rose-100 text-rose-950 border-rose-400 dark:bg-rose-500/30 dark:text-rose-100 dark:border-rose-400/65',
+    isUnlocked: (stats) => stats.knightDragonsSlain >= 1,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round((stats.knightDragonsSlain / 1) * 100)),
+      text: `${Math.min(stats.knightDragonsSlain, 1)}/1 Boss Rồng Hắc Ám bị hạ`
+    })
+  },
+  {
+    id: 'knight_dragon_empress',
+    label: 'Huyền Thoại Long Kỵ Sĩ',
+    icon: '👑',
+    tier: 'Hiệp Sĩ RPG',
+    difficulty: 'Cực Khó',
+    conditionText: 'Hạ gục Boss Cuối Rồng Hắc Ám từ 5 lần trở lên hoặc mở khóa từ 4 nhân vật trong Cửa Hàng Hiệp Sĩ.',
+    badgeClass: 'bg-gradient-to-r from-amber-100 via-rose-50 to-amber-100 text-rose-950 border-amber-400 dark:from-amber-500/30 dark:via-rose-500/25 dark:to-amber-500/30 dark:text-amber-100 dark:border-amber-400/75 font-bold',
+    heroBadgeClass: 'bg-gradient-to-r from-amber-500/45 to-rose-500/45 text-amber-50 border-amber-300/85',
+    gameBadgeClass: 'bg-amber-100 text-rose-950 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/75',
+    isUnlocked: (stats) => stats.knightDragonsSlain >= 5 || stats.knightUnlockedSkinsCount >= 4 || stats.knightBestScore >= 3000,
+    getProgress: (stats) => ({
+      pct: Math.min(
+        100,
+        Math.max(
+          Math.round((stats.knightDragonsSlain / 5) * 100),
+          Math.round((stats.knightUnlockedSkinsCount / 4) * 100),
+          Math.round((stats.knightBestScore / 3000) * 100)
+        )
+      ),
+      text: `${Math.min(stats.knightDragonsSlain, 5)}/5 Rồng • ${Math.min(stats.knightUnlockedSkinsCount, 4)}/4 Nhân vật`
     })
   },
   {
@@ -2515,6 +2658,16 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
   }
 
   let bestGameScore = 0;
+  let knightBestScore = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.bestScore) || 0));
+  const knightMonstersSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.monstersSlain) || 0));
+  const knightDragonsSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.dragonsSlain) || 0));
+  const knightKeysCollected = Math.max(
+    0,
+    Math.floor(Number(user?.knightRpgProfile?.keysCollected ?? user?.knightRpgProfile?.keys) || 0)
+  );
+  const knightUnlockedSkinsCount = Array.isArray(user?.knightRpgProfile?.unlockedSkins)
+    ? Math.max(0, user.knightRpgProfile.unlockedSkins.filter(id => id && id !== 'knight_arthur').length)
+    : 0;
   let hasGamePerfectRun = false;
   Object.values(roomsDb || {}).forEach(room => {
     const pScore = Number(room?.players?.[uname]?.score) || 0;
@@ -2526,10 +2679,17 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     if (!entry?.username || String(entry.username).toLowerCase() !== unameLower) return;
     const sc = Number(entry.score) || 0;
     if (sc > bestGameScore) bestGameScore = sc;
+    if (
+      (entry.gameType === 'knight_rpg' || String(entry.mode || '').toLowerCase().startsWith('knight')) &&
+      sc > knightBestScore
+    ) {
+      knightBestScore = sc;
+    }
     if (sc >= 1500 && Number(entry.accuracyPct) >= 100) {
       hasGamePerfectRun = true;
     }
   });
+  if (knightBestScore > bestGameScore) bestGameScore = knightBestScore;
 
   const skillBandList = [
     bestSkillBand.listening,
@@ -2554,6 +2714,11 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     dailyZoneCount,
     highestBand,
     bestGameScore,
+    knightBestScore,
+    knightMonstersSlain,
+    knightDragonsSlain,
+    knightKeysCollected,
+    knightUnlockedSkinsCount,
     band65Count,
     band70Count,
     exactBand70Count,
@@ -3143,11 +3308,19 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       const slotExpMs = Number(dailySlot?.expiresAtMs || dailyHolders?.expiresAtMs || todayEndMs);
       const remainingText = formatRemainingDailyTitleText(slotExpMs, nowMs);
       const userHasOtherDailyTitle = Boolean(userHeldDailyRecord && userHeldDailyRecord.titleId !== t.id);
+      const liveTodaySlot = dailyHolders?.liveTodayByTitleId?.[t.id] || null;
+      const isLeadingLiveToday = Boolean(
+        liveTodaySlot &&
+        liveTodaySlot.username &&
+        String(liveTodaySlot.username).toLowerCase() === unameLower
+      );
+      const settledDateLabel = formatDateKeyVi(dailySlot?.settledFromDateKey || dailyHolders?.settledDateKey || '');
       dailyRankMeta = {
         board: t.dailyRankBoard,
         boardLabel: t.dailyRankBoardLabel,
         rank: t.dailyRankPosition,
         dateKey: todayKey,
+        settledFromDateKey: dailySlot?.settledFromDateKey || dailyHolders?.settledDateKey || '',
         expiresAtMs: slotExpMs,
         remainingText,
         holderUsername: dailySlot?.username || '',
@@ -3155,22 +3328,41 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
         occupiedByOtherClass: Boolean(dailySlot?.occupiedByOtherClass),
         metricLabel: dailySlot?.metricLabel || '',
         isHeldByUserToday,
+        isLeadingLiveToday,
+        liveTodayLeaderName: liveTodaySlot?.name || '',
+        liveTodayMetricLabel: liveTodaySlot?.metricLabel || '',
         userHasOtherDailyTitle,
         userHeldDailyTitleId: userHeldDailyRecord?.titleId || ''
       };
       if (isHeldByUserToday) {
-        progress = { pct: 100, text: `🏅 Đang giữ hôm nay • ${remainingText}` };
+        progress = {
+          pct: 100,
+          text: `🏅 Thưởng Top #${t.dailyRankPosition} ngày ${settledDateLabel || 'hôm qua'} • ${remainingText}`
+        };
       } else if (dailySlot) {
         progress = {
-          pct: 0,
+          pct: isLeadingLiveToday ? 50 : 0,
           text: dailySlot.occupiedByOtherClass
-            ? `🔒 Đã có chủ hôm nay (${dailySlot.metricLabel || 'BXH'})`
-            : `👤 Đang giữ bởi ${dailySlot.name}${dailySlot.metricLabel ? ` (${dailySlot.metricLabel})` : ''}`
+            ? `🔒 Đã trao hôm nay (${dailySlot.metricLabel || 'BXH hôm qua'})`
+            : `👤 Thưởng ngày ${settledDateLabel || 'hôm qua'}: ${dailySlot.name}${dailySlot.metricLabel ? ` (${dailySlot.metricLabel})` : ''}${isLeadingLiveToday ? ' • Bạn đang dẫn đầu hôm nay (trao vào ngày mai)' : ''}`
+        };
+      } else if (isLeadingLiveToday) {
+        progress = {
+          pct: 60,
+          text: `🔥 Bạn đang tạm dẫn Top #${t.dailyRankPosition} hôm nay (${liveTodaySlot.metricLabel}) • Chốt 23:59 & trao vào 00:00 ngày mai!`
+        };
+      } else if (liveTodaySlot) {
+        progress = {
+          pct: 0,
+          text: `⏳ Đang đua hôm nay: ${liveTodaySlot.name} tạm dẫn (${liveTodaySlot.metricLabel}) • Chốt 23:59 & trao vào ngày mai`
         };
       } else if (userHasOtherDailyTitle) {
         progress = { pct: 0, text: '🔒 Bạn đã giữ 1 suất BXH hôm nay (không cấp trùng)' };
       } else {
-        progress = { pct: 0, text: `⏳ Chưa có chủ hôm nay • Đua Top #${t.dailyRankPosition}` };
+        progress = {
+          pct: 0,
+          text: `⏳ Đua Top #${t.dailyRankPosition} hôm nay • Chốt BXH lúc 23:59 & trao danh hiệu vào ngày hôm sau`
+        };
       }
     }
 

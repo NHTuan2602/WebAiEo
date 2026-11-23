@@ -31,6 +31,7 @@ import {
   Snowflake,
   Square,
   Sun,
+  Swords,
   Target,
   Trash2,
   TrendingDown,
@@ -65,6 +66,7 @@ import { speakWord } from '../utils/mediaHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
+import KnightDragonGame from '../components/game/KnightDragonGame';
 import {
   AIEO_VIP_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
@@ -156,6 +158,7 @@ export default function GameArena({
   myAnimalId = 'cat',
   myCrewColor,
   onOpenCheckoutModal = null,
+  onSyncKnightResult = null,
   openMemberProfile,
   paymentConfig = null,
   previousView = '',
@@ -188,6 +191,7 @@ export default function GameArena({
 }) {
   const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
   const [showPilotDrawer, setShowPilotDrawer] = useState(false);
+  const [arenaGameMode, setArenaGameMode] = useState('space_shooter'); // 'space_shooter' | 'knight_rpg'
   const [entryZone, setEntryZone] = useState('live'); // 'live' | 'practice'
   const [practiceTopicId, setPracticeTopicId] = useState('core');
   const [practiceSpeed, setPracticeSpeed] = useState('normal');
@@ -251,6 +255,23 @@ export default function GameArena({
       : (isTeacher ? 'TEACHER_DASHBOARD' : 'HOME');
     setView(targetBack);
   };
+
+  if (arenaGameMode === 'knight_rpg') {
+    return (
+      <KnightDragonGame
+        currentUser={currentUser}
+        customVocabTopics={customVocabTopics}
+        initialRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
+        initialTopicId={practiceTopicId}
+        onBackToSpaceMode={() => setArenaGameMode('space_shooter')}
+        onExitArena={exitGame}
+        onSyncKnightResult={onSyncKnightResult}
+        roomPin={activePin}
+        roomRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
+        showToast={showToast}
+      />
+    );
+  }
 
   const themeToggleButton = setDarkMode ? (
     <button
@@ -536,6 +557,15 @@ export default function GameArena({
           </button>
           <div className="flex items-center gap-2 text-xs">
             {themeToggleButton}
+          <button
+            type="button"
+            data-testid="lobby-switch-to-knight-game-btn"
+            onClick={() => setArenaGameMode('knight_rpg')}
+            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
+          >
+            <Swords className="w-3.5 h-3.5" />
+            <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
+          </button>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border ${
               serverSyncConnected
                 ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
@@ -551,6 +581,32 @@ export default function GameArena({
         </div>
 
         <div className="max-w-3xl w-full mx-auto my-auto py-4 relative z-10 space-y-4">
+          {/* 2-Game Switcher Banner inside Zone Đấu Trường: Space Shooter vs Knight & Dragon RPG */}
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-rose-950/90 via-slate-900 to-amber-950/85 border border-rose-500/40 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black uppercase">
+                  GAME MỚI TRONG ĐẤU TRƯỜNG
+                </span>
+                <span className="text-xs sm:text-sm font-black text-amber-300">
+                  ⚔️ Hiệp Sĩ Diệt Rồng (Slime ➔ Goblin ➔ Boss Rồng Hắc Ám)
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Nhặt 🪙 Vàng &amp; 🗝️ Chìa Khóa Hồi Sinh trên đường (giống Subway Surfers), mở khóa Nữ Chiến Binh Valkyrie / Nữ Kiếm Khách Sakura &amp; né Skill Tất Sát (Final Smash) của Rồng!
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="switch-to-knight-game-btn"
+              onClick={() => setArenaGameMode('knight_rpg')}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 text-xs font-black shrink-0 inline-flex items-center justify-center gap-1.5 shadow-md transition"
+            >
+              <Swords className="w-4 h-4" />
+              <span>Chơi Hiệp Sĩ Diệt Rồng Ngay →</span>
+            </button>
+          </div>
+
           {/* 2-Zone Selector: Live (Teacher Approval) vs Open Self-Practice + BXH */}
           <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm">
             <button
@@ -1221,7 +1277,25 @@ export default function GameArena({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              data-testid="lobby-switch-to-knight-game-btn"
+              onClick={() => setArenaGameMode('knight_rpg')}
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 text-xs font-black transition inline-flex items-center gap-1.5 shadow-xs"
+            >
+              <Swords className="w-3.5 h-3.5" />
+              <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
+            </button>
             {themeToggleButton}
+          <button
+            type="button"
+            data-testid="lobby-switch-to-knight-game-btn"
+            onClick={() => setArenaGameMode('knight_rpg')}
+            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
+          >
+            <Swords className="w-3.5 h-3.5" />
+            <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
+          </button>
             <span className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-[#334155] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-[#0F172B] dark:text-slate-200">
               <Users className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> {lobbyPlayersList.length}/{room.maxPlayers}
             </span>
@@ -2281,7 +2355,25 @@ export default function GameArena({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              data-testid="lobby-switch-to-knight-game-btn"
+              onClick={() => setArenaGameMode('knight_rpg')}
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 text-xs font-black transition inline-flex items-center gap-1.5 shadow-xs"
+            >
+              <Swords className="w-3.5 h-3.5" />
+              <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
+            </button>
             {themeToggleButton}
+          <button
+            type="button"
+            data-testid="lobby-switch-to-knight-game-btn"
+            onClick={() => setArenaGameMode('knight_rpg')}
+            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
+          >
+            <Swords className="w-3.5 h-3.5" />
+            <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
+          </button>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border ${
               serverSyncConnected
                 ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
@@ -2651,6 +2743,15 @@ export default function GameArena({
             <span className="hidden md:inline">{gameMuted ? 'Đang tắt tiếng' : 'Âm thanh'}</span>
           </button>
           {themeToggleButton}
+          <button
+            type="button"
+            data-testid="lobby-switch-to-knight-game-btn"
+            onClick={() => setArenaGameMode('knight_rpg')}
+            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
+          >
+            <Swords className="w-3.5 h-3.5" />
+            <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
+          </button>
           {isTeacher && isSandboxRound && gameSubState === 'PLAYING' && (
             <button
               type="button"
