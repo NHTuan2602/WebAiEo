@@ -97,11 +97,23 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     await page.getByRole('button', { name: /Thực Chiến \(100k\)/i }).first().click();
     await expect(page.getByText(/TÊN ĐỀ THI IELTS|Soạn & Chỉnh Sửa Đề/i).first()).toBeVisible({ timeout: 12_000 });
+    // Verify Quick 3-PDF Importer (Listening + Reading + Writing) & upgraded 5-step Guide Modal
+    await expect(page.locator('[data-testid="quick-three-pdf-importer"]')).toBeVisible();
+    await expect(page.locator('input[aria-label="Tạo nhanh: chọn PDF Listening"]')).toBeAttached();
+    await expect(page.locator('input[aria-label="Tạo nhanh: chọn PDF Reading"]')).toBeAttached();
+    await expect(page.locator('input[aria-label="Tạo nhanh: chọn PDF hoặc ảnh Writing"]')).toBeAttached();
+    await page.getByRole('button', { name: /Xem Hướng Dẫn Chi Tiết/i }).first().click();
+    await expect(page.getByText(/Cẩm Nang Tạo Đề Thi IELTS Chi Tiết/i)).toBeVisible();
+    await page.getByRole('button', { name: /Đã Hiểu, Đóng Hướng Dẫn/i }).click();
+
     // Verify standard IELTS 4-Skill format tabs: Listening 4 Parts (40 Qs), Reading 3 Passages (40 Qs), Writing 2 Tasks, Speaking 3 Parts
     await expect(page.getByRole('button', { name: /2\. Listening \(4\/4 bài/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /3\. Reading \(3\/3 bài/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /4\. Writing \(2 bài/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /5\. Speaking \(3 phần/i }).first()).toBeVisible();
+    await page.getByRole('button', { name: /4\. Writing \(2 bài/i }).first().click();
+    await expect(page.getByText(/AI Tạo Tự Động Writing/i).first()).toBeVisible();
+    await expect(page.locator('input[aria-label="Chọn PDF hoặc ảnh đề IELTS Writing"]')).toBeAttached();
     await page.getByRole('button', { name: /5\. Speaking \(3 phần/i }).first().click();
     await expect(page.getByText(/Kịch Bản Lời Dẫn Giám Khảo AI/i).first()).toBeVisible();
 

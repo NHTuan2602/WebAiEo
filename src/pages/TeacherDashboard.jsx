@@ -53,7 +53,8 @@ import {
   Users,
   Volume2,
   Wifi,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import {
   DEFAULT_VOCAB_TEXT,
@@ -1083,6 +1084,14 @@ export default function TeacherDashboard({
             className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" /> Thực Chiến (100k)
+          </button>
+          <button
+            type="button"
+            onClick={() => openExamBuilder(null, 'general', [], 'real_exam')}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
+            title="Mở trình tạo nhanh bằng 3 file PDF cùng lúc: Listening + Reading + Writing (tự cắt ảnh biểu đồ)"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300" /> Tạo Nhanh 3 PDF (L·R·W)
           </button>
           <button
             type="button"

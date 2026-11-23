@@ -60,6 +60,8 @@ import { applyAnswerKeyTextToQuestions, syncClozeBlanksWithQuestions } from '../
 import { getQuestionDisplayNumber, sortClozeTextSectionsByBlankNumber } from '../utils/examUiHelpers';
 import { clearBuilderDraft } from '../utils/sessionPersistence';
 import BuilderGuideBanner, { BuilderGuideModal } from '../components/teacher/BuilderGuideAssistant';
+import AiWritingExtractorPanel from '../components/teacher/AiWritingExtractorPanel';
+import QuickThreePdfImporter from '../components/teacher/QuickThreePdfImporter';
 import SkillQuestionWorkspace from '../components/teacher/SkillQuestionWorkspace';
 import SpeakingBuilderPanel from '../components/teacher/SpeakingBuilderPanel';
 import QuickPassageSplitModal from '../components/teacher/QuickPassageSplitModal';
@@ -1324,7 +1326,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return { totalInScope: stampedQuestions.length };
   };
 
-  const handleApplyReadingPdfExtraction = (extracted, { replaceAll = true } = {}) => {
+  const handleApplyReadingPdfExtraction = (extracted, { replaceAll = true, skipConfirm = false } = {}) => {
     const extractedPassages = Array.isArray(extracted?.passages) ? extracted.passages : [];
     if (extractedPassages.length === 0) {
       showToast?.('PDF chưa có passage Reading để áp dụng.', 'error');
@@ -1338,6 +1340,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     );
     const shouldReplaceAll = replaceAll || !hasExistingContent;
     if (
+      !skipConfirm &&
       shouldReplaceAll &&
       hasExistingContent &&
       !window.confirm('Thay toàn bộ passages, nội dung và câu hỏi Reading hiện tại bằng dữ liệu từ PDF?')
@@ -1424,7 +1427,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return { passageCount: importedPassages.length, questionCount };
   };
 
-  const handleApplyListeningPdfExtraction = (extracted, { replaceAll = true } = {}) => {
+  const handleApplyListeningPdfExtraction = (extracted, { replaceAll = true, skipConfirm = false } = {}) => {
     const extractedParts = Array.isArray(extracted?.parts) ? extracted.parts : [];
     if (extractedParts.length === 0) {
       showToast?.('PDF chưa có phần Listening để áp dụng.', 'error');
@@ -1438,6 +1441,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     );
     const shouldReplaceAll = replaceAll || !hasExistingContent;
     if (
+      !skipConfirm &&
       shouldReplaceAll &&
       hasExistingContent &&
       !window.confirm('Thay toàn bộ chủ đề (Parts) và câu hỏi Listening hiện tại bằng dữ liệu từ PDF? (Các file MP3 đã tải lên theo từng Part vẫn sẽ được giữ lại.)')
@@ -1528,6 +1532,59 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return { partCount: importedTracks.length, questionCount };
   };
 
+  const handleApplyWritingExtraction = (extracted, { writingScope = 'both', imageOnly = false } = {}) => {
+    if (!extracted || typeof extracted !== 'object') return;
+    const t1 = extracted.task1 || {};
+    const t2 = extracted.task2 || {};
+    setTestForm(prev => {
+      const prevWriting = prev.writing || {};
+      const prevT1 = prevWriting.task1 || { prompt: '', minWords: 150, imageUrl: '', modelAnswer: '' };
+      const prevT2 = prevWriting.task2 || { prompt: '', minWords: 250, modelAnswer: '' };
+      const nextT1 =
+        writingScope === 'task2'
+          ? prevT1
+          : imageOnly
+          ? { ...prevT1, imageUrl: t1.imageUrl || prevT1.imageUrl || '' }
+          : {
+              ...prevT1,
+              prompt: t1.prompt ? String(t1.prompt).trim() : prevT1.prompt,
+              minWords: Number(t1.minWords) || prevT1.minWords || 150,
+              imageUrl: t1.imageUrl ? t1.imageUrl : prevT1.imageUrl,
+              modelAnswer: t1.modelAnswer ? String(t1.modelAnswer).trim() : prevT1.modelAnswer
+            };
+      const nextT2 =
+        writingScope === 'task1' || imageOnly
+          ? prevT2
+          : {
+              ...prevT2,
+              prompt: t2.prompt ? String(t2.prompt).trim() : prevT2.prompt,
+              minWords: Number(t2.minWords) || prevT2.minWords || 250,
+              modelAnswer: t2.modelAnswer ? String(t2.modelAnswer).trim() : prevT2.modelAnswer
+            };
+      return {
+        ...prev,
+        writing: {
+          ...prevWriting,
+          task1: nextT1,
+          task2: nextT2
+        }
+      };
+    });
+  };
+
+  const handleSuggestExamTitle = (detectedTitle) => {
+    const clean = String(detectedTitle || '').trim();
+    if (!clean) return;
+    setTestForm(prev => {
+      const cur = String(prev.title || '').trim();
+      const isDefaultPlaceholder =
+        !cur ||
+        /^Đề Thực Chiến IELTS Full 4 Kỹ Năng Mới$/i.test(cur) ||
+        /^Mock Test Định Kỳ IELTS Full 4 Kỹ Năng/i.test(cur);
+      return isDefaultPlaceholder ? { ...prev, title: clean } : prev;
+    });
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -1575,15 +1632,30 @@ Write ONE WORD AND/OR A NUMBER for each answer.
         </div>
       </div>
 
-      {/* Step-by-Step Interactive Guide Banner (Hidden cleanly in Single-Skill focus mode) */}
+      {/* Step-by-Step Interactive Guide Banner + Quick 3-PDF Importer (Hidden cleanly in Single-Skill focus mode) */}
       {normalizeExamConfig(testForm).testMode !== 'single_skill' && (
-        <BuilderGuideBanner
-          builderTab={builderTab}
-          onJumpToTab={setBuilderTab}
-          onLoadSampleTemplate={handleLoadSampleTemplate}
-          onOpenGuideModal={() => setShowGuideModal(true)}
-          testForm={testForm}
-        />
+        <>
+          <BuilderGuideBanner
+            builderTab={builderTab}
+            onJumpToTab={setBuilderTab}
+            onLoadSampleTemplate={handleLoadSampleTemplate}
+            onOpenGuideModal={() => setShowGuideModal(true)}
+            testForm={testForm}
+          />
+          <QuickThreePdfImporter
+            aiApiKey={aiApiKey}
+            aiConfigured={aiConfigured}
+            defaultExpanded={builderTab === 'general'}
+            onApplyListeningPdfExtraction={handleApplyListeningPdfExtraction}
+            onApplyReadingPdfExtraction={handleApplyReadingPdfExtraction}
+            onApplyWritingExtraction={handleApplyWritingExtraction}
+            onJumpToTab={setBuilderTab}
+            onSuggestExamTitle={handleSuggestExamTitle}
+            setApiTestState={setApiTestState}
+            setShowApiKeyModal={setShowApiKeyModal}
+            showToast={showToast}
+          />
+        </>
       )}
 
       <BuilderGuideModal
@@ -3566,12 +3638,22 @@ Write ONE WORD AND/OR A NUMBER for each answer.
         );
       })()}
 
-      {/* TAB 4: WRITING BUILDER (PROMPTS, CHART IMAGE & MODEL ANSWERS) */}
+      {/* TAB 4: WRITING BUILDER (AI AUTO-EXTRACT, PROMPTS, CHART IMAGE & MODEL ANSWERS) */}
       {builderTab === 'writing' && (() => {
         const wCfg = normalizeExamConfig(testForm);
         const wScope = wCfg.writingTaskScope || 'both';
         return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-8 shadow-sm">
+          <AiWritingExtractorPanel
+            aiApiKey={aiApiKey}
+            aiConfigured={aiConfigured}
+            onApplyWritingExtraction={handleApplyWritingExtraction}
+            setApiTestState={setApiTestState}
+            setShowApiKeyModal={setShowApiKeyModal}
+            showToast={showToast}
+            writingScope={wScope}
+          />
+
           {/* Task 1 */}
           {wScope !== 'task2' && (
           <div className={`space-y-4 ${wScope === 'both' ? 'pb-6 border-b border-slate-200 dark:border-slate-800' : ''}`}>
