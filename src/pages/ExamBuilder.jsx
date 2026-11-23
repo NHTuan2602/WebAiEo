@@ -73,7 +73,7 @@ export default function ExamBuilder({
   builderTab,
   classesDb = {},
   currentUser,
-  defaultExamPriceVnd = 20000,
+  defaultExamPriceVnd = 100000,
   editingTest,
   handleAudioFileUpload,
   handleListeningImageUpload,
@@ -474,7 +474,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
   };
 
   const applyQuickPreset = (presetType) => {
-    const defaultPrice = Math.max(1000, Number(defaultExamPriceVnd) || 20000);
+    const defaultPrice = Math.max(1000, Number(defaultExamPriceVnd) || 100000);
     const currentCfg = normalizeExamConfig(testForm);
     const isSingle = currentCfg.testMode === 'single_skill' && Boolean(currentCfg.focusSkill);
     const isSpeakingSingle = isSingle && currentCfg.focusSkill === 'speaking';
@@ -505,7 +505,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 }
         };
       });
-      showToast?.('Đã áp dụng: Thực Chiến Thi Thật 4 Kỹ Năng (L·R·W·S · 20.000đ hoặc Combo · 1 lượt · Chờ Ms. Như duyệt điểm).');
+      showToast?.('Đã áp dụng: Thực Chiến Thi Thật 4 Kỹ Năng (L·R·W·S · 100.000đ hoặc Combo · 1 lượt · Chờ Ms. Như duyệt điểm).');
     } else if (presetType === 'periodic_mock') {
       setTestForm(prev => {
         const baseTags = normalizeTestHashtags(prev.hashtags || []).filter(
@@ -1723,7 +1723,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   Loại Nội Dung: Đề Thi IELTS Full 4 Kỹ Năng (L·R·W·S) vs Bài Tập Daily Zone (Từng Team)
                 </h2>
                 <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                  Chọn <b>Đề Thi Full 4 Kỹ Năng</b> cho Thực Chiến Thi Thật (20.000đ / Combo) &amp; Mock Test Định Kỳ (300.000đ), hoặc chọn từng kỹ năng (tách riêng <b>Writing Task 1</b> và <b>Writing Task 2</b>) cho <b>Daily Zone</b>.
+                  Chọn <b>Đề Thi Full 4 Kỹ Năng</b> cho Thực Chiến Thi Thật (100.000đ / Combo) &amp; Mock Test Định Kỳ (300.000đ), hoặc chọn từng kỹ năng (tách riêng <b>Writing Task 1</b> và <b>Writing Task 2</b>) cho <b>Daily Zone</b>.
                 </p>
               </div>
             </div>
@@ -1924,7 +1924,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <p className="text-xs text-[#314158] dark:text-slate-300 mt-0.5">
                   {cfg.testMode === 'single_skill'
                     ? 'Bài tập Daily Zone luôn cho làm lại nhiều lần, miễn phí và có thể đặt Mật khẩu Team riêng cho từng lớp:'
-                    : 'Chọn Thực Chiến Thi Thật (Full 4 kỹ năng · 20.000đ hoặc Combo · 1 lượt) hoặc Mock Test Định Kỳ (300.000đ · 3 tháng/lần · 1 lượt):'}
+                    : 'Chọn Thực Chiến Thi Thật (Full 4 kỹ năng · 100.000đ hoặc Combo · 1 lượt) hoặc Mock Test Định Kỳ (300.000đ · 3 tháng/lần · 1 lượt):'}
                 </p>
               </div>
             </div>
@@ -2064,7 +2064,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         }`}
                       >
                         <div className="text-xs font-extrabold text-[#007A7A] dark:text-[#1EE1D6]">
-                          🏛️ Thực Chiến Thi Thật (20.000đ · 1 Lượt)
+                          🏛️ Thực Chiến Thi Thật (100.000đ · 1 Lượt)
                         </div>
                         <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
                           Full 4 kỹ năng L·R·W·S liên hoàn · Áp dụng Combo 3/5/10 đề · Chờ Ms. Như duyệt điểm
@@ -2226,7 +2226,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {[
-                          { v: 20000, label: 'Thực chiến (20.000đ)' },
+                          { v: 100000, label: 'Thực chiến (100.000đ)' },
                           { v: 300000, label: 'Mock Test Định Kỳ (300.000đ)' },
                           { v: 0, label: 'Miễn phí (0đ)' }
                         ].map(preset => {

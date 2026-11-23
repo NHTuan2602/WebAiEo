@@ -594,7 +594,7 @@ export default function StudentHome({
                   <span>
                     {storefrontTab === 'periodic_mock'
                       ? '+ Tạo Đề Mock Test Định Kỳ (300.000đ) Ngay'
-                      : '+ Tạo Đề Thực Chiến Thi Thật (20.000đ) Ngay'}
+                      : '+ Tạo Đề Thực Chiến Thi Thật (100.000đ) Ngay'}
                   </span>
                 </button>
               )}
@@ -1163,6 +1163,10 @@ export default function StudentHome({
                               ) : memberIsTeacher ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700">
                                   Giáo viên IELTS
+                                </span>
+                              ) : memberObj?.isGuest ? (
+                                <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/40">
+                                  Tài khoản khách
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-md bg-[#F1F5F9] text-[#1E293B] border border-[#E2E8F0] dark:bg-[#27272A] dark:text-[#E4E4E7] dark:border-zinc-700">

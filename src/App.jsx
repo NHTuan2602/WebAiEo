@@ -404,6 +404,8 @@ export default function App() {
   const [mailConfigured, setMailConfigured] = useState(false);
   const [showPaymentConfigModal, setShowPaymentConfigModal] = useState(false);
   const [showRealExamPricingModal, setShowRealExamPricingModal] = useState(false);
+  const [arenaInitialMode, setArenaInitialMode] = useState('hub');
+  const [arenaEntryNonce, setArenaEntryNonce] = useState(0);
   const [paymentConfig, setPaymentConfig] = useState(null);
   const [gamePracticeLeaderboard, setGamePracticeLeaderboard] = useState([]);
   const [dailyRankTitles, setDailyRankTitles] = useState(null);
@@ -659,6 +661,7 @@ export default function App() {
       ...(patch.avatarFrameId !== undefined ? { avatarFrameId: patch.avatarFrameId || 'none' } : {}),
       ...(patch.equippedTitleId !== undefined ? { equippedTitleId: patch.equippedTitleId || 'newbie' } : {}),
       ...(patch.showTitleBadge !== undefined ? { showTitleBadge: Boolean(patch.showTitleBadge) } : {}),
+      ...(patch.showExamTierBadge !== undefined ? { showExamTierBadge: Boolean(patch.showExamTierBadge) } : {}),
       ...(patch.vipRedNameEnabled !== undefined ? { vipRedNameEnabled: Boolean(patch.vipRedNameEnabled) } : {}),
       ...(patch.vipNameColor !== undefined ? { vipNameColor: normalizeVipNameColor(patch.vipNameColor) } : {}),
       ...(patch.vipTagEnabled !== undefined ? { vipTagEnabled: Boolean(patch.vipTagEnabled) } : {}),
@@ -690,6 +693,7 @@ export default function App() {
         patch.avatarFrameId !== undefined ||
         patch.equippedTitleId !== undefined ||
         patch.showTitleBadge !== undefined ||
+        patch.showExamTierBadge !== undefined ||
         patch.vipRedNameEnabled !== undefined ||
         patch.vipNameColor !== undefined ||
         patch.vipTagEnabled !== undefined ||
@@ -2917,7 +2921,7 @@ export default function App() {
     }
 
     if (currentUser?.role === 'teacher') {
-      handleTeacherOpenLobby(currentRoomPin);
+      handleTeacherOpenLobby(currentRoomPin, { initialMode: 'hub' });
       return;
     }
 
@@ -2927,6 +2931,8 @@ export default function App() {
       activeRoom.status === 'LOBBY' &&
       Boolean(activeRoom.lobbyPlayers?.[currentUser?.username]);
 
+    setArenaInitialMode('hub');
+    setArenaEntryNonce(n => n + 1);
     if (isAlreadyInLobby) {
       setGameSubState('LOBBY');
       gameRuntimeRef.current.subState = 'LOBBY';
@@ -3059,7 +3065,7 @@ export default function App() {
     setView('GAME_ARENA');
   };
 
-  const handleTeacherOpenLobby = (pin = currentRoomPin) => {
+  const handleTeacherOpenLobby = (pin = currentRoomPin, options = {}) => {
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
     clearInterval(lobbyCountdownTimerRef.current);
@@ -3067,6 +3073,9 @@ export default function App() {
     if (['TEACHER_DASHBOARD', 'SKILL_HUB', 'HOME', 'STUDENT_PROFILE'].includes(view)) {
       setPreviousView(view);
     }
+    const nextArenaMode = options?.initialMode === 'hub' ? 'hub' : 'space_shooter';
+    setArenaInitialMode(nextArenaMode);
+    setArenaEntryNonce(n => n + 1);
 
     const targetPin = pin || currentRoomPin;
     setCurrentRoomPin(targetPin);
@@ -3751,6 +3760,8 @@ export default function App() {
     showToast(`Đã tạo phòng "${cleanName}" (PIN: ${generatedPin} · ${cleanMaxPlayers} người${cleanTeamCount >= 2 ? ` · ${cleanTeamCount} Team` : ''})!`);
 
     if (isTeacherCreator || newRoomObj.roomMode === 'friend_vip') {
+      setArenaInitialMode('space_shooter');
+      setArenaEntryNonce(n => n + 1);
       setGameSubState('LOBBY');
       gameRuntimeRef.current.subState = 'LOBBY';
       setView('GAME_ARENA');
@@ -5403,7 +5414,7 @@ export default function App() {
       const isPeriodicPreset = presetCategory === 'periodic_mock';
       const presetPrice = isPeriodicPreset
         ? (payCfgNorm.periodicMockPrice || 300000)
-        : (payCfgNorm.defaultExamPriceVnd || 20000);
+        : (payCfgNorm.defaultExamPriceVnd || 100000);
       setTestForm({
         ...createEmptyTestForm(),
         id: 'test-' + Date.now(),
@@ -5417,7 +5428,7 @@ export default function App() {
           : 'Đề Thực Chiến IELTS Full 4 Kỹ Năng Mới',
         description: isPeriodicPreset
           ? 'Kỳ thi Mock Test Định Kỳ 3 tháng/lần đủ 4 kỹ năng Listening, Reading, Writing và Speaking do Ms. Như trực tiếp duyệt chấm (1 lượt thi thật).'
-          : 'Đề thi thực chiến liên hoàn đủ 4 kỹ năng Listening, Reading, Writing và Speaking (1 lượt thi thật, áp dụng đề lẻ 20k hoặc Combo 3/5/10 đề).',
+          : 'Đề thi thực chiến liên hoàn đủ 4 kỹ năng Listening, Reading, Writing và Speaking (1 lượt thi thật, áp dụng đề lẻ 100k hoặc Combo 3/5/8/10 đề).',
         createdAt: new Date().toISOString().split('T')[0],
         listening: {
           audioUrl: '',
@@ -7947,6 +7958,8 @@ export default function App() {
           gameSubState={gameSubState}
           gameTimeLeft={gameTimeLeft}
           gameTimeLimit={gameTimeLimit}
+          arenaEntryNonce={arenaEntryNonce}
+          arenaInitialMode={arenaInitialMode}
           gameToast={gameToast}
           gameTypedProgress={gameTypedProgress}
           gameRound4Input={gameRound4Input}

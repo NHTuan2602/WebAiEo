@@ -18,6 +18,7 @@ import { BRAND_INFO } from '../constants/brandInfo';
 import { formatViDateTime, getSpeakingQuestionItems, normalizeExamConfig, normalizeSpeakingSection } from '../constants/seedData';
 import { createUniqueAttemptId } from '../utils/examHelpers';
 import { cleanAudioMimeType } from '../utils/speakingAiEngine';
+import { buildSpeakingExaminerLeadIn } from '../utils/speakingExaminerScript';
 import { pickSupportedAudioMimeType, uploadSpeakingRecording, verifySpeakingRoomPassword } from '../utils/speakingApi';
 import AudioLevelMeter from '../components/speaking/AudioLevelMeter';
 import SpeakingResultCelebrationModal from '../components/speaking/SpeakingResultCelebrationModal';
@@ -203,8 +204,18 @@ export default function SpeakingExamRoom({
   const currentItem = items[currentIdx] || items[0] || null;
   const currentPromptText = currentItem?.prompt || '';
   const currentPromptAudioUrl = currentItem?.audioUrl || '';
+  const currentExaminerLead = buildSpeakingExaminerLeadIn({
+    item: currentItem,
+    index: currentIdx,
+    items,
+    speakingCfg: spMeta,
+    candidateName: currentUser?.name || '',
+    testTitle: activeTest?.title || ''
+  });
+  const currentSpokenText = currentExaminerLead.fullSpokenText || currentPromptText;
   const currentItemIdRef = useRef(currentItem?.id || '');
   currentItemIdRef.current = currentItem?.id || '';
+  const prevPrepSecRef = useRef(prepRemainingSec);
   const handleBeginRecordingRef = useRef(null);
 
   const startExamRoom3sCountdown = () => {
@@ -241,6 +252,27 @@ export default function SpeakingExamRoom({
     }, 1000);
     return () => clearInterval(t);
   }, [phase, prepRemainingSec]);
+
+  // When Part 2 1-minute prep timer reaches 0, AI Examiner prompts candidate to begin speaking
+  useEffect(() => {
+    const prevVal = prevPrepSecRef.current;
+    prevPrepSecRef.current = prepRemainingSec;
+    if (
+      phase === 'ACTIVE' &&
+      currentItem?.part === 2 &&
+      prevVal > 0 &&
+      prepRemainingSec === 0 &&
+      !isRecordingRef.current &&
+      !recordingsByQidRef.current?.[currentItem.id]
+    ) {
+      const startLine = currentExaminerLead.part2StartSpeakingText;
+      if (startLine && (isExamRoomMode || autoSpeakPrompt)) {
+        triggerPromptPlaybackRef.current(startLine, '', {
+          allowAutoCountdown: isExamRoomMode
+        });
+      }
+    }
+  }, [phase, prepRemainingSec, currentItem?.id, currentItem?.part, currentExaminerLead.part2StartSpeakingText, isExamRoomMode, autoSpeakPrompt]);
 
   const stopPromptPlayback = () => {
     clearAutoRecordTimers();
@@ -331,7 +363,7 @@ export default function SpeakingExamRoom({
       return;
     }
     const wordCount = Math.max(1, String(text).trim().split(/\s+/).length);
-    const estMs = Math.min(18000, Math.max(2200, wordCount * 450 + 600));
+    const estMs = Math.min(48000, Math.max(2500, wordCount * 460 + 1200));
     let completed = false;
     const finishSpeech = () => {
       if (completed) return;
@@ -379,18 +411,19 @@ export default function SpeakingExamRoom({
   const triggerPromptPlaybackRef = useRef(triggerPromptPlayback);
   triggerPromptPlaybackRef.current = triggerPromptPlayback;
 
-  // Auto-play teacher recording or AI English TTS when entering a question.
+  // Auto-play teacher recording or AI English TTS (including official IELTS Examiner lead-in) when entering a question.
   // In Exam Room mode, after reading finishes across Part 1, 2 & 3 -> starts 3s countdown -> auto-records!
   useEffect(() => {
-    if (phase === 'ACTIVE' && (isExamRoomMode || autoSpeakPrompt) && (currentPromptAudioUrl || currentPromptText)) {
+    if (phase === 'ACTIVE' && (isExamRoomMode || autoSpeakPrompt) && (currentPromptAudioUrl || currentSpokenText)) {
       const targetQid = currentItem?.id || '';
       const alreadyRecorded = Boolean(recordingsByQidRef.current?.[targetQid]);
-      triggerPromptPlaybackRef.current(currentPromptText, currentPromptAudioUrl, {
-        allowAutoCountdown: isExamRoomMode && !alreadyRecorded
+      const isPart2WithPrep = currentItem?.part === 2 && (currentItem?.prepSec || 0) > 0 && !alreadyRecorded;
+      triggerPromptPlaybackRef.current(currentSpokenText, currentPromptAudioUrl, {
+        allowAutoCountdown: isExamRoomMode && !alreadyRecorded && !isPart2WithPrep
       });
     }
     return () => stopPromptPlayback();
-  }, [phase, currentIdx, isExamRoomMode, autoSpeakPrompt, currentPromptText, currentPromptAudioUrl, currentItem?.id]);
+  }, [phase, currentIdx, isExamRoomMode, autoSpeakPrompt, currentSpokenText, currentPromptAudioUrl, currentItem?.id, currentItem?.part, currentItem?.prepSec]);
 
   const startMeterFromStream = (stream) => {
     try {
@@ -1064,7 +1097,7 @@ export default function SpeakingExamRoom({
 
               <button
                 type="button"
-                onClick={() => speakPromptQuestion(currentItem.prompt, currentItem.audioUrl)}
+                onClick={() => speakPromptQuestion(currentSpokenText, currentItem.audioUrl)}
                 className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${
                   currentItem.audioUrl
                     ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-200'
@@ -1131,6 +1164,42 @@ export default function SpeakingExamRoom({
             )}
 
             <div className="space-y-3">
+              {currentExaminerLead.leadInText && !currentItem.audioUrl && (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-teal-50/85 dark:bg-teal-950/35 border border-teal-200 dark:border-teal-700/60 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-[#0F766E] dark:text-teal-300 flex items-center gap-1.5">
+                      <Volume2 className="w-3.5 h-3.5" />
+                      Lời dẫn Giám khảo AI (IELTS Examiner Script)
+                    </span>
+                    <span className="text-[11px] font-semibold text-teal-800/80 dark:text-teal-200/80">
+                      Tự động đọc trước câu hỏi
+                    </span>
+                  </div>
+                  {hideQuestionTextNow ? (
+                    <p className="text-xs sm:text-sm italic text-teal-900 dark:text-teal-100">
+                      🎧 Giám khảo AI đang dẫn vào Part {currentItem.part} và đọc câu hỏi theo chuẩn IELTS...
+                    </p>
+                  ) : (
+                    <p className="text-xs sm:text-sm text-slate-800 dark:text-teal-50 leading-relaxed italic">
+                      &ldquo;
+                      {currentExaminerLead.leadInSegments.map((seg, sIdx) =>
+                        seg.isDynamic ? (
+                          <span
+                            key={sIdx}
+                            className="font-extrabold not-italic underline decoration-2 decoration-[#0F766E] dark:decoration-teal-300 underline-offset-2 text-[#0F766E] dark:text-teal-200"
+                          >
+                            {seg.text}
+                          </span>
+                        ) : (
+                          <span key={sIdx}>{seg.text}</span>
+                        )
+                      )}
+                      &rdquo;
+                    </p>
+                  )}
+                </div>
+              )}
+
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-snug">
                 {hideQuestionTextNow
                   ? (isSpeakingPrompt

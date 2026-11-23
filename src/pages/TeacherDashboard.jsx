@@ -47,6 +47,7 @@ import {
   Trash2,
   Trophy,
   Unlock,
+  User,
   UserMinus,
   UserPlus,
   Users,
@@ -226,7 +227,10 @@ export default function TeacherDashboard({
     });
   const teacherAccountsCount = allAccounts.filter(u => u.role === 'teacher' && !u.isSuperAdmin).length;
   const studentAccounts = allAccounts.filter(u => u.role === 'student');
-  const studentAccountsCount = studentAccounts.length;
+  const officialStudentAccounts = studentAccounts.filter(u => !u.isGuest);
+  const guestAccounts = allAccounts.filter(u => u.role !== 'teacher' && Boolean(u.isGuest));
+  const studentAccountsCount = officialStudentAccounts.length;
+  const guestAccountsCount = guestAccounts.length;
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
   const qrConfigured = Boolean(normalizedPayCfg.customQrUrl || (normalizedPayCfg.bankCode && normalizedPayCfg.accountNumber));
   const coverPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
@@ -238,6 +242,10 @@ export default function TeacherDashboard({
       if (u.role !== 'student' || hasCustomCoverPermission(u) || !(Number(u.coverUnlockRequestedAt) > 0)) {
         return false;
       }
+    } else if (accountRoleFilter === 'guest') {
+      if (u.role === 'teacher' || !u.isGuest) return false;
+    } else if (accountRoleFilter === 'student') {
+      if (u.role !== 'student' || u.isGuest) return false;
     } else if (accountRoleFilter !== 'all' && u.role !== accountRoleFilter) {
       return false;
     }
@@ -1064,7 +1072,7 @@ export default function TeacherDashboard({
             )}
           </div>
           <p className="text-sm text-[#475569] dark:text-slate-400 mt-0.5 max-w-2xl">
-            IELTS Nha Trang - {fullExamTests.length} đề thi · {skillExercises.length} bài tập kỹ năng · {studentAccountsCount} học viên
+            IELTS Nha Trang - {fullExamTests.length} đề thi · {skillExercises.length} bài tập kỹ năng · {studentAccountsCount} học viên{guestAccountsCount > 0 ? ` · ${guestAccountsCount} khách` : ''}
           </p>
         </div>
 
@@ -1074,14 +1082,14 @@ export default function TeacherDashboard({
             onClick={() => openExamBuilder(null, 'general', [], 'real_exam')}
             className="bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" /> + Thực Chiến (20k)
+            <Plus className="w-4 h-4" /> Thực Chiến (100k)
           </button>
           <button
             type="button"
             onClick={() => openExamBuilder(null, 'general', [], 'periodic_mock')}
             className="bg-[#FEF3C7] hover:bg-amber-200 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-[#92400E] dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" /> + Mock Định Kỳ (300k)
+            <Plus className="w-4 h-4" /> Mock Định Kỳ (300k)
           </button>
           <button
             type="button"
@@ -1517,7 +1525,7 @@ export default function TeacherDashboard({
               <div className="flex flex-wrap items-center gap-1 bg-[#F8FAFC] dark:bg-slate-800/70 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold">
                 {[
                   { id: 'all', label: `Tất cả (${fullExamTests.length})` },
-                  { id: 'real_exam', label: `Thực Chiến 20k (${realExamFullTests.length})` },
+                  { id: 'real_exam', label: `Thực Chiến 100k (${realExamFullTests.length})` },
                   { id: 'periodic_mock', label: `Mock Định Kỳ 300k (${periodicMockFullTests.length})` }
                 ].map(cat => (
                   <button
@@ -1556,7 +1564,7 @@ export default function TeacherDashboard({
                     onClick={() => openExamBuilder(null, 'general', [], 'real_exam')}
                     className="px-4 py-2 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold transition"
                   >
-                    + Tạo Đề Thực Chiến (20.000đ)
+                    + Tạo Đề Thực Chiến (100.000đ)
                   </button>
                   <button
                     type="button"
@@ -2287,6 +2295,17 @@ export default function TeacherDashboard({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setAccountRoleFilter('guest')}
+                  className={`px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 ${
+                    accountRoleFilter === 'guest'
+                      ? 'bg-amber-600 text-white border-amber-600'
+                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#F1F5F9]'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5" /> Tài khoản khách ({guestAccountsCount})
+                </button>
+                <button
+                  type="button"
                   onClick={() => setAccountRoleFilter('teacher')}
                   className={`px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 ${
                     accountRoleFilter === 'teacher'
@@ -2622,6 +2641,10 @@ export default function TeacherDashboard({
                             ) : isTeacherAccount ? (
                               <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 whitespace-nowrap">
                                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Giáo viên
+                              </span>
+                            ) : account.isGuest ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 whitespace-nowrap">
+                                <User className="w-3.5 h-3.5 shrink-0" /> Tài khoản khách
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 whitespace-nowrap">

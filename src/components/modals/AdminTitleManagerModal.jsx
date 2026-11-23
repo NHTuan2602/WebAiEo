@@ -195,7 +195,7 @@ export default function AdminTitleManagerModal({
                         <div className="min-w-0">
                           <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{u.name || u.username}</p>
                           <p className="text-xs font-mono text-[#475569] dark:text-slate-400 truncate">
-                            @{u.username} · {u.role === 'teacher' ? '👩‍🏫 Giáo viên' : '🎓 Học viên'}
+                            @{u.username} · {u.role === 'teacher' ? '👩‍🏫 Giáo viên' : u.isGuest ? '👤 Tài khoản khách' : '🎓 Học viên'}
                           </p>
                         </div>
                       </div>
@@ -315,7 +315,7 @@ export default function AdminTitleManagerModal({
                 <div>
                   <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <Trophy className="w-4 h-4 text-amber-500" />
-                    Kho Danh Hiệu Của: {activeTargetUser.name} ({activeTargetUser.role === 'teacher' ? 'Giáo viên' : 'Học viên'})
+                    Kho Danh Hiệu Của: {activeTargetUser.name} ({activeTargetUser.role === 'teacher' ? 'Giáo viên' : activeTargetUser.isGuest ? 'Tài khoản khách' : 'Học viên'})
                   </p>
                   <p className="text-xs text-[#475569] dark:text-slate-400">
                     Bấm vào danh hiệu bên dưới để <strong>Trao Tặng</strong> hoặc <strong>Gỡ Bỏ</strong> danh hiệu do Quản trị cấp.

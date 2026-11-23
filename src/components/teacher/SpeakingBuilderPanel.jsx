@@ -21,6 +21,7 @@ import {
 import { MAX_AUDIO_UPLOAD_BYTES } from '../../constants/profileCustomization';
 import { generateSpeakingQuestionsWithAI } from '../../utils/geminiGrader';
 import { cleanAudioMimeType } from '../../utils/speakingAiEngine';
+import { DEFAULT_EXAMINER_SCRIPTS, buildSpeakingExaminerLeadIn } from '../../utils/speakingExaminerScript';
 import { pickSupportedAudioMimeType, uploadSpeakingRecording } from '../../utils/speakingApi';
 
 export default function SpeakingBuilderPanel({
@@ -758,6 +759,100 @@ export default function SpeakingBuilderPanel({
             ))}
           </div>
         )}
+      </div>
+
+      {/* AI EXAMINER INTRO SCRIPT PREVIEW & CUSTOMIZER */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-teal-200 dark:border-teal-800/60 p-6 space-y-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#0F766E] dark:text-teal-400" />
+              Kịch Bản Lời Dẫn Giám Khảo AI (Đọc Trước Câu Hỏi)
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              Giám khảo AI tự động nói lời dẫn chuẩn IELTS trước khi đọc câu hỏi cho cả <b>đề lẻ</b> và <b>Mock Test / Thực Chiến</b>. Phần gạch chân tự thay theo chủ đề của đề này (<code className="font-bold">{'{{part1_topic}}'}</code>, <code className="font-bold">{'{{part2_title}}'}</code>, <code className="font-bold">{'{{part3_topic}}'}</code>).
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sp.examinerScripts?.enabled !== false}
+              onChange={e =>
+                patchSpeaking({
+                  examinerScripts: {
+                    ...(sp.examinerScripts || {}),
+                    enabled: e.target.checked
+                  }
+                })
+              }
+              className="w-4 h-4 accent-[#007A7A]"
+            />
+            <span>Bật lời dẫn Giám khảo AI</span>
+          </label>
+        </div>
+
+        {sp.examinerScripts?.enabled !== false && (() => {
+          const p1Preview = buildSpeakingExaminerLeadIn({
+            item: { part: 1, topic: sp.part1?.topic, prompt: sp.part1?.questions?.[0]?.prompt || '' },
+            index: 0,
+            items: [{ part: 1, topic: sp.part1?.topic }],
+            speakingCfg: sp
+          });
+          const p2Preview = buildSpeakingExaminerLeadIn({
+            item: { part: 2, topic: sp.part2?.title, prompt: sp.part2?.cueCardPrompt || '' },
+            index: 0,
+            items: [{ part: 2, topic: sp.part2?.title }],
+            speakingCfg: sp
+          });
+          const p3Preview = buildSpeakingExaminerLeadIn({
+            item: { part: 3, topic: sp.part3?.topic, prompt: sp.part3?.questions?.[0]?.prompt || '' },
+            index: 0,
+            items: [{ part: 3, topic: sp.part3?.topic }],
+            speakingCfg: sp
+          });
+          return (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {[
+                  { key: 'part1Intro', label: 'Lời dẫn Part 1', preview: p1Preview, fallback: DEFAULT_EXAMINER_SCRIPTS.part1Intro },
+                  { key: 'part2Intro', label: 'Lời dẫn Part 2 (Cue Card)', preview: p2Preview, fallback: DEFAULT_EXAMINER_SCRIPTS.part2Intro },
+                  { key: 'part3Intro', label: 'Lời dẫn Part 3', preview: p3Preview, fallback: DEFAULT_EXAMINER_SCRIPTS.part3Intro }
+                ].map(sec => (
+                  <div key={sec.key} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                    <p className="text-xs font-extrabold text-[#0F766E] dark:text-teal-300">{sec.label}</p>
+                    <p className="text-xs italic text-slate-700 dark:text-slate-200 leading-relaxed bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                      &ldquo;
+                      {sec.preview.leadInSegments.map((seg, i) =>
+                        seg.isDynamic ? (
+                          <span key={i} className="font-extrabold not-italic underline decoration-2 decoration-[#0F766E] dark:decoration-teal-300 text-[#0F766E] dark:text-teal-200">
+                            {seg.text}
+                          </span>
+                        ) : (
+                          <span key={i}>{seg.text}</span>
+                        )
+                      )}
+                      &rdquo;
+                    </p>
+                    <textarea
+                      rows={2}
+                      value={sp.examinerScripts?.[sec.key] || ''}
+                      onChange={e =>
+                        patchSpeaking({
+                          examinerScripts: {
+                            ...(sp.examinerScripts || {}),
+                            [sec.key]: e.target.value
+                          }
+                        })
+                      }
+                      placeholder={`Để trống = dùng mẫu chuẩn: ${sec.fallback}`}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[11px] text-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

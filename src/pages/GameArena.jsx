@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Award,
@@ -110,6 +110,8 @@ export default function GameArena({
   gameSubState,
   gameTimeLeft,
   gameTimeLimit,
+  arenaEntryNonce = 0,
+  arenaInitialMode = 'hub',
   gameToast,
   gameTypedProgress,
   gameRound4Input = '',
@@ -193,8 +195,19 @@ export default function GameArena({
   const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
   const [showPilotDrawer, setShowPilotDrawer] = useState(false);
   const [arenaGameMode, setArenaGameMode] = useState(() =>
-    gameSubState === 'JOIN' ? 'hub' : 'space_shooter'
+    arenaInitialMode || (gameSubState === 'JOIN' || gameSubState === 'LOBBY' ? 'hub' : 'space_shooter')
   ); // 'hub' | 'space_shooter' | 'knight_rpg'
+
+  const gameSubStateRef = useRef(gameSubState);
+  gameSubStateRef.current = gameSubState;
+
+  useEffect(() => {
+    const curSub = gameSubStateRef.current;
+    if (curSub === 'PLAYING' || curSub === 'COUNTDOWN' || curSub === 'HOST_SPECTATE') {
+      return;
+    }
+    setArenaGameMode(arenaInitialMode || 'hub');
+  }, [arenaEntryNonce, arenaInitialMode]);
   const [entryZone, setEntryZone] = useState('live'); // 'live' | 'practice'
   const [practiceTopicId, setPracticeTopicId] = useState('core');
   const [practiceSpeed, setPracticeSpeed] = useState('normal');
@@ -788,7 +801,7 @@ export default function GameArena({
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                Nhặt 🪙 Vàng &amp; 🗝️ Chìa Khóa Hồi Sinh trên đường (giống Subway Surfers), mở khóa Nữ Chiến Binh Valkyrie / Nữ Kiếm Khách Sakura &amp; né Skill Tất Sát (Final Smash) của Rồng!
+                Đánh hạ quái vật rớt 🪙 Tiền Vàng &amp; ngẫu nhiên nhặt 🗝️ Chìa Khóa Hồi Sinh trên đường, mở khóa Nữ Chiến Binh Valkyrie / Nữ Kiếm Khách Sakura &amp; né Skill Tất Sát (Final Smash) của Rồng!
               </p>
             </div>
             <button

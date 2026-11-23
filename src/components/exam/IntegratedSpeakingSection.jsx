@@ -12,6 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { getSpeakingQuestionItems, normalizeSpeakingSection } from '../../constants/seedData';
+import { buildSpeakingExaminerLeadIn } from '../../utils/speakingExaminerScript';
 import AudioLevelMeter from '../speaking/AudioLevelMeter';
 
 const pickSupportedMimeType = () => {
@@ -34,6 +35,7 @@ const pickSupportedMimeType = () => {
 
 export default function IntegratedSpeakingSection({
   autoExaminerMode = false,
+  candidateName = '',
   test,
   recordingsMap = {},
   onUpdateRecording,
@@ -77,6 +79,18 @@ export default function IntegratedSpeakingSection({
 
   const safeIdx = Math.min(Math.max(0, currentIdx), Math.max(0, questions.length - 1));
   const currentQ = questions[safeIdx] || null;
+  const currentExaminerLead = useMemo(
+    () =>
+      buildSpeakingExaminerLeadIn({
+        item: currentQ,
+        index: safeIdx,
+        items: questions,
+        speakingCfg,
+        candidateName,
+        testTitle: test?.title || ''
+      }),
+    [currentQ, safeIdx, questions, speakingCfg, candidateName, test?.title]
+  );
   const currentQuestionIdRef = useRef(currentQ?.id || '');
   const currentRec = currentQ ? recordingsMap[currentQ.id] : null;
   const recordedCount = useMemo(
@@ -305,12 +319,21 @@ export default function IntegratedSpeakingSection({
     }, 1000);
   };
 
-  const readPromptAndAutoRecord = (question, autoRecord = true) => {
+  const readPromptAndAutoRecord = (question, autoRecord = true, explicitIdx = safeIdx) => {
     if (!question) return;
     cancelPromptPlayback();
     const cycle = promptCycleRef.current;
     const questionId = question.id;
     let ttsFallbackStarted = false;
+    const examinerScript = buildSpeakingExaminerLeadIn({
+      item: question,
+      index: explicitIdx,
+      items: questions,
+      speakingCfg,
+      candidateName,
+      testTitle: test?.title || ''
+    });
+    const spokenPayload = examinerScript.fullSpokenText || question.prompt || '';
     if (!question.audioUrl && speakingCfg.disableAiTts) {
       setPromptPlayBlocked(true);
       return;
@@ -330,18 +353,18 @@ export default function IntegratedSpeakingSection({
     const speakPromptText = () => {
       if (cycle !== promptCycleRef.current || currentQuestionIdRef.current !== questionId || ttsFallbackStarted) return;
       ttsFallbackStarted = true;
-      if (!question.prompt || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      if (!spokenPayload || typeof window === 'undefined' || !('speechSynthesis' in window)) {
         setIsSpeakingPrompt(false);
         setPromptPlayBlocked(true);
         return;
       }
       try {
-        const utterance = new SpeechSynthesisUtterance(question.prompt);
+        const utterance = new SpeechSynthesisUtterance(spokenPayload);
         const voices = window.speechSynthesis.getVoices?.() || [];
         const voice = voices.find(item => /^en-GB/i.test(item.lang)) || voices.find(item => /^en/i.test(item.lang));
         if (voice) utterance.voice = voice;
         utterance.lang = voice?.lang || 'en-GB';
-        utterance.rate = 0.96;
+        utterance.rate = 0.95;
         utterance.onend = finishPrompt;
         utterance.onerror = () => {
           if (cycle !== promptCycleRef.current) return;
@@ -350,8 +373,8 @@ export default function IntegratedSpeakingSection({
           setIsSpeakingPrompt(false);
           setPromptPlayBlocked(true);
         };
-        const wordCount = Math.max(1, String(question.prompt).trim().split(/\s+/).length);
-        const estimatedReadMs = Math.min(18000, Math.max(2500, wordCount * 450 + 600));
+        const wordCount = Math.max(1, String(spokenPayload).trim().split(/\s+/).length);
+        const estimatedReadMs = Math.min(48000, Math.max(2500, wordCount * 460 + 1200));
         promptFallbackTimerRef.current = setTimeout(finishPrompt, estimatedReadMs + 1200);
         setPromptPlayBlocked(false);
         setIsSpeakingPrompt(true);
@@ -486,7 +509,7 @@ export default function IntegratedSpeakingSection({
     currentQuestionIdRef.current = questions[targetIdx]?.id || '';
     setCurrentIdx(targetIdx);
     if (autoExaminerMode && isSpeakingSectionStartedRef.current) {
-      readPromptAndAutoRecord(questions[targetIdx], true);
+      readPromptAndAutoRecord(questions[targetIdx], true, targetIdx);
     } else {
       cancelPromptPlayback();
     }
@@ -494,7 +517,7 @@ export default function IntegratedSpeakingSection({
 
   const handleReadCurrentPrompt = () => {
     if (isRecordingRef.current) stopRecording();
-    readPromptAndAutoRecord(currentQ, autoExaminerMode);
+    readPromptAndAutoRecord(currentQ, autoExaminerMode, safeIdx);
   };
 
   const beginSpeakingSection = () => {
@@ -505,7 +528,7 @@ export default function IntegratedSpeakingSection({
     isSpeakingSectionStartedRef.current = true;
     setIsSpeakingSectionStarted(true);
     setMicError('');
-    readPromptAndAutoRecord(currentQ, autoExaminerMode);
+    readPromptAndAutoRecord(currentQ, autoExaminerMode, safeIdx);
   };
 
   if (questions.length === 0) {
@@ -648,6 +671,37 @@ export default function IntegratedSpeakingSection({
                 <Clock className="w-3.5 h-3.5" /> Gợi ý ~{maxTargetSec}s
               </span>
             </div>
+            {currentExaminerLead.leadInText && !currentQ.audioUrl && (
+              <div className="mt-2.5 p-3 rounded-lg bg-teal-50/85 dark:bg-teal-950/35 border border-teal-200 dark:border-teal-800/70 space-y-1">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F766E] dark:text-teal-300 flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5" />
+                  Lời dẫn Giám khảo AI (tự động đọc trước câu hỏi)
+                </p>
+                {autoExaminerMode ? (
+                  <p className="text-xs italic text-teal-900 dark:text-teal-100">
+                    🎧 Giám khảo AI đang dẫn đề Part {currentQ.part} theo kịch bản IELTS chuẩn và đọc câu hỏi...
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-800 dark:text-teal-50 leading-relaxed italic">
+                    &ldquo;
+                    {currentExaminerLead.leadInSegments.map((seg, sIdx) =>
+                      seg.isDynamic ? (
+                        <span
+                          key={sIdx}
+                          className="font-extrabold not-italic underline decoration-2 decoration-[#0F766E] dark:decoration-teal-300 underline-offset-2 text-[#0F766E] dark:text-teal-200"
+                        >
+                          {seg.text}
+                        </span>
+                      ) : (
+                        <span key={sIdx}>{seg.text}</span>
+                      )
+                    )}
+                    &rdquo;
+                  </p>
+                )}
+              </div>
+            )}
+
             <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-zinc-100 leading-snug mt-2">
               {autoExaminerMode
                 ? (isSpeakingPrompt

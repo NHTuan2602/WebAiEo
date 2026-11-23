@@ -484,6 +484,14 @@ export const createDefaultSpeakingSection = (overrides = {}) => ({
   part2PrepSec: 60,
   part2SpeakSec: 120,
   part3SpeakSec: 60,
+  examinerScripts: {
+    enabled: true,
+    part1Intro: '',
+    part1TopicBridge: '',
+    part2Intro: '',
+    part2StartSpeaking: '',
+    part3Intro: ''
+  },
   part1: {
     enabled: true,
     topic: 'Hometown & Daily Routine',
@@ -630,6 +638,14 @@ export const normalizeSpeakingSection = (rawSpeaking = {}) => {
     part2PrepSec: Math.max(10, Number(s.part2PrepSec ?? def.part2PrepSec) || 60),
     part2SpeakSec: Math.max(30, Number(s.part2SpeakSec ?? def.part2SpeakSec) || 120),
     part3SpeakSec: Math.max(15, Number(s.part3SpeakSec ?? def.part3SpeakSec) || 60),
+    examinerScripts: {
+      enabled: s.examinerScripts?.enabled !== false,
+      part1Intro: String(s.examinerScripts?.part1Intro || '').trim(),
+      part1TopicBridge: String(s.examinerScripts?.part1TopicBridge || '').trim(),
+      part2Intro: String(s.examinerScripts?.part2Intro || '').trim(),
+      part2StartSpeaking: String(s.examinerScripts?.part2StartSpeaking || '').trim(),
+      part3Intro: String(s.examinerScripts?.part3Intro || '').trim()
+    },
     part1: {
       enabled: p1.enabled !== false,
       topic: String(p1.topic ?? def.part1.topic),
@@ -1228,7 +1244,7 @@ export const createEmptyTestForm = () => ({
   autoAiGrade: false,
   visibility: 'private',
   examPurpose: 'real_exam',
-  priceVnd: 20000,
+  priceVnd: 100000,
   examPassword: '',
   maxAttempts: 1,
   sequentialMode: true,

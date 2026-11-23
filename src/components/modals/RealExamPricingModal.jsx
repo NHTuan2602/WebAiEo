@@ -1,6 +1,7 @@
 import { CheckCircle2, Info, ShoppingBag, Sparkles, Ticket, X } from 'lucide-react';
 import {
   DEFAULT_EXAM_PRICE_VND,
+  EXAM_PURCHASE_TIERS,
   PERIODIC_MOCK_PRICE_VND,
   REAL_EXAM_COMBOS,
   formatVndCurrency,
@@ -106,12 +107,12 @@ export default function RealExamPricingModal({
                 const perTestRounded = Math.round(comboPrice / combo.credits / 100) * 100;
                 const badgeText =
                   combo.credits === 3
-                    ? 'Hạng Classic'
+                    ? 'Hạng Standard'
                     : combo.credits === 5
-                    ? 'Phổ biến · Standard'
+                    ? 'Phổ biến · Plus'
                     : combo.credits === 8
-                    ? 'Ưu đãi mạnh'
-                    : 'Tiết kiệm nhất · Plus';
+                    ? 'Hạng Advanced'
+                    : 'Tiết kiệm nhất · 10 đề';
                 const isPopular = idx === 1 || combo.credits === 5;
 
                 return (
@@ -216,7 +217,16 @@ export default function RealExamPricingModal({
                 <span>Cách Dùng Lượt Combo (3 / 5 / 8 / 10 Đề)</span>
               </p>
               <p className="text-xs text-[#475569] dark:text-zinc-400 leading-relaxed">
-                Lượt hiển thị ngay cạnh tên bạn. Mỗi đề nạp sẽ tích lũy nâng hạng cạnh tên từ <strong>Classic (3)</strong> → <strong>Standard (5)</strong> → <strong>Plus (10)</strong> → <strong>Advanced (15)</strong> → <strong>Premier (20)</strong> → <strong>Signature (25)</strong> → <strong>Elite (30)</strong> → <strong>Prestige (40)</strong> → <strong>Royal (45)</strong> → <strong>Imperial (60 đề)</strong>.
+                Lượt hiển thị ngay cạnh tên bạn. Mỗi đề nạp sẽ tích lũy nâng hạng cạnh tên từ{' '}
+                {EXAM_PURCHASE_TIERS.map((tier, tIdx) => (
+                  <span key={tier.id}>
+                    {tIdx > 0 ? ' → ' : ''}
+                    <strong>
+                      {tier.label} ({tier.minExams}{tIdx === EXAM_PURCHASE_TIERS.length - 1 ? ' đề' : ''})
+                    </strong>
+                  </span>
+                ))}
+                .
               </p>
             </div>
           </div>

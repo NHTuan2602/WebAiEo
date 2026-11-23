@@ -95,13 +95,15 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await expect(page.getByText(/IELTS Academic Mock Test 02 - Cambridge Standard/i).first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'Teacher-TestsTab');
 
-    await page.getByRole('button', { name: /\+ Thực Chiến/i }).first().click();
+    await page.getByRole('button', { name: /Thực Chiến \(100k\)/i }).first().click();
     await expect(page.getByText(/TÊN ĐỀ THI IELTS|Soạn & Chỉnh Sửa Đề/i).first()).toBeVisible({ timeout: 12_000 });
     // Verify standard IELTS 4-Skill format tabs: Listening 4 Parts (40 Qs), Reading 3 Passages (40 Qs), Writing 2 Tasks, Speaking 3 Parts
     await expect(page.getByRole('button', { name: /2\. Listening \(4\/4 bài/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /3\. Reading \(3\/3 bài/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /4\. Writing \(2 bài/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /5\. Speaking \(3 phần/i }).first()).toBeVisible();
+    await page.getByRole('button', { name: /5\. Speaking \(3 phần/i }).first().click();
+    await expect(page.getByText(/Kịch Bản Lời Dẫn Giám Khảo AI/i).first()).toBeVisible();
 
     // Verify Listening Builder includes AI PDF extraction + side-by-side Answer Key panel & range image tool
     await page.getByRole('button', { name: /2\. Listening/i }).first().click();
@@ -179,9 +181,10 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await expect(modal).toBeHidden({ timeout: 10_000 });
     await expect(studentRow.getByText(/Đã Duyệt Trả Điểm/i)).toBeVisible({ timeout: 10_000 });
 
-    // 3. Tab: Quản Lý Tài Khoản (Tài Khoản Lớp)
+    // 3. Tab: Quản Lý Tài Khoản (Tài Khoản Lớp) — verify Guest filter pill
     await page.locator('aside').getByRole('button', { name: /Tài Khoản Lớp/i }).click();
     await expect(page.getByText(E2E_CREDENTIALS.student.name).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Tài khoản khách/i }).first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'Teacher-AccountsTab');
 
     // 4. Tab: Quản Lý Lớp Học
@@ -189,11 +192,17 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await expect(page.getByText(E2E_CREDENTIALS.className).first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'Teacher-ClassesTab');
 
-    // 5. Hồ Sơ Lớp (StudentProfile.jsx)
+    // 5. Hồ Sơ Lớp (StudentProfile.jsx) + verify Hạng Cạnh Tên unlock roadmap modal
     await page.locator('header').getByRole('tab', { name: /Hồ Sơ Lớp/i }).first().click();
     await expect(page.getByText(/Mục Tiêu & Tiến Độ Từng Kỹ Năng|Danh Bạ/i).first()).toBeVisible({
       timeout: 12_000
     });
+    await page.getByRole('button', { name: /Hạng Cạnh Tên/i }).first().click();
+    await expect(page.getByText(/Hệ Thống 10 Hạng Cạnh Tên & Cách Mở Khóa/i)).toBeVisible();
+    await expect(page.getByText(/1 đề Thực Chiến/i).first()).toBeVisible();
+    await expect(page.getByText(/3 đề Thực Chiến/i).first()).toBeVisible();
+    await expect(page.getByText(/5 đề Thực Chiến/i).first()).toBeVisible();
+    await page.getByRole('button', { name: /Đóng bảng hạng cạnh tên/i }).click();
     await assertNoHorizontalOverflow(page, 'StudentProfile-Light');
 
     // Check Dark Mode on StudentProfile too
@@ -218,6 +227,12 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     await page.getByRole('button', { name: /Quay Lại Quản Trị GV/i }).first().click();
     await expect(page.getByRole('heading', { name: /Quản Lý & Giảng Dạy/i })).toBeVisible();
+
+    // 7. Verify Teacher/Admin clicking Đấu Trường in Navbar opens the 2-Game Selection Hub (not Space Shooter directly)
+    await page.locator('header').getByRole('tab', { name: /Đấu Trường/i }).first().click();
+    await expect(page.locator('[data-testid="arena-game-selection-hub"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="select-space-shooter-game-btn"]')).toBeVisible();
+    await expect(page.locator('[data-testid="switch-to-knight-game-btn"]')).toBeVisible();
 
     healthGuard.assertHealthy('teacher-admin-grading-profile');
   });

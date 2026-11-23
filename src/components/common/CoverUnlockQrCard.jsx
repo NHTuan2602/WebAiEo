@@ -68,7 +68,7 @@ export default function CoverUnlockQrCard({
   const activeQrUrl = cfg.customQrUrl || payosQrDataUrl || vietQrUrl;
   const hasBankDetails = Boolean(displayAccountNumber && (cfg.bankCode || cfg.bankName || payosQrDataUrl));
   const headingText = itemType === 'title' && itemTitle
-    ? `Mua Danh Hiệu VIP (1 Tháng): ${itemTitle}`
+    ? `Donate Ủng Hộ Mở Vĩnh Viễn: ${itemTitle}`
     : itemType === 'test'
     ? `Chi Phí Test 4 Kỹ Năng: ${itemTitle || 'Thực Chiến IELTS'}`
     : comboMeta
@@ -79,7 +79,7 @@ export default function CoverUnlockQrCard({
     ? 'Đăng Ký Gói IELTS VIP Full Quyền (1 Tháng)'
     : 'Mở Khóa Tải Ảnh Nền Riêng (1 Tháng)';
   const subText = itemType === 'title'
-    ? 'Quét mã VietQR để sở hữu danh hiệu Phú Quý ánh kim + hào quang Avatar nổi bật suốt 30 ngày!'
+    ? 'Quét mã VietQR ủng hộ duy trì website để mở khóa VĨNH VIỄN danh hiệu Phú Quý (hiệu lực trọn đời, không hết hạn)!'
     : itemType === 'test'
     ? 'Quét mã VietQR để mở 1 lượt thi thật đủ 4 kỹ năng L·R·W·S (nộp xong chờ Ms. Như duyệt & trả điểm)!'
     : comboMeta

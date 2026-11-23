@@ -2204,77 +2204,109 @@ export const STUDENT_TITLES = [
     id: 'vip_thieu_gia',
     label: 'Thiếu Gia Luyện Đề',
     icon: '💰',
-    tier: 'Cửa Hàng VIP (1 Tháng)',
+    tier: 'Donate Ủng Hộ (Vĩnh Viễn)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
+    isPermanentDonateTitle: true,
     defaultPriceVnd: 10000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-emerald-400',
-    conditionText: 'Danh hiệu Phú Quý (1 tháng): Sở hữu vòng hào quang Lục Bảo & nổi bật trên Hồ sơ + BXH suốt 30 ngày.',
+    conditionText: 'Danh hiệu Phú Quý (Vĩnh viễn): Tự động mở khóa VĨNH VIỄN khi Donate ủng hộ duy trì website đạt mốc từ 10.000đ trở lên (hiệu lực trọn đời, không hết hạn).',
     badgeClass: 'vip-paid-badge vip-paid-emerald bg-[#047857] text-[#FFFFFF] border-emerald-300 font-semibold',
     heroBadgeClass: 'vip-paid-badge vip-paid-emerald bg-[#047857] text-[#FFFFFF] border-emerald-300 font-semibold',
     gameBadgeClass: 'vip-paid-badge vip-paid-emerald bg-[#047857] text-[#FFFFFF] border-emerald-300 font-semibold',
-    isUnlocked: () => false,
-    getProgress: (_stats, _user, priceVnd = 10000) => ({
-      pct: 0,
-      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
-    })
+    isUnlocked: (_stats, userObj) => Number(userObj?.donatedTotalVnd || 0) >= 10000,
+    getProgress: (_stats, userObj, priceVnd = 10000) => {
+      const donated = Math.max(0, Number(userObj?.donatedTotalVnd) || 0);
+      const target = Math.max(1000, Number(priceVnd) || 10000);
+      if (donated >= target) {
+        return { pct: 100, text: '💜 Đã mở khóa VĨNH VIỄN (Donate ủng hộ)' };
+      }
+      return {
+        pct: Math.min(99, Math.round((donated / target) * 100)),
+        text: `Donate tích lũy: ${donated.toLocaleString('vi-VN')}đ / ${target.toLocaleString('vi-VN')}đ (Mở vĩnh viễn)`
+      };
+    }
   },
   {
     id: 'vip_manh_thuong_quan',
     label: 'Mạnh Thường Quân',
     icon: '🥂',
-    tier: 'Cửa Hàng VIP (1 Tháng)',
+    tier: 'Donate Ủng Hộ (Vĩnh Viễn)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
+    isPermanentDonateTitle: true,
     defaultPriceVnd: 15000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-rose-400',
-    conditionText: 'Danh hiệu Phú Quý (1 tháng): Hiệu ứng ánh kim Hồng Ngọc + hào quang Avatar khi đồng hành duy trì server.',
+    conditionText: 'Danh hiệu Phú Quý (Vĩnh viễn): Tự động mở khóa VĨNH VIỄN khi Donate ủng hộ duy trì server đạt mốc quy định (hiệu ứng ánh kim Hồng Ngọc trọn đời).',
     badgeClass: 'vip-paid-badge vip-paid-ruby bg-[#BE123C] text-[#FFFFFF] border-rose-300 font-semibold',
     heroBadgeClass: 'vip-paid-badge vip-paid-ruby bg-[#BE123C] text-[#FFFFFF] border-rose-300 font-semibold',
     gameBadgeClass: 'vip-paid-badge vip-paid-ruby bg-[#BE123C] text-[#FFFFFF] border-rose-300 font-semibold',
-    isUnlocked: () => false,
-    getProgress: (_stats, _user, priceVnd = 15000) => ({
-      pct: 0,
-      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
-    })
+    isUnlocked: (_stats, userObj) => Number(userObj?.donatedTotalVnd || 0) >= 15000,
+    getProgress: (_stats, userObj, priceVnd = 15000) => {
+      const donated = Math.max(0, Number(userObj?.donatedTotalVnd) || 0);
+      const target = Math.max(1000, Number(priceVnd) || 15000);
+      if (donated >= target) {
+        return { pct: 100, text: '💜 Đã mở khóa VĨNH VIỄN (Donate ủng hộ)' };
+      }
+      return {
+        pct: Math.min(99, Math.round((donated / target) * 100)),
+        text: `Donate tích lũy: ${donated.toLocaleString('vi-VN')}đ / ${target.toLocaleString('vi-VN')}đ (Mở vĩnh viễn)`
+      };
+    }
   },
   {
     id: 'vip_dai_gia',
     label: 'Đại Gia IELTS',
     icon: '💸',
-    tier: 'Cửa Hàng VIP (1 Tháng)',
+    tier: 'Donate Ủng Hộ (Vĩnh Viễn)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
+    isPermanentDonateTitle: true,
     defaultPriceVnd: 20000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-amber-400',
-    conditionText: 'Danh hiệu Phú Quý (1 tháng): Ánh vàng Hoàng Kim rực sáng kèm hào quang Avatar & huy hiệu ưu tiên trên BXH 30 ngày.',
+    conditionText: 'Danh hiệu Phú Quý (Vĩnh viễn): Ánh vàng Hoàng Kim rực sáng & huy hiệu ưu tiên trên BXH mở khóa VĨNH VIỄN khi Donate ủng hộ đạt mốc quy định.',
     badgeClass: 'vip-paid-badge vip-paid-gold bg-[#FBBF24] text-[#09090B] border-[#D97706] font-semibold',
     heroBadgeClass: 'vip-paid-badge vip-paid-gold bg-[#FBBF24] text-[#09090B] border-[#D97706] font-semibold',
     gameBadgeClass: 'vip-paid-badge vip-paid-gold bg-[#FBBF24] text-[#09090B] border-[#D97706] font-semibold',
-    isUnlocked: () => false,
-    getProgress: (_stats, _user, priceVnd = 20000) => ({
-      pct: 0,
-      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
-    })
+    isUnlocked: (_stats, userObj) => Number(userObj?.donatedTotalVnd || 0) >= 20000,
+    getProgress: (_stats, userObj, priceVnd = 20000) => {
+      const donated = Math.max(0, Number(userObj?.donatedTotalVnd) || 0);
+      const target = Math.max(1000, Number(priceVnd) || 20000);
+      if (donated >= target) {
+        return { pct: 100, text: '💜 Đã mở khóa VĨNH VIỄN (Donate ủng hộ)' };
+      }
+      return {
+        pct: Math.min(99, Math.round((donated / target) * 100)),
+        text: `Donate tích lũy: ${donated.toLocaleString('vi-VN')}đ / ${target.toLocaleString('vi-VN')}đ (Mở vĩnh viễn)`
+      };
+    }
   },
   {
     id: 'vip_ty_phu',
     label: 'Tỷ Phú Tri Thức',
     icon: '⚜️',
-    tier: 'Cửa Hàng VIP (1 Tháng)',
+    tier: 'Donate Ủng Hộ (Vĩnh Viễn)',
     difficulty: 'Phú Quý',
     isPaidTitle: true,
+    isPermanentDonateTitle: true,
     defaultPriceVnd: 50000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-amber-300',
-    conditionText: 'Danh hiệu Phú Quý Đỉnh Cao (1 tháng): Ánh kim Vàng Đỏ phát sáng độc tôn + hào quang Avatar & vinh danh VIP trên BXH.',
+    conditionText: 'Danh hiệu Phú Quý Đỉnh Cao (Vĩnh viễn): Ánh kim Vàng Đỏ phát sáng độc tôn + vinh danh VIP trên BXH mở khóa VĨNH VIỄN khi Donate ủng hộ đạt mốc quy định.',
     badgeClass: 'vip-paid-badge vip-paid-imperial bg-[#F59E0B] text-[#09090B] border-[#B45309] font-semibold',
     heroBadgeClass: 'vip-paid-badge vip-paid-imperial bg-[#F59E0B] text-[#09090B] border-[#B45309] font-semibold',
     gameBadgeClass: 'vip-paid-badge vip-paid-imperial bg-[#F59E0B] text-[#09090B] border-[#B45309] font-semibold',
-    isUnlocked: () => false,
-    getProgress: (_stats, _user, priceVnd = 50000) => ({
-      pct: 0,
-      text: `Gói 1 tháng bằng QR: ${Number(priceVnd).toLocaleString('vi-VN')}đ`
-    })
+    isUnlocked: (_stats, userObj) => Number(userObj?.donatedTotalVnd || 0) >= 50000,
+    getProgress: (_stats, userObj, priceVnd = 50000) => {
+      const donated = Math.max(0, Number(userObj?.donatedTotalVnd) || 0);
+      const target = Math.max(1000, Number(priceVnd) || 50000);
+      if (donated >= target) {
+        return { pct: 100, text: '💜 Đã mở khóa VĨNH VIỄN (Donate ủng hộ)' };
+      }
+      return {
+        pct: Math.min(99, Math.round((donated / target) * 100)),
+        text: `Donate tích lũy: ${donated.toLocaleString('vi-VN')}đ / ${target.toLocaleString('vi-VN')}đ (Mở vĩnh viễn)`
+      };
+    }
   },
   {
     id: 'aieo_vip',
@@ -2825,9 +2857,9 @@ export const REAL_EXAM_COMBOS = [
 /** 10 bậc hạng thành viên theo tổng số đề Thực Chiến đã nạp (từ màu thường lên màu VIP). */
 export const EXAM_PURCHASE_TIERS = [
   {
-    id: 'classic',
-    label: 'Classic',
-    minExams: 3,
+    id: 'basic',
+    label: 'Basic',
+    minExams: 1,
     isVipVisual: false,
     showCrown: false,
     badgeClass: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-600'
@@ -2835,7 +2867,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'standard',
     label: 'Standard',
-    minExams: 5,
+    minExams: 3,
     isVipVisual: false,
     showCrown: false,
     badgeClass: 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950/70 dark:text-sky-200 dark:border-sky-600/60'
@@ -2843,7 +2875,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'plus',
     label: 'Plus',
-    minExams: 10,
+    minExams: 5,
     isVipVisual: false,
     showCrown: false,
     badgeClass: 'bg-teal-100 text-teal-800 border-teal-400 dark:bg-teal-950/70 dark:text-teal-200 dark:border-teal-500/60'
@@ -2851,7 +2883,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'advanced',
     label: 'Advanced',
-    minExams: 15,
+    minExams: 8,
     isVipVisual: false,
     showCrown: false,
     badgeClass: 'bg-indigo-600 text-white border-indigo-400 shadow-xs'
@@ -2859,7 +2891,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'premier',
     label: 'Premier',
-    minExams: 20,
+    minExams: 12,
     isVipVisual: true,
     showCrown: false,
     badgeClass: 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-300 shadow-xs'
@@ -2867,7 +2899,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'signature',
     label: 'Signature',
-    minExams: 25,
+    minExams: 16,
     isVipVisual: true,
     showCrown: false,
     badgeClass: 'bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white border-pink-300 shadow-xs'
@@ -2875,7 +2907,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'elite',
     label: 'Elite',
-    minExams: 30,
+    minExams: 20,
     isVipVisual: true,
     showCrown: true,
     badgeClass: 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-300 shadow-sm'
@@ -2883,7 +2915,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'prestige',
     label: 'Prestige',
-    minExams: 40,
+    minExams: 25,
     isVipVisual: true,
     showCrown: true,
     badgeClass: 'bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 text-white border-amber-300 shadow-sm'
@@ -2891,7 +2923,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'royal',
     label: 'Royal',
-    minExams: 45,
+    minExams: 30,
     isVipVisual: true,
     showCrown: true,
     badgeClass: 'bg-gradient-to-r from-purple-700 via-fuchsia-600 to-amber-400 text-white border-amber-300 shadow-md'
@@ -2899,7 +2931,7 @@ export const EXAM_PURCHASE_TIERS = [
   {
     id: 'imperial',
     label: 'Imperial',
-    minExams: 60,
+    minExams: 40,
     isVipVisual: true,
     showCrown: true,
     badgeClass: 'vip-paid-badge vip-paid-vip bg-gradient-to-r from-zinc-900 via-red-700 to-amber-500 text-amber-100 border-amber-300 shadow-md'
@@ -3004,7 +3036,7 @@ export function canCreateFriendRoomNow(user, nowMs = Date.now()) {
   return hasVipFriendRoomAccess(user, nowMs) || getFriendRoomTicketCredits(user) > 0;
 }
 
-export function hasActivePaidTitlePermission(user, titleId, nowMs = Date.now()) {
+export function hasActivePaidTitlePermission(user, titleId, nowMs = Date.now(), paymentConfig = null) {
   if (!user || typeof user !== 'object' || !titleId) return false;
   if (user.isSuperAdmin || user.isSystemAdmin || user.username === 'tuanpro123s') return true;
   const grantedArr = Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String) : [];
@@ -3013,6 +3045,12 @@ export function hasActivePaidTitlePermission(user, titleId, nowMs = Date.now()) 
     return Number(user.aieoVipExpiresAt) > nowMs;
   }
   const purchasedArr = Array.isArray(user.purchasedTitleIds) ? user.purchasedTitleIds.map(String) : [];
+  const paidMeta = PAID_SHOP_TITLES.find(t => t.id === String(titleId));
+  if (paidMeta?.isPermanentDonateTitle) {
+    if (purchasedArr.includes(String(titleId))) return true;
+    const threshold = getTitlePriceVnd(paidMeta, paymentConfig);
+    return Number(user.donatedTotalVnd || 0) >= threshold;
+  }
   if (!purchasedArr.includes(String(titleId))) return false;
   const exp = Number(user.purchasedTitleExpiries?.[titleId]) || 0;
   return exp > 0 ? exp > nowMs : true;
@@ -3268,17 +3306,28 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
   const userHeldDailyRecord = unameLower ? dailyHolders?.byUsername?.[unameLower] || null : null;
 
   const itemsWithProgress = catalog.map(t => {
+    const priceVnd = (t.isPaidTitle || t.isVipBundleTitle)
+      ? (t.isVipBundleTitle ? (Number(paymentConfig?.aieoVipPrice) || AIEO_VIP_PRICE_VND) : getTitlePriceVnd(t, paymentConfig))
+      : 0;
+    const isPermanentDonate = Boolean(t.isPermanentDonateTitle);
     const unlockedByGrant = grantedSet.has(t.id);
     const hasPurchasedEntry = purchasedSet.has(t.id);
-    const purchaseExp = Number(purchasedExpiries[t.id]) || (t.isVipBundleTitle ? Number(userObj?.aieoVipExpiresAt) || 0 : 0);
-    const unlockedByPurchase = t.isVipBundleTitle
+    const unlockedByDonateThreshold = isPermanentDonate && priceVnd > 0 && Number(userObj?.donatedTotalVnd || 0) >= priceVnd;
+    const purchaseExp = isPermanentDonate
+      ? 0
+      : (Number(purchasedExpiries[t.id]) || (t.isVipBundleTitle ? Number(userObj?.aieoVipExpiresAt) || 0 : 0));
+    const unlockedByPurchase = isPermanentDonate
+      ? (hasPurchasedEntry || unlockedByDonateThreshold)
+      : t.isVipBundleTitle
       ? (Number(userObj?.aieoVipExpiresAt) > nowMs)
       : hasPurchasedEntry && (purchaseExp > 0 ? purchaseExp > nowMs : true);
-    const purchaseExpired = Boolean(
-      !unlockedByPurchase &&
-      !unlockedByGrant &&
-      ((hasPurchasedEntry && purchaseExp > 0 && purchaseExp <= nowMs) || (t.isVipBundleTitle && Number(userObj?.aieoVipExpiresAt) > 0 && Number(userObj?.aieoVipExpiresAt) <= nowMs))
-    );
+    const purchaseExpired = isPermanentDonate
+      ? false
+      : Boolean(
+          !unlockedByPurchase &&
+          !unlockedByGrant &&
+          ((hasPurchasedEntry && purchaseExp > 0 && purchaseExp <= nowMs) || (t.isVipBundleTitle && Number(userObj?.aieoVipExpiresAt) > 0 && Number(userObj?.aieoVipExpiresAt) <= nowMs))
+        );
 
     const dailySlot = t.isDailyRankTitle ? (dailyHolders?.byTitleId?.[t.id] || null) : null;
     const isHeldByUserToday = Boolean(
@@ -3291,13 +3340,12 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
     const unlockedByDailyRank = isHeldByUserToday;
     const unlockedByMetric = t.isDailyRankTitle
       ? unlockedByDailyRank
+      : isPermanentDonate
+      ? unlockedByDonateThreshold
       : typeof t.isUnlocked === 'function'
       ? Boolean(t.isUnlocked(stats, userObj))
       : false;
     const unlocked = unlockAll || unlockedByGrant || unlockedByPurchase || unlockedByMetric;
-    const priceVnd = (t.isPaidTitle || t.isVipBundleTitle)
-      ? (t.isVipBundleTitle ? (Number(paymentConfig?.aieoVipPrice) || AIEO_VIP_PRICE_VND) : getTitlePriceVnd(t, paymentConfig))
-      : 0;
 
     let dailyRankMeta = null;
     let progress = typeof t.getProgress === 'function'
@@ -3384,6 +3432,7 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       vipHaloClass: t.vipHaloClass || '',
       isCustomTitle: Boolean(t.isCustomTitle),
       isPaidTitle: Boolean(t.isPaidTitle),
+      isPermanentDonateTitle: Boolean(t.isPermanentDonateTitle),
       isVipBundleTitle: Boolean(t.isVipBundleTitle),
       isStaffOnly: Boolean(t.isStaffOnly),
       isHolidayTitle: Boolean(t.isHolidayTitle),
@@ -3407,7 +3456,11 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
         : unlockedByDailyRank
         ? progress.text
         : unlockedByPurchase
-        ? (subLeftLabel ? `💎 Gói 1 tháng (${subLeftLabel})` : '💎 Đã mua mở khóa')
+        ? (isPermanentDonate
+            ? '💜 Đã mở khóa VĨNH VIỄN (Donate ủng hộ)'
+            : subLeftLabel
+            ? `💎 Gói 1 tháng (${subLeftLabel})`
+            : '💎 Đã mua mở khóa')
         : purchaseExpired
         ? '⌛ Hết hạn 1 tháng - Bấm gia hạn để đeo tiếp'
         : unlocked && t.isHolidayTitle && progress?.text

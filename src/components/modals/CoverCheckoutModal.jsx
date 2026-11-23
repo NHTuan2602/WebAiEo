@@ -212,7 +212,7 @@ export default function CoverCheckoutModal({
               <h3 id="cover-checkout-title" className="text-sm sm:text-base font-extrabold flex items-center gap-2 flex-wrap">
                 <span>
                   {isTitleOrder
-                    ? `Mua Danh Hiệu ${itemLabel || 'VIP'} (1 Tháng)`
+                    ? `Donate Mở Vĩnh Viễn: ${itemLabel || 'Danh Hiệu Phú Quý'}`
                     : isTestOrder
                     ? `Chi Phí Test: ${itemLabel || 'Thực Chiến IELTS 4 Kỹ Năng'}`
                     : isComboOrder
@@ -230,6 +230,8 @@ export default function CoverCheckoutModal({
               <p className="text-xs text-slate-300">
                 {order?.orderCode
                   ? `Mã đơn thanh toán: #${order.orderCode}`
+                  : isTitleOrder
+                  ? 'Quét mã VietQR Donate ủng hộ website để mở khóa VĨNH VIỄN danh hiệu Phú Quý!'
                   : isComboOrder
                   ? `Quét mã VietQR để cộng ngay +${comboMeta.credits} lượt mở đề Thực Chiến 4 Kỹ Năng!`
                   : isTestOrder
@@ -271,7 +273,7 @@ export default function CoverCheckoutModal({
               </h4>
               <p className="text-xs text-emerald-800/90 dark:text-emerald-300 leading-relaxed">
                 {isTitleOrder
-                  ? `Tài khoản @${currentUser?.username} đã mở khóa danh hiệu ${itemLabel} (thời hạn 1 tháng${expiryPreview ? ` • ${expiryPreview}` : ''}).`
+                  ? `Tài khoản @${currentUser?.username} đã mở khóa VĨNH VIỄN danh hiệu ${itemLabel} (hiệu lực trọn đời, không hết hạn)!`
                   : isTestOrder
                   ? `Tài khoản @${currentUser?.username} đã mở khóa 1 lượt thi thật đủ 4 kỹ năng L·R·W·S cho "${itemLabel}". Sau khi nộp bài, Ms. Như sẽ trực tiếp duyệt & trả điểm!`
                   : isComboOrder

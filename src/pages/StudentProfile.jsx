@@ -85,6 +85,7 @@ import {
   resolveVisibleTitleBadge
 } from '../constants/profileCustomization';
 import CoverCheckoutModal from '../components/modals/CoverCheckoutModal';
+import ExamTierGuideModal from '../components/common/ExamTierGuideModal';
 import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
@@ -180,6 +181,7 @@ export default function StudentProfile({
     return () => clearTimeout(timer);
   }, [donateAmount, isCustomDonateMode]);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [showExamTierGuideModal, setShowExamTierGuideModal] = useState(false);
   const [checkoutModalState, setCheckoutModalState] = useState(null);
   const [isSavingProfileTheme, setIsSavingProfileTheme] = useState(false);
   const [isTogglingCoverUnlock, setIsTogglingCoverUnlock] = useState(false);
@@ -192,6 +194,7 @@ export default function StudentProfile({
     studyGoal: '',
     equippedTitleId: 'newbie',
     showTitleBadge: true,
+    showExamTierBadge: true,
     vipRedNameEnabled: true,
     vipNameColor: 'crimson'
   });
@@ -291,6 +294,7 @@ export default function StudentProfile({
       studyGoal: student.studyGoal || '',
       equippedTitleId: student.equippedTitleId || titleSummary?.title?.id || 'newbie',
       showTitleBadge: student.showTitleBadge !== false,
+      showExamTierBadge: student.showExamTierBadge !== false,
       vipRedNameEnabled: vipVisual.showNameColor,
       vipNameColor: vipVisual.nameColorValue || 'crimson'
     });
@@ -325,7 +329,7 @@ export default function StudentProfile({
   });
 
   const filteredMembers = allMembers.filter(m => {
-    const effectiveRole = m.isSystemAdmin ? 'admin' : m.role;
+    const effectiveRole = m.isSystemAdmin ? 'admin' : m.role === 'teacher' ? 'teacher' : m.isGuest ? 'guest' : 'student';
     if (memberRoleFilter !== 'all' && effectiveRole !== memberRoleFilter) return false;
     const q = memberSearch.trim().toLowerCase();
     if (!q) return true;
@@ -899,7 +903,10 @@ export default function StudentProfile({
                       { id: 'all', label: `Tất cả (${allMembers.length})` },
                       ...(adminCardMember ? [{ id: 'admin', label: 'Quản trị (1)' }] : []),
                       { id: 'teacher', label: `Giáo viên (${allMembers.filter(m => !m.isSystemAdmin && m.role === 'teacher').length})` },
-                      { id: 'student', label: `Học viên (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher').length})` }
+                      { id: 'student', label: `Học viên (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher' && !m.isGuest).length})` },
+                      ...(allMembers.some(m => !m.isSystemAdmin && m.role !== 'teacher' && m.isGuest)
+                        ? [{ id: 'guest', label: `Tài khoản khách (${allMembers.filter(m => !m.isSystemAdmin && m.role !== 'teacher' && m.isGuest).length})` }]
+                        : [])
                     ].map(f => (
                       <button
                         key={f.id}
@@ -1001,7 +1008,12 @@ export default function StudentProfile({
                                 }
                                 return (
                                   <span className="inline-flex items-center gap-1 flex-wrap">
-                                    {mTitle && !mTitle.isRoleBuiltIn && (
+                                    {member.isGuest && (
+                                      <span className="px-1.5 py-0.2 rounded-full border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold text-xs">
+                                        Tài khoản khách
+                                      </span>
+                                    )}
+                                    {!member.isGuest && mTitle && !mTitle.isRoleBuiltIn && (
                                       <span className={`px-1.5 py-0.2 rounded-full border font-semibold text-xs ${mTitle.badgeClass}`}>
                                         {mTitle.icon} {mTitle.label}
                                       </span>
@@ -1256,6 +1268,14 @@ export default function StudentProfile({
                       <Trophy className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Danh Hiệu ({titleSummary?.unlockedIds?.length || 1}/{titleSummary?.itemsWithProgress?.length || 18})
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setShowExamTierGuideModal(true)}
+                    className={profileActionBtnCls}
+                    title="Xem bảng 10 hạng chữ cạnh tên & cách mở khóa"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-amber-500" /> Hạng Cạnh Tên ({studentPurchaseTier ? studentPurchaseTier.label : `${studentPurchasedCount} đề`} · Cách mở)
+                  </button>
                   {isViewerSuperAdmin && !isTargetSystemAdmin && onOpenAdminTitleManager && (
                     <button
                       type="button"
@@ -2536,7 +2556,14 @@ export default function StudentProfile({
                 </p>
                 {studentNextTier && (
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                    Mốc tiếp theo: <b>{studentNextTier.label}</b> ({studentNextTier.minExams} đề) · Cao nhất: <b>{EXAM_PURCHASE_TIERS[EXAM_PURCHASE_TIERS.length - 1].label}</b> (60 đề)
+                    Mốc tiếp theo: <b>{studentNextTier.label}</b> ({studentNextTier.minExams} đề) · Cao nhất: <b>{EXAM_PURCHASE_TIERS[EXAM_PURCHASE_TIERS.length - 1].label}</b> ({EXAM_PURCHASE_TIERS[EXAM_PURCHASE_TIERS.length - 1].minExams} đề) ·{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowExamTierGuideModal(true)}
+                      className="font-bold text-[#0F766E] dark:text-teal-400 hover:underline"
+                    >
+                      Xem cách mở &amp; cài đặt
+                    </button>
                   </p>
                 )}
               </div>
@@ -3292,7 +3319,7 @@ export default function StudentProfile({
                   { id: 'checkin', label: `📅 Điểm Danh (${checkinTitleCount})` },
                   { id: 'secret', label: `❓ Bí Ẩn (${secretTitleCount})` },
                   { id: 'holiday', label: `🎉 Ngày Lễ (${holidayTitleCount})` },
-                  { id: 'vip', label: `💎 Cửa Hàng VIP (${vipTitleCount})` },
+                  { id: 'vip', label: `💎 Donate & VIP (${vipTitleCount})` },
                   { id: 'unlocked', label: `Đã mở (${titleSummary.unlockedIds?.length || 0})` },
                   { id: 'locked', label: `Chưa mở (${Math.max(0, allTitleItems.length - (titleSummary.unlockedIds?.length || 0))})` }
                 ].map(tab => (
@@ -3441,7 +3468,7 @@ export default function StudentProfile({
                             )}
                           </button>
                         )}
-                        {isSelf && item.unlocked && item.isPaidTitle && item.unlockedByPurchase && item.expiresAt > 0 && (
+                        {isSelf && item.unlocked && item.isPaidTitle && !item.isPermanentDonateTitle && item.unlockedByPurchase && item.expiresAt > 0 && (
                           <button
                             type="button"
                             onClick={() => {
@@ -3467,13 +3494,18 @@ export default function StudentProfile({
                               setCheckoutModalState({
                                 itemType: 'title',
                                 itemId: item.id,
-                                itemLabel: `${item.icon} ${item.label} (1 Tháng)`,
+                                itemLabel: item.isPermanentDonateTitle
+                                  ? `${item.icon} ${item.label} (Donate Vĩnh Viễn)`
+                                  : `${item.icon} ${item.label} (1 Tháng)`,
                                 itemPrice: item.priceVnd
                               });
                             }}
                             className="w-full py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 bg-[#F59E0B] hover:bg-[#D97706] text-[#09090B]"
                           >
-                            <Sparkles className="w-3.5 h-3.5" /> Mua 1 Tháng ({formatVndCurrency(item.priceVnd)})
+                            <Sparkles className="w-3.5 h-3.5" />
+                            {item.isPermanentDonateTitle
+                              ? `Donate Mở Vĩnh Viễn (${formatVndCurrency(item.priceVnd)})`
+                              : `Mua 1 Tháng (${formatVndCurrency(item.priceVnd)})`}
                           </button>
                         )}
                         {isSelf && !item.unlocked && item.isVipBundleTitle && (
@@ -3919,20 +3951,48 @@ export default function StudentProfile({
                 </div>
 
                 {!isTargetTeacher && !isTargetSystemAdmin && (
-                  <label className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 cursor-pointer">
-                    <div>
-                      <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5]">Hiển thị Danh Hiệu trước tên</p>
-                      <p className="text-xs text-[#475569] dark:text-zinc-400">
-                        Bật để bạn bè thấy Danh Hiệu ({titleSummary?.title?.icon} {titleSummary?.title?.label}) trong Game &amp; Hồ sơ.
-                      </p>
+                  <>
+                    <label className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 cursor-pointer">
+                      <div>
+                        <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5]">Hiển thị Danh Hiệu trước tên</p>
+                        <p className="text-xs text-[#475569] dark:text-zinc-400">
+                          Bật để bạn bè thấy Danh Hiệu ({titleSummary?.title?.icon} {titleSummary?.title?.label}) trong Game &amp; Hồ sơ.
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(customDraft.showTitleBadge)}
+                        onChange={e => setCustomDraft(prev => ({ ...prev, showTitleBadge: e.target.checked }))}
+                        className="w-4 h-4 accent-[#007A7A]"
+                      />
+                    </label>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 space-y-2">
+                      <label className="flex items-center justify-between gap-3 cursor-pointer">
+                        <div>
+                          <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5]">
+                            Hiển thị chữ Hạng cạnh tên (Basic / Standard / Plus...)
+                          </p>
+                          <p className="text-xs text-[#475569] dark:text-zinc-400">
+                            Hiện huy hiệu hạng theo số đề Thực Chiến đã nạp ngay cạnh tên bạn. Người khác bấm vào chữ hạng sẽ thấy bảng 10 mốc cách mở khóa.
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(customDraft.showExamTierBadge)}
+                          onChange={e => setCustomDraft(prev => ({ ...prev, showExamTierBadge: e.target.checked }))}
+                          className="w-4 h-4 accent-[#007A7A]"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowExamTierGuideModal(true)}
+                        className="text-xs font-bold text-[#0F766E] dark:text-teal-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        <Crown className="w-3.5 h-3.5" /> Xem bảng 10 hạng &amp; cách mở khóa →
+                      </button>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(customDraft.showTitleBadge)}
-                      onChange={e => setCustomDraft(prev => ({ ...prev, showTitleBadge: e.target.checked }))}
-                      className="w-4 h-4 accent-[#007A7A]"
-                    />
-                  </label>
+                  </>
                 )}
               </div>
             </div>
@@ -3992,6 +4052,25 @@ export default function StudentProfile({
           setCustomDraft(prev => ({ ...prev, profileCoverUrl: croppedUrl }));
           setCoverCropSource('');
         }}
+      />
+
+      <ExamTierGuideModal
+        isOpen={showExamTierGuideModal}
+        user={student}
+        isSelf={isSelf}
+        onToggleVisibility={
+          isSelf && handleUpdateUserProfileFields
+            ? nextVisible => {
+                handleUpdateUserProfileFields(student.username, {
+                  showExamTierBadge: Boolean(nextVisible),
+                  customToast: nextVisible
+                    ? 'Đã BẬT hiển thị chữ Hạng cạnh tên!'
+                    : 'Đã ẨN chữ Hạng cạnh tên.'
+                });
+              }
+            : null
+        }
+        onClose={() => setShowExamTierGuideModal(false)}
       />
 
       {Boolean(checkoutModalState) && isSelf && (

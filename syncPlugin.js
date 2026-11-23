@@ -747,6 +747,7 @@ function sanitizeUserForViewer(user, viewer) {
         ? 'staff_ielts_10'
         : 'newbie',
     showTitleBadge: user.showTitleBadge !== false,
+    showExamTierBadge: user.showExamTierBadge !== false,
     grantedTitleIds: Array.isArray(user.grantedTitleIds) ? user.grantedTitleIds.map(String).filter(Boolean) : [],
     purchasedTitleIds: Array.isArray(user.purchasedTitleIds) ? user.purchasedTitleIds.map(String).filter(Boolean) : [],
     purchasedTestIds: Array.isArray(user.purchasedTestIds) ? user.purchasedTestIds.map(String).filter(Boolean) : [],
@@ -2221,6 +2222,7 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     avatarFrameId: superAdmin.avatarFrameId || 'none',
     equippedTitleId: superAdmin.equippedTitleId || 'staff_ielts_10',
     showTitleBadge: superAdmin.showTitleBadge !== false,
+    showExamTierBadge: superAdmin.showExamTierBadge !== false,
     grantedTitleIds: Array.isArray(superAdmin.grantedTitleIds) ? superAdmin.grantedTitleIds : [],
     purchasedTitleIds: Array.isArray(superAdmin.purchasedTitleIds) ? superAdmin.purchasedTitleIds : [],
     vipRedNameEnabled: superAdmin.vipRedNameEnabled === true,
@@ -3180,7 +3182,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         return { allowed: false, status: 400, error: 'Bài tập Daily Zone luôn miễn phí, không cần dùng lượt Combo.' };
       }
       if (targetTest.examCategory === 'periodic_mock' || Number(targetTest.priceVnd) >= PERIODIC_MOCK_PRICE_VND) {
-        return { allowed: false, status: 400, error: 'Combo chỉ áp dụng cho đề Thực Chiến Thi Thật (20.000đ/đề), không áp dụng cho Mock Test Định Kỳ.' };
+        return { allowed: false, status: 400, error: 'Combo chỉ áp dụng cho đề Thực Chiến Thi Thật (100.000đ/đề), không áp dụng cho Mock Test Định Kỳ.' };
       }
       if (hasTestPurchaseAccess(me, targetTest)) {
         return { allowed: false, status: 400, error: 'Bạn đã mở khóa đề thi này rồi!' };
@@ -3499,6 +3501,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       })(),
       equippedTitleId: typeof rawUser.equippedTitleId === 'string' && rawUser.equippedTitleId ? rawUser.equippedTitleId.slice(0, 64) : (prevUser.equippedTitleId || 'newbie'),
       showTitleBadge: rawUser.showTitleBadge !== undefined ? Boolean(rawUser.showTitleBadge) : (prevUser.showTitleBadge !== false),
+      showExamTierBadge: rawUser.showExamTierBadge !== undefined ? Boolean(rawUser.showExamTierBadge) : (prevUser.showExamTierBadge !== false),
       loginDays: mergeLoginDays(prevUser.loginDays, rawUser.loginDays),
       grantedTitleIds: Array.isArray(prevUser.grantedTitleIds) ? prevUser.grantedTitleIds : [],
       purchasedTitleIds: Array.isArray(prevUser.purchasedTitleIds) ? prevUser.purchasedTitleIds : [],
@@ -3727,6 +3730,9 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     incoming.showTitleBadge = incoming.showTitleBadge !== undefined
       ? Boolean(incoming.showTitleBadge)
       : (prevUser?.showTitleBadge !== false);
+    incoming.showExamTierBadge = incoming.showExamTierBadge !== undefined
+      ? Boolean(incoming.showExamTierBadge)
+      : (prevUser?.showExamTierBadge !== false);
     if (incoming.pass && String(incoming.pass).trim()) {
       incoming.passwordHash = hashPassword(String(incoming.pass).trim());
     } else if (prevUser?.passwordHash) {
@@ -4791,7 +4797,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             store,
             {
               title: `🎫 Đã cộng +${addCount} lượt Thực Chiến Thi Thật!`,
-              message: `Quản Trị Hệ Thống đã cấp +${addCount} lượt Combo Thực Chiến Thi Thật 4 Kỹ Năng (hiện có ${nextCredits} lượt). Bạn có thể vào Trang Chủ đổi 1 lượt để mở bất kỳ đề Thực Chiến 20.000đ nào!`,
+              message: `Quản Trị Hệ Thống đã cấp +${addCount} lượt Combo Thực Chiến Thi Thật 4 Kỹ Năng (hiện có ${nextCredits} lượt). Bạn có thể vào Trang Chủ đổi 1 lượt để mở bất kỳ đề Thực Chiến 100.000đ nào!`,
               type: 'announcement',
               targetUsernames: [targetKey],
               createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
@@ -4921,7 +4927,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           username: uname,
           userName: targetUser.name || uname,
           itemType: 'title',
-          itemLabel: `${paidTitle.icon} ${paidTitle.label} (1 Tháng)`,
+          itemLabel: `${paidTitle.icon} ${paidTitle.label} (Donate Vĩnh Viễn)`,
           amount: getTitlePriceVnd(paidTitle, payCfgNow),
           status: 'reported',
           gateway: 'manual_request'
@@ -5066,22 +5072,54 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const targetUser = userKey ? store.users?.[userKey] : null;
       if (userKey && targetUser) {
         const amt = Math.max(0, Math.round(Number(updated.amount) || 0));
+        const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
+        const isDonateOrTitle = updated.itemType === 'donate' || updated.itemType === 'title';
+        const nextDonatedTotal = isDonateOrTitle
+          ? (Number(targetUser.donatedTotalVnd) || 0) + amt
+          : (Number(targetUser.donatedTotalVnd) || 0);
+        const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
+        const prevExpiries = targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
+          ? { ...targetUser.purchasedTitleExpiries }
+          : {};
+        const newlyPermanentTitles = [];
+        const nextPurchasedSet = new Set(prevPurchased);
+        if (isDonateOrTitle) {
+          PAID_SHOP_TITLES.forEach(t => {
+            if (!t.isPermanentDonateTitle) return;
+            const threshold = getTitlePriceVnd(t, payCfgNow);
+            if (nextDonatedTotal >= threshold || (updated.itemId && updated.itemId === t.id)) {
+              if (!nextPurchasedSet.has(t.id)) {
+                newlyPermanentTitles.push(t);
+              }
+              nextPurchasedSet.add(t.id);
+              delete prevExpiries[t.id];
+            }
+          });
+        }
         store.users[userKey] = {
           ...targetUser,
           totalPaidVnd: (Number(targetUser.totalPaidVnd) || 0) + amt,
           paidCount: (Number(targetUser.paidCount) || 0) + 1,
           lastPaidAt: nowMs,
-          ...(updated.itemType === 'donate'
-            ? { donatedTotalVnd: (Number(targetUser.donatedTotalVnd) || 0) + amt }
+          ...(isDonateOrTitle
+            ? {
+                donatedTotalVnd: nextDonatedTotal,
+                purchasedTitleIds: Array.from(nextPurchasedSet),
+                purchasedTitleExpiries: prevExpiries,
+                paidTitleRequested: null
+              }
             : {})
         };
+        const unlockedBonusText = newlyPermanentTitles.length > 0
+          ? ` Đã tự động mở khóa VĨNH VIỄN danh hiệu: ${newlyPermanentTitles.map(t => `${t.icon} ${t.label}`).join(', ')}!`
+          : '';
         appendStoreNotification(
           store,
           {
-            title: updated.itemType === 'donate'
+            title: isDonateOrTitle
               ? '💜 Cảm ơn bạn đã ủng hộ duy trì website!'
               : '✅ Admin đã xác nhận giao dịch của bạn!',
-            message: `Admin Tuấn đã xác nhận khoản ${formatVndCurrency(amt)} (${updated.itemLabel}). Cảm ơn ${targetUser.name || userKey} rất nhiều vì đã đồng hành cùng website!`,
+            message: `Admin Tuấn đã xác nhận khoản ${formatVndCurrency(amt)} (${updated.itemLabel}).${unlockedBonusText} Cảm ơn ${targetUser.name || userKey} rất nhiều vì đã đồng hành cùng website!`,
             type: 'announcement',
             targetUsernames: [userKey],
             createdBy: SUPER_ADMIN_USERNAME,
@@ -6941,8 +6979,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             isViewerSuperAdmin ||
             (Array.isArray(viewerUser?.purchasedTitleIds) &&
               viewerUser.purchasedTitleIds.includes(matched.itemId) &&
-              ((Number(viewerUser?.purchasedTitleExpiries?.[matched.itemId]) || 0) === 0 ||
+              (Boolean(PAID_SHOP_TITLES.find(t => t.id === matched.itemId)?.isPermanentDonateTitle) ||
+                (Number(viewerUser?.purchasedTitleExpiries?.[matched.itemId]) || 0) === 0 ||
                 Number(viewerUser.purchasedTitleExpiries[matched.itemId]) > Date.now())) ||
+            (Boolean(PAID_SHOP_TITLES.find(t => t.id === matched.itemId)?.isPermanentDonateTitle) &&
+              Number(viewerUser?.donatedTotalVnd || 0) >= getTitlePriceVnd(matched.itemId, store.paymentConfig)) ||
             (Array.isArray(viewerUser?.grantedTitleIds) && viewerUser.grantedTitleIds.includes(matched.itemId))
           )
         : matched?.itemType === 'test'
@@ -7134,24 +7175,45 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         if (targetKey && targetUser) {
           const nowMs = Date.now();
           if (matchedOrder.itemType === 'title' && matchedOrder.itemId) {
-            const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds : [];
-            const nextPurchased = Array.from(new Set([...prevPurchased, matchedOrder.itemId]));
+            const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
+            const matchedTitleDef = PAID_SHOP_TITLES.find(t => t.id === matchedOrder.itemId);
+            const isPermanentDonate = Boolean(matchedTitleDef?.isPermanentDonateTitle);
+            const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
+            const nextPurchasedSet = new Set([...prevPurchased, matchedOrder.itemId]);
             const prevExpiries = targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
-              ? targetUser.purchasedTitleExpiries
+              ? { ...targetUser.purchasedTitleExpiries }
               : {};
-            const baseExp = Math.max(nowMs, Number(prevExpiries[matchedOrder.itemId]) || 0);
-            const nextExp = baseExp + SUBSCRIPTION_DURATION_MS;
+            const nextDonatedTotal = isPermanentDonate
+              ? (Number(targetUser.donatedTotalVnd) || 0) + amount
+              : (Number(targetUser.donatedTotalVnd) || 0);
+            if (isPermanentDonate) {
+              delete prevExpiries[matchedOrder.itemId];
+              PAID_SHOP_TITLES.forEach(t => {
+                if (t.isPermanentDonateTitle && nextDonatedTotal >= getTitlePriceVnd(t, payCfgNow)) {
+                  nextPurchasedSet.add(t.id);
+                  delete prevExpiries[t.id];
+                }
+              });
+            } else {
+              const baseExp = Math.max(nowMs, Number(prevExpiries[matchedOrder.itemId]) || 0);
+              prevExpiries[matchedOrder.itemId] = baseExp + SUBSCRIPTION_DURATION_MS;
+            }
             store.users[targetKey] = {
               ...targetUser,
-              purchasedTitleIds: nextPurchased,
-              purchasedTitleExpiries: { ...prevExpiries, [matchedOrder.itemId]: nextExp },
+              donatedTotalVnd: nextDonatedTotal,
+              purchasedTitleIds: Array.from(nextPurchasedSet),
+              purchasedTitleExpiries: prevExpiries,
               ...(targetUser.paidTitleRequested?.titleId === matchedOrder.itemId ? { paidTitleRequested: null } : {})
             };
             appendStoreNotification(
               store,
               {
-                title: '🎉 Đã mở khóa Danh Hiệu VIP (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và kích hoạt danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId} trong 30 ngày. Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web & server học tập!`,
+                title: isPermanentDonate
+                  ? '💜 Đã mở khóa VĨNH VIỄN Danh Hiệu Phú Quý!'
+                  : '🎉 Đã mở khóa Danh Hiệu VIP (1 Tháng)!',
+                message: isPermanentDonate
+                  ? `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa VĨNH VIỄN danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId}. Cảm ơn bạn đã ủng hộ Tuấn duy trì trang web & server học tập!`
+                  : `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và kích hoạt danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId} trong 30 ngày. Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web & server học tập!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
@@ -7277,15 +7339,36 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               null
             );
           } else if (matchedOrder.itemType === 'donate') {
+            const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
+            const nextDonatedTotal = (Number(targetUser.donatedTotalVnd) || 0) + amount;
+            const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
+            const nextPurchasedSet = new Set(prevPurchased);
+            const prevExpiries = targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
+              ? { ...targetUser.purchasedTitleExpiries }
+              : {};
+            const newlyPermanentTitles = [];
+            PAID_SHOP_TITLES.forEach(t => {
+              if (!t.isPermanentDonateTitle) return;
+              if (nextDonatedTotal >= getTitlePriceVnd(t, payCfgNow)) {
+                if (!nextPurchasedSet.has(t.id)) newlyPermanentTitles.push(t);
+                nextPurchasedSet.add(t.id);
+                delete prevExpiries[t.id];
+              }
+            });
             store.users[targetKey] = {
               ...targetUser,
-              donatedTotalVnd: (Number(targetUser.donatedTotalVnd) || 0) + amount
+              donatedTotalVnd: nextDonatedTotal,
+              purchasedTitleIds: Array.from(nextPurchasedSet),
+              purchasedTitleExpiries: prevExpiries
             };
+            const unlockedText = newlyPermanentTitles.length > 0
+              ? ` Tự động mở khóa VĨNH VIỄN danh hiệu: ${newlyPermanentTitles.map(t => `${t.icon} ${t.label}`).join(', ')}!`
+              : '';
             appendStoreNotification(
               store,
               {
                 title: '💜 Cảm ơn bạn đã ủng hộ duy trì website!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì máy chủ & phát triển website học tập!`,
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}).${unlockedText} Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì máy chủ & phát triển website học tập!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,
