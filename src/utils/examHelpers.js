@@ -132,16 +132,18 @@ export const READING_QUESTION_TYPES = [
   { id: 'correct_ending', label: '8. Matching Sentence Endings (Correct Ending)', shortLabel: 'Correct Ending', answerKind: 'choice', defaultOptions: ['A. Ending A', 'B. Ending B', 'C. Ending C', 'D. Ending D', 'E. Ending E'] },
   { id: 'fill', label: '9. Fill in the Blank (Điền từ vào chỗ trống)', shortLabel: 'Fill in the Blank', answerKind: 'text', defaultOptions: [], wordLimit: 'ONE WORD AND/OR A NUMBER' },
   { id: 'diagram_label', label: '10. Diagram Label Completion (Điền nhãn sơ đồ)', shortLabel: 'Diagram Label', answerKind: 'hybrid', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS' },
-  { id: 'short_answer', label: '11. Short Answer Questions (Trả lời câu hỏi ngắn)', shortLabel: 'Short Answer', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN THREE WORDS AND/OR A NUMBER' }
+  { id: 'short_answer', label: '11. Short Answer Questions (Trả lời câu hỏi ngắn)', shortLabel: 'Short Answer', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN THREE WORDS AND/OR A NUMBER' },
+  { id: 'flowchart_completion', label: '12. Flow-chart Completion (Lưu đồ điền từ / Hộp A–H)', shortLabel: 'Flow-chart', answerKind: 'hybrid', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS' }
 ];
 
 export const LISTENING_QUESTION_TYPES = [
-  { id: 'form_completion', label: '1. Form Completion (Hoàn thành biểu mẫu)', shortLabel: 'Form Completion', answerKind: 'text', defaultOptions: [], wordLimit: 'ONE WORD AND/OR A NUMBER' },
-  { id: 'flowchart_completion', label: '2. Flow-chart Completion (Hoàn thành lưu đồ)', shortLabel: 'Flow-chart', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS' },
+  { id: 'form_completion', label: '1. Form / Note Completion (Hoàn thành biểu mẫu)', shortLabel: 'Form Completion', answerKind: 'text', defaultOptions: [], wordLimit: 'ONE WORD AND/OR A NUMBER' },
+  { id: 'flowchart_completion', label: '2. Flow-chart Completion (Lưu đồ điền từ / Hộp A–H)', shortLabel: 'Flow-chart', answerKind: 'hybrid', defaultOptions: [], wordLimit: 'CHỌN TỪ HỘP A–H HOẶC ĐIỀN TỪ' },
   { id: 'mcq', label: '3. Multiple Choice (Trắc nghiệm)', shortLabel: 'Multiple Choice', answerKind: 'choice', defaultOptions: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C'] },
   { id: 'matching', label: '4. Matching (Nối thông tin A–H)', shortLabel: 'Matching', answerKind: 'choice', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F'] },
   { id: 'map_diagram', label: '5. Map / Plan / Diagram Labelling (Dán nhãn bản đồ A–I)', shortLabel: 'Map / Diagram', answerKind: 'hybrid', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'], wordLimit: 'CHỌN CHỮ CÁI TRÊN BẢN ĐỒ' },
-  { id: 'short_answer', label: '6. Short Answer Questions (Trả lời câu hỏi ngắn)', shortLabel: 'Short Answer', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS AND/OR A NUMBER' }
+  { id: 'short_answer', label: '6. Short Answer Questions (Trả lời câu hỏi ngắn)', shortLabel: 'Short Answer', answerKind: 'text', defaultOptions: [], wordLimit: 'NO MORE THAN TWO WORDS AND/OR A NUMBER' },
+  { id: 'summary_box', label: '7. Summary / Word-Box Completion (Chọn từ trong hộp A–H)', shortLabel: 'Word Box', answerKind: 'hybrid', defaultOptions: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], wordLimit: 'CHỌN ĐÁP ÁN TRONG HỘP (A–H)' }
 ];
 
 const ALL_QUESTION_TYPE_MAP = new Map(
@@ -169,7 +171,10 @@ export function buildDefaultQuestionFields(type = 'mcq', skill = 'reading', prev
       wordLimit: meta.wordLimit || ''
     };
   }
-  const hasCustomOpts = Array.isArray(prevOptions) && prevOptions.length >= 2 && meta.id === 'mcq';
+  const hasCustomOpts =
+    Array.isArray(prevOptions) &&
+    prevOptions.length >= 2 &&
+    (meta.id === 'mcq' || meta.id === 'flowchart_completion' || meta.id === 'summary_box' || meta.id === 'matching');
   const nextOptions = hasCustomOpts ? [...prevOptions] : [...(meta.defaultOptions || [])];
   return {
     type: meta.id,

@@ -871,7 +871,9 @@ export default function ExamMode({
                 }
                 className="text-xs font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
               >
-                {examState.showAllReadingQs ? `Chỉ xem Passage ${safePassageIdx + 1}` : `Xem tất cả (${allReadingQs.length})`}
+                {examState.showAllReadingQs
+                  ? `Chỉ xem Passage ${safePassageIdx + 1}`
+                  : `Xem tất cả (${navParts.reduce((s, p) => s + (p.navQuestions?.length || p.questions?.length || 0), 0)})`}
               </button>
             )}
             {examState.skill === 'listening' && listeningTracks.length > 1 && hasScopedListeningQs && (
@@ -880,7 +882,9 @@ export default function ExamMode({
                 onClick={() => setExamState(prev => ({ ...prev, showAllListeningQs: !prev.showAllListeningQs }))}
                 className="text-xs font-bold px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181818] hover:bg-slate-100 dark:hover:bg-[#2E2E2E] text-slate-700 dark:text-neutral-200 border border-[#CBD5E1] dark:border-[#383838] transition"
               >
-                {examState.showAllListeningQs ? `Chỉ xem Part ${safeTrackIdx + 1}` : `Xem tất cả (${allListeningQs.length})`}
+                {examState.showAllListeningQs
+                  ? `Chỉ xem Part ${safeTrackIdx + 1}`
+                  : `Xem tất cả (${navParts.reduce((s, p) => s + (p.navQuestions?.length || p.questions?.length || 0), 0)})`}
               </button>
             )}
 

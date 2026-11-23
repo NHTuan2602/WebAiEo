@@ -12,6 +12,7 @@ import {
   Crown,
   DoorOpen,
   Edit,
+  Gamepad2,
   Heart,
   Keyboard,
   Lightbulb,
@@ -191,7 +192,9 @@ export default function GameArena({
 }) {
   const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
   const [showPilotDrawer, setShowPilotDrawer] = useState(false);
-  const [arenaGameMode, setArenaGameMode] = useState('space_shooter'); // 'space_shooter' | 'knight_rpg'
+  const [arenaGameMode, setArenaGameMode] = useState(() =>
+    gameSubState === 'JOIN' ? 'hub' : 'space_shooter'
+  ); // 'hub' | 'space_shooter' | 'knight_rpg'
   const [entryZone, setEntryZone] = useState('live'); // 'live' | 'practice'
   const [practiceTopicId, setPracticeTopicId] = useState('core');
   const [practiceSpeed, setPracticeSpeed] = useState('normal');
@@ -263,6 +266,7 @@ export default function GameArena({
         customVocabTopics={customVocabTopics}
         initialRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
         initialTopicId={practiceTopicId}
+        onBackToGameHub={() => setArenaGameMode('hub')}
         onBackToSpaceMode={() => setArenaGameMode('space_shooter')}
         onExitArena={exitGame}
         onSyncKnightResult={onSyncKnightResult}
@@ -541,6 +545,187 @@ export default function GameArena({
     </div>
   );
 
+  // 0. DEDICATED GAME SELECTION HUB SCREEN (Choose between Space Shooter vs Knight & Dragon RPG before entering room)
+  if (arenaGameMode === 'hub' && (gameSubState === 'JOIN' || gameSubState === 'LOBBY')) {
+    const openLobbyRoomsCount = allRoomsList.filter(r => r.status === 'LOBBY').length;
+    return (
+      <div
+        data-testid="arena-game-selection-hub"
+        className="min-h-screen bg-[#070b14] text-white flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden"
+      >
+        <div className="absolute top-[-12%] left-[12%] w-96 h-96 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-12%] right-[12%] w-96 h-96 bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Hub Header */}
+        <div className="max-w-5xl w-full mx-auto flex items-center justify-between relative z-10 gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={exitGame}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition"
+          >
+            <ChevronLeft className="w-4 h-4" /> Quay lại Trang Chủ
+          </button>
+
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            {isTeacher && (
+              <button
+                type="button"
+                onClick={() => {
+                  setArenaGameMode('space_shooter');
+                  setShowCreateRoomModal(true);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
+              >
+                <Plus className="w-3.5 h-3.5" /> Tạo Phòng Mới
+              </button>
+            )}
+            {themeToggleButton}
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border ${
+                serverSyncConnected
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+              }`}
+            >
+              <Wifi className="w-3.5 h-3.5" />
+              {serverSyncConnected ? 'Đã đồng bộ Live' : 'Local Mode'}
+            </span>
+          </div>
+        </div>
+
+        {/* Center 2-Game Arcade Showcase */}
+        <div className="max-w-5xl w-full mx-auto my-auto py-6 relative z-10 space-y-6">
+          <div className="text-center space-y-2">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider">
+              <Gamepad2 className="w-3.5 h-3.5" /> SẢNH CHỌN GAME ĐẤU TRƯỜNG TỪ VỰNG IELTS
+            </span>
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Chọn Tựa Game Bạn Muốn Tham Gia
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto">
+              Mỗi tựa game đều tích hợp 14 kho từ vựng IELTS &amp; bộ đề của Giáo viên, bảng xếp hạng đua Top 1/2/3 theo ngày (chốt 23:59 trao danh hiệu vào ngày hôm sau) và hệ thống danh hiệu độc quyền!
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* GAME CARD 1: SPACE SHOOTER ARENA */}
+            <div className="group rounded-3xl border-2 border-cyan-500/45 hover:border-cyan-400 bg-gradient-to-br from-slate-900 via-[#0b192c] to-slate-950 p-6 flex flex-col justify-between gap-5 shadow-2xl transition">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-black">
+                    🚀 GAME 1 • MULTIPLAYER &amp; TỰ LUYỆN
+                  </span>
+                  {openLobbyRoomsCount > 0 && (
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-extrabold animate-pulse">
+                      ● {openLobbyRoomsCount} phòng PIN đang mở
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4 bg-slate-950/80 border border-cyan-500/25 rounded-2xl p-4">
+                  <AnimalPilotAvatar
+                    animalId={myAnimalId}
+                    accessoryId={myAccessoryId}
+                    colorId={myCrewColor}
+                    avatarUrl={myAvatarUrl}
+                    size={64}
+                    onShip={true}
+                  />
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-black text-white">
+                      Đấu Trường Phi Thuyền Vũ Trụ
+                    </h2>
+                    <p className="text-xs text-cyan-300 font-bold">
+                      Space Shooter Arena • Đấu Phòng PIN Live &amp; Chia Đội
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Chọn <b>Phi Công Thú Cưng &amp; Màu Tàu</b>, vào phòng PIN thi đấu trực tiếp cùng cả lớp hoặc tự luyện 4 vòng: <b>Bắn Thiên Thạch Nghĩa ➔ Gõ Từ Full ➔ Đồng/Trái Nghĩa ➔ Gõ Câu Diệt Boss</b>.
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 font-bold">
+                    🛸 Phòng Đấu PIN Live cùng Giáo viên &amp; Bạn bè
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 font-bold">
+                    🐾 12 Thú Cưng Phi Công &amp; Phụ kiện vương miện
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                data-testid="select-space-shooter-game-btn"
+                onClick={() => setArenaGameMode('space_shooter')}
+                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition"
+              >
+                <Rocket className="w-4 h-4" />
+                <span>CHỌN GAME PHI THUYỀN — VÀO PHÒNG NGAY →</span>
+              </button>
+            </div>
+
+            {/* GAME CARD 2: KNIGHT & DRAGON RPG QUEST */}
+            <div className="group rounded-3xl border-2 border-rose-500/50 hover:border-amber-400 bg-gradient-to-br from-slate-900 via-[#220d1c] to-slate-950 p-6 flex flex-col justify-between gap-5 shadow-2xl transition">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-black">
+                    ⚔️ GAME 2 • NHẬP VAI DIỆT RỒNG (MỚI)
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-extrabold">
+                    🐉 Boss Cuối Final Smash
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4 bg-slate-950/80 border border-rose-500/25 rounded-2xl p-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-600 to-amber-500 border-2 border-amber-300 flex items-center justify-center text-3xl shadow-md shrink-0">
+                    ⚔️
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-black text-white">
+                      Hiệp Sĩ Diệt Rồng — RPG Quest
+                    </h2>
+                    <p className="text-xs text-amber-300 font-bold">
+                      Slime ➔ Goblin ➔ Orc ➔ Boss Cuối Rồng Hắc Ám
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa nhân vật mới (<b>Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura, Nữ Pháp Sư Selena</b>), ngẫu nhiên nhặt <b>🗝️ Chìa Khóa Hồi Sinh</b> trên đường để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-amber-200 font-bold">
+                    🪙 Đánh quái rớt Vàng • Mở khóa 6 Skin Nam &amp; Nữ
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-sky-200 font-bold">
+                    🗝️ Nhặt Chìa Khóa trên đường để Hồi Sinh
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                data-testid="switch-to-knight-game-btn"
+                onClick={() => setArenaGameMode('knight_rpg')}
+                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 hover:opacity-95 text-slate-950 font-black text-sm shadow-lg shadow-rose-500/20 flex items-center justify-center gap-2 transition"
+              >
+                <Swords className="w-4 h-4" />
+                <span>CHỌN GAME HIỆP SĨ — VÀO PHÒNG RPG →</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center text-xs text-slate-400 relative z-10">
+          Bạn có thể chuyển đổi qua lại giữa 2 game bất kỳ lúc nào ngay trong phòng chờ.
+        </div>
+      </div>
+    );
+  }
+
   // 1. JOIN ROOM SCREEN (Students must enter Teacher's Room PIN & Password)
   if (gameSubState === 'JOIN' && !isTeacher) {
     return (
@@ -549,23 +734,33 @@ export default function GameArena({
         <div className="absolute bottom-[-10%] right-[15%] w-96 h-96 bg-pink-400/20 dark:bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-5xl w-full mx-auto flex items-center justify-between relative z-10 gap-2 flex-wrap">
-          <button
-            onClick={exitGame}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-[#F8FAFC] dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
-          >
-            <ChevronLeft className="w-4 h-4" /> Quay lại
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={exitGame}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-[#F8FAFC] dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
+            >
+              <ChevronLeft className="w-4 h-4" /> Quay lại
+            </button>
+            <button
+              type="button"
+              data-testid="back-to-game-hub-btn"
+              onClick={() => setArenaGameMode('hub')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/40 text-xs font-extrabold text-indigo-700 dark:text-indigo-200 transition"
+            >
+              <Gamepad2 className="w-3.5 h-3.5" /> Chọn Game Khác (2 Game)
+            </button>
+          </div>
           <div className="flex items-center gap-2 text-xs">
             {themeToggleButton}
-          <button
-            type="button"
-            data-testid="lobby-switch-to-knight-game-btn"
-            onClick={() => setArenaGameMode('knight_rpg')}
-            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
-          >
-            <Swords className="w-3.5 h-3.5" />
-            <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
-          </button>
+            <button
+              type="button"
+              data-testid="lobby-switch-to-knight-game-btn"
+              onClick={() => setArenaGameMode('knight_rpg')}
+              className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
+            >
+              <Swords className="w-3.5 h-3.5" />
+              <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
+            </button>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border ${
               serverSyncConnected
                 ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
@@ -1279,6 +1474,15 @@ export default function GameArena({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
+              data-testid="open-arena-game-hub-btn"
+              onClick={() => setArenaGameMode('hub')}
+              className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-200 text-xs font-extrabold transition inline-flex items-center gap-1.5"
+            >
+              <Gamepad2 className="w-3.5 h-3.5" />
+              <span>🎮 Chọn Game (2 Game)</span>
+            </button>
+            <button
+              type="button"
               data-testid="lobby-switch-to-knight-game-btn"
               onClick={() => setArenaGameMode('knight_rpg')}
               className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 text-xs font-black transition inline-flex items-center gap-1.5 shadow-xs"
@@ -1287,15 +1491,6 @@ export default function GameArena({
               <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
             </button>
             {themeToggleButton}
-          <button
-            type="button"
-            data-testid="lobby-switch-to-knight-game-btn"
-            onClick={() => setArenaGameMode('knight_rpg')}
-            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
-          >
-            <Swords className="w-3.5 h-3.5" />
-            <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
-          </button>
             <span className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-[#334155] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-[#0F172B] dark:text-slate-200">
               <Users className="w-3.5 h-3.5 text-[#007A7A] dark:text-[#1EE1D6]" /> {lobbyPlayersList.length}/{room.maxPlayers}
             </span>
@@ -2357,6 +2552,15 @@ export default function GameArena({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
+              data-testid="open-arena-game-hub-btn"
+              onClick={() => setArenaGameMode('hub')}
+              className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-200 text-xs font-extrabold transition inline-flex items-center gap-1.5"
+            >
+              <Gamepad2 className="w-3.5 h-3.5" />
+              <span>🎮 Chọn Game (2 Game)</span>
+            </button>
+            <button
+              type="button"
               data-testid="lobby-switch-to-knight-game-btn"
               onClick={() => setArenaGameMode('knight_rpg')}
               className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 text-xs font-black transition inline-flex items-center gap-1.5 shadow-xs"
@@ -2365,15 +2569,6 @@ export default function GameArena({
               <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
             </button>
             {themeToggleButton}
-          <button
-            type="button"
-            data-testid="lobby-switch-to-knight-game-btn"
-            onClick={() => setArenaGameMode('knight_rpg')}
-            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 font-black transition inline-flex items-center gap-1 shadow-xs"
-          >
-            <Swords className="w-3.5 h-3.5" />
-            <span>⚔️ Game Hiệp Sĩ Diệt Rồng</span>
-          </button>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border ${
               serverSyncConnected
                 ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'

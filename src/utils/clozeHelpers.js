@@ -462,17 +462,22 @@ export function syncClozeBlanksWithQuestions({
       const idx = nextQuestions.findIndex(q => q.id === existing.id);
       if (idx >= 0) {
         const current = nextQuestions[idx];
-        const preserveChoiceBlank =
-          (current.type === 'summary_box' || current.type === 'diagram_label') &&
-          Array.isArray(current.options) &&
-          current.options.length > 0;
+        const hasChoiceOptions = Array.isArray(current.options) && current.options.length > 0;
+        const preserveInlineType =
+          hasChoiceOptions ||
+          current.type === 'flowchart_completion' ||
+          current.type === 'summary_box' ||
+          current.type === 'summary_nobox' ||
+          current.type === 'form_completion' ||
+          current.type === 'diagram_label' ||
+          current.type === 'table_completion';
         nextQuestions[idx] = {
           ...current,
-          type: preserveChoiceBlank ? current.type : 'fill',
+          type: preserveInlineType ? current.type : 'fill',
           blankNum: num,
           questionNumber: Number(current.questionNumber) || num,
           source: current.source || defaultSource,
-          options: preserveChoiceBlank ? current.options : [],
+          options: hasChoiceOptions ? current.options : [],
           [scopeField]: scopeIdx
         };
       }

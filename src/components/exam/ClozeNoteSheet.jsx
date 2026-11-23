@@ -37,12 +37,55 @@ function isRedundantOptionBoxLine(line, optionList = []) {
   if (line.segments.some(seg => seg.type === 'blank')) return false;
   const plain = getLinePlainText(line).toLowerCase().replace(/\s+/g, ' ');
   if (!plain || plain.length > 260) return false;
+  // Exact single option line match (e.g. "A ask questions" or "A. ask questions")
+  if (
+    optionList.some(opt => {
+      const cleanOpt = String(opt || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      return cleanOpt && (plain === cleanOpt || plain.replace(/^([a-l])[.):\-–]\s+/i, '$1 ') === cleanOpt.replace(/^([a-l])[.):\-–]\s+/i, '$1 '));
+    })
+  ) {
+    return true;
+  }
   let hits = 0;
   for (const opt of optionList) {
     const clean = String(opt || '').trim().toLowerCase().replace(/\s+/g, ' ');
     if (clean.length >= 2 && plain.includes(clean)) hits += 1;
   }
   return hits >= Math.min(3, optionList.length);
+}
+
+/**
+ * Fallback recovery for existing/legacy exams where AI left the A-H option list
+ * as raw lines inside clozeText (e.g. "A ask questions\nB complete a worksheet...")
+ * without attaching `options` to the blank questions.
+ */
+function recoverInlineWordBoxFromSectionLines(sectionLines = []) {
+  const optionLineIndices = [];
+  const extracted = [];
+  for (let i = 0; i < sectionLines.length; i += 1) {
+    const line = sectionLines[i];
+    if (line.kind === 'spacer' || line.kind === 'table' || line.kind === 'flowArrow') continue;
+    if (line.segments.some(seg => seg.type === 'blank')) continue;
+    const plain = getLinePlainText(line);
+    if (/^[A-L](?:[.):\-–]|\s+)\s*\S+/.test(plain) && plain.length <= 120 && !/^Questions?\s+\d+/i.test(plain)) {
+      const code = plain[0].toUpperCase();
+      if (extracted.length === 0 && code !== 'A') continue;
+      optionLineIndices.push(i);
+      extracted.push(plain.replace(/\s+/g, ' ').trim());
+    } else if (extracted.length > 0 && extracted.length < 3) {
+      optionLineIndices.length = 0;
+      extracted.length = 0;
+    } else if (extracted.length >= 3) {
+      break;
+    }
+  }
+  if (extracted.length >= 3) {
+    return {
+      recoveredOptions: extracted,
+      optionLineIndexSet: new Set(optionLineIndices)
+    };
+  }
+  return { recoveredOptions: [], optionLineIndexSet: new Set() };
 }
 
 export default function ClozeNoteSheet({
@@ -97,10 +140,32 @@ export default function ClozeNoteSheet({
       });
     });
 
+    // Runtime safety net: recover inline A-H word-bank lines if options were missing on legacy tests
+    let recoveredOptionLineIndexSet = new Set();
+    if (sharedWordBoxOptions.length === 0) {
+      const recovered = recoverInlineWordBoxFromSectionLines(sectionLines);
+      if (recovered.recoveredOptions.length >= 3) {
+        recovered.recoveredOptions.forEach(opt => {
+          if (!seenOpts.has(opt)) {
+            seenOpts.add(opt);
+            sharedWordBoxOptions.push(opt);
+          }
+        });
+        recoveredOptionLineIndexSet = recovered.optionLineIndexSet;
+      }
+    }
+
+    const effectiveChoiceBlanks =
+      sharedWordBoxOptions.length > 0 ? sectionBlankLinks : choiceBlanks;
+
     const sectionImageUrl = sectionBlankLinks.find(item => item.linkedQ?.imageUrl)?.linkedQ?.imageUrl || '';
 
     const filteredLines = sharedWordBoxOptions.length > 0
-      ? sectionLines.filter(line => !isRedundantOptionBoxLine(line, sharedWordBoxOptions))
+      ? sectionLines.filter(
+          (line, lIdx) =>
+            !recoveredOptionLineIndexSet.has(lIdx) &&
+            !isRedundantOptionBoxLine(line, sharedWordBoxOptions)
+        )
       : sectionLines;
 
     const firstBodyIdx = filteredLines.findIndex(
@@ -156,7 +221,7 @@ export default function ClozeNoteSheet({
 
     const allowSpacedCodes = optionsUseSpaceSeparatedCodes(sharedWordBoxOptions);
     const usedByMap = new Map();
-    choiceBlanks.forEach(({ blankNum, linkedQ }) => {
+    effectiveChoiceBlanks.forEach(({ blankNum, linkedQ }) => {
       const rawAns = readOnlyPreview ? (linkedQ?.correctAnswer || '') : (linkedQ?.id ? (answers?.[linkedQ.id] || '') : '');
       const canonical = matchChoiceOption(rawAns, sharedWordBoxOptions) || String(rawAns || '').trim();
       if (!canonical) return;
@@ -166,19 +231,19 @@ export default function ClozeNoteSheet({
     });
 
     const handleWordChipClick = (optionVal) => {
-      if (readOnlyPreview || choiceBlanks.length === 0) return;
-      const activeTarget = choiceBlanks.find(
+      if (readOnlyPreview || effectiveChoiceBlanks.length === 0) return;
+      const activeTarget = effectiveChoiceBlanks.find(
         item => Number(item.blankNum) === Number(activeBlankNum) && item.linkedQ?.id
       );
-      const firstEmptyTarget = choiceBlanks.find(
+      const firstEmptyTarget = effectiveChoiceBlanks.find(
         item => item.linkedQ?.id && !String(answers?.[item.linkedQ.id] || '').trim()
       );
-      const target = activeTarget || firstEmptyTarget || choiceBlanks[0];
+      const target = activeTarget || firstEmptyTarget || effectiveChoiceBlanks[0];
       if (!target?.linkedQ?.id) return;
       onAnswerChange?.(target.linkedQ.id, optionVal);
 
       // Advance focus to the next unanswered choice blank in this section
-      const nextEmpty = choiceBlanks.find(
+      const nextEmpty = effectiveChoiceBlanks.find(
         item =>
           item.blankNum !== target.blankNum &&
           item.linkedQ?.id &&
@@ -199,9 +264,10 @@ export default function ClozeNoteSheet({
 
         const linkedQ = resolveQuestionForBlank(questions, seg.blankNum, scopeField, scopeIdx);
         const qId = linkedQ?.id;
-        const optionList = Array.isArray(linkedQ?.options)
+        const ownOptions = Array.isArray(linkedQ?.options)
           ? linkedQ.options.map(opt => String(opt || '').trim()).filter(Boolean)
           : [];
+        const optionList = ownOptions.length > 0 ? ownOptions : sharedWordBoxOptions;
         const isChoiceBlank = optionList.length > 0;
         const rawValue = readOnlyPreview ? (linkedQ?.correctAnswer || '') : (qId ? (answers?.[qId] || '') : '');
         const resolvedChoiceVal = isChoiceBlank
@@ -237,8 +303,19 @@ export default function ClozeNoteSheet({
                 onAnswerChange?.(qId, canonical);
                 onBlankFocus?.(seg.blankNum, qId);
               }}
-              className="inline-flex items-center align-baseline mx-1.5 my-1 gap-1"
+              className="inline-flex items-center align-baseline mx-1.5 my-1 gap-1.5"
             >
+              <span
+                className={`inline-flex items-center justify-center min-w-[24px] h-[24px] px-1.5 rounded-full text-[12px] font-extrabold border shrink-0 ${
+                  isActive
+                    ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                    : resolvedChoiceVal
+                    ? 'bg-blue-100 dark:bg-[#1E2A40] text-[#1D4ED8] dark:text-[#93C5FD] border-[#93C5FD] dark:border-[#3B82F6]/50'
+                    : 'bg-slate-100 dark:bg-[#23262E] text-[#111827] dark:text-[#E5E7EB] border-slate-300 dark:border-[#4A4D57]'
+                }`}
+              >
+                {seg.blankNum}
+              </span>
               <select
                 ref={el => {
                   if (inputRefs?.current && el) {
@@ -256,7 +333,7 @@ export default function ClozeNoteSheet({
                   onBlankFocus?.(seg.blankNum, qId);
                 }}
                 title={resolvedChoiceVal || `Chọn đáp án câu ${seg.blankNum}`}
-                className={`min-w-[70px] max-w-[180px] h-[34px] px-2.5 rounded-lg text-[14px] font-extrabold text-center transition-all outline-none border cursor-pointer ${
+                className={`min-w-[82px] max-w-[220px] h-[34px] px-2.5 rounded-lg text-[14px] font-extrabold text-center transition-all outline-none border cursor-pointer ${
                   isDragOver
                     ? 'bg-blue-50 dark:bg-blue-500/25 text-[#111827] dark:text-white border-[#2563EB] ring-2 ring-[#2563EB]/50'
                     : isActive
@@ -266,12 +343,19 @@ export default function ClozeNoteSheet({
                     : 'bg-[#F1F5F9] dark:bg-[#252830] text-[#111827] dark:text-[#E5E7EB] border-[#CBD5E1] dark:border-[#4A4D57] hover:border-[#111827] dark:hover:border-[#9CA3AF]'
                 }`}
               >
-                <option value="">—</option>
+                <option value="">— Chọn —</option>
                 {optionList.map((opt, optIdx) => {
                   const optCode = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
+                  const optBody = optCode ? stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes }) : '';
+                  const displayLabel =
+                    optCode && optBody && optBody !== opt
+                      ? `${optCode.toUpperCase()} — ${optBody}`
+                      : optCode
+                      ? optCode.toUpperCase()
+                      : opt;
                   return (
                     <option key={optIdx} value={opt}>
-                      {optCode ? optCode.toUpperCase() : opt}
+                      {displayLabel}
                     </option>
                   );
                 })}
@@ -613,8 +697,8 @@ export default function ClozeNoteSheet({
           </div>
         )}
 
-        {/* Shared Interactive Cambridge Legend Box for Flow-chart / Summary Completion with Box (A-H / A-I) */}
-        {sharedWordBoxOptions.length > 0 && (() => {
+        {/* Shared Interactive Cambridge Legend Box + Body (Side-by-Side for Phrase Flow-charts matching Screenshot, Stacked 2-Col for Short Words) */}
+        {(() => {
           const parsedBoxItems = sharedWordBoxOptions.map(opt => {
             const code = extractLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes });
             const labelText = code ? stripLeadingOptionCode(opt, { allowSpaceSeparated: allowSpacedCodes }) : opt;
@@ -625,13 +709,32 @@ export default function ClozeNoteSheet({
               usedBy: usedByMap.get(opt) || []
             };
           });
+          const hasPhraseOptions = parsedBoxItems.some(item => item.labelText.length > 14);
+          const useSideBySideFlowchart = isFlowchartSection && parsedBoxItems.length > 0 && hasPhraseOptions;
           const useTwoColTable =
+            !useSideBySideFlowchart &&
             parsedBoxItems.length >= 6 &&
             parsedBoxItems.every(item => item.labelText.length <= 28);
           const halfCount = Math.ceil(parsedBoxItems.length / 2);
 
-          return (
-            <div className={`mx-auto my-3 rounded-xl border border-slate-300 dark:border-[#3A3D46] bg-white dark:bg-[#1A1C22] p-2 shadow-2xs ${useTwoColTable ? 'max-w-md' : 'max-w-xl'}`}>
+          const wordBoxNode = parsedBoxItems.length > 0 ? (
+            <div
+              className={
+                useSideBySideFlowchart
+                  ? 'rounded-xl border border-slate-300 dark:border-[#3A3D46] bg-white dark:bg-[#1A1C22] p-2.5 shadow-2xs lg:sticky lg:top-4 self-start'
+                  : `mx-auto my-3 rounded-xl border border-slate-300 dark:border-[#3A3D46] bg-white dark:bg-[#1A1C22] p-2 shadow-2xs ${useTwoColTable ? 'max-w-md' : 'max-w-xl'}`
+              }
+            >
+              {useSideBySideFlowchart && (
+                <div className="px-3 py-1.5 mb-1 border-b border-slate-200 dark:border-[#2C2F36] flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                    Bảng Đáp Án (A–{parsedBoxItems[parsedBoxItems.length - 1]?.code || 'H'})
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    Bấm hoặc kéo thả vào ô
+                  </span>
+                </div>
+              )}
               {useTwoColTable ? (
                 <table className="w-full border-collapse text-left text-[14px]">
                   <tbody>
@@ -699,11 +802,11 @@ export default function ClozeNoteSheet({
                           e.dataTransfer.effectAllowed = 'copy';
                         }}
                         onClick={() => handleWordChipClick(item.opt)}
-                        className={`flex items-center justify-between gap-3 px-4 py-2.5 text-[14px] transition ${
+                        className={`flex items-center justify-between gap-3 px-3.5 py-2.5 text-[14.5px] transition ${
                           readOnlyPreview ? 'cursor-default' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-[#23262F]'
                         } ${isUsed ? 'bg-blue-50/60 dark:bg-[#1E2A40]/70' : ''}`}
                       >
-                        <span className="flex items-center gap-4 min-w-0">
+                        <span className="flex items-center gap-3.5 min-w-0">
                           {item.code && item.labelText !== item.opt ? (
                             <>
                               <span className="shrink-0 w-5 font-extrabold text-[#111827] dark:text-white">
@@ -728,85 +831,135 @@ export default function ClozeNoteSheet({
                 </div>
               )}
             </div>
-          );
-        })()}
+          ) : null;
 
-        <div
-          className={
-            hasTableBlock
-              ? 'space-y-2'
-              : isFlowchartSection
-              ? 'space-y-1.5 max-w-2xl mx-auto'
-              : isNoteSection || readOnlyPreview
-              ? 'rounded-xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191919] p-4 sm:p-6 space-y-2 shadow-2xs'
-              : 'space-y-1.5'
-          }
-        >
-          {isFlowchartSection && hasFlowArrow ? (
-            (() => {
-              const flowSteps = [];
-              let currentStepLines = [];
-              boxLines.forEach(line => {
-                if (line.kind === 'flowArrow') {
+          const bodyNode = (
+            <div
+              className={
+                hasTableBlock
+                  ? 'space-y-2'
+                  : isFlowchartSection
+                  ? useSideBySideFlowchart
+                    ? 'rounded-xl border border-slate-300 dark:border-[#343434] bg-white dark:bg-[#16181E] p-4 sm:p-5 space-y-1.5 shadow-2xs'
+                    : 'space-y-1.5 max-w-2xl mx-auto'
+                  : isNoteSection || readOnlyPreview
+                  ? 'rounded-xl border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191919] p-4 sm:p-6 space-y-2 shadow-2xs'
+                  : 'space-y-1.5'
+              }
+            >
+              {isFlowchartSection && hasFlowArrow ? (
+                (() => {
+                  const flowSteps = [];
+                  let currentStepLines = [];
+                  let flowchartTitleLine = null;
+                  const bodyForFlow = [...boxLines];
+
+                  // Extract standalone Flowchart heading (e.g. "Plan for last lesson") before the first step
+                  if (bodyForFlow.length >= 2) {
+                    const firstL = bodyForFlow[0];
+                    const firstPlain = getLinePlainText(firstL);
+                    const secondL = bodyForFlow[1];
+                    const isHeadingCandidate =
+                      (firstL.kind === 'heading' || firstL.kind === 'subheading') ||
+                      (!firstL.segments.some(s => s.type === 'blank') &&
+                        firstL.kind !== 'flowArrow' &&
+                        secondL.kind !== 'flowArrow' &&
+                        firstPlain.length > 0 &&
+                        firstPlain.length <= 64 &&
+                        !/^\(/.test(firstPlain));
+                    if (isHeadingCandidate) {
+                      flowchartTitleLine = bodyForFlow.shift();
+                    }
+                  }
+
+                  bodyForFlow.forEach(line => {
+                    if (line.kind === 'flowArrow') {
+                      if (currentStepLines.length > 0) {
+                        flowSteps.push({ type: 'step', lines: currentStepLines });
+                        currentStepLines = [];
+                      }
+                      flowSteps.push({ type: 'arrow', id: line.id });
+                    } else if (line.kind !== 'spacer') {
+                      currentStepLines.push(line);
+                    }
+                  });
                   if (currentStepLines.length > 0) {
                     flowSteps.push({ type: 'step', lines: currentStepLines });
-                    currentStepLines = [];
                   }
-                  flowSteps.push({ type: 'arrow', id: line.id });
-                } else if (line.kind !== 'spacer') {
-                  currentStepLines.push(line);
-                }
-              });
-              if (currentStepLines.length > 0) {
-                flowSteps.push({ type: 'step', lines: currentStepLines });
-              }
-              return flowSteps.map((stepItem, sIdx) =>
-                stepItem.type === 'arrow' ? (
-                  <div
-                    key={`fc-arr-${stepItem.id || sIdx}`}
-                    className="flex justify-center py-0.5 text-slate-600 dark:text-zinc-300 font-bold text-base select-none"
-                  >
-                    ↓
-                  </div>
-                ) : (
-                  <div
-                    key={`fc-step-${sIdx}`}
-                    className={`rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191B21] px-6 py-4 text-center ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.85] space-y-1 shadow-2xs`}
-                  >
-                    {stepItem.lines.map(l => (
-                      <div key={l.id}>{renderSegments(l.segments)}</div>
-                    ))}
-                  </div>
-                )
-              );
-            })()
-          ) : (
-            boxLines.map((line, lIdx) => {
-              const rendered = renderLine(line);
-              const nextLine = boxLines[lIdx + 1];
-              const needsAutoArrow =
-                isFlowchartSection &&
-                !hasFlowArrow &&
-                line.kind !== 'spacer' &&
-                line.kind !== 'heading' &&
-                line.kind !== 'subheading' &&
-                nextLine &&
-                nextLine.kind !== 'spacer' &&
-                nextLine.kind !== 'flowArrow';
-              if (needsAutoArrow) {
-                return (
-                  <div key={`fc-wrap-${line.id}`}>
-                    {rendered}
-                    <div className="flex justify-center py-0.5 text-slate-500 dark:text-zinc-400 font-bold text-base select-none">
-                      ↓
-                    </div>
-                  </div>
-                );
-              }
-              return rendered;
-            })
-          )}
-        </div>
+                  return (
+                    <>
+                      {flowchartTitleLine && (
+                        <h4 className="text-[17px] font-extrabold text-center text-[#111827] dark:text-white pb-2">
+                          {renderSegments(flowchartTitleLine.segments)}
+                        </h4>
+                      )}
+                      {flowSteps.map((stepItem, sIdx) =>
+                        stepItem.type === 'arrow' ? (
+                          <div
+                            key={`fc-arr-${stepItem.id || sIdx}`}
+                            className="flex justify-center py-0.5 text-slate-600 dark:text-zinc-300 font-bold text-base select-none"
+                          >
+                            ↓
+                          </div>
+                        ) : (
+                          <div
+                            key={`fc-step-${sIdx}`}
+                            className={`rounded-md border border-slate-200 dark:border-[#343434] bg-white dark:bg-[#191B21] px-5 py-3.5 text-center ${fontSizeClass} text-[#111827] dark:text-[#EDEDED] leading-[1.85] space-y-1 shadow-2xs`}
+                          >
+                            {stepItem.lines.map(l => (
+                              <div key={l.id}>{renderSegments(l.segments)}</div>
+                            ))}
+                          </div>
+                        )
+                      )}
+                    </>
+                  );
+                })()
+              ) : (
+                boxLines.map((line, lIdx) => {
+                  const rendered = renderLine(line);
+                  const nextLine = boxLines[lIdx + 1];
+                  const needsAutoArrow =
+                    isFlowchartSection &&
+                    !hasFlowArrow &&
+                    line.kind !== 'spacer' &&
+                    line.kind !== 'heading' &&
+                    line.kind !== 'subheading' &&
+                    nextLine &&
+                    nextLine.kind !== 'spacer' &&
+                    nextLine.kind !== 'flowArrow';
+                  if (needsAutoArrow) {
+                    return (
+                      <div key={`fc-wrap-${line.id}`}>
+                        {rendered}
+                        <div className="flex justify-center py-0.5 text-slate-500 dark:text-zinc-400 font-bold text-base select-none">
+                          ↓
+                        </div>
+                      </div>
+                    );
+                  }
+                  return rendered;
+                })
+              )}
+            </div>
+          );
+
+          if (useSideBySideFlowchart) {
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start pt-1">
+                <div className="lg:col-span-5">{wordBoxNode}</div>
+                <div className="lg:col-span-7">{bodyNode}</div>
+              </div>
+            );
+          }
+
+          return (
+            <>
+              {wordBoxNode}
+              {bodyNode}
+            </>
+          );
+        })()}
       </div>
     );
   };

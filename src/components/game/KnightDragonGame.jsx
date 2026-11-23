@@ -51,6 +51,7 @@ export default function KnightDragonGame({
   initialRawVocab = DEFAULT_VOCAB_TEXT,
   initialTopicId = 'core',
   initialTopicLabel = 'IELTS Core Academic',
+  onBackToGameHub,
   onBackToSpaceMode,
   onExitArena,
   onSyncKnightResult,
@@ -87,7 +88,6 @@ export default function KnightDragonGame({
   const [sessionKeysEarned, setSessionKeysEarned] = useState(0);
   const [sessionMonstersSlain, setSessionMonstersSlain] = useState(0);
   const [sessionDragonsSlain, setSessionDragonsSlain] = useState(0);
-  const [playerLane, setPlayerLane] = useState(1); // 0: Trái, 1: Giữa, 2: Phải
   const [bannerAlert, setBannerAlert] = useState(null);
   const [finalSmashReason, setFinalSmashReason] = useState('');
   const [reviewLog, setReviewLog] = useState([]);
@@ -103,7 +103,8 @@ export default function KnightDragonGame({
     dragonFireAnim: 0,
     finalSmashAnim: 0,
     roadOffset: 0,
-    roadPickups: [],
+    droppedCoins: [],
+    pathKeyDrop: null,
     floatingTexts: [],
     particles: [],
     timeRemainingFloat: 22,
@@ -176,6 +177,23 @@ export default function KnightDragonGame({
     }
   };
 
+  // Physical Gold Coins burst ONLY out of slain/struck monsters (never picked up like Subway Surfers)
+  const spawnMonsterCoinDrops = (coinCount = 8) => {
+    const coins = runtimeRef.current.droppedCoins || [];
+    for (let i = 0; i < coinCount; i += 1) {
+      coins.push({
+        id: `${Date.now()}_${i}_${Math.random()}`,
+        xRatio: 0.7 + (Math.random() - 0.5) * 0.08,
+        yRatio: 0.45 + (Math.random() - 0.5) * 0.06,
+        vx: -2.2 - Math.random() * 2.8,
+        vy: -3.5 - Math.random() * 3.2,
+        age: 0,
+        alpha: 1
+      });
+    }
+    runtimeRef.current.droppedCoins = coins;
+  };
+
   const showQuickBanner = (text, kind = 'success') => {
     setBannerAlert({ text, kind });
   };
@@ -227,11 +245,10 @@ export default function KnightDragonGame({
 
     runtimeRef.current.round = rNum;
     runtimeRef.current.matchState = 'PLAYING';
-    runtimeRef.current.roadPickups = [
-      { id: 'pk_1', lane: 0, z: 0.25, type: 'gold', amount: 15 },
-      { id: 'pk_2', lane: 2, z: 0.58, type: 'gold', amount: 20 },
-      { id: 'pk_3', lane: 1, z: 0.82, type: Math.random() < 0.45 ? 'key' : 'gold', amount: 25 }
-    ];
+    runtimeRef.current.droppedCoins = [];
+    // Only Revive Keys (🗝️) randomly spawn along the path to be picked up (Subway Surfers revive key style)
+    runtimeRef.current.pathKeyDrop =
+      Math.random() < 0.65 ? { xRatio: 0.85, collected: false } : null;
     setupQuestionClock(rNum, firstQ);
 
     if (firstQ) {
@@ -331,9 +348,14 @@ export default function KnightDragonGame({
       bestScore: Math.max(prev.bestScore || 0, score + 200)
     }));
 
-    spawnFloatingText(`+${goldGain} 🪙 Vàng`, '#fbbf24', 0.52, 0.34);
+    spawnMonsterCoinDrops(isDragonBoss ? 14 : 7);
+    spawnFloatingText(`+${goldGain} 🪙 Vàng Rớt Từ Quái!`, '#fbbf24', 0.68, 0.34);
     if (droppedKey > 0) {
-      spawnFloatingText(`+1 🗝️ Chìa Khóa Hồi Sinh!`, '#38bdf8', 0.5, 0.24);
+      spawnFloatingText(`+1 🗝️ Nhặt Chìa Khóa Hồi Sinh Trên Đường!`, '#38bdf8', 0.5, 0.24);
+    }
+    // Randomly spawn a rare Revive Key on the road ahead for the next monster step
+    if (Math.random() < 0.38) {
+      runtimeRef.current.pathKeyDrop = { xRatio: 0.86, collected: false };
     }
     return { goldGain, droppedKey };
   };
@@ -414,16 +436,9 @@ export default function KnightDragonGame({
     return () => clearInterval(timerRef.current);
   }, [matchState, round, wordIdx, activeQ]);
 
-  const handleSwitchLane = (nextLane) => {
-    const clamped = Math.max(0, Math.min(2, nextLane));
-    setPlayerLane(clamped);
-    runtimeRef.current.lane = clamped;
-  };
-
   // Choice handler for Wave 1 (Slime/Goblin Rune Shields) & Wave 3 (Dark Mage Spell Orbs)
-  const handleSelectRuneChoice = (choiceText, laneIdx = 1) => {
+  const handleSelectRuneChoice = (choiceText) => {
     if (matchState !== 'PLAYING' || !activeQ) return;
-    handleSwitchLane(laneIdx % 3);
     const targetAnswer = round === 1 ? activeQ.word : round === 3 ? activeQ.v3Target : '';
     const isCorrect =
       String(choiceText || '').trim().toLowerCase() === String(targetAnswer || '').trim().toLowerCase();
@@ -433,7 +448,7 @@ export default function KnightDragonGame({
       runtimeRef.current.monsterHitAnim = 1;
       playSound('word_clear');
       speakWord(activeQ.word);
-      spawnBurstParticles(0.5, 0.32, activeSkin.slashColor || '#38bdf8', 28);
+      spawnBurstParticles(0.72, 0.45, activeSkin.slashColor || '#38bdf8', 28);
 
       const remainRatio = Math.max(
         0,
@@ -449,8 +464,8 @@ export default function KnightDragonGame({
       const { goldGain, droppedKey } = rewardMonsterKill(false);
       recordWordAttempt(activeQ, round, true);
       showQuickBanner(
-        `⚔️ Chém hạ ${currentMonster.name}! +${gain}đ • +${goldGain} 🪙 Vàng${
-          droppedKey ? ' • 🗝️ NHẶT ĐƯỢC 1 CHÌA KHÓA HỒI SINH!' : ''
+        `⚔️ Chém hạ ${currentMonster.name}! +${gain}đ • Quái rớt +${goldGain} 🪙 Vàng${
+          droppedKey ? ' • 🗝️ Phát hiện 1 Chìa Khóa Hồi Sinh trên đường!' : ''
         }`,
         'success'
       );
@@ -474,7 +489,8 @@ export default function KnightDragonGame({
       playSound('type_hit');
       runtimeRef.current.heroAttackAnim = 0.85;
       runtimeRef.current.monsterHitAnim = 0.7;
-      spawnBurstParticles(0.5, 0.34, activeSkin.slashColor || '#fbbf24', 10);
+      spawnBurstParticles(0.72, 0.45, activeSkin.slashColor || '#fbbf24', 10);
+      spawnMonsterCoinDrops(2);
 
       const nextProg = skipNonAlphaIndex(target, typedProgress + 1);
       setTypedProgress(nextProg);
@@ -661,7 +677,7 @@ export default function KnightDragonGame({
     );
   };
 
-  // Keyboard listener for Lane Switching (ArrowLeft/ArrowRight) & Wave 2 Typing
+  // Keyboard listener for TAB pronunciation & Wave 2 Typing
   useEffect(() => {
     if (matchState !== 'PLAYING') return undefined;
     const onKeyDown = (e) => {
@@ -673,16 +689,6 @@ export default function KnightDragonGame({
         return;
       }
       if (inInput) return;
-      if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        handleSwitchLane(runtimeRef.current.lane - 1);
-        return;
-      }
-      if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        handleSwitchLane(runtimeRef.current.lane + 1);
-        return;
-      }
       if (round === 2 && e.key && e.key.length === 1 && /^[a-zA-Z]$/.test(e.key)) {
         e.preventDefault();
         handleWave2KeyInput(e.key.toUpperCase());
@@ -692,7 +698,7 @@ export default function KnightDragonGame({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [matchState, round, activeQ, typedProgress, score, combo]);
 
-  // 60 FPS RPG Dungeon Runner & Boss Duel Canvas Loop
+  // 60 FPS Side-Scrolling RPG Monster Battle & Physical Monster Coin Drop Canvas Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
@@ -723,97 +729,119 @@ export default function KnightDragonGame({
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, w, h);
 
-      // 2. Perspective 3-Lane Dungeon Stone Road (Subway Surfers style)
-      const horizonY = h * 0.25;
-      const roadTopW = w * 0.28;
-      const roadBotW = w * 0.86;
+      // 2. Side-Scrolling RPG Stone Bridge & Dungeon Pillars
+      const groundY = h * 0.78;
       ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(w / 2 - roadTopW / 2, horizonY);
-      ctx.lineTo(w / 2 + roadTopW / 2, horizonY);
-      ctx.lineTo(w / 2 + roadBotW / 2, h);
-      ctx.lineTo(w / 2 - roadBotW / 2, h);
-      ctx.closePath();
-      ctx.fillStyle = isDragonStage ? '#27121b' : '#1e293b';
-      ctx.fill();
-      ctx.strokeStyle = isDragonStage ? '#f43f5e' : '#38bdf8';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Lane dividers
-      for (let l = 1; l <= 2; l += 1) {
-        const topX = w / 2 - roadTopW / 2 + (roadTopW * l) / 3;
-        const botX = w / 2 - roadBotW / 2 + (roadBotW * l) / 3;
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
-        ctx.setLineDash([8, 8]);
+      // Distant castle / dungeon pillars
+      for (let pIdx = 0; pIdx < 5; pIdx += 1) {
+        const px = ((pIdx * 190 - rt.roadOffset * 120) % (w + 180) + (w + 180)) % (w + 180) - 90;
+        ctx.fillStyle = isDragonStage ? 'rgba(136, 19, 55, 0.22)' : 'rgba(30, 41, 59, 0.45)';
+        ctx.fillRect(px, h * 0.16, 36, groundY - h * 0.16);
+        // Torch glow on pillar
         ctx.beginPath();
-        ctx.moveTo(topX, horizonY);
-        ctx.lineTo(botX, h);
-        ctx.stroke();
+        ctx.arc(px + 18, h * 0.36, 8, 0, Math.PI * 2);
+        ctx.fillStyle = isDragonStage ? 'rgba(251, 113, 133, 0.45)' : 'rgba(251, 191, 36, 0.38)';
+        ctx.fill();
       }
-      ctx.setLineDash([]);
+
+      // Stone Battlefield Ground Floor
+      ctx.fillStyle = isDragonStage ? '#27121b' : '#1e293b';
+      ctx.fillRect(0, groundY, w, h - groundY);
+      ctx.strokeStyle = isDragonStage ? '#f43f5e' : '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(w, groundY);
+      ctx.stroke();
       ctx.restore();
 
-      // 3. Scrolling Road Coins (🪙) & Revive Keys (🗝️) on the 3 lanes
       if (rt.matchState === 'PLAYING') {
-        rt.roadOffset = (rt.roadOffset + 0.012) % 1;
-        rt.roadPickups.forEach(pk => {
-          pk.z += 0.0065;
-          if (pk.z >= 0.88 && pk.z <= 0.96 && pk.lane === rt.lane) {
-            // Collected by Knight on this lane!
-            if (pk.type === 'key') {
-              setSessionKeysEarned(k => k + 1);
-              updateAndPersistProfile(prev => ({
-                ...prev,
-                keys: (prev.keys || 0) + 1,
-                keysCollected: (prev.keysCollected || 0) + 1
-              }));
-              spawnFloatingText('+1 🗝️ Nhặt Chìa Khóa!', '#38bdf8', 0.5, 0.72);
-            } else {
-              const gAmt = pk.amount || 15;
-              setSessionGoldEarned(g => g + gAmt);
-              updateAndPersistProfile(prev => ({
-                ...prev,
-                gold: (prev.gold || 0) + gAmt
-              }));
-              spawnFloatingText(`+${gAmt} 🪙 Vàng`, '#fbbf24', 0.5, 0.75);
-            }
-            pk.z = 0.05;
-            pk.lane = Math.floor(Math.random() * 3);
-            pk.type = Math.random() < 0.22 ? 'key' : 'gold';
-          } else if (pk.z > 1.02) {
-            pk.z = 0.05;
-            pk.lane = Math.floor(Math.random() * 3);
-            pk.type = Math.random() < 0.22 ? 'key' : 'gold';
-          }
-
-          const curRoadW = roadTopW + (roadBotW - roadTopW) * pk.z;
-          const laneCenterX = w / 2 - curRoadW / 2 + ((pk.lane + 0.5) * curRoadW) / 3;
-          const pkY = horizonY + (h - horizonY) * pk.z;
-          const scale = 0.55 + pk.z * 0.65;
-
-          ctx.save();
-          ctx.translate(laneCenterX, pkY);
-          ctx.scale(scale, scale);
-          ctx.beginPath();
-          ctx.arc(0, 0, 12, 0, Math.PI * 2);
-          ctx.fillStyle = pk.type === 'key' ? '#38bdf8' : '#fbbf24';
-          ctx.fill();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = '#ffffff';
-          ctx.stroke();
-          ctx.font = 'bold 12px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = '#0f172a';
-          ctx.fillText(pk.type === 'key' ? '🗝️' : '🪙', 0, 0);
-          ctx.restore();
-        });
+        rt.roadOffset = (rt.roadOffset + 0.004) % 10;
       }
 
-      // 4. Draw Monster / Dragon Boss at top-center of road
-      const monsterX = w / 2 + Math.sin(Date.now() * 0.003) * (isDragonStage ? 28 : 16);
-      const monsterY = Math.max(58, h * 0.33) + (rt.monsterHitAnim > 0 ? -8 : 0);
+      // 3. Rare Revive Key (🗝️) randomly discovered on the adventure path (NOT gold coins)
+      if (rt.pathKeyDrop && !rt.pathKeyDrop.collected && rt.matchState === 'PLAYING') {
+        rt.pathKeyDrop.xRatio -= 0.0025;
+        const keyX = rt.pathKeyDrop.xRatio * w;
+        const keyY = groundY - 24 + Math.sin(Date.now() * 0.008) * 5;
+
+        ctx.save();
+        ctx.translate(keyX, keyY);
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#38bdf8';
+        ctx.stroke();
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🗝️', 0, 0);
+        ctx.restore();
+
+        // Collected when reaching the Knight
+        if (rt.pathKeyDrop.xRatio <= 0.27) {
+          rt.pathKeyDrop.collected = true;
+          rt.pathKeyDrop = null;
+          setSessionKeysEarned(k => k + 1);
+          updateAndPersistProfile(prev => ({
+            ...prev,
+            keys: (prev.keys || 0) + 1,
+            keysCollected: (prev.keysCollected || 0) + 1
+          }));
+          spawnBurstParticles(0.24, 0.68, '#38bdf8', 16);
+          spawnFloatingText('+1 🗝️ Nhặt Chìa Khóa Hồi Sinh trên đường!', '#38bdf8', 0.32, 0.58);
+        }
+      }
+
+      // 4. Physical Gold Coins (🪙) bursting ONLY out of hit/slain Monsters and flying into Knight's pouch
+      for (let i = (rt.droppedCoins || []).length - 1; i >= 0; i -= 1) {
+        const coin = rt.droppedCoins[i];
+        coin.age += 1;
+        if (coin.age < 24) {
+          // Burst out of monster & bounce on stone ground
+          coin.xRatio += coin.vx / w;
+          coin.yRatio += coin.vy / h;
+          coin.vy += 0.28; // gravity
+          if (coin.yRatio >= 0.74) {
+            coin.yRatio = 0.74;
+            coin.vy = -Math.abs(coin.vy) * 0.45;
+          }
+        } else {
+          // Magnet-fly into Knight's Gold Pouch (xRatio = 0.24, yRatio = 0.68)
+          coin.xRatio += (0.24 - coin.xRatio) * 0.16;
+          coin.yRatio += (0.68 - coin.yRatio) * 0.16;
+        }
+
+        const cx = coin.xRatio * w;
+        const cy = coin.yRatio * h;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fill();
+        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = '#fef08a';
+        ctx.stroke();
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#0f172a';
+        ctx.fillText('🪙', 0, 0);
+        ctx.restore();
+
+        if (coin.age >= 24 && Math.hypot(coin.xRatio - 0.24, coin.yRatio - 0.68) < 0.035) {
+          rt.droppedCoins.splice(i, 1);
+        } else if (coin.age > 95) {
+          rt.droppedCoins.splice(i, 1);
+        }
+      }
+
+      // 5. Draw Monster / Dragon Boss on the Right Side of Battlefield
+      const monsterX = w * 0.72 + Math.sin(Date.now() * 0.0035) * (isDragonStage ? 22 : 12);
+      const monsterY = (isDragonStage ? Math.max(76, h * 0.44) : groundY - 30) + (rt.monsterHitAnim > 0 ? -10 : 0);
       if (rt.monsterHitAnim > 0) rt.monsterHitAnim = Math.max(0, rt.monsterHitAnim - 0.06);
 
       // Compute Monster HP ratio
@@ -831,7 +859,6 @@ export default function KnightDragonGame({
         // Giant Ancient Dragon Boss
         const wingFlap = Math.sin(Date.now() * 0.01) * 14;
         ctx.fillStyle = '#9f1239';
-        // Left & Right Dragon Wings
         ctx.beginPath();
         ctx.moveTo(-20, -5);
         ctx.lineTo(-82, -32 + wingFlap);
@@ -845,7 +872,6 @@ export default function KnightDragonGame({
         ctx.closePath();
         ctx.fill();
 
-        // Dragon Body & Scales
         ctx.fillStyle = rt.monsterHitAnim > 0 ? '#ffffff' : '#e11d48';
         ctx.beginPath();
         ctx.arc(0, 0, 34, 0, Math.PI * 2);
@@ -854,7 +880,6 @@ export default function KnightDragonGame({
         ctx.strokeStyle = '#fbbf24';
         ctx.stroke();
 
-        // Dragon Golden Horns
         ctx.fillStyle = '#fbbf24';
         ctx.beginPath();
         ctx.moveTo(-18, -26);
@@ -869,14 +894,12 @@ export default function KnightDragonGame({
         ctx.closePath();
         ctx.fill();
 
-        // Dragon Glowing Eyes
         ctx.fillStyle = '#fde047';
         ctx.beginPath();
         ctx.arc(-11, -6, 5, 0, Math.PI * 2);
         ctx.arc(11, -6, 5, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // Slime / Goblin / Orc / Dark Mage
         const rSize = round === 1 ? 24 : 28;
         ctx.fillStyle = rt.monsterHitAnim > 0 ? '#ffffff' : (currentMonster?.color || '#10b981');
         ctx.beginPath();
@@ -886,7 +909,6 @@ export default function KnightDragonGame({
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
 
-        // Monster Eyes
         ctx.fillStyle = currentMonster?.eyeColor || '#0f172a';
         ctx.beginPath();
         ctx.arc(-8, -4, 4, 0, Math.PI * 2);
@@ -894,8 +916,8 @@ export default function KnightDragonGame({
         ctx.fill();
       }
 
-      // Monster Name & HP Bar
-      const hpW = isDragonStage ? 150 : 104;
+      // Monster Name, HP Bar & Gold Drop Tag
+      const hpW = isDragonStage ? 154 : 112;
       ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
       ctx.fillRect(-hpW / 2, -56, hpW, 8);
       ctx.fillStyle = isDragonStage ? '#f43f5e' : '#10b981';
@@ -903,14 +925,13 @@ export default function KnightDragonGame({
       ctx.font = 'bold 11px sans-serif';
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.fillText(currentMonster?.name || 'Quái Vật', 0, -62);
+      ctx.fillText(`${currentMonster?.name || 'Quái Vật'} (+${stageMeta.goldPerKill} 🪙)`, 0, -63);
       ctx.restore();
 
-      // 5. Draw Knight / Female Hero on the Selected Lane (Bottom)
-      const botLaneW = roadBotW * 0.78;
-      const heroBaseX = w / 2 - botLaneW / 2 + ((rt.lane + 0.5) * botLaneW) / 3;
-      const attackLungeY = rt.heroAttackAnim > 0 ? -36 * rt.heroAttackAnim : 0;
-      const heroY = h - 48 + attackLungeY;
+      // 6. Draw Knight / Female Hero on the Left Side of Battlefield
+      const attackLungeX = rt.heroAttackAnim > 0 ? 58 * rt.heroAttackAnim : 0;
+      const heroBaseX = w * 0.24 + attackLungeX;
+      const heroY = groundY - 22;
       if (rt.heroAttackAnim > 0) rt.heroAttackAnim = Math.max(0, rt.heroAttackAnim - 0.08);
       if (rt.knightHurtAnim > 0) rt.knightHurtAnim = Math.max(0, rt.knightHurtAnim - 0.07);
 
@@ -1157,6 +1178,17 @@ export default function KnightDragonGame({
             <ChevronLeft className="w-4 h-4" /> Thoát Đấu Trường
           </button>
 
+          {onBackToGameHub && (
+            <button
+              type="button"
+              data-testid="knight-back-to-hub-btn"
+              onClick={onBackToGameHub}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-400/40 text-xs font-extrabold text-indigo-200 transition"
+            >
+              <span>🎮 Chọn Game Đấu Trường</span>
+            </button>
+          )}
+
           <button
             type="button"
             data-testid="switch-to-space-game-btn"
@@ -1217,7 +1249,7 @@ export default function KnightDragonGame({
                   Hiệp Sĩ Diệt Rồng — Đấu Trường Từ Vựng RPG
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                  Chạy trên đường hầm 3 làn nhặt <b>🪙 Vàng</b> &amp; <b>🗝️ Chìa Khóa Hồi Sinh</b> (mua mạng khi thua giống Subway Surfers), tích vàng mở khóa <b>Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura, Nữ Pháp Sư Selena</b> và chém hạ <b>Boss Cuối Rồng Hắc Ám</b> trước khi Rồng tung <b>Skill Tất Sát Kết Liễu (Final Smash)</b>!
+                  Đánh hạ quái <b>Slime, Goblin, Orc &amp; Boss Rồng Hắc Ám</b> để quái rớt ra <b>🪙 Tiền Vàng</b> tích lũy mua nhân vật mới (<b>Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura, Nữ Pháp Sư Selena</b>), ngẫu nhiên nhặt <b>🗝️ Chìa Khóa Hồi Sinh</b> trên đường để mua mạng khi thua (giống Subway Surfers) và chém hạ Rồng trước khi Rồng tung <b>Skill Tất Sát Kết Liễu (Final Smash)</b>!
                 </p>
               </div>
 
@@ -1436,26 +1468,17 @@ export default function KnightDragonGame({
             </div>
           </div>
 
-          {/* 3-Lane Dungeon Canvas + Lane Switch Controls */}
+          {/* Side-Scrolling RPG Monster Duel Canvas */}
           <div className="relative h-56 sm:h-64 w-full rounded-2xl border border-slate-800 overflow-hidden shadow-2xl bg-slate-950 shrink-0">
             <canvas ref={canvasRef} className="w-full h-full block" />
 
-            {/* 3-Lane Pick-up Switcher Pills at bottom-right of canvas */}
-            <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1 bg-slate-900/85 border border-slate-700 rounded-xl p-1 z-20">
-              {['← Làn Trái', '↑ Làn Giữa', 'Làn Phải →'].map((lbl, lIdx) => (
-                <button
-                  key={lbl}
-                  type="button"
-                  onClick={() => handleSwitchLane(lIdx)}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-extrabold transition ${
-                    playerLane === lIdx
-                      ? 'bg-amber-500 text-slate-950'
-                      : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  {lbl}
-                </button>
-              ))}
+            {/* Monster Gold Drop & Path Key Drop Info Pill */}
+            <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 z-20 text-[11px] font-bold text-slate-200">
+              <span className="text-amber-300">
+                🪙 Hạ {currentMonster?.name}: Rớt +{stageMeta.goldPerKill + (Number(activeSkin.bonusGoldPerKill) || 0)} Vàng
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="text-sky-300">🗝️ Chìa khóa hồi sinh: Ngẫu nhiên trên đường</span>
             </div>
 
             {bannerAlert && (

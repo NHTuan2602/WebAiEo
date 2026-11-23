@@ -5587,6 +5587,26 @@ async function discoverServerGeminiModels(cleanKey) {
   return ordered;
 }
 
+function safeParseServerAiJson(rawText = '') {
+  const cleaned = String(rawText || '')
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    try {
+      const sanitized = match[0].replace(/,\s*([}\]])/g, '$1');
+      return JSON.parse(sanitized);
+    } catch {
+      return null;
+    }
+  }
+}
+
 async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 }) {
   const cleanKey = String(apiKey || '').trim().replace(/^['"]|['"]$/g, '');
   if (!cleanKey) {
@@ -5597,9 +5617,10 @@ async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 })
 
   for (const modelId of models) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(cleanKey)}`;
-    const doFetch = async (useJsonMime = true) => {
+    const doFetch = async (useJsonMime = true, includeMaxTokens = true) => {
       const generationConfig = { temperature };
       if (useJsonMime) generationConfig.responseMimeType = 'application/json';
+      if (includeMaxTokens) generationConfig.maxOutputTokens = 32768;
       return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5612,16 +5633,18 @@ async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 })
 
     let response = null;
     try {
-      response = await doFetch(true);
+      response = await doFetch(true, true);
       if (response.status === 400) {
         const preview = await response.clone().text();
-        if (/mime|json/i.test(preview)) {
-          response = await doFetch(false);
+        if (/maxOutputTokens|token/i.test(preview)) {
+          response = await doFetch(true, false);
+        } else if (/mime|json/i.test(preview)) {
+          response = await doFetch(false, true);
         }
       }
       if (SERVER_TRANSIENT_GEMINI_STATUSES.has(response.status)) {
         await sleepMsServer(600);
-        response = await doFetch(true);
+        response = await doFetch(true, true);
       }
     } catch (netErr) {
       lastErr = netErr;
@@ -5631,12 +5654,12 @@ async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 })
     if (response.ok) {
       const data = await response.json();
       const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        lastErr = new Error('AI không trả về JSON hợp lệ.');
+      const parsed = safeParseServerAiJson(textContent);
+      if (!parsed) {
+        lastErr = new Error('AI không trả về JSON hợp lệ hoặc phản hồi bị cắt cụt.');
         continue;
       }
-      return { parsed: JSON.parse(jsonMatch[0]), usedModel: modelId };
+      return { parsed, usedModel: modelId };
     }
 
     const errText = await response.text();
@@ -6652,7 +6675,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         return;
       }
       try {
-        const body = await readJsonBody(req);
+        const body = await readJsonBody(req, 40 * 1024 * 1024);
         const promptText = String(body?.promptText || body?.prompt || '');
         if (!promptText) {
           sendJsonResponse(res, 400, { ok: false, error: 'Thiếu promptText cho AI.' });

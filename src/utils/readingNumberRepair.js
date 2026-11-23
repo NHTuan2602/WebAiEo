@@ -300,10 +300,16 @@ export function repairReadingPdfNumbering(rawPassages = [], { answerKey = new Ma
 
     const sortedRaw = [...passage.questions].sort((a, b) => a.questionNumber - b.questionNumber);
 
-    // Propagate matching_features / matching_headings options if consecutive questions share type
+    // Propagate shared options across consecutive matching / word-box / flowchart questions
     for (let k = 0; k < sortedRaw.length; k++) {
       const curr = sortedRaw[k];
-      if (curr.type === 'matching_features' || curr.type === 'matching_headings') {
+      if (
+        curr.type === 'matching_features' ||
+        curr.type === 'matching_headings' ||
+        curr.type === 'matching' ||
+        curr.type === 'flowchart_completion' ||
+        curr.type === 'summary_box'
+      ) {
         const currOpts = Array.isArray(curr.options) ? curr.options.filter(Boolean) : [];
         if (currOpts.length === 0) {
           let donor = null;

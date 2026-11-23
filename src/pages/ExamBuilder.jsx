@@ -182,6 +182,60 @@ export default function ExamBuilder({
     setShowPassageSplitModal(false);
   };
 
+  const countExamQuestionSlots = (questions = []) =>
+    (Array.isArray(questions) ? questions : []).reduce((sum, q, idx) => {
+      const start = getQuestionDisplayNumber(q, idx + 1);
+      const end = Number(q?.questionEndNumber) > start ? Number(q.questionEndNumber) : start;
+      const req = q?.type === 'mcq' ? Math.max(1, Number(q?.requiredSelections) || 1) : 1;
+      return sum + Math.max(1, end - start + 1, req);
+    }, 0);
+
+  const handleQuickSplitListening4Parts = () => {
+    setTestForm(prev => {
+      const existingTracks = getListeningTracks(prev.listening);
+      const nextTracks = [...existingTracks];
+      const defaultTitles = [
+        'Part 1: Listening Part 1 (Q1–10)',
+        'Part 2: Listening Part 2 (Q11–20)',
+        'Part 3: Listening Part 3 (Q21–30)',
+        'Part 4: Listening Part 4 (Q31–40)'
+      ];
+      while (nextTracks.length < 4) {
+        const nextNum = nextTracks.length + 1;
+        nextTracks.push({
+          id: `track-${Date.now()}-${nextNum}`,
+          title: defaultTitles[nextNum - 1] || `Part ${nextNum}`,
+          audioUrl: '',
+          audioFileName: '',
+          imageUrl: '',
+          imageFileName: '',
+          contextText: '',
+          clozeText: '',
+          transcript: ''
+        });
+      }
+      const currentQs = Array.isArray(prev.listening?.questions) ? prev.listening.questions : [];
+      const updatedQs = currentQs.map((q, idx) => {
+        const num = getQuestionDisplayNumber(q, idx + 1);
+        const targetTrackIdx = num <= 10 ? 0 : num <= 20 ? 1 : num <= 30 ? 2 : 3;
+        return { ...q, trackIdx: targetTrackIdx };
+      });
+      const counts = [0, 1, 2, 3].map(i => countExamQuestionSlots(updatedQs.filter(q => q.trackIdx === i)));
+      showToast?.(
+        `Đã chuẩn hóa Listening thành 4 Part: P1 (${counts[0]} câu) · P2 (${counts[1]} câu) · P3 (${counts[2]} câu) · P4 (${counts[3]} câu)!`
+      );
+      return {
+        ...prev,
+        listening: {
+          ...prev.listening,
+          tracks: nextTracks,
+          questions: updatedQs
+        }
+      };
+    });
+    setBuilderListeningIdx(0);
+  };
+
   const updateTestHashtags = (updater) => {
     setTestForm(prev => {
       const current = normalizeTestHashtags(prev.hashtags || prev.speaking?.hashtags || []);
@@ -767,22 +821,35 @@ Write ONE WORD AND/OR A NUMBER for each answer.
 
   const handleInsertCambridgePattern = (skill, scopeField, scopeIdx, patternId) => {
     const stamp = Date.now();
-    if (patternId === 'flowchart_box_ah') {
-      const flowTpl = `Questions 26-30
-Complete the flowchart below. Choose FIVE answers from the box and write the correct letter, A - H, next to Questions 26 - 30.
+    const existingQsForSkill = Array.isArray(testForm?.[skill]?.questions) ? testForm[skill].questions : [];
+    const existingMaxNums = existingQsForSkill.map((q, idx) => {
+      const start = getQuestionDisplayNumber(q, idx + 1);
+      const end = Number(q?.questionEndNumber) > start ? Number(q.questionEndNumber) : start;
+      return end;
+    });
+    const computedStartNum = existingMaxNums.length > 0 ? Math.max(...existingMaxNums) + 1 : 1;
 
-Choose mice which are all the same {{26}}
+    if (patternId === 'flowchart_box_ah') {
+      const f1 = computedStartNum;
+      const f2 = f1 + 1;
+      const f3 = f1 + 2;
+      const f4 = f1 + 3;
+      const f5 = f1 + 4;
+      const flowTpl = `Questions ${f1}-${f5}
+Complete the flowchart below. Choose FIVE answers from the box and write the correct letter, A - H, next to Questions ${f1} - ${f5}.
+
+Choose mice which are all the same {{${f1}}}
 ↓
-Divide the mice into two groups, each with a different {{27}}
+Divide the mice into two groups, each with a different {{${f2}}}
 ↓
 Put each group in a separate cage.
 Feed group A commercial mouse food.
-Feed group B the same, but also sugar contained in {{28}}
+Feed group B the same, but also sugar contained in {{${f3}}}
 ↓
 Take measurements using an electronic scale.
-Place them in a weighing chamber to prevent {{29}}
+Place them in a weighing chamber to prevent {{${f4}}}
 ↓
-Do all necessary {{30}}`;
+Do all necessary {{${f5}}}`;
       const boxOpts = [
         'A size',
         'B escape',
@@ -798,15 +865,17 @@ Do all necessary {{30}}`;
     }
 
     if (patternId === 'table_completion') {
-      const tableTpl = `Questions 1-10
+      const tStart = computedStartNum;
+      const tEnd = tStart + 9;
+      const tableTpl = `Questions ${tStart}-${tEnd}
 Complete the table below.
 Write ONE WORD AND/OR A NUMBER for each answer.
 
 | Name of restaurant | Location | Reason for recommendation | Other comments |
 | --- | --- | --- | --- |
-| The Junction | Greyson Street, near the station | Good for people who are especially keen on {{1}} | • Quite expensive<br>• The {{2}} is a good place for a drink |
-| Paloma | In Bow Street next to the cinema | {{3}} food, good for sharing | • Staff are very friendly<br>• Need to pay £50 deposit<br>• A limited selection of {{4}} food on the menu |
-| The {{5}} | At the top of a {{6}} | • A famous chef<br>• All the {{7}} are very good<br>• Only uses {{8}} ingredients | • Set lunch costs: £ {{9}} per person<br>• Portions probably of {{10}} size |`;
+| The Junction | Greyson Street, near the station | Good for people who are especially keen on {{${tStart}}} | • Quite expensive<br>• The {{${tStart + 1}}} is a good place for a drink |
+| Paloma | In Bow Street next to the cinema | {{${tStart + 2}}} food, good for sharing | • Staff are very friendly<br>• Need to pay £50 deposit<br>• A limited selection of {{${tStart + 3}}} food on the menu |
+| The {{${tStart + 4}}} | At the top of a {{${tStart + 5}}} | • A famous chef<br>• All the {{${tStart + 6}}} are very good<br>• Only uses {{${tStart + 7}}} ingredients | • Set lunch costs: £ {{${tStart + 8}}} per person<br>• Portions probably of {{${tStart + 9}}} size |`;
 
       setTestForm(prev => {
         const prevSkill = prev[skill] || {};
@@ -1300,6 +1369,8 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           ...(typeof question.blankNum === 'number' ? { blankNum: question.blankNum } : {}),
           ...(typeof question.questionNumber === 'number' ? { questionNumber: question.questionNumber } : {}),
           ...(typeof question.questionEndNumber === 'number' ? { questionEndNumber: question.questionEndNumber } : {}),
+          ...(question.instruction ? { instruction: question.instruction } : {}),
+          ...(question.hasNB ? { hasNB: true } : {}),
           passageIdx: passageOffset + passageIdx,
           question: question.question || `${question.blankNum || questionIdx + 1}. Câu hỏi`,
           options: Array.isArray(question.options) ? question.options : [],
@@ -1311,9 +1382,22 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           ...(Array.isArray(question.correctAnswers) ? { correctAnswers: question.correctAnswers } : {})
         }))
       );
-      const readingQuestions = shouldReplaceAll
+      let readingQuestions = shouldReplaceAll
         ? importedQuestions
         : [...(Array.isArray(prev.reading?.questions) ? prev.reading.questions : []), ...importedQuestions];
+      nextPassages.forEach((p, pIdx) => {
+        if (String(p?.clozeText || '').trim()) {
+          readingQuestions = syncClozeBlanksWithQuestions({
+            clozeText: p.clozeText,
+            existingQuestions: readingQuestions,
+            scopeField: 'passageIdx',
+            scopeIdx: pIdx,
+            skill: 'reading',
+            defaultSource: 'ai'
+          });
+        }
+      });
+      readingQuestions = sortQuestionsListByNumber(readingQuestions, 'passageIdx');
       const firstPassage = nextPassages[0] || {};
 
       return {
@@ -1404,9 +1488,22 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           ...(Array.isArray(question.correctAnswers) ? { correctAnswers: question.correctAnswers } : {})
         }))
       );
-      const listeningQuestions = shouldReplaceAll
+      let listeningQuestions = shouldReplaceAll
         ? importedQuestions
         : [...(Array.isArray(prev.listening?.questions) ? prev.listening.questions : []), ...importedQuestions];
+      nextTracks.forEach((tr, tIdx) => {
+        if (String(tr?.clozeText || '').trim()) {
+          listeningQuestions = syncClozeBlanksWithQuestions({
+            clozeText: tr.clozeText,
+            existingQuestions: listeningQuestions,
+            scopeField: 'trackIdx',
+            scopeIdx: tIdx,
+            skill: 'listening',
+            defaultSource: 'ai'
+          });
+        }
+      });
+      listeningQuestions = sortQuestionsListByNumber(listeningQuestions, 'trackIdx');
       const firstTrack = nextTracks[0] || {};
 
       return {
@@ -1545,7 +1642,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <Headphones className="w-4 h-4" /> 2. Phần Listening ({getListeningTracks(testForm.listening).length > 1 ? `${getListeningTracks(testForm.listening).length} Part • ` : ''}{testForm.listening?.questions?.length || 0} câu)
+                    <Headphones className="w-4 h-4" /> 2. Listening ({getListeningTracks(testForm.listening).length}/4 bài · {countExamQuestionSlots(testForm.listening?.questions)}/40 câu)
                   </button>
                   <button
                     onClick={() => setBuilderTab('reading')}
@@ -1555,7 +1652,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <BookOpen className="w-4 h-4" /> 3. Phần Reading ({testForm.reading?.questions?.length || 0} câu)
+                    <BookOpen className="w-4 h-4" /> 3. Reading ({getReadingPassages(testForm.reading).length}/3 bài · {countExamQuestionSlots(testForm.reading?.questions)}/40 câu)
                   </button>
                   <button
                     onClick={() => setBuilderTab('writing')}
@@ -1565,7 +1662,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <PenTool className="w-4 h-4" /> 4. Phần Writing &amp; Bài Mẫu
+                    <PenTool className="w-4 h-4" /> 4. Writing (2 bài: Task 1–2)
                   </button>
                   <button
                     onClick={() => setBuilderTab('speaking')}
@@ -1575,7 +1672,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <Mic className="w-4 h-4" /> 5. Phần Speaking ({getSpeakingQuestionItems(testForm.speaking, 'all').length} câu)
+                    <Mic className="w-4 h-4" /> 5. Speaking (3 phần · {getSpeakingQuestionItems(testForm.speaking, 'all').length} câu)
                   </button>
                 </>
               )}
@@ -2878,20 +2975,32 @@ Write ONE WORD AND/OR A NUMBER for each answer.
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Nội Dung Bài Nghe Listening ({tracks.length} Chủ Đề / Bài)
+                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                  <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <span>Nội Dung Bài Nghe Listening ({tracks.length} Bài · {countExamQuestionSlots(testForm.listening?.questions)}/40 câu)</span>
                 </h2>
                 <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
-                  Mặc định có 1 chủ đề. Bấm &quot;Thêm Chủ Đề&quot; nếu cần chia nhiều chủ đề / file ghi âm đánh số 1, 2, 3... kèm ảnh sơ đồ/đề chụp hoặc đoạn đề dẫn giống phần Reading.
+                  Chuẩn IELTS Listening gồm 4 bài (Part 1: Q1–10 · Part 2: Q11–20 · Part 3: Q21–30 · Part 4: Q31–40). Nếu là bài luyện lẻ Daily Zone, bạn có thể dùng 1 bài hoặc thêm tùy ý.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={addListeningTrack}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0"
-              >
-                <Plus className="w-4 h-4" /> Thêm Chủ Đề / Bài Nghe #{tracks.length + 1}
-              </button>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleQuickSplitListening4Parts}
+                  className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-extrabold px-3.5 py-2.5 rounded-xl shadow-xs transition flex items-center gap-1.5"
+                  title="Tạo đủ 4 Part chuẩn IELTS Listening và tự động chia Q1–10, Q11–20, Q21–30, Q31–40"
+                >
+                  <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>Chia Chuẩn 4 Part (1–40)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={addListeningTrack}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Thêm Bài Nghe #{tracks.length + 1}
+                </button>
+              </div>
             </div>
 
             {/* Numbered Topic Selector Bar (1, 2, 3...) */}

@@ -160,8 +160,8 @@ export const KNIGHT_MONSTER_STAGES = [
     round: 1,
     stageTitle: 'Ải 1/4: Rừng Slime & Goblin',
     shortTitle: 'Ải 1: Slime & Goblin',
-    mechanicLabel: 'Chạy 3 Làn Nhặt Vàng/Chìa Khóa & Chém Khiên Từ Vựng',
-    questionDesc: 'Đọc nghĩa tiếng Việt → Chuyển làn nhặt Vàng/Chìa khóa và chém đúng quái mang từ tiếng Anh khớp nghĩa!',
+    mechanicLabel: 'Đánh Quái Rớt Tiền Vàng (🪙) • Ngẫu Nhiên Nhặt Chìa Khóa Hồi Sinh Trên Đường',
+    questionDesc: 'Đọc nghĩa tiếng Việt → Chọn đúng chiêu kiếm từ tiếng Anh khớp nghĩa để chém hạ Slime & Goblin làm văng Tiền Vàng (🪙)!',
     monsters: [
       { id: 'slime_blue', name: 'Slime Thủy Tinh', color: '#38bdf8', eyeColor: '#0f172a', goldBase: 22 },
       { id: 'slime_king', name: 'Vua Slime Lục Bảo', color: '#10b981', eyeColor: '#064e3b', goldBase: 26 },
@@ -172,8 +172,8 @@ export const KNIGHT_MONSTER_STAGES = [
     round: 2,
     stageTitle: 'Ải 2/4: Pháo Đài Kỵ Sĩ Xương & Orc',
     shortTitle: 'Ải 2: Skeleton & Orc',
-    mechanicLabel: 'Gõ Chữ Cường Hóa Kiếm Khí Phá Giáp Quái',
-    questionDesc: 'Gõ từng chữ cái tiếng Anh chính xác để tung liên hoàn kiếm phá vỡ giáp sắt của Skeleton & Orc!',
+    mechanicLabel: 'Gõ Chữ Liên Hoàn Kiếm Phá Giáp Quái Rớt Tiền Vàng (🪙)',
+    questionDesc: 'Gõ từng chữ cái tiếng Anh chính xác để tung liên hoàn kiếm phá vỡ giáp sắt của Skeleton & Orc, hạ quái rớt Tiền Vàng!',
     monsters: [
       { id: 'skeleton_knight', name: 'Kỵ Sĩ Xương Cổ Đại', color: '#94a3b8', eyeColor: '#ef4444', goldBase: 35 },
       { id: 'orc_berserker', name: 'Orc Cuồng Nộ Giáp Sắt', color: '#d97706', eyeColor: '#fef08a', goldBase: 45 }
@@ -183,8 +183,8 @@ export const KNIGHT_MONSTER_STAGES = [
     round: 3,
     stageTitle: 'Ải 3/4: Tháp Pháp Sư Hắc Ám',
     shortTitle: 'Ải 3: Golem & Dark Mage',
-    mechanicLabel: 'Phản Đòn Cầu Phép Đồng Nghĩa / Trái Nghĩa',
-    questionDesc: 'Chọn đúng cầu phép thuật (Đồng nghĩa / Trái nghĩa / Ngữ cảnh) để phản đòn phép về phía Pháp Sư Hắc Ám!',
+    mechanicLabel: 'Phản Đòn Cầu Phép Đồng Nghĩa / Trái Nghĩa Hạ Quái Rớt Tiền (🪙)',
+    questionDesc: 'Chọn đúng cầu phép thuật (Đồng nghĩa / Trái nghĩa / Ngữ cảnh) để phản đòn phép hạ Pháp Sư Hắc Ám & thu Tiền Vàng!',
     monsters: [
       { id: 'stone_golem', name: 'Golem Đá Hộ Pháp', color: '#64748b', eyeColor: '#38bdf8', goldBase: 48 },
       { id: 'dark_lich', name: 'Pháp Sư Hắc Ám Lich', color: '#9333ea', eyeColor: '#f43f5e', goldBase: 55 }
@@ -195,7 +195,7 @@ export const KNIGHT_MONSTER_STAGES = [
     stageTitle: 'Ải 4/4 — BOSS CUỐI: Rồng Hắc Ám Cổ Đại',
     shortTitle: 'Ải 4: Boss Rồng Hắc Ám',
     mechanicLabel: 'Đọc Câu Gõ Từ Đồ Long • Rồng Tất Sát (Final Smash) Khi Hết Giờ',
-    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng! Gõ sai bị Rồng khè lửa phản công — quá thời gian Rồng sẽ tung Skill Tất Sát Kết Liễu!',
+    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng & nổ kho báu Tiền Vàng! Gõ sai bị Rồng khè lửa phản công — quá thời gian Rồng sẽ tung Skill Tất Sát Kết Liễu!',
     monsters: [
       { id: 'ancient_dragon', name: 'BOSS CUỐI: RỒNG HẮC ÁM IGNIS-REX', color: '#e11d48', eyeColor: '#fde047', goldBase: 110, isDragonBoss: true }
     ]

@@ -5425,59 +5425,89 @@ export default function App() {
           imageUrl: '',
           imageFileName: '',
           contextText: '',
-          transcript: 'Welcome to the lecture. Today we will discuss key developments in modern education...',
+          clozeText: '',
+          transcript: '',
           tracks: [
             {
               id: 'track-1',
-              title: 'Chủ đề 1: Lecture Introduction',
+              title: 'Part 1: Listening Part 1 (Q1–10)',
               audioUrl: '',
               audioFileName: '',
               imageUrl: '',
               imageFileName: '',
               contextText: '',
-              transcript: 'Welcome to the lecture. Today we will discuss key developments in modern education...'
+              clozeText: '',
+              transcript: ''
+            },
+            {
+              id: 'track-2',
+              title: 'Part 2: Listening Part 2 (Q11–20)',
+              audioUrl: '',
+              audioFileName: '',
+              imageUrl: '',
+              imageFileName: '',
+              contextText: '',
+              clozeText: '',
+              transcript: ''
+            },
+            {
+              id: 'track-3',
+              title: 'Part 3: Listening Part 3 (Q21–30)',
+              audioUrl: '',
+              audioFileName: '',
+              imageUrl: '',
+              imageFileName: '',
+              contextText: '',
+              clozeText: '',
+              transcript: ''
+            },
+            {
+              id: 'track-4',
+              title: 'Part 4: Listening Part 4 (Q31–40)',
+              audioUrl: '',
+              audioFileName: '',
+              imageUrl: '',
+              imageFileName: '',
+              contextText: '',
+              clozeText: '',
+              transcript: ''
             }
           ],
-          questions: [
-            {
-              id: 'lq-' + Date.now(),
-              type: 'mcq',
-              trackIdx: 0,
-              question: '1. What is the main topic of the speaker\'s presentation?',
-              options: [
-                'A. Modern educational technology',
-                'B. University admission requirements',
-                'C. Library renovation schedules',
-                'D. International student housing'
-              ],
-              correctAnswer: 'A. Modern educational technology'
-            }
-          ]
+          questions: []
         },
         reading: {
-          passageTitle: 'Bài 1: Urban Architecture & Sustainability',
-          passageText: 'Modern cities are increasingly adopting sustainable architectural practices to reduce carbon footprints and improve residents\' quality of life...',
+          passageTitle: 'Passage 1: Reading Passage 1 (Q1–13)',
+          passageText: '',
+          clozeText: '',
           imageUrl: '',
           imageFileName: '',
           passages: [
             {
               id: 'passage-1',
-              title: 'Bài 1: Urban Architecture & Sustainability',
+              title: 'Passage 1: Reading Passage 1 (Q1–13)',
               imageUrl: '',
               imageFileName: '',
-              passageText: 'Modern cities are increasingly adopting sustainable architectural practices to reduce carbon footprints and improve residents\' quality of life...'
+              passageText: '',
+              clozeText: ''
+            },
+            {
+              id: 'passage-2',
+              title: 'Passage 2: Reading Passage 2 (Q14–26)',
+              imageUrl: '',
+              imageFileName: '',
+              passageText: '',
+              clozeText: ''
+            },
+            {
+              id: 'passage-3',
+              title: 'Passage 3: Reading Passage 3 (Q27–40)',
+              imageUrl: '',
+              imageFileName: '',
+              passageText: '',
+              clozeText: ''
             }
           ],
-          questions: [
-            {
-              id: 'rq-' + (Date.now() + 1),
-              type: 'tfng',
-              passageIdx: 0,
-              question: '1. Sustainable architecture helps lower carbon emissions in urban areas.',
-              options: ['TRUE', 'FALSE', 'NOT GIVEN'],
-              correctAnswer: 'TRUE'
-            }
-          ]
+          questions: []
         },
         writing: {
           task1: {
@@ -5678,12 +5708,18 @@ export default function App() {
   // Question CRUD Helpers for Listening & Reading Builder (all 11 Reading + 6 Listening types)
   const addQuestionToSkill = (skill, questionType = 'mcq') => {
     const currentQuestions = testForm[skill]?.questions || [];
-    const nextNum = currentQuestions.length + 1;
+    const existingEndNums = currentQuestions.map((q, idx) => {
+      const start = getQuestionDisplayNumber(q, idx + 1);
+      const end = Number(q?.questionEndNumber) > start ? Number(q.questionEndNumber) : start;
+      return end;
+    });
+    const nextNum = existingEndNums.length > 0 ? Math.max(...existingEndNums) + 1 : 1;
     const defaults = buildDefaultQuestionFields(questionType, skill);
     const newQ = {
       id: `${skill[0]}q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       ...defaults,
       source: 'manual',
+      questionNumber: nextNum,
       question: `${nextNum}. Nhập nội dung câu hỏi số ${nextNum}...`,
       ...(skill === 'reading' ? { passageIdx: builderReadingIdx } : {}),
       ...(skill === 'listening' ? { trackIdx: builderListeningIdx } : {})

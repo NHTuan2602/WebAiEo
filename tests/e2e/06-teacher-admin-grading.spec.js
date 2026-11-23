@@ -97,6 +97,12 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     await page.getByRole('button', { name: /\+ Thực Chiến/i }).first().click();
     await expect(page.getByText(/TÊN ĐỀ THI IELTS|Soạn & Chỉnh Sửa Đề/i).first()).toBeVisible({ timeout: 12_000 });
+    // Verify standard IELTS 4-Skill format tabs: Listening 4 Parts (40 Qs), Reading 3 Passages (40 Qs), Writing 2 Tasks, Speaking 3 Parts
+    await expect(page.getByRole('button', { name: /2\. Listening \(4\/4 bài/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /3\. Reading \(3\/3 bài/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /4\. Writing \(2 bài/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /5\. Speaking \(3 phần/i }).first()).toBeVisible();
+
     // Verify Listening Builder includes AI PDF extraction + side-by-side Answer Key panel & range image tool
     await page.getByRole('button', { name: /2\. Listening/i }).first().click();
     await page.getByRole('tab', { name: /Tạo Tự Động \(AI Ảnh \/ PDF\)/i }).first().click();
@@ -105,16 +111,15 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await expect(page.locator('input[aria-label="Tải ảnh hoặc PDF bảng đáp án Listening"]')).toBeAttached();
     await expect(page.locator('textarea[aria-label="Nhập hoặc dán bảng đáp án Listening"]')).toBeVisible();
 
-    // Add 1 MCQ question, verify 5 Cambridge Listening Pattern templates & RangeImageAssignPanel appear, paste Excel-style TSV answer key
+    // Add 1 MCQ question (starts clean with no dummy Q1), verify 5 Cambridge Listening Pattern templates & RangeImageAssignPanel appear, paste Excel-style TSV answer key
     await page.getByRole('tab', { name: /Tạo Bằng Tay/i }).first().click();
     await page.getByRole('button', { name: /Multiple Choice/i }).first().click();
     await expect(page.getByText(/Gắn Hình Bản Đồ \(Map\) \/ Lưu Đồ \(Flow-chart\) Cho Nhóm Câu/i)).toBeVisible();
     await expect(page.getByText(/Tạo Nhanh Theo 5 Mẫu Giao Diện Thi Máy Cambridge/i)).toBeVisible();
     await page.getByRole('tab', { name: /Tạo Tự Động \(AI Ảnh \/ PDF\)/i }).first().click();
-    await page.locator('textarea[aria-label="Nhập hoặc dán bảng đáp án Listening"]').fill('1\tB\tMultiple Choice\n2\tB\tMultiple Choice');
+    await page.locator('textarea[aria-label="Nhập hoặc dán bảng đáp án Listening"]').fill('1\tB\tMultiple Choice');
     await page.getByRole('button', { name: /Điền Key \(1–40\)/i }).first().click();
     await page.getByRole('tab', { name: /Tất Cả Câu Hỏi/i }).first().click();
-    await expect(page.locator('label', { hasText: /B\. University admission requirements/i }).locator('input[type="checkbox"]')).toBeChecked();
     await expect(page.locator('label', { hasText: /B\. Đáp án B/i }).locator('input[type="checkbox"]')).toBeChecked();
 
     // Also confirm Reading Builder has side-by-side PDF + Answer Key panel

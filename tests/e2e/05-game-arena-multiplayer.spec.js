@@ -59,9 +59,14 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await expect(teacherPage.getByText(testPin).first()).toBeVisible();
       await assertNoHorizontalOverflow(teacherPage, 'GameArena-TeacherLobby');
 
-      // 2. Student logs in on the second BrowserContext and joins by PIN + Pass
+      // 2. Student logs in on the second BrowserContext, sees the 2-Game Selection Hub first, selects Space Shooter, and joins by PIN + Pass
       await loginViaUI(studentPage, E2E_CREDENTIALS.student.username, E2E_CREDENTIALS.student.password);
       await studentPage.locator('header').getByRole('tab', { name: /Đấu Trường/i }).first().click();
+
+      await expect(studentPage.getByTestId('arena-game-selection-hub')).toBeVisible({
+        timeout: 12_000
+      });
+      await studentPage.getByTestId('select-space-shooter-game-btn').click();
 
       await expect(studentPage.getByRole('heading', { name: /Tham Gia Phòng Đấu Từ Vựng/i })).toBeVisible({
         timeout: 12_000

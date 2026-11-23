@@ -392,18 +392,36 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
       continue;
     }
 
-    // 4. Consecutive questions of the same type (e.g. 2+ tfng, single-answer mcq, or flowchart_completion) OR sharing the same attached diagram imageUrl
+    // 4. Consecutive questions of the same type (e.g. 2+ tfng, single-answer mcq, fill/summary_nobox/short_answer, or flowchart_completion) OR sharing the same attached diagram imageUrl
     const isSingleMcq = q?.type === 'mcq' && qReqSelections === 1;
-    if (q?.type === 'tfng' || isSingleMcq || q?.type === 'flowchart_completion' || Boolean(q?.imageUrl)) {
+    const isTextFillType =
+      !opts.length &&
+      (q?.type === 'fill' ||
+        q?.type === 'summary_nobox' ||
+        q?.type === 'form_completion' ||
+        q?.type === 'short_answer' ||
+        q?.type === 'table_completion' ||
+        q?.type === 'diagram_label');
+    if (q?.type === 'tfng' || isSingleMcq || isTextFillType || q?.type === 'flowchart_completion' || Boolean(q?.imageUrl)) {
       let j = i + 1;
       while (j < questions.length) {
         const nextQ = questions[j];
         const nextReq = Math.max(1, Number(nextQ?.requiredSelections) || 1);
+        const nextOpts = Array.isArray(nextQ?.options) ? nextQ.options.map(o => String(o || '').trim()).filter(Boolean) : [];
         const nextIsSingleMcq = nextQ?.type === 'mcq' && nextReq === 1;
+        const nextIsTextFill =
+          !nextOpts.length &&
+          (nextQ?.type === 'fill' ||
+            nextQ?.type === 'summary_nobox' ||
+            nextQ?.type === 'form_completion' ||
+            nextQ?.type === 'short_answer' ||
+            nextQ?.type === 'table_completion' ||
+            nextQ?.type === 'diagram_label');
         const sameSharedImage = Boolean(q?.imageUrl && nextQ?.imageUrl === q.imageUrl);
         const sameGroupableType =
           ((q?.type === 'tfng' && nextQ?.type === 'tfng') ||
             (isSingleMcq && nextIsSingleMcq) ||
+            (isTextFillType && nextIsTextFill) ||
             (q?.type === 'flowchart_completion' && nextQ?.type === 'flowchart_completion')) &&
           (!q?.imageUrl || nextQ?.imageUrl === q.imageUrl);
         if (sameSharedImage || sameGroupableType) {
@@ -523,6 +541,145 @@ export function parseReadingPassageBlocks(passageText = '') {
   });
 }
 
+function remapClozeBlankTokens(clozeText = '', delta = 0) {
+  if (!clozeText || !delta) return clozeText;
+  return String(clozeText).replace(
+    /(\{\{\s*)(\d+)(\s*\}\}|\[\s*\d+\s*\]|\(__+\s*\d+\s*__+\))/g,
+    (full, prefix, digits, suffix) => {
+      const n = Number(digits);
+      if (!Number.isFinite(n) || n <= 0) return full;
+      return `${prefix}${n + delta}${suffix}`;
+    }
+  );
+}
+
+/**
+ * Resolve continuous, non-overlapping question numbers across all Parts / Passages.
+ * Handles multi-question ranges (e.g. 11–12 or 28–30), missing questionNumber fields,
+ * and Parts/Passages where numbering accidentally restarted at 1.
+ */
+export function resolveScopedItemsAndQuestions({
+  items = [],
+  allQuestions = [],
+  hasScopedQs = false,
+  scopeField = 'passageIdx'
+}) {
+  const safeItems = Array.isArray(items) && items.length > 0 ? items : [{}];
+  const safeQuestions = Array.isArray(allQuestions) ? allQuestions : [];
+  const resolvedGroups = [];
+  let runningMaxEnd = 0;
+
+  for (let idx = 0; idx < safeItems.length; idx++) {
+    const rawGroupItem = safeItems[idx] || {};
+    const scopedQuestions = hasScopedQs
+      ? safeQuestions.filter(q =>
+          typeof q?.[scopeField] === 'number'
+            ? q[scopeField] === idx
+            : idx === 0
+        )
+      : idx === 0
+      ? safeQuestions
+      : [];
+
+    // 1. Determine raw printed/inferred start & end for each question in this Part/Passage
+    let localCursor = runningMaxEnd;
+    const prelim = scopedQuestions.map((question, questionIdx) => {
+      const explicitStart = getQuestionDisplayNumber(question, 0);
+      const start = explicitStart > 0 ? explicitStart : localCursor + 1;
+      const explicitEnd = Number(question?.questionEndNumber);
+      const reqSelections =
+        question?.type === 'mcq' ? Math.max(1, Number(question?.requiredSelections) || 1) : 1;
+      const span =
+        Number.isFinite(explicitEnd) && explicitEnd >= start
+          ? explicitEnd - start + 1
+          : reqSelections > 1
+          ? reqSelections
+          : 1;
+      const end = start + span - 1;
+      localCursor = Math.max(localCursor, end);
+      return {
+        question,
+        questionIdx,
+        rawStart: start,
+        span
+      };
+    });
+
+    // 2. Sort within Part/Passage by rawStart ascending
+    prelim.sort((a, b) => a.rawStart - b.rawStart || a.questionIdx - b.questionIdx);
+
+    // 3. Check if this later Part/Passage (idx > 0) restarted numbering at <= runningMaxEnd (e.g. Part 2 numbered 1..10 after Part 1 1..10)
+    let groupClozeText = String(rawGroupItem?.clozeText || '').trim();
+    const minRawStart = prelim.length > 0 ? prelim[0].rawStart : 0;
+    const restartedScope = idx > 0 && prelim.length > 0 && minRawStart > 0 && minRawStart <= runningMaxEnd;
+    const scopeDelta = restartedScope ? runningMaxEnd + 1 - minRawStart : 0;
+
+    if (scopeDelta > 0 && groupClozeText) {
+      const clozeNums = extractBlankNumbers(groupClozeText);
+      const minCloze = clozeNums.length > 0 ? Math.min(...clozeNums) : 0;
+      if (minCloze > 0 && minCloze <= runningMaxEnd) {
+        groupClozeText = remapClozeBlankTokens(groupClozeText, scopeDelta);
+      }
+    }
+
+    // 4. Assign strictly increasing, collision-free displayNum & endNum
+    let prevEndInScope = runningMaxEnd;
+    const finalizedQuestions = prelim.map((entry, sortedIdx) => {
+      let start = entry.rawStart + scopeDelta;
+      if (start <= prevEndInScope) {
+        // Keep identical number only if this is a multi-card representation of the same multi-select question;
+        // otherwise bump colliding/duplicate question numbers to the next slot
+        const prevQ = sortedIdx > 0 ? prelim[sortedIdx - 1].question : null;
+        const isLinkedMultiSelect =
+          prevQ &&
+          entry.question?.type === 'mcq' &&
+          prevQ?.type === 'mcq' &&
+          Math.max(1, Number(entry.question?.requiredSelections) || 1) > 1 &&
+          stripLeadingQuestionNumber(entry.question?.question || '').trim().toLowerCase() ===
+            stripLeadingQuestionNumber(prevQ?.question || '').trim().toLowerCase();
+        if (!isLinkedMultiSelect) {
+          start = prevEndInScope + 1;
+        }
+      }
+      const end = start + entry.span - 1;
+      prevEndInScope = Math.max(prevEndInScope, end);
+
+      const nextQ = {
+        ...entry.question,
+        questionNumber: start,
+        ...(end > start ? { questionEndNumber: end } : {})
+      };
+      if (typeof nextQ.blankNum === 'number' && scopeDelta > 0) {
+        nextQ.blankNum = start;
+      }
+      return {
+        question: nextQ,
+        originalIdx: entry.questionIdx,
+        displayNum: start,
+        endNum: end,
+        baseOffset: start - 1
+      };
+    });
+
+    const clozeNumsAfter = extractBlankNumbers(groupClozeText);
+    if (clozeNumsAfter.length > 0) {
+      prevEndInScope = Math.max(prevEndInScope, ...clozeNumsAfter);
+    }
+
+    resolvedGroups.push({
+      idx,
+      offset: runningMaxEnd,
+      clozeText: groupClozeText,
+      entries: finalizedQuestions,
+      questions: finalizedQuestions.map(e => e.question)
+    });
+
+    runningMaxEnd = Math.max(runningMaxEnd, prevEndInScope);
+  }
+
+  return resolvedGroups;
+}
+
 /** Build immutable part/passage navigator descriptors with cumulative fallback question offsets. */
 export function buildScopedNavParts({
   items = [],
@@ -532,30 +689,22 @@ export function buildScopedNavParts({
   multiLabelPrefix = 'PASSAGE',
   singleLabel = 'READING'
 }) {
-  const parts = [];
-  let runningOffset = 0;
+  const safeItems = Array.isArray(items) && items.length > 0 ? items : [{}];
+  const resolvedGroups = resolveScopedItemsAndQuestions({
+    items: safeItems,
+    allQuestions,
+    hasScopedQs,
+    scopeField
+  });
 
-  for (let idx = 0; idx < items.length; idx++) {
-    const scopedQuestions = hasScopedQs
-      ? allQuestions.filter(q =>
-          typeof q?.[scopeField] === 'number'
-            ? q[scopeField] === idx
-            : idx === 0
-        )
-      : allQuestions;
-    const partQs = scopedQuestions
-      .map((question, questionIdx) => ({ question, questionIdx }))
-      .sort((a, b) => {
-        const aNum = getQuestionDisplayNumber(a.question, runningOffset + a.questionIdx + 1);
-        const bNum = getQuestionDisplayNumber(b.question, runningOffset + b.questionIdx + 1);
-        return aNum - bNum || a.questionIdx - b.questionIdx;
-      })
-      .map(item => item.question);
-    const navQuestions = partQs.flatMap((question, questionIdx) => {
-      const start = getQuestionDisplayNumber(question, runningOffset + questionIdx + 1);
-      const explicitEnd = Number(question?.questionEndNumber);
-      const end = Number.isFinite(explicitEnd) && explicitEnd >= start ? explicitEnd : start;
-      const rangeSize = Math.min(40, end - start + 1);
+  return resolvedGroups.map(group => {
+    const idx = group.idx;
+    const partQs = group.questions;
+    const navQuestions = group.entries.flatMap((entry, questionIdx) => {
+      const question = entry.question;
+      const start = entry.displayNum;
+      const end = entry.endNum;
+      const rangeSize = Math.min(40, Math.max(1, end - start + 1));
       return Array.from({ length: rangeSize }, (_, offset) => {
         const number = start + offset;
         return {
@@ -570,17 +719,15 @@ export function buildScopedNavParts({
         };
       });
     });
-    parts.push({
+
+    return {
       idx,
-      offset: runningOffset,
-      label: items.length > 1 ? `${multiLabelPrefix} ${idx + 1}` : singleLabel,
+      offset: group.offset,
+      label: safeItems.length > 1 ? `${multiLabelPrefix} ${idx + 1}` : singleLabel,
       questions: partQs,
       navQuestions
-    });
-    runningOffset += navQuestions.length;
-  }
-
-  return parts;
+    };
+  });
 }
 
 /**
@@ -695,23 +842,23 @@ export function buildReadingDisplayBlocks({
   activePassageIdx = 0,
   showAll = false
 }) {
-  const safePassages = Array.isArray(passages) ? passages : [];
+  const safePassages = Array.isArray(passages) && passages.length > 0 ? passages : [{}];
   const safeQuestions = Array.isArray(questions) ? questions : [];
   const hasScopedQuestions = safeQuestions.some(q => typeof q?.passageIdx === 'number');
+  const resolvedGroups = resolveScopedItemsAndQuestions({
+    items: safePassages,
+    allQuestions: safeQuestions,
+    hasScopedQs: hasScopedQuestions,
+    scopeField: 'passageIdx'
+  });
   const passageIndices = showAll
     ? safePassages.map((_, idx) => idx)
     : [Math.max(0, Math.min(activePassageIdx, safePassages.length - 1))];
   const blocks = [];
-  let fallbackOffset = showAll || !hasScopedQuestions
-    ? 0
-    : safeQuestions.filter(q => typeof q?.passageIdx === 'number' && q.passageIdx < passageIndices[0]).length;
 
   passageIndices.forEach(passageIdx => {
-    const rawPassageQuestions = safeQuestions.filter(q => {
-      if (typeof q?.passageIdx === 'number') return q.passageIdx === passageIdx;
-      if (hasScopedQuestions) return passageIdx === 0;
-      return showAll ? passageIdx === 0 : true;
-    });
+    const resolvedGroup = resolvedGroups[passageIdx] || { clozeText: '', entries: [], questions: [] };
+    const rawPassageQuestions = resolvedGroup.questions;
 
     // Auto-repair matching_information options from passage text, and propagate matching_features/matching_headings options
     const passageText = safePassages[passageIdx]?.passageText || '';
@@ -757,15 +904,16 @@ export function buildReadingDisplayBlocks({
         }
       }
     }
-    const numberedQuestions = passageQuestions
-      .map((question, idx) => ({
-        question,
+    const numberedQuestions = passageQuestions.map((question, idx) => {
+      const displayNum = getQuestionDisplayNumber(question, (resolvedGroup.offset || 0) + idx + 1);
+      return {
+        question: { ...question, questionNumber: displayNum },
         originalIdx: idx,
-        displayNum: getQuestionDisplayNumber(question, fallbackOffset + idx + 1),
-        baseOffset: fallbackOffset + idx
-      }))
-      .sort((a, b) => a.displayNum - b.displayNum || a.originalIdx - b.originalIdx);
-    const clozeText = String(safePassages[passageIdx]?.clozeText || '').trim();
+        displayNum,
+        baseOffset: displayNum - 1
+      };
+    });
+    const clozeText = resolvedGroup.clozeText;
     const clozeNumbers = new Set(extractBlankNumbers(clozeText));
     const standaloneQuestions = [];
     const standaloneNumsSet = new Set();
@@ -851,7 +999,6 @@ export function buildReadingDisplayBlocks({
       });
     });
     flushQuestions();
-    fallbackOffset += passageQuestions.length;
   });
 
   return blocks;
@@ -867,34 +1014,35 @@ export function buildListeningDisplayBlocks({
   activeTrackIdx = 0,
   showAll = false
 }) {
-  const safeTracks = Array.isArray(tracks) ? tracks : [];
+  const safeTracks = Array.isArray(tracks) && tracks.length > 0 ? tracks : [{}];
   const safeQuestions = Array.isArray(questions) ? questions : [];
   const hasScopedQuestions = safeQuestions.some(q => typeof q?.trackIdx === 'number');
+  const resolvedGroups = resolveScopedItemsAndQuestions({
+    items: safeTracks,
+    allQuestions: safeQuestions,
+    hasScopedQs: hasScopedQuestions,
+    scopeField: 'trackIdx'
+  });
   const trackIndices = showAll
     ? safeTracks.map((_, idx) => idx)
     : [Math.max(0, Math.min(activeTrackIdx, Math.max(0, safeTracks.length - 1)))];
   const blocks = [];
-  let fallbackOffset = showAll || !hasScopedQuestions
-    ? 0
-    : safeQuestions.filter(q => typeof q?.trackIdx === 'number' && q.trackIdx < trackIndices[0]).length;
 
   trackIndices.forEach(trackIdx => {
-    const trackQuestions = safeQuestions.filter(q => {
-      if (typeof q?.trackIdx === 'number') return q.trackIdx === trackIdx;
-      if (hasScopedQuestions) return trackIdx === 0;
-      return showAll ? trackIdx === 0 : true;
+    const resolvedGroup = resolvedGroups[trackIdx] || { clozeText: '', entries: [], questions: [] };
+    const trackQuestions = resolvedGroup.questions;
+
+    const numberedQuestions = trackQuestions.map((question, idx) => {
+      const displayNum = getQuestionDisplayNumber(question, (resolvedGroup.offset || 0) + idx + 1);
+      return {
+        question: { ...question, questionNumber: displayNum },
+        originalIdx: idx,
+        displayNum,
+        baseOffset: displayNum - 1
+      };
     });
 
-    const numberedQuestions = trackQuestions
-      .map((question, idx) => ({
-        question,
-        originalIdx: idx,
-        displayNum: getQuestionDisplayNumber(question, fallbackOffset + idx + 1),
-        baseOffset: fallbackOffset + idx
-      }))
-      .sort((a, b) => a.displayNum - b.displayNum || a.originalIdx - b.originalIdx);
-
-    const clozeText = String(safeTracks[trackIdx]?.clozeText || '').trim();
+    const clozeText = resolvedGroup.clozeText;
     const clozeNumbers = new Set(extractBlankNumbers(clozeText));
     const standaloneQuestions = [];
     const standaloneNumsSet = new Set();
@@ -980,7 +1128,6 @@ export function buildListeningDisplayBlocks({
       });
     });
     flushQuestions();
-    fallbackOffset += trackQuestions.length;
   });
 
   return blocks;

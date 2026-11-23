@@ -131,7 +131,7 @@ export default function ExamQuestionList({
   const renderSingleQuestionCard = (q, displayNum, { insideGroup = false, groupImageUrl = '' } = {}) => {
     const isActive = activeQuestionId === q.id;
     const isFlagged = Boolean(bookmarkedQuestions?.[q.id]);
-    const cleanPrompt = formatInlineBlankPlaceholders(stripLeadingQuestionNumber(q.question) || q.question);
+    const rawStrippedPrompt = stripLeadingQuestionNumber(q.question) || q.question;
     const typeMeta = getQuestionTypeMeta(q.type, scopeType);
     let optionList = Array.isArray(q.options) ? q.options.map(o => String(o || '').trim()).filter(Boolean) : [];
     if (
@@ -141,6 +141,12 @@ export default function ExamQuestionList({
       optionList = ['A', 'B', 'C', 'D', 'E', 'F'];
     }
     const hasChoiceOptions = optionList.length > 0;
+    const cleanPrompt = hasChoiceOptions
+      ? formatInlineBlankPlaceholders(rawStrippedPrompt)
+      : rawStrippedPrompt;
+    const { parts: inlinePromptParts, foundSlot: hasInlineTextSlot } = !hasChoiceOptions
+      ? splitPromptWithInlineSlot(rawStrippedPrompt)
+      : { parts: [], foundSlot: false };
     const multiSelect = questionNeedsMultipleSelections(q);
     const expectedSelectionCount = getRequiredSelectionCount(q);
     const wordLimitHint = String(q.wordLimit || '').trim();
@@ -224,9 +230,36 @@ export default function ExamQuestionList({
                   </span>
                 )}
               </div>
-              <p className={`font-bold text-[#111827] dark:text-[#F3F4F6] ${fontSizeClass}`}>
-                {formatText(cleanPrompt)}
-              </p>
+              <div className={`font-bold text-[#111827] dark:text-[#F3F4F6] leading-[1.8] ${fontSizeClass}`}>
+                {!hasChoiceOptions && hasInlineTextSlot ? (
+                  inlinePromptParts.map((part, partIdx) =>
+                    part.type === 'slot' ? (
+                      <input
+                        key={`inline-input-${q.id}-${partIdx}`}
+                        type="text"
+                        spellCheck={false}
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        aria-label={`Câu ${displayNum}`}
+                        placeholder={`(${displayNum})`}
+                        value={answers?.[q.id] || ''}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onSelectQuestion?.(q);
+                        }}
+                        onFocus={() => onSelectQuestion?.(q)}
+                        onChange={e => onAnswerChange?.(q.id, e.target.value)}
+                        className="inline-block align-baseline mx-1.5 my-0.5 w-44 sm:w-56 h-[32px] px-2.5 rounded-md text-center text-[14.5px] font-extrabold transition outline-none border border-dashed bg-[#F1F5F9]/95 dark:bg-[#2A2D36] text-[#111827] dark:text-white border-[#94A3B8] dark:border-[#64748B] focus:border-solid focus:bg-[#FFFDF7] dark:focus:bg-[#23262E] focus:border-[#A16207] dark:focus:border-[#EAB308] placeholder:text-[#111827] dark:placeholder:text-slate-200 placeholder:text-xs placeholder:font-extrabold"
+                      />
+                    ) : (
+                      <span key={partIdx}>{formatText(part.value)}</span>
+                    )
+                  )
+                ) : (
+                  formatText(cleanPrompt)
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 ml-auto">
@@ -315,7 +348,7 @@ export default function ExamQuestionList({
               );
             })}
           </div>
-        ) : (
+        ) : !hasInlineTextSlot ? (
           <div className="pl-8 pt-1">
             <input
               type="text"
@@ -323,13 +356,14 @@ export default function ExamQuestionList({
               autoCorrect="off"
               autoCapitalize="off"
               autoComplete="off"
+              aria-label={`Câu ${displayNum}`}
               placeholder={wordLimitHint ? `(${displayNum}) ${wordLimitHint}` : `(${displayNum})`}
               value={answers?.[q.id] || ''}
               onChange={e => onAnswerChange?.(q.id, e.target.value)}
               className="w-56 sm:w-72 h-[34px] px-3 rounded-md text-center text-[15px] font-extrabold transition outline-none border border-dashed bg-[#F1F5F9]/90 dark:bg-[#2A2D36] text-[#111827] dark:text-white border-[#94A3B8] dark:border-[#64748B] focus:border-solid focus:bg-[#FFFDF7] dark:focus:bg-[#23262E] focus:border-[#A16207] dark:focus:border-[#EAB308] placeholder:text-[#111827] dark:placeholder:text-slate-200 placeholder:text-xs placeholder:font-extrabold"
             />
           </div>
-        )}
+        ) : null}
       </div>
     );
   };

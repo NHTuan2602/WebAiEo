@@ -234,6 +234,31 @@ function QuestionCardItem({
     }
   };
   const displayQNum = getQuestionDisplayNumber(q, idx + 1);
+  const explicitEndNum = Number(q?.questionEndNumber);
+  const displayRangeLabel =
+    Number.isFinite(explicitEndNum) && explicitEndNum > displayQNum
+      ? `${displayQNum}–${explicitEndNum}`
+      : `${displayQNum}`;
+  const handleQuestionNumberInputChange = (rawVal) => {
+    const nextNum = Math.max(1, Math.min(99, Math.floor(Number(rawVal) || 1)));
+    const prevSpan =
+      Number.isFinite(explicitEndNum) && explicitEndNum > displayQNum
+        ? explicitEndNum - displayQNum
+        : 0;
+    onUpdateQuestion(q.id, 'questionNumber', nextNum);
+    if (prevSpan > 0) {
+      onUpdateQuestion(q.id, 'questionEndNumber', nextNum + prevSpan);
+    }
+    if (typeof q?.blankNum === 'number') {
+      onUpdateQuestion(q.id, 'blankNum', nextNum);
+    }
+    const rawQText = String(q?.question || '').trim();
+    if (/^(?:(?:câu|questions?|q)\s*)?\d+(?:\s*[-–—]\s*\d+)?(?:\s*[.):\-–—]\s*|\s+)/i.test(rawQText)) {
+      const nextPrefix = prevSpan > 0 ? `${nextNum}–${nextNum + prevSpan}. ` : `${nextNum}. `;
+      const stripped = rawQText.replace(/^(?:(?:câu|questions?|q)\s*)?\d+(?:\s*[-–—]\s*\d+)?(?:\s*[.):\-–—]\s*|\s+)/i, '');
+      onUpdateQuestion(q.id, 'question', `${nextPrefix}${stripped}`);
+    }
+  };
   const isVisualQuestionType =
     typeMeta.id === 'map_diagram' ||
     typeMeta.id === 'flowchart_completion' ||
@@ -247,8 +272,20 @@ function QuestionCardItem({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-xs font-extrabold px-3 py-1 rounded-lg ${meta.badgeBg}`}>
-            {meta.questionHeadingPrefix}{idx + 1}
+            {meta.questionHeadingPrefix}{displayRangeLabel}
           </span>
+          <label className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            <span>Số TT:</span>
+            <input
+              type="number"
+              min={1}
+              max={99}
+              value={displayQNum}
+              onChange={e => handleQuestionNumberInputChange(e.target.value)}
+              className="w-12 bg-transparent font-extrabold text-slate-900 dark:text-white text-center focus:outline-none"
+              title="Đổi số thứ tự câu hỏi (1 → 40)"
+            />
+          </label>
           <QuestionOriginBadge question={q} />
         </div>
 
