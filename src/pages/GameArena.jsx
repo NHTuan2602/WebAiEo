@@ -736,15 +736,15 @@ export default function GameArena({
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa <b>7 nhân vật Nam &amp; Nữ</b> chân thực (<b>Valkyrie Freya, Kiếm Khách Tomoe, Pháp Sư Selena, Nữ Hoàng Long Tộc...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
+                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực (<b>Arthur, Leon, Kenji, Drake, Valkyrie Freya, Kiếm Khách Tomoe...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> và săn <b>Boss Ma Vương Ẩn (5%)</b> sau khi diệt Rồng!
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-amber-200 font-bold">
-                    🪙 Đánh quái rớt Vàng • 7 Nhân Vật Nam &amp; Nữ
+                    🪙 Đánh quái rớt Vàng • 10 Nhân Vật Nam &amp; Nữ
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-sky-200 font-bold">
-                    🗝️ Tỉ lệ hiếm rớt Chìa Khóa khi hạ quái
+                    👿 5% Boss Ma Vương Ẩn • Thưởng 1.000 Vàng
                   </div>
                 </div>
               </div>
@@ -1159,32 +1159,48 @@ export default function GameArena({
                           { r: 2, title: 'V2: Gõ Từ Full', desc: 'Chính tả đầy đủ' },
                           { r: 3, title: 'V3: Đồng / Trái Nghĩa', desc: 'Đồng nghĩa · Trái nghĩa · MCQ' },
                           { r: 4, title: 'V4: Đọc Câu & Gõ', desc: 'Hiện câu hỏi → Gõ đáp án' }
-                        ].map(item => (
-                          <button
-                            key={item.r}
-                            type="button"
-                            onClick={() =>
-                              initPracticeGameCampaign?.({
-                                topicId: practiceTopicId,
-                                topicLabel: chosenTopicLabel,
-                                rawVocab: chosenRawVocab,
-                                roundSize: effectiveRoundSize,
-                                selectedWords: validSelectedWords,
-                                speedMode: practiceSpeed,
-                                startRound: item.r,
-                                singleRoundOnly: true
-                              })
-                            }
-                            className="p-2.5 rounded-xl bg-white dark:bg-slate-950/75 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 text-left transition"
-                          >
-                            <span className="block text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
-                              {item.title}
-                            </span>
-                            <span className="block text-xs text-[#475569] dark:text-slate-400">
-                              {item.desc}
-                            </span>
-                          </button>
-                        ))}
+                        ].map(item =>
+                          isTeacher ? (
+                            <button
+                              key={item.r}
+                              type="button"
+                              onClick={() =>
+                                initPracticeGameCampaign?.({
+                                  topicId: practiceTopicId,
+                                  topicLabel: chosenTopicLabel,
+                                  rawVocab: chosenRawVocab,
+                                  roundSize: effectiveRoundSize,
+                                  selectedWords: validSelectedWords,
+                                  speedMode: practiceSpeed,
+                                  startRound: item.r,
+                                  singleRoundOnly: true
+                                })
+                              }
+                              className="p-2.5 rounded-xl bg-white dark:bg-slate-950/75 hover:border-[#007A7A] border border-slate-200 dark:border-slate-700 text-left transition"
+                            >
+                              <span className="block text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6]">
+                                {item.title}
+                              </span>
+                              <span className="block text-xs text-[#475569] dark:text-slate-400">
+                                {item.desc}
+                              </span>
+                            </button>
+                          ) : (
+                            <div
+                              key={item.r}
+                              title="Chỉ Admin / Giáo viên mới được chọn luyện tập riêng từng màn. Học viên chinh phục lần lượt từ Vòng 1!"
+                              className="p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 text-left opacity-80 select-none"
+                            >
+                              <span className="flex items-center justify-between gap-1 text-xs font-extrabold text-slate-600 dark:text-slate-300">
+                                <span>{item.title}</span>
+                                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                              </span>
+                              <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                                {item.desc}
+                              </span>
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   </>
@@ -3163,9 +3179,19 @@ export default function GameArena({
                     <button
                       type="button"
                       onClick={handleGameHint}
-                      className="bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-transparent px-2.5 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition"
+                      disabled={gameScore < 300}
+                      title={
+                        gameScore < 300
+                          ? 'Cần tối thiểu 300 điểm để dùng Gợi ý (-300đ)'
+                          : 'Gợi ý đáp án (-300đ) — Phím tắt [1]'
+                      }
+                      className={`px-2.5 py-0.5 rounded text-xs font-bold flex items-center gap-1 border transition ${
+                        gameScore >= 300
+                          ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-transparent'
+                          : 'bg-slate-100 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                      }`}
                     >
-                      <Lightbulb className="w-3 h-3" /> Gợi ý (-15đ)
+                      <Lightbulb className="w-3 h-3" /> Gợi ý (-300đ)
                     </button>
                     {gameRound === 2 && (
                       <button

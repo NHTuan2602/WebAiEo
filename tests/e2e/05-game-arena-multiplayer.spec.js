@@ -59,13 +59,23 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await expect(teacherPage.getByText(testPin).first()).toBeVisible();
       await assertNoHorizontalOverflow(teacherPage, 'GameArena-TeacherLobby');
 
-      // 2. Student logs in on the second BrowserContext, sees the 2-Game Selection Hub first, selects Space Shooter, and joins by PIN + Pass
+      // 2. Student logs in on the second BrowserContext, verifies Knight RPG locks per-stage practice for students, then joins Space Shooter Lobby by PIN + Pass
       await loginViaUI(studentPage, E2E_CREDENTIALS.student.username, E2E_CREDENTIALS.student.password);
       await studentPage.locator('header').getByRole('tab', { name: /Đấu Trường/i }).first().click();
 
       await expect(studentPage.getByTestId('arena-game-selection-hub')).toBeVisible({
         timeout: 12_000
       });
+
+      // Verify Student cannot click individual maps or Admin Demon King test button in Knight RPG
+      await studentPage.getByTestId('switch-to-knight-game-btn').click();
+      await expect(studentPage.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
+      await expect(studentPage.getByTestId('locked-knight-stage-4')).toBeVisible();
+      await expect(studentPage.getByTestId('start-knight-stage-4')).toHaveCount(0);
+      await expect(studentPage.getByTestId('admin-test-demon-king-btn')).toHaveCount(0);
+      await studentPage.getByTestId('knight-back-to-hub-btn').click();
+      await expect(studentPage.getByTestId('arena-game-selection-hub')).toBeVisible({ timeout: 8_000 });
+
       await studentPage.getByTestId('select-space-shooter-game-btn').click();
 
       await expect(studentPage.getByRole('heading', { name: /Tham Gia Phòng Đấu Từ Vựng/i })).toBeVisible({
@@ -168,15 +178,17 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('game-vocab-bank-modal').getByRole('button', { name: /Đóng/i }).first().click();
     await expect(page.getByTestId('game-vocab-bank-modal')).toHaveCount(0);
 
-    // Open Character Skin Shop (7 distinct illustrated Male & Female skins + Revive Keys)
+    // Open Character Skin Shop (10 distinct illustrated Male & Female skins + Revive Keys)
     await page.getByTestId('open-knight-shop-btn').click();
     await expect(page.getByTestId('knight-skin-shop-modal')).toBeVisible();
     await expect(page.getByText(/Nữ Chiến Binh Valkyrie Freya/i)).toBeVisible();
-    await expect(page.getByText(/Nữ Kiếm Khách Anh Đào Tomoe/i)).toBeVisible();
+    await expect(page.getByText(/Thánh Kỵ Sĩ Thái Dương Leon/i)).toBeVisible();
+    await expect(page.getByText(/Kiếm Sĩ Lôi Kiếm Kenji/i)).toBeVisible();
+    await expect(page.getByText(/Chiến Thần Cuồng Chiến Drake/i)).toBeVisible();
     const loadedSkinSprites = await page.getByTestId('knight-skin-shop-modal').locator('img').evaluateAll(imgs =>
       imgs.filter(img => img.complete && img.naturalWidth > 0).length
     );
-    expect(loadedSkinSprites).toBeGreaterThanOrEqual(7);
+    expect(loadedSkinSprites).toBeGreaterThanOrEqual(10);
     await page.getByTestId('buy-revive-key-with-gold-btn').click();
     await page.getByTestId('knight-skin-shop-modal').getByRole('button').first().click();
 
@@ -189,14 +201,25 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     expect(lootTextS3).toMatch(/Rớt \+\d+ Vàng/i);
     expect(lootTextS3).toMatch(/Tỉ lệ rớt Chìa Khóa: \d+%/i);
 
-    // Return to Knight Hub via switching round -> re-enter Knight Hub cleanly or jump back
+    // Return to Knight Hub and launch Stage 4 Final Dragon Boss (disable random 5% for deterministic normal Dragon check)
     await page.getByTestId('knight-back-to-hub-btn').click();
     await page.getByTestId('switch-to-knight-game-btn').click();
     await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
 
-    // Launch Stage 4 Final Dragon Boss and test Dragon damage / typing combat
+    await page.evaluate(() => {
+      window.__DISABLE_RANDOM_DEMON_KING__ = true;
+      window.__FORCE_DEMON_KING__ = false;
+    });
+
     await page.getByTestId('start-knight-stage-4').click();
     await expect(page.getByTestId('knight-dragon-boss-input')).toBeVisible({ timeout: 8_000 });
+
+    // Confirm Hint button costs 300 points and CANNOT be clicked at 0 points
+    const hintBtn = page.getByTestId('knight-hint-btn');
+    await expect(hintBtn).toBeVisible();
+    await expect(hintBtn).toContainText('-300đ');
+    await expect(hintBtn).toBeDisabled();
+
     const lootTextS4 = await page.getByTestId('knight-loot-info-pill').textContent();
     expect(lootTextS4).not.toMatch(/NaN|undefined|trên đường/i);
     expect(lootTextS4).toMatch(/Rớt \+\d+ Vàng/i);
@@ -206,6 +229,26 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     // Confirm Dragon Boss defeated -> Knight Summary Overlay appears -> return to Knight Hub
     await expect(page.getByText(/TỔNG KẾT HÀNH TRÌNH HIỆP SĨ/i)).toBeVisible({ timeout: 8_000 });
     const celebrationDialog = page.locator('[aria-labelledby="title-unlock-celebration-heading"]');
+    if (await celebrationDialog.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await celebrationDialog.getByRole('button').first().click();
+    }
+    await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
+
+    // Test Secret Demon King Boss sequence via Admin test trigger (3s Pac-Man Warning -> 5 Hearts -> Wheel -> Victory +1000g +10 Keys + Hidden Title)
+    await page.evaluate(() => {
+      window.__FORCE_DEMON_WHEEL_ROUND__ = 4;
+    });
+    await page.getByTestId('admin-test-demon-king-btn').click();
+    await expect(page.getByTestId('demon-king-warning-overlay')).toBeVisible({ timeout: 4_000 });
+    await expect(page.getByTestId('demon-king-wheel-overlay')).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByTestId('demon-curse-timer-badge')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByTestId('knight-lives-display')).toContainText('❤️❤️❤️❤️❤️');
+
+    // Defeat Secret Demon King on Round 4 mechanic and verify +1000g, +10 keys & Hidden Title banner
+    await page.getByTestId('knight-dragon-boss-input').fill('cohesive global strategy');
+    await page.getByTestId('knight-dragon-boss-submit').click();
+    await expect(page.getByTestId('demon-king-victory-banner')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByTestId('demon-king-victory-banner')).toContainText(/Diệt Ma Vương/i);
     if (await celebrationDialog.isVisible({ timeout: 1200 }).catch(() => false)) {
       await celebrationDialog.getByRole('button').first().click();
     }

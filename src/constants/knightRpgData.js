@@ -1,9 +1,31 @@
 // ==========================================
 // KNIGHT & DRAGON RPG QUEST ("HIỆP SĨ DIỆT RỒNG")
-// Character Skins (Male & Female), Monster Stages, Loot & Storage Helpers
+// Character Skins (5 Male & 5 Female), Monster Stages, Secret Demon King Boss & Storage Helpers
 // ==========================================
 
 export const KNIGHT_STORAGE_KEY_PREFIX = 'ielts_knight_rpg_profile_v1';
+
+export const KNIGHT_HINT_SCORE_COST = 300;
+export const DEATH_REVIVE_DELAY_SEC = 5;
+
+export const DEMON_KING_BOSS = {
+  id: 'demon_king_abyss',
+  name: 'BOSS ẨN: MA VƯƠNG HẮC ÁM MALAKOR',
+  shortName: 'Ma Vương Hắc Ám Malakor',
+  color: '#c026d3',
+  eyeColor: '#fb7185',
+  goldBase: 1000,
+  keyDropChance: 1,
+  isDragonBoss: false,
+  isDemonKing: true,
+  spriteUrl: '/assets/knight-rpg/demon_king_abyss.svg',
+  spawnChance: 0.05,
+  warningDurationSec: 3,
+  curseIntervalSec: 5,
+  grantedLives: 5,
+  rewardGold: 1000,
+  rewardKeys: 10
+};
 
 export const KNIGHT_CHARACTER_SKINS = [
   {
@@ -16,6 +38,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponName: 'Thánh Kiếm Excalibur',
     passiveText: 'Cân bằng công thủ • Mặc định sở hữu',
     spriteUrl: '/assets/knight-rpg/knight_arthur.png',
+    slashStyle: 'holy',
     goldBonusPct: 0,
     keyDropBonusPct: 0,
     bonusTimeSec: 0,
@@ -38,6 +61,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponName: 'Song Kiếm Thiên Vũ',
     passiveText: '+15% Vàng & +2% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
     spriteUrl: '/assets/knight-rpg/valkyrie_freya.png',
+    slashStyle: 'holy',
     goldBonusPct: 15,
     keyDropBonusPct: 2,
     bonusTimeSec: 0,
@@ -51,6 +75,29 @@ export const KNIGHT_CHARACTER_SKINS = [
     slashColor: '#f9a8d4'
   },
   {
+    id: 'paladin_leon',
+    name: 'Thánh Kỵ Sĩ Thái Dương Leon',
+    gender: 'Nam',
+    genderBadge: '♂ Nam',
+    rarity: 'Hiếm',
+    priceGold: 190,
+    weaponName: 'Đại Kiếm Mặt Trời Solarius',
+    passiveText: '+18% Vàng & +2% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
+    spriteUrl: '/assets/knight-rpg/paladin_leon.svg',
+    slashStyle: 'solar',
+    goldBonusPct: 18,
+    keyDropBonusPct: 2,
+    bonusTimeSec: 0,
+    armorPrimary: '#f59e0b',
+    armorSecondary: '#fef08a',
+    capeColor: '#dc2626',
+    hairColor: '#facc15',
+    hairStyle: 'short_spiky',
+    headgear: 'solar_circlet',
+    bladeColor: '#fde047',
+    slashColor: '#fbbf24'
+  },
+  {
     id: 'samurai_tomoe',
     name: 'Nữ Kiếm Khách Anh Đào Tomoe',
     gender: 'Nữ',
@@ -60,6 +107,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponName: 'Katana Hoa Anh Đào',
     passiveText: '+25% Vàng & +3% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
     spriteUrl: '/assets/knight-rpg/samurai_tomoe.png',
+    slashStyle: 'sakura',
     goldBonusPct: 25,
     keyDropBonusPct: 3,
     bonusTimeSec: 0,
@@ -82,6 +130,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponName: 'Quyền Trượng Ngân Hà',
     passiveText: '+3 giây suy nghĩ mỗi câu, +20% Vàng & +2% rớt Chìa Khóa',
     spriteUrl: '/assets/knight-rpg/mage_selena.png',
+    slashStyle: 'arcane',
     goldBonusPct: 20,
     keyDropBonusPct: 2,
     bonusTimeSec: 3,
@@ -95,6 +144,29 @@ export const KNIGHT_CHARACTER_SKINS = [
     slashColor: '#c4b5fd'
   },
   {
+    id: 'ronin_kenji',
+    name: 'Kiếm Sĩ Lôi Kiếm Kenji',
+    gender: 'Nam',
+    genderBadge: '♂ Nam',
+    rarity: 'Sử Thi',
+    priceGold: 480,
+    weaponName: 'Lôi Đao Raijin',
+    passiveText: '+28% Vàng, +3% rớt Chìa Khóa & trảm lôi điện tốc độ cao',
+    spriteUrl: '/assets/knight-rpg/ronin_kenji.svg',
+    slashStyle: 'thunder',
+    goldBonusPct: 28,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 0,
+    armorPrimary: '#1e1b4b',
+    armorSecondary: '#38bdf8',
+    capeColor: '#0284c7',
+    hairColor: '#0f172a',
+    hairStyle: 'high_ponytail',
+    headgear: 'thunder_band',
+    bladeColor: '#38bdf8',
+    slashColor: '#7dd3fc'
+  },
+  {
     id: 'assassin_kael',
     name: 'Sát Thủ Bóng Đêm Kael',
     gender: 'Nam',
@@ -104,6 +176,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponName: 'Huyết Ảnh Song Đao',
     passiveText: '+30% Vàng, +3% rớt Chìa Khóa & chém chí mạng tốc độ cao',
     spriteUrl: '/assets/knight-rpg/assassin_kael.png',
+    slashStyle: 'crimson',
     goldBonusPct: 30,
     keyDropBonusPct: 3,
     bonusTimeSec: 0,
@@ -126,6 +199,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponName: 'Đại Kiếm Plasma Neon',
     passiveText: '+35% Vàng, +4% rớt Chìa Khóa khi hạ quái & +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/cyber_nova.png',
+    slashStyle: 'plasma',
     goldBonusPct: 35,
     keyDropBonusPct: 4,
     bonusTimeSec: 2,
@@ -139,6 +213,29 @@ export const KNIGHT_CHARACTER_SKINS = [
     slashColor: '#67e8f9'
   },
   {
+    id: 'berserker_drake',
+    name: 'Chiến Thần Cuồng Chiến Drake',
+    gender: 'Nam',
+    genderBadge: '♂ Nam',
+    rarity: 'Huyền Thoại',
+    priceGold: 880,
+    weaponName: 'Chiến Rìu Dung Nham Ragnarok',
+    passiveText: '+42% Vàng, +5% rớt Chìa Khóa khi hạ quái & +2 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/berserker_drake.svg',
+    slashStyle: 'magma',
+    goldBonusPct: 42,
+    keyDropBonusPct: 5,
+    bonusTimeSec: 2,
+    armorPrimary: '#334155',
+    armorSecondary: '#f97316',
+    capeColor: '#7f1d1d',
+    hairColor: '#e2e8f0',
+    hairStyle: 'long_flowing',
+    headgear: 'wolf_pelt',
+    bladeColor: '#f97316',
+    slashColor: '#fb923c'
+  },
+  {
     id: 'dragon_empress',
     name: 'Nữ Hoàng Long Tộc Ignis',
     gender: 'Nữ',
@@ -148,6 +245,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponName: 'Long Vương Hỏa Kiếm',
     passiveText: '+50% Vàng, +6% rớt Chìa Khóa khi hạ quái & +3 giây gặp Boss Rồng',
     spriteUrl: '/assets/knight-rpg/dragon_empress.png',
+    slashStyle: 'dragon',
     goldBonusPct: 50,
     keyDropBonusPct: 6,
     bonusTimeSec: 3,
@@ -261,8 +359,8 @@ export const KNIGHT_MONSTER_STAGES = [
     stageTitle: 'Ải 4/4 — BOSS CUỐI: Rồng Hắc Ám Cổ Đại',
     shortTitle: 'Ải 4: Boss Rồng Hắc Ám',
     goldPerKill: 110,
-    mechanicLabel: 'Đọc Câu Gõ Từ Đồ Long • Rồng Tất Sát (Final Smash) Khi Hết Giờ',
-    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng & nổ kho báu Tiền Vàng + tỉ lệ rớt 🗝️ cao nhất! Gõ sai bị Rồng khè lửa phản công — quá giờ Rồng tung Skill Tất Sát!',
+    mechanicLabel: 'Đọc Câu Gõ Từ Đồ Long • Rồng Tất Sát (Final Smash) Khi Hết Giờ • 5% Gặp Boss Ma Vương Ẩn',
+    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng & nổ kho báu Tiền Vàng! Hạ Rồng có 5% triệu hồi Boss Ma Vương Ẩn (Thưởng 1.000 Vàng + 10 Chìa Khóa + Danh Hiệu Ẩn)!',
     monsters: [
       {
         id: 'ancient_dragon',
@@ -281,6 +379,7 @@ export const KNIGHT_MONSTER_STAGES = [
 export const REVIVE_KEY_GOLD_PRICE = 100;
 
 export function computeMonsterGoldDrop(monster, skin, combo = 0) {
+  if (monster?.isDemonKing) return DEMON_KING_BOSS.rewardGold;
   const baseGold = Math.max(1, Number(monster?.goldBase) || (monster?.isDragonBoss ? 110 : 25));
   const skinMult = 1 + Math.max(0, Number(skin?.goldBonusPct) || 0) / 100;
   const comboGold = Math.min(40, Math.max(0, Number(combo) || 0) * 5);
@@ -288,6 +387,7 @@ export function computeMonsterGoldDrop(monster, skin, combo = 0) {
 }
 
 export function computeMonsterKeyDropChance(monster, skin) {
+  if (monster?.isDemonKing) return 1;
   const rawBase = Number(monster?.keyDropChance);
   const baseChance = Number.isFinite(rawBase)
     ? rawBase
@@ -314,6 +414,7 @@ export function normalizeKnightRpgProfile(raw = {}) {
     : 'knight_arthur';
   const monstersSlain = Math.max(0, Math.floor(Number(obj.monstersSlain) || 0));
   const dragonsSlain = Math.max(0, Math.floor(Number(obj.dragonsSlain) || 0));
+  const demonKingsSlain = Math.max(0, Math.floor(Number(obj.demonKingsSlain) || 0));
   const keysCollected = Math.max(keys, Math.floor(Number(obj.keysCollected) || keys));
   const bestScore = Math.max(0, Math.floor(Number(obj.bestScore) || 0));
 
@@ -324,6 +425,7 @@ export function normalizeKnightRpgProfile(raw = {}) {
     equippedSkin,
     monstersSlain,
     dragonsSlain,
+    demonKingsSlain,
     keysCollected,
     bestScore
   };
@@ -349,6 +451,7 @@ export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null)
       equippedSkin: localProfile.equippedSkin || serverProfile.equippedSkin,
       monstersSlain: Math.max(localProfile.monstersSlain, serverProfile.monstersSlain),
       dragonsSlain: Math.max(localProfile.dragonsSlain, serverProfile.dragonsSlain),
+      demonKingsSlain: Math.max(localProfile.demonKingsSlain, serverProfile.demonKingsSlain),
       keysCollected: Math.max(localProfile.keysCollected, serverProfile.keysCollected),
       bestScore: Math.max(localProfile.bestScore, serverProfile.bestScore)
     });

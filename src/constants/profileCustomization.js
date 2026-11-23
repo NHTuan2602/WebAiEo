@@ -2199,6 +2199,26 @@ export const STUDENT_TITLES = [
       text: stats.hasGamePerfectRun ? '🛸 Kỷ lục 100% không sai một từ!' : '??? (Thử thách ẩn)'
     })
   },
+  {
+    id: 'secret_demon_king_slayer',
+    label: 'Diệt Ma Vương',
+    icon: '👿',
+    tier: 'Bí Ẩn',
+    difficulty: 'Bí Ẩn',
+    isSecretTitle: true,
+    conditionText: 'Thử thách ẩn đã mở: Đánh bại Boss Ma Vương Ẩn Malakor (5% xuất hiện sau khi hạ Rồng Hắc Ám) trong Đấu Trường Hiệp Sĩ Diệt Rồng.',
+    badgeClass: 'bg-gradient-to-r from-purple-100 via-fuchsia-100 to-rose-100 text-purple-950 border-fuchsia-500 dark:from-purple-950/80 dark:via-fuchsia-950/75 dark:to-rose-950/80 dark:text-fuchsia-200 dark:border-fuchsia-400/80 font-bold',
+    heroBadgeClass: 'bg-gradient-to-r from-purple-600/50 via-fuchsia-600/45 to-rose-600/50 text-fuchsia-100 border-fuchsia-300/85',
+    gameBadgeClass: 'bg-purple-100 text-purple-950 border-fuchsia-500 dark:bg-purple-600/35 dark:text-fuchsia-100 dark:border-fuchsia-400/80',
+    isUnlocked: (stats) => Number(stats.knightDemonKingsSlain) >= 1,
+    getProgress: (stats) => ({
+      pct: Number(stats.knightDemonKingsSlain) >= 1 ? 100 : 0,
+      text:
+        Number(stats.knightDemonKingsSlain) >= 1
+          ? `👿 Đã tiêu diệt Ma Vương Ẩn (${stats.knightDemonKingsSlain} lần)!`
+          : '??? (Thử thách ẩn)'
+    })
+  },
   ...HOLIDAY_TITLE_SPECS.map(buildHolidayTitleEntry),
   {
     id: 'vip_thieu_gia',
@@ -2693,6 +2713,7 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
   let knightBestScore = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.bestScore) || 0));
   const knightMonstersSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.monstersSlain) || 0));
   const knightDragonsSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.dragonsSlain) || 0));
+  const knightDemonKingsSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.demonKingsSlain) || 0));
   const knightKeysCollected = Math.max(
     0,
     Math.floor(Number(user?.knightRpgProfile?.keysCollected ?? user?.knightRpgProfile?.keys) || 0)
@@ -2749,6 +2770,7 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     knightBestScore,
     knightMonstersSlain,
     knightDragonsSlain,
+    knightDemonKingsSlain,
     knightKeysCollected,
     knightUnlockedSkinsCount,
     band65Count,

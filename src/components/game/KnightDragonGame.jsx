@@ -8,15 +8,20 @@ import {
   KeyRound,
   Keyboard,
   Lightbulb,
+  Lock,
   RefreshCw,
   ShoppingBag,
+  Skull,
   Snowflake,
   Sparkles,
   Swords,
   Volume2
 } from 'lucide-react';
 import {
+  DEATH_REVIVE_DELAY_SEC,
+  DEMON_KING_BOSS,
   KNIGHT_CHARACTER_SKINS,
+  KNIGHT_HINT_SCORE_COST,
   KNIGHT_MONSTER_STAGES,
   REVIVE_KEY_GOLD_PRICE,
   computeMonsterGoldDrop,
@@ -45,9 +50,54 @@ function skipNonAlphaIndex(word, startIdx = 0) {
 const ALL_SPRITE_URLS = Array.from(
   new Set([
     ...KNIGHT_CHARACTER_SKINS.map(s => s.spriteUrl).filter(Boolean),
-    ...KNIGHT_MONSTER_STAGES.flatMap(st => st.monsters.map(m => m.spriteUrl)).filter(Boolean)
+    ...KNIGHT_MONSTER_STAGES.flatMap(st => st.monsters.map(m => m.spriteUrl)).filter(Boolean),
+    DEMON_KING_BOSS.spriteUrl
   ])
 );
+
+const WHEEL_SECTORS = [
+  {
+    round: 1,
+    shortLabel: 'VÒNG 1',
+    title: 'Chọn Khiên Nghĩa',
+    desc: 'Đọc nghĩa Việt → Chọn từ tiếng Anh',
+    color: '#0ea5e9',
+    accent: '#bae6fd'
+  },
+  {
+    round: 2,
+    shortLabel: 'VÒNG 2',
+    title: 'Gõ Chữ Phá Giáp',
+    desc: 'Gõ từng chữ cái tiếng Anh đầy đủ',
+    color: '#f59e0b',
+    accent: '#fef08a'
+  },
+  {
+    round: 3,
+    shortLabel: 'VÒNG 3',
+    title: 'Đồng / Trái Nghĩa',
+    desc: 'Phản đòn phép Đồng/Trái nghĩa',
+    color: '#8b5cf6',
+    accent: '#ddd6fe'
+  },
+  {
+    round: 4,
+    shortLabel: 'VÒNG 4',
+    title: 'Điền Từ Đồ Long',
+    desc: 'Đọc câu → Gõ từ/cụm từ chính xác',
+    color: '#e11d48',
+    accent: '#fecdd3'
+  }
+];
+
+const DEMON_STAGE_META = {
+  round: 5,
+  stageTitle: 'BOSS ẨN (5%): MA VƯƠNG HẮC ÁM MALAKOR',
+  shortTitle: 'BOSS ẨN: MA VƯƠNG',
+  goldPerKill: DEMON_KING_BOSS.rewardGold,
+  mechanicLabel: 'Cứ 5 Giây Rút 1 Tim (-1 ❤️) • Chết Bị Phong Ấn Không Thể Hồi Sinh • Thắng +1.000 🪙 & +10 🗝️',
+  questionDesc: 'Ma Vương quay vòng chọn luật chơi 1 trong 4 vòng. Hạ gục Ma Vương để mở Danh Hiệu Ẩn "Diệt Ma Vương"!'
+};
 
 export default function KnightDragonGame({
   currentUser,
@@ -65,7 +115,13 @@ export default function KnightDragonGame({
   showToast
 }) {
   const username = currentUser?.username || 'guest';
-  const isTeacher = currentUser?.role === 'teacher';
+  const isAdminOrTeacher = Boolean(
+    currentUser?.role === 'teacher' ||
+      currentUser?.role === 'admin' ||
+      currentUser?.isSuperAdmin ||
+      currentUser?.isSystemAdmin
+  );
+
   const [rpgProfile, setRpgProfile] = useState(() =>
     loadLocalKnightRpgProfile(username, currentUser)
   );
@@ -74,11 +130,13 @@ export default function KnightDragonGame({
   const [roundSize, setRoundSize] = useState(8);
   const [speedMode, setSpeedMode] = useState('normal');
 
-  // Match state: 'HUB' | 'PLAYING' | 'REVIVE_PROMPT' | 'FINAL_SMASH' | 'TRANSITION' | 'GAMEOVER'
+  // Match state:
+  // 'HUB' | 'PLAYING' | 'DEATH_COUNTDOWN' | 'REVIVE_PROMPT' | 'FINAL_SMASH' |
+  // 'DEMON_WARNING' | 'DEMON_WHEEL' | 'DEMON_EXECUTION' | 'TRANSITION' | 'GAMEOVER'
   const [matchState, setMatchState] = useState('HUB');
   const [round, setRound] = useState(1);
   const [singleRoundOnly, setSingleRoundOnly] = useState(false);
-  const [queues, setQueues] = useState({ 1: [], 2: [], 3: [], 4: [] });
+  const [queues, setQueues] = useState({ 1: [], 2: [], 3: [], 4: [], 5: [] });
   const [wordIdx, setWordIdx] = useState(0);
   const [activeQ, setActiveQ] = useState(null);
   const [score, setScore] = useState(0);
@@ -98,10 +156,27 @@ export default function KnightDragonGame({
   const [finalSmashReason, setFinalSmashReason] = useState('');
   const [reviewLog, setReviewLog] = useState([]);
 
+  // 5-second Death Delay before Revive modal appears
+  const [deathCountdownSec, setDeathCountdownSec] = useState(DEATH_REVIVE_DELAY_SEC);
+
+  // Secret Demon King Boss states
+  const [demonWarningSec, setDemonWarningSec] = useState(DEMON_KING_BOSS.warningDurationSec);
+  const [pacmanFlashTick, setPacmanFlashTick] = useState(0);
+  const [demonWheelStyle, setDemonWheelStyle] = useState(1);
+  const [demonWheelRotation, setDemonWheelRotation] = useState(0);
+  const [demonWheelSettled, setDemonWheelSettled] = useState(false);
+  const [demonCurseLeft, setDemonCurseLeft] = useState(DEMON_KING_BOSS.curseIntervalSec);
+  const [demonKingDefeated, setDemonKingDefeated] = useState(false);
+  const [cannotReviveByDemon, setCannotReviveByDemon] = useState(false);
+
   const canvasRef = useRef(null);
   const timerRef = useRef(null);
+  const demonCurseTimerRef = useRef(null);
+  const phaseTimerRef = useRef(null);
+  const phaseIntervalRef = useRef(null);
   const animRef = useRef(null);
   const spriteImagesRef = useRef(new Map());
+
   const runtimeRef = useRef({
     lane: 1,
     heroAttackAnim: 0,
@@ -109,21 +184,38 @@ export default function KnightDragonGame({
     monsterHitAnim: 0,
     knightHurtAnim: 0,
     dragonFireAnim: 0,
+    demonCurseAnim: 0,
     finalSmashAnim: 0,
+    screenShake: 0,
     roadOffset: 0,
+    slashes: [],
     droppedCoins: [],
     droppedKeys: [],
     floatingTexts: [],
     particles: [],
     timeRemainingFloat: 22,
     timeLimit: 22,
+    curseRemainingFloat: DEMON_KING_BOSS.curseIntervalSec,
     round4MatchRatio: 0,
     typedProgress: 0,
     round: 1,
-    matchState: 'HUB'
+    demonWheelStyle: 1,
+    matchState: 'HUB',
+    lives: 3,
+    score: 0,
+    combo: 0
   });
 
-  // Preload all 15 RPG Hero & Monster sprites into memory for smooth 60 FPS canvas rendering
+  const clearAllTimers = () => {
+    clearInterval(timerRef.current);
+    clearInterval(demonCurseTimerRef.current);
+    clearTimeout(phaseTimerRef.current);
+    clearInterval(phaseIntervalRef.current);
+  };
+
+  useEffect(() => () => clearAllTimers(), []);
+
+  // Preload all 19 RPG Hero, Monster, Dragon & Secret Demon King sprites for 60 FPS canvas
   useEffect(() => {
     const cache = spriteImagesRef.current;
     ALL_SPRITE_URLS.forEach(url => {
@@ -135,24 +227,38 @@ export default function KnightDragonGame({
     });
   }, []);
 
+  const isDemonKingBattle = round === 5;
+  const effectiveCombatRound = isDemonKingBattle ? demonWheelStyle : round;
+
   const activeSkin =
     KNIGHT_CHARACTER_SKINS.find(s => s.id === rpgProfile.equippedSkin) ||
     KNIGHT_CHARACTER_SKINS[0];
-  const stageMeta =
-    KNIGHT_MONSTER_STAGES.find(s => s.round === round) || KNIGHT_MONSTER_STAGES[0];
-  const currentMonster =
-    stageMeta.monsters[wordIdx % stageMeta.monsters.length] || stageMeta.monsters[0];
+  const stageMeta = isDemonKingBattle
+    ? DEMON_STAGE_META
+    : KNIGHT_MONSTER_STAGES.find(s => s.round === round) || KNIGHT_MONSTER_STAGES[0];
+  const currentMonster = isDemonKingBattle
+    ? DEMON_KING_BOSS
+    : stageMeta.monsters[wordIdx % stageMeta.monsters.length] || stageMeta.monsters[0];
 
   const expectedMonsterGold = computeMonsterGoldDrop(currentMonster, activeSkin, combo);
   const expectedKeyDropPct = Math.round(
     computeMonsterKeyDropChance(currentMonster, activeSkin) * 100
   );
 
+  // Sync key numeric states to runtimeRef safely inside effect
+  useEffect(() => {
+    runtimeRef.current.lives = lives;
+    runtimeRef.current.score = score;
+    runtimeRef.current.combo = combo;
+    runtimeRef.current.round = round;
+    runtimeRef.current.demonWheelStyle = demonWheelStyle;
+    runtimeRef.current.matchState = matchState;
+  }, [lives, score, combo, round, demonWheelStyle, matchState]);
+
   const updateAndPersistProfile = (updater) => {
     setRpgProfile(prev => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
-      const saved = saveLocalKnightRpgProfile(username, next);
-      return saved;
+      return saveLocalKnightRpgProfile(username, next);
     });
   };
 
@@ -202,6 +308,48 @@ export default function KnightDragonGame({
     }
   };
 
+  // Multi-layered anime RPG sword slash arcs tailored per hero weapon style
+  const spawnHeroSlashEffects = (isHeavyKill = false) => {
+    const rt = runtimeRef.current;
+    rt.heroAttackAnim = 1;
+    rt.monsterHitAnim = isHeavyKill ? 1 : 0.78;
+    rt.screenShake = isHeavyKill ? 9 : 4;
+
+    const style = activeSkin.slashStyle || 'holy';
+    const primaryColor = activeSkin.slashColor || '#38bdf8';
+    const slashCount = isHeavyKill ? 3 : 2;
+    const baseAngles = isHeavyKill ? [-0.62, 0.54, -0.14] : [-0.55, 0.48];
+
+    for (let i = 0; i < slashCount; i += 1) {
+      rt.slashes.push({
+        id: `${Date.now()}_${i}_${Math.random()}`,
+        angle: baseAngles[i] + (Math.random() - 0.5) * 0.16,
+        offsetX: (Math.random() - 0.5) * 34,
+        offsetY: (Math.random() - 0.5) * 34,
+        radius: isHeavyKill ? 68 + i * 10 : 48 + i * 8,
+        color: primaryColor,
+        bladeColor: activeSkin.bladeColor || primaryColor,
+        style,
+        age: 0,
+        maxAge: isHeavyKill ? 24 : 16,
+        delay: i * 3
+      });
+    }
+
+    // Extra style-themed slash sparks
+    if (style === 'sakura') {
+      spawnBurstParticles(0.73, 0.5, '#f9a8d4', isHeavyKill ? 26 : 10);
+    } else if (style === 'thunder') {
+      spawnBurstParticles(0.73, 0.48, '#7dd3fc', isHeavyKill ? 28 : 12);
+    } else if (style === 'magma' || style === 'dragon') {
+      spawnBurstParticles(0.73, 0.5, '#fb923c', isHeavyKill ? 30 : 12);
+    } else if (style === 'solar') {
+      spawnBurstParticles(0.73, 0.48, '#fde047', isHeavyKill ? 28 : 12);
+    } else {
+      spawnBurstParticles(0.73, 0.5, primaryColor, isHeavyKill ? 26 : 10);
+    }
+  };
+
   // Physical Gold Coins burst ONLY out of struck/slain monsters
   const spawnMonsterCoinDrops = (coinCount = 8) => {
     const coins = runtimeRef.current.droppedCoins || [];
@@ -219,18 +367,20 @@ export default function KnightDragonGame({
     runtimeRef.current.droppedCoins = coins;
   };
 
-  // Rare Revive Key (🗝️) physically bursts ONLY out of slain monsters on a low drop roll
-  const spawnMonsterKeyDrop = () => {
+  // Rare Revive Key (🗝️) physically bursts ONLY out of slain monsters
+  const spawnMonsterKeyDrop = (count = 1) => {
     const keys = runtimeRef.current.droppedKeys || [];
-    keys.push({
-      id: `${Date.now()}_key_${Math.random()}`,
-      xRatio: 0.72,
-      yRatio: 0.44,
-      vx: -2.4,
-      vy: -5.2,
-      age: 0,
-      alpha: 1
-    });
+    for (let i = 0; i < count; i += 1) {
+      keys.push({
+        id: `${Date.now()}_key_${i}_${Math.random()}`,
+        xRatio: 0.72 + (Math.random() - 0.5) * 0.08,
+        yRatio: 0.44 + (Math.random() - 0.5) * 0.06,
+        vx: -2.0 - Math.random() * 1.8,
+        vy: -4.6 - Math.random() * 1.8,
+        age: 0,
+        alpha: 1
+      });
+    }
     runtimeRef.current.droppedKeys = keys;
   };
 
@@ -238,8 +388,8 @@ export default function KnightDragonGame({
     setBannerAlert({ text, kind });
   };
 
-  const setupQuestionClock = (targetRound, qObj) => {
-    const baseLim = getSpeedAdjustedTimeLimit(targetRound, speedMode);
+  const setupQuestionClock = (combatRoundNum, qObj) => {
+    const baseLim = getSpeedAdjustedTimeLimit(combatRoundNum, speedMode);
     const skinBonus = Number(activeSkin.bonusTimeSec) || 0;
     const lim = baseLim + skinBonus;
     setTimeLimit(lim);
@@ -253,8 +403,166 @@ export default function KnightDragonGame({
     runtimeRef.current.typedProgress = initTyped;
   };
 
+  const finalizeMatchAndSync = (finalScoreVal, latestProfile, extraMode = '') => {
+    clearAllTimers();
+    setMatchState('GAMEOVER');
+    runtimeRef.current.matchState = 'GAMEOVER';
+    const passedCount = reviewLog.filter(item => item.passed).length;
+    const totalCount = Math.max(1, reviewLog.length);
+    onSyncKnightResult?.({
+      score: finalScoreVal,
+      passedCount,
+      totalCount,
+      topicId,
+      topicLabel: resolveSelectedTopicLabel(),
+      mode: extraMode || (singleRoundOnly ? `knight_round_${round}` : 'knight_full_4'),
+      gameType: 'knight_rpg',
+      knightRpgProfile: latestProfile
+    });
+  };
+
+  // Start the 5-second countdown before displaying the Revive Modal on normal deaths
+  const startDeathDelayBeforeRevive = () => {
+    clearAllTimers();
+    setDeathCountdownSec(DEATH_REVIVE_DELAY_SEC);
+    setMatchState('DEATH_COUNTDOWN');
+    runtimeRef.current.matchState = 'DEATH_COUNTDOWN';
+
+    let remaining = DEATH_REVIVE_DELAY_SEC;
+    phaseIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      setDeathCountdownSec(Math.max(0, remaining));
+      if (remaining <= 0) {
+        clearInterval(phaseIntervalRef.current);
+        setMatchState('REVIVE_PROMPT');
+        runtimeRef.current.matchState = 'REVIVE_PROMPT';
+      }
+    }, 1000);
+  };
+
+  // Trigger Demon King's Unrevivable Soul-Seal Execution Finisher -> straight to GAMEOVER
+  const triggerDemonKingUnrevivableExecution = (latestScore) => {
+    clearAllTimers();
+    setLives(0);
+    runtimeRef.current.lives = 0;
+    setCannotReviveByDemon(true);
+    setMatchState('DEMON_EXECUTION');
+    runtimeRef.current.matchState = 'DEMON_EXECUTION';
+    runtimeRef.current.demonCurseAnim = 1;
+    runtimeRef.current.screenShake = 16;
+    playSound('wrong');
+    spawnBurstParticles(0.24, 0.62, '#c026d3', 46);
+    spawnBurstParticles(0.24, 0.62, '#f43f5e', 30);
+
+    let latestProf = rpgProfile;
+    updateAndPersistProfile(prev => {
+      latestProf = {
+        ...prev,
+        bestScore: Math.max(prev.bestScore || 0, latestScore)
+      };
+      return latestProf;
+    });
+
+    phaseTimerRef.current = setTimeout(() => {
+      finalizeMatchAndSync(latestScore, latestProf, 'knight_demon_king_failed');
+    }, 3200);
+  };
+
+  // Secret Demon King Boss Sequence: 3s Pac-Man Warning (+5 Hearts) -> Spinning Wheel -> Stage 5 Boss Battle
+  const beginDemonKingEncounter = (builtQueuesSource) => {
+    clearAllTimers();
+    const activeQueues = builtQueuesSource || queues;
+
+    // 1. Grant 5 lives & launch 3-second Pac-Man flashing warning
+    setLives(DEMON_KING_BOSS.grantedLives);
+    runtimeRef.current.lives = DEMON_KING_BOSS.grantedLives;
+    setRound(5);
+    runtimeRef.current.round = 5;
+    setCannotReviveByDemon(false);
+    setDemonKingDefeated(false);
+    setDemonWarningSec(DEMON_KING_BOSS.warningDurationSec);
+    setPacmanFlashTick(0);
+    setMatchState('DEMON_WARNING');
+    runtimeRef.current.matchState = 'DEMON_WARNING';
+    runtimeRef.current.screenShake = 10;
+    playSound('wrong');
+
+    let ticks = 0;
+    phaseIntervalRef.current = setInterval(() => {
+      ticks += 1;
+      setPacmanFlashTick(ticks);
+      const secLeft = Math.max(1, DEMON_KING_BOSS.warningDurationSec - Math.floor((ticks * 150) / 1000));
+      setDemonWarningSec(secLeft);
+      if (ticks % 4 === 0) playSound('type_hit');
+    }, 150);
+
+    // 2. After exact 3 seconds -> Spin the 4-Round Demon Wheel
+    phaseTimerRef.current = setTimeout(() => {
+      clearInterval(phaseIntervalRef.current);
+
+      const forcedWheel =
+        typeof window !== 'undefined' && [1, 2, 3, 4].includes(Number(window.__FORCE_DEMON_WHEEL_ROUND__))
+          ? Number(window.__FORCE_DEMON_WHEEL_ROUND__)
+          : null;
+      const chosenStyle = forcedWheel || (Math.floor(Math.random() * 4) + 1);
+      setDemonWheelStyle(chosenStyle);
+      runtimeRef.current.demonWheelStyle = chosenStyle;
+      setDemonWheelSettled(false);
+      setDemonWheelRotation(0);
+      setMatchState('DEMON_WHEEL');
+      runtimeRef.current.matchState = 'DEMON_WHEEL';
+
+      // Target sector center angle aligned to top pointer (0deg):
+      // Sector 1: 0..90 (center 45 -> rotate -45 => 315)
+      // Sector 2: 90..180 (center 135 -> rotate 225)
+      // Sector 3: 180..270 (center 225 -> rotate 135)
+      // Sector 4: 270..360 (center 315 -> rotate 45)
+      const targetAngleMap = { 1: 315, 2: 225, 3: 135, 4: 45 };
+      const finalDeg = 5 * 360 + (targetAngleMap[chosenStyle] || 315);
+
+      requestAnimationFrame(() => {
+        setDemonWheelRotation(finalDeg);
+      });
+
+      // Settle wheel after 2.3s, show chosen mechanic for 0.9s, then enter Stage 5 Battle!
+      phaseTimerRef.current = setTimeout(() => {
+        setDemonWheelSettled(true);
+        playSound('word_clear');
+
+        phaseTimerRef.current = setTimeout(() => {
+          const sourceList = activeQueues[chosenStyle] || activeQueues[1] || [];
+          const demonQueue = sourceList.slice(0, Math.min(3, Math.max(1, sourceList.length)));
+          const firstDemonQ = demonQueue[0] || null;
+
+          setQueues(prev => ({
+            ...prev,
+            5: demonQueue
+          }));
+          setWordIdx(0);
+          setActiveQ(firstDemonQ);
+          setDemonCurseLeft(DEMON_KING_BOSS.curseIntervalSec);
+          runtimeRef.current.curseRemainingFloat = DEMON_KING_BOSS.curseIntervalSec;
+          setMatchState('PLAYING');
+          runtimeRef.current.matchState = 'PLAYING';
+          setupQuestionClock(chosenStyle, firstDemonQ);
+          showQuickBanner(
+            `👿 MA VƯƠNG MALAKOR CHỌN LUẬT VÒNG ${chosenStyle}! Cẩn thận: cứ 5 giây mất 1 tim (-1 ❤️)!`,
+            'error'
+          );
+
+          if (firstDemonQ) {
+            if (chosenStyle === 2) speakWord(firstDemonQ.word);
+            else if (chosenStyle === 4) {
+              speakWord(firstDemonQ.v4Display || firstDemonQ.collocation || firstDemonQ.word);
+            }
+          }
+        }, 900);
+      }, 2300);
+    }, DEMON_KING_BOSS.warningDurationSec * 1000);
+  };
+
   const startKnightCampaign = (startRoundNum = 1, onlyOneRound = false) => {
-    clearInterval(timerRef.current);
+    clearAllTimers();
     const rawVocab = resolveSelectedRawVocab();
     const builtQueues = buildPracticeRoundQueues({
       rawVocab,
@@ -262,12 +570,16 @@ export default function KnightDragonGame({
       selectedWords: [],
       seedStr: `knight:${username}:${Date.now()}`
     });
-    const rNum = [1, 2, 3, 4].includes(Number(startRoundNum)) ? Number(startRoundNum) : 1;
+
+    // Strict role guard: only Admin / Teacher can practice individual stages; students always start from Stage 1
+    const rNum =
+      isAdminOrTeacher && [1, 2, 3, 4].includes(Number(startRoundNum)) ? Number(startRoundNum) : 1;
+    const safeOnlyOne = isAdminOrTeacher ? Boolean(onlyOneRound) : false;
     const firstQ = builtQueues[rNum]?.[0] || null;
 
-    setQueues(builtQueues);
+    setQueues({ ...builtQueues, 5: [] });
     setRound(rNum);
-    setSingleRoundOnly(Boolean(onlyOneRound));
+    setSingleRoundOnly(safeOnlyOne);
     setWordIdx(0);
     setActiveQ(firstQ);
     setScore(0);
@@ -279,18 +591,26 @@ export default function KnightDragonGame({
     setSessionKeysEarned(0);
     setSessionMonstersSlain(0);
     setSessionDragonsSlain(0);
+    setDemonKingDefeated(false);
+    setCannotReviveByDemon(false);
     setReviewLog([]);
     setBannerAlert(null);
     setMatchState('PLAYING');
 
     runtimeRef.current.round = rNum;
     runtimeRef.current.matchState = 'PLAYING';
+    runtimeRef.current.lives = 3;
+    runtimeRef.current.score = 0;
+    runtimeRef.current.combo = 0;
     runtimeRef.current.droppedCoins = [];
     runtimeRef.current.droppedKeys = [];
+    runtimeRef.current.slashes = [];
     runtimeRef.current.dragonFireAnim = 0;
+    runtimeRef.current.demonCurseAnim = 0;
     runtimeRef.current.monsterAttackAnim = 0;
     runtimeRef.current.heroAttackAnim = 0;
     runtimeRef.current.finalSmashAnim = 0;
+    runtimeRef.current.screenShake = 0;
     setupQuestionClock(rNum, firstQ);
 
     if (firstQ) {
@@ -299,22 +619,35 @@ export default function KnightDragonGame({
     }
   };
 
-  const finalizeMatchAndSync = (finalScoreVal, latestProfile) => {
-    clearInterval(timerRef.current);
-    setMatchState('GAMEOVER');
-    runtimeRef.current.matchState = 'GAMEOVER';
-    const passedCount = reviewLog.filter(item => item.passed).length;
-    const totalCount = Math.max(1, reviewLog.length);
-    onSyncKnightResult?.({
-      score: finalScoreVal,
-      passedCount,
-      totalCount,
-      topicId,
-      topicLabel: resolveSelectedTopicLabel(),
-      mode: singleRoundOnly ? `knight_round_${round}` : 'knight_full_4',
-      gameType: 'knight_rpg',
-      knightRpgProfile: latestProfile
+  // Admin / Teacher dedicated launcher to test the Secret Demon King Boss immediately
+  const handleAdminStartDemonKingTest = () => {
+    if (!isAdminOrTeacher) return;
+    clearAllTimers();
+    const rawVocab = resolveSelectedRawVocab();
+    const builtQueues = buildPracticeRoundQueues({
+      rawVocab,
+      roundSize: Math.max(1, Math.min(100, Number(roundSize) || 8)),
+      selectedWords: [],
+      seedStr: `knight_demon_test:${username}:${Date.now()}`
     });
+    setQueues({ ...builtQueues, 5: [] });
+    setSingleRoundOnly(true);
+    setScore(0);
+    setCombo(0);
+    setFreezeCharges(2);
+    setReviveUsedCount(0);
+    setSessionGoldEarned(0);
+    setSessionKeysEarned(0);
+    setSessionMonstersSlain(0);
+    setSessionDragonsSlain(0);
+    setReviewLog([]);
+    setBannerAlert(null);
+    runtimeRef.current.score = 0;
+    runtimeRef.current.combo = 0;
+    runtimeRef.current.droppedCoins = [];
+    runtimeRef.current.droppedKeys = [];
+    runtimeRef.current.slashes = [];
+    beginDemonKingEncounter(builtQueues);
   };
 
   const recordWordAttempt = (qObj, rNum, passed) => {
@@ -331,6 +664,41 @@ export default function KnightDragonGame({
     ]);
   };
 
+  const rewardDemonKingVictory = (finalScoreVal) => {
+    const goldGain = DEMON_KING_BOSS.rewardGold;
+    const keyGain = DEMON_KING_BOSS.rewardKeys;
+    setSessionGoldEarned(prev => prev + goldGain);
+    setSessionKeysEarned(prev => prev + keyGain);
+    setSessionMonstersSlain(prev => prev + 1);
+    setDemonKingDefeated(true);
+
+    let syncedProfile = rpgProfile;
+    updateAndPersistProfile(prev => {
+      syncedProfile = {
+        ...prev,
+        gold: (prev.gold || 0) + goldGain,
+        keys: (prev.keys || 0) + keyGain,
+        keysCollected: (prev.keysCollected || 0) + keyGain,
+        monstersSlain: (prev.monstersSlain || 0) + 1,
+        demonKingsSlain: (prev.demonKingsSlain || 0) + 1,
+        bestScore: Math.max(prev.bestScore || 0, finalScoreVal)
+      };
+      return syncedProfile;
+    });
+
+    spawnMonsterCoinDrops(22);
+    spawnMonsterKeyDrop(5);
+    spawnBurstParticles(0.72, 0.44, '#e879f9', 48);
+    spawnBurstParticles(0.5, 0.32, '#fde047', 42);
+    spawnFloatingText(`+1.000 🪙 Vàng & +10 🗝️ Chìa Khóa!`, '#fde047', 0.52, 0.28);
+    spawnFloatingText('👿 MỞ KHÓA DANH HIỆU ẨN: DIỆT MA VƯƠNG!', '#f0abfc', 0.52, 0.18);
+    showToast?.(
+      '👿 CHIẾN THẮNG BOSS MA VƯƠNG ẨN! Nhận +1.000 🪙 Vàng, +10 🗝️ Chìa Khóa & Danh Hiệu Ẩn "Diệt Ma Vương"!'
+    );
+
+    finalizeMatchAndSync(finalScoreVal, syncedProfile, 'knight_demon_king_clear');
+  };
+
   const advanceToNextMonsterOrStage = (latestScore) => {
     const curQueue = queues[round] || [];
     const nextIdx = wordIdx + 1;
@@ -338,9 +706,17 @@ export default function KnightDragonGame({
       const nextQ = curQueue[nextIdx];
       setWordIdx(nextIdx);
       setActiveQ(nextQ);
-      setupQuestionClock(round, nextQ);
-      if (round === 2) speakWord(nextQ.word);
-      else if (round === 4) speakWord(nextQ.v4Display || nextQ.collocation || nextQ.word);
+      setupQuestionClock(effectiveCombatRound, nextQ);
+      if (effectiveCombatRound === 2) speakWord(nextQ.word);
+      else if (effectiveCombatRound === 4) {
+        speakWord(nextQ.v4Display || nextQ.collocation || nextQ.word);
+      }
+      return;
+    }
+
+    // Cleared Secret Demon King Boss!
+    if (round === 5) {
+      rewardDemonKingVictory(latestScore);
       return;
     }
 
@@ -350,7 +726,21 @@ export default function KnightDragonGame({
       return;
     }
 
-    // Completed campaign!
+    // Defeated Stage 4 Dragon Boss -> 5% chance to summon Secret Demon King Boss!
+    if (round === 4) {
+      const disableRandom =
+        typeof window !== 'undefined' && Boolean(window.__DISABLE_RANDOM_DEMON_KING__);
+      const forceDemon =
+        typeof window !== 'undefined' && Boolean(window.__FORCE_DEMON_KING__);
+      const rolledDemon = forceDemon || (!disableRandom && Math.random() < DEMON_KING_BOSS.spawnChance);
+
+      if (rolledDemon) {
+        beginDemonKingEncounter(queues);
+        return;
+      }
+    }
+
+    // Completed campaign normally!
     let syncedProfile = rpgProfile;
     updateAndPersistProfile(prev => {
       syncedProfile = {
@@ -363,6 +753,13 @@ export default function KnightDragonGame({
   };
 
   const rewardMonsterKill = (isDragonBoss = false) => {
+    if (round === 5) {
+      // Mid-phase slash reward on Demon King (full 1000g + 10 keys granted on final kill)
+      spawnMonsterCoinDrops(6);
+      spawnFloatingText('⚔️ Chém Trúng Ma Vương!', '#f0abfc', 0.68, 0.34);
+      return { goldGain: 0, droppedKey: 0 };
+    }
+
     const goldGain = computeMonsterGoldDrop(currentMonster, activeSkin, combo);
     const keyChance = computeMonsterKeyDropChance(currentMonster, activeSkin);
     const droppedKey = Math.random() < keyChance ? 1 : 0;
@@ -389,7 +786,7 @@ export default function KnightDragonGame({
     spawnMonsterCoinDrops(isDragonBoss ? 14 : 7);
     spawnFloatingText(`+${goldGain} 🪙 Vàng Rớt Từ Quái!`, '#fbbf24', 0.68, 0.34);
     if (droppedKey > 0) {
-      spawnMonsterKeyDrop();
+      spawnMonsterKeyDrop(1);
       spawnBurstParticles(0.72, 0.44, '#38bdf8', 24);
       spawnFloatingText('+1 🗝️ Quái Rớt Chìa Khóa Hồi Sinh (Hiếm)!', '#38bdf8', 0.56, 0.22);
     }
@@ -397,41 +794,54 @@ export default function KnightDragonGame({
   };
 
   const triggerDragonFinalSmashOrLifeLoss = (reason, isTimeoutOnDragon = false) => {
-    const nextLives = isTimeoutOnDragon ? 0 : Math.max(0, lives - 1);
+    const currentLives = runtimeRef.current.lives;
+    const nextLives = isTimeoutOnDragon ? 0 : Math.max(0, currentLives - 1);
     setCombo(0);
+    runtimeRef.current.combo = 0;
     playSound('wrong');
     runtimeRef.current.knightHurtAnim = 1;
-    if (round === 4 || isTimeoutOnDragon) {
+    runtimeRef.current.screenShake = 8;
+
+    if (round === 5) {
+      runtimeRef.current.demonCurseAnim = 1;
+    } else if (round === 4 || isTimeoutOnDragon) {
       runtimeRef.current.dragonFireAnim = 1;
     } else {
       runtimeRef.current.monsterAttackAnim = 1;
     }
-    spawnBurstParticles(0.25, 0.66, '#ef4444', 22);
+    spawnBurstParticles(0.25, 0.66, round === 5 ? '#c026d3' : '#ef4444', 24);
 
     if (activeQ) {
-      recordWordAttempt(activeQ, round, false);
+      recordWordAttempt(activeQ, effectiveCombatRound, false);
     }
 
-    if (isTimeoutOnDragon) {
-      // Super Smash Bros. FINAL SMASH Finisher!
+    // Demon King Boss Death -> Unrevivable Execution Finisher!
+    if (round === 5 && nextLives <= 0) {
+      triggerDemonKingUnrevivableExecution(runtimeRef.current.score);
+      return;
+    }
+
+    if (isTimeoutOnDragon && round === 4) {
+      // Super Smash Bros. FINAL SMASH Finisher -> then 5-second Death Countdown -> Revive Modal
+      clearAllTimers();
       setLives(0);
+      runtimeRef.current.lives = 0;
       setFinalSmashReason(reason);
       setMatchState('FINAL_SMASH');
       runtimeRef.current.matchState = 'FINAL_SMASH';
       runtimeRef.current.finalSmashAnim = 1;
-      setTimeout(() => {
-        setMatchState('REVIVE_PROMPT');
-        runtimeRef.current.matchState = 'REVIVE_PROMPT';
+      phaseTimerRef.current = setTimeout(() => {
+        startDeathDelayBeforeRevive();
       }, 2100);
       return;
     }
 
     setLives(nextLives);
+    runtimeRef.current.lives = nextLives;
     showQuickBanner(reason, 'error');
 
     if (nextLives <= 0) {
-      setMatchState('REVIVE_PROMPT');
-      runtimeRef.current.matchState = 'REVIVE_PROMPT';
+      startDeathDelayBeforeRevive();
     }
   };
 
@@ -453,9 +863,9 @@ export default function KnightDragonGame({
       if (nextRem <= 0) {
         clearInterval(timerRef.current);
         const correctAns =
-          round === 4
+          effectiveCombatRound === 4
             ? activeQ.v4Display || activeQ.collocation || activeQ.word
-            : round === 3
+            : effectiveCombatRound === 3
             ? activeQ.v3Target || activeQ.word
             : activeQ.word;
 
@@ -464,49 +874,111 @@ export default function KnightDragonGame({
             `🐉 QUÁ GIỜ! RỒNG HẮC ÁM TUNG SKILL TẤT SÁT "LONG HỎA DIỆT THẾ"! (Đáp án: "${correctAns}")`,
             true
           );
+        } else if (round === 5) {
+          // Reset question clock if still alive after Demon King timeout hit
+          triggerDragonFinalSmashOrLifeLoss(
+            `👿 Hết giờ! Ma Vương Malakor chém phản công (-1 ❤️)! (Đáp án: "${correctAns}")`,
+            false
+          );
+          if (runtimeRef.current.lives > 0) {
+            setupQuestionClock(effectiveCombatRound, activeQ);
+          }
         } else {
           triggerDragonFinalSmashOrLifeLoss(
             `⏰ Quá thời gian! ${currentMonster.name} lao tới tấn công! (Đáp án: "${correctAns}")`,
             false
           );
+          if (runtimeRef.current.lives > 0) {
+            setupQuestionClock(effectiveCombatRound, activeQ);
+          }
         }
       }
     }, 100);
 
     return () => clearInterval(timerRef.current);
-  }, [matchState, round, wordIdx, activeQ]);
+  }, [matchState, round, demonWheelStyle, wordIdx, activeQ]);
 
-  // Choice handler for Wave 1 (Slime/Goblin Rune Shields) & Wave 3 (Golem/Dark Lich Spell Orbs)
+  // Secret Demon King 5-Second Curse Heart Drain Loop (-1 ❤️ every 5s!)
+  useEffect(() => {
+    clearInterval(demonCurseTimerRef.current);
+    if (matchState !== 'PLAYING' || round !== 5) return undefined;
+
+    let lastTick = Date.now();
+    demonCurseTimerRef.current = setInterval(() => {
+      if (runtimeRef.current.matchState !== 'PLAYING' || runtimeRef.current.round !== 5) {
+        clearInterval(demonCurseTimerRef.current);
+        return;
+      }
+      const now = Date.now();
+      const dt = (now - lastTick) / 1000;
+      lastTick = now;
+
+      const nextCurse = runtimeRef.current.curseRemainingFloat - dt;
+      if (nextCurse <= 0) {
+        runtimeRef.current.curseRemainingFloat = DEMON_KING_BOSS.curseIntervalSec;
+        setDemonCurseLeft(DEMON_KING_BOSS.curseIntervalSec);
+
+        const nextLives = Math.max(0, runtimeRef.current.lives - 1);
+        runtimeRef.current.lives = nextLives;
+        setLives(nextLives);
+        runtimeRef.current.demonCurseAnim = 1;
+        runtimeRef.current.knightHurtAnim = 1;
+        runtimeRef.current.screenShake = 11;
+        playSound('wrong');
+        spawnBurstParticles(0.24, 0.62, '#c026d3', 28);
+        spawnFloatingText('👿 Lời Nguyền 5 Giây (-1 ❤️)!', '#e879f9', 0.34, 0.44);
+
+        if (nextLives <= 0) {
+          triggerDemonKingUnrevivableExecution(runtimeRef.current.score);
+        } else {
+          showQuickBanner(
+            `👿 Đủ 5 giây! Ma Vương Malakor rút 1 tim của bạn (Còn ${nextLives} ❤️)!`,
+            'error'
+          );
+        }
+      } else {
+        runtimeRef.current.curseRemainingFloat = nextCurse;
+        setDemonCurseLeft(Math.max(1, Math.ceil(nextCurse)));
+      }
+    }, 100);
+
+    return () => clearInterval(demonCurseTimerRef.current);
+  }, [matchState, round]);
+
+  // Choice handler for Wave 1 (Meaning Shields) & Wave 3 (Syn/Ant/Context Spell Orbs)
   const handleSelectRuneChoice = (choiceText) => {
     if (matchState !== 'PLAYING' || !activeQ) return;
-    const targetAnswer = round === 1 ? activeQ.word : round === 3 ? activeQ.v3Target : '';
+    const targetAnswer =
+      effectiveCombatRound === 1 ? activeQ.word : effectiveCombatRound === 3 ? activeQ.v3Target : '';
     const isCorrect =
       String(choiceText || '').trim().toLowerCase() === String(targetAnswer || '').trim().toLowerCase();
 
     if (isCorrect) {
-      runtimeRef.current.heroAttackAnim = 1;
-      runtimeRef.current.monsterHitAnim = 1;
+      spawnHeroSlashEffects(true);
       playSound('word_clear');
       speakWord(activeQ.word);
-      spawnBurstParticles(0.73, 0.52, activeSkin.slashColor || '#38bdf8', 28);
 
       const remainRatio = Math.max(
         0,
         Math.min(1, runtimeRef.current.timeRemainingFloat / Math.max(1, timeLimit))
       );
       const speedBonus = Math.round(remainRatio * 90);
-      const gain = 150 + combo * 30 + speedBonus;
+      const gain = (round === 5 ? 350 : 150) + combo * 30 + speedBonus;
       const nextScore = score + gain;
       const nextCombo = combo + 1;
       setScore(nextScore);
       setCombo(nextCombo);
+      runtimeRef.current.score = nextScore;
+      runtimeRef.current.combo = nextCombo;
 
       const { goldGain, droppedKey } = rewardMonsterKill(false);
-      recordWordAttempt(activeQ, round, true);
+      recordWordAttempt(activeQ, effectiveCombatRound, true);
       showQuickBanner(
-        `⚔️ Chém hạ ${currentMonster.name}! +${gain}đ • Quái rớt +${goldGain} 🪙 Vàng${
-          droppedKey ? ' • 🗝️ Quái rớt 1 Chìa Khóa Hồi Sinh (Hiếm)!' : ''
-        }`,
+        round === 5
+          ? `⚔️ Chém trúng Ma Vương Malakor! +${gain}đ (Combo x${nextCombo})`
+          : `⚔️ Chém hạ ${currentMonster.name}! +${gain}đ • Quái rớt +${goldGain} 🪙 Vàng${
+              droppedKey ? ' • 🗝️ Quái rớt 1 Chìa Khóa Hồi Sinh (Hiếm)!' : ''
+            }`,
         'success'
       );
       advanceToNextMonsterOrStage(nextScore);
@@ -518,41 +990,44 @@ export default function KnightDragonGame({
     }
   };
 
-  // Wave 2: Continuous sword-combo typing to shatter Skeleton/Orc armor
+  // Wave 2: Continuous sword-combo typing to shatter armor
   const handleWave2KeyInput = (char) => {
-    if (matchState !== 'PLAYING' || round !== 2 || !activeQ) return;
+    if (matchState !== 'PLAYING' || effectiveCombatRound !== 2 || !activeQ) return;
     const target = String(activeQ.word || '').toUpperCase();
     const expected = target[typedProgress];
     if (!expected) return;
 
     if (char.toUpperCase() === expected) {
       playSound('type_hit');
-      runtimeRef.current.heroAttackAnim = 0.85;
-      runtimeRef.current.monsterHitAnim = 0.7;
-      spawnBurstParticles(0.73, 0.52, activeSkin.slashColor || '#fbbf24', 10);
-      spawnMonsterCoinDrops(2);
-
       const nextProg = skipNonAlphaIndex(target, typedProgress + 1);
+      const isFinishingBlow = nextProg >= target.length;
+      spawnHeroSlashEffects(isFinishingBlow);
+      spawnMonsterCoinDrops(isFinishingBlow ? 4 : 1);
+
       setTypedProgress(nextProg);
       runtimeRef.current.typedProgress = nextProg;
 
-      if (nextProg >= target.length) {
+      if (isFinishingBlow) {
         playSound('word_clear');
         speakWord(activeQ.word);
         const remainRatio = Math.max(
           0,
           Math.min(1, runtimeRef.current.timeRemainingFloat / Math.max(1, timeLimit))
         );
-        const gain = 210 + combo * 30 + Math.round(remainRatio * 110);
+        const gain = (round === 5 ? 400 : 210) + combo * 30 + Math.round(remainRatio * 110);
         const nextScore = score + gain;
         setScore(nextScore);
         setCombo(combo + 1);
+        runtimeRef.current.score = nextScore;
+        runtimeRef.current.combo = combo + 1;
         const { goldGain, droppedKey } = rewardMonsterKill(false);
         recordWordAttempt(activeQ, 2, true);
         showQuickBanner(
-          `🗡️ Phá giáp hạ gục ${currentMonster.name} ("${activeQ.word}")! +${gain}đ • +${goldGain} 🪙${
-            droppedKey ? ' • +1 🗝️ Chìa Khóa Hiếm!' : ''
-          }`,
+          round === 5
+            ? `🗡️ Liên Hoàn Kiếm chém trọng thương Ma Vương ("${activeQ.word}")! +${gain}đ`
+            : `🗡️ Phá giáp hạ gục ${currentMonster.name} ("${activeQ.word}")! +${gain}đ • +${goldGain} 🪙${
+                droppedKey ? ' • +1 🗝️ Chìa Khóa Hiếm!' : ''
+              }`,
           'success'
         );
         advanceToNextMonsterOrStage(nextScore);
@@ -565,9 +1040,9 @@ export default function KnightDragonGame({
     }
   };
 
-  // Wave 4: Dragon Boss typing (each correct letter slashes Dragon HP; wrong letter/submit triggers Dragon Fire Counter!)
+  // Wave 4 (and Demon King Wheel 4): Sentence Fill-in-the-Blank Typing
   const handleWave4InputChange = (nextVal) => {
-    if (matchState !== 'PLAYING' || round !== 4 || !activeQ) return;
+    if (matchState !== 'PLAYING' || effectiveCombatRound !== 4 || !activeQ) return;
     const prevVal = round4Input;
     setRound4Input(nextVal);
 
@@ -582,21 +1057,24 @@ export default function KnightDragonGame({
     if (nextVal.length > prevVal.length) {
       if (evalRes.matchRatio >= prevEval.matchRatio && evalRes.matchRatio > 0) {
         playSound('type_hit');
-        runtimeRef.current.heroAttackAnim = 0.9;
-        runtimeRef.current.monsterHitAnim = 0.8;
-        spawnBurstParticles(0.72, 0.42, activeSkin.slashColor || '#fbbf24', 12);
+        spawnHeroSlashEffects(false);
       } else {
         playSound('wrong');
-        runtimeRef.current.dragonFireAnim = 0.85;
+        if (round === 5) {
+          runtimeRef.current.demonCurseAnim = 0.7;
+          spawnFloatingText('👿 Ma Vương Phản Phép!', '#e879f9', 0.48, 0.56);
+        } else {
+          runtimeRef.current.dragonFireAnim = 0.85;
+          spawnFloatingText('🔥 Rồng Khè Lửa Phản Đòn!', '#fb7185', 0.48, 0.56);
+        }
         runtimeRef.current.knightHurtAnim = 0.6;
-        spawnFloatingText('🔥 Rồng Khè Lửa Phản Đòn!', '#fb7185', 0.48, 0.56);
       }
     }
   };
 
   const handleWave4Submit = (e) => {
     if (e) e.preventDefault();
-    if (matchState !== 'PLAYING' || round !== 4 || !activeQ) return;
+    if (matchState !== 'PLAYING' || effectiveCombatRound !== 4 || !activeQ) return;
     const rawTyped = round4Input.trim();
     if (!rawTyped) return;
 
@@ -607,54 +1085,72 @@ export default function KnightDragonGame({
     const evalRes = matchRound4TypingAnswer(rawTyped, accepted);
 
     if (evalRes.matched) {
-      runtimeRef.current.heroAttackAnim = 1;
-      runtimeRef.current.monsterHitAnim = 1;
+      spawnHeroSlashEffects(true);
       runtimeRef.current.round4MatchRatio = 1;
       playSound('word_clear');
       speakWord(evalRes.matchedAnswer || activeQ.v4Display || activeQ.word);
-      spawnBurstParticles(0.72, 0.42, '#fde047', 42);
 
       const remainRatio = Math.max(
         0,
         Math.min(1, runtimeRef.current.timeRemainingFloat / Math.max(1, timeLimit))
       );
-      const gain = 320 + combo * 40 + Math.round(remainRatio * 150);
+      const gain = (round === 5 ? 500 : 320) + combo * 40 + Math.round(remainRatio * 150);
       const nextScore = score + gain;
       setScore(nextScore);
       setCombo(combo + 1);
-      const { goldGain, droppedKey } = rewardMonsterKill(true);
+      runtimeRef.current.score = nextScore;
+      runtimeRef.current.combo = combo + 1;
+      const { goldGain, droppedKey } = rewardMonsterKill(round === 4);
       recordWordAttempt(activeQ, 4, true);
       showQuickBanner(
-        `🐉 ĐỒ LONG TRẢM! Hạ gục Rồng Hắc Ám ("${evalRes.matchedAnswer}")! +${gain}đ • +${goldGain} 🪙 Vàng${
-          droppedKey ? ' • +1 🗝️ Chìa Khóa Hiếm!' : ''
-        }`,
+        round === 5
+          ? `⚔️ TRẢM MA VƯƠNG ("${evalRes.matchedAnswer}")! +${gain}đ`
+          : `🐉 ĐỒ LONG TRẢM! Hạ gục Rồng Hắc Ám ("${evalRes.matchedAnswer}")! +${gain}đ • +${goldGain} 🪙 Vàng${
+              droppedKey ? ' • +1 🗝️ Chìa Khóa Hiếm!' : ''
+            }`,
         'success'
       );
       advanceToNextMonsterOrStage(nextScore);
     } else {
       triggerDragonFinalSmashOrLifeLoss(
-        `🔥 "${rawTyped}" chưa đúng! Rồng Hắc Ám khè lửa phản công (-1 ❤️)!`,
+        round === 5
+          ? `👿 "${rawTyped}" chưa đúng! Ma Vương phản công (-1 ❤️)!`
+          : `🔥 "${rawTyped}" chưa đúng! Rồng Hắc Ám khè lửa phản công (-1 ❤️)!`,
         false
       );
     }
   };
 
+  // Fixed Hint Logic: STRICTLY requires >= 300 points; cannot use at 0 points!
   const handleUseHint = () => {
     if (matchState !== 'PLAYING' || !activeQ) return;
-    if (round === 2) {
+    if (score < KNIGHT_HINT_SCORE_COST) {
+      playSound('wrong');
+      showQuickBanner(
+        `❌ Cần tối thiểu ${KNIGHT_HINT_SCORE_COST} điểm mới được dùng Gợi ý (Hiện có ${score}đ)!`,
+        'error'
+      );
+      return;
+    }
+
+    if (effectiveCombatRound === 2) {
       const target = String(activeQ.word || '').toUpperCase();
       const nextChar = target[typedProgress];
       if (nextChar) {
-        setScore(s => Math.max(0, s - 15));
+        const nextScore = score - KNIGHT_HINT_SCORE_COST;
+        setScore(nextScore);
+        runtimeRef.current.score = nextScore;
         handleWave2KeyInput(nextChar);
       }
-    } else if (round === 4) {
+    } else if (effectiveCombatRound === 4) {
       const primary = String(
         activeQ.v4Answers?.[0] || activeQ.v4Display || activeQ.collocation || activeQ.word || ''
       ).trim();
       if (!primary) return;
       const nextLen = Math.min(primary.length, Math.max(3, round4Input.length + 3));
-      setScore(s => Math.max(0, s - 15));
+      const nextScore = score - KNIGHT_HINT_SCORE_COST;
+      setScore(nextScore);
+      runtimeRef.current.score = nextScore;
       handleWave4InputChange(primary.slice(0, nextLen));
     }
   };
@@ -668,11 +1164,12 @@ export default function KnightDragonGame({
     showQuickBanner('❄️ Băng Phong Kiếm: Đóng băng quái vật +8 giây!', 'success');
   };
 
-  // Revive Mechanic (Use rare Monster-dropped Keys or Gold)
+  // Revive Mechanic (Stages 1–4 ONLY; blocked completely by Demon King Soul Seal)
   const reviveKeyCost = reviveUsedCount + 1;
   const reviveGoldCost = reviveKeyCost * REVIVE_KEY_GOLD_PRICE;
 
   const handleReviveWithKeys = () => {
+    if (cannotReviveByDemon || round === 5) return;
     if ((rpgProfile.keys || 0) < reviveKeyCost) {
       showToast?.(`Cần ${reviveKeyCost} 🗝️ Chìa Khóa Hồi Sinh! Bạn có thể dùng Vàng để hồi sinh.`, 'error');
       return;
@@ -683,11 +1180,12 @@ export default function KnightDragonGame({
     }));
     setReviveUsedCount(c => c + 1);
     setLives(3);
+    runtimeRef.current.lives = 3;
     setMatchState('PLAYING');
     runtimeRef.current.matchState = 'PLAYING';
     runtimeRef.current.finalSmashAnim = 0;
     runtimeRef.current.dragonFireAnim = 0;
-    setupQuestionClock(round, activeQ);
+    setupQuestionClock(effectiveCombatRound, activeQ);
     spawnBurstParticles(0.25, 0.68, '#fde047', 35);
     showQuickBanner(
       `🗝️ HỒI SINH THÀNH CÔNG (-${reviveKeyCost} Chìa Khóa)! Đầy 3 ❤️ & Reset thời gian!`,
@@ -696,6 +1194,7 @@ export default function KnightDragonGame({
   };
 
   const handleReviveWithGold = () => {
+    if (cannotReviveByDemon || round === 5) return;
     if ((rpgProfile.gold || 0) < reviveGoldCost) {
       showToast?.(`Không đủ Vàng! Cần ${reviveGoldCost} 🪙 Vàng để mua mạng hồi sinh.`, 'error');
       return;
@@ -706,11 +1205,12 @@ export default function KnightDragonGame({
     }));
     setReviveUsedCount(c => c + 1);
     setLives(3);
+    runtimeRef.current.lives = 3;
     setMatchState('PLAYING');
     runtimeRef.current.matchState = 'PLAYING';
     runtimeRef.current.finalSmashAnim = 0;
     runtimeRef.current.dragonFireAnim = 0;
-    setupQuestionClock(round, activeQ);
+    setupQuestionClock(effectiveCombatRound, activeQ);
     spawnBurstParticles(0.25, 0.68, '#fbbf24', 35);
     showQuickBanner(
       `🪙 ĐÃ MUA MẠNG HỒI SINH (-${reviveGoldCost} Vàng)! Đầy 3 ❤️ & Tiếp tục chiến đấu!`,
@@ -726,20 +1226,20 @@ export default function KnightDragonGame({
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       if (e.code === 'Tab' && activeQ) {
         e.preventDefault();
-        speakWord(round === 4 ? activeQ.v4Display || activeQ.word : activeQ.word);
+        speakWord(effectiveCombatRound === 4 ? activeQ.v4Display || activeQ.word : activeQ.word);
         return;
       }
       if (inInput) return;
-      if (round === 2 && e.key && e.key.length === 1 && /^[a-zA-Z]$/.test(e.key)) {
+      if (effectiveCombatRound === 2 && e.key && e.key.length === 1 && /^[a-zA-Z]$/.test(e.key)) {
         e.preventDefault();
         handleWave2KeyInput(e.key.toUpperCase());
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [matchState, round, activeQ, typedProgress, score, combo]);
+  }, [matchState, round, demonWheelStyle, activeQ, typedProgress, score, combo]);
 
-  // 60 FPS Fantasy RPG Illustrated Sprite Duel & Volumetric VFX Canvas Loop
+  // 60 FPS Fantasy RPG Illustrated Sprite Duel, Multi-Slash VFX & Demon King Realm Canvas Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
@@ -752,11 +1252,32 @@ export default function KnightDragonGame({
       const rt = runtimeRef.current;
       const now = Date.now();
       const isDragonStage = round === 4;
+      const isDemonStage = round === 5;
+      const isBossStage = isDragonStage || isDemonStage;
       const groundY = h * 0.81;
+
+      // Apply brief camera shake on heavy sword slash / Demon curse impact
+      let shakeX = 0;
+      let shakeY = 0;
+      if (rt.screenShake > 0.2) {
+        shakeX = (Math.random() - 0.5) * rt.screenShake;
+        shakeY = (Math.random() - 0.5) * rt.screenShake * 0.7;
+        rt.screenShake *= 0.84;
+      } else {
+        rt.screenShake = 0;
+      }
+
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
 
       // 1. Atmospheric Fantasy Sky Backdrop per Stage Biome
       const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
-      if (isDragonStage) {
+      if (isDemonStage) {
+        bgGrad.addColorStop(0, '#0a0118');
+        bgGrad.addColorStop(0.45, '#2e0449');
+        bgGrad.addColorStop(0.82, '#4a0624');
+        bgGrad.addColorStop(1, '#09020e');
+      } else if (isDragonStage) {
         bgGrad.addColorStop(0, '#16040d');
         bgGrad.addColorStop(0.5, '#3b0918');
         bgGrad.addColorStop(0.82, '#5c1218');
@@ -775,15 +1296,17 @@ export default function KnightDragonGame({
         bgGrad.addColorStop(1, '#09131e');
       }
       ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(-16, -16, w + 32, h + 32);
 
-      // Twinkling stars
+      // Twinkling stars / void sparks
       ctx.save();
       for (let s = 0; s < 26; s += 1) {
         const sx = ((s * 97.3) % 100) / 100 * w;
         const sy = ((s * 43.7) % 52) / 100 * h;
         const twinkle = 0.25 + 0.65 * Math.abs(Math.sin(now * 0.0018 + s * 1.7));
-        ctx.fillStyle = isDragonStage
+        ctx.fillStyle = isDemonStage
+          ? `rgba(240, 171, 252, ${twinkle * 0.8})`
+          : isDragonStage
           ? `rgba(253, 186, 116, ${twinkle * 0.6})`
           : `rgba(226, 232, 240, ${twinkle * 0.85})`;
         ctx.beginPath();
@@ -792,11 +1315,15 @@ export default function KnightDragonGame({
       }
       ctx.restore();
 
-      // Moon / Volcanic Eclipse with soft atmospheric halo
+      // Moon / Volcanic Eclipse / Abyssal Demon Rift
       const moonX = w * 0.16;
       const moonY = h * 0.23;
-      const moonGlow = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, 68);
-      if (isDragonStage) {
+      const moonGlow = ctx.createRadialGradient(moonX, moonY, 8, moonX, moonY, 74);
+      if (isDemonStage) {
+        moonGlow.addColorStop(0, 'rgba(217, 70, 239, 0.72)');
+        moonGlow.addColorStop(0.45, 'rgba(225, 29, 72, 0.34)');
+        moonGlow.addColorStop(1, 'rgba(88, 28, 135, 0)');
+      } else if (isDragonStage) {
         moonGlow.addColorStop(0, 'rgba(251, 146, 60, 0.55)');
         moonGlow.addColorStop(0.45, 'rgba(225, 29, 72, 0.24)');
         moonGlow.addColorStop(1, 'rgba(225, 29, 72, 0)');
@@ -811,24 +1338,32 @@ export default function KnightDragonGame({
       }
       ctx.fillStyle = moonGlow;
       ctx.beginPath();
-      ctx.arc(moonX, moonY, 68, 0, Math.PI * 2);
+      ctx.arc(moonX, moonY, 74, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.beginPath();
       ctx.arc(moonX, moonY, 18, 0, Math.PI * 2);
-      ctx.fillStyle = isDragonStage ? '#fb7185' : round === 3 ? '#ddd6fe' : '#e0f2fe';
+      ctx.fillStyle = isDemonStage
+        ? '#e879f9'
+        : isDragonStage
+        ? '#fb7185'
+        : round === 3
+        ? '#ddd6fe'
+        : '#e0f2fe';
       ctx.fill();
-      if (isDragonStage) {
+      if (isBossStage) {
         ctx.beginPath();
         ctx.arc(moonX + 3, moonY - 1, 14, 0, Math.PI * 2);
-        ctx.fillStyle = '#1f0610';
+        ctx.fillStyle = isDemonStage ? '#0d021a' : '#1f0610';
         ctx.fill();
       }
 
-      // 2. Parallax Distant Mountain Ridges & Gothic Castle / Volcanic Spires
+      // 2. Parallax Distant Mountains & Castle / Abyssal Monoliths
       ctx.save();
       const mountainShift = (rt.roadOffset * 28) % 240;
-      ctx.fillStyle = isDragonStage
+      ctx.fillStyle = isDemonStage
+        ? 'rgba(26, 4, 42, 0.9)'
+        : isDragonStage
         ? 'rgba(42, 7, 17, 0.85)'
         : round === 3
         ? 'rgba(24, 14, 48, 0.82)'
@@ -838,16 +1373,19 @@ export default function KnightDragonGame({
       for (let x = -240; x <= w + 240; x += 120) {
         const px = x - mountainShift;
         ctx.lineTo(px + 30, groundY - 58);
-        ctx.lineTo(px + 65, groundY - (isDragonStage ? 92 : 76));
+        ctx.lineTo(px + 65, groundY - (isBossStage ? 94 : 76));
         ctx.lineTo(px + 100, groundY - 46);
       }
       ctx.lineTo(w, groundY);
       ctx.closePath();
       ctx.fill();
 
-      // Distant Castle Silhouette on mid-horizon
       const castleX = w * 0.49;
-      ctx.fillStyle = isDragonStage ? 'rgba(30, 6, 14, 0.9)' : 'rgba(15, 23, 42, 0.86)';
+      ctx.fillStyle = isDemonStage
+        ? 'rgba(18, 2, 32, 0.92)'
+        : isDragonStage
+        ? 'rgba(30, 6, 14, 0.9)'
+        : 'rgba(15, 23, 42, 0.86)';
       ctx.fillRect(castleX - 44, groundY - 78, 88, 78);
       ctx.fillRect(castleX - 58, groundY - 102, 22, 102);
       ctx.fillRect(castleX + 36, groundY - 96, 22, 96);
@@ -859,36 +1397,41 @@ export default function KnightDragonGame({
       ctx.lineTo(castleX + 47, groundY - 118);
       ctx.lineTo(castleX + 62, groundY - 96);
       ctx.fill();
-      // Glowing castle windows
-      ctx.fillStyle = isDragonStage ? 'rgba(251, 146, 60, 0.65)' : 'rgba(253, 224, 71, 0.55)';
+      ctx.fillStyle = isDemonStage
+        ? 'rgba(232, 121, 249, 0.75)'
+        : isDragonStage
+        ? 'rgba(251, 146, 60, 0.65)'
+        : 'rgba(253, 224, 71, 0.55)';
       ctx.fillRect(castleX - 50, groundY - 86, 5, 10);
       ctx.fillRect(castleX + 44, groundY - 82, 5, 10);
       ctx.fillRect(castleX - 10, groundY - 56, 6, 11);
       ctx.fillRect(castleX + 8, groundY - 56, 6, 11);
       ctx.restore();
 
-      // 3. Midground Stone Bridge Pillars & Flickering Animated Torches
+      // 3. Stone Pillars & Animated Flickering Torches / Abyssal Braziers
       ctx.save();
       const pillarSpacing = 195;
       for (let pIdx = 0; pIdx < 6; pIdx += 1) {
         const span = w + pillarSpacing;
         const px = ((pIdx * pillarSpacing - rt.roadOffset * 95) % span + span) % span - 95;
-        // Stone column
-        ctx.fillStyle = isDragonStage
+        ctx.fillStyle = isDemonStage
+          ? 'rgba(46, 10, 68, 0.68)'
+          : isDragonStage
           ? 'rgba(54, 15, 24, 0.65)'
           : round === 3
           ? 'rgba(42, 24, 74, 0.58)'
           : 'rgba(30, 41, 59, 0.58)';
         ctx.fillRect(px, h * 0.14, 30, groundY - h * 0.14);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.fillRect(px, h * 0.14, 4, groundY - h * 0.14);
 
-        // Animated Torch radial light cone
         const flicker = Math.sin(now * 0.015 + pIdx * 2.1) * 3.5;
         const tx = px + 15;
         const ty = h * 0.42;
-        const torchGrad = ctx.createRadialGradient(tx, ty, 2, tx, ty, 36 + flicker);
-        if (isDragonStage) {
+        const torchGrad = ctx.createRadialGradient(tx, ty, 2, tx, ty, 38 + flicker);
+        if (isDemonStage) {
+          torchGrad.addColorStop(0, 'rgba(250, 232, 255, 0.92)');
+          torchGrad.addColorStop(0.32, 'rgba(217, 70, 239, 0.48)');
+          torchGrad.addColorStop(1, 'rgba(217, 70, 239, 0)');
+        } else if (isDragonStage) {
           torchGrad.addColorStop(0, 'rgba(254, 215, 170, 0.9)');
           torchGrad.addColorStop(0.3, 'rgba(249, 115, 22, 0.45)');
           torchGrad.addColorStop(1, 'rgba(249, 115, 22, 0)');
@@ -903,38 +1446,42 @@ export default function KnightDragonGame({
         }
         ctx.fillStyle = torchGrad;
         ctx.beginPath();
-        ctx.arc(tx, ty, 36 + flicker, 0, Math.PI * 2);
+        ctx.arc(tx, ty, 38 + flicker, 0, Math.PI * 2);
         ctx.fill();
 
-        // Flame core
         ctx.beginPath();
         ctx.arc(tx, ty, 4.5 + flicker * 0.18, 0, Math.PI * 2);
-        ctx.fillStyle = round === 3 ? '#e879f9' : '#fde047';
+        ctx.fillStyle = isDemonStage || round === 3 ? '#f0abfc' : '#fde047';
         ctx.fill();
       }
 
-      // Ambient floating fireflies / volcanic embers
+      // Ambient drifting particles
       for (let m = 0; m < 16; m += 1) {
-        const mx = ((m * 73 + now * (isDragonStage ? 0.018 : 0.01)) % w);
-        const my = isDragonStage
-          ? groundY - ((m * 41 + now * 0.032) % (groundY * 0.85))
+        const mx = (m * 73 + now * (isBossStage ? 0.02 : 0.01)) % w;
+        const my = isBossStage
+          ? groundY - ((m * 41 + now * 0.036) % (groundY * 0.85))
           : h * 0.24 + ((m * 37) % (groundY * 0.52)) + Math.sin(now * 0.003 + m) * 10;
         const mAlpha = 0.25 + 0.55 * Math.abs(Math.sin(now * 0.004 + m * 1.4));
-        ctx.fillStyle = isDragonStage
+        ctx.fillStyle = isDemonStage
+          ? `rgba(232, 121, 249, ${mAlpha})`
+          : isDragonStage
           ? `rgba(251, 146, 60, ${mAlpha})`
           : round === 3
           ? `rgba(192, 132, 252, ${mAlpha})`
           : `rgba(52, 211, 153, ${mAlpha * 0.85})`;
         ctx.beginPath();
-        ctx.arc(mx, my, isDragonStage ? 2.1 : 1.7, 0, Math.PI * 2);
+        ctx.arc(mx, my, isBossStage ? 2.2 : 1.7, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
 
-      // 4. Textured Stone Cobblestone Battlefield Ground
+      // 4. Cobblestone Battlefield Ground
       ctx.save();
       const groundGrad = ctx.createLinearGradient(0, groundY, 0, h);
-      if (isDragonStage) {
+      if (isDemonStage) {
+        groundGrad.addColorStop(0, '#2a093b');
+        groundGrad.addColorStop(1, '#09020e');
+      } else if (isDragonStage) {
         groundGrad.addColorStop(0, '#301119');
         groundGrad.addColorStop(1, '#12060a');
       } else if (round === 3) {
@@ -947,8 +1494,11 @@ export default function KnightDragonGame({
       ctx.fillStyle = groundGrad;
       ctx.fillRect(0, groundY, w, h - groundY);
 
-      // Scrolling stone slab seams
-      ctx.strokeStyle = isDragonStage ? 'rgba(244, 63, 94, 0.22)' : 'rgba(148, 163, 184, 0.16)';
+      ctx.strokeStyle = isDemonStage
+        ? 'rgba(217, 70, 239, 0.28)'
+        : isDragonStage
+        ? 'rgba(244, 63, 94, 0.22)'
+        : 'rgba(148, 163, 184, 0.16)';
       ctx.lineWidth = 1.2;
       const tileW = 64;
       const tileShift = (rt.roadOffset * 120) % tileW;
@@ -960,18 +1510,25 @@ export default function KnightDragonGame({
         ctx.stroke();
       }
 
-      // Glowing magma pulse beneath floor in Stage 4
-      if (isDragonStage) {
-        const lavaPulse = 0.35 + 0.25 * Math.sin(now * 0.005);
-        const lavaGlow = ctx.createLinearGradient(0, groundY - 6, 0, groundY + 14);
-        lavaGlow.addColorStop(0, `rgba(249, 115, 22, ${lavaPulse})`);
-        lavaGlow.addColorStop(1, 'rgba(249, 115, 22, 0)');
-        ctx.fillStyle = lavaGlow;
+      if (isBossStage) {
+        const pulse = 0.36 + 0.26 * Math.sin(now * 0.006);
+        const floorGlow = ctx.createLinearGradient(0, groundY - 6, 0, groundY + 14);
+        floorGlow.addColorStop(
+          0,
+          isDemonStage ? `rgba(217, 70, 239, ${pulse})` : `rgba(249, 115, 22, ${pulse})`
+        );
+        floorGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = floorGlow;
         ctx.fillRect(0, groundY - 6, w, 20);
       }
 
-      // Crisp illuminated ground rim line
-      ctx.strokeStyle = isDragonStage ? '#fb7185' : round === 3 ? '#a855f7' : '#38bdf8';
+      ctx.strokeStyle = isDemonStage
+        ? '#e879f9'
+        : isDragonStage
+        ? '#fb7185'
+        : round === 3
+        ? '#a855f7'
+        : '#38bdf8';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, groundY);
@@ -983,7 +1540,7 @@ export default function KnightDragonGame({
         rt.roadOffset = (rt.roadOffset + 0.0038) % 10;
       }
 
-      // 5. Physical Gold Coins (🪙) bursting from slain/struck Monsters into Knight's pouch
+      // 5. Physical Gold Coins bursting from monsters into Hero
       for (let i = (rt.droppedCoins || []).length - 1; i >= 0; i -= 1) {
         const coin = rt.droppedCoins[i];
         coin.age += 1;
@@ -999,7 +1556,6 @@ export default function KnightDragonGame({
           coin.xRatio += (0.23 - coin.xRatio) * 0.16;
           coin.yRatio += (0.64 - coin.yRatio) * 0.16;
         }
-
         const cx = coin.xRatio * w;
         const cy = coin.yRatio * h;
         ctx.save();
@@ -1025,7 +1581,7 @@ export default function KnightDragonGame({
         }
       }
 
-      // 6. Rare Revive Keys (🗝️) bursting ONLY out of slain monsters & flying to Knight
+      // 6. Rare Revive Keys bursting ONLY from slain monsters
       for (let i = (rt.droppedKeys || []).length - 1; i >= 0; i -= 1) {
         const kItem = rt.droppedKeys[i];
         kItem.age += 1;
@@ -1041,7 +1597,6 @@ export default function KnightDragonGame({
           kItem.xRatio += (0.23 - kItem.xRatio) * 0.14;
           kItem.yRatio += (0.62 - kItem.yRatio) * 0.14;
         }
-
         const kx = kItem.xRatio * w;
         const ky = kItem.yRatio * h;
         ctx.save();
@@ -1053,7 +1608,6 @@ export default function KnightDragonGame({
         ctx.beginPath();
         ctx.arc(0, 0, 22, 0, Math.PI * 2);
         ctx.fill();
-
         ctx.beginPath();
         ctx.arc(0, 0, 12, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(14, 165, 233, 0.35)';
@@ -1061,7 +1615,6 @@ export default function KnightDragonGame({
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#7dd3fc';
         ctx.stroke();
-
         ctx.font = 'bold 14px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1075,77 +1628,86 @@ export default function KnightDragonGame({
         }
       }
 
-      // Compute Combat Positions & Animation Timers
+      // Compute Combat Positions & Timers
       const heroAttackSin = Math.sin(rt.heroAttackAnim * Math.PI);
       const monsterAttackSin = Math.sin(rt.monsterAttackAnim * Math.PI);
-      const heroLungeX = heroAttackSin * Math.min(92, w * 0.13);
-      const heroHurtShiftX = -rt.knightHurtAnim * 18;
+      const heroLungeX = heroAttackSin * Math.min(110, w * 0.16);
+      const heroHurtShiftX = -rt.knightHurtAnim * 20;
       const heroBaseX = w * 0.23 + heroLungeX + heroHurtShiftX;
 
       const monsterLungeX = -monsterAttackSin * Math.min(92, w * 0.13);
-      const monsterRecoilX = rt.monsterHitAnim * 16;
-      const monsterIdleSway = Math.sin(now * 0.0028) * (isDragonStage ? 8 : 5);
+      const monsterRecoilX = rt.monsterHitAnim * 18;
+      const monsterIdleSway = Math.sin(now * 0.0028) * (isBossStage ? 8 : 5);
       const monsterX = w * 0.75 + monsterLungeX + monsterRecoilX + monsterIdleSway;
 
-      // Decay animation timers
       if (rt.heroAttackAnim > 0) rt.heroAttackAnim = Math.max(0, rt.heroAttackAnim - 0.055);
       if (rt.monsterAttackAnim > 0) rt.monsterAttackAnim = Math.max(0, rt.monsterAttackAnim - 0.055);
       if (rt.monsterHitAnim > 0) rt.monsterHitAnim = Math.max(0, rt.monsterHitAnim - 0.06);
       if (rt.knightHurtAnim > 0) rt.knightHurtAnim = Math.max(0, rt.knightHurtAnim - 0.065);
       if (rt.dragonFireAnim > 0) rt.dragonFireAnim = Math.max(0, rt.dragonFireAnim - 0.042);
+      if (rt.demonCurseAnim > 0) rt.demonCurseAnim = Math.max(0, rt.demonCurseAnim - 0.04);
 
       // Compute Monster HP ratio
       let monsterHpRatio = 1;
-      if (round === 4) {
+      if (isDemonStage) {
+        const totalDemonPhases = Math.max(1, (queues[5] || []).length);
+        const subProg =
+          effectiveCombatRound === 4
+            ? rt.round4MatchRatio || 0
+            : effectiveCombatRound === 2 && activeQ?.word
+            ? rt.typedProgress / Math.max(1, activeQ.word.length)
+            : 0;
+        monsterHpRatio = Math.max(0, (totalDemonPhases - wordIdx - subProg) / totalDemonPhases);
+      } else if (round === 4) {
         monsterHpRatio = Math.max(0, 1 - (rt.round4MatchRatio || 0));
       } else if (round === 2 && activeQ?.word) {
         const len = Math.max(1, activeQ.word.length);
         monsterHpRatio = Math.max(0, (len - rt.typedProgress) / len);
       }
 
-      // 7. Draw Real Illustrated Monster / Ancient Dragon Boss Sprite
+      // 7. Draw Real Illustrated Monster / Ancient Dragon / Secret Demon King Sprite
       const monsterImg = spriteImagesRef.current.get(currentMonster?.spriteUrl);
-      const monsterDrawH = isDragonStage
-        ? Math.min(202, h * 0.74)
-        : Math.min(144, h * 0.56);
+      const monsterDrawH = isBossStage ? Math.min(208, h * 0.76) : Math.min(144, h * 0.56);
       const mAspect =
         monsterImg && monsterImg.complete && monsterImg.naturalHeight > 0
           ? monsterImg.naturalWidth / monsterImg.naturalHeight
-          : isDragonStage
-          ? 1.16
+          : isBossStage
+          ? 1.12
           : 1.0;
       const monsterDrawW = monsterDrawH * mAspect;
-      const isFloatingMonster = isDragonStage || currentMonster?.id === 'dark_lich';
+      const isFloatingMonster = isBossStage || currentMonster?.id === 'dark_lich';
       const monsterBobY = isFloatingMonster
         ? Math.sin(now * 0.0042) * 6 - 6
         : Math.sin(now * 0.005) * 2.5;
       const monsterTopY = groundY + 6 - monsterDrawH + monsterBobY - rt.monsterHitAnim * 6;
       const monsterCenterY = monsterTopY + monsterDrawH * 0.5;
 
-      // Soft dark contact shadow under monster
       ctx.save();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.54)';
       ctx.beginPath();
-      ctx.ellipse(monsterX, groundY + 3, monsterDrawW * 0.36, isDragonStage ? 11 : 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(monsterX, groundY + 3, monsterDrawW * 0.36, isBossStage ? 11 : 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Subtle atmospheric aura behind Monster
       const mAura = ctx.createRadialGradient(
         monsterX,
         monsterCenterY,
         10,
         monsterX,
         monsterCenterY,
-        monsterDrawH * 0.62
+        monsterDrawH * 0.65
       );
       mAura.addColorStop(
         0,
-        isDragonStage ? 'rgba(244, 63, 94, 0.34)' : `${currentMonster?.color || '#10b981'}38`
+        isDemonStage
+          ? 'rgba(217, 70, 239, 0.44)'
+          : isDragonStage
+          ? 'rgba(244, 63, 94, 0.34)'
+          : `${currentMonster?.color || '#10b981'}38`
       );
       mAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = mAura;
       ctx.beginPath();
-      ctx.arc(monsterX, monsterCenterY, monsterDrawH * 0.62, 0, Math.PI * 2);
+      ctx.arc(monsterX, monsterCenterY, monsterDrawH * 0.65, 0, Math.PI * 2);
       ctx.fill();
 
       if (monsterImg && monsterImg.complete && monsterImg.naturalWidth > 0) {
@@ -1159,59 +1721,49 @@ export default function KnightDragonGame({
         ctx.drawImage(monsterImg, -monsterDrawW / 2, -monsterDrawH, monsterDrawW, monsterDrawH);
         ctx.restore();
       } else {
-        // Brief loading fallback silhouette
         ctx.fillStyle = currentMonster?.color || '#10b981';
         ctx.beginPath();
         ctx.arc(monsterX, monsterCenterY, 30, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Crisp white-gold impact flash star when monster is struck
-      if (rt.monsterHitAnim > 0.25) {
-        ctx.save();
-        ctx.translate(monsterX - monsterDrawW * 0.06, monsterCenterY);
-        ctx.globalAlpha = Math.min(1, rt.monsterHitAnim);
-        ctx.strokeStyle = '#ffffff';
-        ctx.shadowColor = activeSkin.slashColor || '#38bdf8';
-        ctx.shadowBlur = 14;
-        ctx.lineWidth = 3.5;
-        ctx.beginPath();
-        ctx.moveTo(-26, -24);
-        ctx.lineTo(26, 24);
-        ctx.moveTo(22, -26);
-        ctx.lineTo(-22, 26);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Monster Nameplate + HP Bar (clamped cleanly inside viewport, NEVER undefined!)
-      const hpW = isDragonStage ? 186 : 138;
+      // Monster Nameplate + HP Bar
+      const hpW = isBossStage ? 196 : 138;
       const plateX = Math.min(w - hpW / 2 - 14, Math.max(hpW / 2 + 14, monsterX));
       const plateY = Math.max(24, monsterTopY - 12);
-      const labelText = `${currentMonster?.name || 'Quái Vật'} (+${expectedMonsterGold} 🪙)`;
+      const labelText = isDemonStage
+        ? `${DEMON_KING_BOSS.shortName} (+1.000 🪙 & +10 🗝️)`
+        : `${currentMonster?.name || 'Quái Vật'} (+${expectedMonsterGold} 🪙)`;
 
       ctx.font = 'bold 11px sans-serif';
       const labelW = Math.max(hpW + 16, ctx.measureText(labelText).width + 20);
-      ctx.fillStyle = 'rgba(9, 13, 24, 0.84)';
+      ctx.fillStyle = isDemonStage ? 'rgba(32, 4, 48, 0.9)' : 'rgba(9, 13, 24, 0.84)';
       ctx.beginPath();
       ctx.roundRect(plateX - labelW / 2, plateY - 15, labelW, 20, 8);
       ctx.fill();
-      ctx.strokeStyle = isDragonStage ? 'rgba(244, 63, 94, 0.55)' : 'rgba(148, 163, 184, 0.35)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = isDemonStage
+        ? 'rgba(232, 121, 249, 0.72)'
+        : isDragonStage
+        ? 'rgba(244, 63, 94, 0.55)'
+        : 'rgba(148, 163, 184, 0.35)';
+      ctx.lineWidth = 1.2;
       ctx.stroke();
 
-      ctx.fillStyle = isDragonStage ? '#fecdd3' : '#f8fafc';
+      ctx.fillStyle = isDemonStage ? '#f5d0fe' : isDragonStage ? '#fecdd3' : '#f8fafc';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(labelText, plateX, plateY - 5);
 
-      // Gradient HP Bar
       ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
       ctx.beginPath();
       ctx.roundRect(plateX - hpW / 2, plateY + 8, hpW, 8, 4);
       ctx.fill();
       const hpGrad = ctx.createLinearGradient(plateX - hpW / 2, 0, plateX + hpW / 2, 0);
-      if (isDragonStage) {
+      if (isDemonStage) {
+        hpGrad.addColorStop(0, '#a21caf');
+        hpGrad.addColorStop(0.5, '#e879f9');
+        hpGrad.addColorStop(1, '#f43f5e');
+      } else if (isDragonStage) {
         hpGrad.addColorStop(0, '#e11d48');
         hpGrad.addColorStop(1, '#f97316');
       } else {
@@ -1224,14 +1776,14 @@ export default function KnightDragonGame({
         ctx.roundRect(plateX - hpW / 2, plateY + 8, Math.max(6, hpW * monsterHpRatio), 8, 4);
         ctx.fill();
       }
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.roundRect(plateX - hpW / 2, plateY + 8, hpW, 8, 4);
       ctx.stroke();
       ctx.restore();
 
-      // 8. Draw Real Illustrated Playable Hero Sprite on the Left Side
+      // 8. Draw Illustrated Playable Hero Sprite with Motion Dash Afterimage
       const heroImg = spriteImagesRef.current.get(activeSkin.spriteUrl);
       const heroDrawH = Math.min(142, h * 0.55);
       const hAspect =
@@ -1244,13 +1796,11 @@ export default function KnightDragonGame({
       const heroCenterY = heroTopY + heroDrawH * 0.5;
 
       ctx.save();
-      // Ground contact shadow
       ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
       ctx.beginPath();
       ctx.ellipse(heroBaseX, groundY + 3, heroDrawW * 0.34, 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Subtle weapon/class aura glow behind hero
       const hAura = ctx.createRadialGradient(
         heroBaseX,
         heroCenterY,
@@ -1261,7 +1811,7 @@ export default function KnightDragonGame({
       );
       hAura.addColorStop(
         0,
-        rt.knightHurtAnim > 0.25 ? 'rgba(239, 68, 68, 0.45)' : `${activeSkin.bladeColor || '#38bdf8'}36`
+        rt.knightHurtAnim > 0.25 ? 'rgba(239, 68, 68, 0.48)' : `${activeSkin.bladeColor || '#38bdf8'}38`
       );
       hAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = hAura;
@@ -1270,14 +1820,24 @@ export default function KnightDragonGame({
       ctx.fill();
 
       if (heroImg && heroImg.complete && heroImg.naturalWidth > 0) {
+        // Motion dash afterimage trails during sword lunge
+        if (rt.heroAttackAnim > 0.28) {
+          for (let g = 1; g <= 2; g += 1) {
+            ctx.save();
+            ctx.globalAlpha = (0.3 - g * 0.1) * rt.heroAttackAnim;
+            ctx.translate(heroBaseX - g * 24, heroTopY + heroDrawH);
+            ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
+            ctx.restore();
+          }
+        }
         ctx.save();
         ctx.translate(heroBaseX, heroTopY + heroDrawH);
         const hScaleY = 1 + Math.sin(now * 0.0055) * 0.016;
         ctx.scale(1, hScaleY);
         if (rt.heroAttackAnim > 0) {
-          ctx.rotate(heroAttackSin * 0.09);
+          ctx.rotate(heroAttackSin * 0.11);
         } else if (rt.knightHurtAnim > 0) {
-          ctx.rotate(-rt.knightHurtAnim * 0.08);
+          ctx.rotate(-rt.knightHurtAnim * 0.09);
         }
         ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
         ctx.restore();
@@ -1289,37 +1849,103 @@ export default function KnightDragonGame({
       }
       ctx.restore();
 
-      // 9. Crisp RPG Combat VFX (Crescent Sword Slash / Monster Claw Strike / Volumetric Dragon Fire Breath)
-      // 9a. Hero Crescent Energy Slash Wave
+      // 9. Upgraded Multi-Layered Sword Slash & Combat VFX
+      // 9a. Sweeping Energy Crescent Wave from Hero Blade -> Monster
       if (rt.heroAttackAnim > 0.06) {
         const progress = 1 - rt.heroAttackAnim;
-        const slashX = heroBaseX + 26 + (monsterX - heroBaseX - 36) * Math.min(1, progress * 1.25);
+        const slashX = heroBaseX + 34 + (monsterX - heroBaseX - 38) * Math.min(1, progress * 1.35);
         const slashY = heroCenterY + (monsterCenterY - heroCenterY) * progress;
         ctx.save();
         ctx.translate(slashX, slashY);
-        ctx.globalAlpha = Math.min(1, rt.heroAttackAnim * 1.4);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.min(1, rt.heroAttackAnim * 1.45);
         ctx.shadowColor = activeSkin.slashColor || '#38bdf8';
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 22;
 
-        // Outer glowing crescent moon arc
         ctx.fillStyle = activeSkin.slashColor || '#38bdf8';
         ctx.beginPath();
-        ctx.arc(0, 0, 38, -Math.PI * 0.44, Math.PI * 0.44);
-        ctx.quadraticCurveTo(10, 0, Math.cos(-Math.PI * 0.44) * 38, Math.sin(-Math.PI * 0.44) * 38);
+        ctx.arc(0, 0, 44, -Math.PI * 0.46, Math.PI * 0.46);
+        ctx.quadraticCurveTo(14, 0, Math.cos(-Math.PI * 0.46) * 44, Math.sin(-Math.PI * 0.46) * 44);
         ctx.closePath();
         ctx.fill();
 
-        // Bright white inner razor edge
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
-        ctx.arc(3, 0, 34, -Math.PI * 0.38, Math.PI * 0.38);
+        ctx.arc(5, 0, 40, -Math.PI * 0.4, Math.PI * 0.4);
         ctx.stroke();
         ctx.restore();
       }
 
-      // 9b. Regular Monster Claw / Arcane Counter-Attack Slash (Stages 1–3 ONLY)
-      if (rt.monsterAttackAnim > 0.06 && !isDragonStage) {
+      // 9b. Multi-Cut Criss-Crossing Anime Sword Slashes Directly Across Monster
+      for (let i = (rt.slashes || []).length - 1; i >= 0; i -= 1) {
+        const sl = rt.slashes[i];
+        sl.age += 1;
+        if (sl.age < sl.delay) continue;
+        const localAge = sl.age - sl.delay;
+        const lifeT = localAge / sl.maxAge;
+        if (lifeT >= 1) {
+          rt.slashes.splice(i, 1);
+          continue;
+        }
+        const alpha = lifeT < 0.25 ? lifeT / 0.25 : 1 - (lifeT - 0.25) / 0.75;
+        const stretch = Math.min(1, lifeT * 3.2);
+        const sx = monsterX + sl.offsetX;
+        const sy = monsterCenterY + sl.offsetY;
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(sl.angle);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+        ctx.shadowColor = sl.color;
+        ctx.shadowBlur = 18;
+
+        // Curved tapering anime blade slash arc
+        const halfLen = sl.radius * (0.65 + 0.55 * stretch);
+        const thickness = (1 - lifeT * 0.65) * 14;
+        ctx.fillStyle = sl.color;
+        ctx.beginPath();
+        ctx.moveTo(-halfLen, 0);
+        ctx.quadraticCurveTo(0, -thickness, halfLen, 0);
+        ctx.quadraticCurveTo(0, thickness * 0.45, -halfLen, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // White-hot razor center line
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = Math.max(1.5, (1 - lifeT) * 4.5);
+        ctx.beginPath();
+        ctx.moveTo(-halfLen * 0.92, 0);
+        ctx.quadraticCurveTo(0, -thickness * 0.35, halfLen * 0.92, 0);
+        ctx.stroke();
+
+        // Thunder hero adds jagged electric crackle on slash
+        if (sl.style === 'thunder') {
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(-halfLen * 0.75, 0);
+          ctx.lineTo(-halfLen * 0.3, -10);
+          ctx.lineTo(0, 7);
+          ctx.lineTo(halfLen * 0.35, -9);
+          ctx.lineTo(halfLen * 0.75, 0);
+          ctx.stroke();
+        }
+
+        // Expanding radial impact shockwave ring on first slash
+        if (i === 0 && lifeT < 0.6) {
+          ctx.strokeStyle = sl.bladeColor;
+          ctx.lineWidth = 2.5 * (1 - lifeT);
+          ctx.beginPath();
+          ctx.arc(0, 0, 14 + lifeT * 66, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 9c. Regular Monster Claw / Arcane Counter-Attack (Stages 1–3 ONLY)
+      if (rt.monsterAttackAnim > 0.06 && !isBossStage) {
         ctx.save();
         ctx.translate(heroBaseX, heroCenterY);
         ctx.globalAlpha = Math.min(1, rt.monsterAttackAnim * 1.3);
@@ -1328,7 +1954,6 @@ export default function KnightDragonGame({
         ctx.shadowColor = strikeColor;
         ctx.shadowBlur = 14;
         ctx.lineCap = 'round';
-        // 3 diagonal claw marks slashing over Hero
         [-14, 0, 14].forEach((offset, idx) => {
           ctx.lineWidth = idx === 1 ? 4.5 : 3;
           ctx.beginPath();
@@ -1336,7 +1961,6 @@ export default function KnightDragonGame({
           ctx.quadraticCurveTo(offset * 0.4, offset * 0.2, -26 + offset, 26 + offset * 0.5);
           ctx.stroke();
         });
-        // Expanding shockwave ring
         const ringR = 18 + (1 - rt.monsterAttackAnim) * 44;
         ctx.strokeStyle = 'rgba(251, 113, 133, 0.55)';
         ctx.lineWidth = 2.5;
@@ -1346,7 +1970,7 @@ export default function KnightDragonGame({
         ctx.restore();
       }
 
-      // 9c. Volumetric Dragon Fire Breath Cone (Stage 4 Boss Dragon ONLY — ZERO solid rectangle!)
+      // 9d. Volumetric Dragon Fire Breath Cone (Stage 4 ONLY)
       if ((rt.dragonFireAnim > 0.05 || rt.finalSmashAnim > 0.05) && isDragonStage) {
         const intensity = rt.finalSmashAnim > 0 ? 1 : rt.dragonFireAnim;
         const mouthX = monsterX - monsterDrawW * 0.21;
@@ -1373,6 +1997,39 @@ export default function KnightDragonGame({
           ctx.arc(fx, fy, radius, 0, Math.PI * 2);
           ctx.fill();
         }
+        ctx.restore();
+      }
+
+      // 9e. Demon King Abyssal Void Lightning & Soul-Drain Curse VFX (Stage 5 ONLY)
+      if (rt.demonCurseAnim > 0.05 && isDemonStage) {
+        const intensity = rt.demonCurseAnim;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.min(1, intensity * 1.25);
+
+        // Dark crimson-magenta lightning arc from Demon King blade to Hero
+        ctx.strokeStyle = '#e879f9';
+        ctx.shadowColor = '#c026d3';
+        ctx.shadowBlur = 18;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        const startX = monsterX - monsterDrawW * 0.24;
+        const startY = monsterCenterY;
+        ctx.moveTo(startX, startY);
+        for (let seg = 1; seg <= 6; seg += 1) {
+          const t = seg / 6;
+          const lx = startX + (heroBaseX - startX) * t;
+          const ly = startY + (heroCenterY - startY) * t + Math.sin(now * 0.04 + seg * 2.3) * 18;
+          ctx.lineTo(lx, ly);
+        }
+        ctx.stroke();
+
+        // Cursed Void Seal Ring locking around Hero
+        ctx.strokeStyle = '#fb7185';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(heroBaseX, heroCenterY, 44 * (1.2 - intensity * 0.35), 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
       }
 
@@ -1415,6 +2072,7 @@ export default function KnightDragonGame({
         ctx.restore();
       }
 
+      ctx.restore(); // restore screenShake transform
       animRef.current = requestAnimationFrame(render);
     };
 
@@ -1422,7 +2080,7 @@ export default function KnightDragonGame({
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [round, wordIdx, activeQ, activeSkin, expectedMonsterGold, currentMonster]);
+  }, [round, wordIdx, activeQ, activeSkin, expectedMonsterGold, currentMonster, queues, effectiveCombatRound]);
 
   const handleBuyOrEquipSkin = (skin) => {
     const isUnlocked = rpgProfile.unlockedSkins.includes(skin.id);
@@ -1483,18 +2141,22 @@ export default function KnightDragonGame({
   };
 
   const bankItemsCount = parseRawVocabText(resolveSelectedRawVocab()).length;
+  const activeWheelMeta = WHEEL_SECTORS.find(s => s.round === demonWheelStyle) || WHEEL_SECTORS[0];
 
   return (
     <div
       data-testid="knight-dragon-game-root"
       className="min-h-[100dvh] w-full bg-[#090D16] text-white flex flex-col select-none relative overflow-x-hidden"
     >
-      {/* Top Bar: Switch Game Mode + Teacher Question Bank + Gold / Revive Keys + Character Skin Shop */}
+      {/* Top Bar */}
       <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 flex-wrap z-30">
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={onExitArena}
+            onClick={() => {
+              clearAllTimers();
+              onExitArena?.();
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition"
           >
             <ChevronLeft className="w-4 h-4" /> Thoát Đấu Trường
@@ -1504,7 +2166,10 @@ export default function KnightDragonGame({
             <button
               type="button"
               data-testid="knight-back-to-hub-btn"
-              onClick={onBackToGameHub}
+              onClick={() => {
+                clearAllTimers();
+                onBackToGameHub();
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-400/40 text-xs font-extrabold text-indigo-200 transition"
             >
               <span>🎮 Chọn Game Đấu Trường</span>
@@ -1514,7 +2179,10 @@ export default function KnightDragonGame({
           <button
             type="button"
             data-testid="switch-to-space-game-btn"
-            onClick={onBackToSpaceMode}
+            onClick={() => {
+              clearAllTimers();
+              onBackToSpaceMode?.();
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-xs font-extrabold text-cyan-300 transition"
           >
             <span>🚀 Đổi sang Game Phi Thuyền Vũ Trụ</span>
@@ -1526,8 +2194,7 @@ export default function KnightDragonGame({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Teacher Question Bank Manager Button */}
-          {isTeacher && onOpenVocabManager && (
+          {isAdminOrTeacher && onOpenVocabManager && (
             <button
               type="button"
               data-testid="knight-open-vocab-manager-btn"
@@ -1539,7 +2206,6 @@ export default function KnightDragonGame({
             </button>
           )}
 
-          {/* Gold Balance */}
           <div
             data-testid="knight-gold-badge"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-black"
@@ -1548,7 +2214,6 @@ export default function KnightDragonGame({
             <span>{Number(rpgProfile.gold || 0).toLocaleString('vi-VN')} 🪙 Vàng</span>
           </div>
 
-          {/* Revive Keys Balance */}
           <div
             data-testid="knight-keys-badge"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 border border-sky-400/40 text-sky-300 text-xs font-black"
@@ -1558,7 +2223,6 @@ export default function KnightDragonGame({
             <span>{rpgProfile.keys || 0} 🗝️ Chìa Khóa</span>
           </div>
 
-          {/* Character Skin Shop Button */}
           <button
             type="button"
             data-testid="open-knight-shop-btn"
@@ -1571,24 +2235,24 @@ export default function KnightDragonGame({
         </div>
       </header>
 
-      {/* HUB SCREEN: Stage Select, Illustrated Hero Preview, Monster Roster & Topic Selector */}
+      {/* HUB SCREEN */}
       {matchState === 'HUB' && (
         <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-5">
           <div className="rounded-3xl border border-rose-500/35 bg-gradient-to-br from-slate-900 via-[#1a1025] to-slate-900 p-5 sm:p-7 shadow-2xl space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
               <div className="space-y-1.5">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-extrabold">
-                  🐉 HÀNH TRÌNH ĐỒ LONG 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG HẮC ÁM
+                  🐉 HÀNH TRÌNH ĐỒ LONG 4 ẢI + 👿 BOSS MA VƯƠNG ẨN (5%)
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-black text-white">
                   Hiệp Sĩ Diệt Rồng — Đấu Trường Từ Vựng RPG
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                  Đánh hạ quái <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để quái rớt ra <b>🪙 Tiền Vàng</b> tích lũy mua nhân vật mới (<b>Valkyrie Freya, Kiếm Khách Tomoe, Pháp Sư Selena, Nữ Hoàng Long Tộc...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
+                  Hạ gục <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để thu <b>🪙 Tiền Vàng</b> mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực và săn tỉ lệ hiếm rớt <b>🗝️ Chìa Khóa Hồi Sinh</b>. Đánh bại Boss Rồng có <b>5% triệu hồi Boss Ma Vương Ẩn</b> (Thưởng <b>1.000 🪙 Vàng + 10 🗝️ Chìa Khóa + Danh Hiệu Ẩn &quot;Diệt Ma Vương&quot;</b>)!
                 </p>
               </div>
 
-              {/* Active Hero Showcase Card with Real Illustrated Sprite */}
+              {/* Active Hero Showcase Card */}
               <div className="shrink-0 rounded-2xl border border-pink-500/40 bg-slate-950/90 p-3 flex items-center gap-3.5 shadow-lg">
                 <div
                   className="w-20 h-20 rounded-2xl flex items-center justify-center border-2 p-1 shadow-inner relative overflow-hidden shrink-0"
@@ -1623,14 +2287,14 @@ export default function KnightDragonGame({
               </div>
             </div>
 
-            {/* Vocab Topic & Speed Configuration + Teacher Quick Question Bank Link */}
+            {/* Vocab Topic & Speed Configuration */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <label className="block text-xs font-bold text-slate-300">
                     Chọn Kho Từ Vựng ({bankItemsCount} từ)
                   </label>
-                  {isTeacher && onOpenVocabManager && (
+                  {isAdminOrTeacher && onOpenVocabManager && (
                     <button
                       type="button"
                       data-testid="knight-hub-manage-vocab-btn"
@@ -1707,84 +2371,134 @@ export default function KnightDragonGame({
               </div>
             </div>
 
-            {/* Start Full 4-Stage Campaign OR Jump to Specific Monster Stage */}
+            {/* Start Full 4-Stage Campaign + Admin/Teacher Per-Map Practice Controls */}
             <div className="space-y-3">
-              <button
-                type="button"
-                data-testid="start-knight-campaign-btn"
-                onClick={() => startKnightCampaign(1, false)}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 hover:opacity-95 text-slate-950 font-black text-sm sm:text-base shadow-xl flex items-center justify-center gap-2 transition"
-              >
-                <Swords className="w-5 h-5" />
-                <span>XUẤT CHINH ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG HẮC ÁM</span>
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  data-testid="start-knight-campaign-btn"
+                  onClick={() => startKnightCampaign(1, false)}
+                  className="flex-1 py-4 px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 hover:opacity-95 text-slate-950 font-black text-sm sm:text-base shadow-xl flex items-center justify-center gap-2 transition"
+                >
+                  <Swords className="w-5 h-5" />
+                  <span>XUẤT CHINH TỪ ẢI 1 ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG</span>
+                </button>
+
+                {isAdminOrTeacher && (
+                  <button
+                    type="button"
+                    data-testid="admin-test-demon-king-btn"
+                    onClick={handleAdminStartDemonKingTest}
+                    className="sm:w-auto py-3.5 px-4 rounded-2xl bg-gradient-to-r from-fuchsia-700 via-purple-700 to-rose-700 hover:opacity-95 border border-fuchsia-400/60 text-white font-black text-xs sm:text-sm shadow-lg flex items-center justify-center gap-1.5 transition shrink-0"
+                    title="Chỉ Admin / Giáo viên: Vào thẳng Boss Ma Vương Ẩn để trải nghiệm cảnh báo Pac-Man & Vòng Quay"
+                  >
+                    <span>👿 Test Boss Ma Vương Ẩn (GV/Admin)</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-[11px] font-bold text-slate-400">
+                  {isAdminOrTeacher
+                    ? '🛡️ Quyền Admin / Giáo viên: Bấm vào bất kỳ bản đồ Ải 1–4 bên dưới để luyện tập hoặc kiểm thử riêng từng map.'
+                    : '🗺️ Lộ trình chinh phục 4 Ải (Học viên luôn xuất phát từ Ải 1 — Chỉ Admin/Giáo viên mới được chọn luyện tập riêng từng map).'}
+                </p>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {KNIGHT_MONSTER_STAGES.map(st => {
                   const stageKeyMinPct = Math.round(
                     computeMonsterKeyDropChance(st.monsters[0], activeSkin) * 100
                   );
+                  const cardContent = (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs font-black text-amber-400">{st.shortTitle}</span>
+                        {st.round === 4 ? (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black">
+                            FINAL BOSS
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[10px] font-bold">
+                            🗝️ {stageKeyMinPct}%+
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-center gap-2 py-1.5 px-2 rounded-xl bg-slate-900/80 border border-slate-800/90">
+                        {st.monsters.map(m => (
+                          <div key={m.id} className="flex flex-col items-center gap-0.5" title={m.name}>
+                            <img
+                              src={m.spriteUrl}
+                              alt={m.name}
+                              className={
+                                st.round === 4
+                                  ? 'w-20 h-16 object-contain drop-shadow-[0_4px_10px_rgba(244,63,94,0.65)]'
+                                  : 'w-12 h-12 object-contain drop-shadow-[0_3px_6px_rgba(0,0,0,0.6)]'
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="text-[11px] font-bold text-slate-200">{st.mechanicLabel}</p>
+                      <p className="text-[11px] text-slate-400 leading-snug">{st.questionDesc}</p>
+
+                      {!isAdminOrTeacher && (
+                        <div className="pt-1 flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                          <Lock className="w-3 h-3 text-amber-400/80" />
+                          <span>{st.round === 1 ? 'Bắt đầu từ nút Xuất Chinh ở trên' : 'Vượt ải trước để mở khóa'}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+
+                  if (isAdminOrTeacher) {
+                    return (
+                      <button
+                        key={st.round}
+                        type="button"
+                        data-testid={`start-knight-stage-${st.round}`}
+                        onClick={() => startKnightCampaign(st.round, true)}
+                        className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2 ${
+                          st.round === 4
+                            ? 'bg-rose-950/45 hover:bg-rose-900/55 border-rose-500/50 text-rose-100'
+                            : 'bg-slate-950/85 hover:bg-slate-900 border-slate-800 hover:border-amber-500/50 text-slate-100'
+                        }`}
+                      >
+                        {cardContent}
+                      </button>
+                    );
+                  }
+
                   return (
-                    <button
+                    <div
                       key={st.round}
-                      type="button"
-                      data-testid={`start-knight-stage-${st.round}`}
-                      onClick={() => startKnightCampaign(st.round, true)}
-                      className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2 ${
+                      data-testid={`locked-knight-stage-${st.round}`}
+                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-2 opacity-85 ${
                         st.round === 4
-                          ? 'bg-rose-950/45 hover:bg-rose-900/55 border-rose-500/50 text-rose-100'
-                          : 'bg-slate-950/85 hover:bg-slate-900 border-slate-800 hover:border-amber-500/50 text-slate-100'
+                          ? 'bg-rose-950/30 border-rose-500/35 text-rose-100'
+                          : 'bg-slate-950/65 border-slate-800 text-slate-100'
                       }`}
                     >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <span className="text-xs font-black text-amber-400">{st.shortTitle}</span>
-                          {st.round === 4 ? (
-                            <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black">
-                              FINAL BOSS
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[10px] font-bold">
-                              🗝️ {stageKeyMinPct}%+
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Real Illustrated Monster Roster Preview */}
-                        <div className="flex items-center justify-center gap-2 py-1.5 px-2 rounded-xl bg-slate-900/80 border border-slate-800/90">
-                          {st.monsters.map(m => (
-                            <div key={m.id} className="flex flex-col items-center gap-0.5" title={m.name}>
-                              <img
-                                src={m.spriteUrl}
-                                alt={m.name}
-                                className={
-                                  st.round === 4
-                                    ? 'w-20 h-16 object-contain drop-shadow-[0_4px_10px_rgba(244,63,94,0.65)]'
-                                    : 'w-12 h-12 object-contain drop-shadow-[0_3px_6px_rgba(0,0,0,0.6)]'
-                                }
-                              />
-                            </div>
-                          ))}
-                        </div>
-
-                        <p className="text-[11px] font-bold text-slate-200">{st.mechanicLabel}</p>
-                        <p className="text-[11px] text-slate-400 leading-snug">{st.questionDesc}</p>
-                      </div>
-                    </button>
+                      {cardContent}
+                    </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* Player RPG Stats & Next-Day Daily Rank Rule Note */}
+            {/* Player RPG Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
               <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
                 <p className="text-[11px] text-slate-400 font-bold">Quái Đã Hạ</p>
                 <p className="text-lg font-black text-emerald-400">{rpgProfile.monstersSlain || 0}</p>
               </div>
               <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
-                <p className="text-[11px] text-slate-400 font-bold">Boss Rồng Đã Hạ</p>
-                <p className="text-lg font-black text-rose-400">{rpgProfile.dragonsSlain || 0} 🐉</p>
+                <p className="text-[11px] text-slate-400 font-bold">Rồng / Ma Vương Đã Hạ</p>
+                <p className="text-lg font-black text-rose-400">
+                  {rpgProfile.dragonsSlain || 0} 🐉 · {rpgProfile.demonKingsSlain || 0} 👿
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
                 <p className="text-[11px] text-slate-400 font-bold">Kỷ Lục Điểm Hiệp Sĩ</p>
@@ -1805,15 +2519,33 @@ export default function KnightDragonGame({
           {/* HUD Status Strip */}
           <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-black">
+              <span
+                className={`px-2.5 py-1 rounded-lg text-white text-xs font-black ${
+                  isDemonKingBattle ? 'bg-gradient-to-r from-fuchsia-600 to-rose-600' : 'bg-rose-600'
+                }`}
+              >
                 {stageMeta.shortTitle}
               </span>
               <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 text-xs font-bold">
-                Quái {wordIdx + 1}/{(queues[round] || []).length || 1}: {currentMonster?.name}
+                {isDemonKingBattle
+                  ? `Đòn ${wordIdx + 1}/${(queues[5] || []).length || 1} (Luật Vòng ${demonWheelStyle})`
+                  : `Quái ${wordIdx + 1}/${(queues[round] || []).length || 1}: ${currentMonster?.name}`}
               </span>
-              <span className="text-sm tracking-wider" title={`Còn ${lives} mạng`}>
+              <span
+                data-testid="knight-lives-display"
+                className="text-sm tracking-wider"
+                title={`Còn ${lives} mạng`}
+              >
                 {lives > 0 ? '❤️'.repeat(lives) : '💀'}
               </span>
+              {isDemonKingBattle && matchState === 'PLAYING' && (
+                <span
+                  data-testid="demon-curse-timer-badge"
+                  className="px-2.5 py-1 rounded-lg bg-fuchsia-600/25 border border-fuchsia-400/60 text-fuchsia-200 text-xs font-black animate-pulse"
+                >
+                  👿 Rút 1 ❤️ sau: {demonCurseLeft}s
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2.5 flex-wrap">
@@ -1827,7 +2559,9 @@ export default function KnightDragonGame({
                 <Clock className="w-3.5 h-3.5" /> {timeLeft}s
               </span>
               <span className="text-xs font-black text-amber-400">Combo x{combo}</span>
-              <span className="text-xs font-black text-emerald-400 tabular-nums">{score}đ</span>
+              <span data-testid="knight-score-display" className="text-xs font-black text-emerald-400 tabular-nums">
+                {score}đ
+              </span>
               <button
                 type="button"
                 onClick={handleUseFreeze}
@@ -1836,13 +2570,24 @@ export default function KnightDragonGame({
               >
                 <Snowflake className="w-3 h-3" /> +8s ({freezeCharges})
               </button>
-              {(round === 2 || round === 4) && (
+              {(effectiveCombatRound === 2 || effectiveCombatRound === 4) && (
                 <button
                   type="button"
+                  data-testid="knight-hint-btn"
                   onClick={handleUseHint}
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center gap-1"
+                  disabled={score < KNIGHT_HINT_SCORE_COST}
+                  title={
+                    score < KNIGHT_HINT_SCORE_COST
+                      ? `Cần tối thiểu ${KNIGHT_HINT_SCORE_COST} điểm mới được dùng Gợi ý!`
+                      : `Mở gợi ý đáp án (-${KNIGHT_HINT_SCORE_COST}đ)`
+                  }
+                  className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition ${
+                    score >= KNIGHT_HINT_SCORE_COST
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-400/40 text-amber-300'
+                      : 'bg-slate-800/70 border-slate-700 text-slate-500 cursor-not-allowed opacity-60'
+                  }`}
                 >
-                  <Lightbulb className="w-3 h-3" /> Gợi ý (-15đ)
+                  <Lightbulb className="w-3 h-3" /> Gợi ý (-{KNIGHT_HINT_SCORE_COST}đ)
                 </button>
               )}
             </div>
@@ -1852,18 +2597,30 @@ export default function KnightDragonGame({
           <div className="relative h-64 sm:h-72 w-full rounded-2xl border border-slate-800 overflow-hidden shadow-2xl bg-slate-950 shrink-0">
             <canvas ref={canvasRef} className="w-full h-full block" />
 
-            {/* Monster Gold & Rare Key Drop Info Pill (computed cleanly — never undefined / NaN) */}
+            {/* Monster Gold & Rare Key Drop Info Pill */}
             <div
               data-testid="knight-loot-info-pill"
               className="absolute bottom-2 right-2.5 flex items-center gap-2 bg-slate-950/90 border border-slate-700/80 rounded-xl px-3 py-1.5 z-20 text-[11px] font-bold text-slate-200 backdrop-blur-xs"
             >
-              <span className="text-amber-300">
-                🪙 Hạ {currentMonster?.name}: Rớt +{expectedMonsterGold} Vàng
-              </span>
-              <span className="text-slate-600">•</span>
-              <span className="text-sky-300">
-                🗝️ Tỉ lệ rớt Chìa Khóa: {expectedKeyDropPct}%
-              </span>
+              {isDemonKingBattle ? (
+                <>
+                  <span className="text-fuchsia-300">
+                    👿 Hạ Ma Vương: +1.000 🪙 Vàng &amp; +10 🗝️ Chìa Khóa
+                  </span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-rose-300">⛓️ Chết không thể hồi sinh</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-amber-300">
+                    🪙 Hạ {currentMonster?.name}: Rớt +{expectedMonsterGold} Vàng
+                  </span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-sky-300">
+                    🗝️ Tỉ lệ rớt Chìa Khóa: {expectedKeyDropPct}%
+                  </span>
+                </>
+              )}
             </div>
 
             {bannerAlert && (
@@ -1878,7 +2635,7 @@ export default function KnightDragonGame({
               </div>
             )}
 
-            {/* SUPER SMASH BROS. "FINAL SMASH / SKILL TẤT SÁT KẾT LIỄU" OVERLAY */}
+            {/* SUPER SMASH BROS. DRAGON FINAL SMASH OVERLAY */}
             {matchState === 'FINAL_SMASH' && (
               <div
                 data-testid="dragon-final-smash-overlay"
@@ -1897,19 +2654,63 @@ export default function KnightDragonGame({
                 </p>
               </div>
             )}
+
+            {/* 5-SECOND DEATH DELAY COUNTDOWN BEFORE REVIVE MODAL */}
+            {matchState === 'DEATH_COUNTDOWN' && (
+              <div
+                data-testid="knight-death-countdown-overlay"
+                className="absolute inset-0 bg-slate-950/92 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-40 space-y-2"
+              >
+                <Skull className="w-10 h-10 text-rose-500 animate-bounce" />
+                <h2 className="text-xl sm:text-2xl font-black text-rose-400 tracking-wide">
+                  💀 HIỆP SĨ ĐÃ NGÃ XUỐNG!
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 font-bold">
+                  Đang mở Bảng Hồi Sinh sau{' '}
+                  <span className="text-amber-300 text-lg font-black font-mono px-1">
+                    {deathCountdownSec}s
+                  </span>
+                  ...
+                </p>
+              </div>
+            )}
+
+            {/* DEMON KING UNREVIVABLE SOUL-SEAL EXECUTION OVERLAY */}
+            {matchState === 'DEMON_EXECUTION' && (
+              <div
+                data-testid="demon-king-execution-overlay"
+                className="absolute inset-0 bg-gradient-to-br from-[#140024]/95 via-black/95 to-[#3d001b]/95 flex flex-col items-center justify-center p-4 text-center z-40 space-y-2.5 animate-pulse"
+              >
+                <div className="w-full py-3 bg-gradient-to-r from-transparent via-fuchsia-800/90 to-transparent border-y-2 border-rose-400 shadow-[0_0_50px_rgba(217,70,239,0.95)]">
+                  <p className="text-[11px] font-black uppercase tracking-[0.28em] text-fuchsia-200">
+                    ⛓️ TUYỆT KỸ ĐOẠT HỒN • PHONG ẤN VĨNH VIỄN ⛓️
+                  </p>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wider mt-0.5">
+                    👿 HƯ KHÔNG PHONG ẤN — KHÔNG THỂ HỒI SINH!
+                  </h2>
+                </div>
+                <p className="text-xs sm:text-sm font-bold text-rose-200 max-w-md">
+                  Ma Vương Hắc Ám Malakor đã khóa chặt linh hồn bạn — Chìa Khóa Hồi Sinh &amp; Vàng đều vô hiệu!
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Interactive Combat Question Panel */}
           {activeQ && matchState === 'PLAYING' && (
             <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400">
-                  {stageMeta.mechanicLabel}
+                  {isDemonKingBattle
+                    ? `👿 MA VƯƠNG MALAKOR • CHẾ ĐỘ VÒNG ${demonWheelStyle}: ${activeWheelMeta.title}`
+                    : stageMeta.mechanicLabel}
                 </span>
                 <button
                   type="button"
                   onClick={() =>
-                    speakWord(round === 4 ? activeQ.v4Display || activeQ.word : activeQ.word)
+                    speakWord(
+                      effectiveCombatRound === 4 ? activeQ.v4Display || activeQ.word : activeQ.word
+                    )
                   }
                   className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 text-xs font-bold inline-flex items-center gap-1"
                 >
@@ -1918,15 +2719,17 @@ export default function KnightDragonGame({
               </div>
 
               {/* Wave 1 (Meaning Shields) & Wave 3 (Syn/Ant/Context Spell Orbs) */}
-              {(round === 1 || round === 3) && (() => {
+              {(effectiveCombatRound === 1 || effectiveCombatRound === 3) && (() => {
                 const choices =
-                  round === 1
+                  effectiveCombatRound === 1
                     ? [activeQ.word, ...(activeQ.distractors || [])].slice(0, 4)
                     : activeQ.v3Choices || [];
                 return (
                   <div className="space-y-3">
                     <p className="text-base sm:text-lg font-extrabold text-white">
-                      {round === 3 ? activeQ.v3Question : `Nghĩa tiếng Việt: "${activeQ.prompt}"`}
+                      {effectiveCombatRound === 3
+                        ? activeQ.v3Question
+                        : `Nghĩa tiếng Việt: "${activeQ.prompt}"`}
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {choices.map((cText, idx) => (
@@ -1948,11 +2751,12 @@ export default function KnightDragonGame({
                 );
               })()}
 
-              {/* Wave 2: Skeleton & Orc Armor-Shatter Full Word Typing */}
-              {round === 2 && (
+              {/* Wave 2: Full Word Typing */}
+              {effectiveCombatRound === 2 && (
                 <div className="space-y-3 text-center">
                   <p className="text-base font-extrabold text-white">
-                    Nghĩa: &quot;{activeQ.prompt}&quot; • Phiên âm: <span className="text-amber-300 font-mono">{activeQ.ipa || ''}</span>
+                    Nghĩa: &quot;{activeQ.prompt}&quot; • Phiên âm:{' '}
+                    <span className="text-amber-300 font-mono">{activeQ.ipa || ''}</span>
                   </p>
                   <div className="flex justify-center gap-1.5 flex-wrap">
                     {String(activeQ.word || '')
@@ -1992,14 +2796,14 @@ export default function KnightDragonGame({
                 </div>
               )}
 
-              {/* Wave 4: FINAL DRAGON BOSS Sentence Fill-in-the-Blank Typing */}
-              {round === 4 && (() => {
+              {/* Wave 4: Sentence Fill-in-the-Blank Typing */}
+              {effectiveCombatRound === 4 && (() => {
                 const acceptedList =
                   Array.isArray(activeQ.v4Answers) && activeQ.v4Answers.length > 0
                     ? activeQ.v4Answers
                     : [activeQ.v4Display || activeQ.collocation || activeQ.word];
                 const evalRes = matchRound4TypingAnswer(round4Input, acceptedList);
-                const dragonHpPct = Math.max(0, Math.round((1 - (evalRes.matchRatio || 0)) * 100));
+                const bossHpPct = Math.max(0, Math.round((1 - (evalRes.matchRatio || 0)) * 100));
 
                 return (
                   <div className="space-y-3">
@@ -2014,22 +2818,28 @@ export default function KnightDragonGame({
                       )}
                     </div>
 
-                    {/* Dragon Boss HP Progress Bar */}
                     <div>
                       <div className="flex items-center justify-between text-xs font-extrabold mb-1">
                         <span className="text-rose-400 flex items-center gap-1">
-                          <Flame className="w-3.5 h-3.5" /> MÁU RỒNG HẮC ÁM: {dragonHpPct}%
+                          <Flame className="w-3.5 h-3.5" />{' '}
+                          {isDemonKingBattle
+                            ? `THANH CHÉM MA VƯƠNG: ${bossHpPct}%`
+                            : `MÁU RỒNG HẮC ÁM: ${bossHpPct}%`}
                         </span>
                         <span className="text-amber-300">
                           {evalRes.matched
-                            ? '⚡ Đủ sát thương! Nhấn Enter để tung Đồ Long Trảm!'
-                            : 'Gõ đúng từ để chém mất máu Rồng • Gõ sai bị Rồng khè lửa!'}
+                            ? '⚡ Đủ sát thương! Nhấn Enter để tung nhát chém kết liễu!'
+                            : 'Gõ đúng từ để chém mất máu Boss • Gõ sai bị Boss phản đòn!'}
                         </span>
                       </div>
                       <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-rose-500/40">
                         <div
-                          className="h-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-400 transition-all duration-150"
-                          style={{ width: `${dragonHpPct}%` }}
+                          className={`h-full transition-all duration-150 ${
+                            isDemonKingBattle
+                              ? 'bg-gradient-to-r from-fuchsia-600 via-purple-500 to-rose-400'
+                              : 'bg-gradient-to-r from-rose-600 via-orange-500 to-amber-400'
+                          }`}
+                          style={{ width: `${bossHpPct}%` }}
                         />
                       </div>
                     </div>
@@ -2043,7 +2853,11 @@ export default function KnightDragonGame({
                           data-testid="knight-dragon-boss-input"
                           value={round4Input}
                           onChange={e => handleWave4InputChange(e.target.value)}
-                          placeholder="Gõ từ / cụm từ tiếng Anh để chém Rồng Hắc Ám rồi nhấn Enter..."
+                          placeholder={
+                            isDemonKingBattle
+                              ? 'Gõ từ / cụm từ tiếng Anh để trảm Ma Vương rồi nhấn Enter...'
+                              : 'Gõ từ / cụm từ tiếng Anh để chém Rồng Hắc Ám rồi nhấn Enter...'
+                          }
                           className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border-2 border-rose-500/60 focus:border-amber-400 text-sm font-bold text-white focus:outline-none"
                         />
                       </div>
@@ -2052,7 +2866,7 @@ export default function KnightDragonGame({
                         data-testid="knight-dragon-boss-submit"
                         className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-slate-950 text-xs sm:text-sm font-black shrink-0 flex items-center gap-1.5"
                       >
-                        <Swords className="w-4 h-4" /> Chém Rồng
+                        <Swords className="w-4 h-4" /> {isDemonKingBattle ? 'Trảm Ma Vương' : 'Chém Rồng'}
                       </button>
                     </form>
                   </div>
@@ -2063,8 +2877,135 @@ export default function KnightDragonGame({
         </div>
       )}
 
-      {/* REVIVE PROMPT MODAL (USE RARE MONSTER-DROPPED KEYS OR GOLD) */}
-      {matchState === 'REVIVE_PROMPT' && (
+      {/* 3-SECOND RETRO PAC-MAN FLASHING WARNING OVERLAY FOR SECRET DEMON KING BOSS */}
+      {matchState === 'DEMON_WARNING' && (() => {
+        const flashPhase = pacmanFlashTick % 3;
+        const flashBg =
+          flashPhase === 0
+            ? 'bg-[#0018A8]/95 border-[#38bdf8]'
+            : flashPhase === 1
+            ? 'bg-[#000000]/96 border-[#facc15]'
+            : 'bg-[#990024]/95 border-[#f43f5e]';
+        return (
+          <div
+            data-testid="demon-king-warning-overlay"
+            className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 text-center transition-colors duration-75 border-8 ${flashBg}`}
+          >
+            {/* Retro Pac-Man Pixel Maze Dots Header */}
+            <div className="flex items-center gap-3 mb-4 text-xl sm:text-2xl font-mono tracking-[0.4em] text-yellow-300">
+              <span>🟡 · · · · 👻 · · · · 🟡</span>
+            </div>
+
+            <div className="max-w-xl w-full rounded-2xl border-4 border-yellow-300 bg-black/90 p-6 sm:p-8 shadow-[0_0_70px_rgba(250,204,21,0.55)] space-y-4">
+              <p className="text-xs sm:text-sm font-mono font-black uppercase tracking-[0.3em] text-yellow-300 animate-pulse">
+                ⚠️ WARNING! RETRO BOSS ALERT (5% SECRET ENCOUNTER) ⚠️
+              </p>
+
+              <div className="flex items-center justify-center gap-4">
+                <img
+                  src={DEMON_KING_BOSS.spriteUrl}
+                  alt={DEMON_KING_BOSS.shortName}
+                  className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-[0_0_24px_rgba(232,121,249,0.9)]"
+                />
+              </div>
+
+              <h2 className="text-2xl sm:text-4xl font-black text-fuchsia-300 tracking-wider font-mono">
+                MA VƯƠNG ẨN XUẤT HIỆN!
+              </h2>
+
+              <div className="py-2 px-4 rounded-xl bg-rose-950/80 border-2 border-rose-400 inline-block">
+                <p className="text-sm sm:text-base font-black text-white">
+                  ❤️❤️❤️❤️❤️ TRAO NGAY 5 MẠNG CHIẾN ĐẤU!
+                </p>
+              </div>
+
+              <p className="text-xs sm:text-sm text-amber-200 font-bold">
+                Cứ 5 giây Ma Vương rút 1 tim (-1 ❤️) • Thua sẽ bị Phong Ấn không thể hồi sinh!
+                <br />
+                Thắng nhận ngay <b className="text-yellow-300">1.000 🪙 Vàng + 10 🗝️ Chìa Khóa + Danh Hiệu Ẩn &quot;Diệt Ma Vương&quot;</b>!
+              </p>
+
+              <div className="text-4xl sm:text-5xl font-black font-mono text-yellow-300">
+                {demonWarningSec}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-4 text-xl sm:text-2xl font-mono tracking-[0.4em] text-yellow-300">
+              <span>👻 · · · · 🟡 · · · · 👻</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* DEMON KING SPINNING 4-SLICE FORTUNE WHEEL MODAL */}
+      {matchState === 'DEMON_WHEEL' && (
+        <div
+          data-testid="demon-king-wheel-overlay"
+          className="fixed inset-0 bg-[#070212]/94 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 text-center"
+        >
+          <div className="max-w-lg w-full rounded-3xl border-2 border-fuchsia-500/70 bg-slate-950/95 p-6 space-y-4 shadow-[0_0_60px_rgba(192,38,211,0.45)]">
+            <div className="space-y-1">
+              <span className="px-3 py-1 rounded-full bg-fuchsia-600/25 border border-fuchsia-400/50 text-fuchsia-200 text-xs font-black uppercase">
+                🎡 VÒNG QUAY ĐỊNH MỆNH CỦA MA VƯƠNG
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                {demonWheelSettled
+                  ? `🎯 TRÚNG VÒNG ${demonWheelStyle}: ${activeWheelMeta.title.toUpperCase()}!`
+                  : 'Ma Vương Đang Quay Chọn Luật Chơi...'}
+              </h2>
+            </div>
+
+            {/* 4-Slice Animated SVG Wheel with Top Pointer */}
+            <div className="relative w-60 h-60 mx-auto my-2 flex items-center justify-center">
+              {/* Golden Pointer Arrow at Top */}
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-amber-300 drop-shadow-[0_2px_6px_rgba(251,191,36,0.9)]" />
+
+              <div
+                className="w-56 h-56 rounded-full border-4 border-amber-300 shadow-[0_0_30px_rgba(217,70,239,0.55)] overflow-hidden"
+                style={{
+                  transform: `rotate(${demonWheelRotation}deg)`,
+                  transition: 'transform 2.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <svg viewBox="0 0 200 200" className="w-full h-full">
+                  {/* Sector 1: 0..90 deg (Top-Right) */}
+                  <path d="M100 100 L100 0 A100 100 0 0 1 200 100 Z" fill="#0284c7" stroke="#0f172a" strokeWidth="3" />
+                  {/* Sector 2: 90..180 deg (Bottom-Right) */}
+                  <path d="M100 100 L200 100 A100 100 0 0 1 100 200 Z" fill="#d97706" stroke="#0f172a" strokeWidth="3" />
+                  {/* Sector 3: 180..270 deg (Bottom-Left) */}
+                  <path d="M100 100 L100 200 A100 100 0 0 1 0 100 Z" fill="#7c3aed" stroke="#0f172a" strokeWidth="3" />
+                  {/* Sector 4: 270..360 deg (Top-Left) */}
+                  <path d="M100 100 L0 100 A100 100 0 0 1 100 0 Z" fill="#e11d48" stroke="#0f172a" strokeWidth="3" />
+
+                  <text x="142" y="56" textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="900">VÒNG 1</text>
+                  <text x="142" y="72" textAnchor="middle" fill="#e0f2fe" fontSize="8" fontWeight="700">Chọn Nghĩa</text>
+
+                  <text x="142" y="138" textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="900">VÒNG 2</text>
+                  <text x="142" y="154" textAnchor="middle" fill="#fef3c7" fontSize="8" fontWeight="700">Gõ Full Từ</text>
+
+                  <text x="58" y="138" textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="900">VÒNG 3</text>
+                  <text x="58" y="154" textAnchor="middle" fill="#ede9fe" fontSize="8" fontWeight="700">Đồng/Trái</text>
+
+                  <text x="58" y="56" textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="900">VÒNG 4</text>
+                  <text x="58" y="72" textAnchor="middle" fill="#ffe4e6" fontSize="8" fontWeight="700">Điền Câu</text>
+
+                  <circle cx="100" cy="100" r="20" fill="#090d16" stroke="#fde047" strokeWidth="3" />
+                  <text x="100" y="106" textAnchor="middle" fontSize="16">👿</text>
+                </svg>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm font-bold text-slate-300">
+              {demonWheelSettled
+                ? `⚔️ Chuẩn bị quyết chiến theo cách chơi ${activeWheelMeta.shortLabel} (${activeWheelMeta.desc}) với 5 ❤️!`
+                : 'Trúng ô nào sẽ đấu Boss Ma Vương theo đúng thể thức của vòng đó!'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* REVIVE PROMPT MODAL (APPEARS AFTER 5-SECOND DEATH DELAY ON STAGES 1–4 ONLY) */}
+      {matchState === 'REVIVE_PROMPT' && !cannotReviveByDemon && round !== 5 && (
         <div
           data-testid="knight-revive-modal"
           className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
@@ -2170,8 +3111,37 @@ export default function KnightDragonGame({
             <h2 className="text-2xl font-black text-amber-300">
               TỔNG KẾT HÀNH TRÌNH HIỆP SĨ
             </h2>
+
+            {demonKingDefeated && (
+              <div
+                data-testid="demon-king-victory-banner"
+                className="p-3.5 rounded-2xl bg-gradient-to-r from-fuchsia-950/90 via-purple-900/80 to-amber-950/85 border-2 border-fuchsia-400 text-left space-y-1 shadow-lg"
+              >
+                <p className="text-xs sm:text-sm font-black text-fuchsia-200">
+                  👿 CHIẾN THẮNG BOSS MA VƯƠNG ẨN MALAKOR!
+                </p>
+                <p className="text-xs text-amber-200 font-bold">
+                  🏆 Mở khóa Danh Hiệu Ẩn: <span className="text-white underline">Diệt Ma Vương</span>
+                  <br />
+                  🎁 Phần thưởng: <span className="text-yellow-300">+1.000 🪙 Vàng</span> &amp;{' '}
+                  <span className="text-sky-300">+10 🗝️ Chìa Khóa Hồi Sinh</span>!
+                </p>
+              </div>
+            )}
+
+            {cannotReviveByDemon && !demonKingDefeated && (
+              <div
+                data-testid="demon-king-sealed-banner"
+                className="p-3 rounded-2xl bg-rose-950/75 border border-rose-500/70 text-xs font-bold text-rose-200"
+              >
+                ⛓️ Bạn đã bị Tuyệt Kỹ Hư Không Phong Ấn của Ma Vương kết liễu — Không thể hồi sinh!
+              </div>
+            )}
+
             <p className="text-xs text-slate-300">
-              Điểm trận này: <b className="text-amber-300 text-base">{score} điểm</b> • Chiến lợi phẩm quái rớt: <b className="text-amber-400">+{sessionGoldEarned} 🪙 Vàng</b> &amp; <b className="text-sky-300">+{sessionKeysEarned} 🗝️ Chìa Khóa</b>
+              Điểm trận này: <b className="text-amber-300 text-base">{score} điểm</b> • Chiến lợi phẩm quái rớt:{' '}
+              <b className="text-amber-400">+{sessionGoldEarned} 🪙 Vàng</b> &amp;{' '}
+              <b className="text-sky-300">+{sessionKeysEarned} 🗝️ Chìa Khóa</b>
             </p>
             <div className="grid grid-cols-2 gap-2.5 bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-xs">
               <div>
@@ -2179,14 +3149,16 @@ export default function KnightDragonGame({
                 <p className="text-base font-black text-emerald-400">{sessionMonstersSlain} quái</p>
               </div>
               <div>
-                <p className="text-slate-400">Boss Rồng Đã Hạ</p>
-                <p className="text-base font-black text-rose-400">{sessionDragonsSlain} 🐉</p>
+                <p className="text-slate-400">Boss Rồng / Ma Vương</p>
+                <p className="text-base font-black text-rose-400">
+                  {sessionDragonsSlain} 🐉 · {demonKingDefeated ? 1 : 0} 👿
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={() => startKnightCampaign(round, singleRoundOnly)}
+                onClick={() => startKnightCampaign(round === 5 ? 1 : round, round === 5 ? false : singleRoundOnly)}
                 className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black flex items-center gap-1.5"
               >
                 <RefreshCw className="w-4 h-4" /> Chơi Lại Ngay
@@ -2201,6 +3173,7 @@ export default function KnightDragonGame({
               <button
                 type="button"
                 onClick={() => {
+                  clearAllTimers();
                   setMatchState('HUB');
                   runtimeRef.current.matchState = 'HUB';
                 }}
@@ -2213,7 +3186,7 @@ export default function KnightDragonGame({
         </div>
       )}
 
-      {/* CHARACTER SKIN SHOP MODAL (7 DISTINCT ILLUSTRATED MALE & FEMALE HEROES + BUY REVIVE KEYS) */}
+      {/* CHARACTER SKIN SHOP MODAL (10 DISTINCT ILLUSTRATED HEROES: 5 MALE & 5 FEMALE) */}
       {showShopModal && (
         <div
           data-testid="knight-skin-shop-modal"
@@ -2224,10 +3197,10 @@ export default function KnightDragonGame({
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-pink-400" />
-                  <span>Cửa Hàng Nhân Vật &amp; Skin Hiệp Sĩ (7 Nhân Vật Nam / Nữ)</span>
+                  <span>Cửa Hàng Nhân Vật &amp; Skin Hiệp Sĩ ({KNIGHT_CHARACTER_SKINS.length} Nhân Vật: 5 Nam / 5 Nữ)</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Tích vàng từ đánh quái Slime, Goblin, Skeleton, Orc, Golem và Rồng để mở khóa nhân vật độc bản với ngoại hình, vũ khí &amp; kỹ năng riêng biệt.
+                  Tích vàng từ đánh quái hoặc hạ Boss Ma Vương Ẩn (+1.000 Vàng) để mở khóa nhân vật độc bản kèm hiệu ứng chém riêng biệt.
                 </p>
               </div>
               <button
@@ -2239,7 +3212,6 @@ export default function KnightDragonGame({
               </button>
             </div>
 
-            {/* Balance & Buy Revive Key Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
               <div className="flex items-center gap-4 text-xs font-black">
                 <span className="text-amber-300">🪙 Vàng của bạn: {rpgProfile.gold || 0}</span>
@@ -2255,7 +3227,6 @@ export default function KnightDragonGame({
               </button>
             </div>
 
-            {/* Character Skins Grid with Real Illustrated Hero Portraits */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {KNIGHT_CHARACTER_SKINS.map(skin => {
                 const unlocked = rpgProfile.unlockedSkins.includes(skin.id);

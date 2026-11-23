@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 380" width="420" height="380">
+  <defs>
+    <radialGradient id="abyssAura" cx="52%" cy="48%" r="48%">
+      <stop offset="0%" stop-color="#c026d3" stop-opacity="0.48"/>
+      <stop offset="48%" stop-color="#991b1b" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#09040f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="demonArmor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b0764"/>
+      <stop offset="45%" stop-color="#1e1b2e"/>
+      <stop offset="100%" stop-color="#09050f"/>
+    </linearGradient>
+    <linearGradient id="voidFire" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fdf4ff"/>
+      <stop offset="35%" stop-color="#e879f9"/>
+      <stop offset="70%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#581c87"/>
+    </linearGradient>
+    <linearGradient id="wingMembrane" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4c0519"/>
+      <stop offset="55%" stop-color="#1e072e"/>
+      <stop offset="100%" stop-color="#09040f"/>
+    </linearGradient>
+    <linearGradient id="cursedBlade" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fae8ff"/>
+      <stop offset="32%" stop-color="#d946ef"/>
+      <stop offset="72%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#4c0519"/>
+    </linearGradient>
+    <filter id="abyssGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Swirling Void Abyssal Halo -->
+  <circle cx="220" cy="185" r="175" fill="url(#abyssAura)"/>
+  <circle cx="220" cy="160" r="118" fill="none" stroke="#c026d3" stroke-width="2.5" stroke-dasharray="14 10" opacity="0.45"/>
+
+  <!-- Massive Demonic Bat/Shadow Wings -->
+  <path d="M210 132 C164 62 96 42 36 74 C66 96 76 132 62 174 C96 154 128 164 148 192 C170 166 192 162 210 162 Z" fill="url(#wingMembrane)" stroke="#09040f" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M236 132 C288 54 354 36 404 72 C376 102 368 144 388 188 C350 166 322 176 298 206 C276 176 256 164 236 164 Z" fill="url(#wingMembrane)" stroke="#09040f" stroke-width="4" stroke-linejoin="round"/>
+  <!-- Glowing Crimson-Violet Wing Veins -->
+  <path d="M196 138 L100 84 M186 146 L94 126 M250 138 L348 80 M260 148 L354 128" stroke="#e11d48" stroke-width="3" opacity="0.78" filter="url(#abyssGlow)"/>
+
+  <!-- Tattered Abyssal Shadow Mantle -->
+  <path d="M180 142 C156 208 146 286 156 356 L192 332 L222 362 L254 334 L294 358 C306 288 294 206 266 142 Z" fill="#180526" stroke="#09040f" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M194 188 L222 332 L252 188" stroke="#c026d3" stroke-width="2.5" fill="none" opacity="0.55"/>
+
+  <!-- Armored Demon Legs -->
+  <path d="M184 244 L168 314 L154 358 L194 360 L204 310 L214 252 Z" fill="url(#demonArmor)" stroke="#09040f" stroke-width="3.8"/>
+  <path d="M238 244 L256 314 L258 360 L298 358 L280 308 L264 248 Z" fill="url(#demonArmor)" stroke="#09040f" stroke-width="3.8"/>
+
+  <!-- Towering Spiked Abyssal Chestplate -->
+  <path d="M168 128 L274 128 L262 248 L182 248 Z" fill="url(#demonArmor)" stroke="#09040f" stroke-width="4.2" stroke-linejoin="round"/>
+  <!-- Burning Void Core on Chest -->
+  <g filter="url(#abyssGlow)">
+    <polygon points="222,150 242,178 222,216 202,178" fill="url(#voidFire)" stroke="#fdf4ff" stroke-width="2"/>
+    <path d="M186 146 L212 170 M258 146 L232 170 M190 226 L214 198 M254 226 L230 198" stroke="#f43f5e" stroke-width="3.2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Massive Horned Pauldrons -->
+  <path d="M142 126 C140 94 180 92 194 122 L184 166 L146 156 Z" fill="url(#demonArmor)" stroke="#09040f" stroke-width="4"/>
+  <polygon points="154,104 124,68 172,96" fill="#581c87" stroke="#09040f" stroke-width="3"/>
+  <path d="M248 122 C264 92 304 94 300 128 L292 162 L256 166 Z" fill="url(#demonArmor)" stroke="#09040f" stroke-width="4"/>
+  <polygon points="290,104 320,66 272,96" fill="#581c87" stroke="#09040f" stroke-width="3"/>
+
+  <!-- Demon King Horned Abyssal Helm & Burning Eyes (Facing Left) -->
+  <path d="M184 74 C184 44 252 44 254 78 C254 110 238 130 218 132 C196 130 184 108 184 74 Z" fill="#09040f" stroke="#581c87" stroke-width="3.5"/>
+  <!-- Massive Swept Obsidian Devil Horns -->
+  <path d="M196 68 C166 44 150 18 174 8 C176 28 190 42 208 54 Z" fill="#1e1b2e" stroke="#e879f9" stroke-width="2.5"/>
+  <path d="M242 68 C274 44 292 16 266 6 C264 26 248 42 232 54 Z" fill="#1e1b2e" stroke="#e879f9" stroke-width="2.5"/>
+  <!-- Levitating Crown of Dark Void Flame -->
+  <g filter="url(#abyssGlow)">
+    <polygon points="196,42 208,16 220,38 232,14 244,42 232,48 208,48" fill="url(#voidFire)"/>
+    <!-- Fierce Glowing Demonic Eyes (Facing Left) -->
+    <polygon points="190,82 208,86 202,94 190,89" fill="#fb7185"/>
+    <polygon points="216,86 232,82 230,90 218,94" fill="#fb7185"/>
+    <circle cx="198" cy="88" r="2.6" fill="#ffffff"/>
+    <circle cx="223" cy="88" r="2.6" fill="#ffffff"/>
+    <!-- Shadowed Fanged Grimace -->
+    <path d="M196 110 L204 106 L210 112 L218 106 L226 111" stroke="#f43f5e" stroke-width="2.4" fill="none"/>
+  </g>
+
+  <!-- Right Arm Raised & Left Arm Wielding Colossal Cursed Greatsword Pointing Left -->
+  <path d="M160 156 L136 204 L156 222 L182 184 Z" fill="url(#demonArmor)" stroke="#09040f" stroke-width="3.5"/>
+  <path d="M276 156 L300 202 L268 232 L252 214 L268 182 Z" fill="url(#demonArmor)" stroke="#09040f" stroke-width="3.5"/>
+
+  <!-- Colossal Cursed Abyssal Greatsword pointing forward-left toward Hero -->
+  <g filter="url(#abyssGlow)">
+    <path d="M148 214 L16 266 L30 286 L160 236 Z" fill="url(#cursedBlade)" stroke="#09040f" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M142 224 L26 274" stroke="#fdf4ff" stroke-width="3.2" stroke-linecap="round"/>
+    <!-- Dark Abyssal Lightning crackling off blade -->
+    <polyline points="122,216 96,204 82,226 52,222 26,254" fill="none" stroke="#f0abfc" stroke-width="2.8"/>
+    <polyline points="116,248 92,268 72,258 44,284" fill="none" stroke="#fb7185" stroke-width="2.4"/>
+  </g>
+  <!-- Demon Crossguard & Gauntlet -->
+  <path d="M148 192 L176 204 L160 250 L136 238 Z" fill="#581c87" stroke="#f0abfc" stroke-width="2.4"/>
+  <circle cx="156" cy="220" r="11" fill="#1e1b2e" stroke="#f43f5e" stroke-width="2.6"/>
+</svg>

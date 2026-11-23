@@ -6174,7 +6174,15 @@ export default function App() {
       selectedWords: Array.isArray(selectedWords) ? selectedWords : [],
       seedStr: `practice:${currentUser?.username || 'guest'}:${Date.now()}`
     });
-    const validRound = [1, 2, 3, 4].includes(Number(startRound)) ? Number(startRound) : 1;
+    const canPracticeSingleMap = Boolean(
+      currentUser?.role === 'teacher' ||
+        currentUser?.role === 'admin' ||
+        currentUser?.isSuperAdmin ||
+        currentUser?.isSystemAdmin
+    );
+    const validRound =
+      canPracticeSingleMap && [1, 2, 3, 4].includes(Number(startRound)) ? Number(startRound) : 1;
+    const effectiveSingleRoundOnly = canPracticeSingleMap ? Boolean(singleRoundOnly) : false;
     const firstQ = queues[validRound]?.[0] || null;
     const initialProgress = firstQ ? skipNonAlphaIndex(getGameTypingTarget(firstQ, validRound), 0) : 0;
 
@@ -6185,7 +6193,12 @@ export default function App() {
     freezeUntilRef.current = 0;
 
     const limit = getSpeedAdjustedTimeLimit(validRound, speedMode);
-    const practiceMeta = { topicId, topicLabel, singleRoundOnly, mode: singleRoundOnly ? `round_${validRound}` : 'full_4' };
+    const practiceMeta = {
+      topicId,
+      topicLabel,
+      singleRoundOnly: effectiveSingleRoundOnly,
+      mode: effectiveSingleRoundOnly ? `round_${validRound}` : 'full_4'
+    };
     setPracticeTopicMeta(practiceMeta);
     setIsPracticeGameSession(true);
 
@@ -6740,7 +6753,7 @@ export default function App() {
       playSound('wrong');
       rt.combo = 0;
       setGameCombo(0);
-      triggerGameToast(`❌ "${rawTyped}" chưa khớp đáp án! Kiểm tra chính tả hoặc bấm Gợi ý (-15đ).`, false);
+      triggerGameToast(`❌ "${rawTyped}" chưa khớp đáp án! Kiểm tra chính tả hoặc bấm Gợi ý (-300đ).`, false);
     }
   };
 
@@ -6815,6 +6828,11 @@ export default function App() {
   const handleGameHint = () => {
     const rt = gameRuntimeRef.current;
     if (rt.subState !== 'PLAYING' || (rt.round !== 2 && rt.round !== 4) || !rt.activeQuestion || rt.paused) return;
+    if ((Number(rt.score) || 0) < 300) {
+      playSound('wrong');
+      triggerGameToast('❌ Cần tối thiểu 300 điểm mới được dùng Gợi ý!', false);
+      return;
+    }
 
     if (rt.round === 4) {
       const q = rt.activeQuestion;
@@ -6829,7 +6847,7 @@ export default function App() {
       }
       const nextStepLen = Math.min(primaryAns.length, matchPrefix + Math.max(3, Math.ceil(primaryAns.length * 0.25)));
       const hinted = primaryAns.slice(0, nextStepLen);
-      const nextScore = Math.max(0, rt.score - 15);
+      const nextScore = Math.max(0, rt.score - 300);
       rt.score = nextScore;
       setGameScore(nextScore);
       handleRound4InputChange(hinted);
@@ -6838,7 +6856,7 @@ export default function App() {
 
     const nextChar = getGameTypingTarget(rt.activeQuestion, rt.round)[rt.typedProgress];
     if (!nextChar) return;
-    const nextScore = Math.max(0, rt.score - 15);
+    const nextScore = Math.max(0, rt.score - 300);
     rt.score = nextScore;
     setGameScore(nextScore);
     handleGameTypingInput(nextChar);

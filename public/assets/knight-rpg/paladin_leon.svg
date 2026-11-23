@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="sunAura" cx="55%" cy="48%" r="48%">
+      <stop offset="0%" stop-color="#fde047" stop-opacity="0.38"/>
+      <stop offset="60%" stop-color="#f59e0b" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="capeRed" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dc2626"/>
+      <stop offset="60%" stop-color="#991b1b"/>
+      <stop offset="100%" stop-color="#450a0a"/>
+    </linearGradient>
+    <linearGradient id="whiteSteel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="solarGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="45%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="solarBlade" x1="0" y1="0" x2="1" y2="0.4">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="35%" stop-color="#fde047"/>
+      <stop offset="75%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fef9c3"/>
+    </linearGradient>
+    <linearGradient id="skinTone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fed7aa"/>
+      <stop offset="100%" stop-color="#e2a679"/>
+    </linearGradient>
+    <filter id="sunGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <circle cx="170" cy="155" r="138" fill="url(#sunAura)"/>
+
+  <!-- Flowing Crimson Solar Cape -->
+  <path d="M126 106 C86 122 46 168 22 248 C56 242 84 252 110 232 C126 205 142 158 148 118 Z" fill="url(#capeRed)" stroke="#450a0a" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M120 120 C88 145 64 185 45 236" stroke="#f59e0b" stroke-width="3" fill="none" opacity="0.8"/>
+
+  <!-- Radiant Sun Halo behind head -->
+  <g filter="url(#sunGlow)" opacity="0.9">
+    <circle cx="150" cy="70" r="34" fill="none" stroke="#fde047" stroke-width="3.5" stroke-dasharray="10 6"/>
+    <path d="M150 26 L154 38 L146 38 Z M188 46 L178 54 L174 47 Z M112 46 L126 47 L122 54 Z M194 74 L182 77 L182 69 Z M106 74 L118 69 L118 77 Z" fill="#fef08a"/>
+  </g>
+
+  <!-- Legs & Armored Sabatons -->
+  <path d="M124 205 L102 268 L90 294 L120 298 L136 266 L146 218 Z" fill="url(#whiteSteel)" stroke="#1e293b" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M100 266 L124 268 L116 294 L92 292 Z" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.5"/>
+  <path d="M164 205 L182 262 L180 295 L218 298 L206 254 L186 208 Z" fill="url(#whiteSteel)" stroke="#1e293b" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M178 260 L206 254 L216 296 L180 295 Z" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.5"/>
+  <!-- Armored Kneecaps -->
+  <polygon points="108,242 126,232 134,248 118,258" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.5"/>
+  <polygon points="174,242 194,234 200,250 182,258" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.5"/>
+
+  <!-- White-Gold Paladin Tabard -->
+  <path d="M134 188 L174 188 L170 258 L152 276 L136 258 Z" fill="#f8fafc" stroke="#1e293b" stroke-width="3"/>
+  <path d="M153 200 L159 224 L153 248 L147 224 Z" fill="url(#solarGold)"/>
+
+  <!-- Torso Breastplate -->
+  <path d="M118 114 L186 114 L180 192 L126 192 Z" fill="url(#whiteSteel)" stroke="#1e293b" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- Solar Emblem on Chest -->
+  <circle cx="154" cy="144" r="14" fill="url(#solarGold)" stroke="#78350f" stroke-width="2.2"/>
+  <circle cx="154" cy="144" r="6" fill="#fffbeb"/>
+  <!-- Gold Belt -->
+  <rect x="122" y="182" width="62" height="14" rx="4" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.5"/>
+  <rect x="147" y="180" width="14" height="18" rx="3" fill="#fef08a" stroke="#78350f" stroke-width="2"/>
+
+  <!-- Massive Ornate Shoulder Pauldrons -->
+  <path d="M100 112 C96 92 124 88 138 106 L132 136 L104 134 Z" fill="url(#solarGold)" stroke="#1e293b" stroke-width="3.2"/>
+  <path d="M168 104 C184 90 212 96 206 122 L198 140 L172 132 Z" fill="url(#solarGold)" stroke="#1e293b" stroke-width="3.2"/>
+
+  <!-- Head, Handsome Face & Swept Golden Hair -->
+  <rect x="142" y="95" width="22" height="18" fill="url(#skinTone)" stroke="#1e293b" stroke-width="2"/>
+  <path d="M134 62 C134 44 172 44 174 68 C176 86 168 100 154 102 C140 100 132 84 134 62 Z" fill="url(#skinTone)" stroke="#1e293b" stroke-width="2.8"/>
+  <!-- Determined Eyes & Brow -->
+  <path d="M150 72 L160 70" stroke="#78350f" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M165 70 L172 72" stroke="#78350f" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="156" cy="77" r="2.6" fill="#0284c7"/>
+  <circle cx="168" cy="77" r="2.4" fill="#0284c7"/>
+  <path d="M154 90 Q161 92 167 89" stroke="#9a3412" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Swept Golden Hair + Solar Circlet -->
+  <path d="M126 74 C122 46 144 32 168 38 C184 42 186 58 178 68 C172 56 158 52 146 60 C138 66 135 76 132 82 Z" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M128 60 L108 48 L128 48 L116 34 L142 40" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M134 60 Q156 50 175 62" stroke="#fef08a" stroke-width="4" fill="none"/>
+  <polygon points="158,48 163,56 158,64 153,56" fill="#ef4444" stroke="#78350f" stroke-width="1.5"/>
+
+  <!-- Right Arm & Radiant Solar Greatsword "Solarius" -->
+  <path d="M112 132 L126 164 L164 176 L172 162 L138 152 L126 128 Z" fill="url(#whiteSteel)" stroke="#1e293b" stroke-width="3"/>
+  <path d="M180 132 L192 164 L182 180 L166 172 L172 152 Z" fill="url(#whiteSteel)" stroke="#1e293b" stroke-width="3"/>
+
+  <!-- Glowing Solar Greatsword pointing right -->
+  <g filter="url(#sunGlow)">
+    <path d="M188 176 L306 220 L294 232 L182 194 Z" fill="url(#solarBlade)" stroke="#78350f" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M192 184 L298 223" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- Crossguard & Hilt -->
+  <path d="M174 160 L198 168 L186 206 L166 198 Z" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.6"/>
+  <circle cx="182" cy="183" r="6" fill="#ef4444" stroke="#fef08a" stroke-width="2"/>
+  <rect x="148" y="168" width="28" height="10" rx="4" transform="rotate(20 162 173)" fill="#78350f" stroke="#1e293b" stroke-width="2.2"/>
+  <!-- Armored Gauntlets gripping hilt -->
+  <circle cx="170" cy="176" r="10" fill="url(#solarGold)" stroke="#1e293b" stroke-width="2.6"/>
+</svg>
