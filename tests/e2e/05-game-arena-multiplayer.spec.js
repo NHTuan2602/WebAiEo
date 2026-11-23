@@ -67,12 +67,14 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
         timeout: 12_000
       });
 
-      // Verify Student cannot click individual maps or Admin Demon King test button in Knight RPG
+      // Verify Student cannot click individual maps, sees ZERO secret boss spoilers, and has NO Admin Demon King button
       await studentPage.getByTestId('switch-to-knight-game-btn').click();
       await expect(studentPage.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
       await expect(studentPage.getByTestId('locked-knight-stage-4')).toBeVisible();
       await expect(studentPage.getByTestId('start-knight-stage-4')).toHaveCount(0);
       await expect(studentPage.getByTestId('admin-test-demon-king-btn')).toHaveCount(0);
+      const studentHubText = await studentPage.getByTestId('knight-dragon-game-root').textContent();
+      expect(studentHubText).not.toMatch(/Ma Vương|Diệt Ma Vương|1\.000 Vàng|5% triệu hồi/i);
       await studentPage.getByTestId('knight-back-to-hub-btn').click();
       await expect(studentPage.getByTestId('arena-game-selection-hub')).toBeVisible({ timeout: 8_000 });
 
@@ -171,6 +173,17 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('lobby-switch-to-knight-game-btn').first().click();
     await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
 
+    // Regular Teacher (teacher_ielts) can test Stages 1-4 & toggle BGM, but CANNOT see Admin-only Secret Boss button or spoilers!
+    await expect(page.getByTestId('admin-test-demon-king-btn')).toHaveCount(0);
+    const teacherHubText = await page.getByTestId('knight-dragon-game-root').textContent();
+    expect(teacherHubText).not.toMatch(/Ma Vương|Diệt Ma Vương|1\.000 Vàng|5% triệu hồi/i);
+    const bgmBtn = page.getByTestId('knight-bgm-toggle-btn');
+    await expect(bgmBtn).toBeVisible();
+    await bgmBtn.click();
+    await expect(bgmBtn).toContainText(/Tắt/i);
+    await bgmBtn.click();
+    await expect(bgmBtn).toContainText(/Nhạc:/i);
+
     // Teacher can open the Question Bank Manager directly from Knight & Dragon RPG
     await expect(page.getByTestId('knight-open-vocab-manager-btn')).toBeVisible();
     await page.getByTestId('knight-open-vocab-manager-btn').click();
@@ -234,26 +247,6 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     }
     await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
 
-    // Test Secret Demon King Boss sequence via Admin test trigger (3s Pac-Man Warning -> 5 Hearts -> Wheel -> Victory +1000g +10 Keys + Hidden Title)
-    await page.evaluate(() => {
-      window.__FORCE_DEMON_WHEEL_ROUND__ = 4;
-    });
-    await page.getByTestId('admin-test-demon-king-btn').click();
-    await expect(page.getByTestId('demon-king-warning-overlay')).toBeVisible({ timeout: 4_000 });
-    await expect(page.getByTestId('demon-king-wheel-overlay')).toBeVisible({ timeout: 6_000 });
-    await expect(page.getByTestId('demon-curse-timer-badge')).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByTestId('knight-lives-display')).toContainText('❤️❤️❤️❤️❤️');
-
-    // Defeat Secret Demon King on Round 4 mechanic and verify +1000g, +10 keys & Hidden Title banner
-    await page.getByTestId('knight-dragon-boss-input').fill('cohesive global strategy');
-    await page.getByTestId('knight-dragon-boss-submit').click();
-    await expect(page.getByTestId('demon-king-victory-banner')).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByTestId('demon-king-victory-banner')).toContainText(/Diệt Ma Vương/i);
-    if (await celebrationDialog.isVisible({ timeout: 1200 }).catch(() => false)) {
-      await celebrationDialog.getByRole('button').first().click();
-    }
-    await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
-
     // Switch back to Space Shooter Arena to verify Màn 3 & Màn 4 Sandbox
     await page.getByTestId('switch-to-space-game-btn').click();
 
@@ -277,5 +270,33 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       timeout: 10_000
     });
     healthGuard.assertHealthy('game-visual-bank-and-round4');
+  });
+
+  test('Only Super Admin (not Teacher or Student) can trigger Secret Demon King test & unlock Diệt Ma Vương', async ({
+    page,
+    healthGuard
+  }) => {
+    await loginViaUI(page, E2E_CREDENTIALS.admin.username, E2E_CREDENTIALS.admin.password);
+    await page.locator('header').getByRole('tab', { name: /Đấu Trường/i }).first().click();
+    await expect(page.getByTestId('arena-game-selection-hub')).toBeVisible({ timeout: 12_000 });
+    await page.getByTestId('switch-to-knight-game-btn').click();
+    await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
+
+    // Admin sees Admin-only secret test button & per-stage buttons
+    await expect(page.getByTestId('admin-test-demon-king-btn')).toBeVisible();
+    await expect(page.getByTestId('start-knight-stage-4')).toBeVisible();
+
+    // Force wheel to Round 1 (4-choice meaning shields) and verify Pac-Man Warning -> 5 Hearts -> Wheel -> Stage 5 BGM & Curse Timer
+    await page.evaluate(() => {
+      window.__FORCE_DEMON_WHEEL_ROUND__ = 1;
+    });
+    await page.getByTestId('admin-test-demon-king-btn').click();
+    await expect(page.getByTestId('demon-king-warning-overlay')).toBeVisible({ timeout: 4_000 });
+    await expect(page.getByTestId('demon-king-wheel-overlay')).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByTestId('demon-curse-timer-badge')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByTestId('knight-lives-display')).toContainText('❤️❤️❤️❤️❤️');
+    await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Trận Chiến Ẩn/i);
+
+    healthGuard.assertHealthy('admin-secret-demon-king-access');
   });
 });

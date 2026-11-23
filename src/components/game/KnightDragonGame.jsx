@@ -9,13 +9,15 @@ import {
   Keyboard,
   Lightbulb,
   Lock,
+  Music,
   RefreshCw,
   ShoppingBag,
   Skull,
   Snowflake,
   Sparkles,
   Swords,
-  Volume2
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import {
   DEATH_REVIVE_DELAY_SEC,
@@ -37,6 +39,7 @@ import {
   parseRawVocabText
 } from '../../utils/examHelpers';
 import { playSound, speakWord } from '../../utils/mediaHelpers';
+import { KNIGHT_BGM_TRACKS, knightRpgBgm } from '../../utils/knightRpgBgm';
 
 function skipNonAlphaIndex(word, startIdx = 0) {
   const upper = String(word || '').toUpperCase();
@@ -92,11 +95,11 @@ const WHEEL_SECTORS = [
 
 const DEMON_STAGE_META = {
   round: 5,
-  stageTitle: 'BOSS ẨN (5%): MA VƯƠNG HẮC ÁM MALAKOR',
+  stageTitle: 'BOSS ẨN: MA VƯƠNG HẮC ÁM MALAKOR',
   shortTitle: 'BOSS ẨN: MA VƯƠNG',
   goldPerKill: DEMON_KING_BOSS.rewardGold,
-  mechanicLabel: 'Cứ 5 Giây Rút 1 Tim (-1 ❤️) • Chết Bị Phong Ấn Không Thể Hồi Sinh • Thắng +1.000 🪙 & +10 🗝️',
-  questionDesc: 'Ma Vương quay vòng chọn luật chơi 1 trong 4 vòng. Hạ gục Ma Vương để mở Danh Hiệu Ẩn "Diệt Ma Vương"!'
+  mechanicLabel: 'Cứ 5 Giây Rút 1 Tim (-1 ❤️) • Chết Bị Phong Ấn Không Thể Hồi Sinh',
+  questionDesc: 'Ma Vương quay vòng chọn luật chơi 1 trong 4 vòng!'
 };
 
 export default function KnightDragonGame({
@@ -115,12 +118,15 @@ export default function KnightDragonGame({
   showToast
 }) {
   const username = currentUser?.username || 'guest';
-  const isAdminOrTeacher = Boolean(
-    currentUser?.role === 'teacher' ||
+  const isStrictAdmin = Boolean(
+    currentUser?.isSuperAdmin ||
+      currentUser?.isSystemAdmin ||
       currentUser?.role === 'admin' ||
-      currentUser?.isSuperAdmin ||
-      currentUser?.isSystemAdmin
+      String(currentUser?.username || '').trim().toLowerCase() === 'tuanpro123s'
   );
+  const isTeacherOrAdmin = Boolean(isStrictAdmin || currentUser?.role === 'teacher');
+
+  const [bgmMuted, setBgmMuted] = useState(() => knightRpgBgm.isMuted());
 
   const [rpgProfile, setRpgProfile] = useState(() =>
     loadLocalKnightRpgProfile(username, currentUser)
@@ -213,7 +219,57 @@ export default function KnightDragonGame({
     clearInterval(phaseIntervalRef.current);
   };
 
-  useEffect(() => () => clearAllTimers(), []);
+  useEffect(
+    () => () => {
+      clearAllTimers();
+      knightRpgBgm.stop();
+    },
+    []
+  );
+
+  // Per-stage procedural RPG Background Music (BGM) switcher
+  const activeBgmTrackId =
+    matchState === 'HUB'
+      ? 'hub'
+      : matchState === 'DEMON_WARNING'
+      ? 'demon_warning'
+      : matchState === 'DEMON_WHEEL' || (round === 5 && matchState === 'PLAYING')
+      ? 'stage5'
+      : matchState === 'PLAYING' || matchState === 'TRANSITION' || matchState === 'FINAL_SMASH'
+      ? `stage${Math.min(5, Math.max(1, Number(round) || 1))}`
+      : null;
+
+  useEffect(() => {
+    if (bgmMuted || !activeBgmTrackId) {
+      knightRpgBgm.stop();
+      return;
+    }
+    knightRpgBgm.setTrack(activeBgmTrackId);
+  }, [activeBgmTrackId, bgmMuted]);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (!bgmMuted) {
+        knightRpgBgm.unlock();
+      }
+    };
+    window.addEventListener('pointerdown', unlockAudio, { passive: true });
+    window.addEventListener('keydown', unlockAudio, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, [bgmMuted]);
+
+  const handleToggleBgm = () => {
+    const nextMuted = !bgmMuted;
+    setBgmMuted(nextMuted);
+    knightRpgBgm.setMuted(nextMuted);
+    if (!nextMuted && activeBgmTrackId) {
+      knightRpgBgm.setTrack(activeBgmTrackId);
+      knightRpgBgm.unlock();
+    }
+  };
 
   // Preload all 19 RPG Hero, Monster, Dragon & Secret Demon King sprites for 60 FPS canvas
   useEffect(() => {
@@ -571,10 +627,10 @@ export default function KnightDragonGame({
       seedStr: `knight:${username}:${Date.now()}`
     });
 
-    // Strict role guard: only Admin / Teacher can practice individual stages; students always start from Stage 1
+    // Strict role guard: Teacher & Admin can practice Stages 1–4; students always start from Stage 1
     const rNum =
-      isAdminOrTeacher && [1, 2, 3, 4].includes(Number(startRoundNum)) ? Number(startRoundNum) : 1;
-    const safeOnlyOne = isAdminOrTeacher ? Boolean(onlyOneRound) : false;
+      isTeacherOrAdmin && [1, 2, 3, 4].includes(Number(startRoundNum)) ? Number(startRoundNum) : 1;
+    const safeOnlyOne = isTeacherOrAdmin ? Boolean(onlyOneRound) : false;
     const firstQ = builtQueues[rNum]?.[0] || null;
 
     setQueues({ ...builtQueues, 5: [] });
@@ -619,9 +675,9 @@ export default function KnightDragonGame({
     }
   };
 
-  // Admin / Teacher dedicated launcher to test the Secret Demon King Boss immediately
+  // STRICTLY Admin-only launcher to test the Secret Boss (Teachers can only test Stages 1–4)
   const handleAdminStartDemonKingTest = () => {
-    if (!isAdminOrTeacher) return;
+    if (!isStrictAdmin) return;
     clearAllTimers();
     const rawVocab = resolveSelectedRawVocab();
     const builtQueues = buildPracticeRoundQueues({
@@ -2194,7 +2250,26 @@ export default function KnightDragonGame({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {isAdminOrTeacher && onOpenVocabManager && (
+          <button
+            type="button"
+            data-testid="knight-bgm-toggle-btn"
+            onClick={handleToggleBgm}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-extrabold transition ${
+              bgmMuted
+                ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
+                : 'bg-violet-500/20 hover:bg-violet-500/30 border-violet-400/50 text-violet-200'
+            }`}
+            title={bgmMuted ? 'Bật nhạc nền theo từng màn' : 'Tắt nhạc nền'}
+          >
+            {bgmMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Music className="w-3.5 h-3.5" />}
+            <span>
+              {bgmMuted
+                ? 'Nhạc: Tắt'
+                : `Nhạc: ${KNIGHT_BGM_TRACKS[activeBgmTrackId]?.label || 'Sảnh Lâu Đài'}`}
+            </span>
+          </button>
+
+          {isTeacherOrAdmin && onOpenVocabManager && (
             <button
               type="button"
               data-testid="knight-open-vocab-manager-btn"
@@ -2242,13 +2317,13 @@ export default function KnightDragonGame({
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
               <div className="space-y-1.5">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-extrabold">
-                  🐉 HÀNH TRÌNH ĐỒ LONG 4 ẢI + 👿 BOSS MA VƯƠNG ẨN (5%)
+                  🐉 HÀNH TRÌNH ĐỒ LONG 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG HẮC ÁM
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-black text-white">
                   Hiệp Sĩ Diệt Rồng — Đấu Trường Từ Vựng RPG
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                  Hạ gục <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để thu <b>🪙 Tiền Vàng</b> mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực và săn tỉ lệ hiếm rớt <b>🗝️ Chìa Khóa Hồi Sinh</b>. Đánh bại Boss Rồng có <b>5% triệu hồi Boss Ma Vương Ẩn</b> (Thưởng <b>1.000 🪙 Vàng + 10 🗝️ Chìa Khóa + Danh Hiệu Ẩn &quot;Diệt Ma Vương&quot;</b>)!
+                  Hạ gục <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để thu <b>🪙 Tiền Vàng</b> mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực, săn tỉ lệ hiếm rớt <b>🗝️ Chìa Khóa Hồi Sinh</b> khi hạ quái và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
                 </p>
               </div>
 
@@ -2294,7 +2369,7 @@ export default function KnightDragonGame({
                   <label className="block text-xs font-bold text-slate-300">
                     Chọn Kho Từ Vựng ({bankItemsCount} từ)
                   </label>
-                  {isAdminOrTeacher && onOpenVocabManager && (
+                  {isTeacherOrAdmin && onOpenVocabManager && (
                     <button
                       type="button"
                       data-testid="knight-hub-manage-vocab-btn"
@@ -2384,23 +2459,25 @@ export default function KnightDragonGame({
                   <span>XUẤT CHINH TỪ ẢI 1 ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG</span>
                 </button>
 
-                {isAdminOrTeacher && (
+                {isStrictAdmin && (
                   <button
                     type="button"
                     data-testid="admin-test-demon-king-btn"
                     onClick={handleAdminStartDemonKingTest}
                     className="sm:w-auto py-3.5 px-4 rounded-2xl bg-gradient-to-r from-fuchsia-700 via-purple-700 to-rose-700 hover:opacity-95 border border-fuchsia-400/60 text-white font-black text-xs sm:text-sm shadow-lg flex items-center justify-center gap-1.5 transition shrink-0"
-                    title="Chỉ Admin / Giáo viên: Vào thẳng Boss Ma Vương Ẩn để trải nghiệm cảnh báo Pac-Man & Vòng Quay"
+                    title="Chỉ tài khoản Admin: Test màn ẩn"
                   >
-                    <span>👿 Test Boss Ma Vương Ẩn (GV/Admin)</span>
+                    <span>👿 Test Màn Ẩn (Admin)</span>
                   </button>
                 )}
               </div>
 
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-[11px] font-bold text-slate-400">
-                  {isAdminOrTeacher
-                    ? '🛡️ Quyền Admin / Giáo viên: Bấm vào bất kỳ bản đồ Ải 1–4 bên dưới để luyện tập hoặc kiểm thử riêng từng map.'
+                  {isStrictAdmin
+                    ? '🛡️ Quyền Admin: Bấm vào bất kỳ bản đồ Ải 1–4 để luyện tập/kiểm thử riêng hoặc test màn ẩn.'
+                    : isTeacherOrAdmin
+                    ? '🛡️ Quyền Giáo viên: Bấm vào bất kỳ bản đồ Ải 1–4 bên dưới để luyện tập hoặc kiểm thử riêng từng map.'
                     : '🗺️ Lộ trình chinh phục 4 Ải (Học viên luôn xuất phát từ Ải 1 — Chỉ Admin/Giáo viên mới được chọn luyện tập riêng từng map).'}
                 </p>
               </div>
@@ -2444,7 +2521,7 @@ export default function KnightDragonGame({
                       <p className="text-[11px] font-bold text-slate-200">{st.mechanicLabel}</p>
                       <p className="text-[11px] text-slate-400 leading-snug">{st.questionDesc}</p>
 
-                      {!isAdminOrTeacher && (
+                      {!isTeacherOrAdmin && (
                         <div className="pt-1 flex items-center gap-1 text-[10px] font-bold text-slate-400">
                           <Lock className="w-3 h-3 text-amber-400/80" />
                           <span>{st.round === 1 ? 'Bắt đầu từ nút Xuất Chinh ở trên' : 'Vượt ải trước để mở khóa'}</span>
@@ -2453,7 +2530,7 @@ export default function KnightDragonGame({
                     </div>
                   );
 
-                  if (isAdminOrTeacher) {
+                  if (isTeacherOrAdmin) {
                     return (
                       <button
                         key={st.round}
@@ -2495,9 +2572,12 @@ export default function KnightDragonGame({
                 <p className="text-lg font-black text-emerald-400">{rpgProfile.monstersSlain || 0}</p>
               </div>
               <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
-                <p className="text-[11px] text-slate-400 font-bold">Rồng / Ma Vương Đã Hạ</p>
+                <p className="text-[11px] text-slate-400 font-bold">
+                  {(rpgProfile.demonKingsSlain || 0) > 0 ? 'Rồng / Boss Ẩn Đã Hạ' : 'Boss Rồng Đã Hạ'}
+                </p>
                 <p className="text-lg font-black text-rose-400">
-                  {rpgProfile.dragonsSlain || 0} 🐉 · {rpgProfile.demonKingsSlain || 0} 👿
+                  {rpgProfile.dragonsSlain || 0} 🐉
+                  {(rpgProfile.demonKingsSlain || 0) > 0 ? ` · ${rpgProfile.demonKingsSlain} 👿` : ''}
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
@@ -2898,7 +2978,7 @@ export default function KnightDragonGame({
 
             <div className="max-w-xl w-full rounded-2xl border-4 border-yellow-300 bg-black/90 p-6 sm:p-8 shadow-[0_0_70px_rgba(250,204,21,0.55)] space-y-4">
               <p className="text-xs sm:text-sm font-mono font-black uppercase tracking-[0.3em] text-yellow-300 animate-pulse">
-                ⚠️ WARNING! RETRO BOSS ALERT (5% SECRET ENCOUNTER) ⚠️
+                ⚠️ WARNING! SECRET BOSS ALERT! ⚠️
               </p>
 
               <div className="flex items-center justify-center gap-4">
@@ -3149,9 +3229,9 @@ export default function KnightDragonGame({
                 <p className="text-base font-black text-emerald-400">{sessionMonstersSlain} quái</p>
               </div>
               <div>
-                <p className="text-slate-400">Boss Rồng / Ma Vương</p>
+                <p className="text-slate-400">{demonKingDefeated ? 'Boss Rồng / Ma Vương' : 'Boss Rồng Đã Hạ'}</p>
                 <p className="text-base font-black text-rose-400">
-                  {sessionDragonsSlain} 🐉 · {demonKingDefeated ? 1 : 0} 👿
+                  {sessionDragonsSlain} 🐉{demonKingDefeated ? ' · 1 👿' : ''}
                 </p>
               </div>
             </div>
@@ -3200,7 +3280,7 @@ export default function KnightDragonGame({
                   <span>Cửa Hàng Nhân Vật &amp; Skin Hiệp Sĩ ({KNIGHT_CHARACTER_SKINS.length} Nhân Vật: 5 Nam / 5 Nữ)</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Tích vàng từ đánh quái hoặc hạ Boss Ma Vương Ẩn (+1.000 Vàng) để mở khóa nhân vật độc bản kèm hiệu ứng chém riêng biệt.
+                  Tích vàng từ đánh quái Slime, Goblin, Skeleton, Orc, Golem và Rồng để mở khóa nhân vật độc bản kèm hiệu ứng chém riêng biệt.
                 </p>
               </div>
               <button

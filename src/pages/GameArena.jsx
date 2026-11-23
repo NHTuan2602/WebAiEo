@@ -736,7 +736,7 @@ export default function GameArena({
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực (<b>Arthur, Leon, Kenji, Drake, Valkyrie Freya, Kiếm Khách Tomoe...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> và săn <b>Boss Ma Vương Ẩn (5%)</b> sau khi diệt Rồng!
+                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực (<b>Arthur, Leon, Kenji, Drake, Valkyrie Freya, Kiếm Khách Tomoe...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -744,7 +744,7 @@ export default function GameArena({
                     🪙 Đánh quái rớt Vàng • 10 Nhân Vật Nam &amp; Nữ
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-sky-200 font-bold">
-                    👿 5% Boss Ma Vương Ẩn • Thưởng 1.000 Vàng
+                    🗝️ Tỉ lệ hiếm rớt Chìa Khóa khi hạ quái
                   </div>
                 </div>
               </div>

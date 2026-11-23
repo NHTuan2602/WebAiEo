@@ -359,8 +359,8 @@ export const KNIGHT_MONSTER_STAGES = [
     stageTitle: 'Ải 4/4 — BOSS CUỐI: Rồng Hắc Ám Cổ Đại',
     shortTitle: 'Ải 4: Boss Rồng Hắc Ám',
     goldPerKill: 110,
-    mechanicLabel: 'Đọc Câu Gõ Từ Đồ Long • Rồng Tất Sát (Final Smash) Khi Hết Giờ • 5% Gặp Boss Ma Vương Ẩn',
-    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng & nổ kho báu Tiền Vàng! Hạ Rồng có 5% triệu hồi Boss Ma Vương Ẩn (Thưởng 1.000 Vàng + 10 Chìa Khóa + Danh Hiệu Ẩn)!',
+    mechanicLabel: 'Đọc Câu Gõ Từ Đồ Long • Rồng Tất Sát (Final Smash) Khi Hết Giờ',
+    questionDesc: 'Gõ đúng từ/cụm từ điền vào câu để chém mất máu Rồng & nổ kho báu Tiền Vàng + tỉ lệ rớt 🗝️ cao nhất! Gõ sai bị Rồng khè lửa phản công — quá giờ Rồng tung Skill Tất Sát Kết Liễu!',
     monsters: [
       {
         id: 'ancient_dragon',
