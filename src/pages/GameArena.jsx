@@ -277,6 +277,7 @@ export default function GameArena({
       <KnightDragonGame
         currentUser={currentUser}
         customVocabTopics={customVocabTopics}
+        darkMode={darkMode}
         gamePracticeLeaderboard={gamePracticeLeaderboard}
         initialRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
         initialTopicId={practiceTopicId}
@@ -294,6 +295,7 @@ export default function GameArena({
         onSyncKnightResult={onSyncKnightResult}
         roomPin={activePin}
         roomRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
+        setDarkMode={setDarkMode}
         showToast={showToast}
         usersDb={usersDb}
       />
@@ -435,12 +437,13 @@ export default function GameArena({
   const themeToggleButton = setDarkMode ? (
     <button
       type="button"
+      data-testid="arena-theme-toggle-btn"
       onClick={() => setDarkMode(d => !d)}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 transition"
-      title={darkMode ? 'Chuyển sang giao diện Sáng (Hồng dịu)' : 'Chuyển sang giao diện Tối (Vũ trụ)'}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-[#334155] text-xs font-semibold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
+      title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
     >
       {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-[#007A7A]" />}
-      <span className="hidden sm:inline">{darkMode ? 'Sáng' : 'Tối'}</span>
+      <span>{darkMode ? 'Sáng' : 'Tối'}</span>
     </button>
   ) : null;
 
@@ -706,17 +709,17 @@ export default function GameArena({
     return (
       <div
         data-testid="arena-game-selection-hub"
-        className="min-h-screen bg-[#070b14] text-white flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden"
+        className="min-h-screen bg-[#F8FAFC] dark:bg-[#070b14] text-[#0F172B] dark:text-white flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden transition-colors duration-200"
       >
-        <div className="absolute top-[-12%] left-[12%] w-96 h-96 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-[-12%] right-[12%] w-96 h-96 bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-[-12%] left-[12%] w-96 h-96 bg-teal-400/15 dark:bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-12%] right-[12%] w-96 h-96 bg-pink-400/15 dark:bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* Hub Header */}
         <div className="max-w-5xl w-full mx-auto flex items-center justify-between relative z-10 gap-2 flex-wrap">
           <button
             type="button"
             onClick={exitGame}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
           >
             <ChevronLeft className="w-4 h-4" /> Quay lại Trang Chủ
           </button>
@@ -731,7 +734,7 @@ export default function GameArena({
                     setCustomVocabInput(room.rawVocab || DEFAULT_VOCAB_TEXT);
                     setShowVocabModal(true);
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm transition"
                 >
                   <Edit className="w-3.5 h-3.5" /> Quản Lý Bộ Câu Hỏi (GV)
                 </button>
@@ -751,8 +754,8 @@ export default function GameArena({
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border ${
                 serverSyncConnected
-                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                  : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
               }`}
             >
               <Wifi className="w-3.5 h-3.5" />
@@ -764,33 +767,33 @@ export default function GameArena({
         {/* Center 2-Game Arcade Showcase */}
         <div className="max-w-5xl w-full mx-auto my-auto py-6 relative z-10 space-y-6">
           <div className="text-center space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-100/90 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-300 text-xs font-black uppercase tracking-wider">
               <Gamepad2 className="w-3.5 h-3.5" /> SẢNH CHỌN GAME ĐẤU TRƯỜNG TỪ VỰNG IELTS
             </span>
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+            <h1 className="text-2xl sm:text-4xl font-black text-[#0F172B] dark:text-white tracking-tight">
               Chọn Tựa Game Bạn Muốn Tham Gia
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto">
+            <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-2xl mx-auto">
               Mỗi tựa game đều tích hợp 14 kho từ vựng IELTS &amp; bộ đề của Giáo viên, bảng xếp hạng đua Top 1/2/3 theo ngày (chốt 23:59 trao danh hiệu vào ngày hôm sau) và hệ thống danh hiệu độc quyền!
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* GAME CARD 1: SPACE SHOOTER ARENA */}
-            <div className="group rounded-3xl border-2 border-cyan-500/45 hover:border-cyan-400 bg-gradient-to-br from-slate-900 via-[#0b192c] to-slate-950 p-6 flex flex-col justify-between gap-5 shadow-2xl transition">
+            <div className="group rounded-3xl border-2 border-cyan-400/70 hover:border-[#007A7A] dark:border-cyan-500/45 dark:hover:border-cyan-400 bg-gradient-to-br from-white via-[#F0FDFA] to-[#E0F2FE]/80 dark:from-slate-900 dark:via-[#0b192c] dark:to-slate-950 p-6 flex flex-col justify-between gap-5 shadow-xl dark:shadow-2xl transition">
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 text-xs font-black">
+                  <span className="px-3 py-1 rounded-full bg-cyan-100/90 dark:bg-cyan-500/20 border border-cyan-300 dark:border-cyan-400/40 text-[#007A7A] dark:text-cyan-300 text-xs font-black">
                     🚀 GAME 1 • MULTIPLAYER &amp; TỰ LUYỆN
                   </span>
                   {openLobbyRoomsCount > 0 && (
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-extrabold animate-pulse">
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-400/40 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold animate-pulse">
                       ● {openLobbyRoomsCount} phòng PIN đang mở
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-4 bg-slate-950/80 border border-cyan-500/25 rounded-2xl p-4">
+                <div className="flex items-center gap-4 bg-white/90 dark:bg-slate-950/80 border border-cyan-200 dark:border-cyan-500/25 rounded-2xl p-4 shadow-xs">
                   <AnimalPilotAvatar
                     animalId={myAnimalId}
                     accessoryId={myAccessoryId}
@@ -800,24 +803,24 @@ export default function GameArena({
                     onShip={true}
                   />
                   <div className="space-y-1">
-                    <h2 className="text-xl font-black text-white">
+                    <h2 className="text-xl font-black text-[#0F172B] dark:text-white">
                       Đấu Trường Phi Thuyền Vũ Trụ
                     </h2>
-                    <p className="text-xs text-cyan-300 font-bold">
+                    <p className="text-xs text-[#007A7A] dark:text-cyan-300 font-bold">
                       Space Shooter Arena • Đấu Phòng PIN Live &amp; Chia Đội
                     </p>
                   </div>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#334155] dark:text-slate-300 leading-relaxed">
                   Chọn <b>Phi Công Thú Cưng &amp; Màu Tàu</b>, vào phòng PIN thi đấu trực tiếp cùng cả lớp hoặc tự luyện 4 vòng: <b>Bắn Thiên Thạch Nghĩa ➔ Gõ Từ Full ➔ Đồng/Trái Nghĩa ➔ Gõ Câu Diệt Boss</b>.
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 font-bold">
+                  <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 text-[#0F172B] dark:text-slate-200 font-bold">
                     🛸 Phòng Đấu PIN Live cùng Giáo viên &amp; Bạn bè
                   </div>
-                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 font-bold">
+                  <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 text-[#0F172B] dark:text-slate-200 font-bold">
                     🐾 12 Thú Cưng Phi Công &amp; Phụ kiện vương miện
                   </div>
                 </div>
@@ -835,18 +838,18 @@ export default function GameArena({
             </div>
 
             {/* GAME CARD 2: KNIGHT & DRAGON RPG QUEST */}
-            <div className="group rounded-3xl border-2 border-rose-500/50 hover:border-amber-400 bg-gradient-to-br from-slate-900 via-[#220d1c] to-slate-950 p-6 flex flex-col justify-between gap-5 shadow-2xl transition">
+            <div className="group rounded-3xl border-2 border-rose-300 hover:border-amber-500 dark:border-rose-500/50 dark:hover:border-amber-400 bg-gradient-to-br from-white via-[#FFF1F2] to-[#FEF3C7]/60 dark:from-slate-900 dark:via-[#220d1c] dark:to-slate-950 p-6 flex flex-col justify-between gap-5 shadow-xl dark:shadow-2xl transition">
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-black">
+                  <span className="px-3 py-1 rounded-full bg-rose-100 dark:bg-rose-500/20 border border-rose-300 dark:border-rose-400/40 text-rose-800 dark:text-rose-300 text-xs font-black">
                     ⚔️ GAME 2 • NHẬP VAI DIỆT RỒNG (MỚI)
                   </span>
-                  <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-extrabold">
+                  <span className="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-300 text-xs font-extrabold">
                     🐉 Boss Cuối Final Smash
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 bg-slate-950/80 border border-rose-500/25 rounded-2xl p-4">
+                <div className="flex items-center gap-4 bg-white/90 dark:bg-slate-950/80 border border-rose-200 dark:border-rose-500/25 rounded-2xl p-4 shadow-xs">
                   <div className="w-20 h-16 rounded-2xl bg-gradient-to-br from-slate-900 via-[#2a0c1d] to-slate-950 border-2 border-amber-400/60 flex items-center justify-center relative overflow-hidden shadow-md shrink-0">
                     <img
                       src="/assets/knight-rpg/knight_arthur.png"
@@ -860,24 +863,24 @@ export default function GameArena({
                     />
                   </div>
                   <div className="space-y-1">
-                    <h2 className="text-xl font-black text-white">
+                    <h2 className="text-xl font-black text-[#0F172B] dark:text-white">
                       Hiệp Sĩ Diệt Rồng — RPG Quest
                     </h2>
-                    <p className="text-xs text-amber-300 font-bold">
+                    <p className="text-xs text-rose-700 dark:text-amber-300 font-bold">
                       Slime ➔ Goblin ➔ Orc ➔ Boss Cuối Rồng Hắc Ám
                     </p>
                   </div>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#334155] dark:text-slate-300 leading-relaxed">
                   Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực (<b>Arthur, Leon, Kenji, Drake, Valkyrie Freya, Kiếm Khách Tomoe...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-amber-200 font-bold">
+                  <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-rose-200/80 dark:border-slate-800 text-amber-800 dark:text-amber-200 font-bold">
                     🪙 Đánh quái rớt Vàng • 10 Nhân Vật Nam &amp; Nữ
                   </div>
-                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-sky-200 font-bold">
+                  <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-rose-200/80 dark:border-slate-800 text-sky-800 dark:text-sky-200 font-bold">
                     🗝️ Tỉ lệ hiếm rớt Chìa Khóa khi hạ quái
                   </div>
                 </div>
@@ -896,7 +899,7 @@ export default function GameArena({
           </div>
         </div>
 
-        <div className="text-center text-xs text-slate-400 relative z-10">
+        <div className="text-center text-xs text-[#475569] dark:text-slate-400 relative z-10">
           Bạn có thể chuyển đổi qua lại giữa 2 game bất kỳ lúc nào ngay trong phòng chờ.
         </div>
       </div>
@@ -954,18 +957,18 @@ export default function GameArena({
 
         <div className="max-w-3xl w-full mx-auto my-auto py-4 relative z-10 space-y-4">
           {/* 2-Game Switcher Banner inside Zone Đấu Trường: Space Shooter vs Knight & Dragon RPG */}
-          <div className="p-3 rounded-2xl bg-gradient-to-r from-rose-950/90 via-slate-900 to-amber-950/85 border border-rose-500/40 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-rose-50 via-white to-amber-50 dark:from-rose-950/90 dark:via-slate-900 dark:to-amber-950/85 border border-rose-200 dark:border-rose-500/40 text-[#0F172B] dark:text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md dark:shadow-lg">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black uppercase">
                   GAME MỚI TRONG ĐẤU TRƯỜNG
                 </span>
-                <span className="text-xs sm:text-sm font-black text-amber-300">
+                <span className="text-xs sm:text-sm font-black text-rose-700 dark:text-amber-300">
                   ⚔️ Hiệp Sĩ Diệt Rồng (Slime ➔ Goblin ➔ Boss Rồng Hắc Ám)
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300">
-                Đánh hạ quái vật rớt 🪙 Tiền Vàng &amp; tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh từ quái, mở khóa 7 nhân vật Nam/Nữ chân thực &amp; né Skill Tất Sát (Final Smash) của Rồng!
+              <p className="text-[11px] text-[#475569] dark:text-slate-300">
+                Đánh hạ quái vật rớt 🪙 Tiền Vàng &amp; tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh từ quái, mở khóa 10 nhân vật Nam/Nữ chân thực &amp; né Skill Tất Sát (Final Smash) của Rồng!
               </p>
             </div>
             <button

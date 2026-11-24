@@ -187,6 +187,23 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await bgmBtn.click();
     await expect(bgmBtn).toContainText(/Nhạc:/i);
 
+    // Verify Light / Dark mode toggle works cleanly inside Knight & Dragon RPG and Game Selection Hub
+    const knightThemeBtn = page.getByTestId('knight-theme-toggle-btn');
+    await expect(knightThemeBtn).toBeVisible();
+    const initialBg = await page.getByTestId('knight-dragon-game-root').evaluate(el => getComputedStyle(el).backgroundColor);
+    await knightThemeBtn.click();
+    await expect
+      .poll(async () =>
+        page.getByTestId('knight-dragon-game-root').evaluate(el => getComputedStyle(el).backgroundColor)
+      )
+      .not.toBe(initialBg);
+    await knightThemeBtn.click();
+    await expect
+      .poll(async () =>
+        page.getByTestId('knight-dragon-game-root').evaluate(el => getComputedStyle(el).backgroundColor)
+      )
+      .toBe(initialBg);
+
     // Teacher can open the Question Bank Manager directly from Knight & Dragon RPG
     await expect(page.getByTestId('knight-open-vocab-manager-btn')).toBeVisible();
     await page.getByTestId('knight-open-vocab-manager-btn').click();
@@ -223,6 +240,21 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
 
     // Return to Knight Hub and launch Stage 4 Final Dragon Boss (disable random 5% for deterministic normal Dragon check)
     await page.getByTestId('knight-back-to-hub-btn').click();
+    await expect(page.getByTestId('arena-game-selection-hub')).toBeVisible({ timeout: 5_000 });
+    const hubInitialBg = await page.getByTestId('arena-game-selection-hub').evaluate(el => getComputedStyle(el).backgroundColor);
+    await page.getByTestId('arena-theme-toggle-btn').click();
+    await expect
+      .poll(async () =>
+        page.getByTestId('arena-game-selection-hub').evaluate(el => getComputedStyle(el).backgroundColor)
+      )
+      .not.toBe(hubInitialBg);
+    await page.getByTestId('arena-theme-toggle-btn').click();
+    await expect
+      .poll(async () =>
+        page.getByTestId('arena-game-selection-hub').evaluate(el => getComputedStyle(el).backgroundColor)
+      )
+      .toBe(hubInitialBg);
+
     await page.getByTestId('switch-to-knight-game-btn').click();
     await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
 

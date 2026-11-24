@@ -9,11 +9,13 @@ import {
   Keyboard,
   Lightbulb,
   Lock,
+  Moon,
   Music,
   RefreshCw,
   ShoppingBag,
   Snowflake,
   Sparkles,
+  Sun,
   Swords,
   Trophy,
   Volume2,
@@ -106,6 +108,7 @@ const DEMON_STAGE_META = {
 export default function KnightDragonGame({
   currentUser,
   customVocabTopics = [],
+  darkMode = false,
   gamePracticeLeaderboard = [],
   initialRawVocab = DEFAULT_VOCAB_TEXT,
   initialTopicId = 'core',
@@ -117,6 +120,7 @@ export default function KnightDragonGame({
   onSyncKnightResult,
   roomPin = '',
   roomRawVocab = '',
+  setDarkMode = null,
   showToast,
   usersDb = {}
 }) {
@@ -2557,10 +2561,10 @@ export default function KnightDragonGame({
   return (
     <div
       data-testid="knight-dragon-game-root"
-      className="min-h-[100dvh] w-full bg-[#090D16] text-white flex flex-col select-none relative overflow-x-hidden"
+      className="min-h-[100dvh] w-full bg-[#F8FAFC] dark:bg-[#090D16] text-[#0F172B] dark:text-white flex flex-col select-none relative overflow-x-hidden transition-colors duration-200"
     >
       {/* Top Bar */}
-      <header className="shrink-0 bg-slate-900/95 border-b border-slate-800 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 flex-wrap z-30">
+      <header className="shrink-0 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 flex-wrap z-30">
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
@@ -2568,7 +2572,7 @@ export default function KnightDragonGame({
               clearAllTimers();
               onExitArena?.();
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
           >
             <ChevronLeft className="w-4 h-4" /> Thoát Đấu Trường
           </button>
@@ -2581,7 +2585,7 @@ export default function KnightDragonGame({
                 clearAllTimers();
                 onBackToGameHub();
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-400/40 text-xs font-extrabold text-indigo-200 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/30 border border-indigo-200 dark:border-indigo-400/40 text-xs font-extrabold text-indigo-700 dark:text-indigo-200 transition"
             >
               <span>🎮 Chọn Game Đấu Trường</span>
             </button>
@@ -2594,7 +2598,7 @@ export default function KnightDragonGame({
               clearAllTimers();
               onBackToSpaceMode?.();
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-xs font-extrabold text-cyan-300 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDFFFD] hover:bg-[#D5FBF7] dark:bg-cyan-500/15 dark:hover:bg-cyan-500/25 border border-[#B5F5F1] dark:border-cyan-500/40 text-xs font-extrabold text-[#007A7A] dark:text-cyan-300 transition"
           >
             <span>🚀 Đổi sang Game Phi Thuyền Vũ Trụ</span>
           </button>
@@ -2605,14 +2609,27 @@ export default function KnightDragonGame({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {setDarkMode && (
+            <button
+              type="button"
+              data-testid="knight-theme-toggle-btn"
+              onClick={() => setDarkMode(d => !d)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
+              title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+            >
+              {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-[#007A7A]" />}
+              <span>{darkMode ? 'Sáng' : 'Tối'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             data-testid="knight-bgm-toggle-btn"
             onClick={handleToggleBgm}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-extrabold transition ${
               bgmMuted
-                ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400'
-                : 'bg-violet-500/20 hover:bg-violet-500/30 border-violet-400/50 text-violet-200'
+                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                : 'bg-violet-50 hover:bg-violet-100 dark:bg-violet-500/20 dark:hover:bg-violet-500/30 border-violet-300 dark:border-violet-400/50 text-violet-700 dark:text-violet-200'
             }`}
             title={bgmMuted ? 'Bật nhạc nền theo từng màn' : 'Tắt nhạc nền'}
           >
@@ -2629,7 +2646,7 @@ export default function KnightDragonGame({
               type="button"
               data-testid="knight-open-vocab-manager-btn"
               onClick={() => onOpenVocabManager(resolveSelectedRawVocab())}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-400/50 text-white text-xs font-extrabold shadow-sm transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/50 text-white text-xs font-extrabold shadow-sm transition"
             >
               <BookOpen className="w-3.5 h-3.5" />
               <span>Quản Lý Bộ Đề / Ra Đề (GV)</span>
@@ -2638,18 +2655,18 @@ export default function KnightDragonGame({
 
           <div
             data-testid="knight-gold-badge"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-black"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-300 text-xs font-black"
           >
-            <Coins className="w-3.5 h-3.5 text-amber-400" />
+            <Coins className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
             <span>{Number(rpgProfile.gold || 0).toLocaleString('vi-VN')} 🪙 Vàng</span>
           </div>
 
           <div
             data-testid="knight-keys-badge"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 border border-sky-400/40 text-sky-300 text-xs font-black"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-500/15 border border-sky-300 dark:border-sky-400/40 text-sky-800 dark:text-sky-300 text-xs font-black"
             title="Chìa Khóa Hồi Sinh (Tỉ lệ hiếm rớt khi hạ quái hoặc đổi bằng Vàng để hồi sinh khi thua)"
           >
-            <KeyRound className="w-3.5 h-3.5 text-sky-400" />
+            <KeyRound className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
             <span>{rpgProfile.keys || 0} 🗝️ Chìa Khóa</span>
           </div>
 
@@ -2668,22 +2685,22 @@ export default function KnightDragonGame({
       {/* HUB SCREEN */}
       {matchState === 'HUB' && (
         <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-5">
-          <div className="rounded-3xl border border-rose-500/35 bg-gradient-to-br from-slate-900 via-[#1a1025] to-slate-900 p-5 sm:p-7 shadow-2xl space-y-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+          <div className="rounded-3xl border border-rose-200 dark:border-rose-500/35 bg-gradient-to-br from-white via-[#FFF5F7] to-[#FEFCE8]/70 dark:from-slate-900 dark:via-[#1a1025] dark:to-slate-900 p-5 sm:p-7 shadow-xl dark:shadow-2xl space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
               <div className="space-y-1.5">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-xs font-extrabold">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 dark:bg-rose-500/20 border border-rose-300 dark:border-rose-400/40 text-rose-800 dark:text-rose-300 text-xs font-extrabold">
                   🐉 HÀNH TRÌNH ĐỒ LONG 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG HẮC ÁM
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-black text-white">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#0F172B] dark:text-white">
                   Hiệp Sĩ Diệt Rồng — Đấu Trường Từ Vựng RPG
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-2xl leading-relaxed">
                   Hạ gục <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để thu <b>🪙 Tiền Vàng</b> mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực, săn tỉ lệ hiếm rớt <b>🗝️ Chìa Khóa Hồi Sinh</b> khi hạ quái và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
                 </p>
               </div>
 
               {/* Active Hero Showcase Card */}
-              <div className="shrink-0 rounded-2xl border border-pink-500/40 bg-slate-950/90 p-3 flex items-center gap-3.5 shadow-lg">
+              <div className="shrink-0 rounded-2xl border border-pink-300 dark:border-pink-500/40 bg-white/95 dark:bg-slate-950/90 p-3 flex items-center gap-3.5 shadow-md dark:shadow-lg">
                 <div
                   className="w-20 h-20 rounded-2xl flex items-center justify-center border-2 p-1 shadow-inner relative overflow-hidden shrink-0"
                   style={{
@@ -2699,13 +2716,13 @@ export default function KnightDragonGame({
                 </div>
                 <div className="min-w-0 max-w-[205px]">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-white truncate">{activeSkin.name}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-[10px] font-extrabold shrink-0">
+                    <span className="text-xs font-black text-[#0F172B] dark:text-white truncate">{activeSkin.name}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-[10px] font-extrabold shrink-0">
                       {activeSkin.genderBadge}
                     </span>
                   </div>
-                  <p className="text-[11px] text-amber-300 font-bold mt-0.5 truncate">{activeSkin.weaponName}</p>
-                  <p className="text-[11px] text-slate-400 leading-snug line-clamp-2">{activeSkin.passiveText}</p>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 font-bold mt-0.5 truncate">{activeSkin.weaponName}</p>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug line-clamp-2">{activeSkin.passiveText}</p>
                 </div>
                 <button
                   type="button"
@@ -2718,10 +2735,10 @@ export default function KnightDragonGame({
             </div>
 
             {/* Vocab Topic & Speed Configuration */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/95 dark:bg-slate-950/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <label className="block text-xs font-bold text-slate-300">
+                  <label className="block text-xs font-bold text-[#334155] dark:text-slate-300">
                     Chọn Kho Từ Vựng ({bankItemsCount} từ)
                   </label>
                   {isTeacherOrAdmin && onOpenVocabManager && (
@@ -2729,7 +2746,7 @@ export default function KnightDragonGame({
                       type="button"
                       data-testid="knight-hub-manage-vocab-btn"
                       onClick={() => onOpenVocabManager(resolveSelectedRawVocab())}
-                      className="text-[11px] font-extrabold text-emerald-300 hover:text-emerald-200 underline underline-offset-2 transition"
+                      className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300 hover:text-emerald-600 dark:hover:text-emerald-200 underline underline-offset-2 transition"
                     >
                       + Tạo / Sửa bộ đề
                     </button>
@@ -2738,7 +2755,7 @@ export default function KnightDragonGame({
                 <select
                   value={topicId}
                   onChange={e => setTopicId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white"
+                  className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-white"
                 >
                   <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
                   {Object.entries(VOCAB_PRESETS || {}).map(([k, preset]) => (
@@ -2758,13 +2775,13 @@ export default function KnightDragonGame({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1.5">
                   Số Quái Vật Mỗi Ải
                 </label>
                 <select
                   value={roundSize}
                   onChange={e => setRoundSize(Number(e.target.value) || 8)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white"
+                  className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-white"
                 >
                   {[4, 8, 12, 16, 20, 30].map(n => (
                     <option key={n} value={n}>
@@ -2775,7 +2792,7 @@ export default function KnightDragonGame({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1.5">
                   Tốc Độ Quái Tấn Công
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -2791,7 +2808,7 @@ export default function KnightDragonGame({
                       className={`py-2.5 rounded-xl text-xs font-extrabold border transition ${
                         speedMode === sp.id
                           ? 'bg-rose-600 text-white border-rose-500'
-                          : 'bg-slate-900 text-slate-300 border-slate-700'
+                          : 'bg-white dark:bg-slate-900 text-[#334155] dark:text-slate-300 border-slate-300 dark:border-slate-700'
                       }`}
                     >
                       {sp.label}
@@ -2828,7 +2845,7 @@ export default function KnightDragonGame({
               </div>
 
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="text-[11px] font-bold text-slate-400">
+                <p className="text-[11px] font-bold text-[#475569] dark:text-slate-400">
                   {isStrictAdmin
                     ? '🛡️ Quyền Admin: Bấm vào bất kỳ bản đồ Ải 1–4 để luyện tập/kiểm thử riêng hoặc test màn ẩn.'
                     : isTeacherOrAdmin
@@ -2845,19 +2862,19 @@ export default function KnightDragonGame({
                   const cardContent = (
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-1.5">
-                        <span className="text-xs font-black text-amber-400">{st.shortTitle}</span>
+                        <span className="text-xs font-black text-amber-700 dark:text-amber-400">{st.shortTitle}</span>
                         {st.round === 4 ? (
                           <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black">
                             FINAL BOSS
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[10px] font-bold">
+                          <span className="px-1.5 py-0.5 rounded-md bg-sky-100 dark:bg-sky-500/15 border border-sky-300 dark:border-sky-400/30 text-sky-800 dark:text-sky-300 text-[10px] font-bold">
                             🗝️ {stageKeyMinPct}%+
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-center gap-2 py-1.5 px-2 rounded-xl bg-slate-900/80 border border-slate-800/90">
+                      <div className="flex items-center justify-center gap-2 py-1.5 px-2 rounded-xl bg-slate-900/90 border border-slate-800/90">
                         {st.monsters.map(m => (
                           <div key={m.id} className="flex flex-col items-center gap-0.5" title={m.name}>
                             <img
@@ -2873,12 +2890,12 @@ export default function KnightDragonGame({
                         ))}
                       </div>
 
-                      <p className="text-[11px] font-bold text-slate-200">{st.mechanicLabel}</p>
-                      <p className="text-[11px] text-slate-400 leading-snug">{st.questionDesc}</p>
+                      <p className="text-[11px] font-bold text-[#0F172B] dark:text-slate-200">{st.mechanicLabel}</p>
+                      <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug">{st.questionDesc}</p>
 
                       {!isTeacherOrAdmin && (
-                        <div className="pt-1 flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                          <Lock className="w-3 h-3 text-amber-400/80" />
+                        <div className="pt-1 flex items-center gap-1 text-[10px] font-bold text-[#475569] dark:text-slate-400">
+                          <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400/80" />
                           <span>{st.round === 1 ? 'Bắt đầu từ nút Xuất Chinh ở trên' : 'Vượt ải trước để mở khóa'}</span>
                         </div>
                       )}
@@ -2894,8 +2911,8 @@ export default function KnightDragonGame({
                         onClick={() => startKnightCampaign(st.round, true)}
                         className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-2 ${
                           st.round === 4
-                            ? 'bg-rose-950/45 hover:bg-rose-900/55 border-rose-500/50 text-rose-100'
-                            : 'bg-slate-950/85 hover:bg-slate-900 border-slate-800 hover:border-amber-500/50 text-slate-100'
+                            ? 'bg-rose-50 hover:bg-rose-100/80 dark:bg-rose-950/45 dark:hover:bg-rose-900/55 border-rose-300 dark:border-rose-500/50 text-[#0F172B] dark:text-rose-100'
+                            : 'bg-white hover:bg-amber-50/50 dark:bg-slate-950/85 dark:hover:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500/50 text-[#0F172B] dark:text-slate-100'
                         }`}
                       >
                         {cardContent}
@@ -2907,10 +2924,10 @@ export default function KnightDragonGame({
                     <div
                       key={st.round}
                       data-testid={`locked-knight-stage-${st.round}`}
-                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-2 opacity-85 ${
+                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-2 opacity-90 ${
                         st.round === 4
-                          ? 'bg-rose-950/30 border-rose-500/35 text-rose-100'
-                          : 'bg-slate-950/65 border-slate-800 text-slate-100'
+                          ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-200 dark:border-rose-500/35 text-[#0F172B] dark:text-rose-100'
+                          : 'bg-white/90 dark:bg-slate-950/65 border-slate-200 dark:border-slate-800 text-[#0F172B] dark:text-slate-100'
                       }`}
                     >
                       {cardContent}
@@ -2922,50 +2939,50 @@ export default function KnightDragonGame({
 
             {/* Player RPG Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
-                <p className="text-[11px] text-slate-400 font-bold">Quái Đã Hạ</p>
-                <p className="text-lg font-black text-emerald-400">{rpgProfile.monstersSlain || 0}</p>
+              <div className="p-3 rounded-2xl bg-white/95 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 text-center shadow-xs">
+                <p className="text-[11px] text-[#475569] dark:text-slate-400 font-bold">Quái Đã Hạ</p>
+                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{rpgProfile.monstersSlain || 0}</p>
               </div>
-              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
-                <p className="text-[11px] text-slate-400 font-bold">
+              <div className="p-3 rounded-2xl bg-white/95 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 text-center shadow-xs">
+                <p className="text-[11px] text-[#475569] dark:text-slate-400 font-bold">
                   {(rpgProfile.demonKingsSlain || 0) > 0 ? 'Rồng / Boss Ẩn Đã Hạ' : 'Boss Rồng Đã Hạ'}
                 </p>
-                <p className="text-lg font-black text-rose-400">
+                <p className="text-lg font-black text-rose-600 dark:text-rose-400">
                   {rpgProfile.dragonsSlain || 0} 🐉
                   {(rpgProfile.demonKingsSlain || 0) > 0 ? ` · ${rpgProfile.demonKingsSlain} 👿` : ''}
                 </p>
               </div>
-              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
-                <p className="text-[11px] text-slate-400 font-bold">Kỷ Lục Điểm Hiệp Sĩ</p>
-                <p className="text-lg font-black text-amber-300">{rpgProfile.bestScore || 0}đ</p>
+              <div className="p-3 rounded-2xl bg-white/95 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 text-center shadow-xs">
+                <p className="text-[11px] text-[#475569] dark:text-slate-400 font-bold">Kỷ Lục Điểm Hiệp Sĩ</p>
+                <p className="text-lg font-black text-amber-600 dark:text-amber-300">{rpgProfile.bestScore || 0}đ</p>
               </div>
-              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-center">
-                <p className="text-[11px] text-slate-400 font-bold">Danh Hiệu Top 1/2/3 Ngày</p>
-                <p className="text-xs font-extrabold text-cyan-300 mt-1">Chốt 23:59 • Trao 00:00 hôm sau</p>
+              <div className="p-3 rounded-2xl bg-white/95 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 text-center shadow-xs">
+                <p className="text-[11px] text-[#475569] dark:text-slate-400 font-bold">Danh Hiệu Top 1/2/3 Ngày</p>
+                <p className="text-xs font-extrabold text-[#007A7A] dark:text-cyan-300 mt-1">Chốt 23:59 • Trao 00:00 hôm sau</p>
               </div>
             </div>
 
             {/* Knight & Dragon RPG Waiting Screen Score Leaderboard */}
             <div
               data-testid="knight-lobby-leaderboard"
-              className="rounded-2xl bg-slate-950/85 border border-amber-500/35 p-4 space-y-3"
+              className="rounded-2xl bg-white/95 dark:bg-slate-950/85 border border-amber-300 dark:border-amber-500/35 p-4 space-y-3 shadow-xs"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/90 pb-2.5">
-                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800/90 pb-2.5">
+                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
                   <span>BẢNG XẾP HẠNG ĐIỂM — HIỆP SĨ DIỆT RỒNG ({knightLeaderboardRows.length} cao thủ)</span>
                 </h3>
-                <span className="text-[11px] text-slate-400 font-bold">
+                <span className="text-[11px] text-[#475569] dark:text-slate-400 font-bold">
                   Đua Top 1/2/3 theo ngày • Cập nhật tự động sau mỗi trận
                 </span>
               </div>
 
               {knightLeaderboardRows.length === 0 ? (
                 <div className="text-center py-4 space-y-1">
-                  <p className="text-xs font-bold text-slate-300">
+                  <p className="text-xs font-bold text-[#334155] dark:text-slate-300">
                     Chưa có kỷ lục điểm nào trên Bảng Xếp Hạng Hiệp Sĩ Diệt Rồng.
                   </p>
-                  <p className="text-[11px] text-amber-300/90">
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300/90">
                     ⚔️ Hãy bấm <b>Xuất Chinh Từ Ải 1</b> ngay để mở hàng Top #1 Đệ Nhất Đồ Long!
                   </p>
                 </div>
@@ -2981,23 +2998,23 @@ export default function KnightDragonGame({
                         key={`${row.username}-${idx}`}
                         className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs transition ${
                           isMe
-                            ? 'bg-rose-950/50 border-amber-400/70 ring-1 ring-amber-400/30'
+                            ? 'bg-rose-50 dark:bg-rose-950/50 border-amber-400 dark:border-amber-400/70 ring-1 ring-amber-400/30'
                             : idx < 3
-                            ? 'bg-slate-900/95 border-amber-500/30'
-                            : 'bg-slate-900/70 border-slate-800'
+                            ? 'bg-amber-50/60 dark:bg-slate-900/95 border-amber-300 dark:border-amber-500/30'
+                            : 'bg-slate-50 dark:bg-slate-900/70 border-slate-200 dark:border-slate-800'
                         }`}
                       >
                         <div className="min-w-0 pr-2">
-                          <div className="font-extrabold text-white truncate flex items-center gap-1.5">
+                          <div className="font-extrabold text-[#0F172B] dark:text-white truncate flex items-center gap-1.5">
                             <span
                               className={`font-black shrink-0 ${
                                 idx === 0
-                                  ? 'text-amber-300'
+                                  ? 'text-amber-600 dark:text-amber-300'
                                   : idx === 1
-                                  ? 'text-slate-200'
+                                  ? 'text-slate-600 dark:text-slate-200'
                                   : idx === 2
-                                  ? 'text-orange-300'
-                                  : 'text-slate-400'
+                                  ? 'text-orange-600 dark:text-orange-300'
+                                  : 'text-slate-500 dark:text-slate-400'
                               }`}
                             >
                               {rankMedal}
@@ -3008,14 +3025,14 @@ export default function KnightDragonGame({
                               badgeSize="xs"
                             />
                             {isMe && (
-                              <span className="text-[11px] font-black text-amber-300 shrink-0">(Bạn)</span>
+                              <span className="text-[11px] font-black text-amber-700 dark:text-amber-300 shrink-0">(Bạn)</span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          <p className="text-[11px] text-[#475569] dark:text-slate-400 truncate mt-0.5">
                             {row.topicLabel} • ⚔️ {row.monstersSlain} quái • 🐉 {row.dragonsSlain} Rồng
                           </p>
                         </div>
-                        <span className="font-mono font-black text-sm text-amber-300 shrink-0">
+                        <span className="font-mono font-black text-sm text-amber-700 dark:text-amber-300 shrink-0">
                           {Number(row.score || 0).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
@@ -3032,7 +3049,7 @@ export default function KnightDragonGame({
       {matchState !== 'HUB' && (
         <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto p-2 sm:p-4 gap-2.5 min-h-0">
           {/* HUD Status Strip */}
-          <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-2 flex-wrap">
+          <div className="bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-2 flex-wrap shadow-sm">
             <div className="flex items-center gap-2 flex-wrap">
               <span
                 className={`px-2.5 py-1 rounded-lg text-white text-xs font-black ${
@@ -3041,7 +3058,7 @@ export default function KnightDragonGame({
               >
                 {stageMeta.shortTitle}
               </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 text-xs font-bold">
+              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[#0F172B] dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-transparent">
                 {isDemonKingBattle
                   ? `Đòn ${wordIdx + 1}/${(queues[5] || []).length || 1} (Luật Vòng ${demonWheelStyle})`
                   : `Quái ${wordIdx + 1}/${(queues[round] || []).length || 1}: ${currentMonster?.name}`}
@@ -3056,7 +3073,7 @@ export default function KnightDragonGame({
               {isDemonKingBattle && matchState === 'PLAYING' && (
                 <span
                   data-testid="demon-curse-timer-badge"
-                  className="px-2.5 py-1 rounded-lg bg-fuchsia-600/25 border border-fuchsia-400/60 text-fuchsia-200 text-xs font-black animate-pulse"
+                  className="px-2.5 py-1 rounded-lg bg-fuchsia-100 dark:bg-fuchsia-600/25 border border-fuchsia-300 dark:border-fuchsia-400/60 text-fuchsia-800 dark:text-fuchsia-200 text-xs font-black animate-pulse"
                 >
                   👿 Rút 1 ❤️ sau: {demonCurseLeft}s
                 </span>
@@ -3067,21 +3084,21 @@ export default function KnightDragonGame({
               <span
                 className={`px-2.5 py-1 rounded-lg font-mono text-xs font-black flex items-center gap-1 border ${
                   timeLeft <= 5
-                    ? 'bg-rose-500/20 text-rose-300 border-rose-500 animate-pulse'
-                    : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40'
+                    ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-400 dark:border-rose-500 animate-pulse'
+                    : 'bg-[#EDFFFD] dark:bg-cyan-500/15 text-[#007A7A] dark:text-cyan-300 border-[#B5F5F1] dark:border-cyan-500/40'
                 }`}
               >
                 <Clock className="w-3.5 h-3.5" /> {timeLeft}s
               </span>
-              <span className="text-xs font-black text-amber-400">Combo x{combo}</span>
-              <span data-testid="knight-score-display" className="text-xs font-black text-emerald-400 tabular-nums">
+              <span className="text-xs font-black text-amber-600 dark:text-amber-400">Combo x{combo}</span>
+              <span data-testid="knight-score-display" className="text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
                 {score}đ
               </span>
               <button
                 type="button"
                 onClick={handleUseFreeze}
                 disabled={freezeCharges <= 0}
-                className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 disabled:opacity-40 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center gap-1"
+                className="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/20 dark:hover:bg-sky-500/30 disabled:opacity-40 border border-sky-300 dark:border-sky-400/40 text-sky-700 dark:text-sky-300 text-xs font-bold flex items-center gap-1"
               >
                 <Snowflake className="w-3 h-3" /> +8s ({freezeCharges})
               </button>
@@ -3098,8 +3115,8 @@ export default function KnightDragonGame({
                   }
                   className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition ${
                     score >= KNIGHT_HINT_SCORE_COST
-                      ? 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-400/40 text-amber-300'
-                      : 'bg-slate-800/70 border-slate-700 text-slate-500 cursor-not-allowed opacity-60'
+                      ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 border-amber-300 dark:border-amber-400/40 text-amber-700 dark:text-amber-300'
+                      : 'bg-slate-100 dark:bg-slate-800/70 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
                   }`}
                 >
                   <Lightbulb className="w-3 h-3" /> Gợi ý (-{KNIGHT_HINT_SCORE_COST}đ)
@@ -3274,9 +3291,9 @@ export default function KnightDragonGame({
 
           {/* Interactive Combat Question Panel */}
           {activeQ && matchState === 'PLAYING' && (
-            <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div className="bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                   {isDemonKingBattle
                     ? `👿 MA VƯƠNG MALAKOR • CHẾ ĐỘ VÒNG ${demonWheelStyle}: ${activeWheelMeta.title}`
                     : stageMeta.mechanicLabel}
@@ -3288,7 +3305,7 @@ export default function KnightDragonGame({
                       effectiveCombatRound === 4 ? activeQ.v4Display || activeQ.word : activeQ.word
                     )
                   }
-                  className="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 text-xs font-bold inline-flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-lg bg-[#EDFFFD] hover:bg-[#D5FBF7] dark:bg-cyan-500/15 dark:hover:bg-cyan-500/25 border border-[#B5F5F1] dark:border-transparent text-[#007A7A] dark:text-cyan-300 text-xs font-bold inline-flex items-center gap-1"
                 >
                   <Volume2 className="w-3.5 h-3.5" /> Nghe phát âm (TAB)
                 </button>
@@ -3302,7 +3319,7 @@ export default function KnightDragonGame({
                     : activeQ.v3Choices || [];
                 return (
                   <div className="space-y-3">
-                    <p className="text-base sm:text-lg font-extrabold text-white">
+                    <p className="text-base sm:text-lg font-extrabold text-[#0F172B] dark:text-white">
                       {effectiveCombatRound === 3
                         ? activeQ.v3Question
                         : `Nghĩa tiếng Việt: "${activeQ.prompt}"`}
@@ -3314,12 +3331,12 @@ export default function KnightDragonGame({
                           type="button"
                           data-testid={`knight-choice-${idx}`}
                           onClick={() => handleSelectRuneChoice(cText)}
-                          className="p-3 rounded-xl bg-slate-950 hover:bg-rose-500/20 border border-slate-700 hover:border-rose-400 text-left flex items-center gap-3 transition group"
+                          className="p-3 rounded-xl bg-slate-50 hover:bg-rose-50 dark:bg-slate-950 dark:hover:bg-rose-500/20 border border-slate-200 dark:border-slate-700 hover:border-rose-400 text-left flex items-center gap-3 transition group"
                         >
                           <span className="w-7 h-7 rounded-lg bg-rose-600 group-hover:bg-amber-400 group-hover:text-slate-950 text-white text-xs font-black flex items-center justify-center shrink-0">
                             {String.fromCharCode(65 + idx)}
                           </span>
-                          <span className="text-sm font-bold text-slate-100">{cText}</span>
+                          <span className="text-sm font-bold text-[#0F172B] dark:text-slate-100">{cText}</span>
                         </button>
                       ))}
                     </div>
@@ -3330,9 +3347,9 @@ export default function KnightDragonGame({
               {/* Wave 2: Full Word Typing */}
               {effectiveCombatRound === 2 && (
                 <div className="space-y-3 text-center">
-                  <p className="text-base font-extrabold text-white">
+                  <p className="text-base font-extrabold text-[#0F172B] dark:text-white">
                     Nghĩa: &quot;{activeQ.prompt}&quot; • Phiên âm:{' '}
-                    <span className="text-amber-300 font-mono">{activeQ.ipa || ''}</span>
+                    <span className="text-amber-700 dark:text-amber-300 font-mono">{activeQ.ipa || ''}</span>
                   </p>
                   <div className="flex justify-center gap-1.5 flex-wrap">
                     {String(activeQ.word || '')
@@ -3348,8 +3365,8 @@ export default function KnightDragonGame({
                               isTyped
                                 ? 'bg-emerald-500 text-slate-950 border-emerald-300'
                                 : idx === typedProgress
-                                ? 'bg-amber-500/20 text-amber-300 border-amber-400'
-                                : 'bg-slate-950 text-slate-500 border-slate-800'
+                                ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-400'
+                                : 'bg-slate-100 dark:bg-slate-950 text-slate-500 border-slate-200 dark:border-slate-800'
                             }`}
                           >
                             {isTyped ? ch : '_'}
@@ -3363,7 +3380,7 @@ export default function KnightDragonGame({
                         key={letter}
                         type="button"
                         onClick={() => handleWave2KeyInput(letter)}
-                        className="w-7 h-8 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-xs font-mono font-bold text-white"
+                        className="w-7 h-8 rounded bg-white hover:bg-amber-500 hover:text-slate-950 dark:bg-slate-800 dark:hover:bg-amber-500 dark:hover:text-slate-950 border border-slate-200 dark:border-transparent text-xs font-mono font-bold text-[#0F172B] dark:text-white"
                       >
                         {letter}
                       </button>
@@ -3383,12 +3400,12 @@ export default function KnightDragonGame({
 
                 return (
                   <div className="space-y-3">
-                    <div className="p-3.5 rounded-xl bg-rose-950/35 border border-rose-500/40 space-y-1.5">
-                      <p className="text-sm sm:text-base font-extrabold text-white leading-relaxed">
+                    <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/35 border border-rose-200 dark:border-rose-500/40 space-y-1.5">
+                      <p className="text-sm sm:text-base font-extrabold text-[#0F172B] dark:text-white leading-relaxed">
                         {activeQ.v4Question}
                       </p>
                       {activeQ.v4HintMeaning && (
-                        <p className="text-xs text-amber-300 font-semibold">
+                        <p className="text-xs text-amber-700 dark:text-amber-300 font-semibold">
                           💡 Gợi ý nghĩa: {activeQ.v4HintMeaning}
                         </p>
                       )}
@@ -3396,19 +3413,19 @@ export default function KnightDragonGame({
 
                     <div>
                       <div className="flex items-center justify-between text-xs font-extrabold mb-1">
-                        <span className="text-rose-400 flex items-center gap-1">
+                        <span className="text-rose-600 dark:text-rose-400 flex items-center gap-1">
                           <Flame className="w-3.5 h-3.5" />{' '}
                           {isDemonKingBattle
                             ? `THANH CHÉM MA VƯƠNG: ${bossHpPct}%`
                             : `MÁU RỒNG HẮC ÁM: ${bossHpPct}%`}
                         </span>
-                        <span className="text-amber-300">
+                        <span className="text-amber-700 dark:text-amber-300">
                           {evalRes.matched
                             ? '⚡ Đủ sát thương! Nhấn Enter để tung nhát chém kết liễu!'
                             : 'Gõ đúng từ để chém mất máu Boss • Gõ sai bị Boss phản đòn!'}
                         </span>
                       </div>
-                      <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-rose-500/40">
+                      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-950 rounded-full overflow-hidden border border-rose-300 dark:border-rose-500/40">
                         <div
                           className={`h-full transition-all duration-150 ${
                             isDemonKingBattle
@@ -3434,7 +3451,7 @@ export default function KnightDragonGame({
                               ? 'Gõ từ / cụm từ tiếng Anh để trảm Ma Vương rồi nhấn Enter...'
                               : 'Gõ từ / cụm từ tiếng Anh để chém Rồng Hắc Ám rồi nhấn Enter...'
                           }
-                          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border-2 border-rose-500/60 focus:border-amber-400 text-sm font-bold text-white focus:outline-none"
+                          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white dark:bg-slate-950 border-2 border-rose-500/60 focus:border-amber-500 dark:focus:border-amber-400 text-sm font-bold text-[#0F172B] dark:text-white focus:outline-none"
                         />
                       </div>
                       <button
@@ -3584,38 +3601,38 @@ export default function KnightDragonGame({
       {matchState === 'REVIVE_PROMPT' && !cannotReviveByDemon && round !== 5 && (
         <div
           data-testid="knight-revive-modal"
-          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-950/75 dark:bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
         >
-          <div className="max-w-md w-full rounded-3xl border-2 border-amber-400 bg-slate-900 p-6 text-center space-y-4 shadow-2xl">
+          <div className="max-w-md w-full rounded-3xl border-2 border-amber-400 bg-white dark:bg-slate-900 p-6 text-center space-y-4 shadow-2xl">
             <div className="flex items-center justify-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-600 flex items-center justify-center text-2xl shadow-inner">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-2xl shadow-inner">
                 🪦
               </div>
-              <span className="text-amber-400 font-black text-lg animate-pulse">➔ 🗝️ ➔</span>
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(251,191,36,0.4)]">
+              <span className="text-amber-600 dark:text-amber-400 font-black text-lg animate-pulse">➔ 🗝️ ➔</span>
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(251,191,36,0.4)]">
                 ⚡
               </div>
             </div>
             <div className="space-y-1">
-              <span className="px-3 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-xs font-black">
+              <span className="px-3 py-0.5 rounded-full bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-black">
                 HIỆP SĨ NGÃ XUỐNG TẠI {stageMeta.shortTitle}
               </span>
-              <h2 className="text-2xl font-black text-white">
+              <h2 className="text-2xl font-black text-[#0F172B] dark:text-white">
                 Dùng Chìa Khóa Hồi Sinh Ngay?
               </h2>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs text-[#475569] dark:text-slate-300 leading-relaxed">
                 Bạn có thể dùng <b>🗝️ Chìa Khóa Hồi Sinh</b> rớt ra từ quái (hoặc dùng <b>🪙 Vàng</b>) để hồi đầy <b>3 ❤️</b> và chiến đấu tiếp ngay tại con quái này!
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 bg-slate-950 p-3 rounded-2xl border border-slate-800 text-xs">
+            <div className="grid grid-cols-2 gap-2.5 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
               <div>
-                <p className="text-slate-400 font-bold">Chìa Khóa Hiện Có</p>
-                <p className="text-base font-black text-sky-300">{rpgProfile.keys || 0} 🗝️</p>
+                <p className="text-[#475569] dark:text-slate-400 font-bold">Chìa Khóa Hiện Có</p>
+                <p className="text-base font-black text-sky-700 dark:text-sky-300">{rpgProfile.keys || 0} 🗝️</p>
               </div>
               <div>
-                <p className="text-slate-400 font-bold">Vàng Hiện Có</p>
-                <p className="text-base font-black text-amber-300">{rpgProfile.gold || 0} 🪙</p>
+                <p className="text-[#475569] dark:text-slate-400 font-bold">Vàng Hiện Có</p>
+                <p className="text-base font-black text-amber-700 dark:text-amber-300">{rpgProfile.gold || 0} 🪙</p>
               </div>
             </div>
 
@@ -3646,7 +3663,7 @@ export default function KnightDragonGame({
                 type="button"
                 data-testid="knight-skip-revive-btn"
                 onClick={() => finalizeMatchAndSync(score, rpgProfile)}
-                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#334155] dark:text-slate-300 text-xs font-bold transition"
               >
                 Không hồi sinh • Kết thúc trận &amp; Lưu điểm ({score}đ)
               </button>
@@ -3657,12 +3674,12 @@ export default function KnightDragonGame({
 
       {/* STAGE TRANSITION OVERLAY */}
       {matchState === 'TRANSITION' && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full rounded-3xl border border-amber-400/50 bg-slate-900 p-6 text-center space-y-4">
-            <h2 className="text-2xl font-black text-amber-400">
+        <div className="fixed inset-0 bg-slate-950/75 dark:bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full rounded-3xl border border-amber-400/60 bg-white dark:bg-slate-900 p-6 text-center space-y-4 shadow-2xl">
+            <h2 className="text-2xl font-black text-amber-600 dark:text-amber-400">
               VƯỢT QUA {stageMeta.shortTitle}!
             </h2>
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-[#475569] dark:text-slate-300">
               Chuẩn bị tiến vào <b>{KNIGHT_MONSTER_STAGES[round]?.stageTitle}</b>!
             </p>
             <button
@@ -3688,9 +3705,9 @@ export default function KnightDragonGame({
 
       {/* GAMEOVER SUMMARY OVERLAY */}
       {matchState === 'GAMEOVER' && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-lg w-full rounded-3xl border border-amber-400/50 bg-slate-900 p-6 text-center space-y-4">
-            <h2 className="text-2xl font-black text-amber-300">
+        <div className="fixed inset-0 bg-slate-950/75 dark:bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-lg w-full rounded-3xl border border-amber-400/60 bg-white dark:bg-slate-900 p-6 text-center space-y-4 shadow-2xl">
+            <h2 className="text-2xl font-black text-amber-600 dark:text-amber-300">
               TỔNG KẾT HÀNH TRÌNH HIỆP SĨ
             </h2>
 
@@ -3714,25 +3731,25 @@ export default function KnightDragonGame({
             {cannotReviveByDemon && !demonKingDefeated && (
               <div
                 data-testid="demon-king-sealed-banner"
-                className="p-3 rounded-2xl bg-rose-950/75 border border-rose-500/70 text-xs font-bold text-rose-200"
+                className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/75 border border-rose-300 dark:border-rose-500/70 text-xs font-bold text-rose-800 dark:text-rose-200"
               >
                 ⛓️ Bạn đã bị Tuyệt Kỹ Hư Không Phong Ấn của Ma Vương kết liễu — Không thể hồi sinh!
               </div>
             )}
 
-            <p className="text-xs text-slate-300">
-              Điểm trận này: <b className="text-amber-300 text-base">{score} điểm</b> • Chiến lợi phẩm quái rớt:{' '}
-              <b className="text-amber-400">+{sessionGoldEarned} 🪙 Vàng</b> &amp;{' '}
-              <b className="text-sky-300">+{sessionKeysEarned} 🗝️ Chìa Khóa</b>
+            <p className="text-xs text-[#475569] dark:text-slate-300">
+              Điểm trận này: <b className="text-amber-600 dark:text-amber-300 text-base">{score} điểm</b> • Chiến lợi phẩm quái rớt:{' '}
+              <b className="text-amber-600 dark:text-amber-400">+{sessionGoldEarned} 🪙 Vàng</b> &amp;{' '}
+              <b className="text-sky-700 dark:text-sky-300">+{sessionKeysEarned} 🗝️ Chìa Khóa</b>
             </p>
-            <div className="grid grid-cols-2 gap-2.5 bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-xs">
+            <div className="grid grid-cols-2 gap-2.5 bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
               <div>
-                <p className="text-slate-400">Quái Đã Hạ Trong Trận</p>
-                <p className="text-base font-black text-emerald-400">{sessionMonstersSlain} quái</p>
+                <p className="text-[#475569] dark:text-slate-400">Quái Đã Hạ Trong Trận</p>
+                <p className="text-base font-black text-emerald-600 dark:text-emerald-400">{sessionMonstersSlain} quái</p>
               </div>
               <div>
-                <p className="text-slate-400">{demonKingDefeated ? 'Boss Rồng / Ma Vương' : 'Boss Rồng Đã Hạ'}</p>
-                <p className="text-base font-black text-rose-400">
+                <p className="text-[#475569] dark:text-slate-400">{demonKingDefeated ? 'Boss Rồng / Ma Vương' : 'Boss Rồng Đã Hạ'}</p>
+                <p className="text-base font-black text-rose-600 dark:text-rose-400">
                   {sessionDragonsSlain} 🐉{demonKingDefeated ? ' · 1 👿' : ''}
                 </p>
               </div>
@@ -3759,7 +3776,7 @@ export default function KnightDragonGame({
                   setMatchState('HUB');
                   runtimeRef.current.matchState = 'HUB';
                 }}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 text-xs font-bold"
               >
                 Về Sảnh Hiệp Sĩ
               </button>
@@ -3772,32 +3789,32 @@ export default function KnightDragonGame({
       {showShopModal && (
         <div
           data-testid="knight-skin-shop-modal"
-          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 bg-slate-950/75 dark:bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
         >
-          <div className="max-w-4xl w-full rounded-3xl border border-pink-500/40 bg-slate-900 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="max-w-4xl w-full rounded-3xl border border-pink-300 dark:border-pink-500/40 bg-white dark:bg-slate-900 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
-                <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-pink-400" />
+                <h2 className="text-lg sm:text-xl font-black text-[#0F172B] dark:text-white flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-pink-500 dark:text-pink-400" />
                   <span>Cửa Hàng Nhân Vật &amp; Skin Hiệp Sĩ ({KNIGHT_CHARACTER_SKINS.length} Nhân Vật: 5 Nam / 5 Nữ)</span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                   Tích vàng từ đánh quái Slime, Goblin, Skeleton, Orc, Golem và Rồng để mở khóa nhân vật độc bản kèm hiệu ứng chém riêng biệt.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowShopModal(false)}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200"
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200"
               >
                 Đóng ✕
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-4 text-xs font-black">
-                <span className="text-amber-300">🪙 Vàng của bạn: {rpgProfile.gold || 0}</span>
-                <span className="text-sky-300">🗝️ Chìa Khóa Hồi Sinh: {rpgProfile.keys || 0}</span>
+                <span className="text-amber-700 dark:text-amber-300">🪙 Vàng của bạn: {rpgProfile.gold || 0}</span>
+                <span className="text-sky-700 dark:text-sky-300">🗝️ Chìa Khóa Hồi Sinh: {rpgProfile.keys || 0}</span>
               </div>
               <button
                 type="button"
@@ -3819,10 +3836,10 @@ export default function KnightDragonGame({
                     data-testid={`knight-skin-card-${skin.id}`}
                     className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 transition ${
                       equipped
-                        ? 'bg-pink-950/35 border-pink-400 ring-1 ring-pink-400/40'
+                        ? 'bg-pink-50 dark:bg-pink-950/35 border-pink-400 ring-1 ring-pink-400/40'
                         : unlocked
-                        ? 'bg-slate-950/90 border-slate-700'
-                        : 'bg-slate-950/65 border-slate-800'
+                        ? 'bg-white dark:bg-slate-950/90 border-slate-200 dark:border-slate-700'
+                        : 'bg-slate-50 dark:bg-slate-950/65 border-slate-200 dark:border-slate-800'
                     }`}
                   >
                     <div className="flex items-center gap-3.5">
@@ -3841,24 +3858,24 @@ export default function KnightDragonGame({
                       </div>
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs sm:text-sm font-black text-white">{skin.name}</span>
+                          <span className="text-xs sm:text-sm font-black text-[#0F172B] dark:text-white">{skin.name}</span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                               skin.gender === 'Nữ'
-                                ? 'bg-pink-500/20 text-pink-300 border border-pink-400/40'
-                                : 'bg-blue-500/20 text-blue-300 border border-blue-400/40'
+                                ? 'bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-400/40'
+                                : 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-400/40'
                             }`}
                           >
                             {skin.genderBadge}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-black">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 text-[10px] font-black">
                             {skin.rarity}
                           </span>
                         </div>
-                        <p className="text-xs font-bold text-amber-300">
+                        <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
                           🗡️ {skin.weaponName}
                         </p>
-                        <p className="text-[11px] text-slate-300 leading-snug">{skin.passiveText}</p>
+                        <p className="text-[11px] text-[#475569] dark:text-slate-300 leading-snug">{skin.passiveText}</p>
                       </div>
                     </div>
 
@@ -3869,7 +3886,7 @@ export default function KnightDragonGame({
                         equipped
                           ? 'bg-emerald-500 text-slate-950'
                           : unlocked
-                          ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                          ? 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0F172B] dark:text-white'
                           : 'bg-gradient-to-r from-amber-400 to-orange-500 hover:opacity-95 text-slate-950'
                       }`}
                     >
