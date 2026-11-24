@@ -12,7 +12,6 @@ import {
   Music,
   RefreshCw,
   ShoppingBag,
-  Skull,
   Snowflake,
   Sparkles,
   Swords,
@@ -168,6 +167,7 @@ export default function KnightDragonGame({
 
   // 5-second Death Delay before Revive modal appears
   const [deathCountdownSec, setDeathCountdownSec] = useState(DEATH_REVIVE_DELAY_SEC);
+  const [reviveCelebration, setReviveCelebration] = useState(null);
 
   // Secret Demon King Boss states
   const [demonWarningSec, setDemonWarningSec] = useState(DEMON_KING_BOSS.warningDurationSec);
@@ -196,6 +196,9 @@ export default function KnightDragonGame({
     dragonFireAnim: 0,
     demonCurseAnim: 0,
     finalSmashAnim: 0,
+    tombstoneDropAnim: 0,
+    reviveBeamAnim: 0,
+    tombstoneShards: [],
     screenShake: 0,
     roadOffset: 0,
     slashes: [],
@@ -481,12 +484,17 @@ export default function KnightDragonGame({
     });
   };
 
-  // Start the 5-second countdown before displaying the Revive Modal on normal deaths
+  // Start the 5-second countdown with Tombstone ("Bia Mộ") drop animation before displaying the Revive Modal
   const startDeathDelayBeforeRevive = () => {
     clearAllTimers();
     setDeathCountdownSec(DEATH_REVIVE_DELAY_SEC);
     setMatchState('DEATH_COUNTDOWN');
     runtimeRef.current.matchState = 'DEATH_COUNTDOWN';
+    runtimeRef.current.tombstoneDropAnim = 0.01;
+    runtimeRef.current.reviveBeamAnim = 0;
+    runtimeRef.current.screenShake = 11;
+    spawnBurstParticles(0.23, 0.76, '#94a3b8', 26);
+    spawnFloatingText('🪦 BIA MỘ HIỆP SĨ...', '#cbd5e1', 0.24, 0.48);
 
     let remaining = DEATH_REVIVE_DELAY_SEC;
     phaseIntervalRef.current = setInterval(() => {
@@ -670,7 +678,11 @@ export default function KnightDragonGame({
     runtimeRef.current.monsterAttackAnim = 0;
     runtimeRef.current.heroAttackAnim = 0;
     runtimeRef.current.finalSmashAnim = 0;
+    runtimeRef.current.tombstoneDropAnim = 0;
+    runtimeRef.current.reviveBeamAnim = 0;
+    runtimeRef.current.tombstoneShards = [];
     runtimeRef.current.screenShake = 0;
+    setReviveCelebration(null);
     setupQuestionClock(rNum, firstQ);
 
     if (firstQ) {
@@ -1228,6 +1240,54 @@ export default function KnightDragonGame({
   const reviveKeyCost = reviveUsedCount + 1;
   const reviveGoldCost = reviveKeyCost * REVIVE_KEY_GOLD_PRICE;
 
+  // Trigger Tombstone-Shatter & Holy Pillar of Light Resurrection Animation
+  const triggerHeroResurrectionAnimation = (methodLabel, bannerText) => {
+    const rt = runtimeRef.current;
+    setReviveUsedCount(c => c + 1);
+    setLives(3);
+    rt.lives = 3;
+    setMatchState('PLAYING');
+    rt.matchState = 'PLAYING';
+    rt.finalSmashAnim = 0;
+    rt.dragonFireAnim = 0;
+    rt.tombstoneDropAnim = 0;
+    rt.reviveBeamAnim = 1;
+    rt.screenShake = 12;
+
+    // Spawn 14 shattering tombstone rock shards flying outward from Hero's grave
+    const shards = [];
+    for (let i = 0; i < 14; i += 1) {
+      const ang = -Math.PI * 0.1 - Math.random() * Math.PI * 0.8;
+      const spd = 2.6 + Math.random() * 5.2;
+      shards.push({
+        xRatio: 0.23 + (Math.random() - 0.5) * 0.04,
+        yRatio: 0.72 + (Math.random() - 0.5) * 0.08,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 1.8,
+        size: 4 + Math.random() * 5,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.28,
+        alpha: 1
+      });
+    }
+    rt.tombstoneShards = shards;
+
+    playSound('word_clear');
+    setupQuestionClock(effectiveCombatRound, activeQ);
+    spawnBurstParticles(0.23, 0.66, '#fde047', 36);
+    spawnBurstParticles(0.23, 0.62, '#38bdf8', 24);
+    spawnFloatingText('⚡ PHÁ BIA MỘ HỒI SINH (+3 ❤️)!', '#fde047', 0.28, 0.34);
+    showQuickBanner(bannerText, 'success');
+
+    setReviveCelebration({
+      id: Date.now(),
+      methodLabel
+    });
+    setTimeout(() => {
+      setReviveCelebration(null);
+    }, 1450);
+  };
+
   const handleReviveWithKeys = () => {
     if (cannotReviveByDemon || round === 5) return;
     if ((rpgProfile.keys || 0) < reviveKeyCost) {
@@ -1238,18 +1298,9 @@ export default function KnightDragonGame({
       ...prev,
       keys: Math.max(0, (prev.keys || 0) - reviveKeyCost)
     }));
-    setReviveUsedCount(c => c + 1);
-    setLives(3);
-    runtimeRef.current.lives = 3;
-    setMatchState('PLAYING');
-    runtimeRef.current.matchState = 'PLAYING';
-    runtimeRef.current.finalSmashAnim = 0;
-    runtimeRef.current.dragonFireAnim = 0;
-    setupQuestionClock(effectiveCombatRound, activeQ);
-    spawnBurstParticles(0.25, 0.68, '#fde047', 35);
-    showQuickBanner(
-      `🗝️ HỒI SINH THÀNH CÔNG (-${reviveKeyCost} Chìa Khóa)! Đầy 3 ❤️ & Reset thời gian!`,
-      'success'
+    triggerHeroResurrectionAnimation(
+      `Dùng ${reviveKeyCost} 🗝️ Chìa Khóa`,
+      `🗝️ HỒI SINH THÀNH CÔNG (-${reviveKeyCost} Chìa Khóa)! Phá bia mộ hồi đầy 3 ❤️ & Reset thời gian!`
     );
   };
 
@@ -1263,18 +1314,9 @@ export default function KnightDragonGame({
       ...prev,
       gold: Math.max(0, (prev.gold || 0) - reviveGoldCost)
     }));
-    setReviveUsedCount(c => c + 1);
-    setLives(3);
-    runtimeRef.current.lives = 3;
-    setMatchState('PLAYING');
-    runtimeRef.current.matchState = 'PLAYING';
-    runtimeRef.current.finalSmashAnim = 0;
-    runtimeRef.current.dragonFireAnim = 0;
-    setupQuestionClock(effectiveCombatRound, activeQ);
-    spawnBurstParticles(0.25, 0.68, '#fbbf24', 35);
-    showQuickBanner(
-      `🪙 ĐÃ MUA MẠNG HỒI SINH (-${reviveGoldCost} Vàng)! Đầy 3 ❤️ & Tiếp tục chiến đấu!`,
-      'success'
+    triggerHeroResurrectionAnimation(
+      `Mua mạng ${reviveGoldCost} 🪙 Vàng`,
+      `🪙 ĐÃ MUA MẠNG HỒI SINH (-${reviveGoldCost} Vàng)! Phá bia mộ hồi đầy 3 ❤️ & Tiếp tục chiến đấu!`
     );
   };
 
@@ -1706,6 +1748,12 @@ export default function KnightDragonGame({
       if (rt.knightHurtAnim > 0) rt.knightHurtAnim = Math.max(0, rt.knightHurtAnim - 0.065);
       if (rt.dragonFireAnim > 0) rt.dragonFireAnim = Math.max(0, rt.dragonFireAnim - 0.042);
       if (rt.demonCurseAnim > 0) rt.demonCurseAnim = Math.max(0, rt.demonCurseAnim - 0.04);
+      if (rt.tombstoneDropAnim > 0 && rt.tombstoneDropAnim < 1) {
+        rt.tombstoneDropAnim = Math.min(1, rt.tombstoneDropAnim + 0.065);
+      }
+      if (rt.reviveBeamAnim > 0) {
+        rt.reviveBeamAnim = Math.max(0, rt.reviveBeamAnim - 0.018);
+      }
 
       // Compute Monster HP ratio
       let monsterHpRatio = 1;
@@ -1843,7 +1891,7 @@ export default function KnightDragonGame({
       ctx.stroke();
       ctx.restore();
 
-      // 8. Draw Illustrated Playable Hero Sprite with Motion Dash Afterimage
+      // 8. Draw Illustrated Playable Hero Sprite OR Fallen Knight Tombstone ("Bia Mộ") & Holy Resurrection Beam
       const heroImg = spriteImagesRef.current.get(activeSkin.spriteUrl);
       const heroDrawH = Math.min(142, h * 0.55);
       const hAspect =
@@ -1854,6 +1902,11 @@ export default function KnightDragonGame({
       const heroBobY = Math.sin(now * 0.0055) * 2.2;
       const heroTopY = groundY + 6 - heroDrawH + heroBobY;
       const heroCenterY = heroTopY + heroDrawH * 0.5;
+      const isHeroDeadOnCanvas =
+        rt.lives <= 0 ||
+        rt.matchState === 'DEATH_COUNTDOWN' ||
+        rt.matchState === 'REVIVE_PROMPT' ||
+        rt.matchState === 'DEMON_EXECUTION';
 
       ctx.save();
       ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
@@ -1861,51 +1914,257 @@ export default function KnightDragonGame({
       ctx.ellipse(heroBaseX, groundY + 3, heroDrawW * 0.34, 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      const hAura = ctx.createRadialGradient(
-        heroBaseX,
-        heroCenterY,
-        8,
-        heroBaseX,
-        heroCenterY,
-        heroDrawH * 0.58
-      );
-      hAura.addColorStop(
-        0,
-        rt.knightHurtAnim > 0.25 ? 'rgba(239, 68, 68, 0.48)' : `${activeSkin.bladeColor || '#38bdf8'}38`
-      );
-      hAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = hAura;
-      ctx.beginPath();
-      ctx.arc(heroBaseX, heroCenterY, heroDrawH * 0.58, 0, Math.PI * 2);
-      ctx.fill();
+      if (isHeroDeadOnCanvas) {
+        // 8A. FALLEN HERO TOMBSTONE ("BIA MỘ HIỆP SĨ") + PLANTED SWORD + FLOATING SOUL WISP
+        const dropT = Math.min(1, Math.max(0, rt.tombstoneDropAnim || 1));
+        const bounceOffset =
+          dropT < 0.75
+            ? -115 * (1 - dropT / 0.75) * (1 - dropT / 0.75)
+            : -Math.sin(((dropT - 0.75) / 0.25) * Math.PI) * 12;
+        const tombX = heroBaseX;
+        const tombBaseY = groundY + 4 + bounceOffset;
 
-      if (heroImg && heroImg.complete && heroImg.naturalWidth > 0) {
-        // Motion dash afterimage trails during sword lunge
-        if (rt.heroAttackAnim > 0.28) {
-          for (let g = 1; g <= 2; g += 1) {
-            ctx.save();
-            ctx.globalAlpha = (0.3 - g * 0.1) * rt.heroAttackAnim;
-            ctx.translate(heroBaseX - g * 24, heroTopY + heroDrawH);
-            ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
-            ctx.restore();
-          }
-        }
+        // Eerie ghostly ground mist around tombstone
+        const ghostMist = ctx.createRadialGradient(tombX, tombBaseY - 30, 6, tombX, tombBaseY - 30, 68);
+        ghostMist.addColorStop(0, 'rgba(56, 189, 248, 0.32)');
+        ghostMist.addColorStop(0.6, 'rgba(148, 163, 184, 0.14)');
+        ghostMist.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = ghostMist;
+        ctx.beginPath();
+        ctx.arc(tombX, tombBaseY - 30, 68, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hero's Glowing Sword planted diagonally in the ground beside the grave
         ctx.save();
-        ctx.translate(heroBaseX, heroTopY + heroDrawH);
-        const hScaleY = 1 + Math.sin(now * 0.0055) * 0.016;
-        ctx.scale(1, hScaleY);
-        if (rt.heroAttackAnim > 0) {
-          ctx.rotate(heroAttackSin * 0.11);
-        } else if (rt.knightHurtAnim > 0) {
-          ctx.rotate(-rt.knightHurtAnim * 0.09);
-        }
-        ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
+        ctx.translate(tombX + 34, tombBaseY - 4);
+        ctx.rotate(0.32);
+        ctx.fillStyle = activeSkin.bladeColor || '#38bdf8';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-4, 0);
+        ctx.lineTo(-4, -52);
+        ctx.lineTo(4, -52);
+        ctx.lineTo(4, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // Crossguard & pommel
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(-13, -55, 26, 6);
+        ctx.strokeRect(-13, -55, 26, 6);
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(-3.5, -72, 7, 17);
+        ctx.beginPath();
+        ctx.arc(0, -75, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fde047';
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // Gothic Arched Stone Tombstone Body
+        const tombW = 54;
+        const tombH = 74;
+        ctx.save();
+        ctx.translate(tombX, tombBaseY);
+
+        const stoneGrad = ctx.createLinearGradient(-tombW / 2, -tombH, tombW / 2, 0);
+        stoneGrad.addColorStop(0, '#94a3b8');
+        stoneGrad.addColorStop(0.45, '#64748b');
+        stoneGrad.addColorStop(1, '#334155');
+        ctx.fillStyle = stoneGrad;
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        ctx.moveTo(-tombW / 2, -10);
+        ctx.lineTo(-tombW / 2, -tombH + tombW / 2);
+        ctx.arc(0, -tombH + tombW / 2, tombW / 2, Math.PI, 0, false);
+        ctx.lineTo(tombW / 2, -10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner carved stone rim
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-tombW / 2 + 6, -14);
+        ctx.lineTo(-tombW / 2 + 6, -tombH + tombW / 2);
+        ctx.arc(0, -tombH + tombW / 2, tombW / 2 - 6, Math.PI, 0, false);
+        ctx.lineTo(tombW / 2 - 6, -14);
+        ctx.stroke();
+
+        // Tiered Stone Pedestal Steps
+        ctx.fillStyle = '#475569';
+        ctx.beginPath();
+        ctx.roundRect(-tombW / 2 - 7, -12, tombW + 14, 8, 3);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.roundRect(-tombW / 2 - 12, -5, tombW + 24, 8, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        // Carved Cross Emblem & R.I.P Inscription
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-2.5, -tombH + 13, 5, 18);
+        ctx.fillRect(-8, -tombH + 18, 16, 4.5);
+
+        ctx.font = '900 12px monospace';
+        ctx.fillStyle = '#e2e8f0';
+        ctx.textAlign = 'center';
+        ctx.fillText('R.I.P', 0, -26);
+
+        // Weathered cracks on stone
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(tombW / 2 - 8, -36);
+        ctx.lineTo(tombW / 2 - 16, -31);
+        ctx.lineTo(tombW / 2 - 12, -24);
+        ctx.stroke();
+        ctx.restore();
+
+        // Rising Translucent Soul Wisp / Spirit Orb floating above Tombstone
+        const soulX = tombX + Math.sin(now * 0.0045) * 11;
+        const soulY = tombBaseY - tombH - 18 - ((now * 0.025) % 28);
+        const soulAlpha = 1 - (((now * 0.025) % 28) / 28) * 0.75;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.2, soulAlpha);
+        const soulGlow = ctx.createRadialGradient(soulX, soulY, 2, soulX, soulY, 16);
+        soulGlow.addColorStop(0, '#e0f2fe');
+        soulGlow.addColorStop(0.5, '#38bdf8');
+        soulGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx.fillStyle = soulGlow;
+        ctx.beginPath();
+        ctx.arc(soulX, soulY, 16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('👻', soulX, soulY);
         ctx.restore();
       } else {
-        ctx.fillStyle = activeSkin.armorPrimary || '#3b82f6';
+        // 8B. LIVING HERO SPRITE (+ HOLY RESURRECTION PILLAR & SHATTERING TOMBSTONE SHARDS!)
+        if (rt.reviveBeamAnim > 0.02) {
+          const revT = rt.reviveBeamAnim;
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+
+          // Heavenly Golden-Cyan Pillar of Light from Sky to Ground
+          const beamW = (34 + Math.sin(now * 0.03) * 8) * Math.min(1, revT * 1.3);
+          const pillarGrad = ctx.createLinearGradient(heroBaseX - beamW, 0, heroBaseX + beamW, 0);
+          pillarGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+          pillarGrad.addColorStop(0.25, `rgba(56, 189, 248, ${0.42 * revT})`);
+          pillarGrad.addColorStop(0.5, `rgba(254, 240, 138, ${0.88 * revT})`);
+          pillarGrad.addColorStop(0.75, `rgba(56, 189, 248, ${0.42 * revT})`);
+          pillarGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          ctx.fillStyle = pillarGrad;
+          ctx.fillRect(heroBaseX - beamW, 0, beamW * 2, groundY + 6);
+
+          // Expanding Golden Resurrection Halo Rings on Ground
+          for (let rIdx = 0; rIdx < 2; rIdx += 1) {
+            const prog = (1 - revT + rIdx * 0.35) % 1;
+            ctx.strokeStyle = rIdx === 0 ? `rgba(253, 224, 71, ${1 - prog})` : `rgba(56, 189, 248, ${1 - prog})`;
+            ctx.lineWidth = 3 * (1 - prog);
+            ctx.beginPath();
+            ctx.ellipse(heroBaseX, groundY + 2, 22 + prog * 72, 6 + prog * 18, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Radiant Valkyrie Light Wings unfurling behind revived Hero
+          const wingSpread = 42 + (1 - revT) * 26;
+          ctx.fillStyle = `rgba(254, 240, 138, ${0.55 * revT})`;
+          ctx.beginPath();
+          ctx.moveTo(heroBaseX - 8, heroCenterY);
+          ctx.quadraticCurveTo(heroBaseX - wingSpread, heroCenterY - 48, heroBaseX - wingSpread * 0.85, heroCenterY + 14);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(heroBaseX + 8, heroCenterY);
+          ctx.quadraticCurveTo(heroBaseX + wingSpread, heroCenterY - 48, heroBaseX + wingSpread * 0.85, heroCenterY + 14);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Shattered Tombstone Rock Shards flying outward after resurrection
+        for (let sIdx = (rt.tombstoneShards || []).length - 1; sIdx >= 0; sIdx -= 1) {
+          const sh = rt.tombstoneShards[sIdx];
+          sh.xRatio += sh.vx / w;
+          sh.yRatio += sh.vy / h;
+          sh.vy += 0.24;
+          sh.rot += sh.vRot;
+          sh.alpha -= 0.024;
+          if (sh.alpha <= 0) {
+            rt.tombstoneShards.splice(sIdx, 1);
+            continue;
+          }
+          ctx.save();
+          ctx.translate(sh.xRatio * w, sh.yRatio * h);
+          ctx.rotate(sh.rot);
+          ctx.globalAlpha = Math.max(0, sh.alpha);
+          ctx.fillStyle = '#64748b';
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 1;
+          ctx.fillRect(-sh.size / 2, -sh.size / 2, sh.size, sh.size * 0.8);
+          ctx.strokeRect(-sh.size / 2, -sh.size / 2, sh.size, sh.size * 0.8);
+          ctx.restore();
+        }
+
+        const hAura = ctx.createRadialGradient(
+          heroBaseX,
+          heroCenterY,
+          8,
+          heroBaseX,
+          heroCenterY,
+          heroDrawH * 0.58
+        );
+        hAura.addColorStop(
+          0,
+          rt.reviveBeamAnim > 0.1
+            ? 'rgba(253, 224, 71, 0.65)'
+            : rt.knightHurtAnim > 0.25
+            ? 'rgba(239, 68, 68, 0.48)'
+            : `${activeSkin.bladeColor || '#38bdf8'}38`
+        );
+        hAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = hAura;
         ctx.beginPath();
-        ctx.arc(heroBaseX, heroCenterY, 26, 0, Math.PI * 2);
+        ctx.arc(heroBaseX, heroCenterY, heroDrawH * 0.58, 0, Math.PI * 2);
         ctx.fill();
+
+        if (heroImg && heroImg.complete && heroImg.naturalWidth > 0) {
+          if (rt.heroAttackAnim > 0.28) {
+            for (let g = 1; g <= 2; g += 1) {
+              ctx.save();
+              ctx.globalAlpha = (0.3 - g * 0.1) * rt.heroAttackAnim;
+              ctx.translate(heroBaseX - g * 24, heroTopY + heroDrawH);
+              ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
+              ctx.restore();
+            }
+          }
+          ctx.save();
+          // During early reviveBeamAnim, Hero rises up from the ground
+          const reviveLiftY = rt.reviveBeamAnim > 0.6 ? (rt.reviveBeamAnim - 0.6) * 45 : 0;
+          ctx.translate(heroBaseX, heroTopY + heroDrawH + reviveLiftY);
+          const hScaleY = 1 + Math.sin(now * 0.0055) * 0.016;
+          ctx.scale(1, hScaleY);
+          if (rt.heroAttackAnim > 0) {
+            ctx.rotate(heroAttackSin * 0.11);
+          } else if (rt.knightHurtAnim > 0) {
+            ctx.rotate(-rt.knightHurtAnim * 0.09);
+          }
+          ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = activeSkin.armorPrimary || '#3b82f6';
+          ctx.beginPath();
+          ctx.arc(heroBaseX, heroCenterY, 26, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.restore();
 
@@ -2911,23 +3170,84 @@ export default function KnightDragonGame({
               </div>
             )}
 
-            {/* 5-SECOND DEATH DELAY COUNTDOWN BEFORE REVIVE MODAL */}
+            {/* 5-SECOND DEATH DELAY WITH ANIMATED TOMBSTONE ("BIA MỘ HIỆP SĨ") BEFORE REVIVE MODAL */}
             {matchState === 'DEATH_COUNTDOWN' && (
               <div
                 data-testid="knight-death-countdown-overlay"
-                className="absolute inset-0 bg-slate-950/92 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-40 space-y-2"
+                className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 text-center z-40 space-y-2"
               >
-                <Skull className="w-10 h-10 text-rose-500 animate-bounce" />
-                <h2 className="text-xl sm:text-2xl font-black text-rose-400 tracking-wide">
-                  💀 HIỆP SĨ ĐÃ NGÃ XUỐNG!
+                <div
+                  data-testid="knight-tombstone-graphic"
+                  className="relative flex items-center justify-center"
+                >
+                  {/* Glowing Ghostly Aura Ring */}
+                  <div className="absolute -inset-3 rounded-full bg-cyan-500/20 blur-md animate-pulse" />
+                  {/* Illustrated SVG Gothic Tombstone & Planted Sword */}
+                  <svg viewBox="0 0 120 110" className="w-24 h-24 drop-shadow-[0_6px_16px_rgba(0,0,0,0.85)]">
+                    <ellipse cx="60" cy="98" rx="44" ry="8" fill="rgba(15,23,42,0.85)" />
+                    {/* Planted Hero Sword beside Tombstone */}
+                    <g transform="translate(86, 88) rotate(18)">
+                      <rect x="-2.5" y="-44" width="5" height="44" fill="#38bdf8" stroke="#0f172a" strokeWidth="1.5" />
+                      <rect x="-10" y="-47" width="20" height="4.5" rx="1.5" fill="#fbbf24" stroke="#0f172a" strokeWidth="1.2" />
+                      <rect x="-2" y="-59" width="4" height="12" fill="#78350f" />
+                      <circle cx="0" cy="-61" r="3.8" fill="#fde047" />
+                    </g>
+                    {/* Gothic Arched Stone Headstone */}
+                    <path
+                      d="M34 90 L34 46 A24 24 0 0 1 82 46 L82 90 Z"
+                      fill="#64748b"
+                      stroke="#1e293b"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M39 86 L39 47 A19 19 0 0 1 77 47 L77 86"
+                      fill="none"
+                      stroke="#cbd5e1"
+                      strokeWidth="1.4"
+                      opacity="0.5"
+                    />
+                    {/* Pedestal Base */}
+                    <rect x="28" y="86" width="60" height="7" rx="2.5" fill="#475569" stroke="#1e293b" strokeWidth="2" />
+                    <rect x="23" y="92" width="70" height="7" rx="2.5" fill="#334155" stroke="#1e293b" strokeWidth="2" />
+                    {/* Carved Cross & R.I.P */}
+                    <rect x="56" y="34" width="4" height="15" fill="#1e293b" />
+                    <rect x="51" y="38" width="14" height="4" fill="#1e293b" />
+                    <text x="58" y="68" textAnchor="middle" fill="#f1f5f9" fontSize="11" fontWeight="900" fontFamily="monospace">
+                      R.I.P
+                    </text>
+                    {/* Floating Soul Wisp */}
+                    <circle cx="42" cy="22" r="6" fill="#38bdf8" opacity="0.65" />
+                    <circle cx="42" cy="22" r="3" fill="#e0f2fe" />
+                  </svg>
+                </div>
+
+                <h2 className="text-lg sm:text-2xl font-black text-rose-400 tracking-wide drop-shadow">
+                  🪦 HIỆP SĨ ĐÃ NGÃ XUỐNG!
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-300 font-bold">
-                  Đang mở Bảng Hồi Sinh sau{' '}
-                  <span className="text-amber-300 text-lg font-black font-mono px-1">
+                <p className="text-xs sm:text-sm text-slate-200 font-bold bg-slate-900/90 border border-slate-700 px-3.5 py-1 rounded-full">
+                  Triệu hồi Bảng Hồi Sinh sau{' '}
+                  <span className="text-amber-300 text-base font-black font-mono px-1">
                     {deathCountdownSec}s
                   </span>
                   ...
                 </p>
+              </div>
+            )}
+
+            {/* HOLY RESURRECTION ("HỒI SINH PHÁ BIA MỘ") CINEMATIC FLASH OVERLAY */}
+            {reviveCelebration && (
+              <div
+                data-testid="knight-revive-animation-overlay"
+                className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4 text-center z-30"
+              >
+                <div className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/95 via-yellow-400/95 to-cyan-400/95 text-slate-950 border-2 border-white shadow-[0_0_45px_rgba(250,204,21,0.95)] animate-bounce">
+                  <p className="text-[11px] font-black uppercase tracking-widest">
+                    ⚡ THÁNH QUANG PHÁ BIA MỘ • {reviveCelebration.methodLabel} ⚡
+                  </p>
+                  <p className="text-base sm:text-xl font-black">
+                    🗝️ HỒI SINH ĐẦY 3 ❤️ — TIẾP TỤC CHIẾN ĐẤU!
+                  </p>
+                </div>
               </div>
             )}
 
@@ -3267,8 +3587,14 @@ export default function KnightDragonGame({
           className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
         >
           <div className="max-w-md w-full rounded-3xl border-2 border-amber-400 bg-slate-900 p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-3xl">
-              🗝️
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-slate-800 border border-slate-600 flex items-center justify-center text-2xl shadow-inner">
+                🪦
+              </div>
+              <span className="text-amber-400 font-black text-lg animate-pulse">➔ 🗝️ ➔</span>
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(251,191,36,0.4)]">
+                ⚡
+              </div>
             </div>
             <div className="space-y-1">
               <span className="px-3 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-xs font-black">

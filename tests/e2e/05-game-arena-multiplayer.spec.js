@@ -243,6 +243,22 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     const lootTextS4 = await page.getByTestId('knight-loot-info-pill').textContent();
     expect(lootTextS4).not.toMatch(/NaN|undefined|trên đường/i);
     expect(lootTextS4).toMatch(/Rớt \+\d+ Vàng/i);
+
+    // Trigger 3 wrong submissions to lose all 3 hearts -> verify Tombstone death animation -> 5s delay -> Revive Modal -> Holy Resurrection animation!
+    for (let miss = 0; miss < 3; miss += 1) {
+      await page.getByTestId('knight-dragon-boss-input').fill('wrong answer miss');
+      await page.getByTestId('knight-dragon-boss-submit').click();
+    }
+    await expect(page.getByTestId('knight-death-countdown-overlay')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByTestId('knight-tombstone-graphic')).toBeVisible();
+    await expect(page.getByTestId('knight-revive-modal')).toHaveCount(0);
+
+    // Wait for 5-second tombstone countdown to open Revive Modal, then revive by Key and verify Resurrection flash overlay!
+    await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 8_000 });
+    await page.getByTestId('knight-revive-by-key-btn').click();
+    await expect(page.getByTestId('knight-revive-animation-overlay')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByTestId('knight-lives-display')).toContainText('❤️❤️❤️');
+
     await page.getByTestId('knight-dragon-boss-input').fill('cohesive global strategy');
     await page.getByTestId('knight-dragon-boss-submit').click();
 
