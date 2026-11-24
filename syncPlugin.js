@@ -2860,6 +2860,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
 
   const teacherOnlyActions = new Set([
     'UPSERT_TEST',
+    'UPSERT_TESTS_BULK',
     'DELETE_TEST',
     'TOGGLE_TEST_ANSWERS',
     'TOGGLE_TEST_VISIBILITY',
@@ -4349,6 +4350,63 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       break;
     }
 
+    case 'UPSERT_TESTS_BULK': {
+      const incomingList = Array.isArray(payload.tests) ? payload.tests : [];
+      if (incomingList.length === 0) break;
+      const existingById = new Map((store.tests || []).map((t, idx) => [t?.id, { test: t, idx }]));
+      const newlyInserted = [];
+      let updatedAny = false;
+      const nextExisting = [...(store.tests || [])];
+
+      incomingList.slice(0, 1000).forEach(rawTest => {
+        if (!rawTest?.id) return;
+        const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(rawTest.scheduleMode)
+          ? rawTest.scheduleMode
+          : 'flexible';
+        const openAt = parseScheduleTimestampServer(rawTest.openAt);
+        const dueAt = parseScheduleTimestampServer(rawTest.dueAt);
+        const assignedClassIds = normalizeClassIdList(rawTest.assignedClassIds);
+        const test = externalizeTestMedia(store, {
+          ...rawTest,
+          assignedClassIds,
+          scheduleMode,
+          openAt,
+          dueAt
+        }).test;
+
+        const found = existingById.get(test.id);
+        if (found) {
+          nextExisting[found.idx] = test;
+          reconcileTestAttemptsObjectiveScores(store, test);
+          updatedAny = true;
+        } else {
+          newlyInserted.push(test);
+          existingById.set(test.id, { test, idx: -1 });
+        }
+      });
+
+      if (newlyInserted.length > 0 || updatedAny) {
+        store.tests = [...newlyInserted, ...nextExisting];
+        if (payload.notify === true && newlyInserted.length > 0) {
+          const firstPublic = newlyInserted.find(t => (t.visibility || 'public') !== 'private');
+          if (firstPublic) {
+            if (newlyInserted.length === 1) {
+              notifyPublishedTest(store, firstPublic, viewer);
+            } else {
+              const summaryLabel = String(payload.summaryLabel || 'Daily Zone Writing').trim().slice(0, 120);
+              const syntheticSummaryTest = {
+                ...firstPublic,
+                title: `${newlyInserted.length} đề mới trong ${summaryLabel}`
+              };
+              notifyPublishedTest(store, syntheticSummaryTest, viewer);
+            }
+          }
+        }
+        changed = true;
+      }
+      break;
+    }
+
     case 'DELETE_TEST': {
       const testId = payload.testId;
       if (!testId) break;
@@ -5768,6 +5826,8 @@ async function gradeSpeakingWithGeminiServer({ apiKey, store, testTitle, partMod
 }
 
 const IMMEDIATE_PERSIST_ACTIONS = new Set([
+  'UPSERT_TEST',
+  'UPSERT_TESTS_BULK',
   'UPSERT_USER',
   'UPSERT_USERS_BULK',
   'RESET_USER_PASSWORD',

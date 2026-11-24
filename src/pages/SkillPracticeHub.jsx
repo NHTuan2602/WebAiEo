@@ -25,12 +25,14 @@ import {
   PenTool,
   Play,
   Plus,
+  Search,
   Send,
   Share2,
   ShieldCheck,
   Sparkles,
   Trophy,
   Users,
+  Wand2,
   X
 } from 'lucide-react';
 import { BRAND_INFO } from '../constants/brandInfo';
@@ -68,6 +70,8 @@ import {
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 import SpeakingForecastZone from '../components/speaking/SpeakingForecastZone';
 import AssignFolderModal from '../components/modals/AssignFolderModal';
+import DailyWritingBulkModal from '../components/teacher/DailyWritingBulkModal';
+import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
 import VipMemberName from '../components/common/VipMemberName';
 
 export default function SkillPracticeHub({
@@ -80,6 +84,7 @@ export default function SkillPracticeHub({
   focusedTestId = null,
   onAssignFolderClasses = null,
   onBackToTeacherDashboard = null,
+  onBulkCreateTests = null,
   onChangeTab,
   onClearFocusedTest,
   onNotifyMissingDaily,
@@ -94,6 +99,8 @@ export default function SkillPracticeHub({
   onStartSpeakingPracticeTest = null,
   paymentConfig = null,
   serverClockOffsetMs = 0,
+  setApiTestState = null,
+  setShowApiKeyModal = null,
   showToast,
   speakingForecast = null,
   examUnlockTokens = {},
@@ -126,6 +133,13 @@ export default function SkillPracticeHub({
   };
   const [passwordPromptTarget, setPasswordPromptTarget] = useState(null);
   const [bulkFolderAssignTarget, setBulkFolderAssignTarget] = useState(null);
+  const [bulkWritingModalState, setBulkWritingModalState] = useState({
+    open: false,
+    mode: 'task2',
+    task1SubCategory: 'w1_dynamic'
+  });
+  const [skillSearchQuery, setSkillSearchQuery] = useState('');
+  const [skillListPageState, setSkillListPageState] = useState({ scopeKey: '', page: 1 });
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
   const [verifyingRoomPass, setVerifyingRoomPass] = useState(false);
@@ -868,6 +882,46 @@ export default function SkillPracticeHub({
                   <Share2 className="w-3.5 h-3.5" /> Giao Cả Thư Mục ({displayedList.length} bài)
                 </button>
               )}
+              {tabKey === 'writing_task1' && onBulkCreateTests && (
+                <button
+                  type="button"
+                  data-testid="open-bulk-w1-ai-btn"
+                  onClick={() =>
+                    setBulkWritingModalState({
+                      open: true,
+                      mode: 'task1',
+                      task1SubCategory: activeSubCatFilter !== 'all' ? activeSubCatFilter : 'auto'
+                    })
+                  }
+                  className="px-3.5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
+                  title="Ném nhiều hình biểu đồ hoặc file PDF để AI tự tạo hàng loạt đề Task 1 vào thư mục này"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>
+                    {activeSubCatFilter !== 'all'
+                      ? `Tạo Hàng Loạt W1 • ${getDailySubCategoryLabel(activeSubCatFilter)} (AI)`
+                      : 'Tạo Hàng Loạt W1 Nhanh (AI)'}
+                  </span>
+                </button>
+              )}
+              {tabKey === 'writing_task2' && onBulkCreateTests && (
+                <button
+                  type="button"
+                  data-testid="open-bulk-w2-ai-btn"
+                  onClick={() =>
+                    setBulkWritingModalState({
+                      open: true,
+                      mode: 'task2',
+                      task1SubCategory: 'w1_dynamic'
+                    })
+                  }
+                  className="px-3.5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
+                  title="Tải file PDF bộ đề (VD: 350 câu Task 2) để AI tự phân loại Chủ đề, Dạng bài và đặt tên theo Danh từ"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>Tạo Đề Task 2 Nhanh (AI PDF)</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() =>
@@ -1029,23 +1083,44 @@ export default function SkillPracticeHub({
                         )}
                       </div>
 
-                      {isTeacher && subCount > 0 && onAssignFolderClasses && (
-                        <button
-                          type="button"
-                          onClick={e => {
-                            e.stopPropagation();
-                            setBulkFolderAssignTarget({
-                              label: `${meta.name} / ${sub.label}`,
-                              testIds: subTests.map(t => t.id),
-                              initialClassIds: unionClassIds
-                            });
-                          }}
-                          className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0 transition"
-                          title={`Giao toàn bộ ${subCount} bài trong ${sub.label} cho lớp`}
-                        >
-                          <Share2 className="w-3 h-3" /> Giao lớp
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isTeacher && tabKey === 'writing_task1' && onBulkCreateTests && (
+                          <button
+                            type="button"
+                            data-testid={`w1-folder-bulk-ai-${sub.id}`}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setActiveSubCatFilter(sub.id);
+                              setBulkWritingModalState({
+                                open: true,
+                                mode: 'task1',
+                                task1SubCategory: sub.id
+                              });
+                            }}
+                            className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/35 text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-500/40 text-[11px] font-extrabold inline-flex items-center gap-1 transition"
+                            title={`Ném nhiều hình / PDF để AI tạo hàng loạt đề vào thẳng thư mục ${sub.label}`}
+                          >
+                            <Wand2 className="w-3 h-3" /> + AI Hàng Loạt
+                          </button>
+                        )}
+                        {isTeacher && subCount > 0 && onAssignFolderClasses && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setBulkFolderAssignTarget({
+                                label: `${meta.name} / ${sub.label}`,
+                                testIds: subTests.map(t => t.id),
+                                initialClassIds: unionClassIds
+                              });
+                            }}
+                            className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0 transition"
+                            title={`Giao toàn bộ ${subCount} bài trong ${sub.label} cho lớp`}
+                          >
+                            <Share2 className="w-3 h-3" /> Giao lớp
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -1268,7 +1343,7 @@ export default function SkillPracticeHub({
             });
           });
           const availableHashtagFilters = Array.from(tagCountsMap.values());
-          const finalSkillList =
+          const hashtagFilteredList =
             selectedSpeakingHashtag === 'all' || Boolean(focusedMatch)
               ? displayedList
               : displayedList.filter(t =>
@@ -1276,52 +1351,106 @@ export default function SkillPracticeHub({
                     h => h.tag.toLowerCase() === selectedSpeakingHashtag.toLowerCase()
                   )
                 );
+          const trimmedSkillSearch = skillSearchQuery.trim().toLowerCase();
+          const finalSkillList =
+            !trimmedSkillSearch || Boolean(focusedMatch)
+              ? hashtagFilteredList
+              : hashtagFilteredList.filter(t => {
+                  const inTitle = String(t.title || '').toLowerCase().includes(trimmedSkillSearch);
+                  const inPrompt1 = String(t.writing?.task1?.prompt || '').toLowerCase().includes(trimmedSkillSearch);
+                  const inPrompt2 = String(t.writing?.task2?.prompt || '').toLowerCase().includes(trimmedSkillSearch);
+                  return inTitle || inPrompt1 || inPrompt2;
+                });
+          const pageScopeKey = `${hashtagScopeKey}:${selectedSpeakingHashtag}:${trimmedSkillSearch}`;
+          const activeSkillPage = skillListPageState.scopeKey === pageScopeKey ? skillListPageState.page : 1;
+          const setActiveSkillPage = nextPage =>
+            setSkillListPageState({ scopeKey: pageScopeKey, page: nextPage });
+          const paginatedSkillCards = paginateItems(finalSkillList, activeSkillPage, 24);
 
           return (
             <>
-              {availableHashtagFilters.length > 0 && !focusedMatch && (
-                <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800">
-                  <span className="text-xs font-extrabold text-[#334155] dark:text-slate-300 inline-flex items-center gap-1 px-1.5">
-                    <Hash className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
-                    Lọc theo Hashtag:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSpeakingHashtag('all')}
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
-                      selectedSpeakingHashtag === 'all'
-                        ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                    }`}
-                  >
-                    Tất cả ({list.length})
-                  </button>
-                  {availableHashtagFilters.map(item => {
-                    const isSelected = selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase();
-                    return (
+              {(availableHashtagFilters.length > 0 || list.length > 6) && !focusedMatch && (
+                <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800">
+                  {availableHashtagFilters.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs font-extrabold text-[#334155] dark:text-slate-300 inline-flex items-center gap-1 px-1.5">
+                        <Hash className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
+                        Lọc theo Hashtag:
+                      </span>
                       <button
-                        key={item.tag}
                         type="button"
-                        onClick={() =>
-                          setSelectedSpeakingHashtag(prev =>
-                            prev.toLowerCase() === item.tag.toLowerCase() ? 'all' : item.tag
-                          )
-                        }
+                        onClick={() => setSelectedSpeakingHashtag('all')}
                         className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
-                          isSelected
-                            ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                            : item.kind === 'real_exam'
-                            ? 'bg-rose-50 dark:bg-rose-500/15 text-[#991B1B] dark:text-rose-300 border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
-                            : item.kind === 'password'
-                            ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40 hover:border-indigo-500'
+                          selectedSpeakingHashtag === 'all'
+                            ? 'bg-[#007A7A] text-white border-[#007A7A]'
                             : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
                         }`}
                       >
-                        {item.tag} ({item.count})
+                        Tất cả ({list.length})
                       </button>
-                    );
-                  })}
+                      {availableHashtagFilters.map(item => {
+                        const isSelected = selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase();
+                        return (
+                          <button
+                            key={item.tag}
+                            type="button"
+                            onClick={() =>
+                              setSelectedSpeakingHashtag(prev =>
+                                prev.toLowerCase() === item.tag.toLowerCase() ? 'all' : item.tag
+                              )
+                            }
+                            className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                              isSelected
+                                ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                                : item.kind === 'real_exam'
+                                ? 'bg-rose-50 dark:bg-rose-500/15 text-[#991B1B] dark:text-rose-300 border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
+                                : item.kind === 'password'
+                                ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40 hover:border-indigo-500'
+                                : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                            }`}
+                          >
+                            {item.tag} ({item.count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span />
+                  )}
+
+                  {list.length > 6 && (
+                    <div className="relative w-full sm:w-64">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        data-testid="daily-skill-search-input"
+                        value={skillSearchQuery}
+                        onChange={e => setSkillSearchQuery(e.target.value)}
+                        placeholder="Tìm nhanh theo tên đề / từ khóa..."
+                        className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-white focus:outline-none focus:border-[#007A7A]"
+                      />
+                      {skillSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSkillSearchQuery('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {finalSkillList.length > 24 && (
+                <ListPaginationBar
+                  currentPage={paginatedSkillCards.safePage}
+                  totalItems={finalSkillList.length}
+                  pageSize={24}
+                  onPageChange={setActiveSkillPage}
+                  itemLabel="bài tập"
+                />
               )}
 
               {finalSkillList.length === 0 ? (
@@ -1349,8 +1478,9 @@ export default function SkillPracticeHub({
                   </p>
                 </div>
               ) : (
+                <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {finalSkillList.map(test => {
+                  {paginatedSkillCards.pageItems.map(test => {
                     const cfg = normalizeExamConfig(test);
                     const schedule = evaluateTestSchedule(cfg, serverNowMs);
                     const myTestAttempts = myAttempts.filter(a => a.testId === test.id);
@@ -1562,6 +1692,16 @@ export default function SkillPracticeHub({
                     );
                   })}
                 </div>
+                {finalSkillList.length > 24 && (
+                  <ListPaginationBar
+                    currentPage={paginatedSkillCards.safePage}
+                    totalItems={finalSkillList.length}
+                    pageSize={24}
+                    onPageChange={setActiveSkillPage}
+                    itemLabel="bài tập"
+                  />
+                )}
+                </>
               )}
             </>
           );
@@ -1681,23 +1821,44 @@ export default function SkillPracticeHub({
               </div>
 
               {isTeacher && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeTab === 'writing_task1') {
-                      onOpenSkillBuilder?.('writing', null, { writingTaskScope: 'task1', dailySubCategory: 'w1_map' });
-                    } else if (activeTab === 'writing_task2') {
-                      onOpenSkillBuilder?.('writing', null, { writingTaskScope: 'task2', dailySubCategory: 'w2_essay' });
-                    } else if (activeTab === 'listening' || activeTab === 'reading') {
-                      onOpenSkillBuilder?.(activeTab);
-                    } else {
-                      onOpenSkillBuilder?.('speaking');
-                    }
-                  }}
-                  className="w-full py-2.5 px-3 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4" /> Tạo Bài Daily Mới
-                </button>
+                <div className="space-y-2">
+                  {onBulkCreateTests && (
+                    <button
+                      type="button"
+                      data-testid="sidebar-open-bulk-writing-ai-btn"
+                      onClick={() =>
+                        setBulkWritingModalState({
+                          open: true,
+                          mode: activeTab === 'writing_task1' ? 'task1' : 'task2',
+                          task1SubCategory:
+                            activeTab === 'writing_task1' && activeSubCatFilter !== 'all'
+                              ? activeSubCatFilter
+                              : 'w1_dynamic'
+                        })
+                      }
+                      className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition"
+                    >
+                      <Wand2 className="w-4 h-4 shrink-0" /> Tạo Đề Hàng Loạt (PDF/AI)
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTab === 'writing_task1') {
+                        onOpenSkillBuilder?.('writing', null, { writingTaskScope: 'task1', dailySubCategory: 'w1_map' });
+                      } else if (activeTab === 'writing_task2') {
+                        onOpenSkillBuilder?.('writing', null, { writingTaskScope: 'task2', dailySubCategory: 'w2_essay' });
+                      } else if (activeTab === 'listening' || activeTab === 'reading') {
+                        onOpenSkillBuilder?.(activeTab);
+                      } else {
+                        onOpenSkillBuilder?.('speaking');
+                      }
+                    }}
+                    className="w-full py-2.5 px-3 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  >
+                    <Plus className="w-4 h-4" /> Tạo Bài Daily Mới
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -2409,6 +2570,20 @@ export default function SkillPracticeHub({
           )}
         </main>
       </div>
+
+      {/* Bulk AI Writing Task 1 (Images/PDF per folder) & Task 2 (350+ Prompts PDF) Creator Modal */}
+      <DailyWritingBulkModal
+        isOpen={bulkWritingModalState.open}
+        initialMode={bulkWritingModalState.mode}
+        initialTask1SubCategory={bulkWritingModalState.task1SubCategory}
+        aiApiKey={aiApiKey}
+        aiConfigured={aiConfigured}
+        onClose={() => setBulkWritingModalState(prev => ({ ...prev, open: false }))}
+        onBulkSaveTests={onBulkCreateTests}
+        setApiTestState={setApiTestState}
+        setShowApiKeyModal={setShowApiKeyModal}
+        showToast={showToast}
+      />
 
       {/* Bulk Assign Folder to Classes Modal (Daily Reading / Listening / Writing Folders) */}
       <AssignFolderModal

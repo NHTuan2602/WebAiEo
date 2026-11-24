@@ -311,4 +311,260 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       });
     }
   });
+
+  test('Teacher bulk-creates Daily Writing Task 1 (per-folder images) and Task 2 (multi-prompt PDF) with AI noun-phrase titles, 20p/40p, public & unlimited retries', async ({
+    page,
+    browser,
+    request,
+    baseURL,
+    healthGuard
+  }) => {
+    // Helper to build a minimal valid multi-line PDF buffer containing numbered Task 2 prompts
+    function buildMinimalPdfBuffer(lines = []) {
+      const escapedLines = lines.map(l =>
+        String(l).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
+      );
+      let streamBody = 'BT\n/F1 11 Tf\n50 760 Td\n';
+      escapedLines.forEach((txt, idx) => {
+        if (idx > 0) streamBody += '0 -18 Td\n';
+        streamBody += `(${txt}) Tj\n`;
+      });
+      streamBody += 'ET\n';
+
+      const objects = [
+        '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+        '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+        '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n',
+        '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+        `5 0 obj\n<< /Length ${Buffer.byteLength(streamBody, 'utf8')} >>\nstream\n${streamBody}endstream\nendobj\n`
+      ];
+
+      let pdf = '%PDF-1.4\n';
+      const offsets = [0];
+      for (const obj of objects) {
+        offsets.push(Buffer.byteLength(pdf, 'utf8'));
+        pdf += obj;
+      }
+      const xrefOffset = Buffer.byteLength(pdf, 'utf8');
+      pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+      for (let i = 1; i < offsets.length; i += 1) {
+        pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+      }
+      pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+      return Buffer.from(pdf, 'utf8');
+    }
+
+    // 1x1 valid PNG buffer for Task 1 chart upload
+    const tinyPngBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64'
+    );
+
+    const createdBulkTestIds = [];
+
+    // Mock server AI generate endpoint so E2E exercises full AI JSON response path deterministically
+    await page.route('**/api/sync/ai/generate', async route => {
+      const postData = route.request().postDataJSON?.() || {};
+      const pText = String(postData.promptText || '');
+      if (pText.includes('Writing Task 1 image/page')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            usedModel: 'mock-gemini-vision',
+            parsed: {
+              nounTitle: 'Spatial transformation of Bankside Cultural Complex',
+              prompt:
+                'The map below shows the layout of Bankside Cultural Complex. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
+              subCategory: 'w1_map',
+              isPureChartImage: true,
+              chartBox: null
+            }
+          })
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          usedModel: 'mock-gemini-classifier',
+          parsed: {
+            items: [
+              {
+                i: 0,
+                title: 'The enforcement of compulsory education until the age of eighteen',
+                topic: 'education',
+                type: 'agree_disagree'
+              },
+              {
+                i: 1,
+                title: 'The decline in bicycle usage and promotion of urban cycling',
+                topic: 'transport',
+                type: 'reason_problem_solution'
+              },
+              {
+                i: 2,
+                title: 'Government financial assistance for painters, musicians and poets',
+                topic: 'art_music',
+                type: 'both_views'
+              }
+            ]
+          }
+        })
+      });
+    });
+
+    try {
+      const setupLogin = await request.post(`${baseURL}/api/sync/auth/login`, {
+        data: {
+          username: E2E_CREDENTIALS.teacher.username,
+          password: E2E_CREDENTIALS.teacher.password
+        }
+      });
+      expect(setupLogin.ok()).toBeTruthy();
+      await request.post(`${baseURL}/api/sync/action`, {
+        data: { type: 'SET_AI_CONFIG', payload: { geminiApiKey: 'mock-e2e-server-key' } }
+      });
+
+      await loginViaUI(page, E2E_CREDENTIALS.teacher.username, E2E_CREDENTIALS.teacher.password);
+      await page.evaluate(() => {
+        localStorage.removeItem('ielts_gemini_api_key');
+      });
+
+      // Navigate to Daily Zone -> 5. Viết Task 1 (W1)
+      await page.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
+      await page.locator('aside').getByRole('button', { name: /5\. Viết Task 1/i }).first().click();
+
+      // Verify each Task 1 folder card has its own "+ AI Hàng Loạt" button
+      await expect(page.getByTestId('w1-folder-bulk-ai-w1_map')).toBeVisible();
+      await expect(page.getByTestId('w1-folder-bulk-ai-w1_process')).toBeVisible();
+      await expect(page.getByTestId('w1-folder-bulk-ai-w1_dynamic')).toBeVisible();
+      await expect(page.getByTestId('w1-folder-bulk-ai-w1_static')).toBeVisible();
+
+      // Click "+ AI Hàng Loạt" directly on Map folder -> opens modal pre-locked to w1_map
+      await page.getByTestId('w1-folder-bulk-ai-w1_map').click();
+      await expect(page.getByTestId('daily-writing-bulk-modal')).toBeVisible();
+      await page.getByTestId('daily-writing-bulk-modal').getByRole('button', { name: 'Đóng' }).first().click();
+
+      // Also verify the header button right beside "+ Tạo Bài W1" after selecting Map folder
+      await expect(page.getByTestId('open-bulk-w1-ai-btn')).toContainText(/Map/i);
+      await page.getByTestId('open-bulk-w1-ai-btn').click();
+      await expect(page.getByTestId('daily-writing-bulk-modal')).toBeVisible();
+
+      // Upload 2 Task 1 chart images at once
+      await page.getByTestId('bulk-w1-file-input').setInputFiles([
+        { name: 'map-chart-1.png', mimeType: 'image/png', buffer: tinyPngBuffer },
+        { name: 'map-chart-2.png', mimeType: 'image/png', buffer: tinyPngBuffer }
+      ]);
+      await page.getByTestId('run-bulk-w1-ai-btn').click();
+
+      await expect(page.getByTestId('bulk-w1-draft-card-0')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('bulk-w1-draft-card-1')).toBeVisible();
+
+      await page.getByTestId('confirm-save-bulk-w1-btn').click();
+      await expect(page.getByTestId('daily-writing-bulk-modal')).toHaveCount(0);
+
+      // Verify new Task 1 cards appear inside Map folder with 20p and Làm lại nhiều lần
+      await expect(page.getByText('Spatial transformation of Bankside Cultural Complex').first()).toBeVisible({
+        timeout: 10_000
+      });
+      await expect(page.getByText(/Map • 20p/i).first()).toBeVisible();
+
+      // Switch to 6. Viết Task 2 (W2) and click "Tạo Đề Task 2 Nhanh (AI PDF)" beside "+ Tạo Bài W2"
+      await page.locator('aside').getByRole('button', { name: /6\. Viết Task 2/i }).first().click();
+      const bulkW2Btn = page.getByTestId('open-bulk-w2-ai-btn');
+      await expect(bulkW2Btn).toBeVisible();
+      await bulkW2Btn.click();
+      await expect(page.getByTestId('daily-writing-bulk-modal')).toBeVisible();
+
+      // Upload a PDF containing numbered Task 2 prompts (including wrapped lines & stray vocab note)
+      const sampleTask2Pdf = buildMinimalPdfBuffer([
+        'pass a tipping point => render any remedial action futile',
+        '1. Everyone should stay at school until the age of 18. Agree/disagree?',
+        '2. In many countries, people are choosing other means of transport',
+        'rather than bicycles. Why is this happening? What can be done to encourage cycling?',
+        '3. Some people think that the government should provide assistance to artists.',
+        'However, other people think this is a waste of money. Discuss both views and give your own opinion.'
+      ]);
+
+      await page.getByTestId('bulk-w2-pdf-input').setInputFiles([
+        { name: '350-task2-forecast.pdf', mimeType: 'application/pdf', buffer: sampleTask2Pdf }
+      ]);
+      await page.getByTestId('run-bulk-w2-ai-btn').click();
+
+      await expect(page.getByTestId('bulk-w2-draft-row-0')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('bulk-w2-draft-row-1')).toBeVisible();
+      await expect(page.getByTestId('bulk-w2-draft-row-2')).toBeVisible();
+
+      await page.getByTestId('confirm-save-bulk-w2-btn').click();
+      await expect(page.getByTestId('daily-writing-bulk-modal')).toHaveCount(0);
+
+      // Verify Task 2 noun-phrase title, Education topic, Agree / Disagree type, 40p, and Làm lại nhiều lần
+      await expect(
+        page.getByText('The enforcement of compulsory education until the age of eighteen').first()
+      ).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(/Writing Task 2 \(Essay\) • 40p/i).first()).toBeVisible();
+
+      // Collect created bulk test IDs from server state & verify Student can access them publicly
+      const teacherLogin = await request.post(`${baseURL}/api/sync/auth/login`, {
+        data: {
+          username: E2E_CREDENTIALS.teacher.username,
+          password: E2E_CREDENTIALS.teacher.password
+        }
+      });
+      expect(teacherLogin.ok()).toBeTruthy();
+      const snapRes = await request.get(`${baseURL}/api/sync/state`);
+      const snap = await snapRes.json();
+      (snap?.tests || []).forEach(t => {
+        if (String(t?.id || '').startsWith('test-w1-bulk-') || String(t?.id || '').startsWith('test-w2-bulk-')) {
+          createdBulkTestIds.push(t.id);
+        }
+      });
+      expect(createdBulkTestIds.length).toBe(5);
+
+      // Student context verifies public visibility, 40p duration, Education filter, and unlimited retries
+      const studentContext = await browser.newContext();
+      const studentPage = await studentContext.newPage();
+      try {
+        await loginViaUI(studentPage, E2E_CREDENTIALS.student.username, E2E_CREDENTIALS.student.password);
+        await studentPage.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
+        await studentPage.locator('aside').getByRole('button', { name: /6\. Viết Task 2/i }).first().click();
+        await studentPage.getByRole('button', { name: /^Education \(\d+\)$/i }).click();
+        await studentPage.getByRole('button', { name: /^Agree \/ Disagree \(\d+\)$/i }).click();
+        await expect(
+          studentPage.getByText('The enforcement of compulsory education until the age of eighteen').first()
+        ).toBeVisible({ timeout: 10_000 });
+        await expect(studentPage.getByText(/Làm lại nhiều lần/i).first()).toBeVisible();
+      } finally {
+        await studentContext.close();
+      }
+
+      healthGuard.assertHealthy('daily-writing-bulk-ai');
+    } finally {
+      await request.post(`${baseURL}/api/sync/auth/login`, {
+        data: {
+          username: E2E_CREDENTIALS.teacher.username,
+          password: E2E_CREDENTIALS.teacher.password
+        }
+      });
+      await request.post(`${baseURL}/api/sync/action`, {
+        data: { type: 'SET_AI_CONFIG', payload: { geminiApiKey: '' } }
+      });
+      const snapRes = await request.get(`${baseURL}/api/sync/state`);
+      if (snapRes.ok()) {
+        const snap = await snapRes.json();
+        const toDelete = (snap?.tests || [])
+          .map(t => t?.id)
+          .filter(id => String(id || '').startsWith('test-w1-bulk-') || String(id || '').startsWith('test-w2-bulk-'));
+        for (const id of toDelete) {
+          await request.post(`${baseURL}/api/sync/action`, {
+            data: { type: 'DELETE_TEST', payload: { testId: id } }
+          });
+        }
+      }
+    }
+  });
 });

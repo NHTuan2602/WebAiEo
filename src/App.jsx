@@ -1424,12 +1424,18 @@ export default function App() {
 
   // Sync state to local storage + cross-tab BroadcastChannel
   useEffect(() => {
-    localStorage.setItem('ielts_tests', JSON.stringify(tests));
+    try {
+      localStorage.setItem('ielts_tests', JSON.stringify(tests));
+    } catch (_e) {
+      // Ignore QuotaExceededError when large test banks or temporary base64 images are in memory
+    }
     if (skipNextTestsBroadcastRef.current) {
       skipNextTestsBroadcastRef.current = false;
       return;
     }
-    syncChannelRef.current?.postMessage({ key: 'ielts_tests', payload: tests });
+    try {
+      syncChannelRef.current?.postMessage({ key: 'ielts_tests', payload: tests });
+    } catch (_e) {}
   }, [tests]);
 
   useEffect(() => {
@@ -6001,6 +6007,38 @@ export default function App() {
     setView(returnAfterSaveView);
   };
 
+  const handleBulkCreateTests = async (rawTests = [], { summaryLabel = 'Daily Zone Writing', notify = true } = {}) => {
+    const cleanList = Array.isArray(rawTests) ? rawTests.filter(t => t && t.id && t.title) : [];
+    if (cleanList.length === 0) return { savedCount: 0 };
+
+    const hasInlineImages = cleanList.some(
+      t => typeof t?.writing?.task1?.imageUrl === 'string' && t.writing.task1.imageUrl.startsWith('data:')
+    );
+    const chunkSize = hasInlineImages ? 15 : 150;
+    let latestServerSnapshot = null;
+
+    for (let i = 0; i < cleanList.length; i += chunkSize) {
+      const chunk = cleanList.slice(i, i + chunkSize);
+      const isLastChunk = i + chunkSize >= cleanList.length;
+      const snap = await dispatchSyncAction('UPSERT_TESTS_BULK', {
+        tests: chunk,
+        notify: Boolean(notify && isLastChunk),
+        summaryLabel
+      });
+      if (snap) latestServerSnapshot = snap;
+    }
+
+    if (!latestServerSnapshot) {
+      setTests(prev => {
+        const incomingIds = new Set(cleanList.map(t => t.id));
+        const filteredPrev = prev.filter(t => !incomingIds.has(t.id));
+        return [...cleanList, ...filteredPrev];
+      });
+    }
+
+    return { savedCount: cleanList.length };
+  };
+
   // ==========================================
   // 3. GAME ARENA ENGINE LOGIC (REACT INTEGRATED)
   // ==========================================
@@ -7847,6 +7885,7 @@ export default function App() {
           onOpenSkillBuilder={(skill, testToEdit = null, subOpts = {}) => openSingleSkillBuilder(skill, testToEdit, [], subOpts)}
           onAssignFolderClasses={handleAssignFolderClasses}
           onBackToTeacherDashboard={() => setView('TEACHER_DASHBOARD')}
+          onBulkCreateTests={handleBulkCreateTests}
           onSaveSpeakingForecast={handleSaveSpeakingForecast}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}
@@ -7857,6 +7896,8 @@ export default function App() {
           onStartSpeakingPracticeTest={handleStartSpeakingPracticeTest}
           paymentConfig={paymentConfig}
           serverClockOffsetMs={serverClockOffsetMs}
+          setApiTestState={setApiTestState}
+          setShowApiKeyModal={setShowApiKeyModal}
           showToast={showToast}
           speakingForecast={speakingForecast}
           examUnlockTokens={examUnlockTokens}
