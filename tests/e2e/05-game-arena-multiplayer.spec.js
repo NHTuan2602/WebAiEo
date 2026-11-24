@@ -54,9 +54,10 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await modalForm.locator('input[placeholder="ielts"]').fill(testPass);
       await modalForm.getByRole('button', { name: /Tạo Phòng & Mở Lobby/i }).click();
 
-      // Confirm Teacher is in Lobby with PIN displayed
+      // Confirm Teacher is in Lobby with PIN & Space Shooter Score Leaderboard displayed
       await expect(teacherPage.getByText(testRoomName).first()).toBeVisible({ timeout: 12_000 });
       await expect(teacherPage.getByText(testPin).first()).toBeVisible();
+      await expect(teacherPage.getByTestId('space-dropship-leaderboard')).toBeVisible();
       await assertNoHorizontalOverflow(teacherPage, 'GameArena-TeacherLobby');
 
       // 2. Student logs in on the second BrowserContext, verifies Knight RPG locks per-stage practice for students, then joins Space Shooter Lobby by PIN + Pass
@@ -67,9 +68,10 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
         timeout: 12_000
       });
 
-      // Verify Student cannot click individual maps, sees ZERO secret boss spoilers, and has NO Admin Demon King button
+      // Verify Student cannot click individual maps, sees ZERO secret boss spoilers, sees Knight Score Leaderboard, and has NO Admin Demon King button
       await studentPage.getByTestId('switch-to-knight-game-btn').click();
       await expect(studentPage.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
+      await expect(studentPage.getByTestId('knight-lobby-leaderboard')).toBeVisible();
       await expect(studentPage.getByTestId('locked-knight-stage-4')).toBeVisible();
       await expect(studentPage.getByTestId('start-knight-stage-4')).toHaveCount(0);
       await expect(studentPage.getByTestId('admin-test-demon-king-btn')).toHaveCount(0);
@@ -83,6 +85,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await expect(studentPage.getByRole('heading', { name: /Tham Gia Phòng Đấu Từ Vựng/i })).toBeVisible({
         timeout: 12_000
       });
+      await expect(studentPage.getByTestId('space-lobby-leaderboard')).toBeVisible();
       await studentPage.locator('input[placeholder*="686868"]').fill(testPin);
       await studentPage.locator('input[placeholder*="Nhập mật khẩu phòng"]').fill(testPass);
       await studentPage.getByRole('button', { name: /VÀO SẢNH CHỜ NGAY/i }).click();
@@ -198,10 +201,14 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await expect(page.getByText(/Thánh Kỵ Sĩ Thái Dương Leon/i)).toBeVisible();
     await expect(page.getByText(/Kiếm Sĩ Lôi Kiếm Kenji/i)).toBeVisible();
     await expect(page.getByText(/Chiến Thần Cuồng Chiến Drake/i)).toBeVisible();
-    const loadedSkinSprites = await page.getByTestId('knight-skin-shop-modal').locator('img').evaluateAll(imgs =>
-      imgs.filter(img => img.complete && img.naturalWidth > 0).length
-    );
-    expect(loadedSkinSprites).toBeGreaterThanOrEqual(10);
+    await expect
+      .poll(async () =>
+        page
+          .getByTestId('knight-skin-shop-modal')
+          .locator('img')
+          .evaluateAll(imgs => imgs.filter(img => img.complete && img.naturalWidth > 0).length)
+      )
+      .toBeGreaterThanOrEqual(10);
     await page.getByTestId('buy-revive-key-with-gold-btn').click();
     await page.getByTestId('knight-skin-shop-modal').getByRole('button').first().click();
 
@@ -246,6 +253,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await celebrationDialog.getByRole('button').first().click();
     }
     await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
+    await expect(page.getByTestId('knight-lobby-leaderboard')).toBeVisible();
 
     // Switch back to Space Shooter Arena to verify Màn 3 & Màn 4 Sandbox
     await page.getByTestId('switch-to-space-game-btn').click();

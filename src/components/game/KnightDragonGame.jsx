@@ -16,9 +16,11 @@ import {
   Snowflake,
   Sparkles,
   Swords,
+  Trophy,
   Volume2,
   VolumeX
 } from 'lucide-react';
+import VipMemberName from '../common/VipMemberName';
 import {
   DEATH_REVIVE_DELAY_SEC,
   DEMON_KING_BOSS,
@@ -105,6 +107,7 @@ const DEMON_STAGE_META = {
 export default function KnightDragonGame({
   currentUser,
   customVocabTopics = [],
+  gamePracticeLeaderboard = [],
   initialRawVocab = DEFAULT_VOCAB_TEXT,
   initialTopicId = 'core',
   initialTopicLabel = 'IELTS Core Academic',
@@ -115,7 +118,8 @@ export default function KnightDragonGame({
   onSyncKnightResult,
   roomPin = '',
   roomRawVocab = '',
-  showToast
+  showToast,
+  usersDb = {}
 }) {
   const username = currentUser?.username || 'guest';
   const isStrictAdmin = Boolean(
@@ -2199,6 +2203,98 @@ export default function KnightDragonGame({
   const bankItemsCount = parseRawVocabText(resolveSelectedRawVocab()).length;
   const activeWheelMeta = WHEEL_SECTORS.find(s => s.round === demonWheelStyle) || WHEEL_SECTORS[0];
 
+  // Aggregate & deduplicate Knight & Dragon RPG Score Leaderboard for the waiting screen (HUB)
+  const knightLeaderboardRows = (() => {
+    const byUser = new Map();
+    const upsertRow = (unameRaw, candidate) => {
+      const cleanUname = String(unameRaw || '').trim();
+      if (!cleanUname) return;
+      const key = cleanUname.toLowerCase();
+      const userObj =
+        usersDb?.[cleanUname] ||
+        Object.values(usersDb || {}).find(
+          u => u && String(u.username || '').toLowerCase() === key
+        ) ||
+        (cleanUname === username ? currentUser : null);
+      const nextScore = Math.max(0, Math.floor(Number(candidate.score) || 0));
+      const existing = byUser.get(key);
+      const profileObj =
+        cleanUname === username
+          ? rpgProfile
+          : userObj?.knightRpgProfile || candidate.knightRpgProfile || {};
+      const monstersSlain = Math.max(
+        existing?.monstersSlain || 0,
+        Math.floor(Number(profileObj?.monstersSlain) || 0)
+      );
+      const dragonsSlain = Math.max(
+        existing?.dragonsSlain || 0,
+        Math.floor(Number(profileObj?.dragonsSlain) || 0)
+      );
+
+      if (!existing || nextScore > existing.score) {
+        byUser.set(key, {
+          username: userObj?.username || cleanUname,
+          name: userObj?.name || candidate.name || cleanUname,
+          userObj: userObj || { username: cleanUname, name: candidate.name || cleanUname },
+          score: Math.max(existing?.score || 0, nextScore),
+          accuracyPct: candidate.accuracyPct ?? existing?.accuracyPct ?? 100,
+          topicLabel: candidate.topicLabel || existing?.topicLabel || 'Hành Trình Đồ Long',
+          monstersSlain,
+          dragonsSlain
+        });
+      } else {
+        existing.monstersSlain = monstersSlain;
+        existing.dragonsSlain = dragonsSlain;
+      }
+    };
+
+    (Array.isArray(gamePracticeLeaderboard) ? gamePracticeLeaderboard : []).forEach(entry => {
+      if (!entry?.username) return;
+      const isKnight =
+        entry.gameType === 'knight_rpg' ||
+        String(entry.mode || '').toLowerCase().startsWith('knight');
+      if (!isKnight) return;
+      const best = Math.max(Number(entry.score) || 0, Number(entry.lastScore) || 0);
+      if (best <= 0) return;
+      upsertRow(entry.username, {
+        name: entry.name,
+        score: best,
+        accuracyPct: entry.accuracyPct ?? 100,
+        topicLabel: entry.topicLabel || 'Hành Trình Đồ Long'
+      });
+    });
+
+    Object.values(usersDb || {}).forEach(u => {
+      if (!u?.username) return;
+      const pBest = Math.floor(Number(u?.knightRpgProfile?.bestScore) || 0);
+      if (pBest > 0) {
+        upsertRow(u.username, {
+          name: u.name,
+          score: pBest,
+          knightRpgProfile: u.knightRpgProfile
+        });
+      }
+    });
+
+    if (username && Number(rpgProfile?.bestScore) > 0) {
+      upsertRow(username, {
+        name: currentUser?.name || username,
+        score: Number(rpgProfile.bestScore) || 0,
+        knightRpgProfile: rpgProfile
+      });
+    }
+
+    return Array.from(byUser.values())
+      .filter(r => r.score > 0)
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          b.dragonsSlain - a.dragonsSlain ||
+          b.monstersSlain - a.monstersSlain
+      )
+      .slice(0, 10);
+  })();
+
   return (
     <div
       data-testid="knight-dragon-game-root"
@@ -2588,6 +2684,86 @@ export default function KnightDragonGame({
                 <p className="text-[11px] text-slate-400 font-bold">Danh Hiệu Top 1/2/3 Ngày</p>
                 <p className="text-xs font-extrabold text-cyan-300 mt-1">Chốt 23:59 • Trao 00:00 hôm sau</p>
               </div>
+            </div>
+
+            {/* Knight & Dragon RPG Waiting Screen Score Leaderboard */}
+            <div
+              data-testid="knight-lobby-leaderboard"
+              className="rounded-2xl bg-slate-950/85 border border-amber-500/35 p-4 space-y-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/90 pb-2.5">
+                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>BẢNG XẾP HẠNG ĐIỂM — HIỆP SĨ DIỆT RỒNG ({knightLeaderboardRows.length} cao thủ)</span>
+                </h3>
+                <span className="text-[11px] text-slate-400 font-bold">
+                  Đua Top 1/2/3 theo ngày • Cập nhật tự động sau mỗi trận
+                </span>
+              </div>
+
+              {knightLeaderboardRows.length === 0 ? (
+                <div className="text-center py-4 space-y-1">
+                  <p className="text-xs font-bold text-slate-300">
+                    Chưa có kỷ lục điểm nào trên Bảng Xếp Hạng Hiệp Sĩ Diệt Rồng.
+                  </p>
+                  <p className="text-[11px] text-amber-300/90">
+                    ⚔️ Hãy bấm <b>Xuất Chinh Từ Ải 1</b> ngay để mở hàng Top #1 Đệ Nhất Đồ Long!
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
+                  {knightLeaderboardRows.map((row, idx) => {
+                    const isMe =
+                      String(row.username || '').toLowerCase() === String(username || '').toLowerCase();
+                    const rankMedal =
+                      idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`;
+                    return (
+                      <div
+                        key={`${row.username}-${idx}`}
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs transition ${
+                          isMe
+                            ? 'bg-rose-950/50 border-amber-400/70 ring-1 ring-amber-400/30'
+                            : idx < 3
+                            ? 'bg-slate-900/95 border-amber-500/30'
+                            : 'bg-slate-900/70 border-slate-800'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="font-extrabold text-white truncate flex items-center gap-1.5">
+                            <span
+                              className={`font-black shrink-0 ${
+                                idx === 0
+                                  ? 'text-amber-300'
+                                  : idx === 1
+                                  ? 'text-slate-200'
+                                  : idx === 2
+                                  ? 'text-orange-300'
+                                  : 'text-slate-400'
+                              }`}
+                            >
+                              {rankMedal}
+                            </span>
+                            <VipMemberName
+                              user={row.userObj}
+                              fallbackName={row.name || row.username}
+                              badgeSize="xs"
+                            />
+                            {isMe && (
+                              <span className="text-[11px] font-black text-amber-300 shrink-0">(Bạn)</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                            {row.topicLabel} • ⚔️ {row.monstersSlain} quái • 🐉 {row.dragonsSlain} Rồng
+                          </p>
+                        </div>
+                        <span className="font-mono font-black text-sm text-amber-300 shrink-0">
+                          {Number(row.score || 0).toLocaleString('vi-VN')}đ
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

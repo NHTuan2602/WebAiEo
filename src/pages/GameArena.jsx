@@ -277,6 +277,7 @@ export default function GameArena({
       <KnightDragonGame
         currentUser={currentUser}
         customVocabTopics={customVocabTopics}
+        gamePracticeLeaderboard={gamePracticeLeaderboard}
         initialRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
         initialTopicId={practiceTopicId}
         onBackToGameHub={() => setArenaGameMode('hub')}
@@ -294,9 +295,142 @@ export default function GameArena({
         roomPin={activePin}
         roomRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
         showToast={showToast}
+        usersDb={usersDb}
       />
     );
   }
+
+  // Dedicated Space Shooter Score Leaderboard (aggregates Space Shooter Self-Practice & Live Room records)
+  const spaceShooterLeaderboardRows = (() => {
+    const byUser = new Map();
+    const upsertSpaceRow = (unameRaw, candidate) => {
+      const cleanUname = String(unameRaw || '').trim();
+      if (!cleanUname) return;
+      const key = cleanUname.toLowerCase();
+      const userObj =
+        usersDb?.[cleanUname] ||
+        Object.values(usersDb || {}).find(
+          u => u && String(u.username || '').toLowerCase() === key
+        );
+      if (userObj?.role === 'teacher') return;
+      const nextScore = Math.max(0, Math.floor(Number(candidate.score) || 0));
+      if (nextScore <= 0) return;
+      const existing = byUser.get(key);
+      if (!existing || nextScore > existing.score) {
+        byUser.set(key, {
+          username: userObj?.username || cleanUname,
+          name: userObj?.name || candidate.name || cleanUname,
+          userObj: userObj || { username: cleanUname, name: candidate.name || cleanUname },
+          score: nextScore,
+          accuracyPct: candidate.accuracyPct ?? existing?.accuracyPct ?? 100,
+          topicLabel: candidate.topicLabel || existing?.topicLabel || 'Đấu Trường Phi Thuyền'
+        });
+      }
+    };
+
+    (Array.isArray(gamePracticeLeaderboard) ? gamePracticeLeaderboard : []).forEach(row => {
+      if (!row?.username) return;
+      const isKnight =
+        row.gameType === 'knight_rpg' ||
+        String(row.mode || '').toLowerCase().startsWith('knight');
+      if (isKnight) return;
+      const best = Math.max(Number(row.score) || 0, Number(row.lastScore) || 0);
+      upsertSpaceRow(row.username, {
+        name: row.name,
+        score: best,
+        accuracyPct: row.accuracyPct ?? 100,
+        topicLabel: row.topicLabel || 'Tự Luyện Phi Thuyền'
+      });
+    });
+
+    Object.values(roomsDb || {}).forEach(rObj => {
+      if (!rObj || rObj.gameType === 'knight_rpg') return;
+      const roomLabel = rObj.name || `Phòng #${rObj.pin || ''}`;
+      Object.entries(rObj.players || {}).forEach(([pKey, pVal]) => {
+        if (!pVal || pVal.role === 'teacher') return;
+        upsertSpaceRow(pVal.username || pKey, {
+          name: pVal.name || pKey,
+          score: Number(pVal.score) || 0,
+          accuracyPct: pVal.accuracyPct ?? 100,
+          topicLabel: roomLabel
+        });
+      });
+    });
+
+    return Array.from(byUser.values())
+      .sort((a, b) => b.score - a.score || (b.accuracyPct || 0) - (a.accuracyPct || 0))
+      .slice(0, 10);
+  })();
+
+  const renderSpaceShooterLeaderboardCard = (testId = 'space-lobby-leaderboard', compact = false) => (
+    <div
+      data-testid={testId}
+      className={`bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl ${
+        compact ? 'p-3.5 space-y-2' : 'p-4 space-y-2.5'
+      } shadow-sm`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 flex items-center gap-1.5">
+          <Trophy className="w-4 h-4 shrink-0" />
+          <span>BẢNG XẾP HẠNG ĐIỂM — PHI THUYỀN VŨ TRỤ ({spaceShooterLeaderboardRows.length} kỷ lục)</span>
+        </h3>
+        <span className="text-[11px] text-slate-400 font-semibold">
+          Đua Top 1/2/3 theo ngày • Tự động cập nhật sau mỗi trận
+        </span>
+      </div>
+      {spaceShooterLeaderboardRows.length === 0 ? (
+        <p className="text-xs text-[#475569] dark:text-slate-400 text-center py-3">
+          Chưa có kỷ lục điểm nào trong Đấu Trường Phi Thuyền — hãy thi đấu ngay để lên Top #1!
+        </p>
+      ) : (
+        <div
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 ${
+            compact ? 'max-h-40' : 'max-h-56'
+          } overflow-y-auto pr-1`}
+        >
+          {spaceShooterLeaderboardRows.map((row, idx) => {
+            const isMe =
+              String(row.username || '').toLowerCase() ===
+              String(currentUser?.username || '').toLowerCase();
+            const rankMedal =
+              idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`;
+            return (
+              <div
+                key={`${row.username}-${idx}`}
+                className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs ${
+                  isMe
+                    ? 'bg-[#EDFFFD] dark:bg-cyan-500/15 border-[#007A7A]/50 dark:border-cyan-400/50'
+                    : 'bg-slate-50 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800'
+                }`}
+              >
+                <div className="min-w-0 pr-2">
+                  <div className="font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1">
+                    <span className="text-amber-600 dark:text-amber-300 shrink-0">{rankMedal}</span>
+                    <VipMemberName
+                      user={row.userObj}
+                      fallbackName={row.name || row.username}
+                      badgeSize="xs"
+                    />
+                    {isMe && (
+                      <span className="text-[11px] font-bold text-[#007A7A] dark:text-cyan-300 shrink-0">
+                        (Bạn)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-400 truncate">
+                    {row.topicLabel} • {row.accuracyPct ?? 100}% đúng
+                  </p>
+                </div>
+                <span className="font-mono font-black text-amber-600 dark:text-amber-300 shrink-0">
+                  {Number(row.score || 0).toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 
   const themeToggleButton = setDarkMode ? (
     <button
@@ -925,6 +1059,9 @@ export default function GameArena({
                     Quay lại Phòng Đấu Live của Giáo Viên
                   </button>
                 </div>
+                <div className="pt-2 text-left">
+                  {renderSpaceShooterLeaderboardCard('space-lobby-leaderboard', false)}
+                </div>
               </div>
             ) : (
             <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-5">
@@ -1208,52 +1345,11 @@ export default function GameArena({
               })()}
 
               {/* Practice Leaderboard (BXH Ranking) */}
-              <div className="bg-white/95 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 flex items-center gap-1.5">
-                    <Trophy className="w-4 h-4" /> BXH Khu Tự Luyện Tập ({gamePracticeLeaderboard.length} kỷ lục)
-                  </h3>
-                  <span className="text-xs text-slate-400 font-semibold">Tự động cập nhật sau mỗi lượt chơi</span>
-                </div>
-                {gamePracticeLeaderboard.length === 0 ? (
-                  <p className="text-xs text-[#475569] dark:text-slate-400 text-center py-4">
-                    Chưa có kỷ lục nào trong Khu Tự Luyện Tập - hãy chơi ngay để lên Top #1!
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                    {gamePracticeLeaderboard.slice(0, 10).map((row, idx) => {
-                      const isMe = row.username === currentUser?.username;
-                      return (
-                        <div
-                          key={row.id || `${row.username}-${idx}`}
-                          className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs ${
-                            isMe
-                              ? 'bg-[#EDFFFD] dark:bg-cyan-500/15 border-[#007A7A]/50 dark:border-cyan-400/50'
-                              : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1">
-                              <span>#{idx + 1}</span>
-                              <VipMemberName user={usersDb[row.username] || row} fallbackName={row.name || row.username} badgeSize="xs" />
-                              {isMe && <span className="text-xs font-bold text-[#007A7A] dark:text-cyan-300">(Bạn)</span>}
-                            </p>
-                            <p className="text-xs text-[#475569] dark:text-slate-400 truncate">
-                              {row.topicLabel} • {row.accuracyPct ?? 100}% đúng
-                            </p>
-                          </div>
-                          <span className="font-mono font-black text-amber-600 dark:text-amber-300 shrink-0 ml-2">
-                            {row.score}đ
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              {renderSpaceShooterLeaderboardCard('space-lobby-leaderboard', false)}
             </div>
             )
           ) : (
+          <div className="space-y-4">
           <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-[0_18px_45px_-18px_rgba(15,23,42,0.14)] dark:shadow-2xl">
             <div className="flex flex-col items-center text-center mb-5">
               <div className="flex items-center justify-center gap-5 mb-3 bg-white/90 dark:bg-slate-950/75 px-6 py-3 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs">
@@ -1464,6 +1560,8 @@ export default function GameArena({
                 </div>
               </div>
             )}
+          </div>
+          {renderSpaceShooterLeaderboardCard('space-lobby-leaderboard', false)}
           </div>
           )}
         </div>
@@ -2290,6 +2388,11 @@ export default function GameArena({
 
             {/* Right: Persistent Live Lobby Chat Box */}
             {renderLobbyChatPanel('h-[270px] lg:h-[360px]', 'Chat Phòng Chờ')}
+          </div>
+
+          {/* Space Shooter Score Leaderboard inside Waiting Lobby */}
+          <div className="max-w-6xl w-full mx-auto">
+            {renderSpaceShooterLeaderboardCard('space-dropship-leaderboard', true)}
           </div>
 
           {/* Bottom Controls Bar (Animal Pilot Customize + Ready / Host Launch) */}
