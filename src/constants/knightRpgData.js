@@ -51,7 +51,7 @@ export const DEMON_KING_BOSS = {
   isDemonKing: true,
   spriteUrl: '/assets/knight-rpg/demon_king_abyss.svg',
   spawnChance: 0.05,
-  warningDurationSec: 3,
+  warningDurationSec: 6,
   curseIntervalSec: 5,
   grantedLives: 5,
   rewardGold: 1000,

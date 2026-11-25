@@ -465,7 +465,8 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     });
     await page.getByTestId('admin-test-demon-king-btn').click();
     await expect(page.getByTestId('demon-king-warning-overlay')).toBeVisible({ timeout: 4_000 });
-    await expect(page.getByTestId('demon-king-wheel-overlay')).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByTestId('demon-king-warning-overlay')).toContainText(/6/);
+    await expect(page.getByTestId('demon-king-wheel-overlay')).toBeVisible({ timeout: 9_000 });
     await expect(page.getByTestId('demon-curse-timer-badge')).toBeVisible({ timeout: 8_000 });
     await expect(page.getByTestId('knight-lives-display')).toContainText('❤️❤️❤️❤️❤️');
     await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Trận Chiến Ẩn/i);

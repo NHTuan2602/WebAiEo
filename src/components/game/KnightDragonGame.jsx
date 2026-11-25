@@ -589,7 +589,7 @@ export default function KnightDragonGame({
       if (ticks % 4 === 0) playSound('type_hit');
     }, 150);
 
-    // 2. After exact 3 seconds -> Spin the 4-Round Demon Wheel
+    // 2. After exact 6 seconds -> Spin the 4-Round Demon Wheel
     phaseTimerRef.current = setTimeout(() => {
       clearInterval(phaseIntervalRef.current);
 
@@ -3640,7 +3640,7 @@ export default function KnightDragonGame({
         </div>
       )}
 
-      {/* 3-SECOND RETRO PAC-MAN FLASHING WARNING OVERLAY FOR SECRET DEMON KING BOSS */}
+      {/* 6-SECOND RETRO PAC-MAN FLASHING WARNING OVERLAY FOR SECRET DEMON KING BOSS */}
       {matchState === 'DEMON_WARNING' && (() => {
         const flashPhase = pacmanFlashTick % 3;
         const flashBg =
