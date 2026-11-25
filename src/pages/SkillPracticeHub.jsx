@@ -30,6 +30,7 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Trophy,
   Users,
   Wand2,
@@ -53,7 +54,11 @@ import {
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
+  getTask2QuestionType,
+  getTask2Topic,
   getVietnamTodayDateKey,
+  isKnownTask2QuestionType,
+  isKnownTask2Topic,
   normalizeExamConfig,
   normalizeSpeakingSection
 } from '../constants/seedData';
@@ -73,6 +78,7 @@ import AssignFolderModal from '../components/modals/AssignFolderModal';
 import DailyWritingBulkModal from '../components/teacher/DailyWritingBulkModal';
 import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
 import VipMemberName from '../components/common/VipMemberName';
+import WritingTask2FilterBar from '../components/common/WritingTask2FilterBar';
 
 export default function SkillPracticeHub({
   activeTab = 'speaking',
@@ -87,6 +93,7 @@ export default function SkillPracticeHub({
   onBulkCreateTests = null,
   onChangeTab,
   onClearFocusedTest,
+  onDeleteTest = null,
   onNotifyMissingDaily,
   onOpenCheckoutModal = null,
   onOpenFullExamCatalog,
@@ -708,14 +715,28 @@ export default function SkillPracticeHub({
                             </span>
                           </button>
                           {isTeacher && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenSkillBuilder?.(sk, test)}
-                              className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
-                              title="Chỉnh sửa bài này"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onOpenSkillBuilder?.(sk, test)}
+                                className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
+                                title="Chỉnh sửa bài này"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              {onDeleteTest && (
+                                <button
+                                  type="button"
+                                  data-testid={`daily-delete-test-btn-${test.id}`}
+                                  onClick={() => onDeleteTest(test)}
+                                  className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#FECACA] dark:border-slate-700 text-[#B91C1C] dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15"
+                                  title="Xóa bài này"
+                                  aria-label={`Xóa ${test.title}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -782,10 +803,6 @@ export default function SkillPracticeHub({
     const selectedWritingTask2Topic = writingTask2Filter.topic;
     const selectedWritingTask2QuestionType = writingTask2Filter.questionType;
     const selectedDailyFolder = isSuperHomeworkTab ? activeDailyFolderFilter : 'all';
-    const getTask2Topic = test => String(test?.writingTask2Topic || '').trim();
-    const getTask2QuestionType = test => String(test?.writingTask2QuestionType || '').trim();
-    const isKnownTask2Topic = topicId => DAILY_WRITING_T2_TOPICS.some(topic => topic.id === topicId);
-    const isKnownTask2QuestionType = typeId => DAILY_WRITING_T2_QUESTION_TYPES.some(type => type.id === typeId);
     const focusedMatch = focusedTestId ? list.find(t => t.id === focusedTestId) : null;
     const subFilteredList = focusedMatch
       ? [focusedMatch]
@@ -831,15 +848,6 @@ export default function SkillPracticeHub({
       : topicFilteredList.filter(test => selectedWritingTask2QuestionType === '__unclassified__'
         ? !isKnownTask2QuestionType(getTask2QuestionType(test))
         : getTask2QuestionType(test) === selectedWritingTask2QuestionType);
-    const task2QuestionTypeScope = selectedWritingTask2Topic === 'all'
-      ? list
-      : list.filter(test => selectedWritingTask2Topic === '__unclassified__'
-        ? !isKnownTask2Topic(getTask2Topic(test))
-        : getTask2Topic(test) === selectedWritingTask2Topic);
-    const unclassifiedTask2TopicCount = list.filter(test => !isKnownTask2Topic(getTask2Topic(test))).length;
-    const unclassifiedTask2QuestionTypeCount = task2QuestionTypeScope.filter(
-      test => !isKnownTask2QuestionType(getTask2QuestionType(test))
-    ).length;
 
     return (
       <div className="space-y-6">
@@ -1211,108 +1219,13 @@ export default function SkillPracticeHub({
         )}
 
         {isWritingTask2Tab && !focusedMatch && (
-          <div className="bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-3">
-            <div className="space-y-2">
-              <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">Chọn chủ đề:</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  aria-pressed={selectedWritingTask2Topic === 'all'}
-                  onClick={() => setWritingTask2Filter(prev => ({ ...prev, topic: 'all' }))}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                    selectedWritingTask2Topic === 'all'
-                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                  }`}
-                >
-                  Tất cả ({list.length})
-                </button>
-                {DAILY_WRITING_T2_TOPICS.map(topic => {
-                  const topicCount = list.filter(test => getTask2Topic(test) === topic.id).length;
-                  return (
-                    <button
-                      key={topic.id}
-                      type="button"
-                      aria-pressed={selectedWritingTask2Topic === topic.id}
-                      onClick={() => setWritingTask2Filter(prev => ({ ...prev, topic: topic.id }))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                        selectedWritingTask2Topic === topic.id
-                          ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                          : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                      }`}
-                    >
-                      {topic.label} ({topicCount})
-                    </button>
-                  );
-                })}
-                {unclassifiedTask2TopicCount > 0 && (
-                  <button
-                    type="button"
-                    aria-pressed={selectedWritingTask2Topic === '__unclassified__'}
-                    onClick={() => setWritingTask2Filter(prev => ({ ...prev, topic: '__unclassified__' }))}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                      selectedWritingTask2Topic === '__unclassified__'
-                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                    }`}
-                  >
-                    Chưa gắn chủ đề ({unclassifiedTask2TopicCount})
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <p className="text-xs font-extrabold text-[#334155] dark:text-slate-300">Chọn dạng bài:</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  aria-pressed={selectedWritingTask2QuestionType === 'all'}
-                  onClick={() => setWritingTask2Filter(prev => ({ ...prev, questionType: 'all' }))}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                    selectedWritingTask2QuestionType === 'all'
-                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                  }`}
-                >
-                  Tất cả ({task2QuestionTypeScope.length})
-                </button>
-                {DAILY_WRITING_T2_QUESTION_TYPES.map(questionType => {
-                  const questionTypeCount = task2QuestionTypeScope.filter(
-                    test => getTask2QuestionType(test) === questionType.id
-                  ).length;
-                  return (
-                    <button
-                      key={questionType.id}
-                      type="button"
-                      aria-pressed={selectedWritingTask2QuestionType === questionType.id}
-                      onClick={() => setWritingTask2Filter(prev => ({ ...prev, questionType: questionType.id }))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                        selectedWritingTask2QuestionType === questionType.id
-                          ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                          : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                      }`}
-                    >
-                      {questionType.label} ({questionTypeCount})
-                    </button>
-                  );
-                })}
-                {unclassifiedTask2QuestionTypeCount > 0 && (
-                  <button
-                    type="button"
-                    aria-pressed={selectedWritingTask2QuestionType === '__unclassified__'}
-                    onClick={() => setWritingTask2Filter(prev => ({ ...prev, questionType: '__unclassified__' }))}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                      selectedWritingTask2QuestionType === '__unclassified__'
-                        ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                        : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                    }`}
-                  >
-                    Chưa chọn dạng bài ({unclassifiedTask2QuestionTypeCount})
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <WritingTask2FilterBar
+            list={list}
+            selectedTopic={selectedWritingTask2Topic}
+            selectedQuestionType={selectedWritingTask2QuestionType}
+            onSelectTopic={topic => setWritingTask2Filter(prev => ({ ...prev, topic }))}
+            onSelectQuestionType={questionType => setWritingTask2Filter(prev => ({ ...prev, questionType }))}
+          />
         )}
 
         {focusedMatch && onClearFocusedTest && (
@@ -1678,14 +1591,28 @@ export default function SkillPracticeHub({
                             </span>
                           </button>
                           {isTeacher && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenSkillBuilder?.(actualSkill, test)}
-                              className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
-                              title="Chỉnh sửa bài tập này"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onOpenSkillBuilder?.(actualSkill, test)}
+                                className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
+                                title="Chỉnh sửa bài tập này"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              {onDeleteTest && (
+                                <button
+                                  type="button"
+                                  data-testid={`daily-delete-test-btn-${test.id}`}
+                                  onClick={() => onDeleteTest(test)}
+                                  className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#FECACA] dark:border-slate-700 text-[#B91C1C] dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15"
+                                  title="Xóa bài tập này"
+                                  aria-label={`Xóa ${test.title}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -2463,14 +2390,28 @@ export default function SkillPracticeHub({
                             </button>
                           )}
                           {isTeacher && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenSkillBuilder?.('speaking', test)}
-                              className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
-                              title="Chỉnh sửa bài tập Speaking này"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onOpenSkillBuilder?.('speaking', test)}
+                                className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#334155] dark:text-slate-300 hover:border-[#007A7A] hover:text-[#0F766E]"
+                                title="Chỉnh sửa bài tập Speaking này"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              {onDeleteTest && (
+                                <button
+                                  type="button"
+                                  data-testid={`daily-delete-test-btn-${test.id}`}
+                                  onClick={() => onDeleteTest(test)}
+                                  className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-[#FECACA] dark:border-slate-700 text-[#B91C1C] dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15"
+                                  title="Xóa bài tập Speaking này"
+                                  aria-label={`Xóa ${test.title}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

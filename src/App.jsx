@@ -7901,6 +7901,7 @@ export default function App() {
             setView('RESULT_VIEW');
           }}
           onOpenSkillBuilder={(skill, testToEdit = null, subOpts = {}) => openSingleSkillBuilder(skill, testToEdit, [], subOpts)}
+          onDeleteTest={handleDeleteTest}
           onAssignFolderClasses={handleAssignFolderClasses}
           onBackToTeacherDashboard={() => setView('TEACHER_DASHBOARD')}
           onBulkCreateTests={handleBulkCreateTests}

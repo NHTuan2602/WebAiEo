@@ -228,8 +228,22 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await page.getByRole('button', { name: /Quay Lại Quản Trị Giáo Viên/i }).first().click();
     await expect(page.getByRole('heading', { name: /Quản Lý & Giảng Dạy/i })).toBeVisible();
 
+    // Verify TeacherDashboard -> Daily Zone (Miễn Phí) has quick Delete button on collapsed rows and Writing W2 Topic/Type filters
+    await page.locator('aside').getByRole('button', { name: /Daily Zone \(Miễn Phí\)/i }).click();
+    await expect(page.locator('[data-testid^="teacher-quick-delete-"]').first()).toBeVisible();
+    await page.getByRole('button', { name: /^Writing W2 \(/i }).first().click();
+    await expect(page.getByText(/Chọn chủ đề:/i).first()).toBeVisible();
+    await expect(page.getByText(/Chọn dạng bài:/i).first()).toBeVisible();
+    await page.getByRole('button', { name: /^Education \(/i }).first().click();
+    await assertNoHorizontalOverflow(page, 'Teacher-DailyZone-W2Filter');
+
     await page.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
     await expect(page.getByText(/DAILY ZONE/i).first()).toBeVisible();
+    await page.locator('aside').getByRole('button', { name: /6\. Viết Task 2/i }).first().click();
+    const dailyDeleteBtn = page.locator('[data-testid^="daily-delete-test-btn-"]').first();
+    await expect(dailyDeleteBtn).toBeVisible();
+    page.once('dialog', d => d.dismiss());
+    await dailyDeleteBtn.click();
 
     await page.getByRole('button', { name: /Tạo Bài Daily Mới/i }).first().click();
     const backToDailyBtn = page.getByRole('button', { name: /Quay Lại Daily Zone/i }).first();

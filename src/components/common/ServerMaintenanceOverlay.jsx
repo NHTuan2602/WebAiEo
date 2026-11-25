@@ -1,50 +1,84 @@
+import { useState } from 'react';
 import { RefreshCw, WifiOff, Wrench } from 'lucide-react';
-import maintenanceMemeImg from '../../assets/server-maintenance.jpg?inline';
+import meme0 from '../../assets/server-maintenance.jpg?inline';
+import meme1 from '../../assets/memes/meme-1.png?inline';
+import meme2 from '../../assets/memes/meme-2.png?inline';
+import meme3 from '../../assets/memes/meme-3.jpg?inline';
+import meme4 from '../../assets/memes/meme-4.jpg?inline';
+import meme5 from '../../assets/memes/meme-5.jpg?inline';
+import meme6 from '../../assets/memes/meme-6.png?inline';
+
+const MAINTENANCE_MEMES = [meme1, meme2, meme3, meme4, meme5, meme6, meme0];
+const MEME_STORAGE_KEY = 'ielts_last_maintenance_meme_idx';
+
+function pickNonRepeatingMemeIdx(excludeIdx = -1) {
+  const total = MAINTENANCE_MEMES.length;
+  if (total <= 1) return 0;
+  let lastIdx = excludeIdx;
+  if (lastIdx < 0 && typeof window !== 'undefined') {
+    try {
+      const raw = Number.parseInt(window.sessionStorage.getItem(MEME_STORAGE_KEY) || '', 10);
+      if (Number.isInteger(raw) && raw >= 0 && raw < total) lastIdx = raw;
+    } catch {
+      // Ignore storage access errors in restricted modes
+    }
+  }
+  const candidates = [];
+  for (let i = 0; i < total; i += 1) {
+    if (i !== lastIdx) candidates.push(i);
+  }
+  const chosen = candidates[Math.floor(Math.random() * candidates.length)] ?? 0;
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage.setItem(MEME_STORAGE_KEY, String(chosen));
+    } catch {
+      // Ignore storage access errors
+    }
+  }
+  return chosen;
+}
 
 export const SERVER_MAINTENANCE_MESSAGE =
-  'Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát';
+  'Máy chủ đang được bảo trì hoặc gặp sự cố tạm thời, vui lòng đợi trong giây lát';
 
 export default function ServerMaintenanceOverlay({
-  isOpen = true,
-  mode = 'disconnected',
   checking = false,
+  isOffline = false,
+  isCrash = false,
+  onRetry = null,
   canDismiss = false,
   dismissLabel = 'Đóng xem trước',
-  onRetry = null,
   onDismiss = null
 }) {
-  if (!isOpen) return null;
-
-  const isCrash = mode === 'crash';
-  const statusBadge = isCrash
-    ? 'LỖI ỨNG DỤNG / BẢO TRÌ KHẨN CẤP'
-    : 'MẤT KẾT NỐI MÁY CHỦ / ĐANG BẢO TRÌ';
+  const [memeIdx, setMemeIdx] = useState(() => pickNonRepeatingMemeIdx());
+  const activeMemeSrc = MAINTENANCE_MEMES[memeIdx] || meme0;
 
   return (
     <div
       data-server-maintenance-overlay="true"
-      className="apple-backdrop-enter fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#F8FAFC]/95 dark:bg-[#09090B]/95 backdrop-blur-md overflow-y-auto"
-      role="alertdialog"
+      className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4"
+      role="dialog"
       aria-modal="true"
       aria-labelledby="server-maintenance-heading"
     >
-      <div className="apple-modal-sheet w-full max-w-lg rounded-2xl bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 p-6 sm:p-8 text-center shadow-2xl space-y-5 my-auto">
-        <div className="flex justify-center">
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold tracking-wide uppercase">
-            {isCrash ? (
-              <Wrench className="w-3.5 h-3.5 shrink-0" />
-            ) : (
-              <WifiOff className="w-3.5 h-3.5 shrink-0" />
-            )}
-            <span>{statusBadge}</span>
+      <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 shadow-2xl p-6 sm:p-7 text-center space-y-4">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 text-xs font-extrabold uppercase tracking-wider">
+          {isOffline ? <WifiOff className="w-3.5 h-3.5" /> : <Wrench className="w-3.5 h-3.5" />}
+          <span>
+            {isOffline
+              ? 'Mất kết nối mạng / Đang bảo trì'
+              : isCrash
+              ? 'Sự cố hiển thị / Đang bảo trì'
+              : 'Đang bảo trì máy chủ'}
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-100 dark:bg-zinc-900">
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-900/5 dark:bg-zinc-900">
           <img
-            src={maintenanceMemeImg}
+            src={activeMemeSrc}
             alt="Thông báo bảo trì máy chủ"
-            className="w-full max-h-[280px] object-cover block mx-auto"
+            data-meme-idx={memeIdx}
+            className="w-full max-h-[280px] object-contain block mx-auto"
           />
         </div>
 
@@ -67,6 +101,7 @@ export default function ServerMaintenanceOverlay({
             type="button"
             disabled={checking}
             onClick={() => {
+              setMemeIdx(prev => pickNonRepeatingMemeIdx(prev));
               if (onRetry) {
                 onRetry();
               } else if (typeof window !== 'undefined') {

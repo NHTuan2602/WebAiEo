@@ -89,4 +89,59 @@ test.describe('1. Smoke, Health & Light/Dark Layout Integrity', () => {
 
     healthGuard.assertHealthy('smoke-student-teacher-layout');
   });
+
+  test('Maintenance page & preview overlay rotate non-repeating memes on F5/retry without banned copy', async ({
+    page,
+    baseURL,
+    healthGuard
+  }) => {
+    // Verify /sw-offline.js caches all /memes/* fallbacks
+    const swText = await (await fetch(`${baseURL}/sw-offline.js`)).text();
+    expect(swText).toContain('/memes/meme-1.png');
+    expect(swText).toContain('/memes/meme-6.png');
+
+    // Visit standalone /maintenance.html and simulate F5 reload
+    await page.goto('/maintenance.html');
+    await expect(
+      page.getByRole('heading', { name: /Máy chủ đang được bảo trì hoặc gặp sự cố tạm thời/i })
+    ).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/đái nhầm/i);
+
+    const memeImg = page.locator('#maintenanceMemeImg');
+    await expect(memeImg).toBeVisible();
+    await page.waitForFunction(() => {
+      const el = document.getElementById('maintenanceMemeImg');
+      return Boolean(el && el.complete && el.naturalWidth > 0);
+    });
+    const firstMemeIdx = await memeImg.getAttribute('data-meme-idx');
+
+    // F5 reload must pick a different meme
+    await page.reload();
+    await expect(memeImg).toBeVisible();
+    await page.waitForFunction(() => {
+      const el = document.getElementById('maintenanceMemeImg');
+      return Boolean(el && el.complete && el.naturalWidth > 0);
+    });
+    const secondMemeIdx = await memeImg.getAttribute('data-meme-idx');
+    expect(secondMemeIdx).not.toBeNull();
+    expect(secondMemeIdx).not.toBe(firstMemeIdx);
+
+    // Check React ServerMaintenanceOverlay via ?maintenance=1
+    await page.goto('/?maintenance=1');
+    const overlay = page.locator('[data-server-maintenance-overlay="true"]');
+    await expect(overlay).toBeVisible();
+    await expect(overlay).toContainText(/Máy chủ đang được bảo trì hoặc gặp sự cố tạm thời/i);
+    await expect(overlay).not.toContainText(/đái nhầm/i);
+    const overlayImg = overlay.locator('img[data-meme-idx]');
+    await expect(overlayImg).toBeVisible();
+    const overlayIdx1 = await overlayImg.getAttribute('data-meme-idx');
+    await page.reload();
+    await expect(overlay).toBeVisible();
+    await expect(overlayImg).toBeVisible();
+    const overlayIdx2 = await overlayImg.getAttribute('data-meme-idx');
+    expect(overlayIdx2).not.toBeNull();
+    expect(overlayIdx2).not.toBe(overlayIdx1);
+
+    healthGuard.assertHealthy('smoke-maintenance-meme-rotation');
+  });
 });

@@ -457,6 +457,11 @@ export const DAILY_WRITING_T2_QUESTION_TYPES = [
   { id: 'two_questions', label: '2 Questions' }
 ];
 
+export const getTask2Topic = test => String(test?.writingTask2Topic || '').trim();
+export const getTask2QuestionType = test => String(test?.writingTask2QuestionType || '').trim();
+export const isKnownTask2Topic = topicId => DAILY_WRITING_T2_TOPICS.some(topic => topic.id === topicId);
+export const isKnownTask2QuestionType = typeId => DAILY_WRITING_T2_QUESTION_TYPES.some(type => type.id === typeId);
+
 export const getDailySubCategoryLabel = (subCatId = '') => {
   const clean = String(subCatId || '').trim();
   if (!clean) return '';

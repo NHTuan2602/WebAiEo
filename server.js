@@ -12,6 +12,8 @@ const INDEX_HTML_PATH = path.join(DIST_DIR, 'index.html');
 const MAINTENANCE_HTML_PATH = path.join(DIST_DIR, 'maintenance.html');
 const PUBLIC_MAINTENANCE_HTML_PATH = path.join(__dirname, 'public', 'maintenance.html');
 
+const MAINTENANCE_MESSAGE = 'Máy chủ đang được bảo trì hoặc gặp sự cố tạm thời, vui lòng đợi trong giây lát';
+
 function isMaintenanceModeEnabled() {
   const flag = String(process.env.MAINTENANCE_MODE || '').trim().toLowerCase();
   return flag === '1' || flag === 'true' || flag === 'on';
@@ -31,7 +33,7 @@ function sendMaintenancePage(res, statusCode = 503) {
     return;
   }
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.end('Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát');
+  res.end(MAINTENANCE_MESSAGE);
 }
 
 const MIME_TYPES = {
@@ -265,7 +267,12 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
     }
 
     if (isMaintenanceModeEnabled()) {
-      if (pathname === '/server-maintenance.jpg' || pathname === '/maintenance.html' || pathname === '/sw-offline.js') {
+      const isMaintenanceAsset =
+        pathname === '/server-maintenance.jpg' ||
+        pathname === '/maintenance.html' ||
+        pathname === '/sw-offline.js' ||
+        (pathname.startsWith('/memes/') && !pathname.includes('..'));
+      if (isMaintenanceAsset) {
         const assetPath = resolveStaticAssetPath(pathname);
         if (assetPath && fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
           sendStaticFile(req, res, assetPath, false);
@@ -276,7 +283,7 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
         res.statusCode = 503;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
-        res.end(JSON.stringify({ ok: false, maintenance: true, error: 'Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát' }));
+        res.end(JSON.stringify({ ok: false, maintenance: true, error: MAINTENANCE_MESSAGE }));
         return;
       }
       sendMaintenancePage(res, 503);
@@ -296,7 +303,7 @@ export function createProductionServer({ port = Number(process.env.PORT) || 4173
         if (!res.headersSent) {
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          res.end(JSON.stringify({ ok: false, error: 'Sever đang được bảo trì hoặc Admin lỡ đái nhầm vào sever vui lòng đợi trong giây lát' }));
+          res.end(JSON.stringify({ ok: false, error: MAINTENANCE_MESSAGE }));
         }
       }
       return;

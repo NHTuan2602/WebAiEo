@@ -67,10 +67,15 @@ import {
   getListeningTracks,
   getReadingPassages,
   getSpeakingQuestionItems,
+  getTask2QuestionType,
+  getTask2Topic,
   getUserClassIds,
+  isKnownTask2QuestionType,
+  isKnownTask2Topic,
   normalizeExamConfig,
   normalizeSpeakingSection
 } from '../constants/seedData';
+import WritingTask2FilterBar from '../components/common/WritingTask2FilterBar';
 import {
   formatVndCurrency,
   getRealExamComboMeta,
@@ -172,6 +177,8 @@ export default function TeacherDashboard({
   const [accountRoleFilter, setAccountRoleFilter] = useState('all');
   const [fullExamCategoryFilter, setFullExamCategoryFilter] = useState('all');
   const [exerciseSkillFilter, setExerciseSkillFilter] = useState('all');
+  const [writingTask2TopicFilter, setWritingTask2TopicFilter] = useState('all');
+  const [writingTask2QuestionTypeFilter, setWritingTask2QuestionTypeFilter] = useState('all');
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [onlyIncompleteFilter, setOnlyIncompleteFilter] = useState(false);
   const [completionModalTestId, setCompletionModalTestId] = useState(null);
@@ -374,7 +381,24 @@ export default function TeacherDashboard({
             return c.focusSkill === 'writing' && c.writingTaskScope !== 'task1';
           })
         : skillExercises.filter(t => normalizeExamConfig(t).focusSkill === exerciseSkillFilter);
-  const filteredSkillExercises = skillFilteredList.filter(matchesItemFilters);
+  const task2FilteredSkillList = exerciseSkillFilter !== 'writing_task2'
+    ? skillFilteredList
+    : skillFilteredList.filter(t => {
+        if (writingTask2TopicFilter !== 'all') {
+          const matchesTopic = writingTask2TopicFilter === '__unclassified__'
+            ? !isKnownTask2Topic(getTask2Topic(t))
+            : getTask2Topic(t) === writingTask2TopicFilter;
+          if (!matchesTopic) return false;
+        }
+        if (writingTask2QuestionTypeFilter !== 'all') {
+          const matchesType = writingTask2QuestionTypeFilter === '__unclassified__'
+            ? !isKnownTask2QuestionType(getTask2QuestionType(t))
+            : getTask2QuestionType(t) === writingTask2QuestionTypeFilter;
+          if (!matchesType) return false;
+        }
+        return true;
+      });
+  const filteredSkillExercises = task2FilteredSkillList.filter(matchesItemFilters);
 
   const SKILL_EXERCISE_BUTTONS = [
     { id: 'speaking_daily', skill: 'speaking', subOpts: { dailySubCategory: 'speaking_daily' }, label: '+ Daily Speaking', shortLabel: 'Daily Speaking', icon: Mic, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
@@ -588,6 +612,17 @@ export default function TeacherDashboard({
             >
               {isPrivate ? <EyeOff className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
               {isPrivate ? 'Chỉ mình tôi' : 'Công khai'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleDeleteTest(t)}
+              data-testid={`teacher-quick-delete-${t.id}`}
+              title={`Xóa ${entityLabel} này`}
+              aria-label={`Xóa ${t.title}`}
+              className="min-h-[32px] text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-rose-400 border border-[#FECACA] dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Xóa
             </button>
 
             <button
@@ -1422,7 +1457,10 @@ export default function TeacherDashboard({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setExerciseSkillFilter(tab.id)}
+                  onClick={() => {
+                    setExerciseSkillFilter(tab.id);
+                    setExercisesPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-md transition ${
                     exerciseSkillFilter === tab.id
                       ? 'bg-[#007A7A] text-white'
@@ -1440,7 +1478,10 @@ export default function TeacherDashboard({
                 <input
                   type="text"
                   value={itemSearchQuery}
-                  onChange={e => setItemSearchQuery(e.target.value)}
+                  onChange={e => {
+                    setItemSearchQuery(e.target.value);
+                    setExercisesPage(1);
+                  }}
                   placeholder="Tìm bài tập..."
                   aria-label="Tìm kiếm bài tập theo tiêu đề"
                   className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
@@ -1448,7 +1489,10 @@ export default function TeacherDashboard({
               </div>
               <button
                 type="button"
-                onClick={() => setOnlyIncompleteFilter(prev => !prev)}
+                onClick={() => {
+                  setOnlyIncompleteFilter(prev => !prev);
+                  setExercisesPage(1);
+                }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
                   onlyIncompleteFilter
                     ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
@@ -1460,6 +1504,22 @@ export default function TeacherDashboard({
               </button>
             </div>
           </div>
+
+          {exerciseSkillFilter === 'writing_task2' && (
+            <WritingTask2FilterBar
+              list={skillFilteredList}
+              selectedTopic={writingTask2TopicFilter}
+              selectedQuestionType={writingTask2QuestionTypeFilter}
+              onSelectTopic={(topic) => {
+                setWritingTask2TopicFilter(topic);
+                setExercisesPage(1);
+              }}
+              onSelectQuestionType={(questionType) => {
+                setWritingTask2QuestionTypeFilter(questionType);
+                setExercisesPage(1);
+              }}
+            />
+          )}
 
           {filteredSkillExercises.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-lg border border-slate-200 dark:border-slate-800 text-center text-sm text-[#475569] dark:text-slate-400">
