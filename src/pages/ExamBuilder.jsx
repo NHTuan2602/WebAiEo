@@ -2139,7 +2139,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                           🏛️ Thực Chiến Thi Thật (100.000đ · 1 Lượt)
                         </div>
                         <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5 leading-snug">
-                          Full 4 kỹ năng L·R·W·S liên hoàn · Áp dụng Combo 3/5/10 đề · Chờ Ms. Như duyệt điểm
+                          Đủ 4 kỹ năng L·R·W·S · Áp dụng Combo 3/5/10 đề · Ms. Như duyệt điểm
                         </p>
                       </button>
 

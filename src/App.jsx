@@ -5452,7 +5452,7 @@ export default function App() {
           : 'Đề Thực Chiến IELTS Full 4 Kỹ Năng Mới',
         description: isPeriodicPreset
           ? 'Kỳ thi Mock Test Định Kỳ 3 tháng/lần đủ 4 kỹ năng Listening, Reading, Writing và Speaking do Ms. Như trực tiếp duyệt chấm (1 lượt thi thật).'
-          : 'Đề thi thực chiến liên hoàn đủ 4 kỹ năng Listening, Reading, Writing và Speaking (1 lượt thi thật, áp dụng đề lẻ 100k hoặc Combo 3/5/8/10 đề).',
+          : 'Đề thi thực chiến đủ 4 kỹ năng Listening, Reading, Writing và Speaking (1 lượt thi thật, áp dụng đề lẻ 100k hoặc Combo 3/5/8/10 đề).',
         createdAt: new Date().toISOString().split('T')[0],
         listening: {
           audioUrl: '',

@@ -875,15 +875,15 @@ export default function GameArena({
                 </div>
 
                 <p className="text-xs sm:text-sm text-[#334155] dark:text-slate-300 leading-relaxed">
-                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy <b>🌠 Cầu Nguyện Gacha Nhân Vật 5★/4★ &amp; Vũ Khí 4★/3★</b> chuẩn tỉ lệ Genshin Impact (<b>Ignis, Drake, Cyber Nova, Selena, Tomoe...</b>), săn <b>🗝️ Chìa Khóa Hồi Sinh</b> và né <b>Skill Tất Sát</b> của Rồng!
+                  Vượt 4 ải hạ quái vật và Boss Rồng để tích Vàng quay Gacha mở khóa nhân vật &amp; vũ khí.
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-rose-200/80 dark:border-slate-800 text-amber-800 dark:text-amber-200 font-bold">
-                    🌠 Gacha Nhân Vật 5★ &amp; Vũ Khí 3★–4★
+                    ⚔️ Vượt 4 ải &amp; Boss Rồng
                   </div>
                   <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-rose-200/80 dark:border-slate-800 text-sky-800 dark:text-sky-200 font-bold">
-                    🗝️ Tỉ lệ hiếm rớt Chìa Khóa khi hạ quái
+                    🌠 Gacha Nhân Vật &amp; Vũ Khí
                   </div>
                 </div>
               </div>

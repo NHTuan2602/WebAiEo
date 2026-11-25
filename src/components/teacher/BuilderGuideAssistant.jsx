@@ -191,7 +191,7 @@ export function BuilderGuideModal({ isOpen, onClose, onJumpToTab }) {
                 <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-teal-200 dark:border-teal-800/60 space-y-1">
                   <p className="font-extrabold text-[#007A7A] dark:text-teal-300">🏛️ Thực Chiến Thi Thật (100.000đ)</p>
                   <p className="text-slate-600 dark:text-slate-400">
-                    Đủ 4 kỹ năng liên hoàn (L: 4 bài/40 câu · R: 3 bài/40 câu · W: 2 bài · S: 3 phần). Thi 1 lượt duy nhất, áp dụng mua lẻ 100k hoặc trừ 1 lượt Combo 3/5/8/10 đề. Nộp xong chờ Ms. Như duyệt điểm.
+                    Đủ 4 kỹ năng (L: 4 bài/40 câu · R: 3 bài/40 câu · W: 2 bài · S: 3 phần). Thi 1 lượt duy nhất, áp dụng mua lẻ 100k hoặc trừ 1 lượt Combo 3/5/8/10 đề. Nộp xong Ms. Như duyệt điểm.
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/60 space-y-1">

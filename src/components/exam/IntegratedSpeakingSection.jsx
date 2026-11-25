@@ -607,7 +607,7 @@ export default function IntegratedSpeakingSection({
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 px-2.5 py-0.5 rounded-md mb-1.5">
-            <Mic className="w-3.5 h-3.5" /> Phần 4/4 · Speaking Thực Chiến Liên Hoàn
+            <Mic className="w-3.5 h-3.5" /> Phần 4/4 · Speaking Thực Chiến
           </span>
           <h2 className="text-lg font-extrabold text-slate-900 dark:text-zinc-100">
             Ghi Âm Trả Lời Speaking Trực Tiếp Trong Phòng Thi

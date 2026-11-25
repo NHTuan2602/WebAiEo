@@ -6,6 +6,7 @@ import {
   KeyRound,
   Lock,
   QrCode,
+  RotateCcw,
   Shield,
   Sparkles,
   Star,
@@ -19,11 +20,12 @@ import {
   normalizePaymentConfig
 } from '../../constants/profileCustomization';
 import {
-  GENSHIN_GACHA_RATES,
   KNIGHT_CHARACTER_EVENT_BANNERS,
   KNIGHT_CHARACTER_SKINS,
+  KNIGHT_DUPLICATE_HERO_REFUND_GOLD,
   KNIGHT_GACHA_GOLD_SINGLE,
   KNIGHT_GACHA_GOLD_TEN,
+  KNIGHT_GACHA_RATES,
   KNIGHT_GACHA_WEAPONS,
   REVIVE_KEY_GOLD_PRICE
 } from '../../constants/knightRpgData';
@@ -50,7 +52,6 @@ function playGachaWishSound(maxRarity = 3, allWhiff = false) {
     };
 
     if (maxRarity === 5) {
-      // Genshin-inspired 5★ Golden Meteor Sweep + Triumphant Major9 Fanfare
       [392, 493.88, 587.33, 783.99, 987.77, 1174.66, 1567.98].forEach((f, idx) => {
         playTone(f, idx * 0.09, 0.75, 'triangle', 0.13);
       });
@@ -58,16 +59,13 @@ function playGachaWishSound(maxRarity = 3, allWhiff = false) {
         playTone(f, 0.72, 1.25, 'sine', 0.11);
       });
     } else if (maxRarity === 4) {
-      // 4★ Amethyst Arcane Shimmer Arpeggio
       [329.63, 440, 523.25, 659.25, 880, 1046.5].forEach((f, idx) => {
         playTone(f, idx * 0.085, 0.65, 'triangle', 0.11);
       });
     } else if (allWhiff) {
-      // Standard Banner Whiff / Tạch Gacha hollow descending tone
       playTone(349.23, 0, 0.35, 'sawtooth', 0.06);
       playTone(233.08, 0.22, 0.55, 'sine', 0.08);
     } else {
-      // 3★ Sky-Blue Shooting Star Chime
       playTone(523.25, 0, 0.35, 'sine', 0.09);
       playTone(659.25, 0.12, 0.45, 'triangle', 0.09);
       playTone(783.99, 0.25, 0.55, 'sine', 0.08);
@@ -85,10 +83,12 @@ function renderStars(count = 3) {
 
 export default function KnightGachaModal({
   isOpen,
+  isStrictAdmin = false,
   rpgProfile,
   paymentConfig = null,
   onClose,
   onExecutePull,
+  onAdminResetHeroes = null,
   onEquipSkin,
   onEquipWeapon,
   onExchangeGoldForWishes,
@@ -96,9 +96,9 @@ export default function KnightGachaModal({
   onOpenWishQrCheckout,
   showToast
 }) {
-  const [activeTab, setActiveTab] = useState('character_event'); // 'character_event' | 'standard' | 'inventory' | 'shop'
+  const [activeTab, setActiveTab] = useState('character_event');
   const [selectedBannerId, setSelectedBannerId] = useState(KNIGHT_CHARACTER_EVENT_BANNERS[0].id);
-  const [cutscene, setCutscene] = useState(null); // { phase: 'meteor' | 'reveal' | 'summary', results, maxRarity, allWhiff, revealIdx }
+  const [cutscene, setCutscene] = useState(null);
   const meteorTimerRef = useRef(null);
 
   useEffect(() => {
@@ -119,8 +119,6 @@ export default function KnightGachaModal({
   const gachaState = rpgProfile?.gachaState || {};
   const unlockedSkins = Array.isArray(rpgProfile?.unlockedSkins) ? rpgProfile.unlockedSkins : ['knight_arthur'];
   const unlockedWeapons = Array.isArray(rpgProfile?.unlockedWeapons) ? rpgProfile.unlockedWeapons : [];
-  const heroConstellations = rpgProfile?.heroConstellations || {};
-  const weaponRefinements = rpgProfile?.weaponRefinements || {};
   const wishHistory = Array.isArray(rpgProfile?.wishHistory) ? rpgProfile.wishHistory : [];
 
   const activeBannerMeta =
@@ -161,7 +159,7 @@ export default function KnightGachaModal({
           revealIdx: 0
         };
       });
-    }, 1850);
+    }, 1750);
   };
 
   const skipCutsceneToSummary = () => {
@@ -180,18 +178,22 @@ export default function KnightGachaModal({
   };
 
   const getCostLabel = (count) => {
+    if (isStrictAdmin) {
+      return 'Miễn phí (Admin Test)';
+    }
     if (wishes >= count) {
-      return `${count} 🌠 Lượt Quay`;
+      return `${count} Lượt Quay`;
     }
     if (wishes > 0) {
       const remGold = (count - wishes) * KNIGHT_GACHA_GOLD_SINGLE;
-      return `${wishes} 🌠 + ${remGold.toLocaleString('vi-VN')} 🪙`;
+      return `${wishes} Lượt + ${remGold.toLocaleString('vi-VN')} Vàng`;
     }
     const totalGold = count === 10 ? KNIGHT_GACHA_GOLD_TEN : KNIGHT_GACHA_GOLD_SINGLE;
-    return `${totalGold.toLocaleString('vi-VN')} 🪙 Vàng`;
+    return `${totalGold.toLocaleString('vi-VN')} Vàng`;
   };
 
   const canAffordPull = (count) => {
+    if (isStrictAdmin) return true;
     const rem = Math.max(0, count - wishes);
     return gold >= rem * KNIGHT_GACHA_GOLD_SINGLE;
   };
@@ -201,9 +203,7 @@ export default function KnightGachaModal({
       data-testid="knight-skin-shop-modal"
       className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
     >
-      {/* =========================================================
-          GENSHIN SHOOTING-STAR METEOR & WISH REVEAL OVERLAY
-      ========================================================= */}
+      {/* SHOOTING-STAR GACHA CUTSCENE OVERLAY */}
       {cutscene && (
         <div
           data-testid="knight-gacha-cutscene"
@@ -219,7 +219,6 @@ export default function KnightGachaModal({
               : 'bg-gradient-to-br from-[#04162d] via-[#0c4a6e] to-[#090d16]'
           }`}
         >
-          {/* Top Skip Bar */}
           <div className="w-full max-w-5xl flex items-center justify-between z-20">
             <span
               className={`px-3.5 py-1.5 rounded-full text-xs font-black border shadow-lg ${
@@ -233,12 +232,12 @@ export default function KnightGachaModal({
               }`}
             >
               {cutscene.maxRarity === 5
-                ? '✨⭐⭐⭐⭐⭐ KIM QUANG 5 SAO — RA VÀNG HUYỀN THOẠI! ✨'
+                ? '⭐⭐⭐⭐⭐ RA VÀNG 5 SAO!'
                 : cutscene.maxRarity === 4
-                ? '🔮⭐⭐⭐⭐ TỬ QUANG 4 SAO — SỬ THI TÍM! 🔮'
+                ? '⭐⭐⭐⭐ VẬT PHẨM 4 SAO!'
                 : cutscene.allWhiff
-                ? '💨 SAO BĂNG VỤT TẮT — TẠCH GACHA BANNER THƯỜNG!'
-                : '☄️⭐⭐⭐ LAM QUANG 3 SAO — VŨ KHÍ CƠ BẢN'}
+                ? '💨 TẠCH GACHA!'
+                : '⭐⭐⭐ VŨ KHÍ 3 SAO'}
             </span>
 
             {cutscene.phase !== 'summary' ? (
@@ -257,34 +256,32 @@ export default function KnightGachaModal({
                 onClick={() => setCutscene(null)}
                 className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition"
               >
-                Xác nhận &amp; Tiếp tục ✕
+                Đóng ✕
               </button>
             )}
           </div>
 
-          {/* PHASE 1: SHOOTING STAR METEOR ANIMATION */}
           {cutscene.phase === 'meteor' && (
             <div
               onClick={skipCutsceneToSummary}
               className="flex-1 w-full flex flex-col items-center justify-center relative cursor-pointer overflow-hidden"
             >
               <style>{`
-                @keyframes genshinMeteorFly {
+                @keyframes gachaMeteorFly {
                   0% { transform: translate(-42vw, -36vh) scale(0.45) rotate(32deg); opacity: 0.2; }
                   45% { opacity: 1; }
                   85% { transform: translate(8vw, 6vh) scale(1.35) rotate(32deg); opacity: 1; }
                   100% { transform: translate(22vw, 18vh) scale(2.4) rotate(32deg); opacity: 0; }
                 }
-                @keyframes genshinBurstPulse {
+                @keyframes gachaBurstPulse {
                   0%, 55% { transform: scale(0.1); opacity: 0; }
                   78% { transform: scale(1.25); opacity: 0.95; }
                   100% { transform: scale(2.6); opacity: 0; }
                 }
               `}</style>
 
-              {/* Starry backdrop */}
               <div className="absolute inset-0 pointer-events-none opacity-65">
-                {Array.from({ length: 24 }).map((_, idx) => (
+                {Array.from({ length: 22 }).map((_, idx) => (
                   <span
                     key={idx}
                     className="absolute rounded-full bg-white animate-pulse"
@@ -299,9 +296,8 @@ export default function KnightGachaModal({
                 ))}
               </div>
 
-              {/* Shooting Star Comet */}
               <div
-                style={{ animation: 'genshinMeteorFly 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}
+                style={{ animation: 'gachaMeteorFly 1.7s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}
                 className="relative flex items-center"
               >
                 <div
@@ -338,9 +334,8 @@ export default function KnightGachaModal({
                 </div>
               </div>
 
-              {/* Impact Halo Shockwave */}
               <div
-                style={{ animation: 'genshinBurstPulse 1.85s ease-out forwards' }}
+                style={{ animation: 'gachaBurstPulse 1.75s ease-out forwards' }}
                 className={`absolute w-64 h-64 rounded-full border-4 pointer-events-none ${
                   cutscene.maxRarity === 5
                     ? 'border-amber-300 bg-amber-400/25 shadow-[0_0_120px_#fbbf24]'
@@ -351,18 +346,9 @@ export default function KnightGachaModal({
                     : 'border-sky-300 bg-sky-400/20 shadow-[0_0_90px_#38bdf8]'
                 }`}
               />
-
-              <p className="mt-16 text-xs sm:text-sm font-extrabold text-white/85 tracking-wider uppercase animate-pulse">
-                {cutscene.maxRarity === 5
-                  ? '🌟 THIÊN MỆNH NỔ VÀNG 5 SAO! Chạm bất kỳ để mở nhanh...'
-                  : cutscene.maxRarity === 4
-                  ? '🔮 ÁNH SÁNG TÍM 4 SAO XUẤT HIỆN! Chạm bất kỳ để mở nhanh...'
-                  : '☄️ Đang triệu hồi kết tinh sao băng...'}
-              </p>
             </div>
           )}
 
-          {/* PHASE 2: SEQUENTIAL CARD REVEAL FOR 10-PULL */}
           {cutscene.phase === 'reveal' && cutscene.results[cutscene.revealIdx] && (() => {
             const item = cutscene.results[cutscene.revealIdx];
             return (
@@ -391,24 +377,19 @@ export default function KnightGachaModal({
                           MỚI!
                         </span>
                       )}
+                      {item.isRefundedHero && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 text-[11px] font-black">
+                          +{KNIGHT_DUPLICATE_HERO_REFUND_GOLD.toLocaleString('vi-VN')} Vàng
+                        </span>
+                      )}
                       {item.isWhiff && (
                         <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[11px] font-black">
-                          💨 TẠCH GACHA
-                        </span>
-                      )}
-                      {item.rateOutcome === 'won_50_50' && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 text-[11px] font-black">
-                          🔥 TRÚNG UP 50/50!
-                        </span>
-                      )}
-                      {item.rateOutcome === 'guaranteed_up' && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 text-[11px] font-black">
-                          👑 NỔ BẢO HIỂM UP 100%!
+                          TẠCH
                         </span>
                       )}
                       {item.rateOutcome === 'lost_50_50' && (
                         <span className="px-2.5 py-0.5 rounded-full bg-orange-500 text-white text-[11px] font-black">
-                          ⚡ LỆCH RATE (Kế tiếp 100% UP)
+                          Lệch 50/50 (Kế tiếp 100% UP)
                         </span>
                       )}
                     </div>
@@ -436,42 +417,29 @@ export default function KnightGachaModal({
                     {renderStars(item.starRarity)}
                   </p>
                   <h3 className="text-lg sm:text-2xl font-black text-white mt-0.5">{item.name}</h3>
-                  <p className="text-xs font-bold text-amber-200/90 mt-1">
-                    {item.itemKind === 'character'
-                      ? `Nhân Vật ${item.starRarity}★ • ${item.genderBadge || ''}`
-                      : item.isWhiff
-                      ? 'Vòng Quay Thường — Lệch Khoảng Không'
-                      : `${item.rarityLabel} • ${item.weaponType || 'Trang Bị'}`}
-                  </p>
-                  <p className="text-xs text-slate-300 mt-2 max-w-md mx-auto">{item.passiveText}</p>
+                  <p className="text-xs text-slate-300 mt-1.5 max-w-md mx-auto">{item.passiveText}</p>
                   {item.bonusText && (
-                    <p className="mt-2 inline-block px-3 py-1 rounded-xl bg-white/10 text-amber-200 text-xs font-extrabold">
+                    <p className="mt-2 inline-block px-3 py-1 rounded-xl bg-amber-400/20 border border-amber-300/40 text-amber-200 text-xs font-extrabold">
                       {item.bonusText}
                     </p>
                   )}
                 </div>
 
                 <p className="text-xs font-bold text-white/80">
-                  Nhấn vào thẻ để mở vật phẩm tiếp theo ({cutscene.revealIdx + 1}/{cutscene.results.length}) ▸
+                  Chạm để xem tiếp ({cutscene.revealIdx + 1}/{cutscene.results.length}) ▸
                 </p>
               </div>
             );
           })()}
 
-          {/* PHASE 3: FINAL WISH SUMMARY SCREEN (1x OR 10x GRID) */}
           {cutscene.phase === 'summary' && (
             <div
               data-testid="knight-gacha-results-view"
               className="flex-1 w-full max-w-5xl flex flex-col items-center justify-center gap-5 py-4"
             >
-              <div className="text-center space-y-1">
-                <h3 className="text-xl sm:text-2xl font-black text-white">
-                  ✨ Kết Quả Cầu Nguyện ({cutscene.results.length} Lượt)
-                </h3>
-                <p className="text-xs text-slate-300">
-                  Nhân vật &amp; Vũ khí nhận được đã tự động lưu vào Tủ Đồ Hiệp Sĩ!
-                </p>
-              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-white">
+                Kết Quả Quay ({cutscene.results.length} Lượt)
+              </h3>
 
               <div
                 className={`grid gap-3 w-full ${
@@ -512,6 +480,10 @@ export default function KnightGachaModal({
                         <span className="px-1.5 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[9px] font-black">
                           MỚI
                         </span>
+                      ) : item.isRefundedHero ? (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-300 text-slate-950 text-[9px] font-black">
+                          +200K VÀNG
+                        </span>
                       ) : item.isWhiff ? (
                         <span className="px-1.5 py-0.5 rounded-md bg-rose-500 text-white text-[9px] font-black">
                           TẠCH
@@ -529,62 +501,79 @@ export default function KnightGachaModal({
 
                     <div className="space-y-0.5">
                       <p className="text-xs font-black text-white line-clamp-2 leading-tight">{item.name}</p>
-                      <p className="text-[10px] text-slate-300 line-clamp-2">{item.bonusText || item.passiveText}</p>
+                      <p className="text-[10px] text-amber-200/90 line-clamp-2">{item.bonusText || item.passiveText}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    startGachaPull(
+                      activeTab === 'standard' ? 'standard' : 'character_event',
+                      cutscene.results.length === 10 ? 10 : 1
+                    )
+                  }
+                  className="px-5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/30 text-white text-xs sm:text-sm font-black transition"
+                >
+                  Quay Tiếp x{cutscene.results.length}
+                </button>
                 <button
                   type="button"
                   onClick={() => setCutscene(null)}
                   className="px-6 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-black shadow-lg transition"
                 >
-                  Đóng Kết Quả Cầu Nguyện
+                  Xác Nhận
                 </button>
               </div>
             </div>
           )}
 
           <div className="text-[11px] text-white/60 text-center">
-            Tỉ lệ chuẩn Genshin Impact: 5★ (0.6% cơ bản • Bảo hiểm 90 lượt) • 4★ (5.1% cơ bản • Bảo hiểm 10 lượt)
+            5★: 0.6% (bảo hiểm 90 lượt) • 4★: 5.1% (bảo hiểm 10 lượt) • Nhân vật cũ / &gt;1 nhân vật trong 10 lượt hoàn 200.000 Vàng
           </div>
         </div>
       )}
 
-      {/* =========================================================
-          MAIN GACHA & INVENTORY MODAL CONTAINER
-      ========================================================= */}
+      {/* MAIN MODAL */}
       <div className="max-w-5xl w-full rounded-3xl border border-amber-300/70 dark:border-amber-400/35 bg-white dark:bg-[#0B1020] text-[#0F172B] dark:text-white p-4 sm:p-6 space-y-4 max-h-[93vh] overflow-y-auto shadow-2xl">
-        {/* Header + Currency Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3.5">
           <div>
             <h2 className="text-lg sm:text-xl font-black flex items-center gap-2 text-[#0F172B] dark:text-white">
               <Sparkles className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0" />
-              <span>Đài Cầu Nguyện Gacha &amp; Tủ Đồ Hiệp Sĩ</span>
+              <span>Vòng Quay Gacha &amp; Tủ Đồ</span>
+              {isStrictAdmin && (
+                <span
+                  data-testid="admin-gacha-free-badge"
+                  className="px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-400/50 text-rose-600 dark:text-rose-300 text-[11px] font-black"
+                >
+                  Admin: Quay Test Vô Hạn
+                </span>
+              )}
             </h2>
             <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
-              Nhân vật không mở bán trực tiếp — Cầu nguyện với tỉ lệ chuẩn Genshin Impact (10.000 🪙 Vàng / 1 lượt hoặc mua gói Lượt Quay riêng).
+              10.000 Vàng / 1 lượt • Trùng nhân vật cũ hoặc ra trên 1 nhân vật trong 10 lượt được hoàn trả 200.000 Vàng.
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-300 text-xs font-black">
               <Coins className="w-3.5 h-3.5 text-amber-500" />
-              <span>{gold.toLocaleString('vi-VN')} 🪙 Vàng</span>
+              <span>{gold.toLocaleString('vi-VN')} Vàng</span>
             </div>
 
             <div
               data-testid="gacha-wishes-count"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-fuchsia-50 dark:bg-fuchsia-500/20 border border-fuchsia-300 dark:border-fuchsia-400/50 text-fuchsia-800 dark:text-fuchsia-200 text-xs font-black"
             >
-              <span>🌠 {wishes} Lượt Quay</span>
+              <span>🌠 {wishes} Lượt</span>
             </div>
 
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-500/15 border border-sky-300 dark:border-sky-400/40 text-sky-800 dark:text-sky-300 text-xs font-black">
               <KeyRound className="w-3.5 h-3.5 text-sky-500" />
-              <span>{keys} 🗝️</span>
+              <span>{keys} Chìa</span>
             </div>
 
             <button
@@ -594,8 +583,21 @@ export default function KnightGachaModal({
               className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-black transition"
               title="Đổi Vàng lấy Chìa Khóa Hồi Sinh"
             >
-              +1 🗝️ ({REVIVE_KEY_GOLD_PRICE} 🪙)
+              +1 🗝️ ({REVIVE_KEY_GOLD_PRICE} Vàng)
             </button>
+
+            {isStrictAdmin && onAdminResetHeroes && (
+              <button
+                type="button"
+                data-testid="admin-reset-gacha-heroes-btn"
+                onClick={onAdminResetHeroes}
+                className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/40 text-rose-700 dark:text-rose-200 text-xs font-bold inline-flex items-center gap-1 transition"
+                title="Reset danh sách nhân vật đã mở về mặc định để test quay lại từ đầu"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Test</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -621,7 +623,7 @@ export default function KnightGachaModal({
             }`}
           >
             <Crown className="w-3.5 h-3.5" />
-            <span>Banner Nhân Vật UP</span>
+            <span>Banner Nhân Vật</span>
           </button>
 
           <button
@@ -635,7 +637,7 @@ export default function KnightGachaModal({
             }`}
           >
             <Star className="w-3.5 h-3.5" />
-            <span>Banner Thường (Có Tạch)</span>
+            <span>Banner Thường</span>
           </button>
 
           <button
@@ -649,7 +651,7 @@ export default function KnightGachaModal({
             }`}
           >
             <Swords className="w-3.5 h-3.5" />
-            <span>Tủ Nhân Vật &amp; Vũ Khí ({unlockedSkins.length}/10)</span>
+            <span>Tủ Đồ ({unlockedSkins.length}/10)</span>
           </button>
 
           <button
@@ -663,16 +665,13 @@ export default function KnightGachaModal({
             }`}
           >
             <QrCode className="w-3.5 h-3.5" />
-            <span>Mua Lượt Quay (5k / 50k)</span>
+            <span>Mua Lượt Quay</span>
           </button>
         </div>
 
-        {/* =========================================================
-            TAB 1: CHARACTER EVENT UP BANNER (GENSHIN 50/50 + GUARANTEE)
-        ========================================================= */}
+        {/* TAB 1: CHARACTER BANNER */}
         {activeTab === 'character_event' && (
           <div className="space-y-4">
-            {/* Switch between 3 UP 5★ Hero Banners */}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {KNIGHT_CHARACTER_EVENT_BANNERS.map(b => {
@@ -690,7 +689,7 @@ export default function KnightGachaModal({
                       }`}
                     >
                       <img src={hero?.spriteUrl} alt={hero?.name} className="w-5 h-5 object-contain" />
-                      <span>UP: {hero?.name}</span>
+                      <span>{hero?.name}</span>
                     </button>
                   );
                 })}
@@ -702,82 +701,67 @@ export default function KnightGachaModal({
                 onClick={() => setActiveTab('shop')}
                 className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition shadow-sm"
               >
-                + Mua Lượt Quay Riêng (5.000đ = 1 lượt • 50.000đ = 10 lượt)
+                + Mua Lượt Quay (5k = 1 lượt • 50k = 10 lượt)
               </button>
             </div>
 
-            {/* Banner Showcase Visual Card */}
             <div className="relative rounded-3xl overflow-hidden border-2 border-amber-400/70 bg-gradient-to-br from-[#2a1205] via-[#1c1033] to-[#090d16] text-white p-5 sm:p-7 shadow-2xl">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
                 <div className="md:col-span-7 space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/60 text-amber-200 text-xs font-black">
-                    <span>🌠 CẦU NGUYỆN NHÂN VẬT SỰ KIỆN • TĂNG TỈ LỆ RƠI UP!</span>
-                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/60 text-amber-200 text-xs font-black">
+                    BANNER NHÂN VẬT TĂNG TỈ LỆ
+                  </span>
 
                   <h3 className="text-2xl sm:text-3xl font-black text-amber-200 leading-tight">
-                    {activeBannerMeta.bannerTitle}
+                    {featured5Hero.name}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                    Mỗi <b>10 lượt cầu nguyện</b> chắc chắn nhận ít nhất <b>1 Nhân Vật hoặc Vũ Khí ≥ 4★</b>. Khi ra <b>5★ (Ra Vàng)</b> có <b>50%</b> xác suất là <b>{featured5Hero.name}</b> — nếu lệch rate, lần nổ 5★ tiếp theo <b>bảo hiểm 100% trúng UP</b>!
+                    Quay 10 lượt chắc chắn có vật phẩm ≥ 4★. Nổ 5★ có 50% trúng nhân vật tâm điểm (nếu lệch, lần 5★ kế tiếp chắc chắn trúng).
                   </p>
 
-                  {/* Featured 5★ Stats Box */}
                   <div className="p-3.5 rounded-2xl bg-black/45 border border-amber-400/40 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-amber-300 font-black text-sm">⭐⭐⭐⭐⭐ {featured5Hero.name}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
-                        NHÂN VẬT 5★ UP
-                      </span>
                     </div>
                     <p className="text-xs text-amber-100 font-bold">🗡️ {featured5Hero.weaponName}</p>
                     <p className="text-xs text-slate-300">{featured5Hero.passiveText}</p>
                   </div>
 
-                  {/* Featured 4★ Rate-Up Row */}
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-extrabold text-fuchsia-200 uppercase tracking-wider">
-                      Nhân Vật 4★ Tăng Tỉ Lệ Rơi &amp; Vũ Khí Đi Kèm (4★ / 3★):
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {featured4Heroes.map(h4 => (
-                        <div
-                          key={h4.id}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/80 border border-fuchsia-400/50 text-xs font-bold text-fuchsia-100"
-                        >
-                          <img src={h4.spriteUrl} alt={h4.name} className="w-6 h-6 object-contain" />
-                          <span>4★ {h4.name}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {featured4Heroes.map(h4 => (
+                      <div
+                        key={h4.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/80 border border-fuchsia-400/50 text-xs font-bold text-fuchsia-100"
+                      >
+                        <img src={h4.spriteUrl} alt={h4.name} className="w-6 h-6 object-contain" />
+                        <span>4★ {h4.name}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Big Hero Portrait */}
                 <div className="md:col-span-5 flex flex-col items-center justify-center">
-                  <div className="w-52 h-52 sm:w-64 sm:h-64 rounded-3xl border-2 border-amber-300/80 bg-gradient-to-b from-amber-400/25 via-rose-500/15 to-black/70 p-3 flex items-center justify-center shadow-[0_0_60px_rgba(251,191,36,0.35)] relative">
+                  <div className="w-52 h-52 sm:w-60 sm:h-60 rounded-3xl border-2 border-amber-300/80 bg-gradient-to-b from-amber-400/25 via-rose-500/15 to-black/70 p-3 flex items-center justify-center shadow-[0_0_60px_rgba(251,191,36,0.35)] relative">
                     <img
                       src={featured5Hero.spriteUrl}
                       alt={featured5Hero.name}
                       className="w-full h-full object-contain drop-shadow-[0_12px_22px_rgba(0,0,0,0.9)]"
                     />
                     <span className="absolute bottom-2.5 px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black shadow">
-                      {unlockedSkins.includes(featured5Hero.id)
-                        ? `ĐÃ SỞ HỮU (C${heroConstellations[featured5Hero.id] || 0})`
-                        : 'CHƯA SỞ HỮU'}
+                      {unlockedSkins.includes(featured5Hero.id) ? 'ĐÃ SỞ HỮU' : 'CHƯA SỞ HỮU'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Pity Status Bar + Pull Buttons */}
               <div className="mt-5 pt-4 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1 text-xs">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-2.5 py-1 rounded-lg bg-white/10 font-bold text-amber-200">
-                      Pity 5★: {gachaState.charPity5 || 0} / {GENSHIN_GACHA_RATES.hardPity5}
+                      5★: {gachaState.charPity5 || 0} / {KNIGHT_GACHA_RATES.hardPity5}
                     </span>
                     <span className="px-2.5 py-1 rounded-lg bg-white/10 font-bold text-fuchsia-200">
-                      Pity 4★: {gachaState.charPity4 || 0} / {GENSHIN_GACHA_RATES.hardPity4}
+                      4★: {gachaState.charPity4 || 0} / {KNIGHT_GACHA_RATES.hardPity4}
                     </span>
                     <span
                       className={`px-2.5 py-1 rounded-lg font-black ${
@@ -786,13 +770,11 @@ export default function KnightGachaModal({
                           : 'bg-amber-500/25 text-amber-200 border border-amber-400/40'
                       }`}
                     >
-                      {gachaState.charGuaranteed5
-                        ? '🔥 ĐANG CÓ BẢO HIỂM 100% TRÚNG UP!'
-                        : '⚖️ Chế độ 50/50 Genshin'}
+                      {gachaState.charGuaranteed5 ? 'Bảo hiểm 100% UP' : 'Tỉ lệ 50/50'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    Tỉ lệ Genshin: 5★ <b>0.6%</b> (Soft Pity từ 74) • 4★ <b>5.1%</b> (Nhân vật 4★ &amp; Vũ khí 4★) • 3★ <b>94.3%</b> (Vũ khí 3★)
+                    5★: 0.6% • 4★: 5.1% • 3★: 94.3% • Trùng nhân vật hoàn 200.000 Vàng
                   </p>
                 </div>
 
@@ -807,7 +789,7 @@ export default function KnightGachaModal({
                         : 'bg-slate-800/80 text-slate-400 border-slate-700'
                     }`}
                   >
-                    <div>Cầu Nguyện x1</div>
+                    <div>Quay x1</div>
                     <div className="text-[11px] font-extrabold text-amber-700 dark:text-amber-600">
                       {getCostLabel(1)}
                     </div>
@@ -823,7 +805,7 @@ export default function KnightGachaModal({
                         : 'bg-slate-800/80 text-slate-400 border-slate-700'
                     }`}
                   >
-                    <div>Cầu Nguyện x10 (Chắc chắn ≥ 4★)</div>
+                    <div>Quay x10 (Chắc chắn ≥ 4★)</div>
                     <div className="text-[11px] font-extrabold text-slate-900">
                       {getCostLabel(10)}
                     </div>
@@ -834,32 +816,23 @@ export default function KnightGachaModal({
           </div>
         )}
 
-        {/* =========================================================
-            TAB 2: STANDARD BANNER (WITH WHIFF / TỈ LỆ TẠCH GACHA)
-        ========================================================= */}
+        {/* TAB 2: STANDARD BANNER */}
         {activeTab === 'standard' && (
           <div className="space-y-4">
             <div className="relative rounded-3xl overflow-hidden border-2 border-cyan-400/60 bg-gradient-to-br from-[#0c1938] via-[#1e1b4b] to-[#090d16] text-white p-5 sm:p-7 shadow-2xl">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
                 <div className="md:col-span-7 space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/20 border border-cyan-300/60 text-cyan-200 text-xs font-black">
-                    <span>🌌 DU HÀNH THẾ GIAN — VÒNG QUAY THƯỜNG TRỰC</span>
-                  </div>
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/20 border border-cyan-300/60 text-cyan-200 text-xs font-black">
+                    BANNER THƯỜNG
+                  </span>
 
                   <h3 className="text-2xl sm:text-3xl font-black text-cyan-200 leading-tight">
-                    Banner Thường: Kho Báu Nhân Vật &amp; Vũ Khí
+                    Vòng Quay Thường (Nhân Vật &amp; Vũ Khí)
                   </h3>
 
-                  <div className="p-3.5 rounded-2xl bg-rose-500/20 border border-rose-400/50 text-xs text-rose-100 space-y-1">
-                    <p className="font-black text-rose-200">
-                      ⚠️ CƠ CHẾ TẠCH GACHA TRÊN BANNER THƯỜNG:
-                    </p>
-                    <p className="leading-relaxed">
-                      • <b>Không có bảo hiểm UP 50/50</b> cho nhân vật giới hạn.<br />
-                      • Khi rơi vào bậc 3★ (94.3% cơ bản), có <b>45% tỉ lệ Tạch Gacha</b> rơi vào <i>Bụi Tinh Trần Vụn</i> (chỉ nhận bù 250 🪙 Vàng thay vì Vũ Khí/Nhân Vật).<br />
-                      • Đổi lại vẫn giữ mốc bảo hiểm <b>10 lượt chắc chắn ≥ 4★</b> và <b>90 lượt chắc chắn nổ Vàng 5★</b>!
-                    </p>
-                  </div>
+                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                    Không có bảo hiểm UP 50/50 và có tỉ lệ tạch Gacha ở bậc 3★ (hoàn 250 Vàng). Vẫn đảm bảo 10 lượt ≥ 4★ và 90 lượt nổ 5★.
+                  </p>
 
                   <div className="flex flex-wrap gap-2">
                     {KNIGHT_CHARACTER_SKINS.filter(s => s.obtainMethod === 'gacha' && s.starRarity === 5).map(h => (
@@ -874,7 +847,6 @@ export default function KnightGachaModal({
                   </div>
                 </div>
 
-                {/* Standard Showcase Collage */}
                 <div className="md:col-span-5 grid grid-cols-2 gap-2.5">
                   {KNIGHT_GACHA_WEAPONS.slice(0, 4).map(wp => (
                     <div
@@ -890,18 +862,16 @@ export default function KnightGachaModal({
               </div>
 
               <div className="mt-5 pt-4 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1 text-xs">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-2.5 py-1 rounded-lg bg-white/10 font-bold text-amber-200">
-                      Pity 5★ Thường: {gachaState.stdPity5 || 0} / {GENSHIN_GACHA_RATES.hardPity5}
-                    </span>
-                    <span className="px-2.5 py-1 rounded-lg bg-white/10 font-bold text-fuchsia-200">
-                      Pity 4★ Thường: {gachaState.stdPity4 || 0} / {GENSHIN_GACHA_RATES.hardPity4}
-                    </span>
-                    <span className="px-2.5 py-1 rounded-lg bg-rose-500/25 border border-rose-400/40 font-black text-rose-200">
-                      💨 Có tỉ lệ Tạch Gacha (45% ở bậc 3★)
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  <span className="px-2.5 py-1 rounded-lg bg-white/10 font-bold text-amber-200">
+                    5★: {gachaState.stdPity5 || 0} / {KNIGHT_GACHA_RATES.hardPity5}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white/10 font-bold text-fuchsia-200">
+                    4★: {gachaState.stdPity4 || 0} / {KNIGHT_GACHA_RATES.hardPity4}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-rose-500/25 border border-rose-400/40 font-black text-rose-200">
+                    Có tỉ lệ tạch Gacha
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -938,20 +908,17 @@ export default function KnightGachaModal({
           </div>
         )}
 
-        {/* =========================================================
-            TAB 3: HEROES & 4★/3★ WEAPONS INVENTORY (NO DIRECT HERO BUYING!)
-        ========================================================= */}
+        {/* TAB 3: INVENTORY (NO C1-C6, NO DIRECT BUY) */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
-            {/* Section A: 10 Heroes */}
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-black text-[#0F172B] dark:text-white flex items-center gap-2">
                   <Crown className="w-4 h-4 text-amber-500" />
-                  <span>Bộ Sưu Tập 10 Nhân Vật Hiệp Sĩ ({unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
+                  <span>Nhân Vật ({unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
                 </h3>
-                <span className="text-xs font-bold text-rose-600 dark:text-rose-300">
-                  🔒 Nhân vật chỉ mở khóa qua Cầu Nguyện Gacha (không mua trực tiếp bằng Vàng)
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Mở khóa qua Gacha • Trùng nhân vật hoàn 200.000 Vàng
                 </span>
               </div>
 
@@ -959,7 +926,6 @@ export default function KnightGachaModal({
                 {KNIGHT_CHARACTER_SKINS.map(skin => {
                   const unlocked = unlockedSkins.includes(skin.id);
                   const equipped = rpgProfile.equippedSkin === skin.id;
-                  const cons = heroConstellations[skin.id] || 0;
                   return (
                     <div
                       key={skin.id}
@@ -1004,11 +970,6 @@ export default function KnightGachaModal({
                             <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-[10px] font-bold">
                               {skin.genderBadge}
                             </span>
-                            {unlocked && cons > 0 && (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-700 dark:text-amber-300 text-[10px] font-black">
-                                Tinh Hồn C{cons}
-                              </span>
-                            )}
                           </div>
                           <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
                             🗡️ {skin.weaponName}
@@ -1029,7 +990,7 @@ export default function KnightGachaModal({
                               : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0F172B] dark:text-white'
                           }`}
                         >
-                          {equipped ? '✓ Đang Xuất Trận' : 'Trang Bị Nhân Vật Này'}
+                          {equipped ? '✓ Đang Trang Bị' : 'Trang Bị'}
                         </button>
                       ) : (
                         <button
@@ -1037,12 +998,12 @@ export default function KnightGachaModal({
                           data-testid={`locked-gacha-hero-btn-${skin.id}`}
                           onClick={() => {
                             setActiveTab('character_event');
-                            showToast?.('Nhân vật hiện chỉ có thể nhận qua Cầu Nguyện Gacha!', 'info');
+                            showToast?.('Nhân vật mở khóa qua vòng quay Gacha!', 'info');
                           }}
                           className="w-full py-2 rounded-xl text-xs font-black bg-slate-200/80 hover:bg-amber-100 dark:bg-slate-800/90 dark:hover:bg-slate-800 text-slate-700 dark:text-amber-300 border border-dashed border-amber-400/50 inline-flex items-center justify-center gap-1.5 transition"
                         >
                           <Lock className="w-3.5 h-3.5" />
-                          <span>Chưa sở hữu • Sang Cầu Nguyện Gacha</span>
+                          <span>Chưa sở hữu • Quay Gacha</span>
                         </button>
                       )}
                     </div>
@@ -1051,12 +1012,11 @@ export default function KnightGachaModal({
               </div>
             </div>
 
-            {/* Section B: 4★ & 3★ Weapons */}
             <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-black text-[#0F172B] dark:text-white flex items-center gap-2">
                   <Shield className="w-4 h-4 text-fuchsia-500" />
-                  <span>Kho Vũ Khí Gacha 4★ &amp; 3★ ({unlockedWeapons.length}/{KNIGHT_GACHA_WEAPONS.length})</span>
+                  <span>Vũ Khí 4★ &amp; 3★ ({unlockedWeapons.length}/{KNIGHT_GACHA_WEAPONS.length})</span>
                 </h3>
                 {rpgProfile.equippedWeapon && (
                   <button
@@ -1064,7 +1024,7 @@ export default function KnightGachaModal({
                     onClick={() => onEquipWeapon?.(null)}
                     className="text-xs font-bold text-slate-600 dark:text-slate-400 underline"
                   >
-                    Gỡ vũ khí phụ đang cầm
+                    Gỡ vũ khí
                   </button>
                 )}
               </div>
@@ -1073,7 +1033,6 @@ export default function KnightGachaModal({
                 {KNIGHT_GACHA_WEAPONS.map(wp => {
                   const owned = unlockedWeapons.includes(wp.id);
                   const isEquipped = rpgProfile.equippedWeapon === wp.id;
-                  const refine = weaponRefinements[wp.id] || 1;
                   return (
                     <div
                       key={wp.id}
@@ -1093,22 +1052,15 @@ export default function KnightGachaModal({
                           className={`w-14 h-14 rounded-xl object-contain shrink-0 ${owned ? '' : 'grayscale opacity-60'}`}
                         />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                                wp.starRarity === 4
-                                  ? 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300'
-                                  : 'bg-sky-500/20 text-sky-700 dark:text-sky-300'
-                              }`}
-                            >
-                              {renderStars(wp.starRarity)}
-                            </span>
-                            {owned && (
-                              <span className="text-[10px] font-black text-amber-600 dark:text-amber-300">
-                                R{refine}
-                              </span>
-                            )}
-                          </div>
+                          <span
+                            className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                              wp.starRarity === 4
+                                ? 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300'
+                                : 'bg-sky-500/20 text-sky-700 dark:text-sky-300'
+                            }`}
+                          >
+                            {renderStars(wp.starRarity)}
+                          </span>
                           <p className="text-xs font-black text-[#0F172B] dark:text-white truncate mt-0.5">
                             {wp.name}
                           </p>
@@ -1128,11 +1080,11 @@ export default function KnightGachaModal({
                               : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-white'
                           }`}
                         >
-                          {isEquipped ? '✓ Đang Trang Bị' : 'Trang Bị Vũ Khí'}
+                          {isEquipped ? '✓ Đang Trang Bị' : 'Trang Bị'}
                         </button>
                       ) : (
                         <span className="text-[11px] text-center py-1 rounded-lg bg-slate-200/60 dark:bg-slate-800/60 text-slate-500 font-bold">
-                          Quay Gacha để mở
+                          Chưa mở
                         </span>
                       )}
                     </div>
@@ -1143,23 +1095,20 @@ export default function KnightGachaModal({
           </div>
         )}
 
-        {/* =========================================================
-            TAB 4: BUY WISH PACKS (5K = 1 WISH, 50K = 10 WISHES + 10K GOLD EXCHANGE + RATES/HISTORY)
-        ========================================================= */}
+        {/* TAB 4: BUY WISH PACKS & HISTORY */}
         {activeTab === 'shop' && (
           <div className="space-y-5">
-            {/* Real VND Wish Purchase Cards (5k = 1 lượt, 50k = 10 lượt) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl border-2 border-cyan-400/60 bg-gradient-to-br from-cyan-50 to-white dark:from-slate-900 dark:to-cyan-950/30 p-4 flex flex-col justify-between gap-3 shadow-md">
                 <div className="space-y-1">
                   <span className="inline-block px-2.5 py-0.5 rounded-full bg-cyan-500 text-slate-950 text-[11px] font-black">
-                    GÓI LẺ CẦU NGUYỆN
+                    GÓI 1 LƯỢT
                   </span>
                   <h4 className="text-base sm:text-lg font-black text-[#0F172B] dark:text-white">
-                    🌠 Gói 1 Lượt Quay Gacha Hiệp Sĩ
+                    1 Lượt Quay Gacha
                   </h4>
                   <p className="text-xs text-[#475569] dark:text-slate-300">
-                    Quét mã VietQR tự động cộng ngay <b>+1 Lượt Quay Cầu Nguyện</b> dùng cho cả Banner Nhân Vật UP &amp; Banner Thường.
+                    Quét VietQR tự động cộng +1 lượt quay.
                   </p>
                 </div>
                 <button
@@ -1169,20 +1118,20 @@ export default function KnightGachaModal({
                   className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-black shadow transition flex items-center justify-center gap-2"
                 >
                   <QrCode className="w-4 h-4" />
-                  <span>Mua Ngay 1 Lượt Quay — {formatVndCurrency(wish1VndPrice)}</span>
+                  <span>Mua 1 Lượt — {formatVndCurrency(wish1VndPrice)}</span>
                 </button>
               </div>
 
               <div className="rounded-2xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 via-yellow-50/60 to-white dark:from-amber-950/35 dark:via-slate-900 dark:to-rose-950/30 p-4 flex flex-col justify-between gap-3 shadow-lg">
                 <div className="space-y-1">
                   <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black">
-                    🔥 GÓI ĐẠI CẦU NGUYỆN X10 (CHẮC CHẮN ≥ 4★)
+                    GÓI 10 LƯỢT (CHẮC CHẮN ≥ 4★)
                   </span>
                   <h4 className="text-base sm:text-lg font-black text-[#0F172B] dark:text-white">
-                    🌠 Gói 10 Lượt Quay Gacha Hiệp Sĩ
+                    10 Lượt Quay Gacha
                   </h4>
                   <p className="text-xs text-[#475569] dark:text-slate-300">
-                    Cộng ngay <b>+10 Lượt Quay Cầu Nguyện</b> — đủ thực hiện 1 lần <b>Quay x10</b> bảo hiểm chắc chắn nổ ít nhất 1 Nhân Vật hoặc Vũ Khí ≥ 4★!
+                    Quét VietQR tự động cộng +10 lượt quay.
                   </p>
                 </div>
                 <button
@@ -1192,19 +1141,18 @@ export default function KnightGachaModal({
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:opacity-95 text-slate-950 text-xs sm:text-sm font-black shadow-md transition flex items-center justify-center gap-2"
                 >
                   <QrCode className="w-4 h-4" />
-                  <span>Mua Gói 10 Lượt Quay — {formatVndCurrency(wish10VndPrice)}</span>
+                  <span>Mua 10 Lượt — {formatVndCurrency(wish10VndPrice)}</span>
                 </button>
               </div>
             </div>
 
-            {/* In-game Gold Exchange (10k Gold = 1 Wish, 100k Gold = 10 Wishes) */}
             <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h4 className="text-sm font-black text-[#0F172B] dark:text-white">
-                  🪙 Đổi Tiền Vàng Cày Trong Game Lấy Lượt Quay (10.000 🪙 Vàng = 1 Lượt)
+                  Đổi Vàng Lấy Lượt Quay (10.000 Vàng = 1 Lượt)
                 </h4>
                 <p className="text-xs text-[#475569] dark:text-slate-400">
-                  Đánh quái &amp; hạ Boss Rồng / Ma Vương tích Vàng để đổi vé cầu nguyện miễn phí!
+                  Dùng Vàng tích lũy từ đánh quái và Boss để đổi lượt quay.
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1214,7 +1162,7 @@ export default function KnightGachaModal({
                   onClick={() => onExchangeGoldForWishes?.(1)}
                   className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition"
                 >
-                  Đổi +1 🌠 ({KNIGHT_GACHA_GOLD_SINGLE.toLocaleString('vi-VN')} 🪙)
+                  Đổi +1 Lượt ({KNIGHT_GACHA_GOLD_SINGLE.toLocaleString('vi-VN')} Vàng)
                 </button>
                 <button
                   type="button"
@@ -1222,32 +1170,31 @@ export default function KnightGachaModal({
                   onClick={() => onExchangeGoldForWishes?.(10)}
                   className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition"
                 >
-                  Đổi +10 🌠 ({KNIGHT_GACHA_GOLD_TEN.toLocaleString('vi-VN')} 🪙)
+                  Đổi +10 Lượt ({KNIGHT_GACHA_GOLD_TEN.toLocaleString('vi-VN')} Vàng)
                 </button>
               </div>
             </div>
 
-            {/* Genshin Drop Rate Specification & History */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 text-xs">
-                <h4 className="font-black text-sm text-[#0F172B] dark:text-white flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Bảng Tỉ Lệ Rơi Vật Phẩm (Chuẩn Genshin Impact)</span>
+                <h4 className="font-black text-sm text-[#0F172B] dark:text-white">
+                  Tỉ Lệ Vòng Quay
                 </h4>
                 <ul className="space-y-1.5 text-[#334155] dark:text-slate-300 leading-relaxed">
-                  <li>• <b>5★ Nhân Vật Huyền Thoại (Ra Vàng):</b> Tỉ lệ cơ bản <b>0.600%</b> (Tổng hợp tính bảo hiểm: <b>1.600%</b>). Soft Pity tăng mạnh từ lượt <b>74</b>, Hard Pity 100% ở lượt <b>90</b>.</li>
-                  <li>• <b>4★ Nhân Vật &amp; Vũ Khí Sử Thi (Ra Tím):</b> Tỉ lệ cơ bản <b>5.100%</b> (2.550% Nhân Vật 4★ + 2.550% Vũ Khí 4★, tổng hợp <b>13.000%</b>). Chắc chắn 100% nổ ≥ 4★ mỗi <b>10 lượt</b>.</li>
-                  <li>• <b>3★ Vũ Khí / Tạch Gacha (Ra Xanh):</b> Tỉ lệ cơ bản <b>94.300%</b>. Riêng ở <b>Banner Thường</b> có <b>45% tỉ lệ Tạch Gacha</b> rơi vào Bụi Tinh Trần (+250 Vàng) và không có bảo hiểm 50/50 UP.</li>
+                  <li>• <b>5★ Nhân vật:</b> 0.6% cơ bản (tăng từ lượt 74, chắc chắn nổ ở lượt 90).</li>
+                  <li>• <b>4★ Nhân vật &amp; Vũ khí:</b> 5.1% cơ bản (mỗi 10 lượt chắc chắn có ≥ 4★).</li>
+                  <li>• <b>3★ Vũ khí / Tạch:</b> 94.3% cơ bản (Banner Thường có tỉ lệ tạch hoàn 250 Vàng).</li>
+                  <li>• <b>Hoàn Vàng:</b> Quay trúng nhân vật cũ hoặc ra trên 1 nhân vật trong 10 lượt hoàn ngay <b>200.000 Vàng</b>.</li>
                 </ul>
               </div>
 
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 text-xs max-h-56 overflow-y-auto">
                 <h4 className="font-black text-sm text-[#0F172B] dark:text-white flex items-center gap-1.5">
                   <History className="w-4 h-4 text-indigo-500" />
-                  <span>Lịch Sử Cầu Nguyện Gần Đây ({wishHistory.length} lượt lưu)</span>
+                  <span>Lịch Sử Quay ({wishHistory.length})</span>
                 </h4>
                 {wishHistory.length === 0 ? (
-                  <p className="text-slate-400 italic">Chưa có lượt cầu nguyện nào.</p>
+                  <p className="text-slate-400 italic">Chưa có lịch sử quay.</p>
                 ) : (
                   <div className="space-y-1">
                     {wishHistory.slice(0, 15).map((h, i) => (
@@ -1266,10 +1213,10 @@ export default function KnightGachaModal({
                               : 'text-slate-600 dark:text-slate-300'
                           }`}
                         >
-                          [{h.starRarity}★] {h.name}
+                          [{h.starRarity}★] {h.name}{h.isRefundedHero ? ' (+200k Vàng)' : ''}
                         </span>
                         <span className="text-[10px] text-slate-400 shrink-0">
-                          {h.bannerType === 'standard' ? 'Thường' : 'Sự Kiện UP'}
+                          {h.bannerType === 'standard' ? 'Thường' : 'Nhân vật'}
                         </span>
                       </div>
                     ))}

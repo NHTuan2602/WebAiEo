@@ -186,13 +186,13 @@ export default function StudentHome({
               </h1>
 
               <p className="text-sm sm:text-base text-[#334155] dark:text-[#D4D4D8] leading-relaxed max-w-2xl">
-                Làm bài thi thực chiến 4 kỹ năng liên hoàn (Listening, Reading, Writing &amp; Speaking), tự động lưu bài làm ngay khi tải lại trang và nhận nhận xét duyệt điểm trực tiếp từ <strong>{BRAND_INFO.teacherName}</strong>.
+                Làm bài thi thực chiến 4 kỹ năng (Listening, Reading, Writing &amp; Speaking), tự động lưu bài làm và nhận chấm chữa trực tiếp từ <strong>{BRAND_INFO.teacherName}</strong>.
               </p>
 
               {/* Inline Feature Checks */}
               <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm font-semibold">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
-                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Full 4 kỹ năng L·R·W·S liên hoàn
+                  <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Đủ 4 kỹ năng L·R·W·S
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] dark:bg-[#27272A] text-[#1E293B] dark:text-[#E4E4E7]">
                   <CheckCircle2 className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Lưu tiến trình tự động (F5 an toàn)
@@ -419,7 +419,7 @@ export default function StudentHome({
                   ? 'Kỳ thi đánh giá tổng lực định kỳ 3 tháng 1 lần do Ms. Như trực tiếp duyệt chấm đủ 4 kỹ năng (1 lượt thi thật)'
                   : storefrontTab === 'daily_zone'
                   ? 'Kho bài tập luyện hàng ngày chia theo Team với mật khẩu riêng, cho phép làm lại nhiều lần và thống kê số câu đúng tức thì'
-                  : 'Thi liên hoàn đủ 4 kỹ năng Listening, Reading, Writing & Speaking (1 lượt thi thật mỗi đề, chờ Ms. Như duyệt điểm)'}
+                  : 'Đề thi đủ 4 kỹ năng Listening, Reading, Writing & Speaking (1 lượt thi thật mỗi đề, Ms. Như duyệt điểm)'}
               </p>
             </div>
 

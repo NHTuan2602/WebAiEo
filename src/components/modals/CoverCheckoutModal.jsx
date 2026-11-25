@@ -252,7 +252,7 @@ export default function CoverCheckoutModal({
                   : isRoomTicketOrder
                   ? 'Quét mã VietQR để cộng ngay +1 lượt tạo Phòng Đấu Trường Bạn Bè!'
                   : isGachaWishOrder
-                  ? `Quét mã VietQR để cộng ngay +${gachaWishPackCount} 🌠 Lượt Quay Cầu Nguyện Gacha Nhân Vật & Vũ Khí!`
+                  ? `Quét mã VietQR để cộng ngay +${gachaWishPackCount} lượt quay Gacha!`
                   : 'Quét mã VietQR để mở khóa tự động trên hệ thống (Thời hạn 30 ngày)'}
               </p>
             </div>
@@ -298,7 +298,7 @@ export default function CoverCheckoutModal({
                   : isRoomTicketOrder
                   ? `Tài khoản @${currentUser?.username} đã nhận +1 lượt tạo Phòng Đấu Trường Bạn Bè (hiện có ${Math.max(1, Number(currentUser?.roomCreateCredits) || 1)} lượt).`
                   : isGachaWishOrder
-                  ? `Tài khoản @${currentUser?.username} đã được cộng +${gachaWishPackCount} 🌠 Lượt Quay Cầu Nguyện Gacha! Bạn có thể đóng bảng này để quay Banner Nhân Vật UP hoặc Banner Thường ngay lập tức!`
+                  ? `Tài khoản @${currentUser?.username} đã được cộng +${gachaWishPackCount} lượt quay Gacha!`
                   : isAieoVipOrder
                   ? `Tài khoản @${currentUser?.username} đã sở hữu Gói IELTS VIP 1 tháng: Ảnh Avatar Động (.GIF/.WebP), Đổi Màu Chữ Tên + Nhãn IELTS VIP, Viền Bìa & Thẻ LED Neon, Ảnh Bìa Cá Nhân miễn phí, 3 Khung Avatar Neon, Danh hiệu 👑 IELTS VIP & Tạo phòng Game Team!`
                   : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`}

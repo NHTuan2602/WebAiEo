@@ -261,12 +261,12 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     });
     await page.getByTestId('gacha-pull-1-btn').click();
     await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', '5');
-    await expect(page.getByTestId('knight-gacha-cutscene')).toContainText(/KIM QUANG 5 SAO/i);
+    await expect(page.getByTestId('knight-gacha-cutscene')).toContainText(/RA VÀNG 5 SAO/i);
     await page.getByTestId('gacha-skip-cutscene-btn').click();
     await expect(page.getByTestId('knight-gacha-results-view')).toBeVisible();
     await page.getByTestId('gacha-close-results-btn').click();
 
-    // 2) Pull 1x on Standard Banner forced Whiff -> verify Tạch Gacha outcome + Pull 10x Standard Banner -> verify ≥ 4★ Genshin Pity!
+    // 2) Pull 1x on Standard Banner forced Whiff -> verify Tạch Gacha outcome + Pull 10x Standard Banner -> verify ≥ 4★ Pity!
     await page.getByTestId('gacha-tab-standard').click();
     await page.evaluate(() => {
       window.__FORCE_GACHA_RARITY__ = 'whiff';
@@ -293,14 +293,13 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('gacha-close-results-btn').click();
     await page.getByTestId('close-knight-gacha-modal-btn').click();
 
-    // Launch Stage 3 (Golem & Dark Mage) briefly to confirm zero NaN/undefined and monster-kill key drop percentage
+    // Launch Stage 3 (Golem & Dark Mage) briefly to confirm zero NaN/undefined and NO key-drop percentage spoiler
     await page.getByTestId('start-knight-stage-3').click();
     const lootPillS3 = page.getByTestId('knight-loot-info-pill');
     await expect(lootPillS3).toBeVisible({ timeout: 8_000 });
     const lootTextS3 = await lootPillS3.textContent();
-    expect(lootTextS3).not.toMatch(/NaN|undefined|trên đường/i);
+    expect(lootTextS3).not.toMatch(/NaN|undefined|trên đường|Tỉ lệ rớt Chìa Khóa/i);
     expect(lootTextS3).toMatch(/Rớt \+\d+ Vàng/i);
-    expect(lootTextS3).toMatch(/Tỉ lệ rớt Chìa Khóa: \d+%/i);
 
     // Return to Knight Hub and launch Stage 4 Final Dragon Boss (disable random 5% for deterministic normal Dragon check)
     await page.getByTestId('knight-back-to-hub-btn').click();
@@ -402,9 +401,27 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('switch-to-knight-game-btn').click();
     await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
 
-    // Admin sees Admin-only secret test button & per-stage buttons
+    // Admin sees Admin-only secret test button, per-stage buttons & unlimited free Gacha test pulls + 200k duplicate refund!
     await expect(page.getByTestId('admin-test-demon-king-btn')).toBeVisible();
     await expect(page.getByTestId('start-knight-stage-4')).toBeVisible();
+
+    await page.getByTestId('open-knight-shop-btn').click();
+    await expect(page.getByTestId('admin-gacha-free-badge')).toBeVisible();
+    await expect(page.getByTestId('gacha-pull-10-btn')).toContainText(/Miễn phí/i);
+    await page.evaluate(() => {
+      window.__FORCE_GACHA_RARITY__ = 5;
+    });
+    // Pull multiple times as Admin with 0 wish/gold cost until duplicate 5★ refunds +200.000 Vàng
+    for (let p = 0; p < 3; p += 1) {
+      await page.getByTestId('gacha-pull-10-btn').click();
+      await page.getByTestId('gacha-skip-cutscene-btn').click();
+      await page.getByTestId('gacha-close-results-btn').click();
+    }
+    await expect(page.getByTestId('knight-skin-shop-modal')).toContainText(/\d{3}\.\d{3} Vàng/);
+    await page.evaluate(() => {
+      delete window.__FORCE_GACHA_RARITY__;
+    });
+    await page.getByTestId('close-knight-gacha-modal-btn').click();
 
     // Force wheel to Round 1 (4-choice meaning shields) and verify Pac-Man Warning -> 5 Hearts -> Wheel -> Stage 5 BGM & Curse Timer
     await page.evaluate(() => {

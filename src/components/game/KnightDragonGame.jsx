@@ -307,7 +307,6 @@ export default function KnightDragonGame({
     KNIGHT_CHARACTER_SKINS.find(s => s.id === rpgProfile.equippedSkin) ||
     KNIGHT_CHARACTER_SKINS[0];
   const activeWeapon = getEquippedWeaponMeta(rpgProfile);
-  const activeHeroConstellation = Number(rpgProfile.heroConstellations?.[activeSkin.id]) || 0;
   const stageMeta = isDemonKingBattle
     ? DEMON_STAGE_META
     : KNIGHT_MONSTER_STAGES.find(s => s.round === round) || KNIGHT_MONSTER_STAGES[0];
@@ -319,11 +318,7 @@ export default function KnightDragonGame({
     currentMonster,
     activeSkin,
     combo,
-    activeWeapon,
-    activeHeroConstellation
-  );
-  const expectedKeyDropPct = Math.round(
-    computeMonsterKeyDropChance(currentMonster, activeSkin, activeWeapon) * 100
+    activeWeapon
   );
 
   // Sync newly purchased VietQR Gacha Wishes from server into local/server RPG profile automatically
@@ -865,8 +860,7 @@ export default function KnightDragonGame({
       currentMonster,
       activeSkin,
       combo,
-      activeWeapon,
-      activeHeroConstellation
+      activeWeapon
     );
     const keyChance = computeMonsterKeyDropChance(currentMonster, activeSkin, activeWeapon);
     const droppedKey = Math.random() < keyChance ? 1 : 0;
@@ -1131,9 +1125,9 @@ export default function KnightDragonGame({
         recordWordAttempt(activeQ, 2, true);
         showQuickBanner(
           round === 5
-            ? `🗡️ Liên Hoàn Kiếm chém trọng thương Ma Vương ("${activeQ.word}")! +${gain}đ`
-            : `🗡️ Phá giáp hạ gục ${currentMonster.name} ("${activeQ.word}")! +${gain}đ • +${goldGain} 🪙${
-                droppedKey ? ' • +1 🗝️ Chìa Khóa Hiếm!' : ''
+            ? `🗡️ Đòn chém trúng Ma Vương ("${activeQ.word}")! +${gain}đ`
+            : `🗡️ Hạ gục ${currentMonster.name} ("${activeQ.word}")! +${gain}đ • +${goldGain} Vàng${
+                droppedKey ? ' • +1 🗝️ Chìa Khóa!' : ''
               }`,
           'success'
         );
@@ -2510,14 +2504,15 @@ export default function KnightDragonGame({
     });
     if (updatedProfile) syncRpgProfileToServer(updatedProfile, 'knight_gacha_exchange');
     playSound('word_clear');
-    showToast?.(`🌠 Đã đổi ${costGold.toLocaleString('vi-VN')} Vàng lấy +${count} Lượt Quay Cầu Nguyện!`);
+    showToast?.(`🌠 Đã đổi ${costGold.toLocaleString('vi-VN')} Vàng lấy +${count} lượt quay Gacha!`);
   };
 
   const handleExecuteGachaPull = ({ bannerType, bannerId, count }) => {
     const rollResult = rollKnightGachaPulls(rpgProfile, {
       bannerType,
       bannerId,
-      count
+      count,
+      isAdminFreePull: isStrictAdmin
     });
     if (!rollResult.ok) {
       showToast?.(rollResult.error, 'error');
@@ -2527,6 +2522,33 @@ export default function KnightDragonGame({
     setRpgProfile(saved);
     syncRpgProfileToServer(saved, 'knight_gacha_pull');
     return { ...rollResult, nextProfile: saved };
+  };
+
+  const handleAdminResetHeroes = () => {
+    if (!isStrictAdmin) return;
+    let updatedProfile = null;
+    updateAndPersistProfile(prev => {
+      updatedProfile = {
+        ...prev,
+        unlockedSkins: ['knight_arthur'],
+        equippedSkin: 'knight_arthur',
+        unlockedWeapons: [],
+        equippedWeapon: '',
+        gachaState: {
+          charPity5: 0,
+          charPity4: 0,
+          charGuaranteed5: false,
+          charGuaranteed4: false,
+          stdPity5: 0,
+          stdPity4: 0,
+          totalPulls: 0
+        },
+        wishHistory: []
+      };
+      return updatedProfile;
+    });
+    if (updatedProfile) syncRpgProfileToServer(updatedProfile, 'knight_admin_reset');
+    showToast?.('Đã reset tủ đồ Gacha về mặc định để test!');
   };
 
   const handleOpenWishQrCheckout = (itemType) => {
@@ -2751,13 +2773,13 @@ export default function KnightDragonGame({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-300 text-xs font-black"
           >
             <Coins className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-            <span>{Number(rpgProfile.gold || 0).toLocaleString('vi-VN')} 🪙 Vàng</span>
+            <span>{Number(rpgProfile.gold || 0).toLocaleString('vi-VN')} Vàng</span>
           </div>
 
           <div
             data-testid="knight-keys-badge"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-500/15 border border-sky-300 dark:border-sky-400/40 text-sky-800 dark:text-sky-300 text-xs font-black"
-            title="Chìa Khóa Hồi Sinh (Tỉ lệ hiếm rớt khi hạ quái hoặc đổi bằng Vàng để hồi sinh khi thua)"
+            title="Chìa Khóa Hồi Sinh"
           >
             <KeyRound className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
             <span>{rpgProfile.keys || 0} 🗝️ Chìa Khóa</span>
@@ -2766,9 +2788,9 @@ export default function KnightDragonGame({
           <div
             data-testid="knight-wishes-badge"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-fuchsia-50 dark:bg-fuchsia-500/15 border border-fuchsia-300 dark:border-fuchsia-400/40 text-fuchsia-800 dark:text-fuchsia-200 text-xs font-black"
-            title="Lượt Quay Cầu Nguyện Gacha (10.000 Vàng/lượt hoặc 5k = 1 lượt • 50k = 10 lượt)"
+            title="Lượt Quay Gacha"
           >
-            <span>🌠 {rpgProfile.wishes || 0} Lượt Quay</span>
+            <span>🌠 {rpgProfile.wishes || 0} Lượt</span>
           </div>
 
           <button
@@ -2778,7 +2800,7 @@ export default function KnightDragonGame({
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-pink-600 to-violet-600 hover:opacity-95 text-white text-xs font-extrabold shadow-sm transition"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Cầu Nguyện Gacha ({rpgProfile.unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
+            <span>Gacha &amp; Tủ Đồ ({rpgProfile.unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
           </button>
         </div>
       </header>
@@ -2790,13 +2812,13 @@ export default function KnightDragonGame({
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
               <div className="space-y-1.5">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 dark:bg-rose-500/20 border border-rose-300 dark:border-rose-400/40 text-rose-800 dark:text-rose-300 text-xs font-extrabold">
-                  🐉 HÀNH TRÌNH ĐỒ LONG 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG HẮC ÁM
+                  🐉 VƯỢT 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG
                 </span>
                 <h1 className="text-2xl sm:text-3xl font-black text-[#0F172B] dark:text-white">
                   Hiệp Sĩ Diệt Rồng — Đấu Trường Từ Vựng RPG
                 </h1>
                 <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-2xl leading-relaxed">
-                  Hạ gục <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để tích <b>🪙 Tiền Vàng</b> quay <b>🌠 Cầu Nguyện Gacha Nhân Vật 5★/4★ &amp; Vũ Khí 4★/3★</b> chuẩn tỉ lệ Genshin Impact (10.000 Vàng/lượt), săn <b>🗝️ Chìa Khóa Hồi Sinh</b> và né <b>Skill Tất Sát</b> của Rồng!
+                  Đánh bại quái vật và Boss Rồng qua 4 ải để tích Vàng mở khóa nhân vật &amp; vũ khí trong Gacha.
                 </p>
               </div>
 
@@ -2961,9 +2983,6 @@ export default function KnightDragonGame({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {KNIGHT_MONSTER_STAGES.map(st => {
-                  const stageKeyMinPct = Math.round(
-                    computeMonsterKeyDropChance(st.monsters[0], activeSkin, activeWeapon) * 100
-                  );
                   const cardContent = (
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between gap-1.5">
@@ -2973,8 +2992,8 @@ export default function KnightDragonGame({
                             FINAL BOSS
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.5 rounded-md bg-sky-100 dark:bg-sky-500/15 border border-sky-300 dark:border-sky-400/30 text-sky-800 dark:text-sky-300 text-[10px] font-bold">
-                            🗝️ {stageKeyMinPct}%+
+                          <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold">
+                            Ải {st.round}
                           </span>
                         )}
                       </div>
@@ -3242,21 +3261,15 @@ export default function KnightDragonGame({
               {isDemonKingBattle ? (
                 <>
                   <span className="text-fuchsia-300">
-                    👿 Hạ Ma Vương: +1.000 🪙 Vàng &amp; +10 🗝️ Chìa Khóa
+                    👿 Hạ Ma Vương: +1.000 Vàng &amp; +10 🗝️ Chìa Khóa
                   </span>
                   <span className="text-slate-600">•</span>
                   <span className="text-rose-300">⛓️ Chết không thể hồi sinh</span>
                 </>
               ) : (
-                <>
-                  <span className="text-amber-300">
-                    🪙 Hạ {currentMonster?.name}: Rớt +{expectedMonsterGold} Vàng
-                  </span>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-sky-300">
-                    🗝️ Tỉ lệ rớt Chìa Khóa: {expectedKeyDropPct}%
-                  </span>
-                </>
+                <span className="text-amber-300">
+                  Hạ {currentMonster?.name}: Rớt +{expectedMonsterGold} Vàng
+                </span>
               )}
             </div>
 
@@ -3872,7 +3885,7 @@ export default function KnightDragonGame({
                 onClick={() => setShowShopModal(true)}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:opacity-95 text-white text-xs font-black flex items-center gap-1.5"
               >
-                <Sparkles className="w-4 h-4" /> Cầu Nguyện Gacha &amp; Tủ Đồ
+                <Sparkles className="w-4 h-4" /> Vòng Quay Gacha &amp; Tủ Đồ
               </button>
               <button
                 type="button"
@@ -3890,13 +3903,15 @@ export default function KnightDragonGame({
         </div>
       )}
 
-      {/* GENSHIN IMPACT-STYLE GACHA WISH & HERO/WEAPON INVENTORY MODAL */}
+      {/* GACHA & INVENTORY MODAL */}
       <KnightGachaModal
         isOpen={showShopModal}
+        isStrictAdmin={isStrictAdmin}
         rpgProfile={rpgProfile}
         paymentConfig={paymentConfig}
         onClose={() => setShowShopModal(false)}
         onExecutePull={handleExecuteGachaPull}
+        onAdminResetHeroes={handleAdminResetHeroes}
         onEquipSkin={handleEquipSkin}
         onEquipWeapon={handleEquipWeapon}
         onExchangeGoldForWishes={handleExchangeGoldForWishes}
