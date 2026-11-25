@@ -10,7 +10,8 @@ export const KNIGHT_HINT_SCORE_COST = 300;
 export const DEATH_REVIVE_DELAY_SEC = 5;
 export const REVIVE_KEY_GOLD_PRICE = 100;
 
-// Gacha Costs & Duplicate Refunds
+// Gacha Costs, Starter Gift & Duplicate Refunds
+export const STARTER_FIRST_GAME_FREE_WISHES = 10; // Quà Tân Thủ: Hoàn thành game đầu tiên tặng ngay +10 lượt quay miễn phí
 export const KNIGHT_GACHA_GOLD_SINGLE = 10000; // 10.000 Vàng = 1 lượt quay
 export const KNIGHT_GACHA_GOLD_TEN = 100000; // 100.000 Vàng = 10 lượt quay
 export const KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD = 200000; // Trùng nhân vật 5★ → hoàn 200.000 Vàng
@@ -364,6 +365,209 @@ export const KNIGHT_CHARACTER_SKINS = [
     bladeColor: '#34d399',
     slashColor: '#6ee7b7'
   },
+  {
+    id: 'nyan_cat_mage',
+    name: 'Mèo Cầu Vồng Nyan Cat',
+    gender: 'Meme',
+    genderBadge: '🌈 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    priceGold: null,
+    weaponName: 'Bánh Nướng Dâu Tây Cầu Vồng 8-Bit',
+    memeQuote: '“Nyan nyan nyan~ Bay vèo qua 4 ải không kịp nhìn đề!”',
+    passiveText: '+23% Vàng • +2 giây mỗi câu (Đường bay cầu vồng)',
+    spriteUrl: '/assets/knight-rpg/nyan_cat_mage.svg',
+    slashStyle: 'plasma',
+    goldBonusPct: 23,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 2,
+    armorPrimary: '#ec4899',
+    armorSecondary: '#38bdf8',
+    capeColor: '#7c3aed',
+    hairColor: '#f472b6',
+    hairStyle: 'twin_tails',
+    headgear: 'star_tiara',
+    bladeColor: '#f472b6',
+    slashColor: '#38bdf8'
+  },
+  {
+    id: 'this_is_fine_dog',
+    name: 'Chú Chó Giữa Biển Lửa',
+    gender: 'Meme',
+    genderBadge: '🔥 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    priceGold: null,
+    weaponName: 'Ly Cà Phê Bình Tâm Giữa Biển Lửa',
+    memeQuote: '“Còn 1 giây hết giờ, máu còn 1 tim: Ổn mà, mọi thứ vẫn ổn!”',
+    passiveText: '+21% Vàng • +2 giây mỗi câu (Tinh thần thép This Is Fine)',
+    spriteUrl: '/assets/knight-rpg/this_is_fine_dog.svg',
+    slashStyle: 'magma',
+    goldBonusPct: 21,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 2,
+    armorPrimary: '#ea580c',
+    armorSecondary: '#fde047',
+    capeColor: '#b91c1c',
+    hairColor: '#fbbf24',
+    hairStyle: 'short_spiky',
+    headgear: 'solar_circlet',
+    bladeColor: '#fb923c',
+    slashColor: '#fde047'
+  },
+  {
+    id: 'stonks_meme_man',
+    name: 'Chuyên Gia Đầu Tư Stonks',
+    gender: 'Meme',
+    genderBadge: '📈 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    priceGold: null,
+    weaponName: 'Mũi Tên Biểu Đồ Tăng Trưởng Dựng Đứng',
+    memeQuote: '“Đoán đại trúng từ khó — Vàng tăng STONKS dựng đứng!”',
+    passiveText: '+28% Vàng • +1 giây mỗi câu (Lãi kép diệt quái)',
+    spriteUrl: '/assets/knight-rpg/stonks_meme_man.svg',
+    slashStyle: 'plasma',
+    goldBonusPct: 28,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 1,
+    armorPrimary: '#1e293b',
+    armorSecondary: '#22c55e',
+    capeColor: '#0f172a',
+    hairColor: '#cbd5e1',
+    hairStyle: 'short_spiky',
+    headgear: 'cyber_halo',
+    bladeColor: '#22c55e',
+    slashColor: '#4ade80'
+  },
+  {
+    id: 'crying_banana_cat',
+    name: 'Mèo Chuối Mít Ướt',
+    gender: 'Meme',
+    genderBadge: '🍌 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    priceGold: null,
+    weaponName: 'Thánh Kiếm Vỏ Chuối Trơn Trượt',
+    memeQuote: '“Hu hu sao câu này dài quá vậy... nhưng em vẫn chém trúng!”',
+    passiveText: '+20% Vàng • +2 giây mỗi câu (Nước mắt cá sấu)',
+    spriteUrl: '/assets/knight-rpg/crying_banana_cat.svg',
+    slashStyle: 'solar',
+    goldBonusPct: 20,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 2,
+    armorPrimary: '#facc15',
+    armorSecondary: '#fef08a',
+    capeColor: '#ca8a04',
+    hairColor: '#fde047',
+    hairStyle: 'short_spiky',
+    headgear: 'solar_circlet',
+    bladeColor: '#fde047',
+    slashColor: '#38bdf8'
+  },
+  {
+    id: 'el_gato_boots',
+    name: 'Mèo Đi Hia Mắt Long Lanh',
+    gender: 'Meme',
+    genderBadge: '🐱 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    priceGold: null,
+    weaponName: 'Kiếm Liễu Tây Ban Nha Xin Tha Mạng',
+    memeQuote: '“Nhìn đôi mắt long lanh này đi Boss Rồng nỡ khè lửa sao?”',
+    passiveText: '+22% Vàng • +2 giây mỗi câu (Mắt ướt làm mềm lòng Boss)',
+    spriteUrl: '/assets/knight-rpg/el_gato_boots.svg',
+    slashStyle: 'holy',
+    goldBonusPct: 22,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 2,
+    armorPrimary: '#ea580c',
+    armorSecondary: '#fde68a',
+    capeColor: '#7c2d12',
+    hairColor: '#f97316',
+    hairStyle: 'short_spiky',
+    headgear: 'knight_visor',
+    bladeColor: '#e2e8f0',
+    slashColor: '#fbbf24'
+  },
+  {
+    id: 'question_mark_guy',
+    name: 'Chiến Thần Chấm Hỏi ???',
+    gender: 'Meme',
+    genderBadge: '❓ Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    priceGold: null,
+    weaponName: 'Trường Thương Ba Dấu Hỏi Chấm ???',
+    memeQuote: '“Ủa từ này học hồi nào vậy cô?? Khoanh đại trúng luôn ???”',
+    passiveText: '+23% Vàng • +2 giây mỗi câu (Hoang mang cực độ)',
+    spriteUrl: '/assets/knight-rpg/question_mark_guy.svg',
+    slashStyle: 'thunder',
+    goldBonusPct: 23,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 2,
+    armorPrimary: '#7c3aed',
+    armorSecondary: '#facc15',
+    capeColor: '#4c1d95',
+    hairColor: '#0f172a',
+    hairStyle: 'short_spiky',
+    headgear: 'thunder_band',
+    bladeColor: '#facc15',
+    slashColor: '#fde047'
+  },
+  {
+    id: 'pointing_laugh_cat',
+    name: 'Mèo Cười Chỉ Tay Quê Chữ Ê',
+    gender: 'Meme',
+    genderBadge: '🫵 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    priceGold: null,
+    weaponName: 'Bàn Tay Vàng Chỉ Điểm Quái Vật',
+    memeQuote: '“Hahaha Boss Rồng né hụt kìa quê chữ ê kéo dài!!”',
+    passiveText: '+24% Vàng • +1 giây mỗi câu (Sát thương tâm lý cực mạnh)',
+    spriteUrl: '/assets/knight-rpg/pointing_laugh_cat.svg',
+    slashStyle: 'crimson',
+    goldBonusPct: 24,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 1,
+    armorPrimary: '#f43f5e',
+    armorSecondary: '#facc15',
+    capeColor: '#be185d',
+    hairColor: '#ffffff',
+    hairStyle: 'short_spiky',
+    headgear: 'star_tiara',
+    bladeColor: '#facc15',
+    slashColor: '#fb7185'
+  },
 
   // ---- 5★ STANDARD POOL (Banner Thường & lệch 50/50 ở Banner Giới Hạn) ----
   {
@@ -515,6 +719,156 @@ export const KNIGHT_CHARACTER_SKINS = [
     headgear: 'solar_circlet',
     bladeColor: '#22c55e',
     slashColor: '#86efac'
+  },
+  {
+    id: 'buff_doge_titan',
+    name: 'Chiến Thần Shiba Cơ Bắp Swole Doge',
+    gender: 'Meme',
+    genderBadge: '💪 Meme',
+    rarity: '5★ Thường',
+    starRarity: 5,
+    pool: 'standard',
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    priceGold: null,
+    weaponName: 'Đại Kiếm Cơ Bắp Cuồn Cuộn 8 Múi',
+    memeQuote: '“Học sinh IELTS xưa gõ từ điển giấy — Giờ gõ 1 phát bay Boss!”',
+    passiveText: '+40% Vàng • +2 giây mỗi câu (Sức mạnh Shiba cổ đại)',
+    spriteUrl: '/assets/knight-rpg/buff_doge_titan.svg',
+    slashStyle: 'solar',
+    goldBonusPct: 40,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 2,
+    armorPrimary: '#d97706',
+    armorSecondary: '#fef08a',
+    capeColor: '#991b1b',
+    hairColor: '#f59e0b',
+    hairStyle: 'short_spiky',
+    headgear: 'solar_circlet',
+    bladeColor: '#fbbf24',
+    slashColor: '#fde047'
+  },
+  {
+    id: 'sigma_moai',
+    name: 'Thần Tượng Đá Moai Lạnh Lùng',
+    gender: 'Meme',
+    genderBadge: '🗿 Meme',
+    rarity: '5★ Thường',
+    starRarity: 5,
+    pool: 'standard',
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    priceGold: null,
+    weaponName: 'Cột Đá Phục Sinh Ngàn Cân 🗿',
+    memeQuote: '“🗿 Không chớp mắt, không đổi sắc mặt, âm thầm lụm Top 1”',
+    passiveText: '+38% Vàng • +3 giây mỗi câu (Tâm bất biến 🗿)',
+    spriteUrl: '/assets/knight-rpg/sigma_moai.svg',
+    slashStyle: 'plasma',
+    goldBonusPct: 38,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 3,
+    armorPrimary: '#475569',
+    armorSecondary: '#38bdf8',
+    capeColor: '#1e293b',
+    hairColor: '#64748b',
+    hairStyle: 'short_spiky',
+    headgear: 'cyber_halo',
+    bladeColor: '#94a3b8',
+    slashColor: '#38bdf8'
+  },
+  {
+    id: 'maxwell_spin_cat',
+    name: 'Mèo Đen Xoay Vòng Maxwell',
+    gender: 'Meme',
+    genderBadge: '🐈‍⬛ Meme',
+    rarity: '5★ Thường',
+    starRarity: 5,
+    pool: 'standard',
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    priceGold: null,
+    weaponName: 'Đĩa Nhạc Xoay Tròn Vô Tận',
+    memeQuote: '“Doo-doo-doo~ Xoay vòng vòng thôi miên cả đàn quái vật!”',
+    passiveText: '+37% Vàng • +3 giây mỗi câu (Nhạc xoay thôi miên)',
+    spriteUrl: '/assets/knight-rpg/maxwell_spin_cat.svg',
+    slashStyle: 'arcane',
+    goldBonusPct: 37,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 3,
+    armorPrimary: '#1e293b',
+    armorSecondary: '#e879f9',
+    capeColor: '#581c87',
+    hairColor: '#0f172a',
+    hairStyle: 'short_spiky',
+    headgear: 'star_tiara',
+    bladeColor: '#e879f9',
+    slashColor: '#f0abfc'
+  },
+  {
+    id: 'thinking_monkey_sage',
+    name: 'Đại Sư Khỉ Trầm Tư Chọn Đáp Án',
+    gender: 'Meme',
+    genderBadge: '🐒 Meme',
+    rarity: '5★ Thường',
+    starRarity: 5,
+    pool: 'standard',
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    priceGold: null,
+    weaponName: 'Bí Kíp Chống Cằm Ngẫm Nhân Sinh',
+    memeQuote: '“Chống cằm suy ngẫm 5 giây... quyết định chọn C vì C đẹp!”',
+    passiveText: '+38% Vàng • +3 giây mỗi câu (Trầm tư thấu thiên cơ)',
+    spriteUrl: '/assets/knight-rpg/thinking_monkey_sage.svg',
+    slashStyle: 'holy',
+    goldBonusPct: 38,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 3,
+    armorPrimary: '#0284c7',
+    armorSecondary: '#fde047',
+    capeColor: '#1e3a8a',
+    hairColor: '#92400e',
+    hairStyle: 'short_spiky',
+    headgear: 'solar_circlet',
+    bladeColor: '#38bdf8',
+    slashColor: '#fde047'
+  },
+  {
+    id: 'two_buttons_sweat_hero',
+    name: 'Siêu Anh Hùng Đổ Mồ Hôi Chọn Đáp Án',
+    gender: 'Meme',
+    genderBadge: '💦 Meme',
+    rarity: '5★ Thường',
+    starRarity: 5,
+    pool: 'standard',
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    priceGold: null,
+    weaponName: 'Bảng Điều Khiển 2 Nút Đỏ Định Mệnh',
+    memeQuote: '“Loại được 2 câu sai rồi, còn 2 câu giống hệt nhau lau mồ hôi hột!”',
+    passiveText: '+39% Vàng • +2 giây mỗi câu (Hồi hộp nghẹt thở)',
+    spriteUrl: '/assets/knight-rpg/two_buttons_sweat_hero.svg',
+    slashStyle: 'crimson',
+    goldBonusPct: 39,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 2,
+    armorPrimary: '#ef4444',
+    armorSecondary: '#ffffff',
+    capeColor: '#991b1b',
+    hairColor: '#9a3412',
+    hairStyle: 'short_spiky',
+    headgear: 'knight_visor',
+    bladeColor: '#ef4444',
+    slashColor: '#fca5a5'
   },
 
   // ---- 5 EXCLUSIVE LIMITED 5★ POOL (CHỈ XUẤT HIỆN Ở BANNER GIỚI HẠN 7 NGÀY/LẦN — KHÔNG RƠI Ở BANNER THƯỜNG) ----
@@ -727,6 +1081,66 @@ export const KNIGHT_CHARACTER_SKINS = [
     headgear: 'thunder_band',
     bladeColor: '#38bdf8',
     slashColor: '#bae6fd'
+  },
+  {
+    id: 'shrek_swamp_king',
+    name: 'Chúa Tể Đầm Lầy Xanh',
+    gender: 'Meme',
+    genderBadge: '🧅 Meme',
+    rarity: '5★ Giới Hạn',
+    starRarity: 5,
+    pool: 'limited',
+    isLimited5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    priceGold: null,
+    weaponName: 'Đại Chùy Hành Tây Nhiều Lớp',
+    memeQuote: '“Quái vật biến khỏi đầm lầy IELTS của ta ngay lập tức!!”',
+    passiveText: '+51% Vàng • +3 giây mỗi câu (Bá chủ Đầm Lầy)',
+    spriteUrl: '/assets/knight-rpg/shrek_swamp_king.svg',
+    slashStyle: 'dragon',
+    goldBonusPct: 51,
+    keyDropBonusPct: 6,
+    bonusTimeSec: 3,
+    armorPrimary: '#65a30d',
+    armorSecondary: '#bef264',
+    capeColor: '#78350f',
+    hairColor: '#4d7c0f',
+    hairStyle: 'short_spiky',
+    headgear: 'wolf_pelt',
+    bladeColor: '#84cc16',
+    slashColor: '#bef264'
+  },
+  {
+    id: 'ultra_instinct_hamster',
+    name: 'Chuột Hamster Bản Năng Vô Cực',
+    gender: 'Meme',
+    genderBadge: '🐹 Meme',
+    rarity: '5★ Giới Hạn',
+    starRarity: 5,
+    pool: 'limited',
+    isLimited5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    priceGold: null,
+    weaponName: 'Thần Thương Hạt Hướng Dương Ánh Bạc',
+    memeQuote: '“Nhỏ mà có võ — Bật Bản Năng Vô Cực né mọi đòn khè lửa của Boss Rồng!”',
+    passiveText: '+52% Vàng • +3 giây mỗi câu (Hào quang Vô Cực)',
+    spriteUrl: '/assets/knight-rpg/ultra_instinct_hamster.svg',
+    slashStyle: 'plasma',
+    goldBonusPct: 52,
+    keyDropBonusPct: 6,
+    bonusTimeSec: 3,
+    armorPrimary: '#e2e8f0',
+    armorSecondary: '#38bdf8',
+    capeColor: '#1d4ed8',
+    hairColor: '#f59e0b',
+    hairStyle: 'short_spiky',
+    headgear: 'cyber_halo',
+    bladeColor: '#38bdf8',
+    slashColor: '#e0f2fe'
   }
 ];
 
@@ -736,43 +1150,55 @@ export const KNIGHT_LIMITED_BANNERS = [
     id: 'limited_gigachad',
     featuredHeroId: 'gigachad_knight',
     bannerTitle: 'Banner Giới Hạn: Đại Đế Cơ Bắp GigaChad',
-    featured4StarIds: ['cheems_bonk', 'smudge_cat', 'mage_selena']
+    featured4StarIds: ['cheems_bonk', 'nyan_cat_mage', 'stonks_meme_man']
   },
   {
     id: 'limited_panda',
     featuredHeroId: 'bing_chilling_panda',
     bannerTitle: 'Banner Giới Hạn: Tông Sư Gấu Trúc Kem Ốc Quế',
-    featured4StarIds: ['smudge_cat', 'cheems_bonk', 'samurai_tomoe']
+    featured4StarIds: ['smudge_cat', 'this_is_fine_dog', 'question_mark_guy']
+  },
+  {
+    id: 'limited_shrek',
+    featuredHeroId: 'shrek_swamp_king',
+    bannerTitle: 'Banner Giới Hạn: Chúa Tể Đầm Lầy Xanh',
+    featured4StarIds: ['el_gato_boots', 'pointing_laugh_cat', 'crying_banana_cat']
+  },
+  {
+    id: 'limited_hamster',
+    featuredHeroId: 'ultra_instinct_hamster',
+    bannerTitle: 'Banner Giới Hạn: Chuột Hamster Bản Năng Vô Cực',
+    featured4StarIds: ['nyan_cat_mage', 'stonks_meme_man', 'cheems_bonk']
   },
   {
     id: 'limited_ignis',
     featuredHeroId: 'dragon_empress',
     bannerTitle: 'Banner Giới Hạn: Nữ Hoàng Long Tộc Ignis',
-    featured4StarIds: ['cheems_bonk', 'mage_selena', 'samurai_tomoe']
+    featured4StarIds: ['this_is_fine_dog', 'mage_selena', 'samurai_tomoe']
   },
   {
     id: 'limited_drake',
     featuredHeroId: 'berserker_drake',
     bannerTitle: 'Banner Giới Hạn: Chiến Thần Drake',
-    featured4StarIds: ['smudge_cat', 'valkyrie_freya', 'paladin_leon']
+    featured4StarIds: ['smudge_cat', 'question_mark_guy', 'paladin_leon']
   },
   {
     id: 'limited_zephyr',
     featuredHeroId: 'archmage_zephyr',
     bannerTitle: 'Banner Giới Hạn: Đại Pháp Sư Zephyr',
-    featured4StarIds: ['cheems_bonk', 'mage_selena', 'valkyrie_freya']
+    featured4StarIds: ['nyan_cat_mage', 'mage_selena', 'valkyrie_freya']
   },
   {
     id: 'limited_celestia',
     featuredHeroId: 'valkyrie_celestia',
     bannerTitle: 'Banner Giới Hạn: Thánh Nữ Celestia',
-    featured4StarIds: ['smudge_cat', 'samurai_tomoe', 'valkyrie_freya']
+    featured4StarIds: ['el_gato_boots', 'samurai_tomoe', 'valkyrie_freya']
   },
   {
     id: 'limited_raiden',
     featuredHeroId: 'emperor_raiden',
     bannerTitle: 'Banner Giới Hạn: Lôi Đế Raiden',
-    featured4StarIds: ['cheems_bonk', 'paladin_leon', 'samurai_tomoe']
+    featured4StarIds: ['stonks_meme_man', 'pointing_laugh_cat', 'samurai_tomoe']
   }
 ];
 
@@ -1010,6 +1436,32 @@ export const KNIGHT_GACHA_WEAPONS = [
     slashColor: '#fbcfe8',
     passiveText: 'Trang trí vũ khí (Hệ Thương & Đao)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#38bdf8', secondary: '#fbcfe8', bg: '#0c4a6e', stars: 4 })
+  },
+  {
+    id: 'wp4_stonks_spear',
+    name: 'Mũi Tên Tăng Trưởng STONKS',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    isCosmeticOnly: true,
+    bladeColor: '#22c55e',
+    slashColor: '#86efac',
+    passiveText: 'Trang trí vũ khí Meme (Hệ Thương & Đao)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#22c55e', secondary: '#fde047', bg: '#052e16', stars: 4 })
+  },
+  {
+    id: 'wp4_coffee_mug_tome',
+    name: 'Bí Kíp Ly Cà Phê Biển Lửa',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    isCosmeticOnly: true,
+    bladeColor: '#fb923c',
+    slashColor: '#fde047',
+    passiveText: 'Trang trí vũ khí Meme (Hệ Pháp Khí)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'codex', primary: '#ea580c', secondary: '#fde047', bg: '#431407', stars: 4 })
   },
 
   // ---- 3★ COSMETIC WEAPONS (10) ----
@@ -1777,12 +2229,14 @@ export function normalizeKnightRpgProfile(raw = {}, nowMs = Date.now()) {
   const isStaleScoreWeek = Boolean(rawScoreWeekKey && rawScoreWeekKey !== currentWeekKey);
   const bestScore = isStaleScoreWeek ? 0 : Math.max(0, Math.floor(Number(obj.bestScore) || 0));
   const bestScoreWeekKey = currentWeekKey;
+  const firstGameGiftClaimed = Boolean(obj.firstGameGiftClaimed);
 
   return {
     gold,
     keys,
     wishes,
     claimedServerWishCredits,
+    firstGameGiftClaimed,
     unlockedSkins,
     equippedSkin,
     unlockedWeapons,
@@ -1803,13 +2257,20 @@ export function normalizeKnightRpgProfile(raw = {}, nowMs = Date.now()) {
 export function applyServerPurchasedWishes(profileObj, userRecord = null, nowMs = Date.now()) {
   const normalized = normalizeKnightRpgProfile(profileObj || {}, nowMs);
   const serverPurchasedTotal = Math.max(0, Math.floor(Number(userRecord?.gachaWishCredits) || 0));
-  if (serverPurchasedTotal > normalized.claimedServerWishCredits) {
-    const delta = serverPurchasedTotal - normalized.claimedServerWishCredits;
+  const serverGiftClaimed = Boolean(
+    userRecord?.starterFirstGameGiftClaimed || userRecord?.knightRpgProfile?.firstGameGiftClaimed
+  );
+  if (
+    serverPurchasedTotal > normalized.claimedServerWishCredits ||
+    (serverGiftClaimed && !normalized.firstGameGiftClaimed)
+  ) {
+    const delta = Math.max(0, serverPurchasedTotal - normalized.claimedServerWishCredits);
     return normalizeKnightRpgProfile(
       {
         ...normalized,
         wishes: normalized.wishes + delta,
-        claimedServerWishCredits: serverPurchasedTotal
+        claimedServerWishCredits: Math.max(normalized.claimedServerWishCredits, serverPurchasedTotal),
+        firstGameGiftClaimed: Boolean(normalized.firstGameGiftClaimed || serverGiftClaimed)
       },
       nowMs
     );
@@ -1861,12 +2322,17 @@ export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null,
 
     const mergedBase = normalizeKnightRpgProfile(
       {
-        gold: newerByPulls.gold,
+        gold: localPulls === serverPulls ? Math.max(localProfile.gold, serverProfile.gold) : newerByPulls.gold,
         keys: Math.max(localProfile.keys, serverProfile.keys),
-        wishes: newerByPulls.wishes,
+        wishes: localPulls === serverPulls ? Math.max(localProfile.wishes, serverProfile.wishes) : newerByPulls.wishes,
         claimedServerWishCredits: Math.max(
           localProfile.claimedServerWishCredits || 0,
           serverProfile.claimedServerWishCredits || 0
+        ),
+        firstGameGiftClaimed: Boolean(
+          localProfile.firstGameGiftClaimed ||
+            serverProfile.firstGameGiftClaimed ||
+            userRecord?.starterFirstGameGiftClaimed
         ),
         unlockedSkins: mergedSkins,
         equippedSkin: localProfile.equippedSkin || serverProfile.equippedSkin,

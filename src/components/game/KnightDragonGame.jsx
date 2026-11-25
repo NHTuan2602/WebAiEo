@@ -34,6 +34,7 @@ import {
   KNIGHT_HINT_SCORE_COST,
   KNIGHT_MONSTER_STAGES,
   REVIVE_KEY_GOLD_PRICE,
+  STARTER_FIRST_GAME_FREE_WISHES,
   applyServerPurchasedWishes,
   computeMonsterGoldDrop,
   computeMonsterKeyDropChance,
@@ -121,11 +122,13 @@ export default function KnightDragonGame({
   initialRawVocab = DEFAULT_VOCAB_TEXT,
   initialTopicId = 'core',
   initialTopicLabel = 'IELTS Core Academic',
+  initialOpenShop = false,
   knightGachaConfig = null,
   onAdminGrantGachaWishes = null,
   onAdminSetGachaBannerConfig = null,
   onBackToGameHub,
   onBackToSpaceMode,
+  onConsumedInitialOpenShop = null,
   onExitArena,
   onOpenCheckoutModal = null,
   onOpenVocabManager = null,
@@ -151,9 +154,17 @@ export default function KnightDragonGame({
   const [rpgProfile, setRpgProfile] = useState(() =>
     loadLocalKnightRpgProfile(username, currentUser)
   );
-  const [showShopModal, setShowShopModal] = useState(false);
+  const [showShopModal, setShowShopModal] = useState(() => Boolean(initialOpenShop));
+  const [starterGiftJustUnlocked, setStarterGiftJustUnlocked] = useState(false);
 
-  // Sync incoming server wish grants / QR wish purchases in real time without page reload
+  useEffect(() => {
+    if (initialOpenShop) {
+      setShowShopModal(true);
+      onConsumedInitialOpenShop?.();
+    }
+  }, [initialOpenShop, onConsumedInitialOpenShop]);
+
+  // Sync incoming server wish grants / Starter Gift / QR wish purchases in real time without page reload
   const liveServerUser =
     usersDb?.[username] ||
     Object.values(usersDb || {}).find(
@@ -164,15 +175,36 @@ export default function KnightDragonGame({
     Math.floor(Number(currentUser?.gachaWishCredits) || 0),
     Math.floor(Number(liveServerUser?.gachaWishCredits) || 0)
   );
+  const liveStarterGiftClaimed = Boolean(
+    currentUser?.starterFirstGameGiftClaimed ||
+      liveServerUser?.starterFirstGameGiftClaimed ||
+      currentUser?.knightRpgProfile?.firstGameGiftClaimed ||
+      liveServerUser?.knightRpgProfile?.firstGameGiftClaimed
+  );
+  const isStarterGiftUnclaimed = Boolean(
+    !rpgProfile?.firstGameGiftClaimed && !liveStarterGiftClaimed
+  );
   useEffect(() => {
     if (!username || username === 'guest') return;
-    if (liveServerWishCredits > (rpgProfile.claimedServerWishCredits || 0)) {
+    if (
+      liveServerWishCredits > (rpgProfile.claimedServerWishCredits || 0) ||
+      (liveStarterGiftClaimed && !rpgProfile.firstGameGiftClaimed)
+    ) {
       setRpgProfile(prev => {
-        const credited = applyServerPurchasedWishes(prev, { gachaWishCredits: liveServerWishCredits });
+        const credited = applyServerPurchasedWishes(prev, {
+          gachaWishCredits: liveServerWishCredits,
+          starterFirstGameGiftClaimed: liveStarterGiftClaimed
+        });
         return saveLocalKnightRpgProfile(username, credited);
       });
     }
-  }, [username, liveServerWishCredits, rpgProfile.claimedServerWishCredits]);
+  }, [
+    username,
+    liveServerWishCredits,
+    liveStarterGiftClaimed,
+    rpgProfile.claimedServerWishCredits,
+    rpgProfile.firstGameGiftClaimed
+  ]);
   const [topicId, setTopicId] = useState(initialTopicId || 'core');
   const [roundSize, setRoundSize] = useState(8);
   const [speedMode, setSpeedMode] = useState('normal');
@@ -349,16 +381,6 @@ export default function KnightDragonGame({
     combo
   );
 
-  // Sync newly purchased VietQR Gacha Wishes from server into local/server RPG profile automatically
-  useEffect(() => {
-    const serverCredits = Math.max(0, Math.floor(Number(currentUser?.gachaWishCredits) || 0));
-    if (serverCredits <= 0) return;
-    setRpgProfile(prev => {
-      if (serverCredits <= (prev?.claimedServerWishCredits || 0)) return prev;
-      return saveLocalKnightRpgProfile(username, applyServerPurchasedWishes(prev, currentUser));
-    });
-  }, [currentUser, currentUser?.gachaWishCredits, username]);
-
   // Sync key numeric states to runtimeRef safely inside effect
   useEffect(() => {
     runtimeRef.current.lives = lives;
@@ -521,6 +543,27 @@ export default function KnightDragonGame({
     clearAllTimers();
     setMatchState('GAMEOVER');
     runtimeRef.current.matchState = 'GAMEOVER';
+    const alreadyClaimedGift = Boolean(
+      latestProfile?.firstGameGiftClaimed ||
+        rpgProfile?.firstGameGiftClaimed ||
+        liveStarterGiftClaimed
+    );
+    let syncedProfile = latestProfile;
+    if (!alreadyClaimedGift) {
+      setStarterGiftJustUnlocked(true);
+      if (!username || username === 'guest' || currentUser?.isGuest) {
+        syncedProfile = saveLocalKnightRpgProfile(username, {
+          ...latestProfile,
+          firstGameGiftClaimed: true,
+          wishes: (Number(latestProfile?.wishes) || 0) + STARTER_FIRST_GAME_FREE_WISHES
+        });
+        setRpgProfile(syncedProfile);
+      }
+      showToast?.(
+        `🎁 Quà Tân Thủ: Hoàn thành game đầu tiên — Tặng +${STARTER_FIRST_GAME_FREE_WISHES} Lượt Quay Gacha miễn phí!`,
+        'success'
+      );
+    }
     const passedCount = reviewLog.filter(item => item.passed).length;
     const totalCount = Math.max(1, reviewLog.length);
     onSyncKnightResult?.({
@@ -531,7 +574,8 @@ export default function KnightDragonGame({
       topicLabel: resolveSelectedTopicLabel(),
       mode: extraMode || (singleRoundOnly ? `knight_round_${round}` : 'knight_full_4'),
       gameType: 'knight_rpg',
-      knightRpgProfile: latestProfile
+      gameCompleted: true,
+      knightRpgProfile: syncedProfile
     });
   };
 
@@ -712,6 +756,7 @@ export default function KnightDragonGame({
     setSessionDragonsSlain(0);
     setDemonKingDefeated(false);
     setCannotReviveByDemon(false);
+    setStarterGiftJustUnlocked(false);
     setReviewLog([]);
     setBannerAlert(null);
     setMatchState('PLAYING');
@@ -2899,6 +2944,21 @@ export default function KnightDragonGame({
                 <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-2xl leading-relaxed">
                   Đánh bại quái vật và Boss Rồng qua 4 ải để tích Vàng mở khóa nhân vật &amp; vũ khí trong Gacha.
                 </p>
+                {isStarterGiftUnclaimed && (
+                  <div
+                    data-testid="knight-hub-starter-gift-banner"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-fuchsia-500/20 to-rose-500/20 border border-amber-400/70 text-amber-900 dark:text-amber-200 text-xs font-black shadow-xs"
+                  >
+                    <span>🎁 Quà Tân Thủ:</span>
+                    <span>
+                      Chơi xong ván game đầu tiên tặng ngay{' '}
+                      <b className="text-rose-600 dark:text-amber-300 underline">
+                        +{STARTER_FIRST_GAME_FREE_WISHES} 🌠 Lượt Quay miễn phí
+                      </b>
+                      !
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Active Hero Showcase Card */}
@@ -3873,6 +3933,24 @@ export default function KnightDragonGame({
             <h2 className="text-2xl font-black text-amber-600 dark:text-amber-300">
               TỔNG KẾT HÀNH TRÌNH HIỆP SĨ
             </h2>
+
+            {starterGiftJustUnlocked && (
+              <div
+                data-testid="starter-gift-10-wishes-banner"
+                className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-fuchsia-600/25 to-rose-500/20 dark:from-amber-950/90 dark:via-fuchsia-950/85 dark:to-rose-950/90 border-2 border-amber-400 text-left space-y-1 shadow-lg"
+              >
+                <p className="text-xs sm:text-sm font-black text-amber-700 dark:text-amber-300">
+                  🎁 QUÀ TÂN THỦ MỞ KHÓA: +{STARTER_FIRST_GAME_FREE_WISHES} 🌠 LƯỢT QUAY GACHA MIỄN PHÍ!
+                </p>
+                <p className="text-xs text-[#334155] dark:text-slate-200 font-bold">
+                  Chúc mừng hoàn thành trận đầu tiên! Đã cộng ngay{' '}
+                  <span className="text-fuchsia-700 dark:text-fuchsia-300 underline">
+                    +{STARTER_FIRST_GAME_FREE_WISHES} Lượt Quay
+                  </span>{' '}
+                  vào Vòng Quay Gacha (hiện có <b>{rpgProfile.wishes || 0} Lượt</b>)!
+                </p>
+              </div>
+            )}
 
             {demonKingDefeated && (
               <div

@@ -69,7 +69,7 @@ import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 import VerticalPodiumLeaderboard from '../components/common/VerticalPodiumLeaderboard';
 import KnightDragonGame from '../components/game/KnightDragonGame';
-import { getVietnamMondayWeekState } from '../constants/knightRpgData';
+import { STARTER_FIRST_GAME_FREE_WISHES, getVietnamMondayWeekState } from '../constants/knightRpgData';
 import {
   AIEO_VIP_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
@@ -193,12 +193,14 @@ export default function GameArena({
   setView,
   showMobileKeyboard,
   showToast,
+  spaceStarterGiftUnlocked = false,
   transitionCountdown,
   usersDb,
   wordTimerRef
 }) {
   const [inspectedLobbyUsername, setInspectedLobbyUsername] = useState(null);
   const [showPilotDrawer, setShowPilotDrawer] = useState(false);
+  const [autoOpenKnightShopOnEnter, setAutoOpenKnightShopOnEnter] = useState(false);
   const [arenaGameMode, setArenaGameMode] = useState(() =>
     arenaInitialMode || (gameSubState === 'JOIN' || gameSubState === 'LOBBY' ? 'hub' : 'space_shooter')
   ); // 'hub' | 'space_shooter' | 'knight_rpg'
@@ -262,6 +264,15 @@ export default function GameArena({
   const activeAnimalObj = ANIMAL_CHARACTERS.find(a => a.id === activeAnimalId) || ANIMAL_CHARACTERS[0];
   const activeAccessoryObj = ANIMAL_ACCESSORIES.find(a => a.id === activeAccessoryId) || ANIMAL_ACCESSORIES[0];
   const myAvatarUrl = currentUser?.avatarUrl || '';
+  const liveSelfUser = (currentUser?.username && usersDb?.[currentUser.username]) || currentUser;
+  const isStarterGiftAvailable = Boolean(
+    currentUser &&
+      !currentUser.isGuest &&
+      !currentUser.starterFirstGameGiftClaimed &&
+      !liveSelfUser?.starterFirstGameGiftClaimed &&
+      !currentUser?.knightRpgProfile?.firstGameGiftClaimed &&
+      !liveSelfUser?.knightRpgProfile?.firstGameGiftClaimed
+  );
   const timePct = Math.max(0, Math.min(100, (gameTimeLeft / Math.max(1, gameTimeLimit)) * 100));
   const isLowTime = gameTimeLeft <= 5;
   const isMidTime = gameTimeLeft <= 10 && gameTimeLeft > 5;
@@ -286,6 +297,8 @@ export default function GameArena({
         gamePracticeLeaderboard={gamePracticeLeaderboard}
         initialRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
         initialTopicId={practiceTopicId}
+        initialOpenShop={autoOpenKnightShopOnEnter}
+        onConsumedInitialOpenShop={() => setAutoOpenKnightShopOnEnter(false)}
         onBackToGameHub={() => setArenaGameMode('hub')}
         onBackToSpaceMode={() => setArenaGameMode('space_shooter')}
         onExitArena={exitGame}
@@ -760,6 +773,21 @@ export default function GameArena({
             <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-2xl mx-auto">
               Mỗi tựa game đều tích hợp 14 kho từ vựng IELTS &amp; bộ đề của Giáo viên, bảng xếp hạng đua Top 1/2/3 theo ngày (chốt 23:59 trao danh hiệu vào ngày hôm sau) và hệ thống danh hiệu độc quyền!
             </p>
+            {isStarterGiftAvailable && (
+              <div
+                data-testid="hub-starter-gift-callout"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-amber-500/20 via-fuchsia-500/20 to-rose-500/20 border-2 border-amber-400/70 text-amber-900 dark:text-amber-200 text-xs sm:text-sm font-black shadow-md"
+              >
+                <span>🎁 QUÀ TÂN THỦ:</span>
+                <span>
+                  Hoàn thành ván game đầu tiên nhận ngay{' '}
+                  <b className="text-rose-600 dark:text-amber-300 underline">
+                    +{STARTER_FIRST_GAME_FREE_WISHES} 🌠 Lượt Quay Gacha Miễn Phí
+                  </b>
+                  !
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -3551,6 +3579,33 @@ export default function GameArena({
               <p className="text-xs text-[#475569] dark:text-slate-300 mb-4">
                 Điểm số: <b className="text-amber-600 dark:text-amber-400 text-base">{gameScore} điểm</b> • Đạt: <b className="text-emerald-600 dark:text-emerald-400">{passedWordsCount}/{gameReviewLog.length} từ</b> • Đã lưu vào Bảng Xếp Hạng!
               </p>
+
+              {spaceStarterGiftUnlocked && (
+                <div
+                  data-testid="starter-gift-10-wishes-banner"
+                  className="max-w-xl w-full p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-fuchsia-600/20 to-rose-500/20 dark:from-amber-950/90 dark:via-fuchsia-950/85 dark:to-rose-950/90 border-2 border-amber-400 mb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-left shadow-lg"
+                >
+                  <div className="space-y-0.5">
+                    <p className="text-xs sm:text-sm font-black text-amber-800 dark:text-amber-300">
+                      🎁 QUÀ TÂN THỦ MỞ KHÓA: +{STARTER_FIRST_GAME_FREE_WISHES} 🌠 LƯỢT QUAY GACHA MIỄN PHÍ!
+                    </p>
+                    <p className="text-[11px] font-bold text-[#334155] dark:text-slate-200">
+                      Chúc mừng bạn hoàn thành ván game đầu tiên! Vào ngay Vòng Quay Gacha để triệu hồi dàn nhân vật Meme mới!
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="claim-starter-open-gacha-btn"
+                    onClick={() => {
+                      setAutoOpenKnightShopOnEnter(true);
+                      setArenaGameMode('knight_rpg');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:opacity-95 text-white text-xs font-black shrink-0 shadow"
+                  >
+                    🌠 Mở Quay Gacha Ngay →
+                  </button>
+                </div>
+              )}
 
               {/* Practice BXH OR Live Room Top 10 Standings */}
               {isPracticeGameSession ? (

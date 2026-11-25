@@ -311,6 +311,7 @@ export default function App() {
     return { pin: pinFromUrl.trim(), pass: '' };
   });
   const [roomJoinError, setRoomJoinError] = useState('');
+  const [spaceStarterGiftUnlocked, setSpaceStarterGiftUnlocked] = useState(false);
   const [myCrewColor, setMyCrewColor] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('ielts_game_pilot_prefs') || '{}').colorId || 'cyan';
@@ -6199,9 +6200,51 @@ export default function App() {
     }
   }, [roomsDb, view, joinedRoomPin, currentRoomPin, currentUser]);
 
+  const claimStarterGiftOptimisticallyIfEligible = (incomingRpgProfile = null) => {
+    if (!currentUser?.username || currentUser?.isGuest) return false;
+    const liveU = usersDb?.[currentUser.username] || currentUser;
+    const alreadyClaimed = Boolean(
+      currentUser?.starterFirstGameGiftClaimed ||
+        liveU?.starterFirstGameGiftClaimed ||
+        currentUser?.knightRpgProfile?.firstGameGiftClaimed ||
+        liveU?.knightRpgProfile?.firstGameGiftClaimed ||
+        incomingRpgProfile?.firstGameGiftClaimed
+    );
+    if (alreadyClaimed) return false;
+    const nextCredits =
+      Math.max(
+        Math.floor(Number(currentUser?.gachaWishCredits) || 0),
+        Math.floor(Number(liveU?.gachaWishCredits) || 0)
+      ) + 10;
+    setCurrentUser(prev =>
+      prev
+        ? {
+            ...prev,
+            starterFirstGameGiftClaimed: true,
+            gachaWishCredits: nextCredits,
+            ...(incomingRpgProfile ? { knightRpgProfile: incomingRpgProfile } : {})
+          }
+        : prev
+    );
+    setUsersDb(prev => ({
+      ...prev,
+      [currentUser.username]: {
+        ...(prev[currentUser.username] || currentUser),
+        starterFirstGameGiftClaimed: true,
+        gachaWishCredits: nextCredits,
+        ...(incomingRpgProfile ? { knightRpgProfile: incomingRpgProfile } : {})
+      }
+    }));
+    return true;
+  };
+
   const submitPracticeGameScore = (scoreVal, passedWords, totalWords) => {
     if (!currentUser?.username) return;
     const meta = gameRuntimeRef.current.practiceMeta || practiceTopicMeta || { topicId: 'core', topicLabel: 'IELTS Core Academic', mode: 'full_4' };
+    if (claimStarterGiftOptimisticallyIfEligible()) {
+      setSpaceStarterGiftUnlocked(true);
+      showToast('🎁 Quà Tân Thủ: Hoàn thành ván game đầu tiên — Tặng +10 Lượt Quay Gacha miễn phí!', 'success');
+    }
     dispatchSyncAction('SUBMIT_PRACTICE_GAME_SCORE', {
       username: currentUser.username,
       topicId: meta.topicId || 'core',
@@ -6209,7 +6252,8 @@ export default function App() {
       mode: meta.singleRoundOnly ? `round_${gameRuntimeRef.current.round}` : 'full_4',
       score: scoreVal,
       passedCount: passedWords,
-      totalCount: Math.max(1, totalWords)
+      totalCount: Math.max(1, totalWords),
+      gameCompleted: true
     });
   };
 
@@ -6296,6 +6340,7 @@ export default function App() {
     setFreezeCharges(2);
     setIsFrozenBoost(false);
     setGameOutcome(null);
+    setSpaceStarterGiftUnlocked(false);
     setIsSandboxRound(false);
     setGameReviewLog([]);
     setActiveQuestion(firstQ);
@@ -6362,6 +6407,7 @@ export default function App() {
     setFreezeCharges(2);
     setIsFrozenBoost(false);
     setGameOutcome(null);
+    setSpaceStarterGiftUnlocked(false);
     setIsSandboxRound(false);
     setGameReviewLog([]);
     setActiveQuestion(firstQ);
@@ -6573,6 +6619,10 @@ export default function App() {
         if (rt.isPractice) {
           submitPracticeGameScore(finalScore, passedTotal, attemptedTotal);
         } else {
+          if (!rt.isSandbox && claimStarterGiftOptimisticallyIfEligible()) {
+            setSpaceStarterGiftUnlocked(true);
+            showToast('🎁 Quà Tân Thủ: Hoàn thành ván game đầu tiên — Tặng +10 Lượt Quay Gacha miễn phí!', 'success');
+          }
           syncLiveMatchProgress({
             scoreVal: finalScore,
             streakVal: finalCombo,
@@ -6630,6 +6680,10 @@ export default function App() {
         const attemptedTotal = Math.max(1, gameReviewLog.length + 1);
         submitPracticeGameScore(rt.score, passedTotal, attemptedTotal);
       } else {
+        if (!rt.isSandbox && claimStarterGiftOptimisticallyIfEligible()) {
+          setSpaceStarterGiftUnlocked(true);
+          showToast('🎁 Quà Tân Thủ: Hoàn thành ván game đầu tiên — Tặng +10 Lượt Quay Gacha miễn phí!', 'success');
+        }
         syncLiveMatchProgress({
           scoreVal: rt.score,
           streakVal: 0,
@@ -8091,9 +8145,13 @@ export default function App() {
           myAnimalId={myAnimalId}
           myCrewColor={myCrewColor}
           onOpenCheckoutModal={openGlobalCheckoutModal}
+          spaceStarterGiftUnlocked={spaceStarterGiftUnlocked}
           onSyncKnightResult={payload => {
             if (!currentUser?.username) return;
-            if (payload?.knightRpgProfile) {
+            const gifted = payload?.gameCompleted
+              ? claimStarterGiftOptimisticallyIfEligible(payload?.knightRpgProfile || null)
+              : false;
+            if (!gifted && payload?.knightRpgProfile) {
               setCurrentUser(prev =>
                 prev
                   ? {
@@ -8119,6 +8177,7 @@ export default function App() {
               score: Number(payload?.score) || 0,
               passedCount: Number(payload?.passedCount) || 0,
               totalCount: Math.max(1, Number(payload?.totalCount) || 1),
+              gameCompleted: Boolean(payload?.gameCompleted),
               knightRpgProfile: payload?.knightRpgProfile || null
             });
           }}

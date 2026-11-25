@@ -443,18 +443,28 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await page.getByTestId('gacha-std-pull-10-btn').click();
       await page.getByTestId('gacha-skip-cutscene-btn').click();
       const stdResText = await page.getByTestId('knight-gacha-results-view').textContent();
-      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden|GigaChad|Gấu Trúc/i);
+      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden|GigaChad|Gấu Trúc|Đầm Lầy|Hamster/i);
       await page.getByTestId('gacha-close-results-btn').click();
     }
 
-    // Check Inventory: 19 total heroes (including 6 new meme heroes) + equip class-matched cosmetic sword on Arthur!
+    // Check Inventory: 33 total heroes (including expanded Meme roster) + equip class-matched cosmetic sword on Arthur!
     await page.getByTestId('gacha-tab-inventory').click();
     await expect(page.getByText(/Thần Chó Cheems Gậy Bonk/i)).toBeVisible();
     await expect(page.getByText(/Hoàng Thượng Mèo Trắng Đa Nghi/i)).toBeVisible();
+    await expect(page.getByText(/Mèo Cầu Vồng Nyan Cat/i)).toBeVisible();
+    await expect(page.getByText(/Chú Chó Giữa Biển Lửa/i)).toBeVisible();
+    await expect(page.getByText(/Chuyên Gia Đầu Tư Stonks/i)).toBeVisible();
+    await expect(page.getByText(/Chiến Thần Chấm Hỏi/i)).toBeVisible();
+    await expect(page.getByText(/Mèo Cười Chỉ Tay Quê Chữ Ê/i)).toBeVisible();
     await expect(page.getByText(/Pháp Sư Ếch Xanh Pepe/i)).toBeVisible();
     await expect(page.getByText(/Thánh Capybara Đội Cam/i)).toBeVisible();
+    await expect(page.getByText(/Chiến Thần Shiba Cơ Bắp Swole Doge/i)).toBeVisible();
+    await expect(page.getByText(/Thần Tượng Đá Moai Lạnh Lùng/i)).toBeVisible();
+    await expect(page.getByText(/Đại Sư Khỉ Trầm Tư Chọn Đáp Án/i)).toBeVisible();
     await expect(page.getByText(/Đại Đế Cơ Bắp GigaChad/i)).toBeVisible();
     await expect(page.getByText(/Tông Sư Gấu Trúc Kem Ốc Quế/i)).toBeVisible();
+    await expect(page.getByText(/Chúa Tể Đầm Lầy Xanh/i)).toBeVisible();
+    await expect(page.getByText(/Chuột Hamster Bản Năng Vô Cực/i)).toBeVisible();
     await expect(page.getByText(/Đại Pháp Sư Tinh Không Zephyr/i)).toBeVisible();
     await expect(page.getByText(/Thánh Nữ Thần Thương Celestia/i)).toBeVisible();
     await expect(page.getByText(/Lôi Đế Huyết Kiếm Raiden/i)).toBeVisible();
@@ -633,11 +643,39 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await expect(page.getByTestId('knight-lobby-leaderboard')).not.toContainText(/Tuần Cũ Đã Reset|99\.999/i);
     await assertNoHorizontalOverflow(page, 'KnightLeaderboard-Desktop');
 
-    // Verify Student received the +7 wishes granted by Admin earlier AND Student cannot see Admin Gacha Tab!
+    // Verify Student received the +7 wishes granted by Admin earlier AND sees unclaimed Starter Gift (+10 wishes) before first game!
+    await expect(page.getByTestId('knight-hub-starter-gift-banner')).toBeVisible();
     await page.getByTestId('open-knight-shop-btn').click();
-    await expect(page.getByTestId('gacha-wishes-count')).toContainText(/[789]\s*Lượt|\d{2,}\s*Lượt/i);
+    const beforeGiftText = (await page.getByTestId('gacha-wishes-count').textContent()) || '';
+    const beforeGiftMatch = beforeGiftText.match(/(\d+)\s*Lượt/i);
+    const wishesBeforeFirstGame = beforeGiftMatch ? Number(beforeGiftMatch[1]) : 0;
+    expect(wishesBeforeFirstGame).toBeGreaterThanOrEqual(7);
     await expect(page.getByTestId('gacha-tab-admin')).toHaveCount(0);
     await page.getByTestId('close-knight-gacha-modal-btn').click();
+
+    // Finish Student's VERY FIRST game run -> MUST unlock Starter Gift (+10 free wishes) strictly ONCE!
+    await page.getByTestId('start-knight-campaign-btn').click();
+    await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
+    await page.getByTestId('knight-choice-1').click();
+    await page.getByTestId('knight-choice-1').click();
+    await page.getByTestId('knight-choice-1').click();
+    await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('knight-skip-revive-btn').click();
+    await expect(page.getByTestId('starter-gift-10-wishes-banner')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('knight-wishes-badge')).toContainText(`${wishesBeforeFirstGame + 10} Lượt`);
+    await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
+    await expect(page.getByTestId('knight-hub-starter-gift-banner')).toHaveCount(0);
+
+    // Finish a SECOND game run -> MUST NOT grant another +10 wishes!
+    await page.getByTestId('start-knight-campaign-btn').click();
+    await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
+    await page.getByTestId('knight-choice-1').click();
+    await page.getByTestId('knight-choice-1').click();
+    await page.getByTestId('knight-choice-1').click();
+    await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('knight-skip-revive-btn').click();
+    await expect(page.getByTestId('starter-gift-10-wishes-banner')).toHaveCount(0);
+    await expect(page.getByTestId('knight-wishes-badge')).toContainText(`${wishesBeforeFirstGame + 10} Lượt`);
 
     healthGuard.assertHealthy('vertical-podium-leaderboard-desktop-mobile');
   });

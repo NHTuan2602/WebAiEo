@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <defs>
+    <radialGradient id="qaura" cx="50%" cy="45%" r="52%">
+      <stop offset="0%" stop-color="#facc15" stop-opacity="0.45"/>
+      <stop offset="65%" stop-color="#a855f7" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="qarmor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="156" r="144" fill="url(#qaura)"/>
+  <ellipse cx="160" cy="284" rx="76" ry="14" fill="#020617" opacity="0.55"/>
+  <!-- Cape -->
+  <path d="M94 172 Q160 156 226 172 L242 270 Q160 284 78 270 Z" fill="#4c1d95" stroke="#fde047" stroke-width="3"/>
+  <!-- White Knight Chestplate -->
+  <rect x="112" y="170" width="96" height="94" rx="22" fill="url(#qarmor)" stroke="#f59e0b" stroke-width="3.5"/>
+  <text x="160" y="228" font-family="Arial Black, sans-serif" font-size="34" fill="#7c3aed" text-anchor="middle">???</text>
+  <!-- Question Mark Halberd -->
+  <g transform="translate(72,174) rotate(-14)">
+    <rect x="-4" y="-58" width="8" height="146" rx="4" fill="#94a3b8" stroke="#1e293b" stroke-width="2"/>
+    <text x="0" y="-62" font-family="Arial Black, sans-serif" font-size="48" fill="#facc15" stroke="#78350f" stroke-width="2" text-anchor="middle">?</text>
+  </g>
+  <!-- Tilted Confused Smirk Head -->
+  <g transform="translate(160,114) rotate(-9)">
+    <ellipse cx="0" cy="4" rx="46" ry="50" fill="#8d5524" stroke="#3f2305" stroke-width="3"/>
+    <!-- Fade Haircut -->
+    <path d="M-45 -10 Q-46 -50 0 -52 Q46 -50 45 -10 Q24 -24 0 -24 Q-24 -24 -45 -10 Z" fill="#0f172a"/>
+    <!-- Squinting Confused Eyes -->
+    <path d="M-28 -8 Q-16 -15 -6 -9" fill="none" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M8 -12 Q20 -18 30 -10" fill="none" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/>
+    <ellipse cx="-17" cy="-1" rx="8" ry="4.5" fill="#ffffff"/>
+    <circle cx="-15" cy="-1" r="3" fill="#0f172a"/>
+    <ellipse cx="18" cy="-2" rx="8" ry="4.5" fill="#ffffff"/>
+    <circle cx="20" cy="-2" r="3" fill="#0f172a"/>
+    <!-- Big Confused Grin showing white teeth + goatee -->
+    <path d="M-22 18 Q0 34 24 16 Q20 36 0 36 Q-20 36 -22 18 Z" fill="#ffffff" stroke="#3f2305" stroke-width="2.5"/>
+    <path d="M-12 42 Q0 49 12 42" fill="none" stroke="#0f172a" stroke-width="4.5" stroke-linecap="round"/>
+  </g>
+  <!-- Iconic Floating ??? Marks -->
+  <text x="236" y="88" font-family="Arial Black, sans-serif" font-size="34" fill="#facc15" stroke="#0f172a" stroke-width="2">?</text>
+  <text x="262" y="106" font-family="Arial Black, sans-serif" font-size="38" fill="#fde047" stroke="#0f172a" stroke-width="2">?</text>
+  <text x="286" y="92" font-family="Arial Black, sans-serif" font-size="34" fill="#facc15" stroke="#0f172a" stroke-width="2">?</text>
+  <text x="64" y="84" font-family="Arial Black, sans-serif" font-size="30" fill="#fde047" stroke="#0f172a" stroke-width="2">??</text>
+</svg>

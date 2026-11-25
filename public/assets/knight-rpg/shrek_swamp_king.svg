@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="swampAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#84cc16" stop-opacity="0.48"/>
+      <stop offset="60%" stop-color="#eab308" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#15803d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ogreGreen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a3e635"/>
+      <stop offset="60%" stop-color="#65a30d"/>
+      <stop offset="100%" stop-color="#3f6212"/>
+    </linearGradient>
+    <linearGradient id="onionBulb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="55%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#92400e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="142" fill="url(#swampAura)"/>
+
+  <!-- Swamp King Tunic, Brown Leather Vest & Gold Crown Pauldrons -->
+  <ellipse cx="146" cy="218" rx="66" ry="62" fill="#fef3c7" stroke="#422006" stroke-width="4"/>
+  <path d="M90 162 L130 162 L124 256 L84 246 Z" fill="#78350f" stroke="#290f02" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M164 162 L204 162 L210 246 L170 256 Z" fill="#78350f" stroke="#290f02" stroke-width="3.6" stroke-linejoin="round"/>
+  <rect x="86" y="236" width="122" height="16" rx="5" fill="#451a03" stroke="#fde047" stroke-width="2.8"/>
+
+  <!-- Big Friendly Swamp Ogre Head + Iconic Trumpet-Shaped Ogre Ears! -->
+  <g stroke="#292524" stroke-width="3.4">
+    <path d="M96 92 L64 70 C56 66 52 82 62 86 L92 104 Z" fill="url(#ogreGreen)"/>
+    <ellipse cx="60" cy="77" rx="5" ry="9" fill="#3f6212"/>
+    <path d="M196 92 L228 70 C236 66 240 82 230 86 L200 104 Z" fill="url(#ogreGreen)"/>
+    <ellipse cx="232" cy="77" rx="5" ry="9" fill="#3f6212"/>
+  </g>
+
+  <ellipse cx="146" cy="112" rx="54" ry="48" fill="url(#ogreGreen)" stroke="#1a2e05" stroke-width="3.8"/>
+  <!-- Tiny Royal Swamp Crown -->
+  <polygon points="122,66 130,42 146,56 162,42 170,66" fill="#fde047" stroke="#78350f" stroke-width="2.8" stroke-linejoin="round"/>
+
+  <!-- Expressive Brows, Smug Grin & Bulbous Nose -->
+  <path d="M112 92 Q126 84 138 92 M154 92 Q168 84 180 92" fill="none" stroke="#290f02" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="126" cy="104" r="6.5" fill="#ffffff" stroke="#1a2e05" stroke-width="2.2"/>
+  <circle cx="127" cy="104" r="3" fill="#422006"/>
+  <circle cx="166" cy="104" r="6.5" fill="#ffffff" stroke="#1a2e05" stroke-width="2.2"/>
+  <circle cx="167" cy="104" r="3" fill="#422006"/>
+  <ellipse cx="146" cy="116" rx="12" ry="8" fill="#65a30d" stroke="#1a2e05" stroke-width="2.5"/>
+  <path d="M118 134 Q146 150 174 132" fill="#ffffff" stroke="#1a2e05" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- Colossal Multi-Layered Golden ONION Mace / Greathammer! -->
+  <g transform="rotate(-22 246 176)">
+    <rect x="240" y="128" width="14" height="148" rx="5" fill="#78350f" stroke="#290f02" stroke-width="3.2"/>
+    <path d="M247 56 C288 86 284 138 247 142 C210 138 206 86 247 56 Z" fill="url(#onionBulb)" stroke="#78350f" stroke-width="3.6"/>
+    <path d="M247 62 C268 88 266 132 247 138 M247 62 C226 88 228 132 247 138" fill="none" stroke="#b45309" stroke-width="2.4"/>
+    <path d="M247 56 L242 38 M247 56 L254 38" stroke="#65a30d" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

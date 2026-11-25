@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="moaiAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#64748b" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stoneMonolith" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="45%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="goldCrown" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="142" fill="url(#moaiAura)"/>
+
+  <!-- Imperial Purple-Gold Sigma Cloak -->
+  <path d="M68 188 C52 226 54 264 68 290 L236 290 C250 258 248 222 232 188 Z" fill="#581c87" stroke="url(#goldCrown)" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- ICONIC CHISELED EASTER ISLAND 🗿 MOAI STATUE HEAD! -->
+  <polygon points="104,44 196,44 210,94 202,216 150,236 98,216 90,94" fill="url(#stoneMonolith)" stroke="#0f172a" stroke-width="4" stroke-linejoin="round"/>
+  <!-- Deep Overhanging Stone Brow Ridge -->
+  <polygon points="90,82 210,82 204,102 150,108 96,102" fill="#334155" stroke="#0f172a" stroke-width="3.2"/>
+  <!-- Raised Sigma Eyebrow & Glowing Cyan Eyes -->
+  <line x1="104" y1="78" x2="138" y2="84" stroke="#fde047" stroke-width="4" stroke-linecap="round"/>
+  <line x1="162" y1="72" x2="196" y2="66" stroke="#fde047" stroke-width="4" stroke-linecap="round"/>
+  <rect x="108" y="102" width="26" height="10" rx="3" fill="#090d16"/>
+  <circle cx="122" cy="107" r="3.5" fill="#38bdf8"/>
+  <rect x="166" y="102" width="26" height="10" rx="3" fill="#090d16"/>
+  <circle cx="180" cy="107" r="3.5" fill="#38bdf8"/>
+
+  <!-- Long Monolithic Nose & Stoic Pursed Stone Lips -->
+  <polygon points="142,98 160,98 168,166 134,166" fill="#94a3b8" stroke="#0f172a" stroke-width="3.2" stroke-linejoin="round"/>
+  <circle cx="143" cy="162" r="4" fill="#1e293b"/>
+  <circle cx="159" cy="162" r="4" fill="#1e293b"/>
+  <path d="M120 188 L182 188 L174 198 L128 198 Z" fill="#475569" stroke="#0f172a" stroke-width="3"/>
+
+  <!-- Elongated Stone Ears + Golden Crown -->
+  <rect x="78" y="104" width="14" height="68" rx="5" fill="#475569" stroke="#0f172a" stroke-width="3"/>
+  <rect x="208" y="104" width="14" height="68" rx="5" fill="#475569" stroke="#0f172a" stroke-width="3"/>
+  <polygon points="116,44 126,20 148,36 168,18 184,44" fill="url(#goldCrown)" stroke="#78350f" stroke-width="2.8" stroke-linejoin="round"/>
+
+  <!-- Colossal Easter Island Stone Pillar Greatsword -->
+  <g transform="rotate(-24 252 184)">
+    <rect x="234" y="72" width="34" height="162" rx="6" fill="url(#stoneMonolith)" stroke="#fde047" stroke-width="3.4"/>
+    <rect x="222" y="232" width="58" height="12" rx="4" fill="url(#goldCrown)" stroke="#0f172a" stroke-width="2.8"/>
+  </g>
+</svg>

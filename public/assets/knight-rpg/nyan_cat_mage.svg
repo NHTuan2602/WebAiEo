@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="nyanBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f472b6" stop-opacity="0.4"/>
+      <stop offset="60%" stop-color="#38bdf8" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="160" cy="160" r="142" fill="url(#nyanBg)"/>
+
+  <!-- 6-Stripe Pixel Rainbow Trail -->
+  <g stroke-linejoin="round">
+    <path d="M18 132 Q52 120 86 134 L86 146 Q52 132 18 144 Z" fill="#ef4444"/>
+    <path d="M18 144 Q52 132 86 146 L86 158 Q52 144 18 156 Z" fill="#f97316"/>
+    <path d="M18 156 Q52 144 86 158 L86 170 Q52 156 18 168 Z" fill="#facc15"/>
+    <path d="M18 168 Q52 156 86 170 L86 182 Q52 168 18 180 Z" fill="#22c55e"/>
+    <path d="M18 180 Q52 168 86 182 L86 194 Q52 180 18 192 Z" fill="#3b82f6"/>
+    <path d="M18 192 Q52 180 86 194 L86 206 Q52 192 18 204 Z" fill="#a855f7"/>
+  </g>
+
+  <!-- Sparkle Stars -->
+  <polygon points="56,74 60,84 70,88 60,92 56,102 52,92 42,88 52,84" fill="#fef08a"/>
+  <polygon points="264,68 268,78 278,82 268,86 264,96 260,86 250,82 260,78" fill="#fef08a"/>
+
+  <!-- Grey Tail & Stubby Running Paws -->
+  <path d="M84 184 C60 182 54 162 72 158" fill="none" stroke="#64748b" stroke-width="10" stroke-linecap="round"/>
+  <ellipse cx="102" cy="226" rx="14" ry="9" fill="#94a3b8" stroke="#1e293b" stroke-width="3"/>
+  <ellipse cx="138" cy="230" rx="14" ry="9" fill="#94a3b8" stroke="#1e293b" stroke-width="3"/>
+  <ellipse cx="192" cy="230" rx="14" ry="9" fill="#94a3b8" stroke="#1e293b" stroke-width="3"/>
+  <ellipse cx="222" cy="224" rx="14" ry="9" fill="#94a3b8" stroke="#1e293b" stroke-width="3"/>
+
+  <!-- Iconic Pink Frosted Pop-Tart Pastry Body -->
+  <rect x="78" y="114" width="144" height="106" rx="22" fill="#fcd34d" stroke="#78350f" stroke-width="4"/>
+  <rect x="90" y="124" width="120" height="86" rx="16" fill="#f472b6" stroke="#db2777" stroke-width="3"/>
+  <!-- Sprinkles -->
+  <circle cx="114" cy="144" r="4.5" fill="#e11d48"/>
+  <circle cx="144" cy="138" r="4.5" fill="#7c3aed"/>
+  <circle cx="172" cy="148" r="4.5" fill="#0284c7"/>
+  <circle cx="116" cy="184" r="4.5" fill="#16a34a"/>
+  <circle cx="152" cy="176" r="4.5" fill="#e11d48"/>
+  <circle cx="182" cy="188" r="4.5" fill="#facc15"/>
+  <circle cx="132" cy="162" r="4.5" fill="#fde047"/>
+
+  <!-- Cute Grey Pixel-Cat Head + Pointy Wizard Hat -->
+  <polygon points="188,128 182,92 214,112" fill="#94a3b8" stroke="#1e293b" stroke-width="3.5" stroke-linejoin="round"/>
+  <polygon points="256,128 264,92 232,112" fill="#94a3b8" stroke="#1e293b" stroke-width="3.5" stroke-linejoin="round"/>
+  <rect x="180" y="112" width="88" height="76" rx="24" fill="#94a3b8" stroke="#1e293b" stroke-width="3.8"/>
+
+  <!-- Tiny Rainbow Star Mage Hat -->
+  <polygon points="200,104 224,54 248,104" fill="#6366f1" stroke="#1e1b4b" stroke-width="3.2" stroke-linejoin="round"/>
+  <ellipse cx="224" cy="104" rx="34" ry="8" fill="#4f46e5" stroke="#fde047" stroke-width="2.5"/>
+
+  <!-- Cute Eyes, Pink Cheeks & ":3" Cat Smile -->
+  <circle cx="206" cy="144" r="6" fill="#0f172a"/>
+  <circle cx="208" cy="142" r="2.2" fill="#ffffff"/>
+  <circle cx="244" cy="144" r="6" fill="#0f172a"/>
+  <circle cx="246" cy="142" r="2.2" fill="#ffffff"/>
+  <ellipse cx="194" cy="156" rx="7" ry="5" fill="#fb7185"/>
+  <ellipse cx="256" cy="156" rx="7" ry="5" fill="#fb7185"/>
+  <path d="M214 158 Q220 165 225 158 Q230 165 236 158" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Rainbow Starlight Wand -->
+  <line x1="256" y1="198" x2="294" y2="152" stroke="#fde047" stroke-width="5" stroke-linecap="round"/>
+  <polygon points="294,136 299,148 311,148 301,155 305,167 294,160 283,167 287,155 277,148 289,148" fill="#fef08a" stroke="#f59e0b" stroke-width="2"/>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <defs>
+    <radialGradient id="aura" cx="50%" cy="46%" r="52%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.45"/>
+      <stop offset="65%" stop-color="#0284c7" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="robe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="156" r="144" fill="url(#aura)"/>
+  <ellipse cx="160" cy="282" rx="78" ry="15" fill="#020617" opacity="0.55"/>
+  <!-- Ocean harbor horizon vibe -->
+  <path d="M44 214 Q160 198 276 214 L268 242 Q160 232 52 242 Z" fill="#0369a1" opacity="0.35"/>
+  <!-- Sage cape & armor -->
+  <path d="M96 172 Q160 154 224 172 L242 268 Q160 284 78 268 Z" fill="#1e1b4b" stroke="#fbbf24" stroke-width="3"/>
+  <rect x="112" y="170" width="96" height="94" rx="22" fill="url(#robe)" stroke="#fde047" stroke-width="3"/>
+  <polygon points="160,182 174,206 160,230 146,206" fill="#fde047"/>
+  <!-- Floating philosopher scroll / staff -->
+  <g transform="translate(242,168) rotate(12)">
+    <rect x="-5" y="-66" width="10" height="148" rx="5" fill="#92400e" stroke="#fde047" stroke-width="2"/>
+    <circle cx="0" cy="-74" r="16" fill="#38bdf8" stroke="#fef08a" stroke-width="3"/>
+    <text x="0" y="-68" font-family="Arial Black, sans-serif" font-size="16" fill="#ffffff" text-anchor="middle">?</text>
+  </g>
+  <!-- Thinking Monkey Head -->
+  <circle cx="106" cy="118" r="18" fill="#92400e" stroke="#451a03" stroke-width="3"/>
+  <circle cx="106" cy="118" r="10" fill="#fed7aa"/>
+  <circle cx="214" cy="118" r="18" fill="#92400e" stroke="#451a03" stroke-width="3"/>
+  <circle cx="214" cy="118" r="10" fill="#fed7aa"/>
+  <ellipse cx="160" cy="116" rx="54" ry="52" fill="url(#fur)" stroke="#451a03" stroke-width="3.5"/>
+  <!-- Monkey tuft -->
+  <path d="M148 64 Q160 44 172 64 Z" fill="#92400e" stroke="#451a03" stroke-width="2.5"/>
+  <!-- Face mask -->
+  <ellipse cx="160" cy="110" rx="36" ry="24" fill="#fde68a"/>
+  <ellipse cx="160" cy="136" rx="32" ry="24" fill="#fed7aa"/>
+  <!-- Eyes looking up toward the sky contemplating -->
+  <ellipse cx="145" cy="106" rx="9" ry="8" fill="#ffffff" stroke="#451a03" stroke-width="2"/>
+  <circle cx="147" cy="103" r="4.5" fill="#1e293b"/>
+  <circle cx="149" cy="101" r="1.5" fill="#ffffff"/>
+  <ellipse cx="175" cy="106" rx="9" ry="8" fill="#ffffff" stroke="#451a03" stroke-width="2"/>
+  <circle cx="177" cy="103" r="4.5" fill="#1e293b"/>
+  <circle cx="179" cy="101" r="1.5" fill="#ffffff"/>
+  <!-- Furrowed contemplative brows -->
+  <path d="M133 95 Q145 90 154 96" fill="none" stroke="#451a03" stroke-width="3" stroke-linecap="round"/>
+  <path d="M166 96 Q175 90 187 95" fill="none" stroke="#451a03" stroke-width="3" stroke-linecap="round"/>
+  <!-- Nose & pursed mouth -->
+  <ellipse cx="155" cy="122" rx="3" ry="4" fill="#451a03"/>
+  <ellipse cx="165" cy="122" rx="3" ry="4" fill="#451a03"/>
+  <path d="M145 138 Q160 134 175 139" fill="none" stroke="#7c2d12" stroke-width="3" stroke-linecap="round"/>
+  <!-- Iconic Hand on Chin Pose -->
+  <path d="M124 214 Q142 182 166 156" fill="none" stroke="#92400e" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="170" cy="150" r="13" fill="#451a03"/>
+  <path d="M162 144 Q174 136 180 144" fill="none" stroke="#78350f" stroke-width="6" stroke-linecap="round"/>
+  <!-- Floating thought bubbles -->
+  <circle cx="216" cy="72" r="5" fill="#fef08a"/>
+  <circle cx="230" cy="56" r="8" fill="#fef08a"/>
+  <rect x="236" y="26" width="64" height="30" rx="12" fill="#fef08a" stroke="#f59e0b" stroke-width="2.5"/>
+  <text x="268" y="46" font-family="Arial Black, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle">A hay C?</text>
+</svg>

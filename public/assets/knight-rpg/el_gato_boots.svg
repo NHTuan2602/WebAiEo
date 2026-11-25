@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="gatoAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fb923c" stop-opacity="0.44"/>
+      <stop offset="65%" stop-color="#facc15" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gingerFur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="60%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="140" fill="url(#gatoAura)"/>
+
+  <!-- Cavalier Cape & Feathered Musketeer Hat Held/Worn -->
+  <path d="M104 156 C68 180 62 232 82 268 L138 254 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3.5"/>
+
+  <!-- Tiny Standing Ginger Kitten Body ("El Gato" + Puss in Boots!) -->
+  <ellipse cx="154" cy="212" rx="40" ry="48" fill="url(#gingerFur)" stroke="#431407" stroke-width="3.6"/>
+  <ellipse cx="154" cy="216" rx="24" ry="34" fill="#ffedd5"/>
+  <!-- Leather Belt & Tall Cavalier Boots -->
+  <rect x="116" y="218" width="76" height="12" rx="4" fill="#451a03" stroke="#1c1917" stroke-width="2.5"/>
+  <rect x="146" y="215" width="16" height="18" rx="3" fill="#fbbf24" stroke="#78350f" stroke-width="2"/>
+  <path d="M124 248 L116 290 L146 290 L148 250 Z" fill="#292524" stroke="#0c0a09" stroke-width="3.2"/>
+  <path d="M184 248 L192 290 L162 290 L160 250 Z" fill="#292524" stroke="#0c0a09" stroke-width="3.2"/>
+
+  <!-- Big Round Ginger Kitten Head & Ears -->
+  <polygon points="104,104 92,58 134,82" fill="url(#gingerFur)" stroke="#431407" stroke-width="3.5" stroke-linejoin="round"/>
+  <polygon points="204,104 216,58 174,82" fill="url(#gingerFur)" stroke="#431407" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- Cavalier Hat + Golden Feather -->
+  <path d="M84 82 Q154 58 224 82 Q188 42 154 44 Q120 42 84 82 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3.4"/>
+  <path d="M168 54 C196 22 236 26 232 54 C210 56 188 58 168 54 Z" fill="#facc15" stroke="#854d0e" stroke-width="2.5"/>
+
+  <ellipse cx="154" cy="126" rx="52" ry="44" fill="url(#gingerFur)" stroke="#431407" stroke-width="3.6"/>
+
+  <!-- HUGE IRRESISTIBLE GALAXY PUPPY/KITTY EYES! -->
+  <circle cx="132" cy="124" r="18" fill="#090d16" stroke="#431407" stroke-width="2.5"/>
+  <circle cx="126" cy="117" r="6.5" fill="#ffffff"/>
+  <circle cx="139" cy="131" r="3.2" fill="#ffffff"/>
+  <circle cx="176" cy="124" r="18" fill="#090d16" stroke="#431407" stroke-width="2.5"/>
+  <circle cx="170" cy="117" r="6.5" fill="#ffffff"/>
+  <circle cx="183" cy="131" r="3.2" fill="#ffffff"/>
+
+  <!-- Tiny Pink Nose & Pleading ":3" Mouth + Clasped Paws -->
+  <polygon points="150,140 158,140 154,145" fill="#fb7185"/>
+  <path d="M144 150 Q149 155 154 150 Q159 155 164 150" fill="none" stroke="#431407" stroke-width="2.8" stroke-linecap="round"/>
+  <ellipse cx="144" cy="186" rx="13" ry="10" fill="#ffedd5" stroke="#431407" stroke-width="3"/>
+  <ellipse cx="164" cy="186" rx="13" ry="10" fill="#ffedd5" stroke="#431407" stroke-width="3"/>
+
+  <!-- Silver Rapier Sword -->
+  <g transform="rotate(-32 232 192)">
+    <line x1="232" y1="84" x2="232" y2="218" stroke="#f8fafc" stroke-width="5" stroke-linecap="round"/>
+    <path d="M214 216 Q232 200 250 216 Z" fill="#fbbf24" stroke="#78350f" stroke-width="2.8"/>
+    <rect x="229" y="216" width="6" height="22" rx="2" fill="#78350f"/>
+  </g>
+</svg>

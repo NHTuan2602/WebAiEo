@@ -773,6 +773,9 @@ function sanitizeUserForViewer(user, viewer) {
     aieoVipExpiresAt: Number(user.aieoVipExpiresAt) || 0,
     roomCreateCredits: getFriendRoomTicketCredits(user),
     gachaWishCredits: getGachaWishPurchasedCredits(user),
+    starterFirstGameGiftClaimed: Boolean(
+      user.starterFirstGameGiftClaimed || user.knightRpgProfile?.firstGameGiftClaimed
+    ),
     realExamCredits: getRealExamCredits(user),
     vipRedNameEnabled: (() => {
       const isVip = Number(user.aieoVipExpiresAt) > Date.now();
@@ -813,6 +816,9 @@ function sanitizeUserForViewer(user, viewer) {
   }
   if (viewer && viewer.username === user.username && Array.isArray(user.acknowledgedTitleIds)) {
     safe.acknowledgedTitleIds = user.acknowledgedTitleIds;
+  }
+  if (viewer && viewer.username === user.username && user.knightRpgProfile && typeof user.knightRpgProfile === 'object') {
+    safe.knightRpgProfile = user.knightRpgProfile;
   }
   if (viewer?.isSuperAdmin && user.isSuperAdmin) {
     safe.isSuperAdmin = true;
@@ -2538,6 +2544,51 @@ function serializeSentNotificationsForTeacher(store, viewer) {
   if (!viewer || viewer.role !== 'teacher') return [];
   const list = Array.isArray(store.notifications) ? store.notifications : [];
   return list.map(n => serializeNotificationItem(n, viewer.username || ''));
+}
+
+const STARTER_FIRST_GAME_FREE_WISHES = 10;
+
+function grantFirstGameStarterGiftIfEligible(store, rawUsername) {
+  if (!store || typeof store !== 'object' || !rawUsername) return false;
+  const targetKey = findUserKeyInStore(store, rawUsername);
+  const targetUser = targetKey ? store.users?.[targetKey] : null;
+  if (!targetKey || !targetUser || targetUser.isGuest) return false;
+  if (targetUser.starterFirstGameGiftClaimed || targetUser.knightRpgProfile?.firstGameGiftClaimed) {
+    if (!targetUser.starterFirstGameGiftClaimed) {
+      store.users[targetKey] = { ...targetUser, starterFirstGameGiftClaimed: true };
+    }
+    return false;
+  }
+  const nextWishCredits = getGachaWishPurchasedCredits(targetUser) + STARTER_FIRST_GAME_FREE_WISHES;
+  const prevRpg =
+    targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
+      ? targetUser.knightRpgProfile
+      : {};
+  const nextRpgWishes = Math.max(0, (Number(prevRpg.wishes) || 0) + STARTER_FIRST_GAME_FREE_WISHES);
+  store.users[targetKey] = {
+    ...targetUser,
+    starterFirstGameGiftClaimed: true,
+    gachaWishCredits: nextWishCredits,
+    knightRpgProfile: {
+      ...prevRpg,
+      firstGameGiftClaimed: true,
+      wishes: nextRpgWishes,
+      claimedServerWishCredits: nextWishCredits
+    }
+  };
+  appendStoreNotification(
+    store,
+    {
+      title: `🎁 Quà Tân Thủ: Tặng +${STARTER_FIRST_GAME_FREE_WISHES} Lượt Quay Gacha Miễn Phí!`,
+      message: `Chúc mừng bạn vừa hoàn thành trận game đầu tiên! Hệ thống đã tặng +${STARTER_FIRST_GAME_FREE_WISHES} 🌠 Lượt Quay Gacha miễn phí vào Hiệp Sĩ Diệt Rồng (hiện có ${nextRpgWishes} lượt).`,
+      type: 'game',
+      targetUsernames: [targetKey],
+      createdBy: SUPER_ADMIN_USERNAME,
+      createdByName: 'Hệ Thống Đấu Trường'
+    },
+    null
+  );
+  return true;
 }
 
 function ensureWeeklyMondayReset(store, nowMs = Date.now()) {
@@ -4294,6 +4345,12 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const base = normalizeServerRoom(store.rooms[cleanPin], cleanPin);
       base.status = 'ENDED';
       store.rooms[cleanPin] = base;
+      Object.keys(base.liveMatch || {}).forEach(uname => {
+        const uRec = store.users?.[findUserKeyInStore(store, uname) || uname];
+        if (uRec && uRec.role !== 'teacher') {
+          grantFirstGameStarterGiftIfEligible(store, uname);
+        }
+      });
       changed = true;
       break;
     }
@@ -4411,6 +4468,9 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         };
       }
       store.rooms[cleanPin] = base;
+      if (entry.finished) {
+        grantFirstGameStarterGiftIfEligible(store, username);
+      }
       changed = true;
       break;
     }
@@ -4429,6 +4489,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         score: bestScore
       };
       store.rooms[cleanPin] = base;
+      grantFirstGameStarterGiftIfEligible(store, username);
       changed = true;
       break;
     }
@@ -5832,6 +5893,11 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         list.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
         store.gamePracticeLeaderboard = list.slice(0, 250);
         changed = true;
+      }
+      if (payload?.gameCompleted) {
+        if (grantFirstGameStarterGiftIfEligible(store, viewer.username)) {
+          changed = true;
+        }
       }
       break;
     }

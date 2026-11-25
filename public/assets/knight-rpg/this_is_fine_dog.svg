@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="fireGlow" cx="50%" cy="55%" r="52%">
+      <stop offset="0%" stop-color="#fde047" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#f97316" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#dc2626" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="160" cy="165" r="144" fill="url(#fireGlow)"/>
+
+  <!-- Roaring Cartoon Flames Surrounding Everything ("THIS IS FINE"!) -->
+  <path d="M28 274 C18 220 44 176 58 148 C64 182 78 192 84 166 C98 202 104 238 92 274 Z" fill="#ef4444" stroke="#7f1d1d" stroke-width="3"/>
+  <path d="M42 274 C36 236 52 204 62 186 C68 210 78 218 80 274 Z" fill="#facc15"/>
+  <path d="M228 274 C218 228 234 184 252 150 C258 184 274 190 282 162 C298 204 298 244 286 274 Z" fill="#ef4444" stroke="#7f1d1d" stroke-width="3"/>
+  <path d="M242 274 C238 236 250 206 260 186 C268 214 276 226 276 274 Z" fill="#facc15"/>
+
+  <!-- Wooden Chair & Table -->
+  <rect x="86" y="244" width="152" height="36" rx="10" fill="#92400e" stroke="#451a03" stroke-width="3.5"/>
+
+  <!-- Calm Yellow Hound Dog Body in Knight Vest -->
+  <ellipse cx="144" cy="216" rx="44" ry="42" fill="#fbbf24" stroke="#451a03" stroke-width="3.6"/>
+  <path d="M110 186 L178 186 L172 238 L116 238 Z" fill="#cbd5e1" stroke="#1e293b" stroke-width="3"/>
+
+  <!-- Floppy Brown Ears & Round Hound Head -->
+  <ellipse cx="104" cy="128" rx="14" ry="30" fill="#78350f" stroke="#290f02" stroke-width="3.2" transform="rotate(12 104 128)"/>
+  <ellipse cx="186" cy="130" rx="14" ry="28" fill="#78350f" stroke="#290f02" stroke-width="3.2" transform="rotate(-12 186 130)"/>
+  <ellipse cx="146" cy="124" rx="44" ry="40" fill="#fbbf24" stroke="#451a03" stroke-width="3.6"/>
+  <!-- Long Snout & Black Nose -->
+  <ellipse cx="174" cy="134" rx="28" ry="18" fill="#fde68a" stroke="#451a03" stroke-width="3.2"/>
+  <circle cx="198" cy="128" r="7" fill="#1c1917"/>
+
+  <!-- Tiny Brown Bowler Hat -->
+  <ellipse cx="142" cy="84" rx="34" ry="8" fill="#78350f" stroke="#290f02" stroke-width="3"/>
+  <path d="M118 84 C118 56 166 56 166 84 Z" fill="#92400e" stroke="#290f02" stroke-width="3"/>
+
+  <!-- Wide Unblinking "Everything Is Fine" Eyes & Big Calm Smile -->
+  <circle cx="136" cy="112" r="10" fill="#ffffff" stroke="#1c1917" stroke-width="2.8"/>
+  <circle cx="138" cy="112" r="3.5" fill="#1c1917"/>
+  <circle cx="162" cy="112" r="10" fill="#ffffff" stroke="#1c1917" stroke-width="2.8"/>
+  <circle cx="164" cy="112" r="3.5" fill="#1c1917"/>
+  <path d="M148 144 Q168 156 186 144" fill="none" stroke="#451a03" stroke-width="3.2" stroke-linecap="round"/>
+
+  <!-- White Coffee Mug Held Calmly + Flame Sword -->
+  <rect x="184" y="204" width="32" height="36" rx="6" fill="#ffffff" stroke="#1e293b" stroke-width="3.2"/>
+  <path d="M216 212 C228 212 228 232 216 232" fill="none" stroke="#1e293b" stroke-width="3.5"/>
+  <path d="M194 196 Q198 186 194 178 M206 196 Q210 186 206 178" fill="none" stroke="#fde68a" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Blazing Sword Stuck Ready Beside Table -->
+  <g transform="rotate(18 256 196)">
+    <polygon points="256,88 266,112 262,216 250,216 246,112" fill="#fb923c" stroke="#7c2d12" stroke-width="3"/>
+    <rect x="240" y="214" width="32" height="8" rx="3" fill="#fbbf24" stroke="#451a03" stroke-width="2.5"/>
+  </g>
+</svg>
