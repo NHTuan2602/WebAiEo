@@ -409,6 +409,7 @@ export default function App() {
   const [arenaInitialMode, setArenaInitialMode] = useState('hub');
   const [arenaEntryNonce, setArenaEntryNonce] = useState(0);
   const [paymentConfig, setPaymentConfig] = useState(null);
+  const [knightGachaConfig, setKnightGachaConfig] = useState(null);
   const [gamePracticeLeaderboard, setGamePracticeLeaderboard] = useState([]);
   const [dailyRankTitles, setDailyRankTitles] = useState(null);
   const [syncHydrated, setSyncHydrated] = useState(false);
@@ -1701,6 +1702,9 @@ export default function App() {
     }
     if (snap.paymentConfig && typeof snap.paymentConfig === 'object') {
       setPaymentConfig(prev => (JSON.stringify(prev) === JSON.stringify(snap.paymentConfig) ? prev : snap.paymentConfig));
+    }
+    if (snap.knightGachaConfig && typeof snap.knightGachaConfig === 'object') {
+      setKnightGachaConfig(prev => (JSON.stringify(prev) === JSON.stringify(snap.knightGachaConfig) ? prev : snap.knightGachaConfig));
     }
     if (Array.isArray(snap.notifications)) {
       const nextNotifs = snap.notifications;
@@ -8119,6 +8123,66 @@ export default function App() {
             });
           }}
           openMemberProfile={openMemberProfile}
+          knightGachaConfig={knightGachaConfig}
+          onAdminGrantGachaWishes={
+            currentUser?.isSuperAdmin
+              ? ({ username: targetUsername, amount, note = '' }) => {
+                  const cleanAmt = Math.max(1, Math.min(10000, Math.round(Number(amount) || 0)));
+                  if (!targetUsername || !cleanAmt) return;
+                  setUsersDb(prev => {
+                    const existingKey =
+                      Object.keys(prev || {}).find(
+                        k => k.toLowerCase() === String(targetUsername).toLowerCase()
+                      ) || targetUsername;
+                    const u = prev?.[existingKey];
+                    if (!u) return prev;
+                    const nextCredits = Math.max(0, Math.floor(Number(u.gachaWishCredits) || 0)) + cleanAmt;
+                    const prevRpg = u.knightRpgProfile && typeof u.knightRpgProfile === 'object' ? u.knightRpgProfile : {};
+                    return {
+                      ...prev,
+                      [existingKey]: {
+                        ...u,
+                        gachaWishCredits: nextCredits,
+                        knightRpgProfile: {
+                          ...prevRpg,
+                          wishes: Math.max(0, (Number(prevRpg.wishes) || 0) + cleanAmt),
+                          claimedServerWishCredits: nextCredits
+                        }
+                      }
+                    };
+                  });
+                  if (String(currentUser.username || '').toLowerCase() === String(targetUsername).toLowerCase()) {
+                    setCurrentUser(prev => {
+                      if (!prev) return prev;
+                      const nextCredits = Math.max(0, Math.floor(Number(prev.gachaWishCredits) || 0)) + cleanAmt;
+                      const prevRpg = prev.knightRpgProfile && typeof prev.knightRpgProfile === 'object' ? prev.knightRpgProfile : {};
+                      return {
+                        ...prev,
+                        gachaWishCredits: nextCredits,
+                        knightRpgProfile: {
+                          ...prevRpg,
+                          wishes: Math.max(0, (Number(prevRpg.wishes) || 0) + cleanAmt),
+                          claimedServerWishCredits: nextCredits
+                        }
+                      };
+                    });
+                  }
+                  dispatchSyncAction('ADMIN_GRANT_GACHA_WISHES', {
+                    username: targetUsername,
+                    amount: cleanAmt,
+                    note
+                  });
+                }
+              : undefined
+          }
+          onAdminSetGachaBannerConfig={
+            currentUser?.isSuperAdmin
+              ? (cfgPatch) => {
+                  setKnightGachaConfig(prev => ({ ...(prev || {}), ...(cfgPatch || {}) }));
+                  dispatchSyncAction('ADMIN_SET_GACHA_BANNER_CONFIG', cfgPatch || {});
+                }
+              : undefined
+          }
           paymentConfig={paymentConfig}
           previousView={previousView}
           roomJoinError={roomJoinError}

@@ -33,6 +33,21 @@ export const KNIGHT_BGM_TRACKS = {
     lead: ['D4', 'F4', 'A4', 'C5', 'A4', 'F4', 'G4', 'A4', 'C4', 'E4', 'G4', 'B4', 'A4', 'G4', 'E4', 'D4'],
     bass: ['D3', null, null, null, 'C3', null, null, null, 'Bb2', null, null, null, 'A2', null, null, null]
   },
+  gacha: {
+    label: 'Cầu Nguyện Sao Băng',
+    bpm: 108,
+    leadWave: 'sine',
+    harmonyWave: 'triangle',
+    bassWave: 'triangle',
+    leadGain: 0.088,
+    harmonyGain: 0.045,
+    bassGain: 0.068,
+    percussion: 'celestial',
+    // Dreamy F Lydian / Starlight Celesta progression inside Gacha Banner Modal
+    lead: ['C5', 'E5', 'G5', 'B5', 'C6', 'B5', 'G5', 'E5', 'A4', 'C5', 'E5', 'G5', 'Fs5', 'G5', 'B5', 'D6'],
+    harmony: ['E4', null, 'B4', null, 'E5', null, 'B4', null, 'C4', null, 'G4', null, 'D4', null, 'Fs4', null],
+    bass: ['F3', null, 'C3', null, 'F3', null, 'C3', null, 'D3', null, 'A2', null, 'G3', null, 'D3', null]
+  },
   stage1: {
     label: 'Ải 1: Rừng Slime',
     bpm: 126,
@@ -270,16 +285,28 @@ class KnightRpgBgmController {
 
       const idx = this.stepIndex % activeTrack.lead.length;
       const leadNote = activeTrack.lead[idx];
+      const harmonyNote = Array.isArray(activeTrack.harmony) ? activeTrack.harmony[idx] : null;
       const bassNote = activeTrack.bass[idx];
 
       if (leadNote && NOTE_FREQ[leadNote]) {
         this.playTone(NOTE_FREQ[leadNote], stepSec * 0.92, activeTrack.leadWave, activeTrack.leadGain);
       }
+      if (harmonyNote && NOTE_FREQ[harmonyNote]) {
+        this.playTone(
+          NOTE_FREQ[harmonyNote],
+          stepSec * 1.1,
+          activeTrack.harmonyWave || 'triangle',
+          activeTrack.harmonyGain || 0.04,
+          4
+        );
+      }
       if (bassNote && NOTE_FREQ[bassNote]) {
         this.playTone(NOTE_FREQ[bassNote], stepSec * 1.15, activeTrack.bassWave, activeTrack.bassGain);
       }
 
-      if (activeTrack.percussion === 'light') {
+      if (activeTrack.percussion === 'celestial') {
+        if (idx % 4 === 0) this.playTickHat(0.015);
+      } else if (activeTrack.percussion === 'light') {
         if (idx % 4 === 0) this.playKick(0.08);
         if (idx % 2 === 1) this.playTickHat(0.018);
       } else if (activeTrack.percussion === 'march') {

@@ -16,8 +16,10 @@ export const KNIGHT_GACHA_GOLD_TEN = 100000; // 100.000 Vàng = 10 lượt quay
 export const KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD = 200000; // Trùng nhân vật 5★ → hoàn 200.000 Vàng
 export const KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD = 10000; // Trùng nhân vật 4★ → hoàn 10.000 Vàng
 
-// Weekly Banner Rotation: strictly 1 Limited Banner per 7-day period
+// Weekly Banner & Game Leaderboard Reset: strictly every Monday 00:00 Vietnam time (UTC+7)
 export const LIMITED_BANNER_ROTATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 ngày
+export const VN_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+export const VN_MONDAY_EPOCH_OFFSET_MS = 4 * 24 * 60 * 60 * 1000; // 1970-01-05 00:00 was Monday
 
 export const KNIGHT_WEAPON_CLASS_LABELS = {
   sword: 'Hệ Kiếm',
@@ -169,8 +171,9 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: 0,
-    weaponName: 'Thánh Kiếm Excalibur',
-    passiveText: 'Nhân vật mặc định',
+    weaponName: 'Thánh Kiếm Excalibur (Bản Tập Sự)',
+    memeQuote: '“Người bình thường duy nhất giữa ổ Meme”',
+    passiveText: 'Nhân vật mặc định • Tâm lý ổn định',
     spriteUrl: '/assets/knight-rpg/knight_arthur.png',
     slashStyle: 'holy',
     goldBonusPct: 0,
@@ -199,8 +202,9 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
-    weaponName: 'Song Kiếm Thiên Vũ',
-    passiveText: '+15% Vàng khi hạ quái',
+    weaponName: 'Song Kiếm Gánh Team Còng Lưng',
+    memeQuote: '“Đừng lo để chị gánh hết 4 ải!”',
+    passiveText: '+15% Vàng khi hạ quái • Hệ Gánh Team',
     spriteUrl: '/assets/knight-rpg/valkyrie_freya.png',
     slashStyle: 'holy',
     goldBonusPct: 15,
@@ -227,8 +231,9 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Đại Kiếm Mặt Trời Solarius',
-    passiveText: '+18% Vàng khi hạ quái',
+    weaponName: 'Đại Kiếm Chói Mù Mắt Quái',
+    memeQuote: '“Bật sáng màn hình 100% lúc 2 giờ sáng”',
+    passiveText: '+18% Vàng khi hạ quái • Hào quang chói lóa',
     spriteUrl: '/assets/knight-rpg/paladin_leon.svg',
     slashStyle: 'solar',
     goldBonusPct: 18,
@@ -255,8 +260,9 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'polearm',
     weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
-    weaponName: 'Katana Hoa Anh Đào',
-    passiveText: '+25% Vàng khi hạ quái',
+    weaponName: 'Katana Chém Deadline Bay Màu',
+    memeQuote: '“Lưỡi đao nhanh hơn tốc độ mạng rớt”',
+    passiveText: '+25% Vàng khi hạ quái • Chém lốc anh đào',
     spriteUrl: '/assets/knight-rpg/samurai_tomoe.png',
     slashStyle: 'sakura',
     goldBonusPct: 25,
@@ -283,8 +289,9 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'catalyst',
     weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
-    weaponName: 'Quyền Trượng Ngân Hà',
-    passiveText: '+20% Vàng • +3 giây mỗi câu',
+    weaponName: 'Quyền Trượng Cú Đêm 23:59',
+    memeQuote: '“Nước đến chân mới nhảy nhưng vẫn kịp giờ!”',
+    passiveText: '+20% Vàng • +3 giây mỗi câu (Trùm kéo giờ)',
     spriteUrl: '/assets/knight-rpg/mage_selena.png',
     slashStyle: 'arcane',
     goldBonusPct: 20,
@@ -298,6 +305,64 @@ export const KNIGHT_CHARACTER_SKINS = [
     headgear: 'star_tiara',
     bladeColor: '#a78bfa',
     slashColor: '#c4b5fd'
+  },
+  {
+    id: 'cheems_bonk',
+    name: 'Thần Chó Cheems Gậy Bonk',
+    gender: 'Meme',
+    genderBadge: '🐕 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    priceGold: null,
+    weaponName: 'Chày Gỗ BONK Chống Lười Học',
+    memeQuote: '“BONK! Quái vật dám quên từ vựng hả!”',
+    passiveText: '+22% Vàng • +1 giây mỗi câu (Gõ Bonk u đầu quái)',
+    spriteUrl: '/assets/knight-rpg/cheems_bonk.svg',
+    slashStyle: 'solar',
+    goldBonusPct: 22,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 1,
+    armorPrimary: '#f59e0b',
+    armorSecondary: '#fde68a',
+    capeColor: '#dc2626',
+    hairColor: '#fbbf24',
+    hairStyle: 'short_spiky',
+    headgear: 'knight_visor',
+    bladeColor: '#fbbf24',
+    slashColor: '#fde047'
+  },
+  {
+    id: 'smudge_cat',
+    name: 'Hoàng Thượng Mèo Trắng Đa Nghi',
+    gender: 'Meme',
+    genderBadge: '😼 Meme',
+    rarity: '4★ Thường',
+    starRarity: 4,
+    pool: 'standard',
+    obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    priceGold: null,
+    weaponName: 'Đĩa Salad Phán Xét Vũ Trụ',
+    memeQuote: '“Ủa tự nhiên bắt trẫm học từ vựng là sao??”',
+    passiveText: '+24% Vàng • +2 giây mỗi câu (Ánh mắt khinh bỉ)',
+    spriteUrl: '/assets/knight-rpg/smudge_cat.svg',
+    slashStyle: 'arcane',
+    goldBonusPct: 24,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 2,
+    armorPrimary: '#9333ea',
+    armorSecondary: '#f8fafc',
+    capeColor: '#6b21a8',
+    hairColor: '#ffffff',
+    hairStyle: 'short_spiky',
+    headgear: 'star_tiara',
+    bladeColor: '#34d399',
+    slashColor: '#6ee7b7'
   },
 
   // ---- 5★ STANDARD POOL (Banner Thường & lệch 50/50 ở Banner Giới Hạn) ----
@@ -314,7 +379,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'polearm',
     weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
-    weaponName: 'Lôi Đao Raijin',
+    weaponName: 'Lôi Đao Múa Thông Thạo 7',
+    memeQuote: '“Hasagi!! Đừng cản anh bật thông thạo!”',
     passiveText: '+32% Vàng • +1 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/ronin_kenji.svg',
     slashStyle: 'thunder',
@@ -343,7 +409,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
-    weaponName: 'Huyết Ảnh Song Đao',
+    weaponName: 'Song Đao Chúa Tể Góc Tối',
+    memeQuote: '“Lạnh lùng ít nói nhưng rớt Vàng là nhặt hết”',
     passiveText: '+34% Vàng • +1 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/assassin_kael.png',
     slashStyle: 'crimson',
@@ -372,7 +439,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Đại Kiếm Plasma Neon',
+    weaponName: 'Đại Kiếm RGB Tăng 200% FPS',
+    memeQuote: '“Đèn LED càng nhiều màu chém càng mạnh!”',
     passiveText: '+38% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/cyber_nova.png',
     slashStyle: 'plasma',
@@ -387,6 +455,66 @@ export const KNIGHT_CHARACTER_SKINS = [
     headgear: 'cyber_halo',
     bladeColor: '#22d3ee',
     slashColor: '#67e8f9'
+  },
+  {
+    id: 'pepe_wizard',
+    name: 'Pháp Sư Ếch Xanh Pepe',
+    gender: 'Meme',
+    genderBadge: '🐸 Meme',
+    rarity: '5★ Thường',
+    starRarity: 5,
+    pool: 'standard',
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    priceGold: null,
+    weaponName: 'Bí Kíp Chống Liệt IELTS 9.0',
+    memeQuote: '“Feels Good Man — Đoán bừa cũng trúng!”',
+    passiveText: '+36% Vàng • +2 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/pepe_wizard.svg',
+    slashStyle: 'arcane',
+    goldBonusPct: 36,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 2,
+    armorPrimary: '#4338ca',
+    armorSecondary: '#4ade80',
+    capeColor: '#312e81',
+    hairColor: '#22c55e',
+    hairStyle: 'short_spiky',
+    headgear: 'star_tiara',
+    bladeColor: '#4ade80',
+    slashColor: '#fde047'
+  },
+  {
+    id: 'capybara_chill',
+    name: 'Thánh Capybara Đội Cam',
+    gender: 'Meme',
+    genderBadge: '🍊 Meme',
+    rarity: '5★ Thường',
+    starRarity: 5,
+    pool: 'standard',
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    priceGold: null,
+    weaponName: 'Thánh Kiếm Mía Đường Hệ Chill',
+    memeQuote: '“Rồng khè lửa kệ Rồng, đội trái quýt chill tiếp”',
+    passiveText: '+39% Vàng • +2 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/capybara_chill.svg',
+    slashStyle: 'sakura',
+    goldBonusPct: 39,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 2,
+    armorPrimary: '#d97706',
+    armorSecondary: '#22c55e',
+    capeColor: '#059669',
+    hairColor: '#b45309',
+    hairStyle: 'short_spiky',
+    headgear: 'solar_circlet',
+    bladeColor: '#22c55e',
+    slashColor: '#86efac'
   },
 
   // ---- 5 EXCLUSIVE LIMITED 5★ POOL (CHỈ XUẤT HIỆN Ở BANNER GIỚI HẠN 7 NGÀY/LẦN — KHÔNG RƠI Ở BANNER THƯỜNG) ----
@@ -403,7 +531,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Long Vương Hỏa Kiếm',
+    weaponName: 'Long Vương Hỏa Kiếm (Nóc Nhà Tối Cao)',
+    memeQuote: '“Quái vật cãi 1 câu là bay màu!”',
     passiveText: '+50% Vàng • +3 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/dragon_empress.png',
     slashStyle: 'dragon',
@@ -432,7 +561,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Chiến Rìu Dung Nham Ragnarok',
+    weaponName: 'Chiến Rìu Cục Súc Vô Cực',
+    memeQuote: '“Không nói nhiều, bổ trước tính sau!”',
     passiveText: '+44% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/berserker_drake.svg',
     slashStyle: 'magma',
@@ -461,7 +591,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'catalyst',
     weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
-    weaponName: 'Quyền Trượng Tinh Vân',
+    weaponName: 'Quyền Trượng Out Trình Vũ Trụ',
+    memeQuote: '“Não to thiên hà — nhìn đề biết ngay đáp án”',
     passiveText: '+46% Vàng • +3 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/archmage_zephyr.svg',
     slashStyle: 'arcane',
@@ -490,7 +621,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'polearm',
     weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
-    weaponName: 'Thánh Thương Quang Minh',
+    weaponName: 'Thánh Thương Con Nhà Người Ta',
+    memeQuote: '“Điểm 9.0 nhưng vẫn kêu làm bài dở lắm”',
     passiveText: '+48% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/valkyrie_celestia.svg',
     slashStyle: 'solar',
@@ -519,7 +651,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
-    weaponName: 'Huyết Lôi Thần Kiếm',
+    weaponName: 'Huyết Lôi Thần Kiếm (Cấm Vào Bếp)',
+    memeQuote: '“Chém đứt không gian nhưng luộc trứng cháy nồi”',
     passiveText: '+45% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/emperor_raiden.svg',
     slashStyle: 'crimson',
@@ -534,66 +667,212 @@ export const KNIGHT_CHARACTER_SKINS = [
     headgear: 'dragon_horns',
     bladeColor: '#f43f5e',
     slashColor: '#e879f9'
+  },
+  {
+    id: 'gigachad_knight',
+    name: 'Đại Đế Cơ Bắp GigaChad',
+    gender: 'Meme',
+    genderBadge: '🗿 Chad',
+    rarity: '5★ Giới Hạn',
+    starRarity: 5,
+    pool: 'limited',
+    isLimited5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    priceGold: null,
+    weaponName: 'Đại Kiếm Cằm Vuông Tối Thượng',
+    memeQuote: '“Vào phòng thi không cần nháp, gật đầu là qua ải”',
+    passiveText: '+52% Vàng • +3 giây mỗi câu (Hào quang Chad)',
+    spriteUrl: '/assets/knight-rpg/gigachad_knight.svg',
+    slashStyle: 'dragon',
+    goldBonusPct: 52,
+    keyDropBonusPct: 6,
+    bonusTimeSec: 3,
+    armorPrimary: '#cbd5e1',
+    armorSecondary: '#fbbf24',
+    capeColor: '#991b1b',
+    hairColor: '#0f172a',
+    hairStyle: 'short_spiky',
+    headgear: 'solar_circlet',
+    bladeColor: '#fbbf24',
+    slashColor: '#fef08a'
+  },
+  {
+    id: 'bing_chilling_panda',
+    name: 'Tông Sư Gấu Trúc Kem Ốc Quế',
+    gender: 'Meme',
+    genderBadge: '🐼 Meme',
+    rarity: '5★ Giới Hạn',
+    starRarity: 5,
+    pool: 'limited',
+    isLimited5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    priceGold: null,
+    weaponName: 'Thánh Thương Kem Ốc Quế Băng Giá',
+    memeQuote: '“Chào buổi sáng! Ăn một cây kem đóng băng Boss Rồng!”',
+    passiveText: '+50% Vàng • +3 giây mỗi câu (Kem lạnh tê não)',
+    spriteUrl: '/assets/knight-rpg/bing_chilling_panda.svg',
+    slashStyle: 'thunder',
+    goldBonusPct: 50,
+    keyDropBonusPct: 6,
+    bonusTimeSec: 3,
+    armorPrimary: '#0284c7',
+    armorSecondary: '#38bdf8',
+    capeColor: '#0369a1',
+    hairColor: '#0f172a',
+    hairStyle: 'short_spiky',
+    headgear: 'thunder_band',
+    bladeColor: '#38bdf8',
+    slashColor: '#bae6fd'
   }
 ];
 
-// Strictly ONE active Limited Banner per 7-day cycle! Rotates automatically every 7 days.
+// Strictly ONE active Limited Banner per week! Resets every Monday at 00:00 Vietnam time (or Admin next-hero pick).
 export const KNIGHT_LIMITED_BANNERS = [
+  {
+    id: 'limited_gigachad',
+    featuredHeroId: 'gigachad_knight',
+    bannerTitle: 'Banner Giới Hạn: Đại Đế Cơ Bắp GigaChad',
+    featured4StarIds: ['cheems_bonk', 'smudge_cat', 'mage_selena']
+  },
+  {
+    id: 'limited_panda',
+    featuredHeroId: 'bing_chilling_panda',
+    bannerTitle: 'Banner Giới Hạn: Tông Sư Gấu Trúc Kem Ốc Quế',
+    featured4StarIds: ['smudge_cat', 'cheems_bonk', 'samurai_tomoe']
+  },
   {
     id: 'limited_ignis',
     featuredHeroId: 'dragon_empress',
     bannerTitle: 'Banner Giới Hạn: Nữ Hoàng Long Tộc Ignis',
-    featured4StarIds: ['mage_selena', 'samurai_tomoe', 'paladin_leon']
+    featured4StarIds: ['cheems_bonk', 'mage_selena', 'samurai_tomoe']
   },
   {
     id: 'limited_drake',
     featuredHeroId: 'berserker_drake',
     bannerTitle: 'Banner Giới Hạn: Chiến Thần Drake',
-    featured4StarIds: ['valkyrie_freya', 'paladin_leon', 'samurai_tomoe']
+    featured4StarIds: ['smudge_cat', 'valkyrie_freya', 'paladin_leon']
   },
   {
     id: 'limited_zephyr',
     featuredHeroId: 'archmage_zephyr',
     bannerTitle: 'Banner Giới Hạn: Đại Pháp Sư Zephyr',
-    featured4StarIds: ['mage_selena', 'valkyrie_freya', 'paladin_leon']
+    featured4StarIds: ['cheems_bonk', 'mage_selena', 'valkyrie_freya']
   },
   {
     id: 'limited_celestia',
     featuredHeroId: 'valkyrie_celestia',
     bannerTitle: 'Banner Giới Hạn: Thánh Nữ Celestia',
-    featured4StarIds: ['samurai_tomoe', 'valkyrie_freya', 'mage_selena']
+    featured4StarIds: ['smudge_cat', 'samurai_tomoe', 'valkyrie_freya']
   },
   {
     id: 'limited_raiden',
     featuredHeroId: 'emperor_raiden',
     bannerTitle: 'Banner Giới Hạn: Lôi Đế Raiden',
-    featured4StarIds: ['paladin_leon', 'samurai_tomoe', 'valkyrie_freya']
+    featured4StarIds: ['cheems_bonk', 'paladin_leon', 'samurai_tomoe']
   }
 ];
 
 // Keep backward-compatible alias for any import expecting KNIGHT_CHARACTER_EVENT_BANNERS
 export const KNIGHT_CHARACTER_EVENT_BANNERS = KNIGHT_LIMITED_BANNERS;
 
-export function getWeeklyLimitedBannerState(nowMs = Date.now()) {
-  const vnAdjustedMs = (Number(nowMs) || Date.now()) + 7 * 60 * 60 * 1000;
-  const weekNumber = Math.floor(vnAdjustedMs / LIMITED_BANNER_ROTATION_MS);
-  const bannerIdx = ((weekNumber % KNIGHT_LIMITED_BANNERS.length) + KNIGHT_LIMITED_BANNERS.length) % KNIGHT_LIMITED_BANNERS.length;
-  const nextRotationVnMs = (weekNumber + 1) * LIMITED_BANNER_ROTATION_MS;
-  const remainingMs = Math.max(1000, nextRotationVnMs - vnAdjustedMs);
+export function getVietnamMondayWeekState(nowMs = Date.now()) {
+  const safeNow = Number(nowMs) || Date.now();
+  const vnMs = safeNow + VN_UTC_OFFSET_MS;
+  const weekNumber = Math.floor((vnMs - VN_MONDAY_EPOCH_OFFSET_MS) / LIMITED_BANNER_ROTATION_MS);
+  const weekStartVnMs = weekNumber * LIMITED_BANNER_ROTATION_MS + VN_MONDAY_EPOCH_OFFSET_MS;
+  const nextMondayVnMs = (weekNumber + 1) * LIMITED_BANNER_ROTATION_MS + VN_MONDAY_EPOCH_OFFSET_MS;
+  const weekStartMs = weekStartVnMs - VN_UTC_OFFSET_MS;
+  const nextMondayMs = nextMondayVnMs - VN_UTC_OFFSET_MS;
+  const weekKey = new Date(weekStartVnMs).toISOString().slice(0, 10);
+  const prevWeekKey = new Date(weekStartVnMs - LIMITED_BANNER_ROTATION_MS).toISOString().slice(0, 10);
+  const remainingMs = Math.max(1000, nextMondayVnMs - vnMs);
   const totalMinutes = Math.floor(remainingMs / 60000);
   const days = Math.floor(totalMinutes / (60 * 24));
   const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
   const minutes = totalMinutes % 60;
-  const activeBanner = KNIGHT_LIMITED_BANNERS[bannerIdx];
-  const nextBanner = KNIGHT_LIMITED_BANNERS[(bannerIdx + 1) % KNIGHT_LIMITED_BANNERS.length];
 
   return {
     weekNumber,
-    bannerIdx,
-    activeBanner,
-    nextBanner,
+    weekKey,
+    prevWeekKey,
+    weekStartMs,
+    nextMondayMs,
     remainingMs,
     countdownText: `${days} ngày ${hours} giờ ${minutes} phút`
+  };
+}
+
+export function normalizeKnightGachaConfig(raw = {}, nowMs = Date.now()) {
+  const obj = raw && typeof raw === 'object' ? raw : {};
+  const { weekKey } = getVietnamMondayWeekState(nowMs);
+  const limitedIds = new Set(KNIGHT_CHARACTER_SKINS.filter(h => h.pool === 'limited').map(h => h.id));
+  const cleanActive = limitedIds.has(String(obj.activeFeaturedHeroId || '')) ? String(obj.activeFeaturedHeroId) : '';
+  const cleanNext = limitedIds.has(String(obj.nextFeaturedHeroId || '')) ? String(obj.nextFeaturedHeroId) : '';
+  const rawWeekKey = /^\d{4}-\d{2}-\d{2}$/.test(String(obj.weekKey || '')) ? String(obj.weekKey) : weekKey;
+  const lastResetWeekKey = /^\d{4}-\d{2}-\d{2}$/.test(String(obj.lastResetWeekKey || ''))
+    ? String(obj.lastResetWeekKey)
+    : weekKey;
+  return {
+    weekKey: rawWeekKey,
+    activeFeaturedHeroId: cleanActive,
+    nextFeaturedHeroId: cleanNext,
+    lastResetWeekKey
+  };
+}
+
+export function getWeeklyLimitedBannerState(nowMs = Date.now(), gachaConfig = null) {
+  const mondayState = getVietnamMondayWeekState(nowMs);
+  const { weekNumber, weekKey, prevWeekKey, weekStartMs, nextMondayMs, remainingMs, countdownText } = mondayState;
+  const defaultIdx =
+    ((weekNumber % KNIGHT_LIMITED_BANNERS.length) + KNIGHT_LIMITED_BANNERS.length) %
+    KNIGHT_LIMITED_BANNERS.length;
+
+  let activeIdx = defaultIdx;
+  let scheduledNextHeroId = '';
+
+  if (gachaConfig && typeof gachaConfig === 'object') {
+    const cfgWeek = String(gachaConfig.weekKey || '');
+    const cfgActiveHero = String(gachaConfig.activeFeaturedHeroId || '');
+    const cfgNextHero = String(gachaConfig.nextFeaturedHeroId || '');
+
+    if (cfgWeek === weekKey) {
+      if (cfgActiveHero) {
+        const foundIdx = KNIGHT_LIMITED_BANNERS.findIndex(b => b.featuredHeroId === cfgActiveHero);
+        if (foundIdx >= 0) activeIdx = foundIdx;
+      }
+      if (cfgNextHero) {
+        scheduledNextHeroId = cfgNextHero;
+      }
+    } else if (cfgWeek === prevWeekKey && cfgNextHero) {
+      // Monday 00:00 VN crossed: immediately promote Admin's scheduled next hero!
+      const promotedIdx = KNIGHT_LIMITED_BANNERS.findIndex(b => b.featuredHeroId === cfgNextHero);
+      if (promotedIdx >= 0) activeIdx = promotedIdx;
+    }
+  }
+
+  const activeBanner = KNIGHT_LIMITED_BANNERS[activeIdx] || KNIGHT_LIMITED_BANNERS[0];
+  const scheduledNextBanner = scheduledNextHeroId
+    ? KNIGHT_LIMITED_BANNERS.find(b => b.featuredHeroId === scheduledNextHeroId) || null
+    : null;
+  const nextBanner =
+    scheduledNextBanner || KNIGHT_LIMITED_BANNERS[(activeIdx + 1) % KNIGHT_LIMITED_BANNERS.length];
+
+  return {
+    weekNumber,
+    weekKey,
+    weekStartMs,
+    nextMondayMs,
+    bannerIdx: activeIdx,
+    activeBanner,
+    nextBanner,
+    isAdminScheduledNext: Boolean(scheduledNextBanner),
+    scheduledNextHeroId: scheduledNextBanner ? scheduledNextBanner.featuredHeroId : '',
+    remainingMs,
+    countdownText
   };
 }
 
@@ -705,6 +984,32 @@ export const KNIGHT_GACHA_WEAPONS = [
     slashColor: '#38bdf8',
     passiveText: 'Trang trí vũ khí (Hệ Pháp Khí)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'staff', primary: '#e879f9', secondary: '#38bdf8', bg: '#2e1065', stars: 4 })
+  },
+  {
+    id: 'wp4_bonk_club',
+    name: 'Chày Gỗ BONK Huyền Thoại',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#fbbf24',
+    slashColor: '#fde047',
+    passiveText: 'Trang trí vũ khí (Hệ Trọng Kiếm)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'claymore', primary: '#f59e0b', secondary: '#fef08a', bg: '#451a03', stars: 4 })
+  },
+  {
+    id: 'wp4_ice_cream_lance',
+    name: 'Thương Kem Ốc Quế Băng Tuyết',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    isCosmeticOnly: true,
+    bladeColor: '#38bdf8',
+    slashColor: '#fbcfe8',
+    passiveText: 'Trang trí vũ khí (Hệ Thương & Đao)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#38bdf8', secondary: '#fbcfe8', bg: '#0c4a6e', stars: 4 })
   },
 
   // ---- 3★ COSMETIC WEAPONS (10) ----
@@ -1046,11 +1351,12 @@ export function rollKnightGachaPulls(
     count = 1,
     isAdminFreePull = false,
     nowMs = Date.now(),
+    gachaConfig = null,
     randFn = Math.random
   } = {}
 ) {
   const pullCount = count === 10 ? 10 : 1;
-  const profile = normalizeKnightRpgProfile(rawProfile);
+  const profile = normalizeKnightRpgProfile(rawProfile, nowMs);
   const availableWishes = profile.wishes || 0;
   const wishesToSpend = isAdminFreePull ? 0 : Math.min(pullCount, availableWishes);
   const remainingPullsByGold = isAdminFreePull ? 0 : pullCount - wishesToSpend;
@@ -1064,7 +1370,7 @@ export function rollKnightGachaPulls(
   }
 
   const isCharBanner = bannerType !== 'standard';
-  const weeklyState = getWeeklyLimitedBannerState(nowMs);
+  const weeklyState = getWeeklyLimitedBannerState(nowMs, gachaConfig);
   const activeBannerMeta = weeklyState.activeBanner;
 
   // STRICT POOL SEPARATION:
@@ -1373,8 +1679,9 @@ export function rollKnightGachaPulls(
   };
 }
 
-export function normalizeKnightRpgProfile(raw = {}) {
+export function normalizeKnightRpgProfile(raw = {}, nowMs = Date.now()) {
   const obj = raw && typeof raw === 'object' ? raw : {};
+  const { weekKey: currentWeekKey } = getVietnamMondayWeekState(nowMs);
   const rawGold = obj.gold === undefined || obj.gold === null ? 150 : Number(obj.gold);
   const gold = Math.max(0, Math.min(99_999_999, Math.floor(Number.isFinite(rawGold) ? rawGold : 150)));
   const rawKeys = obj.keys === undefined || obj.keys === null ? 1 : Number(obj.keys);
@@ -1463,7 +1770,13 @@ export function normalizeKnightRpgProfile(raw = {}) {
   const dragonsSlain = Math.max(0, Math.floor(Number(obj.dragonsSlain) || 0));
   const demonKingsSlain = Math.max(0, Math.floor(Number(obj.demonKingsSlain) || 0));
   const keysCollected = Math.max(keys, Math.floor(Number(obj.keysCollected) || keys));
-  const bestScore = Math.max(0, Math.floor(Number(obj.bestScore) || 0));
+  const rawScoreWeekKey = /^\d{4}-\d{2}-\d{2}$/.test(String(obj.bestScoreWeekKey || ''))
+    ? String(obj.bestScoreWeekKey)
+    : '';
+  // Reset weekly game high-score back to 0 whenever Monday 00:00 Vietnam week rolls over
+  const isStaleScoreWeek = Boolean(rawScoreWeekKey && rawScoreWeekKey !== currentWeekKey);
+  const bestScore = isStaleScoreWeek ? 0 : Math.max(0, Math.floor(Number(obj.bestScore) || 0));
+  const bestScoreWeekKey = currentWeekKey;
 
   return {
     gold,
@@ -1482,36 +1795,45 @@ export function normalizeKnightRpgProfile(raw = {}) {
     dragonsSlain,
     demonKingsSlain,
     keysCollected,
-    bestScore
+    bestScore,
+    bestScoreWeekKey
   };
 }
 
-export function applyServerPurchasedWishes(profileObj, userRecord = null) {
-  const normalized = normalizeKnightRpgProfile(profileObj || {});
+export function applyServerPurchasedWishes(profileObj, userRecord = null, nowMs = Date.now()) {
+  const normalized = normalizeKnightRpgProfile(profileObj || {}, nowMs);
   const serverPurchasedTotal = Math.max(0, Math.floor(Number(userRecord?.gachaWishCredits) || 0));
   if (serverPurchasedTotal > normalized.claimedServerWishCredits) {
     const delta = serverPurchasedTotal - normalized.claimedServerWishCredits;
-    return normalizeKnightRpgProfile({
-      ...normalized,
-      wishes: normalized.wishes + delta,
-      claimedServerWishCredits: serverPurchasedTotal
-    });
+    return normalizeKnightRpgProfile(
+      {
+        ...normalized,
+        wishes: normalized.wishes + delta,
+        claimedServerWishCredits: serverPurchasedTotal
+      },
+      nowMs
+    );
   }
   return normalized;
 }
 
-export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null) {
-  const serverProfile = userRecord?.knightRpgProfile ? normalizeKnightRpgProfile(userRecord.knightRpgProfile) : null;
+export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null, nowMs = Date.now()) {
+  const { weekKey: currentWeekKey } = getVietnamMondayWeekState(nowMs);
+  const rawServerObj = userRecord?.knightRpgProfile && typeof userRecord.knightRpgProfile === 'object'
+    ? userRecord.knightRpgProfile
+    : null;
+  const serverProfile = rawServerObj ? normalizeKnightRpgProfile(rawServerObj, nowMs) : null;
   if (typeof window === 'undefined') {
-    return applyServerPurchasedWishes(serverProfile || normalizeKnightRpgProfile({}), userRecord);
+    return applyServerPurchasedWishes(serverProfile || normalizeKnightRpgProfile({}, nowMs), userRecord, nowMs);
   }
   try {
     const key = `${KNIGHT_STORAGE_KEY_PREFIX}:${String(username || 'guest').toLowerCase()}`;
-    const raw = window.localStorage.getItem(key);
-    const localProfile = raw ? normalizeKnightRpgProfile(JSON.parse(raw)) : null;
-    if (!localProfile && !serverProfile) return applyServerPurchasedWishes({}, userRecord);
-    if (!localProfile) return applyServerPurchasedWishes(serverProfile, userRecord);
-    if (!serverProfile) return applyServerPurchasedWishes(localProfile, userRecord);
+    const rawStr = window.localStorage.getItem(key);
+    const parsedLocal = rawStr ? JSON.parse(rawStr) : null;
+    const localProfile = parsedLocal ? normalizeKnightRpgProfile(parsedLocal, nowMs) : null;
+    if (!localProfile && !serverProfile) return applyServerPurchasedWishes({}, userRecord, nowMs);
+    if (!localProfile) return applyServerPurchasedWishes(serverProfile, userRecord, nowMs);
+    if (!serverProfile) return applyServerPurchasedWishes(localProfile, userRecord, nowMs);
 
     const mergedSkins = Array.from(new Set([...localProfile.unlockedSkins, ...serverProfile.unlockedSkins]));
     const mergedWeapons = Array.from(new Set([...localProfile.unlockedWeapons, ...serverProfile.unlockedWeapons]));
@@ -1528,31 +1850,44 @@ export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null)
     const serverPulls = serverProfile.gachaState?.totalPulls || 0;
     const newerByPulls = localPulls >= serverPulls ? localProfile : serverProfile;
 
-    const mergedBase = normalizeKnightRpgProfile({
-      gold: newerByPulls.gold,
-      keys: Math.max(localProfile.keys, serverProfile.keys),
-      wishes: newerByPulls.wishes,
-      claimedServerWishCredits: Math.max(
-        localProfile.claimedServerWishCredits || 0,
-        serverProfile.claimedServerWishCredits || 0
-      ),
-      unlockedSkins: mergedSkins,
-      equippedSkin: localProfile.equippedSkin || serverProfile.equippedSkin,
-      unlockedWeapons: mergedWeapons,
-      weaponCounts: mergedWeaponCounts,
-      heroEquippedWeapons: mergedHeroWp,
-      gachaState: newerByPulls.gachaState,
-      wishHistory: newerByPulls.wishHistory,
-      monstersSlain: Math.max(localProfile.monstersSlain, serverProfile.monstersSlain),
-      dragonsSlain: Math.max(localProfile.dragonsSlain, serverProfile.dragonsSlain),
-      demonKingsSlain: Math.max(localProfile.demonKingsSlain, serverProfile.demonKingsSlain),
-      keysCollected: Math.max(localProfile.keysCollected, serverProfile.keysCollected),
-      bestScore: Math.max(localProfile.bestScore, serverProfile.bestScore)
-    });
+    // Respect server Monday 00:00 score reset if local cache came from an un-tagged legacy week
+    const serverWasResetThisWeek =
+      rawServerObj?.bestScoreWeekKey === currentWeekKey &&
+      Number(rawServerObj?.bestScore || 0) === 0 &&
+      parsedLocal?.bestScoreWeekKey !== currentWeekKey;
+    const mergedBestScore = serverWasResetThisWeek
+      ? 0
+      : Math.max(localProfile.bestScore, serverProfile.bestScore);
 
-    return applyServerPurchasedWishes(mergedBase, userRecord);
+    const mergedBase = normalizeKnightRpgProfile(
+      {
+        gold: newerByPulls.gold,
+        keys: Math.max(localProfile.keys, serverProfile.keys),
+        wishes: newerByPulls.wishes,
+        claimedServerWishCredits: Math.max(
+          localProfile.claimedServerWishCredits || 0,
+          serverProfile.claimedServerWishCredits || 0
+        ),
+        unlockedSkins: mergedSkins,
+        equippedSkin: localProfile.equippedSkin || serverProfile.equippedSkin,
+        unlockedWeapons: mergedWeapons,
+        weaponCounts: mergedWeaponCounts,
+        heroEquippedWeapons: mergedHeroWp,
+        gachaState: newerByPulls.gachaState,
+        wishHistory: newerByPulls.wishHistory,
+        monstersSlain: Math.max(localProfile.monstersSlain, serverProfile.monstersSlain),
+        dragonsSlain: Math.max(localProfile.dragonsSlain, serverProfile.dragonsSlain),
+        demonKingsSlain: Math.max(localProfile.demonKingsSlain, serverProfile.demonKingsSlain),
+        keysCollected: Math.max(localProfile.keysCollected, serverProfile.keysCollected),
+        bestScore: mergedBestScore,
+        bestScoreWeekKey: currentWeekKey
+      },
+      nowMs
+    );
+
+    return applyServerPurchasedWishes(mergedBase, userRecord, nowMs);
   } catch {
-    return applyServerPurchasedWishes(serverProfile || {}, userRecord);
+    return applyServerPurchasedWishes(serverProfile || {}, userRecord, nowMs);
   }
 }
 

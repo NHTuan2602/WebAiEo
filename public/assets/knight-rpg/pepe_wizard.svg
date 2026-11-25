@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="pepeAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.4"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="frogGreen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="60%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+    <linearGradient id="wizRobe" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="55%" stop-color="#4338ca"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="starGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="160" cy="160" r="138" fill="url(#pepeAura)"/>
+
+  <!-- Starry Archmage Robe -->
+  <path d="M78 186 C64 226 64 264 78 292 L228 292 C240 260 236 220 216 186 Z" fill="url(#wizRobe)" stroke="#0f172a" stroke-width="3.8" stroke-linejoin="round"/>
+  <path d="M124 186 L152 292 L180 186 Z" fill="#312e81" stroke="url(#starGold)" stroke-width="2.5"/>
+  <polygon points="104,236 108,245 118,245 110,251 113,260 104,254 95,260 98,251 90,245 100,245" fill="#fde047"/>
+  <polygon points="200,246 203,253 211,253 205,258 207,265 200,260 193,265 195,258 189,253 197,253" fill="#fde047"/>
+
+  <!-- Pepe Frog Head & Bulging Eyes ("Feels Good Man" Smug Archmage!) -->
+  <circle cx="128" cy="108" r="24" fill="url(#frogGreen)" stroke="#14532d" stroke-width="3.5"/>
+  <circle cx="176" cy="108" r="24" fill="url(#frogGreen)" stroke="#14532d" stroke-width="3.5"/>
+  <ellipse cx="152" cy="144" rx="64" ry="44" fill="url(#frogGreen)" stroke="#14532d" stroke-width="3.8"/>
+
+  <!-- Big Half-Lidded Smug Pepe Eyes -->
+  <ellipse cx="128" cy="110" rx="16" ry="14" fill="#ffffff" stroke="#0f172a" stroke-width="2.8"/>
+  <circle cx="132" cy="112" r="7" fill="#0f172a"/>
+  <circle cx="135" cy="109" r="2.5" fill="#ffffff"/>
+  <path d="M111 106 Q128 96 145 106 L144 100 Q128 91 112 100 Z" fill="#16a34a" stroke="#14532d" stroke-width="2"/>
+
+  <ellipse cx="176" cy="110" rx="16" ry="14" fill="#ffffff" stroke="#0f172a" stroke-width="2.8"/>
+  <circle cx="180" cy="112" r="7" fill="#0f172a"/>
+  <circle cx="183" cy="109" r="2.5" fill="#ffffff"/>
+  <path d="M159 106 Q176 96 193 106 L192 100 Q176 91 160 100 Z" fill="#16a34a" stroke="#14532d" stroke-width="2"/>
+
+  <!-- Iconic Wide Red-Brown Smug Pepe Lips -->
+  <path d="M104 154 Q152 168 202 150 Q196 166 152 170 Q110 168 104 154 Z" fill="#dc2626" stroke="#7f1d1d" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M106 155 Q152 162 200 151" fill="none" stroke="#450a0a" stroke-width="2.4"/>
+
+  <!-- Pointed Starry Archmage Hat -->
+  <path d="M98 88 L152 18 L194 42 L174 52 L204 88 Z" fill="url(#wizRobe)" stroke="#0f172a" stroke-width="3.6" stroke-linejoin="round"/>
+  <ellipse cx="151" cy="88" rx="74" ry="14" fill="url(#wizRobe)" stroke="url(#starGold)" stroke-width="3.4"/>
+  <rect x="118" y="74" width="66" height="10" rx="4" fill="url(#starGold)" stroke="#78350f" stroke-width="2"/>
+
+  <!-- Glowing Floating IELTS 9.0 Spellbook & frog hand casting magic -->
+  <g transform="translate(244, 188) rotate(-10)">
+    <rect x="-32" y="-38" width="64" height="76" rx="8" fill="#7e22ce" stroke="url(#starGold)" stroke-width="3.6"/>
+    <rect x="-24" y="-30" width="48" height="60" rx="4" fill="#1e1b4b"/>
+    <text x="0" y="7" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="22" fill="#fde047">9.0</text>
+  </g>
+  <ellipse cx="204" cy="206" rx="16" ry="11" fill="url(#frogGreen)" stroke="#14532d" stroke-width="3"/>
+</svg>

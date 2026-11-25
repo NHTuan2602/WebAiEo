@@ -3,15 +3,19 @@ import {
   Clock,
   Coins,
   Crown,
+  Gift,
   History,
   KeyRound,
   Lock,
+  Music,
   QrCode,
   RotateCcw,
+  Settings,
   Shield,
   Sparkles,
   Star,
   Swords,
+  VolumeX,
   X
 } from 'lucide-react';
 import {
@@ -156,11 +160,18 @@ function playStarPopPing(starIdx = 0, totalStars = 3) {
 export default function KnightGachaModal({
   isOpen,
   isStrictAdmin = false,
+  bgmMuted = false,
+  onToggleBgm = null,
+  knightGachaConfig = null,
+  usersDb = {},
+  currentUsername = '',
   rpgProfile,
   paymentConfig = null,
   onClose,
   onExecutePull,
   onAdminResetHeroes = null,
+  onAdminGrantGachaWishes = null,
+  onAdminSetGachaBannerConfig = null,
   onEquipSkin,
   onEquipHeroWeapon,
   onExchangeGoldForWishes,
@@ -173,7 +184,10 @@ export default function KnightGachaModal({
   // Per-item silhouette → full-color unveil + sequential star pop-in states
   const [unveilStage, setUnveilStage] = useState('silhouette'); // 'silhouette' | 'lit'
   const [visibleStars, setVisibleStars] = useState(0);
-  const [weeklyBanner, setWeeklyBanner] = useState(() => getWeeklyLimitedBannerState());
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const [grantTargetQuery, setGrantTargetQuery] = useState('');
+  const [grantAmount, setGrantAmount] = useState(10);
+  const [grantNote, setGrantNote] = useState('');
 
   const timersRef = useRef([]);
 
@@ -186,15 +200,17 @@ export default function KnightGachaModal({
     return () => clearAllCutsceneTimers();
   }, []);
 
-  // Refresh weekly 7-day countdown every 30s while open
+  // Refresh Monday 00:00 countdown every 30s while open
   useEffect(() => {
     if (!isOpen) return undefined;
-    setWeeklyBanner(getWeeklyLimitedBannerState());
+    setNowTick(Date.now());
     const iv = setInterval(() => {
-      setWeeklyBanner(getWeeklyLimitedBannerState());
+      setNowTick(Date.now());
     }, 30_000);
     return () => clearInterval(iv);
   }, [isOpen]);
+
+  const weeklyBanner = getWeeklyLimitedBannerState(nowTick, knightGachaConfig);
 
   // Trigger silhouette -> flash unveil -> star-by-star pop-in whenever entering 'reveal' phase or changing revealIdx!
   useEffect(() => {
@@ -246,11 +262,15 @@ export default function KnightGachaModal({
     KNIGHT_CHARACTER_SKINS.find(s => s.id === rpgProfile?.equippedSkin) ||
     KNIGHT_CHARACTER_SKINS[0];
 
-  // Single weekly active Limited Banner (rotates every 7 days — never >1 Limited Banner in a week!)
+  // Single weekly active Limited Banner (resets every Monday 00:00 VN — never >1 Limited Banner in a week!)
   const activeBannerMeta = weeklyBanner.activeBanner;
   const featured5Hero =
     KNIGHT_CHARACTER_SKINS.find(s => s.id === activeBannerMeta.featuredHeroId) ||
     KNIGHT_CHARACTER_SKINS.find(s => s.pool === 'limited');
+  const nextFeatured5Hero =
+    KNIGHT_CHARACTER_SKINS.find(s => s.id === weeklyBanner.nextBanner?.featuredHeroId) ||
+    featured5Hero;
+  const limited5Heroes = KNIGHT_CHARACTER_SKINS.filter(s => s.pool === 'limited');
   const featured4Heroes = KNIGHT_CHARACTER_SKINS.filter(s =>
     activeBannerMeta.featured4StarIds.includes(s.id)
   );
@@ -953,6 +973,23 @@ export default function KnightGachaModal({
               <span>{keys} Chìa</span>
             </div>
 
+            {onToggleBgm && (
+              <button
+                type="button"
+                data-testid="gacha-modal-bgm-btn"
+                onClick={onToggleBgm}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black transition ${
+                  bgmMuted
+                    ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+                    : 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-300 dark:border-indigo-400/50 text-indigo-700 dark:text-indigo-200'
+                }`}
+                title="Bật / Tắt nhạc nền riêng của sảnh Cầu Nguyện Gacha"
+              >
+                {bgmMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Music className="w-3.5 h-3.5" />}
+                <span>{bgmMuted ? 'Nhạc: Tắt' : 'Nhạc: Cầu Nguyện Sao Băng'}</span>
+              </button>
+            )}
+
             <button
               type="button"
               data-testid="buy-revive-key-with-gold-btn"
@@ -988,7 +1025,7 @@ export default function KnightGachaModal({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className={`grid grid-cols-2 ${isStrictAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-2`}>
           <button
             type="button"
             data-testid="gacha-tab-character"
@@ -1000,7 +1037,7 @@ export default function KnightGachaModal({
             }`}
           >
             <Crown className="w-3.5 h-3.5" />
-            <span>Banner Giới Hạn (7 Ngày)</span>
+            <span>Banner Giới Hạn (Thứ 2)</span>
           </button>
 
           <button
@@ -1044,6 +1081,22 @@ export default function KnightGachaModal({
             <QrCode className="w-3.5 h-3.5" />
             <span>Mua Lượt Quay</span>
           </button>
+
+          {isStrictAdmin && (
+            <button
+              type="button"
+              data-testid="gacha-tab-admin"
+              onClick={() => setActiveTab('admin')}
+              className={`px-3 py-2.5 rounded-2xl text-xs font-black border transition flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1 ${
+                activeTab === 'admin'
+                  ? 'bg-gradient-to-r from-rose-600 to-amber-500 text-white border-rose-300 shadow-md'
+                  : 'bg-rose-50/70 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-200'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Quản Trị (Admin)</span>
+            </button>
+          )}
         </div>
 
         {/* =========================================================
@@ -1057,7 +1110,7 @@ export default function KnightGachaModal({
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-400/40 text-amber-900 dark:text-amber-200 text-xs font-black"
               >
                 <Clock className="w-3.5 h-3.5 text-amber-500" />
-                <span>Đổi banner giới hạn sau: {weeklyBanner.countdownText} (Chu kỳ 7 ngày / 1 banner duy nhất)</span>
+                <span>Reset 00:00 Thứ 2 (còn {weeklyBanner.countdownText}) • 1 Banner Giới Hạn / tuần</span>
               </div>
 
               <button
@@ -1092,6 +1145,9 @@ export default function KnightGachaModal({
                       </span>
                     </div>
                     <p className="text-xs text-amber-100 font-bold">🗡️ {featured5Hero.weaponName}</p>
+                    {featured5Hero.memeQuote && (
+                      <p className="text-xs italic text-amber-200/95">{featured5Hero.memeQuote}</p>
+                    )}
                     <p className="text-xs text-slate-300">{featured5Hero.passiveText}</p>
                   </div>
 
@@ -1365,6 +1421,11 @@ export default function KnightGachaModal({
                           <p className="text-xs font-bold text-amber-700 dark:text-amber-300 truncate">
                             🗡️ {heldWeapon ? `${heldWeapon.name} (Trang trí)` : skin.weaponName}
                           </p>
+                          {skin.memeQuote && (
+                            <p className="text-[11px] italic text-pink-600 dark:text-pink-300 leading-snug">
+                              {skin.memeQuote}
+                            </p>
+                          )}
                           <p className="text-[11px] text-[#475569] dark:text-slate-300 leading-snug">
                             {skin.passiveText}
                           </p>
@@ -1645,7 +1706,7 @@ export default function KnightGachaModal({
                   Quy Tắc Vòng Quay
                 </h4>
                 <ul className="space-y-1.5 text-[#334155] dark:text-slate-300 leading-relaxed">
-                  <li>• <b>Banner Giới Hạn:</b> Đổi mỗi 7 ngày (1 banner duy nhất/tuần). Có tỉ lệ 50% ra nhân vật Thường nếu lệch 50/50.</li>
+                  <li>• <b>Banner Giới Hạn:</b> Reset cố định lúc <b>00:00 Thứ 2 hàng tuần</b> (1 banner duy nhất/tuần). Có tỉ lệ 50% ra nhân vật Thường nếu lệch 50/50.</li>
                   <li>• <b>Banner Thường:</b> Không bao giờ ra nhân vật Giới Hạn, có tỉ lệ tạch ở bậc 3★.</li>
                   <li>• <b>Hoàn Vàng trùng nhân vật:</b> Nhân vật 5★ hoàn <b>{KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD.toLocaleString('vi-VN')} Vàng</b> • Nhân vật 4★ hoàn <b>{KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD.toLocaleString('vi-VN')} Vàng</b>.</li>
                   <li>• <b>Vũ khí 4★ &amp; 3★:</b> Trùng vẫn cộng dồn bình thường, dùng trang trí ngoại hình theo đúng Hệ nhân vật.</li>
@@ -1693,6 +1754,310 @@ export default function KnightGachaModal({
             </div>
           </div>
         )}
+
+        {/* =========================================================
+            TAB 5 (ADMIN ONLY): GRANT WISHES TO ACCOUNTS & SCHEDULE NEXT MONDAY BANNER HERO
+        ========================================================= */}
+        {isStrictAdmin && activeTab === 'admin' && (() => {
+          const allAccounts = Object.entries(usersDb || {})
+            .map(([uKey, uVal]) => ({
+              username: uVal?.username || uKey,
+              name: uVal?.name || uKey,
+              isGuest: Boolean(uVal?.isGuest),
+              role: uVal?.role || 'student',
+              wishes: Math.max(0, Math.floor(Number(uVal?.knightRpgProfile?.wishes) || 0))
+            }))
+            .filter(acc => acc.username && !acc.isGuest)
+            .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+
+          const qTrim = grantTargetQuery.trim().replace(/^@/, '').toLowerCase();
+          const filteredAccounts = qTrim
+            ? allAccounts.filter(
+                acc =>
+                  acc.username.toLowerCase().includes(qTrim) ||
+                  acc.name.toLowerCase().includes(qTrim)
+              )
+            : allAccounts;
+          const exactTarget = allAccounts.find(
+            acc => acc.username.toLowerCase() === qTrim
+          );
+
+          const handleGrantSubmit = (e) => {
+            e?.preventDefault();
+            const targetAcc = exactTarget || (filteredAccounts.length === 1 ? filteredAccounts[0] : null);
+            const cleanTargetUname = targetAcc?.username || grantTargetQuery.trim().replace(/^@/, '');
+            const cleanAmt = Math.max(1, Math.min(10000, Math.round(Number(grantAmount) || 0)));
+            if (!cleanTargetUname) {
+              showToast?.('Vui lòng chọn hoặc nhập @username tài khoản cần trao lượt quay!', 'error');
+              return;
+            }
+            const existsInDb = allAccounts.find(
+              acc => acc.username.toLowerCase() === cleanTargetUname.toLowerCase()
+            );
+            if (!existsInDb) {
+              showToast?.(`Không tìm thấy tài khoản "@${cleanTargetUname}" trong hệ thống!`, 'error');
+              return;
+            }
+            if (!onAdminGrantGachaWishes) {
+              showToast?.('Chức năng đồng bộ Admin chưa sẵn sàng.', 'error');
+              return;
+            }
+            onAdminGrantGachaWishes({
+              username: existsInDb.username,
+              amount: cleanAmt,
+              note: grantNote.trim()
+            });
+            setGrantNote('');
+            showToast?.(
+              `🎁 Đã trao +${cleanAmt} 🌠 Lượt Quay Gacha cho ${existsInDb.name} (@${existsInDb.username})!`
+            );
+          };
+
+          return (
+            <div className="space-y-5">
+              {/* 1. Grant Wishes to Another Account */}
+              <form
+                onSubmit={handleGrantSubmit}
+                data-testid="admin-grant-wishes-panel"
+                className="rounded-2xl border-2 border-rose-300 dark:border-rose-500/40 bg-rose-50/40 dark:bg-slate-900/90 p-4 sm:p-5 space-y-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-[#0F172B] dark:text-white flex items-center gap-2">
+                      <Gift className="w-4 h-4 text-rose-500" />
+                      <span>Trao Lượt Quay Gacha Cho Tài Khoản Khác</span>
+                    </h3>
+                    <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                      Cộng trực tiếp lượt quay vào tài khoản học viên / giáo viên và gửi thông báo tự động theo thời gian thực.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <div className="md:col-span-6 space-y-1.5">
+                    <label className="block text-xs font-extrabold text-[#334155] dark:text-slate-300">
+                      Tài khoản nhận (@username hoặc tên)
+                    </label>
+                    <input
+                      type="text"
+                      data-testid="admin-grant-target-input"
+                      value={grantTargetQuery}
+                      onChange={e => setGrantTargetQuery(e.target.value)}
+                      placeholder="VD: e2e_student hoặc bấm chọn bên dưới..."
+                      className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3 space-y-1.5">
+                    <label className="block text-xs font-extrabold text-[#334155] dark:text-slate-300">
+                      Số lượt quay tặng
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      data-testid="admin-grant-amount-input"
+                      value={grantAmount}
+                      onChange={e => setGrantAmount(Math.max(1, Math.min(10000, Number(e.target.value) || 1)))}
+                      className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-black text-amber-600 dark:text-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3 flex items-end">
+                    <button
+                      type="submit"
+                      data-testid="admin-grant-wishes-btn"
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:opacity-95 text-white text-xs font-black shadow-md transition flex items-center justify-center gap-1.5"
+                    >
+                      <Gift className="w-3.5 h-3.5" />
+                      <span>Trao +{grantAmount} Lượt</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">Chọn nhanh số lượt:</span>
+                  {[1, 5, 10, 20, 50, 90].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setGrantAmount(preset)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-black border transition ${
+                        Number(grantAmount) === preset
+                          ? 'bg-amber-400 text-slate-950 border-amber-400'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-amber-400'
+                      }`}
+                    >
+                      +{preset} lượt
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    value={grantNote}
+                    onChange={e => setGrantNote(e.target.value)}
+                    placeholder="Lời nhắn kèm thông báo (tùy chọn, VD: Thưởng Top BXH tuần này!)..."
+                    className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-[#0F172B] dark:text-white focus:outline-none focus:border-rose-400"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    Bấm chọn nhanh tài khoản ({filteredAccounts.length} tài khoản):
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                    {filteredAccounts.slice(0, 30).map(acc => {
+                      const isSelected = acc.username.toLowerCase() === qTrim;
+                      const isSelf = acc.username.toLowerCase() === String(currentUsername || '').toLowerCase();
+                      return (
+                        <button
+                          key={acc.username}
+                          type="button"
+                          data-testid={`admin-pick-account-${acc.username}`}
+                          onClick={() => setGrantTargetQuery(acc.username)}
+                          className={`px-2.5 py-1 rounded-xl border text-xs font-bold transition inline-flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-rose-600 text-white border-rose-500'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-[#0F172B] dark:text-slate-200 hover:border-rose-400'
+                          }`}
+                        >
+                          <span>{acc.name}</span>
+                          <span className="opacity-75">(@{acc.username}{isSelf ? ' • Bạn' : ''})</span>
+                          <span className="px-1.5 py-0.2 rounded bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-200 font-black text-[10px]">
+                            {acc.wishes}🌠
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </form>
+
+              {/* 2. Choose Next Featured Limited Hero for Monday 00:00 Reset */}
+              <div
+                data-testid="admin-next-banner-panel"
+                className="rounded-2xl border-2 border-amber-300 dark:border-amber-500/40 bg-amber-50/40 dark:bg-slate-900/90 p-4 sm:p-5 space-y-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-[#0F172B] dark:text-white flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-500" />
+                      <span>Chọn Nhân Vật Tiếp Theo Cho Banner Giới Hạn (Reset 00:00 Thứ 2)</span>
+                    </h3>
+                    <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                      Đúng <b>00:00 Thứ 2 hàng tuần</b>: Banner Giới Hạn sẽ tự động chuyển sang nhân vật Admin đã chọn (đồng thời điểm BXH ở 2 game tự động reset về 0, không ảnh hưởng điểm học tập).
+                    </p>
+                  </div>
+                  {weeklyBanner.isAdminScheduledNext && (
+                    <button
+                      type="button"
+                      data-testid="admin-clear-scheduled-hero-btn"
+                      onClick={() => {
+                        onAdminSetGachaBannerConfig?.({ nextFeaturedHeroId: '' });
+                        showToast?.('Đã chuyển Banner Thứ 2 tới về chế độ tự động xoay vòng!');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 transition"
+                    >
+                      🔄 Để Tự Động Xoay Vòng
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-amber-300 dark:border-amber-500/40 flex items-center gap-3">
+                    <img src={featured5Hero.spriteUrl} alt={featured5Hero.name} className="w-12 h-12 object-contain shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-300">
+                        Đang mở tuần này ({weeklyBanner.weekKey})
+                      </span>
+                      <p className="font-black text-[#0F172B] dark:text-white truncate">{featured5Hero.name}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Còn {weeklyBanner.countdownText}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-emerald-300 dark:border-emerald-500/40 flex items-center gap-3">
+                    <img src={nextFeatured5Hero.spriteUrl} alt={nextFeatured5Hero.name} className="w-12 h-12 object-contain shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-300">
+                        {weeklyBanner.isAdminScheduledNext ? '📌 Đã khóa cho 00:00 Thứ 2 tới' : '🔄 Dự kiến 00:00 Thứ 2 tới (Tự động)'}
+                      </span>
+                      <p
+                        data-testid="admin-scheduled-next-hero-name"
+                        className="font-black text-[#0F172B] dark:text-white truncate"
+                      >
+                        {nextFeatured5Hero.name}
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{nextFeatured5Hero.weaponClassLabel}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {limited5Heroes.map(hero => {
+                    const isCurrentActive = featured5Hero.id === hero.id;
+                    const isScheduledNext = weeklyBanner.scheduledNextHeroId === hero.id;
+                    return (
+                      <div
+                        key={hero.id}
+                        className={`p-3 rounded-2xl border flex flex-col justify-between gap-2.5 ${
+                          isScheduledNext
+                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-400 ring-1 ring-emerald-400/40'
+                            : isCurrentActive
+                            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-400'
+                            : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <img src={hero.spriteUrl} alt={hero.name} className="w-12 h-12 object-contain shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-[#0F172B] dark:text-white leading-snug">{hero.name}</p>
+                            <p className="text-[10px] font-bold text-amber-600 dark:text-amber-300">{hero.weaponClassLabel}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            data-testid={`admin-schedule-next-hero-${hero.id}`}
+                            onClick={() => {
+                              onAdminSetGachaBannerConfig?.({ nextFeaturedHeroId: hero.id });
+                              showToast?.(`📌 Đã chọn "${hero.name}" làm Banner Giới Hạn cho 00:00 Thứ 2 tới!`);
+                            }}
+                            className={`py-1.5 px-2 rounded-xl text-[11px] font-black transition ${
+                              isScheduledNext
+                                ? 'bg-emerald-500 text-slate-950'
+                                : 'bg-emerald-600/15 hover:bg-emerald-600 hover:text-white text-emerald-700 dark:text-emerald-300 border border-emerald-400/40'
+                            }`}
+                          >
+                            {isScheduledNext ? '✓ Thứ 2 Tới' : '📌 Thứ 2 Tới'}
+                          </button>
+
+                          <button
+                            type="button"
+                            data-testid={`admin-activate-now-hero-${hero.id}`}
+                            onClick={() => {
+                              onAdminSetGachaBannerConfig?.({ activeFeaturedHeroId: hero.id });
+                              showToast?.(`⚡ Đã chuyển Banner Giới Hạn tuần này sang "${hero.name}"!`);
+                            }}
+                            className={`py-1.5 px-2 rounded-xl text-[11px] font-black transition ${
+                              isCurrentActive
+                                ? 'bg-amber-400 text-slate-950'
+                                : 'bg-amber-500/15 hover:bg-amber-500 hover:text-slate-950 text-amber-700 dark:text-amber-300 border border-amber-400/40'
+                            }`}
+                          >
+                            {isCurrentActive ? '★ Đang Mở' : '⚡ Mở Ngay'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

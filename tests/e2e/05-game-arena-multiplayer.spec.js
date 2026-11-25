@@ -255,8 +255,8 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('switch-to-knight-game-btn').click();
     await page.getByTestId('open-knight-shop-btn').click();
 
-    // Verify strictly ONE Weekly Limited Banner with 7-day rotation countdown
-    await expect(page.getByTestId('weekly-limited-banner-timer')).toContainText(/Chu kỳ 7 ngày/i);
+    // Verify strictly ONE Weekly Limited Banner resetting Monday 00:00
+    await expect(page.getByTestId('weekly-limited-banner-timer')).toContainText(/Reset 00:00 Thứ 2/i);
 
     // 1) Pull 1x on Limited Banner forced 5★:
     //    - Initially (0-3s) MUST be neutral mystery color ('neutral', no early spoiler!)
@@ -424,12 +424,17 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     // Admin sees Admin-only secret test button, per-stage buttons & unlimited free Gacha test pulls + 200k duplicate refund!
     await expect(page.getByTestId('admin-test-demon-king-btn')).toBeVisible();
     await expect(page.getByTestId('start-knight-stage-4')).toBeVisible();
+    await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Sảnh Lâu Đài/i);
 
     await page.getByTestId('open-knight-shop-btn').click();
+    // Verify BGM switches to dedicated Gacha Banner track ("Cầu Nguyện Sao Băng") while inside Gacha modal!
+    await expect(page.getByTestId('gacha-modal-bgm-btn')).toContainText(/Cầu Nguyện Sao Băng/i);
+    await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Cầu Nguyện Sao Băng/i);
     await expect(page.getByTestId('admin-gacha-free-badge')).toBeVisible();
     await expect(page.getByTestId('gacha-pull-10-btn')).toContainText(/Miễn phí/i);
+    await expect(page.getByTestId('weekly-limited-banner-timer')).toContainText(/00:00 Thứ 2/i);
 
-    // Pull Standard Banner forced 5★ x10 three times as Admin -> confirm NO Limited 5★ hero ever drops on Standard Banner & 5★ dupes refund +200K VÀNG!
+    // Pull Standard Banner forced 5★ x10 four times as Admin -> confirm NO Limited 5★ hero ever drops on Standard Banner & 5★ dupes refund +200K VÀNG!
     await page.getByTestId('gacha-tab-standard').click();
     await page.evaluate(() => {
       window.__FORCE_GACHA_RARITY__ = 5;
@@ -438,12 +443,18 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await page.getByTestId('gacha-std-pull-10-btn').click();
       await page.getByTestId('gacha-skip-cutscene-btn').click();
       const stdResText = await page.getByTestId('knight-gacha-results-view').textContent();
-      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden/i);
+      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden|GigaChad|Gấu Trúc/i);
       await page.getByTestId('gacha-close-results-btn').click();
     }
 
-    // Check Inventory: 13 total heroes (including new Limited 5★ heroes) + equip class-matched cosmetic sword on Arthur!
+    // Check Inventory: 19 total heroes (including 6 new meme heroes) + equip class-matched cosmetic sword on Arthur!
     await page.getByTestId('gacha-tab-inventory').click();
+    await expect(page.getByText(/Thần Chó Cheems Gậy Bonk/i)).toBeVisible();
+    await expect(page.getByText(/Hoàng Thượng Mèo Trắng Đa Nghi/i)).toBeVisible();
+    await expect(page.getByText(/Pháp Sư Ếch Xanh Pepe/i)).toBeVisible();
+    await expect(page.getByText(/Thánh Capybara Đội Cam/i)).toBeVisible();
+    await expect(page.getByText(/Đại Đế Cơ Bắp GigaChad/i)).toBeVisible();
+    await expect(page.getByText(/Tông Sư Gấu Trúc Kem Ốc Quế/i)).toBeVisible();
     await expect(page.getByText(/Đại Pháp Sư Tinh Không Zephyr/i)).toBeVisible();
     await expect(page.getByText(/Thánh Nữ Thần Thương Celestia/i)).toBeVisible();
     await expect(page.getByText(/Lôi Đế Huyết Kiếm Raiden/i)).toBeVisible();
@@ -453,11 +464,26 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await expect(page.getByTestId('knight-skin-card-knight_arthur')).toContainText(/Trang trí/i);
     }
 
+    // Test Admin Tab: Grant wishes to e2e_student & schedule next Monday Limited Banner hero + switch active hero
+    await page.getByTestId('gacha-tab-admin').click();
+    await expect(page.getByTestId('admin-grant-wishes-panel')).toBeVisible();
+    await page.getByTestId(`admin-pick-account-${E2E_CREDENTIALS.student.username}`).click();
+    await page.getByTestId('admin-grant-amount-input').fill('7');
+    await page.getByTestId('admin-grant-wishes-btn').click();
+
+    await page.getByTestId('admin-schedule-next-hero-bing_chilling_panda').click();
+    await expect(page.getByTestId('admin-scheduled-next-hero-name')).toContainText(/Gấu Trúc Kem Ốc Quế/i);
+    await page.getByTestId('admin-activate-now-hero-gigachad_knight').click();
+    await page.getByTestId('gacha-tab-character').click();
+    await expect(page.getByRole('heading', { name: /Đại Đế Cơ Bắp GigaChad/i })).toBeVisible();
+
     await expect(page.getByTestId('knight-skin-shop-modal')).toContainText(/\d{3}\.\d{3} Vàng/);
     await page.evaluate(() => {
       delete window.__FORCE_GACHA_RARITY__;
     });
     await page.getByTestId('close-knight-gacha-modal-btn').click();
+    // Verify closing Gacha Modal restores Hub BGM ("Sảnh Lâu Đài")
+    await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Sảnh Lâu Đài/i);
 
     // Force wheel to Round 1 (4-choice meaning shields) and verify Pac-Man Warning -> 5 Hearts -> Wheel -> Stage 5 BGM & Curse Timer
     await page.evaluate(() => {
@@ -477,28 +503,55 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
   test('Game Arena Space Shooter & Knight RPG render Top 1-3 podium row and vertical Top 4-10 list without horizontal overflow', async ({
     page
   }) => {
-    const spaceEntries = Array.from({ length: 12 }, (_, idx) => ({
-      id: `lb_space_${idx + 1}`,
-      username: `e2e_top_space_${idx + 1}`,
-      name: `Cao Thủ Phi Thuyền Số ${idx + 1} Tên Khá Dài`,
-      gameType: 'space_shooter',
-      mode: 'space_shooter',
-      score: 5000 - idx * 250,
-      accuracyPct: 100 - idx,
-      topicLabel: 'IELTS Academic',
-      updatedAtMs: Date.now() - idx * 1000
-    }));
-    const knightEntries = Array.from({ length: 12 }, (_, idx) => ({
-      id: `lb_knight_${idx + 1}`,
-      username: `e2e_top_knight_${idx + 1}`,
-      name: `Hiệp Sĩ Đồ Long Hạng ${idx + 1} Tên Dài`,
-      gameType: 'knight_rpg',
-      mode: 'knight_rpg',
-      score: 8000 - idx * 300,
-      accuracyPct: 100 - idx,
-      topicLabel: 'Hành Trình Đồ Long',
-      updatedAtMs: Date.now() - idx * 1000
-    }));
+    const staleLastWeekTs = 1700000000000; // Older than Monday 00:00 of current week -> must be excluded (reset to 0)!
+    const spaceEntries = [
+      {
+        id: 'lb_space_stale_last_week',
+        username: 'e2e_stale_last_week_space',
+        name: 'Kỷ Lục Tuần Cũ Đã Reset',
+        gameType: 'space_shooter',
+        mode: 'space_shooter',
+        score: 99999,
+        accuracyPct: 100,
+        topicLabel: 'Tuần Cũ',
+        updatedAtMs: staleLastWeekTs
+      },
+      ...Array.from({ length: 12 }, (_, idx) => ({
+        id: `lb_space_${idx + 1}`,
+        username: `e2e_top_space_${idx + 1}`,
+        name: `Cao Thủ Phi Thuyền Số ${idx + 1} Tên Khá Dài`,
+        gameType: 'space_shooter',
+        mode: 'space_shooter',
+        score: 5000 - idx * 250,
+        accuracyPct: 100 - idx,
+        topicLabel: 'IELTS Academic',
+        updatedAtMs: Date.now() - idx * 1000
+      }))
+    ];
+    const knightEntries = [
+      {
+        id: 'lb_knight_stale_last_week',
+        username: 'e2e_stale_last_week_knight',
+        name: 'Hiệp Sĩ Tuần Cũ Đã Reset',
+        gameType: 'knight_rpg',
+        mode: 'knight_rpg',
+        score: 99999,
+        accuracyPct: 100,
+        topicLabel: 'Tuần Cũ',
+        updatedAtMs: staleLastWeekTs
+      },
+      ...Array.from({ length: 12 }, (_, idx) => ({
+        id: `lb_knight_${idx + 1}`,
+        username: `e2e_top_knight_${idx + 1}`,
+        name: `Hiệp Sĩ Đồ Long Hạng ${idx + 1} Tên Dài`,
+        gameType: 'knight_rpg',
+        mode: 'knight_rpg',
+        score: 8000 - idx * 300,
+        accuracyPct: 100 - idx,
+        topicLabel: 'Hành Trình Đồ Long',
+        updatedAtMs: Date.now() - idx * 1000
+      }))
+    ];
 
     await page.route('**/api/sync/state', async route => {
       const response = await route.fetch();
@@ -577,7 +630,14 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
 
     await page.setViewportSize({ width: 1366, height: 820 });
     await assertLeaderboardGeometry('knight-lobby-leaderboard', 'Knight-Desktop');
+    await expect(page.getByTestId('knight-lobby-leaderboard')).not.toContainText(/Tuần Cũ Đã Reset|99\.999/i);
     await assertNoHorizontalOverflow(page, 'KnightLeaderboard-Desktop');
+
+    // Verify Student received the +7 wishes granted by Admin earlier AND Student cannot see Admin Gacha Tab!
+    await page.getByTestId('open-knight-shop-btn').click();
+    await expect(page.getByTestId('gacha-wishes-count')).toContainText(/[789]\s*Lượt|\d{2,}\s*Lượt/i);
+    await expect(page.getByTestId('gacha-tab-admin')).toHaveCount(0);
+    await page.getByTestId('close-knight-gacha-modal-btn').click();
 
     healthGuard.assertHealthy('vertical-podium-leaderboard-desktop-mobile');
   });

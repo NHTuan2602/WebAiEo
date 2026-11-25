@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="capyAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fb923c" stop-opacity="0.38"/>
+      <stop offset="65%" stop-color="#22c55e" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="capyFur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="55%" stop-color="#b45309"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </linearGradient>
+    <linearGradient id="snoutDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#78350f"/>
+      <stop offset="100%" stop-color="#451a03"/>
+    </linearGradient>
+    <linearGradient id="jadeBlade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#bbf7d0"/>
+      <stop offset="50%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="160" cy="160" r="138" fill="url(#capyAura)"/>
+
+  <!-- Emerald Knight Cape -->
+  <path d="M96 158 C56 184 48 236 68 278 C96 272 118 274 134 256 Z" fill="#059669" stroke="#064e3b" stroke-width="3.6"/>
+
+  <!-- Round Unbothered Capybara Body in Silver-Gold Armor -->
+  <ellipse cx="146" cy="222" rx="58" ry="56" fill="url(#capyFur)" stroke="#451a03" stroke-width="3.8"/>
+  <path d="M104 176 L190 176 L184 242 L147 258 L110 242 Z" fill="#f8fafc" stroke="#1e293b" stroke-width="3.5" stroke-linejoin="round"/>
+  <circle cx="147" cy="210" r="13" fill="#fb923c" stroke="#7c2d12" stroke-width="2.5"/>
+
+  <!-- Stubby Chill Legs -->
+  <rect x="108" y="264" width="24" height="24" rx="10" fill="url(#snoutDark)" stroke="#290f02" stroke-width="3"/>
+  <rect x="162" y="264" width="24" height="24" rx="10" fill="url(#snoutDark)" stroke="#290f02" stroke-width="3"/>
+
+  <!-- Iconic Rectangular Chill Capybara Head (Side-3/4 Zen Profile!) -->
+  <ellipse cx="118" cy="96" rx="11" ry="13" fill="url(#snoutDark)" stroke="#290f02" stroke-width="3"/>
+  <rect x="98" y="90" width="114" height="84" rx="38" fill="url(#capyFur)" stroke="#451a03" stroke-width="3.8"/>
+  <!-- Dark Snout Patch -->
+  <rect x="158" y="102" width="56" height="66" rx="26" fill="url(#snoutDark)"/>
+
+  <!-- Zen Unbothered Closed-Line Eye & Nostrils ("Ok I Pull Up") -->
+  <line x1="130" y1="118" x2="152" y2="118" stroke="#1c1917" stroke-width="4.2" stroke-linecap="round"/>
+  <circle cx="141" cy="118" r="3.5" fill="#1c1917"/>
+  <ellipse cx="194" cy="118" rx="4.5" ry="6" fill="#1c1917"/>
+  <path d="M178 148 Q190 154 200 146" fill="none" stroke="#fde68a" stroke-width="2.6" stroke-linecap="round"/>
+
+  <!-- Famous Bright Tangerine / Orange Balanced Perfectly on Capybara's Head! -->
+  <ellipse cx="150" cy="74" rx="22" ry="18" fill="#fb923c" stroke="#9a3412" stroke-width="3.2"/>
+  <path d="M150 56 C156 44 170 46 166 56 C160 60 154 58 150 56 Z" fill="#22c55e" stroke="#14532d" stroke-width="2.2"/>
+  <circle cx="142" cy="69" r="3.5" fill="#fed7aa" opacity="0.75"/>
+
+  <!-- Glowing Jade Sugar-Cane / Bamboo Sword -->
+  <g transform="rotate(-30 226 196)">
+    <rect x="184" y="188" width="118" height="14" rx="6" fill="url(#jadeBlade)" stroke="#064e3b" stroke-width="3.2"/>
+    <line x1="216" y1="188" x2="216" y2="202" stroke="#dcfce7" stroke-width="3"/>
+    <line x1="250" y1="188" x2="250" y2="202" stroke="#dcfce7" stroke-width="3"/>
+    <line x1="280" y1="188" x2="280" y2="202" stroke="#dcfce7" stroke-width="3"/>
+    <rect x="176" y="180" width="10" height="30" rx="4" fill="#fbbf24" stroke="#78350f" stroke-width="2.5"/>
+  </g>
+  <ellipse cx="182" cy="212" rx="15" ry="11" fill="url(#capyFur)" stroke="#451a03" stroke-width="3"/>
+</svg>

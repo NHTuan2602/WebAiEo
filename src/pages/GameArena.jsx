@@ -69,6 +69,7 @@ import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
 import VerticalPodiumLeaderboard from '../components/common/VerticalPodiumLeaderboard';
 import KnightDragonGame from '../components/game/KnightDragonGame';
+import { getVietnamMondayWeekState } from '../constants/knightRpgData';
 import {
   AIEO_VIP_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
@@ -103,6 +104,9 @@ export default function GameArena({
   gameOutcome,
   gamePaused,
   gamePracticeLeaderboard = [],
+  knightGachaConfig = null,
+  onAdminGrantGachaWishes = null,
+  onAdminSetGachaBannerConfig = null,
   gameQueues,
   gameReviewLog,
   gameRound,
@@ -295,6 +299,9 @@ export default function GameArena({
             : null
         }
         onSyncKnightResult={onSyncKnightResult}
+        knightGachaConfig={knightGachaConfig}
+        onAdminGrantGachaWishes={onAdminGrantGachaWishes}
+        onAdminSetGachaBannerConfig={onAdminSetGachaBannerConfig}
         paymentConfig={paymentConfig}
         roomPin={activePin}
         roomRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
@@ -305,8 +312,9 @@ export default function GameArena({
     );
   }
 
-  // Dedicated Space Shooter Score Leaderboard (aggregates Space Shooter Self-Practice & Live Room records)
+  // Dedicated Space Shooter Score Leaderboard (resets every Monday 00:00 Vietnam time)
   const spaceShooterLeaderboardRows = (() => {
+    const { weekStartMs } = getVietnamMondayWeekState(Date.now());
     const byUser = new Map();
     const upsertSpaceRow = (unameRaw, candidate) => {
       const cleanUname = String(unameRaw || '').trim();
@@ -335,6 +343,7 @@ export default function GameArena({
 
     (Array.isArray(gamePracticeLeaderboard) ? gamePracticeLeaderboard : []).forEach(row => {
       if (!row?.username) return;
+      if (Number(row.updatedAtMs) > 0 && Number(row.updatedAtMs) < weekStartMs) return;
       const isKnight =
         row.gameType === 'knight_rpg' ||
         String(row.mode || '').toLowerCase().startsWith('knight');
@@ -350,9 +359,12 @@ export default function GameArena({
 
     Object.values(roomsDb || {}).forEach(rObj => {
       if (!rObj || rObj.gameType === 'knight_rpg') return;
+      const roomTs = Number(rObj.finishedAtMs || rObj.updatedAtMs || rObj.lastUpdatedAt) || 0;
       const roomLabel = rObj.name || `Phòng #${rObj.pin || ''}`;
       Object.entries(rObj.players || {}).forEach(([pKey, pVal]) => {
         if (!pVal || pVal.role === 'teacher') return;
+        const pTs = Number(pVal.updatedAtMs || pVal.finishedAtMs || roomTs) || 0;
+        if (pTs > 0 && pTs < weekStartMs) return;
         upsertSpaceRow(pVal.username || pKey, {
           name: pVal.name || pKey,
           score: Number(pVal.score) || 0,
@@ -380,7 +392,7 @@ export default function GameArena({
           <span>BẢNG XẾP HẠNG ĐIỂM — PHI THUYỀN VŨ TRỤ ({spaceShooterLeaderboardRows.length} kỷ lục)</span>
         </h3>
         <span className="text-[11px] text-slate-400 font-semibold">
-          Đua Top 1/2/3 theo ngày • Tự động cập nhật sau mỗi trận
+          Reset 00:00 Thứ 2 hàng tuần • Đua Top 1/2/3 theo ngày
         </span>
       </div>
       {spaceShooterLeaderboardRows.length === 0 ? (

@@ -27,6 +27,7 @@ import {
   DEATH_REVIVE_DELAY_SEC,
   DEMON_KING_BOSS,
   getHeroCosmeticWeapon,
+  getVietnamMondayWeekState,
   KNIGHT_CHARACTER_SKINS,
   KNIGHT_GACHA_GOLD_SINGLE,
   KNIGHT_GACHA_WEAPONS,
@@ -120,6 +121,9 @@ export default function KnightDragonGame({
   initialRawVocab = DEFAULT_VOCAB_TEXT,
   initialTopicId = 'core',
   initialTopicLabel = 'IELTS Core Academic',
+  knightGachaConfig = null,
+  onAdminGrantGachaWishes = null,
+  onAdminSetGachaBannerConfig = null,
   onBackToGameHub,
   onBackToSpaceMode,
   onExitArena,
@@ -148,6 +152,27 @@ export default function KnightDragonGame({
     loadLocalKnightRpgProfile(username, currentUser)
   );
   const [showShopModal, setShowShopModal] = useState(false);
+
+  // Sync incoming server wish grants / QR wish purchases in real time without page reload
+  const liveServerUser =
+    usersDb?.[username] ||
+    Object.values(usersDb || {}).find(
+      u => u && String(u.username || '').toLowerCase() === String(username || '').toLowerCase()
+    ) ||
+    currentUser;
+  const liveServerWishCredits = Math.max(
+    Math.floor(Number(currentUser?.gachaWishCredits) || 0),
+    Math.floor(Number(liveServerUser?.gachaWishCredits) || 0)
+  );
+  useEffect(() => {
+    if (!username || username === 'guest') return;
+    if (liveServerWishCredits > (rpgProfile.claimedServerWishCredits || 0)) {
+      setRpgProfile(prev => {
+        const credited = applyServerPurchasedWishes(prev, { gachaWishCredits: liveServerWishCredits });
+        return saveLocalKnightRpgProfile(username, credited);
+      });
+    }
+  }, [username, liveServerWishCredits, rpgProfile.claimedServerWishCredits]);
   const [topicId, setTopicId] = useState(initialTopicId || 'core');
   const [roundSize, setRoundSize] = useState(8);
   const [speedMode, setSpeedMode] = useState('normal');
@@ -247,17 +272,18 @@ export default function KnightDragonGame({
     []
   );
 
-  // Per-stage procedural RPG Background Music (BGM) switcher
-  const activeBgmTrackId =
-    matchState === 'HUB'
-      ? 'hub'
-      : matchState === 'DEMON_WARNING'
-      ? 'demon_warning'
-      : matchState === 'DEMON_WHEEL' || (round === 5 && matchState === 'PLAYING')
-      ? 'stage5'
-      : matchState === 'PLAYING' || matchState === 'TRANSITION' || matchState === 'FINAL_SMASH'
-      ? `stage${Math.min(5, Math.max(1, Number(round) || 1))}`
-      : null;
+  // Per-stage + Gacha Banner procedural RPG Background Music (BGM) switcher
+  const activeBgmTrackId = showShopModal
+    ? 'gacha'
+    : matchState === 'HUB'
+    ? 'hub'
+    : matchState === 'DEMON_WARNING'
+    ? 'demon_warning'
+    : matchState === 'DEMON_WHEEL' || (round === 5 && matchState === 'PLAYING')
+    ? 'stage5'
+    : matchState === 'PLAYING' || matchState === 'TRANSITION' || matchState === 'FINAL_SMASH'
+    ? `stage${Math.min(5, Math.max(1, Number(round) || 1))}`
+    : null;
 
   useEffect(() => {
     if (bgmMuted || !activeBgmTrackId) {
@@ -2554,6 +2580,7 @@ export default function KnightDragonGame({
       bannerType,
       bannerId,
       count,
+      gachaConfig: knightGachaConfig,
       isAdminFreePull: isStrictAdmin
     });
     if (!rollResult.ok) {
@@ -2625,8 +2652,9 @@ export default function KnightDragonGame({
   const bankItemsCount = parseRawVocabText(resolveSelectedRawVocab()).length;
   const activeWheelMeta = WHEEL_SECTORS.find(s => s.round === demonWheelStyle) || WHEEL_SECTORS[0];
 
-  // Aggregate & deduplicate Knight & Dragon RPG Score Leaderboard for the waiting screen (HUB)
+  // Aggregate & deduplicate Knight & Dragon RPG Score Leaderboard for the waiting screen (resets every Monday 00:00 VN)
   const knightLeaderboardRows = (() => {
+    const { weekStartMs, weekKey: currentWeekKey } = getVietnamMondayWeekState(Date.now());
     const byUser = new Map();
     const upsertRow = (unameRaw, candidate) => {
       const cleanUname = String(unameRaw || '').trim();
@@ -2672,6 +2700,7 @@ export default function KnightDragonGame({
 
     (Array.isArray(gamePracticeLeaderboard) ? gamePracticeLeaderboard : []).forEach(entry => {
       if (!entry?.username) return;
+      if (Number(entry.updatedAtMs) > 0 && Number(entry.updatedAtMs) < weekStartMs) return;
       const isKnight =
         entry.gameType === 'knight_rpg' ||
         String(entry.mode || '').toLowerCase().startsWith('knight');
@@ -2688,6 +2717,8 @@ export default function KnightDragonGame({
 
     Object.values(usersDb || {}).forEach(u => {
       if (!u?.username) return;
+      const uWeekKey = u?.knightRpgProfile?.bestScoreWeekKey;
+      if (uWeekKey && uWeekKey !== currentWeekKey) return;
       const pBest = Math.floor(Number(u?.knightRpgProfile?.bestScore) || 0);
       if (pBest > 0) {
         upsertRow(u.username, {
@@ -2698,7 +2729,11 @@ export default function KnightDragonGame({
       }
     });
 
-    if (username && Number(rpgProfile?.bestScore) > 0) {
+    if (
+      username &&
+      Number(rpgProfile?.bestScore) > 0 &&
+      (!rpgProfile?.bestScoreWeekKey || rpgProfile.bestScoreWeekKey === currentWeekKey)
+    ) {
       upsertRow(username, {
         name: currentUser?.name || username,
         score: Number(rpgProfile.bestScore) || 0,
@@ -3149,7 +3184,7 @@ export default function KnightDragonGame({
                   <span>BẢNG XẾP HẠNG ĐIỂM — HIỆP SĨ DIỆT RỒNG ({knightLeaderboardRows.length} cao thủ)</span>
                 </h3>
                 <span className="text-[11px] text-[#475569] dark:text-slate-400 font-bold">
-                  Đua Top 1/2/3 theo ngày • Cập nhật tự động sau mỗi trận
+                  Reset 00:00 Thứ 2 hàng tuần • Đua Top 1/2/3 theo ngày
                 </span>
               </div>
 
@@ -3917,11 +3952,18 @@ export default function KnightDragonGame({
       <KnightGachaModal
         isOpen={showShopModal}
         isStrictAdmin={isStrictAdmin}
+        bgmMuted={bgmMuted}
+        onToggleBgm={handleToggleBgm}
+        knightGachaConfig={knightGachaConfig}
+        usersDb={usersDb}
+        currentUsername={username}
         rpgProfile={rpgProfile}
         paymentConfig={paymentConfig}
         onClose={() => setShowShopModal(false)}
         onExecutePull={handleExecuteGachaPull}
         onAdminResetHeroes={handleAdminResetHeroes}
+        onAdminGrantGachaWishes={onAdminGrantGachaWishes}
+        onAdminSetGachaBannerConfig={onAdminSetGachaBannerConfig}
         onEquipSkin={handleEquipSkin}
         onEquipHeroWeapon={handleEquipHeroWeapon}
         onExchangeGoldForWishes={handleExchangeGoldForWishes}

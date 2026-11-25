@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="chadAura" cx="50%" cy="48%" r="50%">
+      <stop offset="0%" stop-color="#fde047" stop-opacity="0.48"/>
+      <stop offset="55%" stop-color="#cbd5e1" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#94a3b8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="chadSkin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="50%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="chadBeard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="platinumGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef9c3"/>
+      <stop offset="50%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="160" cy="160" r="142" fill="url(#chadAura)"/>
+
+  <!-- Flowing Golden-Crimson Emperor Cape -->
+  <path d="M96 118 C52 146 34 214 48 282 C84 272 114 278 136 258 Z" fill="#991b1b" stroke="#450a0a" stroke-width="3.6"/>
+
+  <!-- Massive Sculpted Monochrome-Titanium Muscular Torso & Pauldrons -->
+  <path d="M88 124 L216 124 L196 226 L152 246 L108 226 Z" fill="url(#chadSkin)" stroke="#0f172a" stroke-width="3.8" stroke-linejoin="round"/>
+  <!-- Chiseled Pecs & Six-Pack Abs Lines -->
+  <path d="M110 162 Q130 172 150 160 Q172 172 194 162" fill="none" stroke="#334155" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="152" y1="160" x2="152" y2="226" stroke="#334155" stroke-width="3"/>
+  <line x1="132" y1="184" x2="172" y2="184" stroke="#334155" stroke-width="2.8"/>
+  <line x1="134" y1="204" x2="170" y2="204" stroke="#334155" stroke-width="2.8"/>
+
+  <!-- Golden Champion Shoulder Pauldrons & Belt -->
+  <path d="M68 126 C68 96 102 92 116 116 L106 150 L74 146 Z" fill="url(#platinumGold)" stroke="#0f172a" stroke-width="3.5"/>
+  <path d="M188 116 C204 92 238 96 236 126 L230 146 L198 150 Z" fill="url(#platinumGold)" stroke="#0f172a" stroke-width="3.5"/>
+  <rect x="108" y="224" width="88" height="18" rx="5" fill="url(#platinumGold)" stroke="#0f172a" stroke-width="3.2"/>
+  <path d="M112 242 L102 292 L138 292 L146 248 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3.2"/>
+  <path d="M192 242 L202 292 L166 292 L158 248 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3.2"/>
+
+  <!-- LEGENDARY ULTRA-CHISELED OCTAGONAL GIGACHAD JAWLINE & BEARD! -->
+  <polygon points="122,52 182,52 192,86 186,118 152,130 118,118 112,86" fill="url(#chadSkin)" stroke="#0f172a" stroke-width="3.6" stroke-linejoin="round"/>
+  <!-- Swept Pompadour Hair -->
+  <path d="M112 64 C112 30 162 22 192 42 C198 54 190 66 182 62 C164 52 134 54 116 68 Z" fill="url(#chadBeard)" stroke="#0f172a" stroke-width="3"/>
+  <!-- Square Granite Beard & Mustache -->
+  <polygon points="115,96 126,96 136,104 168,104 178,96 189,96 186,120 152,132 118,120" fill="url(#chadBeard)"/>
+  <path d="M134 108 Q152 115 170 108" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>
+  <!-- Piercing Chad Brow & Sparkle -->
+  <line x1="124" y1="74" x2="146" y2="77" stroke="#0f172a" stroke-width="3.8" stroke-linecap="round"/>
+  <line x1="158" y1="77" x2="180" y2="74" stroke="#0f172a" stroke-width="3.8" stroke-linecap="round"/>
+  <circle cx="136" cy="82" r="3" fill="#0f172a"/>
+  <circle cx="168" cy="82" r="3" fill="#0f172a"/>
+  <!-- Sparkle on Chin -->
+  <polygon points="188,116 192,124 200,128 192,132 188,140 184,132 176,128 184,124" fill="#fde047"/>
+
+  <!-- Colossal Golden Diamond Greatsword -->
+  <g transform="rotate(-34 236 184)">
+    <polygon points="236,68 256,96 250,224 222,224 216,96" fill="url(#platinumGold)" stroke="#0f172a" stroke-width="3.6" stroke-linejoin="round"/>
+    <line x1="236" y1="80" x2="236" y2="216" stroke="#ffffff" stroke-width="3.5"/>
+    <rect x="204" y="222" width="64" height="12" rx="4" fill="#f8fafc" stroke="#0f172a" stroke-width="3"/>
+    <rect x="230" y="234" width="12" height="28" rx="3" fill="#78350f" stroke="#0f172a" stroke-width="2.8"/>
+  </g>
+</svg>

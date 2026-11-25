@@ -87,6 +87,11 @@ import {
   filterSpeakingForecastForViewer,
   normalizeSpeakingForecastBank
 } from './src/constants/speakingForecast.js';
+import {
+  KNIGHT_CHARACTER_SKINS,
+  getVietnamMondayWeekState,
+  normalizeKnightGachaConfig
+} from './src/constants/knightRpgData.js';
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -1361,6 +1366,8 @@ function createInitialStore(audioDir = '', mediaDir = '') {
     speakingForecast: createDefaultSpeakingForecastBank(),
     customTitles: [],
     gamePracticeLeaderboard: [],
+    archivedPrevWeekGameEntries: [],
+    knightGachaConfig: normalizeKnightGachaConfig({}),
     adminFeedbacks: [],
     notifications: [],
     aiConfig: { geminiApiKey: '' },
@@ -1923,6 +1930,14 @@ function applyParsedStoreSnapshot(store, parsed) {
       .filter(e => e && e.username && Number.isFinite(Number(e.score)))
       .slice(0, 300);
   }
+  if (Array.isArray(parsed.archivedPrevWeekGameEntries)) {
+    store.archivedPrevWeekGameEntries = parsed.archivedPrevWeekGameEntries
+      .filter(e => e && e.username && Number.isFinite(Number(e.score)))
+      .slice(0, 250);
+  }
+  if (parsed.knightGachaConfig && typeof parsed.knightGachaConfig === 'object') {
+    store.knightGachaConfig = normalizeKnightGachaConfig(parsed.knightGachaConfig);
+  }
   if (Array.isArray(parsed.adminFeedbacks)) {
     store.adminFeedbacks = parsed.adminFeedbacks.filter(f => f?.id && f?.content);
   }
@@ -2061,7 +2076,8 @@ export function createPersistentSyncStore(persistFile = '') {
 
   const mediaMigratedOnBoot = externalizeStoreMedia(store);
   const attemptsRepairedOnBoot = reconcileAllStaleAttemptsInStore(store);
-  if (attemptsRepairedOnBoot) {
+  const mondayResetOnBoot = ensureWeeklyMondayReset(store, bootTimestamp);
+  if (attemptsRepairedOnBoot || mondayResetOnBoot) {
     store.version += 1;
   }
 
@@ -2524,16 +2540,86 @@ function serializeSentNotificationsForTeacher(store, viewer) {
   return list.map(n => serializeNotificationItem(n, viewer.username || ''));
 }
 
+function ensureWeeklyMondayReset(store, nowMs = Date.now()) {
+  if (!store || typeof store !== 'object') return false;
+  const { weekKey } = getVietnamMondayWeekState(nowMs);
+  const cfg = normalizeKnightGachaConfig(store.knightGachaConfig, nowMs);
+  if (cfg.lastResetWeekKey === weekKey) {
+    if (!store.knightGachaConfig) store.knightGachaConfig = cfg;
+    return false;
+  }
+
+  // Monday 00:00 Vietnam time reached:
+  // 1) Promote Admin's scheduled next Limited 5★ hero (if any) into this week's active Limited Banner
+  const promotedHeroId = cfg.nextFeaturedHeroId || '';
+  store.knightGachaConfig = {
+    weekKey,
+    activeFeaturedHeroId: promotedHeroId,
+    nextFeaturedHeroId: '',
+    lastResetWeekKey: weekKey
+  };
+
+  // 2) Archive ending week's game leaderboard so Monday's Daily Top 1/2/3 titles from Sunday still settle,
+  //    then reset ONLY Game Leaderboard scores back to 0 (NEVER touch IELTS / academic attempts!)
+  if (Array.isArray(store.gamePracticeLeaderboard) && store.gamePracticeLeaderboard.length > 0) {
+    store.archivedPrevWeekGameEntries = store.gamePracticeLeaderboard.slice(0, 250);
+  }
+  store.gamePracticeLeaderboard = [];
+
+  if (store.users && typeof store.users === 'object') {
+    Object.keys(store.users).forEach(uKey => {
+      const u = store.users[uKey];
+      if (!u || typeof u !== 'object') return;
+      if (u.knightRpgProfile && typeof u.knightRpgProfile === 'object') {
+        store.users[uKey] = {
+          ...u,
+          knightRpgProfile: {
+            ...u.knightRpgProfile,
+            bestScore: 0,
+            bestScoreWeekKey: weekKey
+          }
+        };
+      }
+    });
+  }
+
+  if (store.rooms && typeof store.rooms === 'object') {
+    Object.keys(store.rooms).forEach(pin => {
+      const r = store.rooms[pin];
+      if (!r || typeof r !== 'object' || r.status === 'playing') return;
+      const nextPlayers = {};
+      Object.entries(r.players || {}).forEach(([pk, pv]) => {
+        if (pv && typeof pv === 'object') {
+          nextPlayers[pk] = { ...pv, score: 0, streak: 0, updatedAtMs: nowMs };
+        }
+      });
+      store.rooms[pin] = {
+        ...r,
+        players: nextPlayers,
+        liveMatch: {}
+      };
+    });
+  }
+
+  store._localMutated = true;
+  return true;
+}
+
 function getSnapshotForViewer(store, viewer = null) {
-  pruneExpiredStoreChats(store, Date.now());
-  const todayKey = getVietnamDateKey(Date.now());
+  const nowMs = Date.now();
+  pruneExpiredStoreChats(store, nowMs);
+  if (ensureWeeklyMondayReset(store, nowMs)) {
+    store.version += 1;
+  }
+  const todayKey = getVietnamDateKey(nowMs);
   const basePayload = {
     authenticated: Boolean(viewer),
     bootId: store._bootId || '',
     version: store.version,
     dateKey: todayKey,
     seeded: store.seeded,
-    serverTime: Date.now(),
+    serverTime: nowMs,
+    knightGachaConfig: normalizeKnightGachaConfig(store.knightGachaConfig, nowMs),
     aiConfigured: Boolean(getEffectiveGeminiKey(store)),
     mailConfigured: getEffectiveMailConfig(store).configured
   };
@@ -2606,7 +2692,10 @@ function getSnapshotForViewer(store, viewer = null) {
     globalDailyRankTitles = computeDailyLeaderboardTitleHolders({
       attempts: store.attempts || [],
       roomsDb: store.rooms || {},
-      gamePracticeLeaderboard: store.gamePracticeLeaderboard || [],
+      gamePracticeLeaderboard: [
+        ...(Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : []),
+        ...(Array.isArray(store.archivedPrevWeekGameEntries) ? store.archivedPrevWeekGameEntries : [])
+      ],
       usersDb: store.users || {}
     });
     store._dailyRankCache = {
@@ -3378,6 +3467,29 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     case 'GRANT_USER_TITLES': {
       if (!isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống mới có quyền tạo hoặc trao tặng danh hiệu!' };
+      }
+      return { allowed: true };
+    }
+
+    case 'ADMIN_GRANT_GACHA_WISHES': {
+      if (!isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống (Admin) mới có quyền trao lượt quay Gacha!' };
+      }
+      const targetKey = findUserKeyInStore(store, payload?.username);
+      const targetUser = targetKey ? store.users?.[targetKey] : null;
+      if (!targetKey || !targetUser) {
+        return { allowed: false, status: 404, error: 'Không tìm thấy tài khoản người nhận.' };
+      }
+      const amount = Math.round(Number(payload?.amount) || 0);
+      if (!Number.isFinite(amount) || amount < 1 || amount > 10000) {
+        return { allowed: false, status: 400, error: 'Số lượt quay trao tặng phải từ 1 đến 10.000 lượt.' };
+      }
+      return { allowed: true };
+    }
+
+    case 'ADMIN_SET_GACHA_BANNER_CONFIG': {
+      if (!isSuperAdmin) {
+        return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống (Admin) mới có quyền chọn nhân vật Banner Giới Hạn!' };
       }
       return { allowed: true };
     }
@@ -5686,37 +5798,99 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
               ...payload.knightRpgProfile
             }
           };
+          changed = true;
         }
       }
-      const list = Array.isArray(store.gamePracticeLeaderboard) ? [...store.gamePracticeLeaderboard] : [];
-      const existingIdx = list.findIndex(
-        e => e.username === viewer.username && e.topicId === topicId && e.mode === mode && (e.gameType || 'space_shooter') === gameType
-      );
-      const bestScore = existingIdx >= 0 ? Math.max(Number(list[existingIdx].score) || 0, cleanScore) : cleanScore;
-      const bestAccuracy = existingIdx >= 0
-        ? (cleanScore >= (Number(list[existingIdx].score) || 0) ? accuracyPct : list[existingIdx].accuracyPct)
-        : accuracyPct;
-      const nextEntry = {
-        id: existingIdx >= 0 ? list[existingIdx].id : `gpr_${viewer.username}_${gameType}_${topicId}_${mode}`,
-        username: viewer.username,
-        name: viewer.name || viewer.username,
-        gameType,
-        topicId,
-        topicLabel,
-        mode,
-        score: bestScore,
-        lastScore: cleanScore,
-        passedCount,
-        totalCount,
-        accuracyPct: bestAccuracy,
-        runsCount: existingIdx >= 0 ? (Number(list[existingIdx].runsCount) || 1) + 1 : 1,
-        updatedAt: new Date(nowMs).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
-        updatedAtMs: nowMs
+      if (cleanScore > 0) {
+        const list = Array.isArray(store.gamePracticeLeaderboard) ? [...store.gamePracticeLeaderboard] : [];
+        const existingIdx = list.findIndex(
+          e => e.username === viewer.username && e.topicId === topicId && e.mode === mode && (e.gameType || 'space_shooter') === gameType
+        );
+        const bestScore = existingIdx >= 0 ? Math.max(Number(list[existingIdx].score) || 0, cleanScore) : cleanScore;
+        const bestAccuracy = existingIdx >= 0
+          ? (cleanScore >= (Number(list[existingIdx].score) || 0) ? accuracyPct : list[existingIdx].accuracyPct)
+          : accuracyPct;
+        const nextEntry = {
+          id: existingIdx >= 0 ? list[existingIdx].id : `gpr_${viewer.username}_${gameType}_${topicId}_${mode}`,
+          username: viewer.username,
+          name: viewer.name || viewer.username,
+          gameType,
+          topicId,
+          topicLabel,
+          mode,
+          score: bestScore,
+          lastScore: cleanScore,
+          passedCount,
+          totalCount,
+          accuracyPct: bestAccuracy,
+          runsCount: existingIdx >= 0 ? (Number(list[existingIdx].runsCount) || 1) + 1 : 1,
+          updatedAt: new Date(nowMs).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
+          updatedAtMs: nowMs
+        };
+        if (existingIdx >= 0) list[existingIdx] = nextEntry;
+        else list.push(nextEntry);
+        list.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
+        store.gamePracticeLeaderboard = list.slice(0, 250);
+        changed = true;
+      }
+      break;
+    }
+
+    case 'ADMIN_GRANT_GACHA_WISHES': {
+      const targetKey = findUserKeyInStore(store, payload?.username);
+      const targetUser = targetKey ? store.users?.[targetKey] : null;
+      const amount = Math.round(Number(payload?.amount) || 0);
+      if (!targetKey || !targetUser || amount < 1 || amount > 10000) break;
+      const nextWishCredits = getGachaWishPurchasedCredits(targetUser) + amount;
+      const prevRpg = targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
+        ? targetUser.knightRpgProfile
+        : {};
+      const nextRpgWishes = Math.max(0, (Number(prevRpg.wishes) || 0) + amount);
+      store.users[targetKey] = {
+        ...targetUser,
+        gachaWishCredits: nextWishCredits,
+        knightRpgProfile: {
+          ...prevRpg,
+          wishes: nextRpgWishes,
+          claimedServerWishCredits: nextWishCredits
+        }
       };
-      if (existingIdx >= 0) list[existingIdx] = nextEntry;
-      else list.push(nextEntry);
-      list.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
-      store.gamePracticeLeaderboard = list.slice(0, 250);
+      const cleanNote = String(payload?.note || '').trim().slice(0, 160);
+      appendStoreNotification(
+        store,
+        {
+          title: `🎁 Admin đã tặng bạn +${amount} Lượt Quay Gacha!`,
+          message: cleanNote
+            ? `${cleanNote} (Đã cộng +${amount} 🌠 Lượt Quay vào Hiệp Sĩ Diệt Rồng — hiện có ${nextRpgWishes} lượt!)`
+            : `Quản Trị Hệ Thống đã trao tặng +${amount} 🌠 Lượt Quay Cầu Nguyện vào tài khoản của bạn trong Hiệp Sĩ Diệt Rồng (hiện có ${nextRpgWishes} lượt)!`,
+          type: 'announcement',
+          targetUsernames: [targetKey],
+          createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+          createdByName: viewer?.name || 'Quản Trị Hệ Thống'
+        },
+        viewer
+      );
+      changed = true;
+      break;
+    }
+
+    case 'ADMIN_SET_GACHA_BANNER_CONFIG': {
+      const nowMs = Date.now();
+      const { weekKey } = getVietnamMondayWeekState(nowMs);
+      const prevCfg = normalizeKnightGachaConfig(store.knightGachaConfig, nowMs);
+      const limitedSet = new Set(KNIGHT_CHARACTER_SKINS.filter(h => h.pool === 'limited').map(h => h.id));
+      const nextHeroRaw = payload?.nextFeaturedHeroId !== undefined
+        ? String(payload.nextFeaturedHeroId || '').trim()
+        : prevCfg.nextFeaturedHeroId;
+      const activeHeroRaw = payload?.activeFeaturedHeroId !== undefined
+        ? String(payload.activeFeaturedHeroId || '').trim()
+        : (prevCfg.weekKey === weekKey ? prevCfg.activeFeaturedHeroId : '');
+      store.knightGachaConfig = {
+        weekKey,
+        activeFeaturedHeroId: limitedSet.has(activeHeroRaw) ? activeHeroRaw : '',
+        nextFeaturedHeroId: limitedSet.has(nextHeroRaw) ? nextHeroRaw : '',
+        lastResetWeekKey: prevCfg.lastResetWeekKey || weekKey
+      };
       changed = true;
       break;
     }
@@ -6007,9 +6181,13 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
     broadcastTimer.unref?.();
   };
 
-  // Sweep expired 10-minute room chats automatically and broadcast updates
+  // Sweep expired 10-minute room chats AND Monday 00:00 VN weekly game score & banner rollover
   const chatSweepTimer = setInterval(() => {
-    if (pruneExpiredStoreChats(store, Date.now())) {
+    const nowMs = Date.now();
+    const chatsPruned = pruneExpiredStoreChats(store, nowMs);
+    const mondayRolled = ensureWeeklyMondayReset(store, nowMs);
+    if (chatsPruned || mondayRolled) {
+      if (mondayRolled) store.version += 1;
       onChanged?.(store);
       scheduleBroadcast(25);
     }

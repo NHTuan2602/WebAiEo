@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="iceAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#f472b6" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="coneWaffle" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="frostSwirl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#bae6fd"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="160" cy="160" r="140" fill="url(#iceAura)"/>
+
+  <!-- Kung Fu Frost Dragon Cloak -->
+  <path d="M88 152 C52 182 46 240 68 282 L222 282 C238 244 232 188 204 152 Z" fill="#0284c7" stroke="#0f172a" stroke-width="3.8"/>
+
+  <!-- Round Panda Martial Artist Body & Golden Sash -->
+  <ellipse cx="148" cy="222" rx="62" ry="56" fill="#ffffff" stroke="#0f172a" stroke-width="4"/>
+  <path d="M92 174 C108 156 188 156 204 174 L196 206 C168 196 128 196 100 206 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3.5"/>
+  <rect x="94" y="226" width="108" height="18" rx="8" fill="#fbbf24" stroke="#78350f" stroke-width="3"/>
+
+  <!-- Panda Ears & Round Head -->
+  <circle cx="104" cy="68" r="20" fill="#0f172a"/>
+  <circle cx="192" cy="68" r="20" fill="#0f172a"/>
+  <ellipse cx="148" cy="112" rx="56" ry="48" fill="#ffffff" stroke="#0f172a" stroke-width="4"/>
+
+  <!-- Panda Eye Patches + Deal-With-It Pixel/Cool Sunglasses! -->
+  <ellipse cx="124" cy="108" rx="16" ry="13" fill="#0f172a" transform="rotate(-10 124 108)"/>
+  <ellipse cx="172" cy="108" rx="16" ry="13" fill="#0f172a" transform="rotate(10 172 108)"/>
+  <rect x="102" y="96" width="40" height="18" rx="3" fill="#020617" stroke="#38bdf8" stroke-width="2.5"/>
+  <rect x="154" y="96" width="40" height="18" rx="3" fill="#020617" stroke="#38bdf8" stroke-width="2.5"/>
+  <line x1="142" y1="102" x2="154" y2="102" stroke="#38bdf8" stroke-width="3"/>
+  <line x1="108" y1="101" x2="122" y2="101" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="160" y1="101" x2="174" y2="101" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Confident Grin -->
+  <ellipse cx="148" cy="122" rx="8" ry="5.5" fill="#0f172a"/>
+  <path d="M130 134 Q148 146 168 132" fill="none" stroke="#0f172a" stroke-width="3.4" stroke-linecap="round"/>
+
+  <!-- Legendary Giant Soft-Serve Ice Cream Cone Spear ("Bing Chilling"!) -->
+  <g transform="rotate(-26 238 176)">
+    <!-- Frost Polearm Shaft -->
+    <rect x="232" y="156" width="12" height="128" rx="5" fill="#38bdf8" stroke="#0f172a" stroke-width="3"/>
+    <!-- Golden Waffle Cone Guard -->
+    <polygon points="214,132 262,132 238,186" fill="url(#coneWaffle)" stroke="#78350f" stroke-width="3" stroke-linejoin="round"/>
+    <!-- Swirling Soft-Serve Ice Cream Spearhead -->
+    <path d="M214 132 C210 112 266 112 262 132 Z" fill="url(#frostSwirl)" stroke="#0284c7" stroke-width="2.8"/>
+    <path d="M220 114 C218 96 258 96 256 114 Z" fill="#fbcfe8" stroke="#db2777" stroke-width="2.6"/>
+    <path d="M228 98 C230 78 238 64 238 56 C244 72 248 84 248 98 Z" fill="url(#frostSwirl)" stroke="#0284c7" stroke-width="2.6"/>
+    <circle cx="238" cy="54" r="6" fill="#ef4444" stroke="#7f1d1d" stroke-width="2"/>
+  </g>
+  <circle cx="204" cy="204" r="16" fill="#0f172a"/>
+</svg>

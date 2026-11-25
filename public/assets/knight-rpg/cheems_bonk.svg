@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="bonkAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.42"/>
+      <stop offset="65%" stop-color="#f59e0b" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shibaFur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="55%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="creamFur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="woodBat" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="45%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </linearGradient>
+    <linearGradient id="potSteel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="160" cy="160" r="138" fill="url(#bonkAura)"/>
+
+  <!-- Comic BONK! impact starburst -->
+  <polygon points="248,40 260,58 282,50 272,70 292,82 268,88 274,108 254,95 236,110 240,87 220,78 240,68" fill="#fef08a" stroke="#dc2626" stroke-width="3" stroke-linejoin="round"/>
+  <text x="255" y="83" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-weight="900" font-size="16" fill="#dc2626" transform="rotate(-10 255 83)">BONK!</text>
+
+  <!-- Shiba Curly Tail -->
+  <path d="M92 214 C56 196 58 148 92 152 C110 154 108 178 92 178 C84 178 84 168 92 167" fill="url(#shibaFur)" stroke="#451a03" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Chubby Shiba Knight Body & Red Cape -->
+  <path d="M104 150 C68 176 58 228 74 266 C96 260 116 264 130 248 Z" fill="#dc2626" stroke="#450a0a" stroke-width="3.5"/>
+  <ellipse cx="148" cy="216" rx="52" ry="58" fill="url(#shibaFur)" stroke="#451a03" stroke-width="3.8"/>
+  <ellipse cx="152" cy="222" rx="34" ry="42" fill="url(#creamFur)"/>
+
+  <!-- Mini Knight Chestplate -->
+  <path d="M112 166 L186 166 L178 226 L149 242 L120 226 Z" fill="url(#potSteel)" stroke="#1e293b" stroke-width="3.5" stroke-linejoin="round"/>
+  <polygon points="149,180 158,196 149,214 140,196" fill="#fbbf24" stroke="#78350f" stroke-width="2"/>
+
+  <!-- Feet -->
+  <ellipse cx="124" cy="276" rx="20" ry="12" fill="url(#creamFur)" stroke="#451a03" stroke-width="3.2"/>
+  <ellipse cx="174" cy="276" rx="20" ry="12" fill="url(#creamFur)" stroke="#451a03" stroke-width="3.2"/>
+
+  <!-- Shiba Head & Pointy Ears -->
+  <polygon points="108,86 96,42 134,64" fill="url(#shibaFur)" stroke="#451a03" stroke-width="3.5" stroke-linejoin="round"/>
+  <polygon points="110,78 103,52 127,66" fill="#fde68a"/>
+  <polygon points="186,82 204,40 164,62" fill="url(#shibaFur)" stroke="#451a03" stroke-width="3.5" stroke-linejoin="round"/>
+  <ellipse cx="150" cy="116" rx="52" ry="46" fill="url(#shibaFur)" stroke="#451a03" stroke-width="3.8"/>
+  <!-- Cream Cheeks & Snout -->
+  <path d="M106 122 C112 98 136 98 150 112 C164 98 188 98 194 122 C198 148 176 160 150 160 C124 160 102 148 106 122 Z" fill="url(#creamFur)"/>
+
+  <!-- Tilted Funny Iron Pot Helmet -->
+  <g transform="rotate(-12 146 68)">
+    <path d="M104 76 C106 38 188 38 190 76 Z" fill="url(#potSteel)" stroke="#1e293b" stroke-width="3.5"/>
+    <rect x="96" y="72" width="102" height="10" rx="5" fill="url(#potSteel)" stroke="#1e293b" stroke-width="3"/>
+    <circle cx="132" cy="56" r="4" fill="#ffffff" opacity="0.7"/>
+  </g>
+
+  <!-- Iconic Cheems Squinting Side-Eye & Smirk -->
+  <ellipse cx="132" cy="108" rx="8" ry="5.5" fill="#1e293b"/>
+  <circle cx="135" cy="106" r="2.2" fill="#ffffff"/>
+  <ellipse cx="170" cy="108" rx="8" ry="5.5" fill="#1e293b"/>
+  <circle cx="173" cy="106" r="2.2" fill="#ffffff"/>
+  <path d="M122 98 L140 101" stroke="#451a03" stroke-width="3" stroke-linecap="round"/>
+  <path d="M160 101 L178 98" stroke="#451a03" stroke-width="3" stroke-linecap="round"/>
+  <!-- Nose & Smug W-Mouth -->
+  <ellipse cx="152" cy="122" rx="7.5" ry="5.5" fill="#1e293b"/>
+  <path d="M138 133 Q145 140 152 132 Q160 140 168 131" fill="none" stroke="#451a03" stroke-width="3.2" stroke-linecap="round"/>
+  <ellipse cx="118" cy="124" rx="7" ry="4" fill="#fb7185" opacity="0.55"/>
+  <ellipse cx="184" cy="124" rx="7" ry="4" fill="#fb7185" opacity="0.55"/>
+
+  <!-- Paws gripping the Giant Wooden BONK Baseball Bat -->
+  <g transform="rotate(-28 210 175)">
+    <path d="M156 196 L284 166 C302 162 308 198 288 202 L158 214 Z" fill="url(#woodBat)" stroke="#451a03" stroke-width="3.8" stroke-linejoin="round"/>
+    <line x1="230" y1="182" x2="276" y2="174" stroke="#fef3c7" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+    <rect x="142" y="196" width="20" height="18" rx="4" fill="#fef3c7" stroke="#451a03" stroke-width="2.8"/>
+    <circle cx="138" cy="205" r="7" fill="#d97706" stroke="#451a03" stroke-width="2.8"/>
+  </g>
+  <ellipse cx="164" cy="196" rx="15" ry="12" fill="url(#shibaFur)" stroke="#451a03" stroke-width="3.2"/>
+  <ellipse cx="182" cy="186" rx="15" ry="12" fill="url(#shibaFur)" stroke="#451a03" stroke-width="3.2"/>
+</svg>
