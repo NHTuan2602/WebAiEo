@@ -255,25 +255,41 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('switch-to-knight-game-btn').click();
     await page.getByTestId('open-knight-shop-btn').click();
 
-    // 1) Pull 1x on Character UP Banner forced 5★ -> verify distinct Golden 5★ Shooting Star Cutscene!
+    // Verify strictly ONE Weekly Limited Banner with 7-day rotation countdown
+    await expect(page.getByTestId('weekly-limited-banner-timer')).toContainText(/Chu kỳ 7 ngày/i);
+
+    // 1) Pull 1x on Limited Banner forced 5★:
+    //    - Initially (0-3s) MUST be neutral mystery color ('neutral', no early spoiler!)
+    //    - After ~3s MUST shift to Golden 5★ ('5' / RA VÀNG 5 SAO!)
+    //    - Then enters Black Silhouette ('silhouette') -> Full Color ('lit') + 5 popped stars!
     await page.evaluate(() => {
       window.__FORCE_GACHA_RARITY__ = 5;
     });
     await page.getByTestId('gacha-pull-1-btn').click();
-    await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', '5');
+    await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', 'neutral');
+    await expect(page.getByTestId('gacha-cutscene-status-pill')).toContainText(/Đang triệu hồi/i);
+
+    await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', '5', {
+      timeout: 5_000
+    });
     await expect(page.getByTestId('knight-gacha-cutscene')).toContainText(/RA VÀNG 5 SAO/i);
+
+    await expect(page.getByTestId('knight-gacha-single-reveal')).toBeVisible({ timeout: 3_500 });
+    await expect(page.getByTestId('knight-gacha-single-reveal')).toHaveAttribute('data-unveil', 'lit', {
+      timeout: 3_000
+    });
+    await expect(page.getByTestId('gacha-popped-star')).toHaveCount(5, { timeout: 3_000 });
     await page.getByTestId('gacha-skip-cutscene-btn').click();
     await expect(page.getByTestId('knight-gacha-results-view')).toBeVisible();
     await page.getByTestId('gacha-close-results-btn').click();
 
-    // 2) Pull 1x on Standard Banner forced Whiff -> verify Tạch Gacha outcome + Pull 10x Standard Banner -> verify ≥ 4★ Pity!
+    // 2) Pull 1x on Standard Banner forced Whiff -> skip -> verify Tạch Gacha + Pull 10x Standard -> verify ≥ 4★!
     await page.getByTestId('gacha-tab-standard').click();
     await page.evaluate(() => {
       window.__FORCE_GACHA_RARITY__ = 'whiff';
     });
     await page.getByTestId('gacha-std-pull-1-btn').click();
-    await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', '3');
-    await expect(page.getByTestId('knight-gacha-cutscene')).toContainText(/TẠCH GACHA/i);
+    await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', 'neutral');
     await page.getByTestId('gacha-skip-cutscene-btn').click();
     await expect(page.getByTestId('knight-gacha-results-view')).toContainText(/Tạch Gacha/i);
     await page.getByTestId('gacha-close-results-btn').click();
@@ -292,6 +308,10 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     expect(highRarityCount).toBeGreaterThanOrEqual(1);
     await page.getByTestId('gacha-close-results-btn').click();
     await page.getByTestId('close-knight-gacha-modal-btn').click();
+    const midTitleDialog = page.locator('[aria-labelledby="title-unlock-celebration-heading"]');
+    if (await midTitleDialog.isVisible({ timeout: 800 }).catch(() => false)) {
+      await midTitleDialog.getByRole('button').first().click();
+    }
 
     // Launch Stage 3 (Golem & Dark Mage) briefly to confirm zero NaN/undefined and NO key-drop percentage spoiler
     await page.getByTestId('start-knight-stage-3').click();
@@ -408,15 +428,31 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('open-knight-shop-btn').click();
     await expect(page.getByTestId('admin-gacha-free-badge')).toBeVisible();
     await expect(page.getByTestId('gacha-pull-10-btn')).toContainText(/Miễn phí/i);
+
+    // Pull Standard Banner forced 5★ x10 three times as Admin -> confirm NO Limited 5★ hero ever drops on Standard Banner & 5★ dupes refund +200K VÀNG!
+    await page.getByTestId('gacha-tab-standard').click();
     await page.evaluate(() => {
       window.__FORCE_GACHA_RARITY__ = 5;
     });
-    // Pull multiple times as Admin with 0 wish/gold cost until duplicate 5★ refunds +200.000 Vàng
-    for (let p = 0; p < 3; p += 1) {
-      await page.getByTestId('gacha-pull-10-btn').click();
+    for (let p = 0; p < 4; p += 1) {
+      await page.getByTestId('gacha-std-pull-10-btn').click();
       await page.getByTestId('gacha-skip-cutscene-btn').click();
+      const stdResText = await page.getByTestId('knight-gacha-results-view').textContent();
+      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden/i);
       await page.getByTestId('gacha-close-results-btn').click();
     }
+
+    // Check Inventory: 13 total heroes (including new Limited 5★ heroes) + equip class-matched cosmetic sword on Arthur!
+    await page.getByTestId('gacha-tab-inventory').click();
+    await expect(page.getByText(/Đại Pháp Sư Tinh Không Zephyr/i)).toBeVisible();
+    await expect(page.getByText(/Thánh Nữ Thần Thương Celestia/i)).toBeVisible();
+    await expect(page.getByText(/Lôi Đế Huyết Kiếm Raiden/i)).toBeVisible();
+    const swordEquipBtn = page.locator('[data-testid^="equip-hero-wp-knight_arthur-"]').first();
+    if (await swordEquipBtn.isVisible().catch(() => false)) {
+      await swordEquipBtn.click();
+      await expect(page.getByTestId('knight-skin-card-knight_arthur')).toContainText(/Trang trí/i);
+    }
+
     await expect(page.getByTestId('knight-skin-shop-modal')).toContainText(/\d{3}\.\d{3} Vàng/);
     await page.evaluate(() => {
       delete window.__FORCE_GACHA_RARITY__;

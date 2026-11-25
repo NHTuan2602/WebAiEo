@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  Clock,
   Coins,
   Crown,
   History,
@@ -20,9 +21,12 @@ import {
   normalizePaymentConfig
 } from '../../constants/profileCustomization';
 import {
-  KNIGHT_CHARACTER_EVENT_BANNERS,
+  canHeroEquipWeapon,
+  getHeroCosmeticWeapon,
+  getWeeklyLimitedBannerState,
   KNIGHT_CHARACTER_SKINS,
-  KNIGHT_DUPLICATE_HERO_REFUND_GOLD,
+  KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD,
+  KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD,
   KNIGHT_GACHA_GOLD_SINGLE,
   KNIGHT_GACHA_GOLD_TEN,
   KNIGHT_GACHA_RATES,
@@ -30,55 +34,123 @@ import {
   REVIVE_KEY_GOLD_PRICE
 } from '../../constants/knightRpgData';
 
-function playGachaWishSound(maxRarity = 3, allWhiff = false) {
-  if (typeof window === 'undefined') return;
+// ==========================================
+// WEB AUDIO SYNTHESIZER FOR GACHA SUSPENSE, CLIMAX, SILHOUETTE & STAR POP-IN
+// ==========================================
+let sharedGachaAudioCtx = null;
+function getGachaAudioCtx() {
+  if (typeof window === 'undefined') return null;
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) return;
+  if (!AudioCtx) return null;
   try {
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-    const playTone = (freq, startOffset, duration, type = 'sine', gainPeak = 0.12) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, now + startOffset);
-      gain.gain.setValueAtTime(0.0001, now + startOffset);
-      gain.gain.exponentialRampToValueAtTime(gainPeak, now + startOffset + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + startOffset);
-      osc.stop(now + startOffset + duration + 0.03);
-    };
-
-    if (maxRarity === 5) {
-      [392, 493.88, 587.33, 783.99, 987.77, 1174.66, 1567.98].forEach((f, idx) => {
-        playTone(f, idx * 0.09, 0.75, 'triangle', 0.13);
-      });
-      [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach(f => {
-        playTone(f, 0.72, 1.25, 'sine', 0.11);
-      });
-    } else if (maxRarity === 4) {
-      [329.63, 440, 523.25, 659.25, 880, 1046.5].forEach((f, idx) => {
-        playTone(f, idx * 0.085, 0.65, 'triangle', 0.11);
-      });
-    } else if (allWhiff) {
-      playTone(349.23, 0, 0.35, 'sawtooth', 0.06);
-      playTone(233.08, 0.22, 0.55, 'sine', 0.08);
-    } else {
-      playTone(523.25, 0, 0.35, 'sine', 0.09);
-      playTone(659.25, 0.12, 0.45, 'triangle', 0.09);
-      playTone(783.99, 0.25, 0.55, 'sine', 0.08);
+    if (!sharedGachaAudioCtx || sharedGachaAudioCtx.state === 'closed') {
+      sharedGachaAudioCtx = new AudioCtx();
     }
+    if (sharedGachaAudioCtx.state === 'suspended') {
+      sharedGachaAudioCtx.resume().catch(() => {});
+    }
+    return sharedGachaAudioCtx;
+  } catch {
+    return null;
+  }
+}
 
-    setTimeout(() => {
-      ctx.close().catch(() => {});
-    }, 2400);
+function scheduleTone(ctx, freq, startOffset, duration, type = 'sine', peakGain = 0.1, endFreq = null) {
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(Math.max(40, freq), now + startOffset);
+    if (endFreq) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(40, endFreq), now + startOffset + duration);
+    }
+    gain.gain.setValueAtTime(0.0001, now + startOffset);
+    gain.gain.exponentialRampToValueAtTime(peakGain, now + startOffset + Math.min(0.05, duration * 0.25));
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + startOffset);
+    osc.stop(now + startOffset + duration + 0.03);
   } catch {}
 }
 
-function renderStars(count = 3) {
-  return '★'.repeat(Math.max(1, Math.min(5, count)));
+function playMeteorSuspenseBuildup() {
+  const ctx = getGachaAudioCtx();
+  if (!ctx) return;
+  // 3.0s neutral cosmic buildup — identical for 3★, 4★, 5★ so sound never spoils rarity early!
+  scheduleTone(ctx, 165, 0.0, 2.95, 'sine', 0.06, 620);
+  scheduleTone(ctx, 247.5, 0.2, 2.75, 'triangle', 0.04, 880);
+  const pulseTimes = [0.1, 0.58, 1.0, 1.38, 1.72, 2.02, 2.28, 2.5, 2.7, 2.86];
+  pulseTimes.forEach((t, idx) => {
+    scheduleTone(ctx, 440 + idx * 42, t, 0.18, 'sine', 0.055);
+  });
+}
+
+function playMeteorClimaxReveal(maxRarity = 3, allWhiff = false) {
+  const ctx = getGachaAudioCtx();
+  if (!ctx) return;
+  if (maxRarity === 5) {
+    // Dramatic 5★ Golden Transformation Explosion + Fanfare
+    scheduleTone(ctx, 130.81, 0, 0.55, 'sawtooth', 0.09, 65.4);
+    [523.25, 659.25, 783.99, 987.77, 1174.66, 1567.98].forEach((f, idx) => {
+      scheduleTone(ctx, f, idx * 0.075, 0.85, 'triangle', 0.13);
+    });
+    [523.25, 783.99, 1046.5, 1318.5].forEach(f => {
+      scheduleTone(ctx, f, 0.48, 0.95, 'sine', 0.1);
+    });
+  } else if (maxRarity === 4) {
+    // 4★ Amethyst Purple Shift Chord
+    scheduleTone(ctx, 174.61, 0, 0.4, 'triangle', 0.08, 110);
+    [440, 523.25, 659.25, 880, 1046.5].forEach((f, idx) => {
+      scheduleTone(ctx, f, idx * 0.07, 0.65, 'triangle', 0.11);
+    });
+  } else if (allWhiff) {
+    scheduleTone(ctx, 329.63, 0, 0.35, 'sawtooth', 0.05, 164.81);
+  } else {
+    [523.25, 659.25, 783.99].forEach((f, idx) => {
+      scheduleTone(ctx, f, idx * 0.08, 0.45, 'sine', 0.085);
+    });
+  }
+}
+
+function playSilhouetteEnterSound() {
+  const ctx = getGachaAudioCtx();
+  if (!ctx) return;
+  scheduleTone(ctx, 220, 0, 0.48, 'sine', 0.06, 440);
+}
+
+function playItemUnveilSound(starRarity = 3, isWhiff = false) {
+  const ctx = getGachaAudioCtx();
+  if (!ctx) return;
+  if (starRarity === 5) {
+    [523.25, 659.25, 783.99, 1046.5, 1567.98].forEach((f, i) => {
+      scheduleTone(ctx, f, i * 0.05, 0.7, 'triangle', 0.11);
+    });
+  } else if (starRarity === 4) {
+    [440, 554.37, 659.25, 880].forEach((f, i) => {
+      scheduleTone(ctx, f, i * 0.05, 0.5, 'triangle', 0.095);
+    });
+  } else if (isWhiff) {
+    scheduleTone(ctx, 246.94, 0, 0.3, 'sine', 0.06, 185);
+  } else {
+    [523.25, 659.25].forEach((f, i) => {
+      scheduleTone(ctx, f, i * 0.06, 0.35, 'sine', 0.08);
+    });
+  }
+}
+
+function playStarPopPing(starIdx = 0, totalStars = 3) {
+  const ctx = getGachaAudioCtx();
+  if (!ctx) return;
+  const scale = [587.33, 659.25, 783.99, 987.77, 1318.51];
+  const freq = scale[Math.min(scale.length - 1, starIdx)] || 783.99;
+  const isFinalHighStar = starIdx === totalStars - 1 && totalStars >= 4;
+  scheduleTone(ctx, freq, 0, isFinalHighStar ? 0.42 : 0.22, 'triangle', isFinalHighStar ? 0.12 : 0.085);
+  if (isFinalHighStar) {
+    scheduleTone(ctx, freq * 1.5, 0.03, 0.38, 'sine', 0.08);
+  }
 }
 
 export default function KnightGachaModal({
@@ -90,22 +162,70 @@ export default function KnightGachaModal({
   onExecutePull,
   onAdminResetHeroes = null,
   onEquipSkin,
-  onEquipWeapon,
+  onEquipHeroWeapon,
   onExchangeGoldForWishes,
   onBuyReviveKeyWithGold,
   onOpenWishQrCheckout,
   showToast
 }) {
   const [activeTab, setActiveTab] = useState('character_event');
-  const [selectedBannerId, setSelectedBannerId] = useState(KNIGHT_CHARACTER_EVENT_BANNERS[0].id);
   const [cutscene, setCutscene] = useState(null);
-  const meteorTimerRef = useRef(null);
+  // Per-item silhouette → full-color unveil + sequential star pop-in states
+  const [unveilStage, setUnveilStage] = useState('silhouette'); // 'silhouette' | 'lit'
+  const [visibleStars, setVisibleStars] = useState(0);
+  const [weeklyBanner, setWeeklyBanner] = useState(() => getWeeklyLimitedBannerState());
+
+  const timersRef = useRef([]);
+
+  const clearAllCutsceneTimers = () => {
+    timersRef.current.forEach(t => clearTimeout(t));
+    timersRef.current = [];
+  };
 
   useEffect(() => {
-    return () => {
-      if (meteorTimerRef.current) clearTimeout(meteorTimerRef.current);
-    };
+    return () => clearAllCutsceneTimers();
   }, []);
+
+  // Refresh weekly 7-day countdown every 30s while open
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    setWeeklyBanner(getWeeklyLimitedBannerState());
+    const iv = setInterval(() => {
+      setWeeklyBanner(getWeeklyLimitedBannerState());
+    }, 30_000);
+    return () => clearInterval(iv);
+  }, [isOpen]);
+
+  // Trigger silhouette -> flash unveil -> star-by-star pop-in whenever entering 'reveal' phase or changing revealIdx!
+  useEffect(() => {
+    if (!cutscene || cutscene.phase !== 'reveal') return undefined;
+    const item = cutscene.results[cutscene.revealIdx];
+    if (!item) return undefined;
+
+    const localTimers = [];
+    setUnveilStage('silhouette');
+    setVisibleStars(0);
+    playSilhouetteEnterSound();
+
+    const unveilTimer = setTimeout(() => {
+      setUnveilStage('lit');
+      playItemUnveilSound(item.starRarity, item.isWhiff);
+
+      const starTotal = Math.max(1, Math.min(5, item.starRarity || 3));
+      for (let s = 1; s <= starTotal; s += 1) {
+        const st = setTimeout(() => {
+          setVisibleStars(s);
+          playStarPopPing(s - 1, starTotal);
+        }, s * 135);
+        localTimers.push(st);
+      }
+    }, 680);
+    localTimers.push(unveilTimer);
+
+    return () => {
+      localTimers.forEach(t => clearTimeout(t));
+    };
+  }, [cutscene?.phase, cutscene?.revealIdx]);
 
   if (!isOpen) return null;
 
@@ -119,62 +239,89 @@ export default function KnightGachaModal({
   const gachaState = rpgProfile?.gachaState || {};
   const unlockedSkins = Array.isArray(rpgProfile?.unlockedSkins) ? rpgProfile.unlockedSkins : ['knight_arthur'];
   const unlockedWeapons = Array.isArray(rpgProfile?.unlockedWeapons) ? rpgProfile.unlockedWeapons : [];
+  const weaponCounts = rpgProfile?.weaponCounts || {};
   const wishHistory = Array.isArray(rpgProfile?.wishHistory) ? rpgProfile.wishHistory : [];
 
-  const activeBannerMeta =
-    KNIGHT_CHARACTER_EVENT_BANNERS.find(b => b.id === selectedBannerId) ||
-    KNIGHT_CHARACTER_EVENT_BANNERS[0];
+  const activeSkin =
+    KNIGHT_CHARACTER_SKINS.find(s => s.id === rpgProfile?.equippedSkin) ||
+    KNIGHT_CHARACTER_SKINS[0];
+
+  // Single weekly active Limited Banner (rotates every 7 days — never >1 Limited Banner in a week!)
+  const activeBannerMeta = weeklyBanner.activeBanner;
   const featured5Hero =
     KNIGHT_CHARACTER_SKINS.find(s => s.id === activeBannerMeta.featuredHeroId) ||
-    KNIGHT_CHARACTER_SKINS[KNIGHT_CHARACTER_SKINS.length - 1];
+    KNIGHT_CHARACTER_SKINS.find(s => s.pool === 'limited');
   const featured4Heroes = KNIGHT_CHARACTER_SKINS.filter(s =>
     activeBannerMeta.featured4StarIds.includes(s.id)
+  );
+  const standard5Heroes = KNIGHT_CHARACTER_SKINS.filter(
+    s => s.obtainMethod === 'gacha' && s.pool === 'standard' && s.starRarity === 5
   );
 
   const startGachaPull = (bannerType, count) => {
     const res = onExecutePull?.({
       bannerType,
-      bannerId: activeBannerMeta.id,
       count
     });
     if (!res || !res.ok) return;
 
-    if (meteorTimerRef.current) clearTimeout(meteorTimerRef.current);
-    playGachaWishSound(res.maxRarity, res.allWhiff);
+    clearAllCutsceneTimers();
+    playMeteorSuspenseBuildup();
 
+    // Stage 1 (0.0s -> 3.0s): NEUTRAL MYSTERY METEOR — Never reveals Gold/Purple early!
     setCutscene({
-      phase: 'meteor',
+      phase: 'meteor_suspense',
       results: res.results,
       maxRarity: res.maxRarity,
       allWhiff: res.allWhiff,
       revealIdx: 0
     });
 
-    meteorTimerRef.current = setTimeout(() => {
-      setCutscene(prev => {
-        if (!prev || prev.phase !== 'meteor') return prev;
-        return {
-          ...prev,
-          phase: prev.results.length === 1 ? 'summary' : 'reveal',
-          revealIdx: 0
-        };
-      });
-    }, 1750);
+    // Stage 2 (at 3.0s -> 4.3s): DRAMATIC COLOR SHIFT TO GOLD (5★) OR PURPLE (4★) OR BLUE (3★)!
+    const tClimax = setTimeout(() => {
+      playMeteorClimaxReveal(res.maxRarity, res.allWhiff);
+      setCutscene(prev =>
+        prev && prev.phase === 'meteor_suspense'
+          ? { ...prev, phase: 'meteor_climax' }
+          : prev
+      );
+    }, 3000);
+
+    // Stage 3 (at 4.3s): Enter Silhouette -> Full-Color Unveil + Sequential Star Pop-in!
+    const tReveal = setTimeout(() => {
+      setCutscene(prev =>
+        prev && (prev.phase === 'meteor_suspense' || prev.phase === 'meteor_climax')
+          ? { ...prev, phase: 'reveal', revealIdx: 0 }
+          : prev
+      );
+    }, 4300);
+
+    timersRef.current.push(tClimax, tReveal);
   };
 
   const skipCutsceneToSummary = () => {
-    if (meteorTimerRef.current) clearTimeout(meteorTimerRef.current);
+    clearAllCutsceneTimers();
     setCutscene(prev => (prev ? { ...prev, phase: 'summary' } : null));
   };
 
-  const advanceRevealCard = () => {
-    setCutscene(prev => {
-      if (!prev) return null;
-      if (prev.revealIdx + 1 < prev.results.length) {
-        return { ...prev, revealIdx: prev.revealIdx + 1 };
-      }
-      return { ...prev, phase: 'summary' };
-    });
+  const handleRevealCardClick = () => {
+    if (!cutscene || cutscene.phase !== 'reveal') return;
+    const currentItem = cutscene.results[cutscene.revealIdx];
+    const maxStars = currentItem?.starRarity || 3;
+
+    // If still in black silhouette or stars still popping in, instant-reveal current card first!
+    if (unveilStage === 'silhouette' || visibleStars < maxStars) {
+      setUnveilStage('lit');
+      setVisibleStars(maxStars);
+      playItemUnveilSound(maxStars, currentItem?.isWhiff);
+      return;
+    }
+
+    if (cutscene.revealIdx + 1 < cutscene.results.length) {
+      setCutscene(prev => (prev ? { ...prev, revealIdx: prev.revealIdx + 1 } : null));
+    } else {
+      setCutscene(prev => (prev ? { ...prev, phase: 'summary' } : null));
+    }
   };
 
   const getCostLabel = (count) => {
@@ -198,40 +345,113 @@ export default function KnightGachaModal({
     return gold >= rem * KNIGHT_GACHA_GOLD_SINGLE;
   };
 
+  const isSuspensePhase = cutscene?.phase === 'meteor_suspense';
+  const isClimaxPhase = cutscene?.phase === 'meteor_climax';
+
   return (
     <div
       data-testid="knight-skin-shop-modal"
-      className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[85] flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
     >
-      {/* SHOOTING-STAR GACHA CUTSCENE OVERLAY */}
+      {/* =========================================================
+          SUSPENSEFUL METEOR (3s NEUTRAL -> CLIMAX SHIFT) + SILHOUETTE UNVEIL + STAR POP-IN
+      ========================================================= */}
       {cutscene && (
         <div
           data-testid="knight-gacha-cutscene"
-          data-rarity={String(cutscene.maxRarity)}
+          data-rarity={isSuspensePhase ? 'neutral' : String(cutscene.maxRarity)}
+          data-target-rarity={String(cutscene.maxRarity)}
           data-phase={cutscene.phase}
-          className={`fixed inset-0 z-[70] flex flex-col items-center justify-between p-4 sm:p-8 overflow-y-auto select-none ${
-            cutscene.maxRarity === 5
-              ? 'bg-gradient-to-br from-[#1f1200] via-[#451a03] to-[#090d16]'
+          className={`fixed inset-0 z-[140] flex flex-col items-center justify-between p-4 sm:p-8 overflow-y-auto select-none transition-colors duration-500 ${
+            isSuspensePhase
+              ? 'bg-gradient-to-br from-[#040714] via-[#0b132b] to-[#050816]'
+              : cutscene.maxRarity === 5
+              ? 'bg-gradient-to-br from-[#291500] via-[#5c2404] to-[#090d16]'
               : cutscene.maxRarity === 4
-              ? 'bg-gradient-to-br from-[#1e0936] via-[#3b0764] to-[#090d16]'
+              ? 'bg-gradient-to-br from-[#240a42] via-[#4a097a] to-[#090d16]'
               : cutscene.allWhiff
               ? 'bg-gradient-to-br from-[#090d16] via-[#1e293b] to-[#020617]'
               : 'bg-gradient-to-br from-[#04162d] via-[#0c4a6e] to-[#090d16]'
           }`}
         >
+          <style>{`
+            @keyframes gachaSpinCw {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+            @keyframes gachaSpinCcw {
+              from { transform: rotate(360deg); }
+              to { transform: rotate(0deg); }
+            }
+            @keyframes gachaSpeedStreak {
+              0% { transform: translate(-55vw, -45vh) rotate(32deg); opacity: 0; }
+              25% { opacity: 0.75; }
+              100% { transform: translate(55vw, 45vh) rotate(32deg); opacity: 0; }
+            }
+            @keyframes gachaSuspenseComet {
+              0% { transform: translate(-44vw, -36vh) scale(0.42) rotate(32deg); opacity: 0.25; }
+              30% { opacity: 1; }
+              100% { transform: translate(2vw, 2vh) scale(1.08) rotate(32deg); opacity: 1; }
+            }
+            @keyframes gachaClimaxComet {
+              0% { transform: translate(2vw, 2vh) scale(1.15) rotate(32deg); opacity: 1; }
+              65% { transform: translate(14vw, 11vh) scale(1.85) rotate(32deg); opacity: 1; }
+              100% { transform: translate(28vw, 22vh) scale(2.9) rotate(32deg); opacity: 0; }
+            }
+            @keyframes gachaClimaxFlash {
+              0% { opacity: 0.95; }
+              100% { opacity: 0; }
+            }
+            @keyframes gachaShockwave {
+              0% { transform: scale(0.15); opacity: 1; }
+              100% { transform: scale(3.2); opacity: 0; }
+            }
+            @keyframes gachaCameraShake {
+              0%, 100% { transform: translate(0, 0); }
+              20% { transform: translate(-8px, 6px); }
+              40% { transform: translate(8px, -6px); }
+              60% { transform: translate(-5px, -4px); }
+              80% { transform: translate(5px, 4px); }
+            }
+            @keyframes gachaSilhouetteZoom {
+              0% { transform: scale(1.26); opacity: 0.2; }
+              100% { transform: scale(1.0); opacity: 1; }
+            }
+            @keyframes gachaUnveilBurst {
+              0% { transform: scale(0.86); filter: brightness(2.8); }
+              55% { transform: scale(1.06); filter: brightness(1.25); }
+              100% { transform: scale(1.0); filter: brightness(1); }
+            }
+            @keyframes gachaStarPop {
+              0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+              65% { transform: scale(1.48) rotate(10deg); opacity: 1; }
+              100% { transform: scale(1) rotate(0deg); opacity: 1; }
+            }
+            @keyframes gachaCardRise {
+              0% { transform: translateY(22px) scale(0.94); opacity: 0; }
+              100% { transform: translateY(0) scale(1); opacity: 1; }
+            }
+          `}</style>
+
+          {/* Top Bar */}
           <div className="w-full max-w-5xl flex items-center justify-between z-20">
             <span
-              className={`px-3.5 py-1.5 rounded-full text-xs font-black border shadow-lg ${
-                cutscene.maxRarity === 5
-                  ? 'bg-amber-400/20 border-amber-300 text-amber-200'
+              data-testid="gacha-cutscene-status-pill"
+              className={`px-3.5 py-1.5 rounded-full text-xs font-black border shadow-lg transition-all duration-300 ${
+                isSuspensePhase
+                  ? 'bg-slate-800/80 border-sky-300/40 text-sky-100'
+                  : cutscene.maxRarity === 5
+                  ? 'bg-amber-400/25 border-amber-300 text-amber-200 scale-105'
                   : cutscene.maxRarity === 4
-                  ? 'bg-fuchsia-500/20 border-fuchsia-300 text-fuchsia-200'
+                  ? 'bg-fuchsia-500/25 border-fuchsia-300 text-fuchsia-200 scale-105'
                   : cutscene.allWhiff
                   ? 'bg-slate-700/60 border-slate-400 text-slate-200'
                   : 'bg-sky-500/20 border-sky-300 text-sky-200'
               }`}
             >
-              {cutscene.maxRarity === 5
+              {isSuspensePhase
+                ? '☄️ Đang triệu hồi sao băng...'
+                : cutscene.maxRarity === 5
                 ? '⭐⭐⭐⭐⭐ RA VÀNG 5 SAO!'
                 : cutscene.maxRarity === 4
                 ? '⭐⭐⭐⭐ VẬT PHẨM 4 SAO!'
@@ -261,70 +481,122 @@ export default function KnightGachaModal({
             )}
           </div>
 
-          {cutscene.phase === 'meteor' && (
+          {/* METEOR PHASES: 0-3s NEUTRAL SUSPENSE -> 3.0s+ DRAMATIC COLOR SHIFT */}
+          {(isSuspensePhase || isClimaxPhase) && (
             <div
-              onClick={skipCutsceneToSummary}
-              className="flex-1 w-full flex flex-col items-center justify-center relative cursor-pointer overflow-hidden"
+              style={
+                isClimaxPhase && cutscene.maxRarity >= 4
+                  ? { animation: 'gachaCameraShake 0.48s ease-out' }
+                  : undefined
+              }
+              className="flex-1 w-full flex flex-col items-center justify-center relative overflow-hidden"
             >
-              <style>{`
-                @keyframes gachaMeteorFly {
-                  0% { transform: translate(-42vw, -36vh) scale(0.45) rotate(32deg); opacity: 0.2; }
-                  45% { opacity: 1; }
-                  85% { transform: translate(8vw, 6vh) scale(1.35) rotate(32deg); opacity: 1; }
-                  100% { transform: translate(22vw, 18vh) scale(2.4) rotate(32deg); opacity: 0; }
-                }
-                @keyframes gachaBurstPulse {
-                  0%, 55% { transform: scale(0.1); opacity: 0; }
-                  78% { transform: scale(1.25); opacity: 0.95; }
-                  100% { transform: scale(2.6); opacity: 0; }
-                }
-              `}</style>
+              {/* Full-screen Flashbang right at the 3.0s color shift moment */}
+              {isClimaxPhase && (
+                <div
+                  style={{ animation: 'gachaClimaxFlash 0.65s ease-out forwards' }}
+                  className={`fixed inset-0 pointer-events-none z-30 ${
+                    cutscene.maxRarity === 5
+                      ? 'bg-amber-200'
+                      : cutscene.maxRarity === 4
+                      ? 'bg-fuchsia-300'
+                      : 'bg-sky-200/70'
+                  }`}
+                />
+              )}
 
-              <div className="absolute inset-0 pointer-events-none opacity-65">
-                {Array.from({ length: 22 }).map((_, idx) => (
-                  <span
+              {/* Rotating Astral Gate Rings */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div
+                  style={{ animation: 'gachaSpinCw 9s linear infinite' }}
+                  className={`w-72 h-72 sm:w-96 sm:h-96 rounded-full border-2 border-dashed transition-colors duration-300 ${
+                    isSuspensePhase
+                      ? 'border-sky-300/25'
+                      : cutscene.maxRarity === 5
+                      ? 'border-amber-300/70 shadow-[0_0_80px_rgba(251,191,36,0.45)]'
+                      : cutscene.maxRarity === 4
+                      ? 'border-fuchsia-400/70 shadow-[0_0_70px_rgba(192,132,252,0.4)]'
+                      : 'border-sky-400/40'
+                  }`}
+                />
+                <div
+                  style={{ animation: 'gachaSpinCcw 6s linear infinite' }}
+                  className={`absolute w-52 h-52 sm:w-64 sm:h-64 rounded-full border transition-colors duration-300 ${
+                    isSuspensePhase
+                      ? 'border-indigo-300/20'
+                      : cutscene.maxRarity === 5
+                      ? 'border-yellow-200/80'
+                      : cutscene.maxRarity === 4
+                      ? 'border-purple-300/75'
+                      : 'border-cyan-300/35'
+                  }`}
+                />
+              </div>
+
+              {/* Diagonal Hyperspace Speed-Lines */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {Array.from({ length: 18 }).map((_, idx) => (
+                  <div
                     key={idx}
-                    className="absolute rounded-full bg-white animate-pulse"
                     style={{
-                      width: `${(idx % 3) + 2}px`,
-                      height: `${(idx % 3) + 2}px`,
-                      left: `${(idx * 17) % 96}%`,
-                      top: `${(idx * 29) % 92}%`,
-                      animationDelay: `${(idx % 5) * 0.2}s`
+                      top: `${(idx * 19) % 95}%`,
+                      left: `${(idx * 23) % 90}%`,
+                      animation: `gachaSpeedStreak ${0.75 + (idx % 4) * 0.22}s linear infinite`,
+                      animationDelay: `${(idx % 6) * 0.12}s`
                     }}
+                    className={`absolute w-28 sm:w-44 h-[2px] rounded-full ${
+                      isSuspensePhase
+                        ? 'bg-gradient-to-r from-transparent via-sky-200/50 to-transparent'
+                        : cutscene.maxRarity === 5
+                        ? 'bg-gradient-to-r from-transparent via-amber-300 to-transparent'
+                        : cutscene.maxRarity === 4
+                        ? 'bg-gradient-to-r from-transparent via-fuchsia-300 to-transparent'
+                        : 'bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent'
+                    }`}
                   />
                 ))}
               </div>
 
+              {/* Shooting Star Comet (Neutral Silver-Blue in 0-3s -> Transforms at 3.0s!) */}
               <div
-                style={{ animation: 'gachaMeteorFly 1.7s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}
-                className="relative flex items-center"
+                style={{
+                  animation: isSuspensePhase
+                    ? 'gachaSuspenseComet 3s cubic-bezier(0.25, 0.8, 0.4, 1) forwards'
+                    : 'gachaClimaxComet 1.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+                }}
+                className="relative flex items-center z-10"
               >
                 <div
-                  className={`w-64 sm:w-96 h-3 sm:h-4 rounded-full blur-[2px] ${
-                    cutscene.maxRarity === 5
-                      ? 'bg-gradient-to-r from-transparent via-amber-300 to-yellow-100 shadow-[0_0_45px_#fbbf24]'
+                  className={`w-64 sm:w-[420px] h-3.5 sm:h-5 rounded-full blur-[1.5px] transition-all duration-300 ${
+                    isSuspensePhase
+                      ? 'bg-gradient-to-r from-transparent via-sky-200 to-white shadow-[0_0_30px_rgba(186,230,253,0.8)]'
+                      : cutscene.maxRarity === 5
+                      ? 'bg-gradient-to-r from-transparent via-amber-400 to-yellow-100 shadow-[0_0_65px_#fbbf24]'
                       : cutscene.maxRarity === 4
-                      ? 'bg-gradient-to-r from-transparent via-fuchsia-400 to-purple-100 shadow-[0_0_40px_#c084fc]'
+                      ? 'bg-gradient-to-r from-transparent via-fuchsia-500 to-purple-100 shadow-[0_0_55px_#c084fc]'
                       : cutscene.allWhiff
                       ? 'bg-gradient-to-r from-transparent via-slate-500 to-slate-300'
-                      : 'bg-gradient-to-r from-transparent via-sky-400 to-cyan-100 shadow-[0_0_35px_#38bdf8]'
+                      : 'bg-gradient-to-r from-transparent via-sky-400 to-cyan-100 shadow-[0_0_40px_#38bdf8]'
                   }`}
                 />
                 <div
-                  className={`w-12 h-12 sm:w-16 sm:h-16 -ml-4 rounded-full flex items-center justify-center ${
-                    cutscene.maxRarity === 5
-                      ? 'bg-amber-200 shadow-[0_0_80px_25px_rgba(251,191,36,0.95)] ring-4 ring-yellow-100'
+                  className={`w-12 h-12 sm:w-18 sm:h-18 -ml-4 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isSuspensePhase
+                      ? 'bg-white shadow-[0_0_55px_16px_rgba(186,230,253,0.85)] ring-4 ring-sky-100'
+                      : cutscene.maxRarity === 5
+                      ? 'bg-amber-200 shadow-[0_0_110px_36px_rgba(251,191,36,1)] ring-4 ring-yellow-50 scale-125'
                       : cutscene.maxRarity === 4
-                      ? 'bg-fuchsia-200 shadow-[0_0_70px_20px_rgba(192,132,252,0.9)] ring-4 ring-purple-100'
+                      ? 'bg-fuchsia-200 shadow-[0_0_95px_28px_rgba(192,132,252,0.95)] ring-4 ring-purple-50 scale-115'
                       : cutscene.allWhiff
-                      ? 'bg-slate-300 shadow-[0_0_30px_8px_rgba(148,163,184,0.6)]'
-                      : 'bg-cyan-100 shadow-[0_0_60px_18px_rgba(56,189,248,0.85)] ring-4 ring-sky-100'
+                      ? 'bg-slate-400 shadow-[0_0_30px_8px_rgba(148,163,184,0.6)]'
+                      : 'bg-cyan-100 shadow-[0_0_65px_20px_rgba(56,189,248,0.9)] ring-4 ring-sky-100'
                   }`}
                 >
                   <Sparkles
                     className={`w-7 h-7 ${
-                      cutscene.maxRarity === 5
+                      isSuspensePhase
+                        ? 'text-sky-700 animate-spin'
+                        : cutscene.maxRarity === 5
                         ? 'text-amber-700'
                         : cutscene.maxRarity === 4
                         ? 'text-purple-800'
@@ -334,104 +606,202 @@ export default function KnightGachaModal({
                 </div>
               </div>
 
-              <div
-                style={{ animation: 'gachaBurstPulse 1.75s ease-out forwards' }}
-                className={`absolute w-64 h-64 rounded-full border-4 pointer-events-none ${
-                  cutscene.maxRarity === 5
-                    ? 'border-amber-300 bg-amber-400/25 shadow-[0_0_120px_#fbbf24]'
-                    : cutscene.maxRarity === 4
-                    ? 'border-fuchsia-300 bg-purple-500/25 shadow-[0_0_100px_#c084fc]'
-                    : cutscene.allWhiff
-                    ? 'border-slate-400 bg-slate-500/20'
-                    : 'border-sky-300 bg-sky-400/20 shadow-[0_0_90px_#38bdf8]'
-                }`}
-              />
+              {/* Expanding Shockwaves at 3.0s Climax */}
+              {isClimaxPhase && (
+                <>
+                  <div
+                    style={{ animation: 'gachaShockwave 1.15s ease-out forwards' }}
+                    className={`absolute w-56 h-56 rounded-full border-4 pointer-events-none ${
+                      cutscene.maxRarity === 5
+                        ? 'border-amber-300 bg-amber-400/25 shadow-[0_0_120px_#fbbf24]'
+                        : cutscene.maxRarity === 4
+                        ? 'border-fuchsia-300 bg-purple-500/25 shadow-[0_0_100px_#c084fc]'
+                        : 'border-sky-300 bg-sky-400/20'
+                    }`}
+                  />
+                  {cutscene.maxRarity >= 4 && (
+                    <div
+                      style={{ animation: 'gachaShockwave 1.15s ease-out 0.18s forwards' }}
+                      className={`absolute w-40 h-40 rounded-full border-2 pointer-events-none ${
+                        cutscene.maxRarity === 5 ? 'border-yellow-100' : 'border-purple-200'
+                      }`}
+                    />
+                  )}
+                </>
+              )}
+
+              <p className="mt-20 text-xs sm:text-sm font-extrabold text-white/85 tracking-wider z-10">
+                {isSuspensePhase
+                  ? 'Sao băng đang lao xuống...'
+                  : cutscene.maxRarity === 5
+                  ? '✨ Sao băng hóa Kim Quang 5★!'
+                  : cutscene.maxRarity === 4
+                  ? '🔮 Sao băng hóa Ánh Tím 4★!'
+                  : cutscene.allWhiff
+                  ? '💨 Sao băng vụt tắt...'
+                  : '☄️ Kết tinh vũ khí 3★!'}
+              </p>
             </div>
           )}
 
+          {/* SILHOUETTE BLACKOUT -> FLASH UNVEIL + SEQUENTIAL STAR POP-IN (RUNS FOR BOTH 1x & 10x!) */}
           {cutscene.phase === 'reveal' && cutscene.results[cutscene.revealIdx] && (() => {
             const item = cutscene.results[cutscene.revealIdx];
+            const isSilhouette = unveilStage === 'silhouette';
+            const totalItemStars = Math.max(1, Math.min(5, item.starRarity || 3));
+
             return (
               <div
-                onClick={advanceRevealCard}
-                className="flex-1 w-full max-w-xl flex flex-col items-center justify-center text-center gap-4 cursor-pointer py-4"
+                data-testid="knight-gacha-single-reveal"
+                data-unveil={unveilStage}
+                onClick={handleRevealCardClick}
+                className="flex-1 w-full max-w-xl flex flex-col items-center justify-center text-center gap-4 cursor-pointer py-4 relative"
               >
                 <div
-                  className={`relative p-6 sm:p-8 rounded-3xl border-2 w-full shadow-2xl transition-all ${
-                    item.starRarity === 5
-                      ? 'bg-gradient-to-b from-amber-500/25 via-amber-950/80 to-slate-950 border-amber-300 shadow-[0_0_70px_rgba(251,191,36,0.5)]'
+                  className={`relative p-6 sm:p-8 rounded-3xl border-2 w-full shadow-2xl overflow-hidden transition-all duration-500 ${
+                    isSilhouette
+                      ? 'bg-gradient-to-b from-slate-900 via-slate-950 to-black border-white/25 shadow-[0_0_55px_rgba(255,255,255,0.18)]'
+                      : item.starRarity === 5
+                      ? 'bg-gradient-to-b from-amber-500/30 via-amber-950/85 to-slate-950 border-amber-300 shadow-[0_0_80px_rgba(251,191,36,0.55)]'
                       : item.starRarity === 4
-                      ? 'bg-gradient-to-b from-purple-500/25 via-purple-950/80 to-slate-950 border-fuchsia-400 shadow-[0_0_55px_rgba(192,132,252,0.45)]'
+                      ? 'bg-gradient-to-b from-purple-500/30 via-purple-950/85 to-slate-950 border-fuchsia-400 shadow-[0_0_65px_rgba(192,132,252,0.5)]'
                       : item.isWhiff
                       ? 'bg-gradient-to-b from-slate-800/80 to-slate-950 border-slate-500'
-                      : 'bg-gradient-to-b from-sky-500/20 via-slate-900 to-slate-950 border-sky-400 shadow-[0_0_40px_rgba(56,189,248,0.3)]'
+                      : 'bg-gradient-to-b from-sky-500/20 via-slate-900 to-slate-950 border-sky-400 shadow-[0_0_45px_rgba(56,189,248,0.35)]'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-xs font-black text-white/75">
-                      Lượt {cutscene.revealIdx + 1} / {cutscene.results.length}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {item.isNew && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-[11px] font-black">
-                          MỚI!
-                        </span>
-                      )}
-                      {item.isRefundedHero && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 text-[11px] font-black">
-                          +{KNIGHT_DUPLICATE_HERO_REFUND_GOLD.toLocaleString('vi-VN')} Vàng
-                        </span>
-                      )}
-                      {item.isWhiff && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[11px] font-black">
-                          TẠCH
-                        </span>
-                      )}
-                      {item.rateOutcome === 'lost_50_50' && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-orange-500 text-white text-[11px] font-black">
-                          Lệch 50/50 (Kế tiếp 100% UP)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="w-36 h-36 sm:w-44 sm:h-44 mx-auto rounded-3xl flex items-center justify-center p-2 bg-black/40 border border-white/15 shadow-inner">
-                    <img
-                      src={item.spriteUrl}
-                      alt={item.name}
-                      className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.85)]"
+                  {/* Rotating Radiant God-Rays behind revealed Hero/Weapon */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+                    <div
+                      style={{ animation: 'gachaSpinCw 14s linear infinite' }}
+                      className={`w-80 h-80 rounded-full border-4 border-dashed ${
+                        isSilhouette
+                          ? 'border-white/20'
+                          : item.starRarity === 5
+                          ? 'border-amber-300/60'
+                          : item.starRarity === 4
+                          ? 'border-fuchsia-400/55'
+                          : 'border-sky-300/40'
+                      }`}
                     />
                   </div>
 
-                  <p
-                    className={`mt-3 text-lg sm:text-2xl font-black tracking-wider ${
-                      item.starRarity === 5
-                        ? 'text-amber-300'
-                        : item.starRarity === 4
-                        ? 'text-fuchsia-300'
-                        : item.isWhiff
-                        ? 'text-slate-400'
-                        : 'text-sky-300'
-                    }`}
+                  <div className="relative z-10 flex items-center justify-between gap-2 mb-3">
+                    <span className="text-xs font-black text-white/75">
+                      Lượt {cutscene.revealIdx + 1} / {cutscene.results.length}
+                    </span>
+                    {!isSilhouette && (
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {item.isNew && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-[11px] font-black">
+                            MỚI!
+                          </span>
+                        )}
+                        {item.isRefundedHero && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 text-[11px] font-black">
+                            +{(item.refundGoldAmount || 0).toLocaleString('vi-VN')} Vàng
+                          </span>
+                        )}
+                        {item.isWhiff && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[11px] font-black">
+                            TẠCH
+                          </span>
+                        )}
+                        {item.rateOutcome === 'lost_50_50' && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-orange-500 text-white text-[11px] font-black">
+                            Lệch 50/50 (Kế tiếp 100% Giới Hạn)
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Artwork Container: Black Silhouette -> Bright Flash Unveil! */}
+                  <div className="relative z-10 w-40 h-40 sm:w-48 sm:h-48 mx-auto rounded-3xl flex items-center justify-center p-2.5 bg-black/45 border border-white/15 shadow-inner">
+                    <img
+                      src={item.spriteUrl}
+                      alt={isSilhouette ? '???' : item.name}
+                      style={{
+                        animation: isSilhouette
+                          ? 'gachaSilhouetteZoom 0.65s ease-out forwards'
+                          : 'gachaUnveilBurst 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+                        filter: isSilhouette
+                          ? 'brightness(0) contrast(220%) drop-shadow(0 0 18px rgba(255,255,255,0.65))'
+                          : 'brightness(1) contrast(100%) drop-shadow(0 12px 22px rgba(0,0,0,0.85))'
+                      }}
+                      className="w-full h-full object-contain select-none"
+                    />
+                  </div>
+
+                  {/* Sequential Star Pop-in Row */}
+                  <div
+                    data-testid="gacha-reveal-stars-row"
+                    className="relative z-10 mt-4 h-9 flex items-center justify-center gap-1.5"
                   >
-                    {renderStars(item.starRarity)}
-                  </p>
-                  <h3 className="text-lg sm:text-2xl font-black text-white mt-0.5">{item.name}</h3>
-                  <p className="text-xs text-slate-300 mt-1.5 max-w-md mx-auto">{item.passiveText}</p>
-                  {item.bonusText && (
-                    <p className="mt-2 inline-block px-3 py-1 rounded-xl bg-amber-400/20 border border-amber-300/40 text-amber-200 text-xs font-extrabold">
-                      {item.bonusText}
-                    </p>
+                    {!isSilhouette &&
+                      Array.from({ length: totalItemStars }).map((_, sIdx) => {
+                        const shown = sIdx < visibleStars;
+                        if (!shown) {
+                          return <span key={sIdx} className="w-6 h-6 inline-block opacity-0" />;
+                        }
+                        return (
+                          <span
+                            key={sIdx}
+                            data-testid="gacha-popped-star"
+                            style={{ animation: 'gachaStarPop 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}
+                            className={`inline-flex items-center justify-center text-2xl sm:text-3xl font-black drop-shadow-[0_0_12px_currentColor] ${
+                              item.starRarity === 5
+                                ? 'text-amber-300'
+                                : item.starRarity === 4
+                                ? 'text-fuchsia-300'
+                                : item.isWhiff
+                                ? 'text-slate-400'
+                                : 'text-sky-300'
+                            }`}
+                          >
+                            ★
+                          </span>
+                        );
+                      })}
+                  </div>
+
+                  <h3 className="relative z-10 text-lg sm:text-2xl font-black text-white mt-1">
+                    {isSilhouette ? '???' : item.name}
+                  </h3>
+
+                  {!isSilhouette && (
+                    <>
+                      <p className="relative z-10 text-xs font-bold text-amber-200/90 mt-1">
+                        {item.itemKind === 'character'
+                          ? `${item.rarityLabel} • ${item.weaponClassLabel || ''}`
+                          : item.isWhiff
+                          ? 'Không trúng vật phẩm'
+                          : `${item.rarityLabel} • ${item.weaponClassLabel || 'Trang trí'}`}
+                      </p>
+                      <p className="relative z-10 text-xs text-slate-300 mt-1.5 max-w-md mx-auto">
+                        {item.passiveText}
+                      </p>
+                      {item.bonusText && (
+                        <p className="relative z-10 mt-2.5 inline-block px-3.5 py-1 rounded-xl bg-amber-400/20 border border-amber-300/40 text-amber-200 text-xs font-extrabold">
+                          {item.bonusText}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
                 <p className="text-xs font-bold text-white/80">
-                  Chạm để xem tiếp ({cutscene.revealIdx + 1}/{cutscene.results.length}) ▸
+                  {isSilhouette
+                    ? 'Đang hé lộ nhân vật / vật phẩm...'
+                    : cutscene.revealIdx + 1 < cutscene.results.length
+                    ? `Chạm để mở tiếp (${cutscene.revealIdx + 1}/${cutscene.results.length}) ▸`
+                    : 'Chạm để xem tổng kết ▸'}
                 </p>
               </div>
             );
           })()}
 
+          {/* SUMMARY GRID */}
           {cutscene.phase === 'summary' && (
             <div
               data-testid="knight-gacha-results-view"
@@ -448,10 +818,13 @@ export default function KnightGachaModal({
                     : 'grid-cols-2 sm:grid-cols-5'
                 }`}
               >
-                {cutscene.results.map(item => (
+                {cutscene.results.map((item, idx) => (
                   <div
                     key={item.pullId}
                     data-testid={`gacha-result-card-${item.starRarity}`}
+                    style={{
+                      animation: `gachaCardRise 0.35s ease-out ${idx * 0.05}s both`
+                    }}
                     className={`rounded-2xl border-2 p-3 flex flex-col items-center text-center justify-between gap-2 relative overflow-hidden transition ${
                       item.starRarity === 5
                         ? 'bg-gradient-to-b from-amber-400/30 via-amber-950/85 to-slate-950 border-amber-300 shadow-[0_0_35px_rgba(251,191,36,0.45)]'
@@ -474,7 +847,7 @@ export default function KnightGachaModal({
                             : 'text-sky-300'
                         }`}
                       >
-                        {renderStars(item.starRarity)}
+                        {'★'.repeat(item.starRarity)}
                       </span>
                       {item.isNew ? (
                         <span className="px-1.5 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[9px] font-black">
@@ -482,7 +855,7 @@ export default function KnightGachaModal({
                         </span>
                       ) : item.isRefundedHero ? (
                         <span className="px-1.5 py-0.5 rounded-md bg-amber-300 text-slate-950 text-[9px] font-black">
-                          +200K VÀNG
+                          +{item.refundGoldAmount === 10000 ? '10K' : '200K'} VÀNG
                         </span>
                       ) : item.isWhiff ? (
                         <span className="px-1.5 py-0.5 rounded-md bg-rose-500 text-white text-[9px] font-black">
@@ -501,7 +874,9 @@ export default function KnightGachaModal({
 
                     <div className="space-y-0.5">
                       <p className="text-xs font-black text-white line-clamp-2 leading-tight">{item.name}</p>
-                      <p className="text-[10px] text-amber-200/90 line-clamp-2">{item.bonusText || item.passiveText}</p>
+                      <p className="text-[10px] text-amber-200/90 line-clamp-2">
+                        {item.bonusText || item.passiveText}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -532,16 +907,18 @@ export default function KnightGachaModal({
           )}
 
           <div className="text-[11px] text-white/60 text-center">
-            5★: 0.6% (bảo hiểm 90 lượt) • 4★: 5.1% (bảo hiểm 10 lượt) • Nhân vật cũ / &gt;1 nhân vật trong 10 lượt hoàn 200.000 Vàng
+            Hoàn trùng nhân vật: 5★ +200.000 Vàng • 4★ +10.000 Vàng • Vũ khí dùng trang trí theo Hệ
           </div>
         </div>
       )}
 
-      {/* MAIN MODAL */}
+      {/* =========================================================
+          MAIN MODAL CONTAINER
+      ========================================================= */}
       <div className="max-w-5xl w-full rounded-3xl border border-amber-300/70 dark:border-amber-400/35 bg-white dark:bg-[#0B1020] text-[#0F172B] dark:text-white p-4 sm:p-6 space-y-4 max-h-[93vh] overflow-y-auto shadow-2xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3.5">
           <div>
-            <h2 className="text-lg sm:text-xl font-black flex items-center gap-2 text-[#0F172B] dark:text-white">
+            <h2 className="text-lg sm:text-xl font-black flex items-center gap-2 flex-wrap text-[#0F172B] dark:text-white">
               <Sparkles className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0" />
               <span>Vòng Quay Gacha &amp; Tủ Đồ</span>
               {isStrictAdmin && (
@@ -554,7 +931,7 @@ export default function KnightGachaModal({
               )}
             </h2>
             <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
-              10.000 Vàng / 1 lượt • Trùng nhân vật cũ hoặc ra trên 1 nhân vật trong 10 lượt được hoàn trả 200.000 Vàng.
+              10.000 Vàng / 1 lượt • Trùng nhân vật 5★ hoàn 200.000 Vàng, trùng nhân vật 4★ hoàn 10.000 Vàng.
             </p>
           </div>
 
@@ -592,7 +969,7 @@ export default function KnightGachaModal({
                 data-testid="admin-reset-gacha-heroes-btn"
                 onClick={onAdminResetHeroes}
                 className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/40 text-rose-700 dark:text-rose-200 text-xs font-bold inline-flex items-center gap-1 transition"
-                title="Reset danh sách nhân vật đã mở về mặc định để test quay lại từ đầu"
+                title="Reset tủ đồ Gacha về mặc định để test"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset Test</span>
@@ -623,7 +1000,7 @@ export default function KnightGachaModal({
             }`}
           >
             <Crown className="w-3.5 h-3.5" />
-            <span>Banner Nhân Vật</span>
+            <span>Banner Giới Hạn (7 Ngày)</span>
           </button>
 
           <button
@@ -651,7 +1028,7 @@ export default function KnightGachaModal({
             }`}
           >
             <Swords className="w-3.5 h-3.5" />
-            <span>Tủ Đồ ({unlockedSkins.length}/10)</span>
+            <span>Tủ Đồ ({unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
           </button>
 
           <button
@@ -669,30 +1046,18 @@ export default function KnightGachaModal({
           </button>
         </div>
 
-        {/* TAB 1: CHARACTER BANNER */}
+        {/* =========================================================
+            TAB 1: WEEKLY SINGLE LIMITED BANNER (ONLY 1 PER 7 DAYS!)
+        ========================================================= */}
         {activeTab === 'character_event' && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                {KNIGHT_CHARACTER_EVENT_BANNERS.map(b => {
-                  const hero = KNIGHT_CHARACTER_SKINS.find(s => s.id === b.featuredHeroId);
-                  const active = b.id === activeBannerMeta.id;
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => setSelectedBannerId(b.id)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-black flex items-center gap-2 transition ${
-                        active
-                          ? 'bg-amber-100 dark:bg-amber-500/25 border-amber-400 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/50'
-                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50'
-                      }`}
-                    >
-                      <img src={hero?.spriteUrl} alt={hero?.name} className="w-5 h-5 object-contain" />
-                      <span>{hero?.name}</span>
-                    </button>
-                  );
-                })}
+              <div
+                data-testid="weekly-limited-banner-timer"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-400/40 text-amber-900 dark:text-amber-200 text-xs font-black"
+              >
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                <span>Đổi banner giới hạn sau: {weeklyBanner.countdownText} (Chu kỳ 7 ngày / 1 banner duy nhất)</span>
               </div>
 
               <button
@@ -709,19 +1074,22 @@ export default function KnightGachaModal({
               <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
                 <div className="md:col-span-7 space-y-3">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/60 text-amber-200 text-xs font-black">
-                    BANNER NHÂN VẬT TĂNG TỈ LỆ
+                    BANNER NHÂN VẬT GIỚI HẠN TUẦN NÀY
                   </span>
 
                   <h3 className="text-2xl sm:text-3xl font-black text-amber-200 leading-tight">
                     {featured5Hero.name}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                    Quay 10 lượt chắc chắn có vật phẩm ≥ 4★. Nổ 5★ có 50% trúng nhân vật tâm điểm (nếu lệch, lần 5★ kế tiếp chắc chắn trúng).
+                    Khi nổ 5★ có <b>50%</b> ra nhân vật giới hạn <b>{featured5Hero.name}</b> và <b>50%</b> ra nhân vật 5★ Banner Thường (nếu lệch, lần 5★ sau chắc chắn trúng Giới Hạn).
                   </p>
 
                   <div className="p-3.5 rounded-2xl bg-black/45 border border-amber-400/40 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-amber-300 font-black text-sm">⭐⭐⭐⭐⭐ {featured5Hero.name}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-white/15 text-amber-200 text-[10px] font-black">
+                        {featured5Hero.weaponClassLabel}
+                      </span>
                     </div>
                     <p className="text-xs text-amber-100 font-bold">🗡️ {featured5Hero.weaponName}</p>
                     <p className="text-xs text-slate-300">{featured5Hero.passiveText}</p>
@@ -748,7 +1116,7 @@ export default function KnightGachaModal({
                       className="w-full h-full object-contain drop-shadow-[0_12px_22px_rgba(0,0,0,0.9)]"
                     />
                     <span className="absolute bottom-2.5 px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black shadow">
-                      {unlockedSkins.includes(featured5Hero.id) ? 'ĐÃ SỞ HỮU' : 'CHƯA SỞ HỮU'}
+                      {unlockedSkins.includes(featured5Hero.id) ? 'ĐÃ SỞ HỮU' : 'GIỚI HẠN TUẦN'}
                     </span>
                   </div>
                 </div>
@@ -770,11 +1138,11 @@ export default function KnightGachaModal({
                           : 'bg-amber-500/25 text-amber-200 border border-amber-400/40'
                       }`}
                     >
-                      {gachaState.charGuaranteed5 ? 'Bảo hiểm 100% UP' : 'Tỉ lệ 50/50'}
+                      {gachaState.charGuaranteed5 ? 'Bảo hiểm 100% Giới Hạn' : 'Tỉ lệ 50/50'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    5★: 0.6% • 4★: 5.1% • 3★: 94.3% • Trùng nhân vật hoàn 200.000 Vàng
+                    5★: 0.6% • 4★: 5.1% • Trùng 5★ hoàn 200k Vàng • Trùng 4★ hoàn 10k Vàng
                   </p>
                 </div>
 
@@ -816,7 +1184,9 @@ export default function KnightGachaModal({
           </div>
         )}
 
-        {/* TAB 2: STANDARD BANNER */}
+        {/* =========================================================
+            TAB 2: STANDARD BANNER (ONLY STANDARD 5★/4★ HEROES — NEVER LIMITED!)
+        ========================================================= */}
         {activeTab === 'standard' && (
           <div className="space-y-4">
             <div className="relative rounded-3xl overflow-hidden border-2 border-cyan-400/60 bg-gradient-to-br from-[#0c1938] via-[#1e1b4b] to-[#090d16] text-white p-5 sm:p-7 shadow-2xl">
@@ -827,23 +1197,26 @@ export default function KnightGachaModal({
                   </span>
 
                   <h3 className="text-2xl sm:text-3xl font-black text-cyan-200 leading-tight">
-                    Vòng Quay Thường (Nhân Vật &amp; Vũ Khí)
+                    Vòng Quay Thường (Nhân Vật Thường &amp; Vũ Khí)
                   </h3>
 
                   <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                    Không có bảo hiểm UP 50/50 và có tỉ lệ tạch Gacha ở bậc 3★ (hoàn 250 Vàng). Vẫn đảm bảo 10 lượt ≥ 4★ và 90 lượt nổ 5★.
+                    Chỉ gồm các nhân vật 5★/4★ Thường và vũ khí 4★/3★ (không ra nhân vật Giới Hạn). Có tỉ lệ tạch Gacha ở bậc 3★ (hoàn 250 Vàng).
                   </p>
 
-                  <div className="flex flex-wrap gap-2">
-                    {KNIGHT_CHARACTER_SKINS.filter(s => s.obtainMethod === 'gacha' && s.starRarity === 5).map(h => (
-                      <span
-                        key={h.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/10 border border-amber-300/40 text-xs font-bold text-amber-200"
-                      >
-                        <img src={h.spriteUrl} alt={h.name} className="w-5 h-5 object-contain" />
-                        <span>5★ {h.name}</span>
-                      </span>
-                    ))}
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-cyan-200">Nhân vật 5★ trong Banner Thường:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {standard5Heroes.map(h => (
+                        <span
+                          key={h.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/10 border border-cyan-300/40 text-xs font-bold text-amber-200"
+                        >
+                          <img src={h.spriteUrl} alt={h.name} className="w-5 h-5 object-contain" />
+                          <span>5★ {h.name}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -856,6 +1229,7 @@ export default function KnightGachaModal({
                       <img src={wp.iconUrl} alt={wp.name} className="w-16 h-16 object-contain" />
                       <span className="text-[11px] font-black text-fuchsia-300">⭐⭐⭐⭐</span>
                       <span className="text-xs font-bold text-white line-clamp-1">{wp.name}</span>
+                      <span className="text-[10px] text-slate-300">{wp.weaponClassLabel}</span>
                     </div>
                   ))}
                 </div>
@@ -870,7 +1244,7 @@ export default function KnightGachaModal({
                     4★: {gachaState.stdPity4 || 0} / {KNIGHT_GACHA_RATES.hardPity4}
                   </span>
                   <span className="px-2.5 py-1 rounded-lg bg-rose-500/25 border border-rose-400/40 font-black text-rose-200">
-                    Có tỉ lệ tạch Gacha
+                    Không có nhân vật Giới Hạn • Có tỉ lệ tạch
                   </span>
                 </div>
 
@@ -908,7 +1282,9 @@ export default function KnightGachaModal({
           </div>
         )}
 
-        {/* TAB 3: INVENTORY (NO C1-C6, NO DIRECT BUY) */}
+        {/* =========================================================
+            TAB 3: INVENTORY & CLASS-MATCHED COSMETIC WEAPON EQUIPPING
+        ========================================================= */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
             <div className="space-y-3">
@@ -918,7 +1294,7 @@ export default function KnightGachaModal({
                   <span>Nhân Vật ({unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
                 </h3>
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                  Mở khóa qua Gacha • Trùng nhân vật hoàn 200.000 Vàng
+                  Mỗi nhân vật chỉ cầm được vũ khí trang trí đúng Hệ của mình
                 </span>
               </div>
 
@@ -926,6 +1302,11 @@ export default function KnightGachaModal({
                 {KNIGHT_CHARACTER_SKINS.map(skin => {
                   const unlocked = unlockedSkins.includes(skin.id);
                   const equipped = rpgProfile.equippedSkin === skin.id;
+                  const heldWeapon = getHeroCosmeticWeapon(rpgProfile, skin);
+                  const compatibleOwnedWeapons = KNIGHT_GACHA_WEAPONS.filter(
+                    w => unlockedWeapons.includes(w.id) && canHeroEquipWeapon(skin, w)
+                  );
+
                   return (
                     <div
                       key={skin.id}
@@ -942,7 +1323,7 @@ export default function KnightGachaModal({
                         <div
                           className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center border-2 p-1.5 shrink-0 relative overflow-hidden shadow-md"
                           style={{
-                            background: `radial-gradient(circle at 50% 45%, ${skin.bladeColor}40, #090d16 78%)`,
+                            background: `radial-gradient(circle at 50% 45%, ${(heldWeapon?.bladeColor || skin.bladeColor)}40, #090d16 78%)`,
                             borderColor: skin.starRarity === 5 ? '#fbbf24' : '#c084fc'
                           }}
                         >
@@ -953,13 +1334,23 @@ export default function KnightGachaModal({
                           />
                           <span
                             className={`absolute top-1 left-1 px-1.5 py-0.5 rounded-md text-[9px] font-black ${
-                              skin.starRarity === 5
+                              skin.pool === 'limited'
                                 ? 'bg-amber-400 text-slate-950'
+                                : skin.starRarity === 5
+                                ? 'bg-cyan-300 text-slate-950'
                                 : 'bg-purple-500 text-white'
                             }`}
                           >
-                            {skin.starRarity}★
+                            {skin.pool === 'limited' ? '5★ GH' : `${skin.starRarity}★`}
                           </span>
+                          {unlocked && heldWeapon && (
+                            <img
+                              src={heldWeapon.iconUrl}
+                              alt={heldWeapon.name}
+                              title={`Đang cầm: ${heldWeapon.name}`}
+                              className="absolute bottom-1 right-1 w-7 h-7 rounded-lg border border-amber-300 bg-slate-950/90 object-contain shadow"
+                            />
+                          )}
                         </div>
 
                         <div className="min-w-0 flex-1 space-y-1">
@@ -967,18 +1358,65 @@ export default function KnightGachaModal({
                             <span className="text-xs sm:text-sm font-black text-[#0F172B] dark:text-white">
                               {skin.name}
                             </span>
-                            <span className="px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-[10px] font-bold">
-                              {skin.genderBadge}
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 text-[10px] font-extrabold">
+                              {skin.weaponClassLabel}
                             </span>
                           </div>
-                          <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                            🗡️ {skin.weaponName}
+                          <p className="text-xs font-bold text-amber-700 dark:text-amber-300 truncate">
+                            🗡️ {heldWeapon ? `${heldWeapon.name} (Trang trí)` : skin.weaponName}
                           </p>
                           <p className="text-[11px] text-[#475569] dark:text-slate-300 leading-snug">
                             {skin.passiveText}
                           </p>
                         </div>
                       </div>
+
+                      {/* Class-Matched Cosmetic Weapon Selector for Unlocked Hero */}
+                      {unlocked && (
+                        <div className="pt-2 border-t border-slate-200/70 dark:border-slate-800 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-bold text-slate-600 dark:text-slate-400">
+                              Cầm vũ khí ({skin.weaponClassLabel} • Trang trí):
+                            </span>
+                            {heldWeapon && (
+                              <button
+                                type="button"
+                                onClick={() => onEquipHeroWeapon?.(skin.id, '')}
+                                className="text-rose-500 font-bold hover:underline"
+                              >
+                                Về mặc định
+                              </button>
+                            )}
+                          </div>
+                          {compatibleOwnedWeapons.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 italic">
+                              Chưa có vũ khí {skin.weaponClassLabel} trong kho.
+                            </p>
+                          ) : (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {compatibleOwnedWeapons.map(wp => {
+                                const isHolding = heldWeapon?.id === wp.id;
+                                return (
+                                  <button
+                                    key={wp.id}
+                                    type="button"
+                                    data-testid={`equip-hero-wp-${skin.id}-${wp.id}`}
+                                    onClick={() => onEquipHeroWeapon?.(skin.id, isHolding ? '' : wp.id)}
+                                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-xl border text-[11px] font-bold transition ${
+                                      isHolding
+                                        ? 'bg-amber-400/25 border-amber-400 text-amber-800 dark:text-amber-200'
+                                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                                    }`}
+                                  >
+                                    <img src={wp.iconUrl} alt={wp.name} className="w-4 h-4 rounded object-contain" />
+                                    <span>{wp.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {unlocked ? (
                         <button
@@ -990,20 +1428,27 @@ export default function KnightGachaModal({
                               : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0F172B] dark:text-white'
                           }`}
                         >
-                          {equipped ? '✓ Đang Trang Bị' : 'Trang Bị'}
+                          {equipped ? '✓ Đang Xuất Trận' : 'Chọn Nhân Vật'}
                         </button>
                       ) : (
                         <button
                           type="button"
                           data-testid={`locked-gacha-hero-btn-${skin.id}`}
                           onClick={() => {
-                            setActiveTab('character_event');
-                            showToast?.('Nhân vật mở khóa qua vòng quay Gacha!', 'info');
+                            setActiveTab(skin.pool === 'limited' ? 'character_event' : 'standard');
+                            showToast?.(
+                              skin.pool === 'limited'
+                                ? 'Nhân vật Giới Hạn chỉ xuất hiện theo chu kỳ 7 ngày ở Banner Giới Hạn!'
+                                : 'Nhân vật mở khóa qua vòng quay Gacha!',
+                              'info'
+                            );
                           }}
                           className="w-full py-2 rounded-xl text-xs font-black bg-slate-200/80 hover:bg-amber-100 dark:bg-slate-800/90 dark:hover:bg-slate-800 text-slate-700 dark:text-amber-300 border border-dashed border-amber-400/50 inline-flex items-center justify-center gap-1.5 transition"
                         >
                           <Lock className="w-3.5 h-3.5" />
-                          <span>Chưa sở hữu • Quay Gacha</span>
+                          <span>
+                            {skin.pool === 'limited' ? 'Nhân vật Banner Giới Hạn' : 'Chưa sở hữu • Quay Gacha'}
+                          </span>
                         </button>
                       )}
                     </div>
@@ -1012,33 +1457,32 @@ export default function KnightGachaModal({
               </div>
             </div>
 
+            {/* Weapons Collection */}
             <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-black text-[#0F172B] dark:text-white flex items-center gap-2">
                   <Shield className="w-4 h-4 text-fuchsia-500" />
-                  <span>Vũ Khí 4★ &amp; 3★ ({unlockedWeapons.length}/{KNIGHT_GACHA_WEAPONS.length})</span>
+                  <span>Kho Vũ Khí Trang Trí 4★ &amp; 3★ ({unlockedWeapons.length}/{KNIGHT_GACHA_WEAPONS.length})</span>
                 </h3>
-                {rpgProfile.equippedWeapon && (
-                  <button
-                    type="button"
-                    onClick={() => onEquipWeapon?.(null)}
-                    className="text-xs font-bold text-slate-600 dark:text-slate-400 underline"
-                  >
-                    Gỡ vũ khí
-                  </button>
-                )}
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Nhân vật đang chọn: <b>{activeSkin.name}</b> ({activeSkin.weaponClassLabel})
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {KNIGHT_GACHA_WEAPONS.map(wp => {
                   const owned = unlockedWeapons.includes(wp.id);
-                  const isEquipped = rpgProfile.equippedWeapon === wp.id;
+                  const countOwned = weaponCounts[wp.id] || (owned ? 1 : 0);
+                  const matchesActiveHero = canHeroEquipWeapon(activeSkin, wp);
+                  const activeHeroHeldWp = getHeroCosmeticWeapon(rpgProfile, activeSkin);
+                  const isEquippedOnActive = activeHeroHeldWp?.id === wp.id;
+
                   return (
                     <div
                       key={wp.id}
                       data-testid={`knight-weapon-card-${wp.id}`}
                       className={`p-3 rounded-2xl border flex flex-col justify-between gap-2.5 ${
-                        isEquipped
+                        isEquippedOnActive
                           ? 'bg-fuchsia-50 dark:bg-fuchsia-950/35 border-fuchsia-400 ring-1 ring-fuchsia-400/40'
                           : owned
                           ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
@@ -1052,36 +1496,54 @@ export default function KnightGachaModal({
                           className={`w-14 h-14 rounded-xl object-contain shrink-0 ${owned ? '' : 'grayscale opacity-60'}`}
                         />
                         <div className="min-w-0">
-                          <span
-                            className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                              wp.starRarity === 4
-                                ? 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300'
-                                : 'bg-sky-500/20 text-sky-700 dark:text-sky-300'
-                            }`}
-                          >
-                            {renderStars(wp.starRarity)}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                                wp.starRarity === 4
+                                  ? 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300'
+                                  : 'bg-sky-500/20 text-sky-700 dark:text-sky-300'
+                              }`}
+                            >
+                              {'★'.repeat(wp.starRarity)}
+                            </span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {wp.weaponClassLabel}
+                            </span>
+                            {owned && countOwned > 1 && (
+                              <span className="text-[10px] font-black text-amber-600 dark:text-amber-300">
+                                x{countOwned}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs font-black text-[#0F172B] dark:text-white truncate mt-0.5">
                             {wp.name}
                           </p>
                           <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-tight">
-                            {wp.passiveText}
+                            Chỉ trang trí ngoại hình
                           </p>
                         </div>
                       </div>
 
                       {owned ? (
-                        <button
-                          type="button"
-                          onClick={() => onEquipWeapon?.(wp)}
-                          className={`w-full py-1.5 rounded-xl text-xs font-black transition ${
-                            isEquipped
-                              ? 'bg-emerald-500 text-slate-950'
-                              : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-white'
-                          }`}
-                        >
-                          {isEquipped ? '✓ Đang Trang Bị' : 'Trang Bị'}
-                        </button>
+                        matchesActiveHero ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onEquipHeroWeapon?.(activeSkin.id, isEquippedOnActive ? '' : wp.id)
+                            }
+                            className={`w-full py-1.5 rounded-xl text-xs font-black transition ${
+                              isEquippedOnActive
+                                ? 'bg-emerald-500 text-slate-950'
+                                : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-white'
+                            }`}
+                          >
+                            {isEquippedOnActive ? '✓ Đang Cầm' : `Cho ${activeSkin.name.split(' ').pop()} Cầm`}
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-center py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold">
+                            Dành cho {wp.weaponClassLabel}
+                          </span>
+                        )
                       ) : (
                         <span className="text-[11px] text-center py-1 rounded-lg bg-slate-200/60 dark:bg-slate-800/60 text-slate-500 font-bold">
                           Chưa mở
@@ -1095,7 +1557,9 @@ export default function KnightGachaModal({
           </div>
         )}
 
-        {/* TAB 4: BUY WISH PACKS & HISTORY */}
+        {/* =========================================================
+            TAB 4: BUY WISH PACKS & HISTORY
+        ========================================================= */}
         {activeTab === 'shop' && (
           <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1178,13 +1642,13 @@ export default function KnightGachaModal({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 text-xs">
                 <h4 className="font-black text-sm text-[#0F172B] dark:text-white">
-                  Tỉ Lệ Vòng Quay
+                  Quy Tắc Vòng Quay
                 </h4>
                 <ul className="space-y-1.5 text-[#334155] dark:text-slate-300 leading-relaxed">
-                  <li>• <b>5★ Nhân vật:</b> 0.6% cơ bản (tăng từ lượt 74, chắc chắn nổ ở lượt 90).</li>
-                  <li>• <b>4★ Nhân vật &amp; Vũ khí:</b> 5.1% cơ bản (mỗi 10 lượt chắc chắn có ≥ 4★).</li>
-                  <li>• <b>3★ Vũ khí / Tạch:</b> 94.3% cơ bản (Banner Thường có tỉ lệ tạch hoàn 250 Vàng).</li>
-                  <li>• <b>Hoàn Vàng:</b> Quay trúng nhân vật cũ hoặc ra trên 1 nhân vật trong 10 lượt hoàn ngay <b>200.000 Vàng</b>.</li>
+                  <li>• <b>Banner Giới Hạn:</b> Đổi mỗi 7 ngày (1 banner duy nhất/tuần). Có tỉ lệ 50% ra nhân vật Thường nếu lệch 50/50.</li>
+                  <li>• <b>Banner Thường:</b> Không bao giờ ra nhân vật Giới Hạn, có tỉ lệ tạch ở bậc 3★.</li>
+                  <li>• <b>Hoàn Vàng trùng nhân vật:</b> Nhân vật 5★ hoàn <b>{KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD.toLocaleString('vi-VN')} Vàng</b> • Nhân vật 4★ hoàn <b>{KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD.toLocaleString('vi-VN')} Vàng</b>.</li>
+                  <li>• <b>Vũ khí 4★ &amp; 3★:</b> Trùng vẫn cộng dồn bình thường, dùng trang trí ngoại hình theo đúng Hệ nhân vật.</li>
                 </ul>
               </div>
 
@@ -1213,10 +1677,13 @@ export default function KnightGachaModal({
                               : 'text-slate-600 dark:text-slate-300'
                           }`}
                         >
-                          [{h.starRarity}★] {h.name}{h.isRefundedHero ? ' (+200k Vàng)' : ''}
+                          [{h.starRarity}★] {h.name}
+                          {h.isRefundedHero
+                            ? ` (+${h.refundGoldAmount === 10000 ? '10k' : '200k'} Vàng)`
+                            : ''}
                         </span>
                         <span className="text-[10px] text-slate-400 shrink-0">
-                          {h.bannerType === 'standard' ? 'Thường' : 'Nhân vật'}
+                          {h.bannerType === 'standard' ? 'Thường' : 'Giới hạn'}
                         </span>
                       </div>
                     ))}

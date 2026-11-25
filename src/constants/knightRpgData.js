@@ -1,6 +1,7 @@
 // ==========================================
 // KNIGHT & DRAGON RPG ("HIỆP SĨ DIỆT RỒNG")
-// Gacha System (Character UP Banner & Standard Banner), 5★/4★ Heroes, 4★/3★ Weapons & Stages
+// Weekly Rotating Limited Banner (7-Day Cycle), Standard Pool vs Exclusive Limited Pool,
+// 10k (4★) / 200k (5★) Duplicate Hero Refunds & Class-Matched Cosmetic Weapons
 // ==========================================
 
 export const KNIGHT_STORAGE_KEY_PREFIX = 'ielts_knight_rpg_profile_v1';
@@ -9,10 +10,21 @@ export const KNIGHT_HINT_SCORE_COST = 300;
 export const DEATH_REVIVE_DELAY_SEC = 5;
 export const REVIVE_KEY_GOLD_PRICE = 100;
 
-// Gacha Costs & Duplicate Refund
+// Gacha Costs & Duplicate Refunds
 export const KNIGHT_GACHA_GOLD_SINGLE = 10000; // 10.000 Vàng = 1 lượt quay
 export const KNIGHT_GACHA_GOLD_TEN = 100000; // 100.000 Vàng = 10 lượt quay
-export const KNIGHT_DUPLICATE_HERO_REFUND_GOLD = 200000; // Trùng nhân vật cũ hoặc >1 bản trong 10 lượt → hoàn 200.000 Vàng
+export const KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD = 200000; // Trùng nhân vật 5★ → hoàn 200.000 Vàng
+export const KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD = 10000; // Trùng nhân vật 4★ → hoàn 10.000 Vàng
+
+// Weekly Banner Rotation: strictly 1 Limited Banner per 7-day period
+export const LIMITED_BANNER_ROTATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 ngày
+
+export const KNIGHT_WEAPON_CLASS_LABELS = {
+  sword: 'Hệ Kiếm',
+  claymore: 'Hệ Trọng Kiếm',
+  polearm: 'Hệ Thương & Đao',
+  catalyst: 'Hệ Pháp Khí'
+};
 
 export const KNIGHT_GACHA_RATES = {
   base5Star: 0.006, // 0.6% cơ bản
@@ -98,14 +110,6 @@ function buildWeaponSvgDataUrl({ kind = 'sword', primary = '#a855f7', secondary 
         <rect x="-3.5" y="-34" width="7" height="74" rx="3" fill="#94a3b8"/>
         <circle cx="0" cy="-19" r="5" fill="${secondary}"/>
       </g>`;
-  } else if (kind === 'bow') {
-    shape = `
-      <g transform="translate(60,60) rotate(-32)">
-        <path d="M-12,-38 Q24,0 -12,38" fill="none" stroke="${primary}" stroke-width="5" stroke-linecap="round"/>
-        <line x1="-12" y1="-38" x2="-12" y2="38" stroke="#e2e8f0" stroke-width="1.6"/>
-        <line x1="-22" y1="0" x2="22" y2="0" stroke="${secondary}" stroke-width="3"/>
-        <polygon points="27,0 17,-6 19,0 17,6" fill="${secondary}"/>
-      </g>`;
   } else if (kind === 'twin') {
     shape = `
       <g transform="translate(60,60)">
@@ -145,7 +149,11 @@ function buildWeaponSvgDataUrl({ kind = 'sword', primary = '#a855f7', secondary 
 }
 
 // ==========================================
-// 10 HEROES: 1 Starter (Arthur) + 9 Gacha Heroes (5x 5★ & 4x 4★)
+// 13 HEROES:
+// - 1 Starter: Arthur (4★)
+// - 4 Standard 4★ Heroes (pool: 'standard')
+// - 3 Standard 5★ Heroes (pool: 'standard' — obtainable on Standard Banner AND 50/50 loss on Limited Banner)
+// - 5 Exclusive Limited 5★ Heroes (pool: 'limited' — ONLY obtainable on their 7-day Weekly Limited Banner, NEVER on Standard Banner!)
 // ==========================================
 export const KNIGHT_CHARACTER_SKINS = [
   {
@@ -155,8 +163,11 @@ export const KNIGHT_CHARACTER_SKINS = [
     genderBadge: '♂ Nam',
     rarity: 'Mặc Định',
     starRarity: 4,
+    pool: 'starter',
     isStarter: true,
     obtainMethod: 'starter',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
     priceGold: 0,
     weaponName: 'Thánh Kiếm Excalibur',
     passiveText: 'Nhân vật mặc định',
@@ -174,14 +185,19 @@ export const KNIGHT_CHARACTER_SKINS = [
     bladeColor: '#38bdf8',
     slashColor: '#60a5fa'
   },
+
+  // ---- 4★ STANDARD POOL ----
   {
     id: 'valkyrie_freya',
     name: 'Nữ Chiến Binh Valkyrie Freya',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: '4★',
+    rarity: '4★ Thường',
     starRarity: 4,
+    pool: 'standard',
     obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
     weaponName: 'Song Kiếm Thiên Vũ',
     passiveText: '+15% Vàng khi hạ quái',
@@ -204,9 +220,12 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Thánh Kỵ Sĩ Thái Dương Leon',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: '4★',
+    rarity: '4★ Thường',
     starRarity: 4,
+    pool: 'standard',
     obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
     weaponName: 'Đại Kiếm Mặt Trời Solarius',
     passiveText: '+18% Vàng khi hạ quái',
@@ -229,9 +248,12 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Kiếm Khách Anh Đào Tomoe',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: '4★',
+    rarity: '4★ Thường',
     starRarity: 4,
+    pool: 'standard',
     obtainMethod: 'gacha',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
     weaponName: 'Katana Hoa Anh Đào',
     passiveText: '+25% Vàng khi hạ quái',
@@ -254,9 +276,12 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Pháp Sư Tinh Tú Selena',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: '4★',
+    rarity: '4★ Thường',
     starRarity: 4,
+    pool: 'standard',
     obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
     weaponName: 'Quyền Trượng Ngân Hà',
     passiveText: '+20% Vàng • +3 giây mỗi câu',
@@ -274,15 +299,20 @@ export const KNIGHT_CHARACTER_SKINS = [
     bladeColor: '#a78bfa',
     slashColor: '#c4b5fd'
   },
+
+  // ---- 5★ STANDARD POOL (Banner Thường & lệch 50/50 ở Banner Giới Hạn) ----
   {
     id: 'ronin_kenji',
     name: 'Kiếm Sĩ Lôi Kiếm Kenji',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: '5★',
+    rarity: '5★ Thường',
     starRarity: 5,
+    pool: 'standard',
     isStandard5Star: true,
     obtainMethod: 'gacha',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
     weaponName: 'Lôi Đao Raijin',
     passiveText: '+32% Vàng • +1 giây mỗi câu',
@@ -305,10 +335,13 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Sát Thủ Bóng Đêm Kael',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: '5★',
+    rarity: '5★ Thường',
     starRarity: 5,
+    pool: 'standard',
     isStandard5Star: true,
     obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
     weaponName: 'Huyết Ảnh Song Đao',
     passiveText: '+34% Vàng • +1 giây mỗi câu',
@@ -331,10 +364,13 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Thánh Kỵ Sĩ Cyber Nova',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: '5★ UP',
+    rarity: '5★ Thường',
     starRarity: 5,
-    isFeaturedUpHero: true,
+    pool: 'standard',
+    isStandard5Star: true,
     obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
     weaponName: 'Đại Kiếm Plasma Neon',
     passiveText: '+38% Vàng • +2 giây mỗi câu',
@@ -352,15 +388,49 @@ export const KNIGHT_CHARACTER_SKINS = [
     bladeColor: '#22d3ee',
     slashColor: '#67e8f9'
   },
+
+  // ---- 5 EXCLUSIVE LIMITED 5★ POOL (CHỈ XUẤT HIỆN Ở BANNER GIỚI HẠN 7 NGÀY/LẦN — KHÔNG RƠI Ở BANNER THƯỜNG) ----
+  {
+    id: 'dragon_empress',
+    name: 'Nữ Hoàng Long Tộc Ignis',
+    gender: 'Nữ',
+    genderBadge: '♀ Nữ',
+    rarity: '5★ Giới Hạn',
+    starRarity: 5,
+    pool: 'limited',
+    isLimited5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    priceGold: null,
+    weaponName: 'Long Vương Hỏa Kiếm',
+    passiveText: '+50% Vàng • +3 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/dragon_empress.png',
+    slashStyle: 'dragon',
+    goldBonusPct: 50,
+    keyDropBonusPct: 6,
+    bonusTimeSec: 3,
+    armorPrimary: '#f59e0b',
+    armorSecondary: '#fef08a',
+    capeColor: '#dc2626',
+    hairColor: '#fffbeb',
+    hairStyle: 'long_flowing',
+    headgear: 'dragon_horns',
+    bladeColor: '#fbbf24',
+    slashColor: '#fde047'
+  },
   {
     id: 'berserker_drake',
     name: 'Chiến Thần Cuồng Chiến Drake',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: '5★ UP',
+    rarity: '5★ Giới Hạn',
     starRarity: 5,
-    isFeaturedUpHero: true,
+    pool: 'limited',
+    isLimited5Star: true,
     obtainMethod: 'gacha',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
     weaponName: 'Chiến Rìu Dung Nham Ragnarok',
     passiveText: '+44% Vàng • +2 giây mỗi câu',
@@ -379,80 +449,222 @@ export const KNIGHT_CHARACTER_SKINS = [
     slashColor: '#fb923c'
   },
   {
-    id: 'dragon_empress',
-    name: 'Nữ Hoàng Long Tộc Ignis',
+    id: 'archmage_zephyr',
+    name: 'Đại Pháp Sư Tinh Không Zephyr',
+    gender: 'Nam',
+    genderBadge: '♂ Nam',
+    rarity: '5★ Giới Hạn',
+    starRarity: 5,
+    pool: 'limited',
+    isLimited5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    priceGold: null,
+    weaponName: 'Quyền Trượng Tinh Vân',
+    passiveText: '+46% Vàng • +3 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/archmage_zephyr.svg',
+    slashStyle: 'arcane',
+    goldBonusPct: 46,
+    keyDropBonusPct: 5,
+    bonusTimeSec: 3,
+    armorPrimary: '#312e81',
+    armorSecondary: '#c084fc',
+    capeColor: '#4c1d95',
+    hairColor: '#e0f2fe',
+    hairStyle: 'short_spiky',
+    headgear: 'star_tiara',
+    bladeColor: '#c084fc',
+    slashColor: '#e879f9'
+  },
+  {
+    id: 'valkyrie_celestia',
+    name: 'Thánh Nữ Thần Thương Celestia',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: '5★ UP',
+    rarity: '5★ Giới Hạn',
     starRarity: 5,
-    isFeaturedUpHero: true,
+    pool: 'limited',
+    isLimited5Star: true,
     obtainMethod: 'gacha',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
-    weaponName: 'Long Vương Hỏa Kiếm',
-    passiveText: '+50% Vàng • +3 giây mỗi câu',
-    spriteUrl: '/assets/knight-rpg/dragon_empress.png',
-    slashStyle: 'dragon',
-    goldBonusPct: 50,
-    keyDropBonusPct: 6,
-    bonusTimeSec: 3,
-    armorPrimary: '#f59e0b',
-    armorSecondary: '#fef08a',
-    capeColor: '#dc2626',
-    hairColor: '#fffbeb',
+    weaponName: 'Thánh Thương Quang Minh',
+    passiveText: '+48% Vàng • +2 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/valkyrie_celestia.svg',
+    slashStyle: 'solar',
+    goldBonusPct: 48,
+    keyDropBonusPct: 5,
+    bonusTimeSec: 2,
+    armorPrimary: '#f8fafc',
+    armorSecondary: '#fde047',
+    capeColor: '#1d4ed8',
+    hairColor: '#fef08a',
     hairStyle: 'long_flowing',
+    headgear: 'valkyrie_wings',
+    bladeColor: '#38bdf8',
+    slashColor: '#fef08a'
+  },
+  {
+    id: 'emperor_raiden',
+    name: 'Lôi Đế Huyết Kiếm Raiden',
+    gender: 'Nam',
+    genderBadge: '♂ Nam',
+    rarity: '5★ Giới Hạn',
+    starRarity: 5,
+    pool: 'limited',
+    isLimited5Star: true,
+    obtainMethod: 'gacha',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    priceGold: null,
+    weaponName: 'Huyết Lôi Thần Kiếm',
+    passiveText: '+45% Vàng • +2 giây mỗi câu',
+    spriteUrl: '/assets/knight-rpg/emperor_raiden.svg',
+    slashStyle: 'crimson',
+    goldBonusPct: 45,
+    keyDropBonusPct: 5,
+    bonusTimeSec: 2,
+    armorPrimary: '#3b0764',
+    armorSecondary: '#f43f5e',
+    capeColor: '#881337',
+    hairColor: '#2e1065',
+    hairStyle: 'short_spiky',
     headgear: 'dragon_horns',
-    bladeColor: '#fbbf24',
-    slashColor: '#fde047'
+    bladeColor: '#f43f5e',
+    slashColor: '#e879f9'
   }
 ];
 
-export const KNIGHT_CHARACTER_EVENT_BANNERS = [
+// Strictly ONE active Limited Banner per 7-day cycle! Rotates automatically every 7 days.
+export const KNIGHT_LIMITED_BANNERS = [
   {
-    id: 'up_dragon_empress',
+    id: 'limited_ignis',
     featuredHeroId: 'dragon_empress',
-    bannerTitle: 'Banner Nhân Vật: Nữ Hoàng Ignis',
+    bannerTitle: 'Banner Giới Hạn: Nữ Hoàng Long Tộc Ignis',
     featured4StarIds: ['mage_selena', 'samurai_tomoe', 'paladin_leon']
   },
   {
-    id: 'up_berserker_drake',
+    id: 'limited_drake',
     featuredHeroId: 'berserker_drake',
-    bannerTitle: 'Banner Nhân Vật: Chiến Thần Drake',
+    bannerTitle: 'Banner Giới Hạn: Chiến Thần Drake',
     featured4StarIds: ['valkyrie_freya', 'paladin_leon', 'samurai_tomoe']
   },
   {
-    id: 'up_cyber_nova',
-    featuredHeroId: 'cyber_nova',
-    bannerTitle: 'Banner Nhân Vật: Kỵ Sĩ Cyber Nova',
-    featured4StarIds: ['mage_selena', 'valkyrie_freya', 'samurai_tomoe']
+    id: 'limited_zephyr',
+    featuredHeroId: 'archmage_zephyr',
+    bannerTitle: 'Banner Giới Hạn: Đại Pháp Sư Zephyr',
+    featured4StarIds: ['mage_selena', 'valkyrie_freya', 'paladin_leon']
+  },
+  {
+    id: 'limited_celestia',
+    featuredHeroId: 'valkyrie_celestia',
+    bannerTitle: 'Banner Giới Hạn: Thánh Nữ Celestia',
+    featured4StarIds: ['samurai_tomoe', 'valkyrie_freya', 'mage_selena']
+  },
+  {
+    id: 'limited_raiden',
+    featuredHeroId: 'emperor_raiden',
+    bannerTitle: 'Banner Giới Hạn: Lôi Đế Raiden',
+    featured4StarIds: ['paladin_leon', 'samurai_tomoe', 'valkyrie_freya']
   }
 ];
 
+// Keep backward-compatible alias for any import expecting KNIGHT_CHARACTER_EVENT_BANNERS
+export const KNIGHT_CHARACTER_EVENT_BANNERS = KNIGHT_LIMITED_BANNERS;
+
+export function getWeeklyLimitedBannerState(nowMs = Date.now()) {
+  const vnAdjustedMs = (Number(nowMs) || Date.now()) + 7 * 60 * 60 * 1000;
+  const weekNumber = Math.floor(vnAdjustedMs / LIMITED_BANNER_ROTATION_MS);
+  const bannerIdx = ((weekNumber % KNIGHT_LIMITED_BANNERS.length) + KNIGHT_LIMITED_BANNERS.length) % KNIGHT_LIMITED_BANNERS.length;
+  const nextRotationVnMs = (weekNumber + 1) * LIMITED_BANNER_ROTATION_MS;
+  const remainingMs = Math.max(1000, nextRotationVnMs - vnAdjustedMs);
+  const totalMinutes = Math.floor(remainingMs / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  const activeBanner = KNIGHT_LIMITED_BANNERS[bannerIdx];
+  const nextBanner = KNIGHT_LIMITED_BANNERS[(bannerIdx + 1) % KNIGHT_LIMITED_BANNERS.length];
+
+  return {
+    weekNumber,
+    bannerIdx,
+    activeBanner,
+    nextBanner,
+    remainingMs,
+    countdownText: `${days} ngày ${hours} giờ ${minutes} phút`
+  };
+}
+
 // ==========================================
-// 4★ & 3★ WEAPONS
+// 4★ & 3★ COSMETIC WEAPONS (Trang trí ngoại hình theo Hệ nhân vật — không cộng chỉ số)
 // ==========================================
 export const KNIGHT_GACHA_WEAPONS = [
+  // ---- 4★ COSMETIC WEAPONS (2 per class = 8) ----
+  {
+    id: 'wp4_sacrificial_sword',
+    name: 'Kiếm Nghi Lễ Cổ Đại',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#c084fc',
+    slashColor: '#e879f9',
+    passiveText: 'Trang trí vũ khí (Hệ Kiếm)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#c084fc', secondary: '#fbbf24', bg: '#312e81', stars: 4 })
+  },
+  {
+    id: 'wp4_frost_twinblades',
+    name: 'Băng Tinh Song Kiếm',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#38bdf8',
+    slashColor: '#67e8f9',
+    passiveText: 'Trang trí vũ khí (Hệ Kiếm)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'twin', primary: '#38bdf8', secondary: '#e879f9', bg: '#1e1b4b', stars: 4 })
+  },
   {
     id: 'wp4_skyward_claymore',
     name: 'Đại Kiếm Bầu Trời',
     starRarity: 4,
     rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Đại Kiếm',
-    goldBonusPct: 22,
-    keyDropBonusPct: 2,
-    bonusTimeSec: 0,
-    passiveText: '+22% Vàng khi hạ quái',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#a855f7',
+    slashColor: '#fde047',
+    passiveText: 'Trang trí vũ khí (Hệ Trọng Kiếm)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'claymore', primary: '#c084fc', secondary: '#fde047', bg: '#2e1065', stars: 4 })
+  },
+  {
+    id: 'wp4_serpent_spine',
+    name: 'Chiến Rìu Hắc Long',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#fb7185',
+    slashColor: '#fde047',
+    passiveText: 'Trang trí vũ khí (Hệ Trọng Kiếm)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'axe', primary: '#fb7185', secondary: '#fde047', bg: '#4c0519', stars: 4 })
   },
   {
     id: 'wp4_amenoma_katana',
     name: 'Đoản Đao Ảnh Nguyệt',
     starRarity: 4,
     rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Katana',
-    goldBonusPct: 20,
-    keyDropBonusPct: 1,
-    bonusTimeSec: 1,
-    passiveText: '+20% Vàng • +1 giây mỗi câu',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    isCosmeticOnly: true,
+    bladeColor: '#e879f9',
+    slashColor: '#f472b6',
+    passiveText: 'Trang trí vũ khí (Hệ Thương & Đao)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'katana', primary: '#e879f9', secondary: '#f472b6', bg: '#3b0764', stars: 4 })
   },
   {
@@ -460,11 +672,12 @@ export const KNIGHT_GACHA_WEAPONS = [
     name: 'Trường Thương Phong Kỵ',
     starRarity: 4,
     rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Trường Thương',
-    goldBonusPct: 18,
-    keyDropBonusPct: 3,
-    bonusTimeSec: 1,
-    passiveText: '+18% Vàng • +1 giây mỗi câu',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    isCosmeticOnly: true,
+    bladeColor: '#a78bfa',
+    slashColor: '#67e8f9',
+    passiveText: 'Trang trí vũ khí (Hệ Thương & Đao)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#a78bfa', secondary: '#67e8f9', bg: '#1e1b4b', stars: 4 })
   },
   {
@@ -472,181 +685,158 @@ export const KNIGHT_GACHA_WEAPONS = [
     name: 'Pháp Điển Cổ Ngữ',
     starRarity: 4,
     rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Pháp Khí',
-    goldBonusPct: 15,
-    keyDropBonusPct: 1,
-    bonusTimeSec: 2,
-    passiveText: '+15% Vàng • +2 giây mỗi câu',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    isCosmeticOnly: true,
+    bladeColor: '#9333ea',
+    slashColor: '#fde047',
+    passiveText: 'Trang trí vũ khí (Hệ Pháp Khí)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'codex', primary: '#9333ea', secondary: '#fde047', bg: '#2e1065', stars: 4 })
   },
   {
-    id: 'wp4_sacrificial_sword',
-    name: 'Kiếm Nghi Lễ Cổ Đại',
+    id: 'wp4_astral_scepter',
+    name: 'Quyền Trượng Tinh Hà',
     starRarity: 4,
     rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Kiếm Đơn',
-    goldBonusPct: 16,
-    keyDropBonusPct: 2,
-    bonusTimeSec: 1,
-    passiveText: '+16% Vàng • +1 giây mỗi câu',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#c084fc', secondary: '#fbbf24', bg: '#312e81', stars: 4 })
-  },
-  {
-    id: 'wp4_serpent_spine',
-    name: 'Chiến Rìu Hắc Long',
-    starRarity: 4,
-    rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Chiến Rìu',
-    goldBonusPct: 26,
-    keyDropBonusPct: 1,
-    bonusTimeSec: 0,
-    passiveText: '+26% Vàng khi hạ quái',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'axe', primary: '#fb7185', secondary: '#fde047', bg: '#4c0519', stars: 4 })
-  },
-  {
-    id: 'wp4_rust_bowblade',
-    name: 'Cung Kiếm Huyết Chiến',
-    starRarity: 4,
-    rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Cung Kiếm',
-    goldBonusPct: 24,
-    keyDropBonusPct: 2,
-    bonusTimeSec: 0,
-    passiveText: '+24% Vàng khi hạ quái',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'bow', primary: '#f97316', secondary: '#e879f9', bg: '#3b0764', stars: 4 })
-  },
-  {
-    id: 'wp4_frost_twinblades',
-    name: 'Băng Tinh Song Kiếm',
-    starRarity: 4,
-    rarityLabel: 'Vũ Khí 4★',
-    weaponType: 'Song Kiếm',
-    goldBonusPct: 18,
-    keyDropBonusPct: 2,
-    bonusTimeSec: 1,
-    passiveText: '+18% Vàng • +1 giây mỗi câu',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'twin', primary: '#38bdf8', secondary: '#e879f9', bg: '#1e1b4b', stars: 4 })
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    isCosmeticOnly: true,
+    bladeColor: '#e879f9',
+    slashColor: '#38bdf8',
+    passiveText: 'Trang trí vũ khí (Hệ Pháp Khí)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'staff', primary: '#e879f9', secondary: '#38bdf8', bg: '#2e1065', stars: 4 })
   },
 
+  // ---- 3★ COSMETIC WEAPONS (10) ----
   {
     id: 'wp3_harbinger_dawn',
     name: 'Kiếm Bình Minh',
     starRarity: 3,
     rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Kiếm Đơn',
-    goldBonusPct: 8,
-    keyDropBonusPct: 0,
-    bonusTimeSec: 0,
-    passiveText: '+8% Vàng khi hạ quái',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#38bdf8',
+    slashColor: '#bae6fd',
+    passiveText: 'Trang trí vũ khí (Hệ Kiếm)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#38bdf8', secondary: '#bae6fd', bg: '#0f172a', stars: 3 })
-  },
-  {
-    id: 'wp3_thrilling_tales',
-    name: 'Sách Diệt Rồng',
-    starRarity: 3,
-    rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Pháp Khí',
-    goldBonusPct: 5,
-    keyDropBonusPct: 0,
-    bonusTimeSec: 1,
-    passiveText: '+5% Vàng • +1 giây mỗi câu',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'codex', primary: '#0284c7', secondary: '#7dd3fc', bg: '#0f172a', stars: 3 })
-  },
-  {
-    id: 'wp3_black_tassel',
-    name: 'Trường Thương Thép Đen',
-    starRarity: 3,
-    rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Trường Thương',
-    goldBonusPct: 7,
-    keyDropBonusPct: 1,
-    bonusTimeSec: 0,
-    passiveText: '+7% Vàng khi hạ quái',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#0ea5e9', secondary: '#e2e8f0', bg: '#0f172a', stars: 3 })
-  },
-  {
-    id: 'wp3_debate_club',
-    name: 'Đại Kiếm Thiết Giáp',
-    starRarity: 3,
-    rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Đại Kiếm',
-    goldBonusPct: 9,
-    keyDropBonusPct: 0,
-    bonusTimeSec: 0,
-    passiveText: '+9% Vàng khi hạ quái',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'claymore', primary: '#38bdf8', secondary: '#93c5fd', bg: '#0c4a6e', stars: 3 })
-  },
-  {
-    id: 'wp3_cool_steel',
-    name: 'Đoản Kiếm Thép Lạnh',
-    starRarity: 3,
-    rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Kiếm Đơn',
-    goldBonusPct: 6,
-    keyDropBonusPct: 1,
-    bonusTimeSec: 0,
-    passiveText: '+6% Vàng khi hạ quái',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'katana', primary: '#60a5fa', secondary: '#e0f2fe', bg: '#0f172a', stars: 3 })
-  },
-  {
-    id: 'wp3_slingshot_bow',
-    name: 'Nỏ Thợ Săn',
-    starRarity: 3,
-    rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Cung Kiếm',
-    goldBonusPct: 8,
-    keyDropBonusPct: 0,
-    bonusTimeSec: 0,
-    passiveText: '+8% Vàng khi hạ quái',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'bow', primary: '#22d3ee', secondary: '#bae6fd', bg: '#083344', stars: 3 })
-  },
-  {
-    id: 'wp3_magic_guide',
-    name: 'Trượng Học Đồ',
-    starRarity: 3,
-    rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Pháp Trượng',
-    goldBonusPct: 4,
-    keyDropBonusPct: 0,
-    bonusTimeSec: 1,
-    passiveText: '+4% Vàng • +1 giây mỗi câu',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'staff', primary: '#38bdf8', secondary: '#a5f3fc', bg: '#0f172a', stars: 3 })
   },
   {
     id: 'wp3_skyrider_sword',
     name: 'Kiếm Bạc Kỵ Binh',
     starRarity: 3,
     rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Kiếm Đơn',
-    goldBonusPct: 7,
-    keyDropBonusPct: 0,
-    bonusTimeSec: 0,
-    passiveText: '+7% Vàng khi hạ quái',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#06b6d4',
+    slashColor: '#cffafe',
+    passiveText: 'Trang trí vũ khí (Hệ Kiếm)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#06b6d4', secondary: '#cffafe', bg: '#0f172a', stars: 3 })
-  },
-  {
-    id: 'wp3_iron_point',
-    name: 'Chiến Rìu Lính Gác',
-    starRarity: 3,
-    rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Chiến Rìu',
-    goldBonusPct: 6,
-    keyDropBonusPct: 0,
-    bonusTimeSec: 0,
-    passiveText: '+6% Vàng khi hạ quái',
-    iconUrl: buildWeaponSvgDataUrl({ kind: 'axe', primary: '#64748b', secondary: '#7dd3fc', bg: '#0f172a', stars: 3 })
   },
   {
     id: 'wp3_traveler_twin',
     name: 'Song Đao Lữ Khách',
     starRarity: 3,
     rarityLabel: 'Vũ Khí 3★',
-    weaponType: 'Song Kiếm',
-    goldBonusPct: 5,
-    keyDropBonusPct: 1,
-    bonusTimeSec: 0,
-    passiveText: '+5% Vàng khi hạ quái',
+    weaponClass: 'sword',
+    weaponClassLabel: 'Hệ Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#38bdf8',
+    slashColor: '#94a3b8',
+    passiveText: 'Trang trí vũ khí (Hệ Kiếm)',
     iconUrl: buildWeaponSvgDataUrl({ kind: 'twin', primary: '#38bdf8', secondary: '#94a3b8', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_debate_club',
+    name: 'Đại Kiếm Thiết Giáp',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#38bdf8',
+    slashColor: '#93c5fd',
+    passiveText: 'Trang trí vũ khí (Hệ Trọng Kiếm)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'claymore', primary: '#38bdf8', secondary: '#93c5fd', bg: '#0c4a6e', stars: 3 })
+  },
+  {
+    id: 'wp3_iron_point',
+    name: 'Chiến Rìu Lính Gác',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponClass: 'claymore',
+    weaponClassLabel: 'Hệ Trọng Kiếm',
+    isCosmeticOnly: true,
+    bladeColor: '#94a3b8',
+    slashColor: '#7dd3fc',
+    passiveText: 'Trang trí vũ khí (Hệ Trọng Kiếm)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'axe', primary: '#64748b', secondary: '#7dd3fc', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_black_tassel',
+    name: 'Trường Thương Thép Đen',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    isCosmeticOnly: true,
+    bladeColor: '#0ea5e9',
+    slashColor: '#e2e8f0',
+    passiveText: 'Trang trí vũ khí (Hệ Thương & Đao)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#0ea5e9', secondary: '#e2e8f0', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_cool_steel',
+    name: 'Đoản Đao Thép Lạnh',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponClass: 'polearm',
+    weaponClassLabel: 'Hệ Thương & Đao',
+    isCosmeticOnly: true,
+    bladeColor: '#60a5fa',
+    slashColor: '#e0f2fe',
+    passiveText: 'Trang trí vũ khí (Hệ Thương & Đao)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'katana', primary: '#60a5fa', secondary: '#e0f2fe', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_thrilling_tales',
+    name: 'Sách Diệt Rồng',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    isCosmeticOnly: true,
+    bladeColor: '#0284c7',
+    slashColor: '#7dd3fc',
+    passiveText: 'Trang trí vũ khí (Hệ Pháp Khí)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'codex', primary: '#0284c7', secondary: '#7dd3fc', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_magic_guide',
+    name: 'Trượng Học Đồ',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    isCosmeticOnly: true,
+    bladeColor: '#38bdf8',
+    slashColor: '#a5f3fc',
+    passiveText: 'Trang trí vũ khí (Hệ Pháp Khí)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'staff', primary: '#38bdf8', secondary: '#a5f3fc', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_star_grimoire',
+    name: 'Ấn Ký Sao Đêm',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponClass: 'catalyst',
+    weaponClassLabel: 'Hệ Pháp Khí',
+    isCosmeticOnly: true,
+    bladeColor: '#67e8f9',
+    slashColor: '#bae6fd',
+    passiveText: 'Trang trí vũ khí (Hệ Pháp Khí)',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'codex', primary: '#0ea5e9', secondary: '#fde047', bg: '#0f172a', stars: 3 })
   }
 ];
 
@@ -777,25 +967,44 @@ export const KNIGHT_MONSTER_STAGES = [
   }
 ];
 
-export function getEquippedWeaponMeta(profile) {
-  const wpId = String(profile?.equippedWeapon || '');
+export function canHeroEquipWeapon(hero, weapon) {
+  if (!hero || !weapon) return false;
+  return hero.weaponClass === weapon.weaponClass;
+}
+
+export function getHeroCosmeticWeapon(profile, heroOrId = null) {
+  const heroObj =
+    typeof heroOrId === 'string'
+      ? KNIGHT_CHARACTER_SKINS.find(s => s.id === heroOrId)
+      : heroOrId || KNIGHT_CHARACTER_SKINS.find(s => s.id === profile?.equippedSkin) || KNIGHT_CHARACTER_SKINS[0];
+  if (!heroObj) return null;
+  const map = profile?.heroEquippedWeapons && typeof profile.heroEquippedWeapons === 'object'
+    ? profile.heroEquippedWeapons
+    : {};
+  const wpId = String(map[heroObj.id] || '');
   if (!wpId) return null;
   const unlocked = Array.isArray(profile?.unlockedWeapons) ? profile.unlockedWeapons : [];
   if (!unlocked.includes(wpId)) return null;
-  return KNIGHT_GACHA_WEAPONS.find(w => w.id === wpId) || null;
+  const wp = KNIGHT_GACHA_WEAPONS.find(w => w.id === wpId) || null;
+  return canHeroEquipWeapon(heroObj, wp) ? wp : null;
 }
 
-export function computeMonsterGoldDrop(monster, skin, combo = 0, weapon = null) {
+// Keep backward-compat helper returning cosmetic weapon for active hero
+export function getEquippedWeaponMeta(profile) {
+  return getHeroCosmeticWeapon(profile);
+}
+
+// Weapons are purely cosmetic: monster gold & key drop depend strictly on Hero passive!
+export function computeMonsterGoldDrop(monster, skin, combo = 0) {
   if (monster?.isDemonKing) return DEMON_KING_BOSS.rewardGold;
   const baseGold = Math.max(1, Number(monster?.goldBase) || (monster?.isDragonBoss ? 110 : 25));
   const skinPct = Math.max(0, Number(skin?.goldBonusPct) || 0);
-  const wpPct = Math.max(0, Number(weapon?.goldBonusPct) || 0);
-  const totalMult = 1 + (skinPct + wpPct) / 100;
+  const totalMult = 1 + skinPct / 100;
   const comboGold = Math.min(40, Math.max(0, Number(combo) || 0) * 5);
   return Math.round((baseGold + comboGold) * totalMult);
 }
 
-export function computeMonsterKeyDropChance(monster, skin, weapon = null) {
+export function computeMonsterKeyDropChance(monster, skin) {
   if (monster?.isDemonKing) return 1;
   const rawBase = Number(monster?.keyDropChance);
   const baseChance = Number.isFinite(rawBase)
@@ -803,16 +1012,14 @@ export function computeMonsterKeyDropChance(monster, skin, weapon = null) {
     : monster?.isDragonBoss
     ? 0.18
     : 0.06;
-  const skinBonus = Math.max(0, Number(skin?.keyDropBonusPct) || 0) / 100;
-  const wpBonus = Math.max(0, Number(weapon?.keyDropBonusPct) || 0) / 100;
-  const totalBonus = Math.min(0.12, skinBonus + wpBonus);
-  return Math.min(0.38, Math.max(0.02, baseChance + totalBonus));
+  const skinBonus = Math.min(0.1, Math.max(0, Number(skin?.keyDropBonusPct) || 0) / 100);
+  return Math.min(0.38, Math.max(0.02, baseChance + skinBonus));
 }
 
 export function compute5StarProbability(nextPullIndex5) {
   if (nextPullIndex5 >= KNIGHT_GACHA_RATES.hardPity5) return 1.0;
   if (nextPullIndex5 < KNIGHT_GACHA_RATES.softPity5Start) {
-    return KNIGHT_GACHA_RATES.base5Star; // 0.6%
+    return KNIGHT_GACHA_RATES.base5Star;
   }
   return Math.min(
     1.0,
@@ -823,7 +1030,7 @@ export function compute5StarProbability(nextPullIndex5) {
 export function compute4StarProbability(nextPullIndex4) {
   if (nextPullIndex4 >= KNIGHT_GACHA_RATES.hardPity4) return 1.0;
   if (nextPullIndex4 === KNIGHT_GACHA_RATES.softPity4Start) return 0.561;
-  return KNIGHT_GACHA_RATES.base4Star; // 5.1%
+  return KNIGHT_GACHA_RATES.base4Star;
 }
 
 function pickRandomItem(arr, randFn = Math.random) {
@@ -835,10 +1042,10 @@ function pickRandomItem(arr, randFn = Math.random) {
 export function rollKnightGachaPulls(
   rawProfile = {},
   {
-    bannerType = 'character_event',
-    bannerId = 'up_dragon_empress',
+    bannerType = 'character_event', // 'character_event' (1 weekly limited banner) | 'standard'
     count = 1,
     isAdminFreePull = false,
+    nowMs = Date.now(),
     randFn = Math.random
   } = {}
 ) {
@@ -857,21 +1064,28 @@ export function rollKnightGachaPulls(
   }
 
   const isCharBanner = bannerType !== 'standard';
-  const bannerMeta =
-    KNIGHT_CHARACTER_EVENT_BANNERS.find(b => b.id === bannerId) ||
-    KNIGHT_CHARACTER_EVENT_BANNERS[0];
+  const weeklyState = getWeeklyLimitedBannerState(nowMs);
+  const activeBannerMeta = weeklyState.activeBanner;
 
-  const gachaHeroes5 = KNIGHT_CHARACTER_SKINS.filter(h => h.obtainMethod === 'gacha' && h.starRarity === 5);
-  const gachaHeroes4 = KNIGHT_CHARACTER_SKINS.filter(h => h.obtainMethod === 'gacha' && h.starRarity === 4);
+  // STRICT POOL SEPARATION:
+  // - Standard 5★ pool: ONLY pool === 'standard' & starRarity === 5 (Kenji, Kael, Cyber Nova)
+  // - Limited 5★ hero: ONLY this week's single active Limited 5★ hero (NEVER drops on Standard Banner!)
+  const standardHeroes5 = KNIGHT_CHARACTER_SKINS.filter(
+    h => h.obtainMethod === 'gacha' && h.pool === 'standard' && h.starRarity === 5
+  );
+  const standardHeroes4 = KNIGHT_CHARACTER_SKINS.filter(
+    h => h.obtainMethod === 'gacha' && h.pool === 'standard' && h.starRarity === 4
+  );
+  const featuredLimitedHero =
+    KNIGHT_CHARACTER_SKINS.find(h => h.id === activeBannerMeta.featuredHeroId) ||
+    KNIGHT_CHARACTER_SKINS.find(h => h.pool === 'limited');
+
   const weapons4 = KNIGHT_GACHA_WEAPONS.filter(w => w.starRarity === 4);
   const weapons3 = KNIGHT_GACHA_WEAPONS.filter(w => w.starRarity === 3);
 
-  const featuredHero =
-    gachaHeroes5.find(h => h.id === bannerMeta.featuredHeroId) || gachaHeroes5[gachaHeroes5.length - 1];
-  const offBanner5Heroes = gachaHeroes5.filter(h => h.id !== featuredHero.id);
-
   const unlockedSkinsSet = new Set(profile.unlockedSkins);
   const unlockedWeaponsSet = new Set(profile.unlockedWeapons);
+  const weaponCounts = { ...(profile.weaponCounts || {}) };
   const gachaState = { ...(profile.gachaState || {}) };
 
   let nextGold = Math.max(0, (profile.gold || 0) - goldCost);
@@ -920,24 +1134,26 @@ export function rollKnightGachaPulls(
       gachaState[pity5Key] = 0;
       gachaState[pity4Key] = nextPull4;
 
-      let chosenHero = featuredHero;
+      let chosenHero = null;
       let rateOutcome = 'standard_5';
       if (isCharBanner) {
         if (gachaState.charGuaranteed5) {
-          chosenHero = featuredHero;
+          chosenHero = featuredLimitedHero;
           gachaState.charGuaranteed5 = false;
           rateOutcome = 'guaranteed_up';
         } else if (randFn() < 0.5) {
-          chosenHero = featuredHero;
+          chosenHero = featuredLimitedHero;
           gachaState.charGuaranteed5 = false;
           rateOutcome = 'won_50_50';
         } else {
-          chosenHero = pickRandomItem(offBanner5Heroes, randFn) || featuredHero;
+          // Lệch 50/50 ở Banner Giới Hạn → Rơi vào Nhân Vật 5★ của Banner Thường!
+          chosenHero = pickRandomItem(standardHeroes5, randFn) || standardHeroes5[0];
           gachaState.charGuaranteed5 = true;
           rateOutcome = 'lost_50_50';
         }
       } else {
-        chosenHero = pickRandomItem(gachaHeroes5, randFn) || gachaHeroes5[0];
+        // Banner Thường TUYỆT ĐỐI KHÔNG ra nhân vật Giới Hạn
+        chosenHero = pickRandomItem(standardHeroes5, randFn) || standardHeroes5[0];
       }
 
       heroesPulledInBatch += 1;
@@ -948,10 +1164,8 @@ export function rollKnightGachaPulls(
       let isNew = false;
       let bonusText = '';
       if (shouldRefundHero) {
-        nextGold += KNIGHT_DUPLICATE_HERO_REFUND_GOLD;
-        bonusText = alreadyOwned
-          ? `Nhân vật cũ → Hoàn +${KNIGHT_DUPLICATE_HERO_REFUND_GOLD.toLocaleString('vi-VN')} Vàng`
-          : `Nhân vật thứ ${heroesPulledInBatch} trong 10 lượt → Hoàn +${KNIGHT_DUPLICATE_HERO_REFUND_GOLD.toLocaleString('vi-VN')} Vàng`;
+        nextGold += KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD;
+        bonusText = `Hoàn +${KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD.toLocaleString('vi-VN')} Vàng`;
       } else {
         isNew = true;
         unlockedSkinsSet.add(chosenHero.id);
@@ -964,12 +1178,15 @@ export function rollKnightGachaPulls(
         name: chosenHero.name,
         starRarity: 5,
         rarityLabel: chosenHero.rarity,
+        weaponClass: chosenHero.weaponClass,
+        weaponClassLabel: chosenHero.weaponClassLabel,
         spriteUrl: chosenHero.spriteUrl,
         passiveText: chosenHero.passiveText,
         weaponName: chosenHero.weaponName,
         genderBadge: chosenHero.genderBadge,
         isNew,
         isRefundedHero: shouldRefundHero,
+        refundGoldAmount: shouldRefundHero ? KNIGHT_DUPLICATE_HERO_5_REFUND_GOLD : 0,
         isWhiff: false,
         rateOutcome,
         bonusText,
@@ -997,9 +1214,9 @@ export function rollKnightGachaPulls(
       }
 
       if (rollCharacter4) {
-        let chosen4Hero = pickRandomItem(gachaHeroes4, randFn);
-        if (isCharBanner && Array.isArray(bannerMeta.featured4StarIds) && randFn() < 0.7) {
-          const upPool = gachaHeroes4.filter(h => bannerMeta.featured4StarIds.includes(h.id));
+        let chosen4Hero = pickRandomItem(standardHeroes4, randFn);
+        if (isCharBanner && Array.isArray(activeBannerMeta.featured4StarIds) && randFn() < 0.7) {
+          const upPool = standardHeroes4.filter(h => activeBannerMeta.featured4StarIds.includes(h.id));
           if (upPool.length > 0) chosen4Hero = pickRandomItem(upPool, randFn);
         }
 
@@ -1011,10 +1228,9 @@ export function rollKnightGachaPulls(
         let isNew = false;
         let bonusText = '';
         if (shouldRefundHero) {
-          nextGold += KNIGHT_DUPLICATE_HERO_REFUND_GOLD;
-          bonusText = alreadyOwned
-            ? `Nhân vật cũ → Hoàn +${KNIGHT_DUPLICATE_HERO_REFUND_GOLD.toLocaleString('vi-VN')} Vàng`
-            : `Nhân vật thứ ${heroesPulledInBatch} trong 10 lượt → Hoàn +${KNIGHT_DUPLICATE_HERO_REFUND_GOLD.toLocaleString('vi-VN')} Vàng`;
+          // Nhân vật 4★ trùng hoàn 10.000 Vàng
+          nextGold += KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD;
+          bonusText = `Hoàn +${KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD.toLocaleString('vi-VN')} Vàng`;
         } else {
           isNew = true;
           unlockedSkinsSet.add(chosen4Hero.id);
@@ -1027,12 +1243,15 @@ export function rollKnightGachaPulls(
           name: chosen4Hero.name,
           starRarity: 4,
           rarityLabel: chosen4Hero.rarity,
+          weaponClass: chosen4Hero.weaponClass,
+          weaponClassLabel: chosen4Hero.weaponClassLabel,
           spriteUrl: chosen4Hero.spriteUrl,
           passiveText: chosen4Hero.passiveText,
           weaponName: chosen4Hero.weaponName,
           genderBadge: chosen4Hero.genderBadge,
           isNew,
           isRefundedHero: shouldRefundHero,
+          refundGoldAmount: shouldRefundHero ? KNIGHT_DUPLICATE_HERO_4_REFUND_GOLD : 0,
           isWhiff: false,
           bonusText,
           bannerType: isCharBanner ? 'character_event' : 'standard',
@@ -1042,11 +1261,8 @@ export function rollKnightGachaPulls(
         const chosenWp4 = pickRandomItem(weapons4, randFn);
         const isNew = !unlockedWeaponsSet.has(chosenWp4.id);
         unlockedWeaponsSet.add(chosenWp4.id);
-        let bonusText = '';
-        if (!isNew) {
-          nextGold += 2000;
-          bonusText = 'Vũ khí trùng → +2.000 Vàng';
-        }
+        weaponCounts[chosenWp4.id] = (weaponCounts[chosenWp4.id] || 0) + 1;
+
         results.push({
           pullId: `wish_${nowTs}_${i}`,
           itemKind: 'weapon',
@@ -1054,12 +1270,13 @@ export function rollKnightGachaPulls(
           name: chosenWp4.name,
           starRarity: 4,
           rarityLabel: chosenWp4.rarityLabel,
+          weaponClass: chosenWp4.weaponClass,
+          weaponClassLabel: chosenWp4.weaponClassLabel,
           spriteUrl: chosenWp4.iconUrl,
           passiveText: chosenWp4.passiveText,
-          weaponType: chosenWp4.weaponType,
           isNew,
           isWhiff: false,
-          bonusText,
+          bonusText: '',
           bannerType: isCharBanner ? 'character_event' : 'standard',
           timestamp: nowTs + i
         });
@@ -1092,11 +1309,8 @@ export function rollKnightGachaPulls(
         const chosenWp3 = pickRandomItem(weapons3, randFn);
         const isNew = !unlockedWeaponsSet.has(chosenWp3.id);
         unlockedWeaponsSet.add(chosenWp3.id);
-        let bonusText = '';
-        if (!isNew) {
-          nextGold += 500;
-          bonusText = 'Vũ khí trùng → +500 Vàng';
-        }
+        weaponCounts[chosenWp3.id] = (weaponCounts[chosenWp3.id] || 0) + 1;
+
         results.push({
           pullId: `wish_${nowTs}_${i}`,
           itemKind: 'weapon',
@@ -1104,12 +1318,13 @@ export function rollKnightGachaPulls(
           name: chosenWp3.name,
           starRarity: 3,
           rarityLabel: chosenWp3.rarityLabel,
+          weaponClass: chosenWp3.weaponClass,
+          weaponClassLabel: chosenWp3.weaponClassLabel,
           spriteUrl: chosenWp3.iconUrl,
           passiveText: chosenWp3.passiveText,
-          weaponType: chosenWp3.weaponType,
           isNew,
           isWhiff: false,
-          bonusText,
+          bonusText: '',
           bannerType: isCharBanner ? 'character_event' : 'standard',
           timestamp: nowTs + i
         });
@@ -1126,18 +1341,11 @@ export function rollKnightGachaPulls(
     starRarity: r.starRarity,
     isWhiff: r.isWhiff,
     isRefundedHero: Boolean(r.isRefundedHero),
+    refundGoldAmount: Number(r.refundGoldAmount) || 0,
     rateOutcome: r.rateOutcome || '',
     bannerType: r.bannerType,
     timestamp: r.timestamp
   }));
-
-  let nextEquippedWeapon = profile.equippedWeapon || '';
-  if (!nextEquippedWeapon) {
-    const newlyPulled4Wp = results.find(r => r.itemKind === 'weapon' && r.starRarity === 4);
-    const newlyPulled3Wp = results.find(r => r.itemKind === 'weapon' && r.starRarity === 3);
-    if (newlyPulled4Wp) nextEquippedWeapon = newlyPulled4Wp.id;
-    else if (newlyPulled3Wp) nextEquippedWeapon = newlyPulled3Wp.id;
-  }
 
   const nextProfile = normalizeKnightRpgProfile({
     ...profile,
@@ -1145,7 +1353,7 @@ export function rollKnightGachaPulls(
     wishes: nextWishes,
     unlockedSkins: Array.from(unlockedSkinsSet),
     unlockedWeapons: Array.from(unlockedWeaponsSet),
-    equippedWeapon: nextEquippedWeapon,
+    weaponCounts,
     gachaState,
     wishHistory: [...historyItems.reverse(), ...(profile.wishHistory || [])].slice(0, 50)
   });
@@ -1190,9 +1398,37 @@ export function normalizeKnightRpgProfile(raw = {}) {
   const validWeaponIds = new Set(KNIGHT_GACHA_WEAPONS.map(w => w.id));
   const rawWeapons = Array.isArray(obj.unlockedWeapons) ? obj.unlockedWeapons.map(String) : [];
   const unlockedWeapons = Array.from(new Set(rawWeapons.filter(id => validWeaponIds.has(id))));
-  const equippedWeapon = unlockedWeapons.includes(String(obj.equippedWeapon || ''))
-    ? String(obj.equippedWeapon)
-    : '';
+
+  const rawWpCounts = obj.weaponCounts && typeof obj.weaponCounts === 'object' ? obj.weaponCounts : {};
+  const weaponCounts = {};
+  unlockedWeapons.forEach(id => {
+    weaponCounts[id] = Math.max(1, Math.min(9999, Math.floor(Number(rawWpCounts[id]) || 1)));
+  });
+
+  // Per-character cosmetic weapon assignment (validated by weaponClass!)
+  const rawHeroWpMap =
+    obj.heroEquippedWeapons && typeof obj.heroEquippedWeapons === 'object'
+      ? obj.heroEquippedWeapons
+      : {};
+  const heroEquippedWeapons = {};
+  Object.entries(rawHeroWpMap).forEach(([hId, wId]) => {
+    const heroObj = KNIGHT_CHARACTER_SKINS.find(s => s.id === hId);
+    const wpObj = KNIGHT_GACHA_WEAPONS.find(w => w.id === String(wId || ''));
+    if (heroObj && wpObj && unlockedWeapons.includes(wpObj.id) && canHeroEquipWeapon(heroObj, wpObj)) {
+      heroEquippedWeapons[hId] = wpObj.id;
+    }
+  });
+
+  // Migrate legacy single equippedWeapon if valid for equippedSkin
+  if (obj.equippedWeapon && !heroEquippedWeapons[equippedSkin]) {
+    const activeHero = KNIGHT_CHARACTER_SKINS.find(s => s.id === equippedSkin);
+    const legacyWp = KNIGHT_GACHA_WEAPONS.find(w => w.id === String(obj.equippedWeapon));
+    if (activeHero && legacyWp && unlockedWeapons.includes(legacyWp.id) && canHeroEquipWeapon(activeHero, legacyWp)) {
+      heroEquippedWeapons[equippedSkin] = legacyWp.id;
+    }
+  }
+
+  const equippedWeapon = heroEquippedWeapons[equippedSkin] || '';
 
   const rawGacha = obj.gachaState && typeof obj.gachaState === 'object' ? obj.gachaState : {};
   const gachaState = {
@@ -1216,6 +1452,7 @@ export function normalizeKnightRpgProfile(raw = {}) {
           starRarity: Math.max(3, Math.min(5, Math.floor(Number(item.starRarity) || 3))),
           isWhiff: Boolean(item.isWhiff),
           isRefundedHero: Boolean(item.isRefundedHero),
+          refundGoldAmount: Math.max(0, Math.floor(Number(item.refundGoldAmount) || 0)),
           rateOutcome: String(item.rateOutcome || ''),
           bannerType: String(item.bannerType || 'character_event'),
           timestamp: Number(item.timestamp) || 0
@@ -1236,6 +1473,8 @@ export function normalizeKnightRpgProfile(raw = {}) {
     unlockedSkins,
     equippedSkin,
     unlockedWeapons,
+    weaponCounts,
+    heroEquippedWeapons,
     equippedWeapon,
     gachaState,
     wishHistory,
@@ -1276,6 +1515,14 @@ export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null)
 
     const mergedSkins = Array.from(new Set([...localProfile.unlockedSkins, ...serverProfile.unlockedSkins]));
     const mergedWeapons = Array.from(new Set([...localProfile.unlockedWeapons, ...serverProfile.unlockedWeapons]));
+    const mergedWeaponCounts = { ...(serverProfile.weaponCounts || {}) };
+    Object.entries(localProfile.weaponCounts || {}).forEach(([k, v]) => {
+      mergedWeaponCounts[k] = Math.max(mergedWeaponCounts[k] || 0, v);
+    });
+    const mergedHeroWp = {
+      ...(serverProfile.heroEquippedWeapons || {}),
+      ...(localProfile.heroEquippedWeapons || {})
+    };
 
     const localPulls = localProfile.gachaState?.totalPulls || 0;
     const serverPulls = serverProfile.gachaState?.totalPulls || 0;
@@ -1292,7 +1539,8 @@ export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null)
       unlockedSkins: mergedSkins,
       equippedSkin: localProfile.equippedSkin || serverProfile.equippedSkin,
       unlockedWeapons: mergedWeapons,
-      equippedWeapon: localProfile.equippedWeapon || serverProfile.equippedWeapon,
+      weaponCounts: mergedWeaponCounts,
+      heroEquippedWeapons: mergedHeroWp,
       gachaState: newerByPulls.gachaState,
       wishHistory: newerByPulls.wishHistory,
       monstersSlain: Math.max(localProfile.monstersSlain, serverProfile.monstersSlain),

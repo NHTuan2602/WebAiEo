@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="raidenAura" cx="52%" cy="50%" r="48%">
+      <stop offset="0%" stop-color="#e879f9" stop-opacity="0.44"/>
+      <stop offset="55%" stop-color="#ef4444" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#090d16" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shogunArmor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b0764"/>
+      <stop offset="55%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+    <linearGradient id="crimsonBlade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f43f5e"/>
+      <stop offset="50%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+    <linearGradient id="empSkin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fde8d7"/>
+      <stop offset="100%" stop-color="#d9a482"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="160" cy="156" r="138" fill="url(#raidenAura)"/>
+  <!-- Electro-Crimson Chakra Ring behind back -->
+  <circle cx="156" cy="136" r="78" fill="none" stroke="#e879f9" stroke-width="4" stroke-dasharray="14 8"/>
+
+  <!-- Billowing Crimson-Violet Shogun Cape -->
+  <path d="M114 106 C64 118 32 166 22 246 C66 232 98 242 128 214 Z" fill="#881337" stroke="#090d16" stroke-width="3"/>
+
+  <!-- Armored Legs -->
+  <path d="M122 198 L88 288 L118 294 L146 212 Z" fill="url(#shogunArmor)" stroke="#e879f9" stroke-width="2.4"/>
+  <path d="M164 198 L194 294 L224 288 L190 202 Z" fill="url(#shogunArmor)" stroke="#e879f9" stroke-width="2.4"/>
+
+  <!-- Shogun Chestplate -->
+  <path d="M114 108 L190 108 L184 200 L120 200 Z" fill="url(#shogunArmor)" stroke="#fbbf24" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M122 114 L180 186" stroke="#f43f5e" stroke-width="6" stroke-linecap="round"/>
+  <rect x="118" y="182" width="68" height="14" rx="4" fill="#fbbf24"/>
+
+  <!-- Horned Shoulder Pauldrons -->
+  <path d="M88 108 L128 102 L126 142 L86 138 Z" fill="#4c0519" stroke="#fbbf24" stroke-width="2.6"/>
+  <path d="M176 102 L216 108 L214 138 L178 142 Z" fill="#4c0519" stroke="#fbbf24" stroke-width="2.6"/>
+
+  <!-- Head, Glowing Violet Eyes & Shogun Horns -->
+  <rect x="142" y="92" width="20" height="16" fill="url(#empSkin)"/>
+  <path d="M132 62 C132 44 172 44 172 64 C172 84 162 98 152 98 C142 98 132 84 132 62 Z" fill="url(#empSkin)" stroke="#090d16" stroke-width="2.6"/>
+  <circle cx="145" cy="73" r="2.8" fill="#e879f9"/>
+  <circle cx="160" cy="73" r="2.8" fill="#f43f5e"/>
+  <path d="M146 86 L160 85" stroke="#4c0519" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M124 74 C118 40 142 26 164 32 C182 36 186 58 176 74 C168 54 142 52 124 74 Z" fill="#2e1065" stroke="#e879f9" stroke-width="2"/>
+  <path d="M136 44 L114 16 L144 36 Z" fill="#fbbf24" stroke="#090d16" stroke-width="1.8"/>
+  <path d="M168 44 L190 16 L160 36 Z" fill="#fbbf24" stroke="#090d16" stroke-width="1.8"/>
+
+  <!-- Crimson-Thunder Royal Sword -->
+  <g transform="translate(184, 174) rotate(-26)">
+    <polygon points="0,-6 126,-12 142,0 126,8 0,6" fill="url(#crimsonBlade)" stroke="#fbbf24" stroke-width="2"/>
+    <polyline points="16,-2 42,-9 58,4 88,-8 112,3 136,-1" fill="none" stroke="#fef08a" stroke-width="2.6"/>
+    <rect x="-8" y="-16" width="8" height="32" rx="3" fill="#fbbf24"/>
+    <rect x="-34" y="-4.5" width="26" height="9" rx="2" fill="#4c0519" stroke="#fbbf24" stroke-width="1.8"/>
+  </g>
+</svg>

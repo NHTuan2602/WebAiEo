@@ -23,17 +23,19 @@ import {
 import VipMemberName from '../common/VipMemberName';
 import KnightGachaModal from './KnightGachaModal';
 import {
+  canHeroEquipWeapon,
   DEATH_REVIVE_DELAY_SEC,
   DEMON_KING_BOSS,
+  getHeroCosmeticWeapon,
   KNIGHT_CHARACTER_SKINS,
   KNIGHT_GACHA_GOLD_SINGLE,
+  KNIGHT_GACHA_WEAPONS,
   KNIGHT_HINT_SCORE_COST,
   KNIGHT_MONSTER_STAGES,
   REVIVE_KEY_GOLD_PRICE,
   applyServerPurchasedWishes,
   computeMonsterGoldDrop,
   computeMonsterKeyDropChance,
-  getEquippedWeaponMeta,
   loadLocalKnightRpgProfile,
   rollKnightGachaPulls,
   saveLocalKnightRpgProfile
@@ -60,6 +62,7 @@ function skipNonAlphaIndex(word, startIdx = 0) {
 const ALL_SPRITE_URLS = Array.from(
   new Set([
     ...KNIGHT_CHARACTER_SKINS.map(s => s.spriteUrl).filter(Boolean),
+    ...KNIGHT_GACHA_WEAPONS.map(w => w.iconUrl).filter(Boolean),
     ...KNIGHT_MONSTER_STAGES.flatMap(st => st.monsters.map(m => m.spriteUrl)).filter(Boolean),
     DEMON_KING_BOSS.spriteUrl
   ])
@@ -306,7 +309,7 @@ export default function KnightDragonGame({
   const activeSkin =
     KNIGHT_CHARACTER_SKINS.find(s => s.id === rpgProfile.equippedSkin) ||
     KNIGHT_CHARACTER_SKINS[0];
-  const activeWeapon = getEquippedWeaponMeta(rpgProfile);
+  const activeWeapon = getHeroCosmeticWeapon(rpgProfile, activeSkin);
   const stageMeta = isDemonKingBattle
     ? DEMON_STAGE_META
     : KNIGHT_MONSTER_STAGES.find(s => s.round === round) || KNIGHT_MONSTER_STAGES[0];
@@ -317,8 +320,7 @@ export default function KnightDragonGame({
   const expectedMonsterGold = computeMonsterGoldDrop(
     currentMonster,
     activeSkin,
-    combo,
-    activeWeapon
+    combo
   );
 
   // Sync newly purchased VietQR Gacha Wishes from server into local/server RPG profile automatically
@@ -402,7 +404,7 @@ export default function KnightDragonGame({
     rt.screenShake = isHeavyKill ? 9 : 4;
 
     const style = activeSkin.slashStyle || 'holy';
-    const primaryColor = activeSkin.slashColor || '#38bdf8';
+    const primaryColor = activeWeapon?.slashColor || activeSkin.slashColor || '#38bdf8';
     const slashCount = isHeavyKill ? 3 : 2;
     const baseAngles = isHeavyKill ? [-0.62, 0.54, -0.14] : [-0.55, 0.48];
 
@@ -476,8 +478,7 @@ export default function KnightDragonGame({
 
   const setupQuestionClock = (combatRoundNum, qObj) => {
     const baseLim = getSpeedAdjustedTimeLimit(combatRoundNum, speedMode);
-    const skinBonus =
-      (Number(activeSkin.bonusTimeSec) || 0) + (Number(activeWeapon?.bonusTimeSec) || 0);
+    const skinBonus = Number(activeSkin.bonusTimeSec) || 0;
     const lim = baseLim + skinBonus;
     setTimeLimit(lim);
     setTimeLeft(lim);
@@ -859,10 +860,9 @@ export default function KnightDragonGame({
     const goldGain = computeMonsterGoldDrop(
       currentMonster,
       activeSkin,
-      combo,
-      activeWeapon
+      combo
     );
-    const keyChance = computeMonsterKeyDropChance(currentMonster, activeSkin, activeWeapon);
+    const keyChance = computeMonsterKeyDropChance(currentMonster, activeSkin);
     const droppedKey = Math.random() < keyChance ? 1 : 0;
 
     setSessionGoldEarned(prev => prev + goldGain);
@@ -2187,6 +2187,24 @@ export default function KnightDragonGame({
             ctx.rotate(-rt.knightHurtAnim * 0.09);
           }
           ctx.drawImage(heroImg, -heroDrawW / 2, -heroDrawH, heroDrawW, heroDrawH);
+
+          // Render equipped Class-Matched Cosmetic Weapon held by the Hero!
+          if (activeWeapon?.iconUrl) {
+            const wpImg = spriteImagesRef.current.get(activeWeapon.iconUrl);
+            if (wpImg && wpImg.complete && wpImg.naturalWidth > 0) {
+              ctx.save();
+              ctx.translate(heroDrawW * 0.34, -heroDrawH * 0.44);
+              const swingAngle =
+                rt.heroAttackAnim > 0
+                  ? Math.sin((1 - rt.heroAttackAnim) * Math.PI) * 0.95
+                  : Math.sin(now * 0.004) * 0.08;
+              ctx.rotate(swingAngle);
+              ctx.shadowColor = activeWeapon.bladeColor || activeSkin.bladeColor || '#38bdf8';
+              ctx.shadowBlur = 12;
+              ctx.drawImage(wpImg, -22, -22, 44, 44);
+              ctx.restore();
+            }
+          }
           ctx.restore();
         } else {
           ctx.fillStyle = activeSkin.armorPrimary || '#3b82f6';
@@ -2463,24 +2481,48 @@ export default function KnightDragonGame({
     showToast?.(`⚔️ Đã trang bị nhân vật: ${skin.name}!`);
   };
 
-  const handleEquipWeapon = (weaponObj) => {
-    const nextWpId = weaponObj?.id || '';
-    if (nextWpId && !(rpgProfile.unlockedWeapons || []).includes(nextWpId)) {
-      showToast?.('Bạn chưa mở khóa vũ khí này trong Gacha!', 'error');
+  const handleEquipHeroWeapon = (heroId, weaponId) => {
+    const heroObj = KNIGHT_CHARACTER_SKINS.find(s => s.id === heroId);
+    if (!heroObj) return;
+    if (!weaponId) {
+      let updatedProfile = null;
+      updateAndPersistProfile(prev => {
+        const nextMap = { ...(prev.heroEquippedWeapons || {}) };
+        delete nextMap[heroId];
+        updatedProfile = { ...prev, heroEquippedWeapons: nextMap };
+        return updatedProfile;
+      });
+      if (updatedProfile) syncRpgProfileToServer(updatedProfile, 'knight_equip_sync');
+      showToast?.(`Đã gỡ vũ khí trang trí của ${heroObj.name}.`);
       return;
     }
+
+    const wpObj = KNIGHT_GACHA_WEAPONS.find(w => w.id === weaponId);
+    if (!wpObj || !(rpgProfile.unlockedWeapons || []).includes(wpObj.id)) {
+      showToast?.('Bạn chưa sở hữu vũ khí này!', 'error');
+      return;
+    }
+    if (!canHeroEquipWeapon(heroObj, wpObj)) {
+      showToast?.(
+        `${heroObj.name} thuộc ${heroObj.weaponClassLabel}, không thể cầm ${wpObj.weaponClassLabel}!`,
+        'error'
+      );
+      return;
+    }
+
     let updatedProfile = null;
     updateAndPersistProfile(prev => {
       updatedProfile = {
         ...prev,
-        equippedWeapon: nextWpId
+        heroEquippedWeapons: {
+          ...(prev.heroEquippedWeapons || {}),
+          [heroId]: wpObj.id
+        }
       };
       return updatedProfile;
     });
     if (updatedProfile) syncRpgProfileToServer(updatedProfile, 'knight_equip_sync');
-    showToast?.(
-      weaponObj ? `🗡️ Đã trang bị vũ khí: ${weaponObj.name}!` : 'Đã gỡ vũ khí phụ.'
-    );
+    showToast?.(`🗡️ ${heroObj.name} đã cầm ${wpObj.name} (Trang trí)!`);
   };
 
   const handleExchangeGoldForWishes = (wishCount = 1) => {
@@ -2533,6 +2575,8 @@ export default function KnightDragonGame({
         unlockedSkins: ['knight_arthur'],
         equippedSkin: 'knight_arthur',
         unlockedWeapons: [],
+        weaponCounts: {},
+        heroEquippedWeapons: {},
         equippedWeapon: '',
         gachaState: {
           charPity5: 0,
@@ -2827,7 +2871,7 @@ export default function KnightDragonGame({
                 <div
                   className="w-20 h-20 rounded-2xl flex items-center justify-center border-2 p-1 shadow-inner relative overflow-hidden shrink-0"
                   style={{
-                    background: `radial-gradient(circle at 50% 45%, ${activeSkin.bladeColor}33, #090d16 80%)`,
+                    background: `radial-gradient(circle at 50% 45%, ${(activeWeapon?.bladeColor || activeSkin.bladeColor)}33, #090d16 80%)`,
                     borderColor: activeSkin.armorSecondary
                   }}
                 >
@@ -2836,6 +2880,14 @@ export default function KnightDragonGame({
                     alt={activeSkin.name}
                     className="w-full h-full object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.75)]"
                   />
+                  {activeWeapon && (
+                    <img
+                      src={activeWeapon.iconUrl}
+                      alt={activeWeapon.name}
+                      title={`Vũ khí cầm tay: ${activeWeapon.name}`}
+                      className="absolute bottom-1 right-1 w-7 h-7 rounded-lg border border-amber-300 bg-slate-950/90 object-contain shadow"
+                    />
+                  )}
                 </div>
                 <div className="min-w-0 max-w-[215px]">
                   <div className="flex items-center gap-1.5">
@@ -2845,10 +2897,10 @@ export default function KnightDragonGame({
                     </span>
                   </div>
                   <p className="text-[11px] text-amber-700 dark:text-amber-300 font-bold mt-0.5 truncate">
-                    {activeWeapon ? `⚔️ ${activeWeapon.name} (${activeWeapon.starRarity}★)` : activeSkin.weaponName}
+                    {activeWeapon ? `🗡️ ${activeWeapon.name} (Trang trí)` : activeSkin.weaponName}
                   </p>
                   <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug line-clamp-2">
-                    {activeWeapon ? `${activeSkin.passiveText} • ${activeWeapon.passiveText}` : activeSkin.passiveText}
+                    {activeSkin.passiveText}
                   </p>
                 </div>
                 <button
@@ -3913,7 +3965,7 @@ export default function KnightDragonGame({
         onExecutePull={handleExecuteGachaPull}
         onAdminResetHeroes={handleAdminResetHeroes}
         onEquipSkin={handleEquipSkin}
-        onEquipWeapon={handleEquipWeapon}
+        onEquipHeroWeapon={handleEquipHeroWeapon}
         onExchangeGoldForWishes={handleExchangeGoldForWishes}
         onBuyReviveKeyWithGold={handleBuyReviveKeyWithGold}
         onOpenWishQrCheckout={handleOpenWishQrCheckout}
