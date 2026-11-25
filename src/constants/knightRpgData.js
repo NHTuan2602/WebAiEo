@@ -1,12 +1,31 @@
 // ==========================================
 // KNIGHT & DRAGON RPG QUEST ("HIỆP SĨ DIỆT RỒNG")
-// Character Skins (5 Male & 5 Female), Monster Stages, Secret Demon King Boss & Storage Helpers
+// Genshin Impact-Style Gacha System (Character Event UP Banner & Standard Banner),
+// 5★ / 4★ Heroes, 4★ / 3★ Weapons, Exact Genshin Drop Rates & Pity, Monster Stages & Storage Helpers
 // ==========================================
 
 export const KNIGHT_STORAGE_KEY_PREFIX = 'ielts_knight_rpg_profile_v1';
 
 export const KNIGHT_HINT_SCORE_COST = 300;
 export const DEATH_REVIVE_DELAY_SEC = 5;
+export const REVIVE_KEY_GOLD_PRICE = 100;
+
+// Gacha Currency & Genshin Impact Exact Drop Rates
+export const KNIGHT_GACHA_GOLD_SINGLE = 10000; // 10.000 Vàng = 1 lượt quay
+export const KNIGHT_GACHA_GOLD_TEN = 100000; // 100.000 Vàng = 10 lượt quay
+
+export const GENSHIN_GACHA_RATES = {
+  base5Star: 0.006, // 0.6% tỉ lệ cơ bản ra 5★ (giống hệt Genshin Impact)
+  consolidated5StarPct: 1.6, // 1.6% tỉ lệ tổng hợp tính cả bảo hiểm 90 lượt
+  softPity5Start: 74, // Soft Pity từ lượt thứ 74 (+6% mỗi lượt)
+  hardPity5: 90, // Hard Pity: Lượt thứ 90 chắc chắn 100% nổ Vàng 5★
+  base4Star: 0.051, // 5.1% tỉ lệ cơ bản ra 4★ (2.55% Nhân Vật 4★ + 2.55% Vũ Khí 4★)
+  consolidated4StarPct: 13.0, // 13.0% tỉ lệ tổng hợp tính cả bảo hiểm 10 lượt
+  softPity4Start: 9, // Soft Pity 4★ ở lượt 9 (56.1%)
+  hardPity4: 10, // Hard Pity: Mỗi 10 lượt chắc chắn ra ít nhất 1 vật phẩm/nhân vật ≥ 4★
+  base3Star: 0.943, // 94.3% tỉ lệ cơ bản ra 3★
+  standardWhiffChance: 0.45 // Ở Banner Thường: 45% lượt 3★ bị "Tạch Gacha" (Bụi Tinh Trần) + không có bảo hiểm UP 50/50
+};
 
 export const DEMON_KING_BOSS = {
   id: 'demon_king_abyss',
@@ -27,16 +46,122 @@ export const DEMON_KING_BOSS = {
   rewardKeys: 10
 };
 
+// SVG Weapon Artwork Generator (Crisp data-URI icons for all 4★ and 3★ Gacha Weapons)
+function buildWeaponSvgDataUrl({ kind = 'sword', primary = '#a855f7', secondary = '#fde047', bg = '#1e1b4b', stars = 4 }) {
+  const glow = stars >= 4 ? '#e879f9' : '#38bdf8';
+  const border = stars >= 4 ? '#c084fc' : '#38bdf8';
+  let shape = '';
+  if (kind === 'claymore') {
+    shape = `
+      <g transform="translate(60,60) rotate(-38)">
+        <polygon points="0,-44 11,-24 8,16 -8,16 -11,-24" fill="${primary}" stroke="${secondary}" stroke-width="2.2"/>
+        <line x1="0" y1="-38" x2="0" y2="12" stroke="#ffffff" stroke-width="2" opacity="0.7"/>
+        <rect x="-18" y="15" width="36" height="6" rx="3" fill="${secondary}"/>
+        <rect x="-4" y="21" width="8" height="17" rx="2" fill="#475569"/>
+        <circle cx="0" cy="40" r="5" fill="${secondary}"/>
+      </g>`;
+  } else if (kind === 'katana') {
+    shape = `
+      <g transform="translate(60,60) rotate(-40)">
+        <path d="M-3,-45 Q6,-15 3,16 L-4,16 Q-2,-15 -3,-45 Z" fill="${primary}" stroke="#ffffff" stroke-width="1.6"/>
+        <ellipse cx="0" cy="17" rx="13" ry="4" fill="${secondary}"/>
+        <rect x="-3.5" y="20" width="7" height="20" rx="2" fill="#9f1239"/>
+        <line x1="-3.5" y1="25" x2="3.5" y2="28" stroke="${secondary}" stroke-width="1.5"/>
+        <line x1="-3.5" y1="31" x2="3.5" y2="34" stroke="${secondary}" stroke-width="1.5"/>
+      </g>`;
+  } else if (kind === 'spear') {
+    shape = `
+      <g transform="translate(60,60) rotate(-42)">
+        <polygon points="0,-46 9,-24 0,-18 -9,-24" fill="${primary}" stroke="${secondary}" stroke-width="2"/>
+        <polygon points="-10,-22 0,-15 10,-22 0,-11" fill="${secondary}"/>
+        <rect x="-2.8" y="-14" width="5.6" height="56" rx="2.5" fill="#cbd5e1"/>
+        <circle cx="0" cy="43" r="4" fill="${secondary}"/>
+      </g>`;
+  } else if (kind === 'staff' || kind === 'codex') {
+    shape = kind === 'codex'
+      ? `
+      <g transform="translate(60,60)">
+        <rect x="-24" y="-30" width="48" height="60" rx="7" fill="${primary}" stroke="${secondary}" stroke-width="3"/>
+        <rect x="-17" y="-22" width="34" height="44" rx="4" fill="${bg}" opacity="0.65"/>
+        <polygon points="0,-14 5,-3 16,-3 7,4 10,15 0,8 -10,15 -7,4 -16,-3 -5,-3" fill="${secondary}"/>
+      </g>`
+      : `
+      <g transform="translate(60,60) rotate(-36)">
+        <circle cx="0" cy="-28" r="14" fill="none" stroke="${secondary}" stroke-width="3"/>
+        <polygon points="0,-39 8,-28 0,-17 -8,-28" fill="${primary}" stroke="#ffffff" stroke-width="1.5"/>
+        <rect x="-3" y="-13" width="6" height="53" rx="3" fill="${secondary}"/>
+      </g>`;
+  } else if (kind === 'axe') {
+    shape = `
+      <g transform="translate(60,60) rotate(-36)">
+        <path d="M-4,-28 C-26,-34 -30,-6 -4,-10 Z" fill="${primary}" stroke="${secondary}" stroke-width="2"/>
+        <path d="M4,-28 C26,-34 30,-6 4,-10 Z" fill="${primary}" stroke="${secondary}" stroke-width="2"/>
+        <rect x="-3.5" y="-34" width="7" height="74" rx="3" fill="#94a3b8"/>
+        <circle cx="0" cy="-19" r="5" fill="${secondary}"/>
+      </g>`;
+  } else if (kind === 'bow') {
+    shape = `
+      <g transform="translate(60,60) rotate(-32)">
+        <path d="M-12,-38 Q24,0 -12,38" fill="none" stroke="${primary}" stroke-width="5" stroke-linecap="round"/>
+        <line x1="-12" y1="-38" x2="-12" y2="38" stroke="#e2e8f0" stroke-width="1.6"/>
+        <line x1="-22" y1="0" x2="22" y2="0" stroke="${secondary}" stroke-width="3"/>
+        <polygon points="27,0 17,-6 19,0 17,6" fill="${secondary}"/>
+      </g>`;
+  } else if (kind === 'twin') {
+    shape = `
+      <g transform="translate(60,60)">
+        <g transform="rotate(-32)">
+          <polygon points="0,-40 6,-18 4,14 -4,14 -6,-18" fill="${primary}" stroke="#ffffff" stroke-width="1.5"/>
+          <rect x="-11" y="14" width="22" height="4.5" rx="2" fill="${secondary}"/>
+          <rect x="-3" y="18" width="6" height="14" rx="2" fill="#475569"/>
+        </g>
+        <g transform="rotate(32)">
+          <polygon points="0,-40 6,-18 4,14 -4,14 -6,-18" fill="${secondary}" stroke="#ffffff" stroke-width="1.5"/>
+          <rect x="-11" y="14" width="22" height="4.5" rx="2" fill="${primary}"/>
+          <rect x="-3" y="18" width="6" height="14" rx="2" fill="#475569"/>
+        </g>
+      </g>`;
+  } else {
+    shape = `
+      <g transform="translate(60,60) rotate(-38)">
+        <polygon points="0,-44 7,-22 5,16 -5,16 -7,-22" fill="${primary}" stroke="#ffffff" stroke-width="1.8"/>
+        <rect x="-15" y="15" width="30" height="5.5" rx="2.5" fill="${secondary}"/>
+        <rect x="-3.5" y="20" width="7" height="16" rx="2" fill="#334155"/>
+        <circle cx="0" cy="38" r="4.5" fill="${secondary}"/>
+      </g>`;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+    <defs>
+      <radialGradient id="g" cx="50%" cy="45%" r="60%">
+        <stop offset="0%" stop-color="${glow}" stop-opacity="0.48"/>
+        <stop offset="100%" stop-color="${bg}" stop-opacity="0.98"/>
+      </radialGradient>
+    </defs>
+    <rect x="4" y="4" width="112" height="112" rx="24" fill="url(#g)" stroke="${border}" stroke-width="3"/>
+    <circle cx="60" cy="56" r="36" fill="none" stroke="${glow}" stroke-opacity="0.28" stroke-dasharray="4 4" stroke-width="1.5"/>
+    ${shape}
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// ==========================================
+// 10 HEROES: 1 Starter (Arthur) + 9 Gacha-Exclusive Heroes (5x 5★ Legendary & 4x 4★ Epic)
+// Direct Gold purchasing is DISABLED — Heroes are unlocked exclusively via Genshin-style Gacha!
+// ==========================================
 export const KNIGHT_CHARACTER_SKINS = [
   {
     id: 'knight_arthur',
     name: 'Hiệp Sĩ Ánh Sáng Arthur',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: 'Cơ Bản',
+    rarity: 'Khởi Đầu',
+    starRarity: 4,
+    isStarter: true,
+    obtainMethod: 'starter',
     priceGold: 0,
     weaponName: 'Thánh Kiếm Excalibur',
-    passiveText: 'Cân bằng công thủ • Mặc định sở hữu',
+    passiveText: 'Cân bằng công thủ • Nhân vật khởi đầu mặc định sở hữu',
     spriteUrl: '/assets/knight-rpg/knight_arthur.png',
     slashStyle: 'holy',
     goldBonusPct: 0,
@@ -56,8 +181,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Chiến Binh Valkyrie Freya',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: 'Hiếm',
-    priceGold: 120,
+    rarity: 'Sử Thi 4★',
+    starRarity: 4,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Song Kiếm Thiên Vũ',
     passiveText: '+15% Vàng & +2% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
     spriteUrl: '/assets/knight-rpg/valkyrie_freya.png',
@@ -79,8 +206,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Thánh Kỵ Sĩ Thái Dương Leon',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: 'Hiếm',
-    priceGold: 190,
+    rarity: 'Sử Thi 4★',
+    starRarity: 4,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Đại Kiếm Mặt Trời Solarius',
     passiveText: '+18% Vàng & +2% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
     spriteUrl: '/assets/knight-rpg/paladin_leon.svg',
@@ -102,8 +231,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Kiếm Khách Anh Đào Tomoe',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: 'Sử Thi',
-    priceGold: 260,
+    rarity: 'Sử Thi 4★',
+    starRarity: 4,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Katana Hoa Anh Đào',
     passiveText: '+25% Vàng & +3% tỉ lệ hiếm rớt Chìa Khóa khi hạ quái',
     spriteUrl: '/assets/knight-rpg/samurai_tomoe.png',
@@ -125,8 +256,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Pháp Sư Tinh Tú Selena',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: 'Sử Thi',
-    priceGold: 420,
+    rarity: 'Sử Thi 4★',
+    starRarity: 4,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Quyền Trượng Ngân Hà',
     passiveText: '+3 giây suy nghĩ mỗi câu, +20% Vàng & +2% rớt Chìa Khóa',
     spriteUrl: '/assets/knight-rpg/mage_selena.png',
@@ -148,15 +281,18 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Kiếm Sĩ Lôi Kiếm Kenji',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: 'Sử Thi',
-    priceGold: 480,
+    rarity: 'Huyền Thoại 5★',
+    starRarity: 5,
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Lôi Đao Raijin',
-    passiveText: '+28% Vàng, +3% rớt Chìa Khóa & trảm lôi điện tốc độ cao',
+    passiveText: '+32% Vàng, +3% rớt Chìa Khóa & trảm lôi điện tốc độ cao',
     spriteUrl: '/assets/knight-rpg/ronin_kenji.svg',
     slashStyle: 'thunder',
-    goldBonusPct: 28,
+    goldBonusPct: 32,
     keyDropBonusPct: 3,
-    bonusTimeSec: 0,
+    bonusTimeSec: 1,
     armorPrimary: '#1e1b4b',
     armorSecondary: '#38bdf8',
     capeColor: '#0284c7',
@@ -171,15 +307,18 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Sát Thủ Bóng Đêm Kael',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: 'Sử Thi',
-    priceGold: 560,
+    rarity: 'Huyền Thoại 5★',
+    starRarity: 5,
+    isStandard5Star: true,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Huyết Ảnh Song Đao',
-    passiveText: '+30% Vàng, +3% rớt Chìa Khóa & chém chí mạng tốc độ cao',
+    passiveText: '+34% Vàng, +4% rớt Chìa Khóa & chém chí mạng tốc độ cao',
     spriteUrl: '/assets/knight-rpg/assassin_kael.png',
     slashStyle: 'crimson',
-    goldBonusPct: 30,
-    keyDropBonusPct: 3,
-    bonusTimeSec: 0,
+    goldBonusPct: 34,
+    keyDropBonusPct: 4,
+    bonusTimeSec: 1,
     armorPrimary: '#1e293b',
     armorSecondary: '#ef4444',
     capeColor: '#991b1b',
@@ -194,13 +333,16 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Thánh Kỵ Sĩ Cyber Nova',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: 'Huyền Thoại',
-    priceGold: 780,
+    rarity: 'Giới Hạn UP 5★',
+    starRarity: 5,
+    isFeaturedUpHero: true,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Đại Kiếm Plasma Neon',
-    passiveText: '+35% Vàng, +4% rớt Chìa Khóa khi hạ quái & +2 giây mỗi câu',
+    passiveText: '+38% Vàng, +4% rớt Chìa Khóa khi hạ quái & +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/cyber_nova.png',
     slashStyle: 'plasma',
-    goldBonusPct: 35,
+    goldBonusPct: 38,
     keyDropBonusPct: 4,
     bonusTimeSec: 2,
     armorPrimary: '#06b6d4',
@@ -217,13 +359,16 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Chiến Thần Cuồng Chiến Drake',
     gender: 'Nam',
     genderBadge: '♂ Nam',
-    rarity: 'Huyền Thoại',
-    priceGold: 880,
+    rarity: 'Giới Hạn UP 5★',
+    starRarity: 5,
+    isFeaturedUpHero: true,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Chiến Rìu Dung Nham Ragnarok',
-    passiveText: '+42% Vàng, +5% rớt Chìa Khóa khi hạ quái & +2 giây mỗi câu',
+    passiveText: '+44% Vàng, +5% rớt Chìa Khóa khi hạ quái & +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/berserker_drake.svg',
     slashStyle: 'magma',
-    goldBonusPct: 42,
+    goldBonusPct: 44,
     keyDropBonusPct: 5,
     bonusTimeSec: 2,
     armorPrimary: '#334155',
@@ -240,8 +385,11 @@ export const KNIGHT_CHARACTER_SKINS = [
     name: 'Nữ Hoàng Long Tộc Ignis',
     gender: 'Nữ',
     genderBadge: '♀ Nữ',
-    rarity: 'Thần Thoại',
-    priceGold: 1100,
+    rarity: 'Giới Hạn UP 5★',
+    starRarity: 5,
+    isFeaturedUpHero: true,
+    obtainMethod: 'gacha',
+    priceGold: null,
     weaponName: 'Long Vương Hỏa Kiếm',
     passiveText: '+50% Vàng, +6% rớt Chìa Khóa khi hạ quái & +3 giây gặp Boss Rồng',
     spriteUrl: '/assets/knight-rpg/dragon_empress.png',
@@ -259,6 +407,273 @@ export const KNIGHT_CHARACTER_SKINS = [
     slashColor: '#fde047'
   }
 ];
+
+// Character Event UP Banner Presets (Shared Pity & 50/50 Guarantee just like Genshin Impact)
+export const KNIGHT_CHARACTER_EVENT_BANNERS = [
+  {
+    id: 'up_dragon_empress',
+    featuredHeroId: 'dragon_empress',
+    bannerTitle: 'Cầu Nguyện Nhân Vật: Hỏa Long Vương Tọa',
+    subtitle: 'Tăng tỉ lệ rơi 5★ Nữ Hoàng Long Tộc Ignis (50/50 & Bảo Hiểm 100%)',
+    accentFrom: '#f59e0b',
+    accentTo: '#dc2626',
+    featured4StarIds: ['mage_selena', 'samurai_tomoe', 'paladin_leon']
+  },
+  {
+    id: 'up_berserker_drake',
+    featuredHeroId: 'berserker_drake',
+    bannerTitle: 'Cầu Nguyện Nhân Vật: Cuồng Nộ Dung Nham',
+    subtitle: 'Tăng tỉ lệ rơi 5★ Chiến Thần Cuồng Chiến Drake (50/50 & Bảo Hiểm 100%)',
+    accentFrom: '#f97316',
+    accentTo: '#991b1b',
+    featured4StarIds: ['valkyrie_freya', 'paladin_leon', 'samurai_tomoe']
+  },
+  {
+    id: 'up_cyber_nova',
+    featuredHeroId: 'cyber_nova',
+    bannerTitle: 'Cầu Nguyện Nhân Vật: Tinh Hà Thánh Quang',
+    subtitle: 'Tăng tỉ lệ rơi 5★ Nữ Thánh Kỵ Sĩ Cyber Nova (50/50 & Bảo Hiểm 100%)',
+    accentFrom: '#06b6d4',
+    accentTo: '#7c3aed',
+    featured4StarIds: ['mage_selena', 'valkyrie_freya', 'samurai_tomoe']
+  }
+];
+
+// ==========================================
+// 4★ & 3★ GACHA WEAPONS (Equipable alongside Hero for extra Gold / Key / Time stats)
+// ==========================================
+export const KNIGHT_GACHA_WEAPONS = [
+  // ---- 8 EPIC 4★ WEAPONS ----
+  {
+    id: 'wp4_skyward_claymore',
+    name: 'Thiên Không Đại Kiếm',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Đại Kiếm',
+    goldBonusPct: 22,
+    keyDropBonusPct: 2,
+    bonusTimeSec: 0,
+    passiveText: '+22% Vàng & +2% tỉ lệ rớt Chìa Khóa khi hạ quái',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'claymore', primary: '#c084fc', secondary: '#fde047', bg: '#2e1065', stars: 4 })
+  },
+  {
+    id: 'wp4_amenoma_katana',
+    name: 'Đoản Đao Amenoma Ảnh Nguyệt',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Katana',
+    goldBonusPct: 20,
+    keyDropBonusPct: 1,
+    bonusTimeSec: 1,
+    passiveText: '+20% Vàng, +1% rớt Chìa Khóa & +1 giây suy nghĩ',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'katana', primary: '#e879f9', secondary: '#f472b6', bg: '#3b0764', stars: 4 })
+  },
+  {
+    id: 'wp4_favonius_lance',
+    name: 'Tây Phong Trường Thương',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Trường Thương',
+    goldBonusPct: 18,
+    keyDropBonusPct: 3,
+    bonusTimeSec: 0,
+    passiveText: '+18% Vàng & +3% tỉ lệ hiếm rớt Chìa Khóa',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#a78bfa', secondary: '#67e8f9', bg: '#1e1b4b', stars: 4 })
+  },
+  {
+    id: 'wp4_widsith_codex',
+    name: 'Chương Nhạc Lang Thang',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Pháp Khí',
+    goldBonusPct: 15,
+    keyDropBonusPct: 1,
+    bonusTimeSec: 2,
+    passiveText: '+2 giây suy nghĩ mỗi câu, +15% Vàng & +1% Chìa Khóa',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'codex', primary: '#9333ea', secondary: '#fde047', bg: '#2e1065', stars: 4 })
+  },
+  {
+    id: 'wp4_sacrificial_sword',
+    name: 'Kiếm Tế Lễ Cổ Đại',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Kiếm Đơn',
+    goldBonusPct: 16,
+    keyDropBonusPct: 2,
+    bonusTimeSec: 1,
+    passiveText: '+16% Vàng, +2% rớt Chìa Khóa & +1 giây suy nghĩ',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#c084fc', secondary: '#fbbf24', bg: '#312e81', stars: 4 })
+  },
+  {
+    id: 'wp4_serpent_spine',
+    name: 'Li Cốt Chiến Rìu',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Chiến Rìu',
+    goldBonusPct: 26,
+    keyDropBonusPct: 1,
+    bonusTimeSec: 0,
+    passiveText: '+26% Vàng & +1% rớt Chìa Khóa khi hạ quái',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'axe', primary: '#fb7185', secondary: '#fde047', bg: '#4c0519', stars: 4 })
+  },
+  {
+    id: 'wp4_rust_bowblade',
+    name: 'Cung Kiếm Huyết Chiến',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Cung Kiếm',
+    goldBonusPct: 24,
+    keyDropBonusPct: 2,
+    bonusTimeSec: 0,
+    passiveText: '+24% Vàng & +2% rớt Chìa Khóa khi hạ quái',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'bow', primary: '#f97316', secondary: '#e879f9', bg: '#3b0764', stars: 4 })
+  },
+  {
+    id: 'wp4_frost_twinblades',
+    name: 'Băng Tinh Song Kiếm',
+    starRarity: 4,
+    rarityLabel: 'Vũ Khí 4★',
+    weaponType: 'Song Kiếm',
+    goldBonusPct: 18,
+    keyDropBonusPct: 2,
+    bonusTimeSec: 1,
+    passiveText: '+18% Vàng, +2% Chìa Khóa & +1 giây suy nghĩ',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'twin', primary: '#38bdf8', secondary: '#e879f9', bg: '#1e1b4b', stars: 4 })
+  },
+
+  // ---- 10 COMMON 3★ WEAPONS ----
+  {
+    id: 'wp3_harbinger_dawn',
+    name: 'Thần Kiếm Lê Minh',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Kiếm Đơn',
+    goldBonusPct: 8,
+    keyDropBonusPct: 0,
+    bonusTimeSec: 0,
+    passiveText: '+8% Vàng rớt từ quái vật',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#38bdf8', secondary: '#bae6fd', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_thrilling_tales',
+    name: 'Câu Chuyện Diệt Rồng',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Pháp Khí',
+    goldBonusPct: 5,
+    keyDropBonusPct: 0,
+    bonusTimeSec: 1,
+    passiveText: '+1 giây suy nghĩ mỗi câu & +5% Vàng',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'codex', primary: '#0284c7', secondary: '#7dd3fc', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_black_tassel',
+    name: 'Hắc Anh Thương',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Trường Thương',
+    goldBonusPct: 7,
+    keyDropBonusPct: 1,
+    bonusTimeSec: 0,
+    passiveText: '+7% Vàng & +1% rớt Chìa Khóa',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'spear', primary: '#0ea5e9', secondary: '#e2e8f0', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_debate_club',
+    name: 'Đại Kiếm Hùng Biện',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Đại Kiếm',
+    goldBonusPct: 9,
+    keyDropBonusPct: 0,
+    bonusTimeSec: 0,
+    passiveText: '+9% Vàng rớt từ quái vật',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'claymore', primary: '#38bdf8', secondary: '#93c5fd', bg: '#0c4a6e', stars: 3 })
+  },
+  {
+    id: 'wp3_cool_steel',
+    name: 'Lãnh Nhẫn Kiếm',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Kiếm Đơn',
+    goldBonusPct: 6,
+    keyDropBonusPct: 1,
+    bonusTimeSec: 0,
+    passiveText: '+6% Vàng & +1% rớt Chìa Khóa',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'katana', primary: '#60a5fa', secondary: '#e0f2fe', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_slingshot_bow',
+    name: 'Nỏ Đạn Thợ Săn',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Cung Kiếm',
+    goldBonusPct: 8,
+    keyDropBonusPct: 0,
+    bonusTimeSec: 0,
+    passiveText: '+8% Vàng rớt từ quái vật',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'bow', primary: '#22d3ee', secondary: '#bae6fd', bg: '#083344', stars: 3 })
+  },
+  {
+    id: 'wp3_magic_guide',
+    name: 'Tóm Tắt Ma Pháp',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Pháp Trượng',
+    goldBonusPct: 4,
+    keyDropBonusPct: 0,
+    bonusTimeSec: 1,
+    passiveText: '+1 giây suy nghĩ & +4% Vàng',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'staff', primary: '#38bdf8', secondary: '#a5f3fc', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_skyrider_sword',
+    name: 'Kiếm Phi Thiên Ngự Không',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Kiếm Đơn',
+    goldBonusPct: 7,
+    keyDropBonusPct: 0,
+    bonusTimeSec: 0,
+    passiveText: '+7% Vàng rớt từ quái vật',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#06b6d4', secondary: '#cffafe', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_iron_point',
+    name: 'Chiến Rìu Lính Gác',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Chiến Rìu',
+    goldBonusPct: 6,
+    keyDropBonusPct: 0,
+    bonusTimeSec: 0,
+    passiveText: '+6% Vàng rớt từ quái vật',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'axe', primary: '#64748b', secondary: '#7dd3fc', bg: '#0f172a', stars: 3 })
+  },
+  {
+    id: 'wp3_traveler_twin',
+    name: 'Song Đao Lữ Khách',
+    starRarity: 3,
+    rarityLabel: 'Vũ Khí 3★',
+    weaponType: 'Song Kiếm',
+    goldBonusPct: 5,
+    keyDropBonusPct: 1,
+    bonusTimeSec: 0,
+    passiveText: '+5% Vàng & +1% rớt Chìa Khóa',
+    iconUrl: buildWeaponSvgDataUrl({ kind: 'twin', primary: '#38bdf8', secondary: '#94a3b8', bg: '#0f172a', stars: 3 })
+  }
+];
+
+export const STANDARD_WHIFF_ITEM = {
+  id: 'whiff_stardust',
+  name: 'Tạch Gacha — Bụi Tinh Trần Vụn',
+  starRarity: 3,
+  rarityLabel: 'Tạch Gacha (3★)',
+  isWhiff: true,
+  consolationGold: 250,
+  passiveText: 'Vòng quay Thường bị lệch vào khoảng không! Nhận bù +250 🪙 Vàng an ủi.',
+  iconUrl: buildWeaponSvgDataUrl({ kind: 'sword', primary: '#475569', secondary: '#94a3b8', bg: '#090d16', stars: 3 })
+};
 
 export const KNIGHT_MONSTER_STAGES = [
   {
@@ -376,17 +791,26 @@ export const KNIGHT_MONSTER_STAGES = [
   }
 ];
 
-export const REVIVE_KEY_GOLD_PRICE = 100;
-
-export function computeMonsterGoldDrop(monster, skin, combo = 0) {
-  if (monster?.isDemonKing) return DEMON_KING_BOSS.rewardGold;
-  const baseGold = Math.max(1, Number(monster?.goldBase) || (monster?.isDragonBoss ? 110 : 25));
-  const skinMult = 1 + Math.max(0, Number(skin?.goldBonusPct) || 0) / 100;
-  const comboGold = Math.min(40, Math.max(0, Number(combo) || 0) * 5);
-  return Math.round((baseGold + comboGold) * skinMult);
+export function getEquippedWeaponMeta(profile) {
+  const wpId = String(profile?.equippedWeapon || '');
+  if (!wpId) return null;
+  const unlocked = Array.isArray(profile?.unlockedWeapons) ? profile.unlockedWeapons : [];
+  if (!unlocked.includes(wpId)) return null;
+  return KNIGHT_GACHA_WEAPONS.find(w => w.id === wpId) || null;
 }
 
-export function computeMonsterKeyDropChance(monster, skin) {
+export function computeMonsterGoldDrop(monster, skin, combo = 0, weapon = null, constellation = 0) {
+  if (monster?.isDemonKing) return DEMON_KING_BOSS.rewardGold;
+  const baseGold = Math.max(1, Number(monster?.goldBase) || (monster?.isDragonBoss ? 110 : 25));
+  const skinPct = Math.max(0, Number(skin?.goldBonusPct) || 0);
+  const wpPct = Math.max(0, Number(weapon?.goldBonusPct) || 0);
+  const consPct = Math.max(0, Math.min(6, Number(constellation) || 0)) * 4;
+  const totalMult = 1 + (skinPct + wpPct + consPct) / 100;
+  const comboGold = Math.min(40, Math.max(0, Number(combo) || 0) * 5);
+  return Math.round((baseGold + comboGold) * totalMult);
+}
+
+export function computeMonsterKeyDropChance(monster, skin, weapon = null) {
   if (monster?.isDemonKing) return 1;
   const rawBase = Number(monster?.keyDropChance);
   const baseChance = Number.isFinite(rawBase)
@@ -394,16 +818,394 @@ export function computeMonsterKeyDropChance(monster, skin) {
     : monster?.isDragonBoss
     ? 0.18
     : 0.06;
-  const skinBonus = Math.min(0.08, Math.max(0, Number(skin?.keyDropBonusPct) || 0) / 100);
-  return Math.min(0.35, Math.max(0.02, baseChance + skinBonus));
+  const skinBonus = Math.max(0, Number(skin?.keyDropBonusPct) || 0) / 100;
+  const wpBonus = Math.max(0, Number(weapon?.keyDropBonusPct) || 0) / 100;
+  const totalBonus = Math.min(0.12, skinBonus + wpBonus);
+  return Math.min(0.38, Math.max(0.02, baseChance + totalBonus));
+}
+
+// ==========================================
+// EXACT GENSHIN IMPACT PROBABILITY & PITY CALCULATOR
+// ==========================================
+export function computeGenshin5StarProbability(nextPullIndex5) {
+  if (nextPullIndex5 >= GENSHIN_GACHA_RATES.hardPity5) return 1.0;
+  if (nextPullIndex5 < GENSHIN_GACHA_RATES.softPity5Start) {
+    return GENSHIN_GACHA_RATES.base5Star; // 0.6%
+  }
+  // Soft pity ramp from pull 74 to 89 (+6% per pull)
+  return Math.min(
+    1.0,
+    GENSHIN_GACHA_RATES.base5Star + (nextPullIndex5 - (GENSHIN_GACHA_RATES.softPity5Start - 1)) * 0.06
+  );
+}
+
+export function computeGenshin4StarProbability(nextPullIndex4) {
+  if (nextPullIndex4 >= GENSHIN_GACHA_RATES.hardPity4) return 1.0;
+  if (nextPullIndex4 === GENSHIN_GACHA_RATES.softPity4Start) return 0.561; // 56.1% soft pity at pull 9
+  return GENSHIN_GACHA_RATES.base4Star; // 5.1%
+}
+
+function pickRandomItem(arr, randFn = Math.random) {
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const idx = Math.min(arr.length - 1, Math.floor(randFn() * arr.length));
+  return arr[idx];
+}
+
+export function rollKnightGachaPulls(
+  rawProfile = {},
+  {
+    bannerType = 'character_event', // 'character_event' | 'standard'
+    bannerId = 'up_dragon_empress',
+    count = 1,
+    randFn = Math.random
+  } = {}
+) {
+  const pullCount = count === 10 ? 10 : 1;
+  const profile = normalizeKnightRpgProfile(rawProfile);
+  const availableWishes = profile.wishes || 0;
+  const wishesToSpend = Math.min(pullCount, availableWishes);
+  const remainingPullsByGold = pullCount - wishesToSpend;
+  const goldCost = remainingPullsByGold * KNIGHT_GACHA_GOLD_SINGLE;
+
+  if (remainingPullsByGold > 0 && (profile.gold || 0) < goldCost) {
+    return {
+      ok: false,
+      error: `Chưa đủ tài nguyên cầu nguyện! Cần ${pullCount} 🌠 Lượt Quay hoặc ${(pullCount * KNIGHT_GACHA_GOLD_SINGLE).toLocaleString('vi-VN')} 🪙 Vàng (Còn thiếu ${(goldCost - (profile.gold || 0)).toLocaleString('vi-VN')} 🪙 Vàng).`
+    };
+  }
+
+  const isCharBanner = bannerType !== 'standard';
+  const bannerMeta =
+    KNIGHT_CHARACTER_EVENT_BANNERS.find(b => b.id === bannerId) ||
+    KNIGHT_CHARACTER_EVENT_BANNERS[0];
+
+  const gachaHeroes5 = KNIGHT_CHARACTER_SKINS.filter(h => h.obtainMethod === 'gacha' && h.starRarity === 5);
+  const gachaHeroes4 = KNIGHT_CHARACTER_SKINS.filter(h => h.obtainMethod === 'gacha' && h.starRarity === 4);
+  const weapons4 = KNIGHT_GACHA_WEAPONS.filter(w => w.starRarity === 4);
+  const weapons3 = KNIGHT_GACHA_WEAPONS.filter(w => w.starRarity === 3);
+
+  const featuredHero =
+    gachaHeroes5.find(h => h.id === bannerMeta.featuredHeroId) || gachaHeroes5[gachaHeroes5.length - 1];
+  const offBanner5Heroes = gachaHeroes5.filter(h => h.id !== featuredHero.id);
+  const standard5Heroes = gachaHeroes5;
+
+  const unlockedSkinsSet = new Set(profile.unlockedSkins);
+  const unlockedWeaponsSet = new Set(profile.unlockedWeapons);
+  const heroConstellations = { ...(profile.heroConstellations || {}) };
+  const weaponRefinements = { ...(profile.weaponRefinements || {}) };
+  const gachaState = { ...(profile.gachaState || {}) };
+
+  let nextGold = Math.max(0, (profile.gold || 0) - goldCost);
+  let nextKeys = profile.keys || 0;
+  let nextKeysCollected = profile.keysCollected || 0;
+  const nextWishes = Math.max(0, availableWishes - wishesToSpend);
+
+  const forcedRarityGlobal =
+    typeof window !== 'undefined' && window.__FORCE_GACHA_RARITY__ !== undefined
+      ? window.__FORCE_GACHA_RARITY__
+      : null;
+
+  const results = [];
+  const nowTs = Date.now();
+
+  for (let i = 0; i < pullCount; i += 1) {
+    const pity5Key = isCharBanner ? 'charPity5' : 'stdPity5';
+    const pity4Key = isCharBanner ? 'charPity4' : 'stdPity4';
+
+    const nextPull5 = (gachaState[pity5Key] || 0) + 1;
+    const nextPull4 = (gachaState[pity4Key] || 0) + 1;
+
+    const prob5 = computeGenshin5StarProbability(nextPull5);
+    const prob4 = computeGenshin4StarProbability(nextPull4);
+    const roll = randFn();
+
+    let starRarity = 3;
+    let forceWhiff = false;
+    if (forcedRarityGlobal && i === 0) {
+      if (forcedRarityGlobal === 5 || forcedRarityGlobal === '5') starRarity = 5;
+      else if (forcedRarityGlobal === 4 || forcedRarityGlobal === '4') starRarity = 4;
+      else if (forcedRarityGlobal === 'whiff') {
+        starRarity = 3;
+        forceWhiff = true;
+      } else {
+        starRarity = 3;
+      }
+    } else if (roll < prob5) {
+      starRarity = 5;
+    } else if (nextPull4 >= GENSHIN_GACHA_RATES.hardPity4 || roll < prob5 + prob4) {
+      starRarity = 4;
+    } else {
+      starRarity = 3;
+    }
+
+    if (starRarity === 5) {
+      gachaState[pity5Key] = 0;
+      gachaState[pity4Key] = nextPull4; // 4★ pity continues or stays capped at 10 on next pull
+
+      let chosenHero = featuredHero;
+      let rateOutcome = 'standard_5';
+      if (isCharBanner) {
+        if (gachaState.charGuaranteed5) {
+          chosenHero = featuredHero;
+          gachaState.charGuaranteed5 = false;
+          rateOutcome = 'guaranteed_up';
+        } else if (randFn() < 0.5) {
+          chosenHero = featuredHero;
+          gachaState.charGuaranteed5 = false;
+          rateOutcome = 'won_50_50';
+        } else {
+          chosenHero = pickRandomItem(offBanner5Heroes, randFn) || featuredHero;
+          gachaState.charGuaranteed5 = true;
+          rateOutcome = 'lost_50_50';
+        }
+      } else {
+        chosenHero = pickRandomItem(standard5Heroes, randFn) || gachaHeroes5[0];
+      }
+
+      const isNew = !unlockedSkinsSet.has(chosenHero.id);
+      unlockedSkinsSet.add(chosenHero.id);
+      let bonusText = '';
+      if (!isNew) {
+        const prevC = Number(heroConstellations[chosenHero.id]) || 0;
+        const nextC = Math.min(6, prevC + 1);
+        heroConstellations[chosenHero.id] = nextC;
+        nextKeys += 3;
+        nextKeysCollected += 3;
+        bonusText = `Trùng Nhân Vật 5★ → Tinh Hồn C${nextC} & +3 🗝️ Chìa Khóa!`;
+      }
+
+      results.push({
+        pullId: `wish_${nowTs}_${i}`,
+        itemKind: 'character',
+        id: chosenHero.id,
+        name: chosenHero.name,
+        starRarity: 5,
+        rarityLabel: chosenHero.rarity,
+        spriteUrl: chosenHero.spriteUrl,
+        passiveText: chosenHero.passiveText,
+        weaponName: chosenHero.weaponName,
+        genderBadge: chosenHero.genderBadge,
+        isNew,
+        isWhiff: false,
+        rateOutcome,
+        bonusText,
+        bannerType: isCharBanner ? 'character_event' : 'standard',
+        timestamp: nowTs + i
+      });
+    } else if (starRarity === 4) {
+      gachaState[pity5Key] = nextPull5;
+      gachaState[pity4Key] = 0;
+
+      let rollCharacter4 = false;
+      if (isCharBanner) {
+        if (gachaState.charGuaranteed4) {
+          rollCharacter4 = true;
+          gachaState.charGuaranteed4 = false;
+        } else if (randFn() < 0.5) {
+          rollCharacter4 = true;
+          gachaState.charGuaranteed4 = false;
+        } else {
+          rollCharacter4 = false;
+          gachaState.charGuaranteed4 = true;
+        }
+      } else {
+        // Standard banner has higher weapon weight (65% 4★ weapon, 35% 4★ hero) & no 4★ character UP guarantee
+        rollCharacter4 = randFn() < 0.35;
+      }
+
+      if (rollCharacter4) {
+        let chosen4Hero = pickRandomItem(gachaHeroes4, randFn);
+        if (isCharBanner && Array.isArray(bannerMeta.featured4StarIds) && randFn() < 0.7) {
+          const upPool = gachaHeroes4.filter(h => bannerMeta.featured4StarIds.includes(h.id));
+          if (upPool.length > 0) chosen4Hero = pickRandomItem(upPool, randFn);
+        }
+        const isNew = !unlockedSkinsSet.has(chosen4Hero.id);
+        unlockedSkinsSet.add(chosen4Hero.id);
+        let bonusText = '';
+        if (!isNew) {
+          const prevC = Number(heroConstellations[chosen4Hero.id]) || 0;
+          const nextC = Math.min(6, prevC + 1);
+          heroConstellations[chosen4Hero.id] = nextC;
+          nextKeys += 1;
+          nextKeysCollected += 1;
+          bonusText = `Trùng Nhân Vật 4★ → Tinh Hồn C${nextC} & +1 🗝️ Chìa Khóa!`;
+        }
+        results.push({
+          pullId: `wish_${nowTs}_${i}`,
+          itemKind: 'character',
+          id: chosen4Hero.id,
+          name: chosen4Hero.name,
+          starRarity: 4,
+          rarityLabel: chosen4Hero.rarity,
+          spriteUrl: chosen4Hero.spriteUrl,
+          passiveText: chosen4Hero.passiveText,
+          weaponName: chosen4Hero.weaponName,
+          genderBadge: chosen4Hero.genderBadge,
+          isNew,
+          isWhiff: false,
+          bonusText,
+          bannerType: isCharBanner ? 'character_event' : 'standard',
+          timestamp: nowTs + i
+        });
+      } else {
+        const chosenWp4 = pickRandomItem(weapons4, randFn);
+        const isNew = !unlockedWeaponsSet.has(chosenWp4.id);
+        unlockedWeaponsSet.add(chosenWp4.id);
+        let bonusText = '';
+        if (isNew) {
+          weaponRefinements[chosenWp4.id] = 1;
+        } else {
+          const prevR = Number(weaponRefinements[chosenWp4.id]) || 1;
+          if (prevR < 5) {
+            weaponRefinements[chosenWp4.id] = prevR + 1;
+            bonusText = `Tinh Luyện Vũ Khí 4★ → R${prevR + 1}`;
+          } else {
+            nextGold += 500;
+            bonusText = 'Đã tối đa R5 → Đổi +500 🪙 Vàng Tinh Huy';
+          }
+        }
+        results.push({
+          pullId: `wish_${nowTs}_${i}`,
+          itemKind: 'weapon',
+          id: chosenWp4.id,
+          name: chosenWp4.name,
+          starRarity: 4,
+          rarityLabel: chosenWp4.rarityLabel,
+          spriteUrl: chosenWp4.iconUrl,
+          passiveText: chosenWp4.passiveText,
+          weaponType: chosenWp4.weaponType,
+          isNew,
+          isWhiff: false,
+          bonusText,
+          bannerType: isCharBanner ? 'character_event' : 'standard',
+          timestamp: nowTs + i
+        });
+      }
+    } else {
+      gachaState[pity5Key] = nextPull5;
+      gachaState[pity4Key] = nextPull4;
+
+      const isStandardWhiff =
+        forceWhiff || (!isCharBanner && randFn() < GENSHIN_GACHA_RATES.standardWhiffChance);
+
+      if (isStandardWhiff) {
+        nextGold += STANDARD_WHIFF_ITEM.consolationGold;
+        results.push({
+          pullId: `wish_${nowTs}_${i}`,
+          itemKind: 'whiff',
+          id: STANDARD_WHIFF_ITEM.id,
+          name: STANDARD_WHIFF_ITEM.name,
+          starRarity: 3,
+          rarityLabel: STANDARD_WHIFF_ITEM.rarityLabel,
+          spriteUrl: STANDARD_WHIFF_ITEM.iconUrl,
+          passiveText: STANDARD_WHIFF_ITEM.passiveText,
+          isNew: false,
+          isWhiff: true,
+          bonusText: `+${STANDARD_WHIFF_ITEM.consolationGold} 🪙 Vàng Bụi Tinh Trần`,
+          bannerType: 'standard',
+          timestamp: nowTs + i
+        });
+      } else {
+        const chosenWp3 = pickRandomItem(weapons3, randFn);
+        const isNew = !unlockedWeaponsSet.has(chosenWp3.id);
+        unlockedWeaponsSet.add(chosenWp3.id);
+        let bonusText = '';
+        if (isNew) {
+          weaponRefinements[chosenWp3.id] = 1;
+        } else {
+          const prevR = Number(weaponRefinements[chosenWp3.id]) || 1;
+          if (prevR < 5) {
+            weaponRefinements[chosenWp3.id] = prevR + 1;
+            bonusText = `Tinh Luyện Vũ Khí 3★ → R${prevR + 1}`;
+          } else {
+            nextGold += 150;
+            bonusText = 'Đã tối đa R5 → +150 🪙 Vàng Tinh Trần';
+          }
+        }
+        results.push({
+          pullId: `wish_${nowTs}_${i}`,
+          itemKind: 'weapon',
+          id: chosenWp3.id,
+          name: chosenWp3.name,
+          starRarity: 3,
+          rarityLabel: chosenWp3.rarityLabel,
+          spriteUrl: chosenWp3.iconUrl,
+          passiveText: chosenWp3.passiveText,
+          weaponType: chosenWp3.weaponType,
+          isNew,
+          isWhiff: false,
+          bonusText,
+          bannerType: isCharBanner ? 'character_event' : 'standard',
+          timestamp: nowTs + i
+        });
+      }
+    }
+
+    gachaState.totalPulls = (gachaState.totalPulls || 0) + 1;
+  }
+
+  const historyItems = results.map(r => ({
+    pullId: r.pullId,
+    name: r.name,
+    itemKind: r.itemKind,
+    starRarity: r.starRarity,
+    isWhiff: r.isWhiff,
+    rateOutcome: r.rateOutcome || '',
+    bannerType: r.bannerType,
+    timestamp: r.timestamp
+  }));
+
+  let nextEquippedWeapon = profile.equippedWeapon || '';
+  if (!nextEquippedWeapon) {
+    const newlyPulled4Wp = results.find(r => r.itemKind === 'weapon' && r.starRarity === 4);
+    const newlyPulled3Wp = results.find(r => r.itemKind === 'weapon' && r.starRarity === 3);
+    if (newlyPulled4Wp) nextEquippedWeapon = newlyPulled4Wp.id;
+    else if (newlyPulled3Wp) nextEquippedWeapon = newlyPulled3Wp.id;
+  }
+
+  const nextProfile = normalizeKnightRpgProfile({
+    ...profile,
+    gold: nextGold,
+    keys: Math.min(999, nextKeys),
+    keysCollected: nextKeysCollected,
+    wishes: nextWishes,
+    unlockedSkins: Array.from(unlockedSkinsSet),
+    unlockedWeapons: Array.from(unlockedWeaponsSet),
+    equippedWeapon: nextEquippedWeapon,
+    heroConstellations,
+    weaponRefinements,
+    gachaState,
+    wishHistory: [...historyItems.reverse(), ...(profile.wishHistory || [])].slice(0, 50)
+  });
+
+  const maxRarity = results.reduce((mx, r) => Math.max(mx, r.starRarity || 3), 3);
+
+  return {
+    ok: true,
+    nextProfile,
+    results,
+    maxRarity,
+    has5Star: maxRarity === 5,
+    has4Star: maxRarity === 4,
+    allWhiff: results.every(r => r.isWhiff),
+    wishesSpent: wishesToSpend,
+    goldSpent: goldCost
+  };
 }
 
 export function normalizeKnightRpgProfile(raw = {}) {
   const obj = raw && typeof raw === 'object' ? raw : {};
   const rawGold = obj.gold === undefined || obj.gold === null ? 150 : Number(obj.gold);
-  const gold = Math.max(0, Math.min(9_999_999, Math.floor(Number.isFinite(rawGold) ? rawGold : 150)));
+  const gold = Math.max(0, Math.min(99_999_999, Math.floor(Number.isFinite(rawGold) ? rawGold : 150)));
   const rawKeys = obj.keys === undefined || obj.keys === null ? 1 : Number(obj.keys);
   const keys = Math.max(0, Math.min(999, Math.floor(Number.isFinite(rawKeys) ? rawKeys : 1)));
+  const rawWishes = obj.wishes === undefined || obj.wishes === null ? 0 : Number(obj.wishes);
+  const wishes = Math.max(0, Math.min(99_999, Math.floor(Number.isFinite(rawWishes) ? rawWishes : 0)));
+  const claimedServerWishCredits = Math.max(
+    0,
+    Math.floor(Number(obj.claimedServerWishCredits) || 0)
+  );
+
   const rawSkins = Array.isArray(obj.unlockedSkins) ? obj.unlockedSkins.map(String) : [];
   const validSkinIds = new Set(KNIGHT_CHARACTER_SKINS.map(s => s.id));
   const unlockedSkins = Array.from(
@@ -412,6 +1214,57 @@ export function normalizeKnightRpgProfile(raw = {}) {
   const equippedSkin = unlockedSkins.includes(String(obj.equippedSkin || ''))
     ? String(obj.equippedSkin)
     : 'knight_arthur';
+
+  const validWeaponIds = new Set(KNIGHT_GACHA_WEAPONS.map(w => w.id));
+  const rawWeapons = Array.isArray(obj.unlockedWeapons) ? obj.unlockedWeapons.map(String) : [];
+  const unlockedWeapons = Array.from(new Set(rawWeapons.filter(id => validWeaponIds.has(id))));
+  const equippedWeapon = unlockedWeapons.includes(String(obj.equippedWeapon || ''))
+    ? String(obj.equippedWeapon)
+    : '';
+
+  const rawHeroCons = obj.heroConstellations && typeof obj.heroConstellations === 'object' ? obj.heroConstellations : {};
+  const heroConstellations = {};
+  Object.entries(rawHeroCons).forEach(([k, v]) => {
+    if (validSkinIds.has(k)) {
+      heroConstellations[k] = Math.max(0, Math.min(6, Math.floor(Number(v) || 0)));
+    }
+  });
+
+  const rawWpRefs = obj.weaponRefinements && typeof obj.weaponRefinements === 'object' ? obj.weaponRefinements : {};
+  const weaponRefinements = {};
+  Object.entries(rawWpRefs).forEach(([k, v]) => {
+    if (validWeaponIds.has(k)) {
+      weaponRefinements[k] = Math.max(1, Math.min(5, Math.floor(Number(v) || 1)));
+    }
+  });
+
+  const rawGacha = obj.gachaState && typeof obj.gachaState === 'object' ? obj.gachaState : {};
+  const gachaState = {
+    charPity5: Math.max(0, Math.min(89, Math.floor(Number(rawGacha.charPity5) || 0))),
+    charPity4: Math.max(0, Math.min(9, Math.floor(Number(rawGacha.charPity4) || 0))),
+    charGuaranteed5: Boolean(rawGacha.charGuaranteed5),
+    charGuaranteed4: Boolean(rawGacha.charGuaranteed4),
+    stdPity5: Math.max(0, Math.min(89, Math.floor(Number(rawGacha.stdPity5) || 0))),
+    stdPity4: Math.max(0, Math.min(9, Math.floor(Number(rawGacha.stdPity4) || 0))),
+    totalPulls: Math.max(0, Math.floor(Number(rawGacha.totalPulls) || 0))
+  };
+
+  const wishHistory = Array.isArray(obj.wishHistory)
+    ? obj.wishHistory
+        .filter(item => item && typeof item === 'object' && item.name)
+        .slice(0, 50)
+        .map(item => ({
+          pullId: String(item.pullId || ''),
+          name: String(item.name || ''),
+          itemKind: String(item.itemKind || 'weapon'),
+          starRarity: Math.max(3, Math.min(5, Math.floor(Number(item.starRarity) || 3))),
+          isWhiff: Boolean(item.isWhiff),
+          rateOutcome: String(item.rateOutcome || ''),
+          bannerType: String(item.bannerType || 'character_event'),
+          timestamp: Number(item.timestamp) || 0
+        }))
+    : [];
+
   const monstersSlain = Math.max(0, Math.floor(Number(obj.monstersSlain) || 0));
   const dragonsSlain = Math.max(0, Math.floor(Number(obj.dragonsSlain) || 0));
   const demonKingsSlain = Math.max(0, Math.floor(Number(obj.demonKingsSlain) || 0));
@@ -421,8 +1274,16 @@ export function normalizeKnightRpgProfile(raw = {}) {
   return {
     gold,
     keys,
+    wishes,
+    claimedServerWishCredits,
     unlockedSkins,
     equippedSkin,
+    unlockedWeapons,
+    equippedWeapon,
+    heroConstellations,
+    weaponRefinements,
+    gachaState,
+    wishHistory,
     monstersSlain,
     dragonsSlain,
     demonKingsSlain,
@@ -431,32 +1292,74 @@ export function normalizeKnightRpgProfile(raw = {}) {
   };
 }
 
+export function applyServerPurchasedWishes(profileObj, userRecord = null) {
+  const normalized = normalizeKnightRpgProfile(profileObj || {});
+  const serverPurchasedTotal = Math.max(0, Math.floor(Number(userRecord?.gachaWishCredits) || 0));
+  if (serverPurchasedTotal > normalized.claimedServerWishCredits) {
+    const delta = serverPurchasedTotal - normalized.claimedServerWishCredits;
+    return normalizeKnightRpgProfile({
+      ...normalized,
+      wishes: normalized.wishes + delta,
+      claimedServerWishCredits: serverPurchasedTotal
+    });
+  }
+  return normalized;
+}
+
 export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null) {
   const serverProfile = userRecord?.knightRpgProfile ? normalizeKnightRpgProfile(userRecord.knightRpgProfile) : null;
   if (typeof window === 'undefined') {
-    return serverProfile || normalizeKnightRpgProfile({});
+    return applyServerPurchasedWishes(serverProfile || normalizeKnightRpgProfile({}), userRecord);
   }
   try {
     const key = `${KNIGHT_STORAGE_KEY_PREFIX}:${String(username || 'guest').toLowerCase()}`;
     const raw = window.localStorage.getItem(key);
     const localProfile = raw ? normalizeKnightRpgProfile(JSON.parse(raw)) : null;
-    if (!localProfile && !serverProfile) return normalizeKnightRpgProfile({});
-    if (!localProfile) return serverProfile;
-    if (!serverProfile) return localProfile;
+    if (!localProfile && !serverProfile) return applyServerPurchasedWishes({}, userRecord);
+    if (!localProfile) return applyServerPurchasedWishes(serverProfile, userRecord);
+    if (!serverProfile) return applyServerPurchasedWishes(localProfile, userRecord);
+
     const mergedSkins = Array.from(new Set([...localProfile.unlockedSkins, ...serverProfile.unlockedSkins]));
-    return normalizeKnightRpgProfile({
-      gold: Math.max(localProfile.gold, serverProfile.gold),
+    const mergedWeapons = Array.from(new Set([...localProfile.unlockedWeapons, ...serverProfile.unlockedWeapons]));
+    const mergedHeroCons = { ...serverProfile.heroConstellations };
+    Object.entries(localProfile.heroConstellations || {}).forEach(([k, v]) => {
+      mergedHeroCons[k] = Math.max(mergedHeroCons[k] || 0, v);
+    });
+    const mergedWpRefs = { ...serverProfile.weaponRefinements };
+    Object.entries(localProfile.weaponRefinements || {}).forEach(([k, v]) => {
+      mergedWpRefs[k] = Math.max(mergedWpRefs[k] || 1, v);
+    });
+
+    const localPulls = localProfile.gachaState?.totalPulls || 0;
+    const serverPulls = serverProfile.gachaState?.totalPulls || 0;
+    const newerByPulls = localPulls >= serverPulls ? localProfile : serverProfile;
+
+    const mergedBase = normalizeKnightRpgProfile({
+      gold: newerByPulls.gold,
       keys: Math.max(localProfile.keys, serverProfile.keys),
+      wishes: newerByPulls.wishes,
+      claimedServerWishCredits: Math.max(
+        localProfile.claimedServerWishCredits || 0,
+        serverProfile.claimedServerWishCredits || 0
+      ),
       unlockedSkins: mergedSkins,
       equippedSkin: localProfile.equippedSkin || serverProfile.equippedSkin,
+      unlockedWeapons: mergedWeapons,
+      equippedWeapon: localProfile.equippedWeapon || serverProfile.equippedWeapon,
+      heroConstellations: mergedHeroCons,
+      weaponRefinements: mergedWpRefs,
+      gachaState: newerByPulls.gachaState,
+      wishHistory: newerByPulls.wishHistory,
       monstersSlain: Math.max(localProfile.monstersSlain, serverProfile.monstersSlain),
       dragonsSlain: Math.max(localProfile.dragonsSlain, serverProfile.dragonsSlain),
       demonKingsSlain: Math.max(localProfile.demonKingsSlain, serverProfile.demonKingsSlain),
       keysCollected: Math.max(localProfile.keysCollected, serverProfile.keysCollected),
       bestScore: Math.max(localProfile.bestScore, serverProfile.bestScore)
     });
+
+    return applyServerPurchasedWishes(mergedBase, userRecord);
   } catch {
-    return serverProfile || normalizeKnightRpgProfile({});
+    return applyServerPurchasedWishes(serverProfile || {}, userRecord);
   }
 }
 

@@ -4,6 +4,8 @@ import {
   AIEO_VIP_PRICE_VND,
   DEFAULT_EXAM_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
+  GACHA_WISH_1_PRICE_VND,
+  GACHA_WISH_10_PRICE_VND,
   MAX_AUDIO_UPLOAD_BYTES,
   canCreateFriendRoomNow,
   evaluateTitleUnlockNotification,
@@ -782,6 +784,10 @@ export default function App() {
         ? `${unlocked ? '+1' : '-1'} Lượt Thực Chiến Thi Thật`
         : planType === 'room_ticket'
         ? `${unlocked ? '+1' : '-1'} Vé Tạo Phòng Đấu Riêng (5k)`
+        : planType === 'gacha_wish_1'
+        ? `${unlocked ? '+1' : '-1'} Lượt Quay Gacha Hiệp Sĩ (5k)`
+        : planType === 'gacha_wish_10'
+        ? `${unlocked ? '+10' : '-10'} Lượt Quay Gacha Hiệp Sĩ (50k)`
         : planType === 'test'
         ? 'quyền thi Đề Thực Chiến 4 Kỹ Năng'
         : 'quyền mở gói tháng';
@@ -807,6 +813,10 @@ export default function App() {
         ? `${comboMeta.label} - Thực Chiến Thi Thật 4 Kỹ Năng`
         : itemType === 'room_ticket'
         ? 'Vé Tạo 1 Phòng Đấu Riêng (5k/lần)'
+        : itemType === 'gacha_wish_1'
+        ? 'Mua 1 Lượt Quay Gacha Hiệp Sĩ (5.000đ)'
+        : itemType === 'gacha_wish_10'
+        ? 'Mua Gói 10 Lượt Quay Gacha Hiệp Sĩ (50.000đ)'
         : itemType === 'test'
         ? 'Chi Phí Test Thực Chiến IELTS (4 Kỹ Năng)'
         : 'Ảnh Nền Riêng (1 Tháng)';
@@ -817,6 +827,10 @@ export default function App() {
         ? comboMeta.price
         : itemType === 'room_ticket'
         ? (cfgPay.friendRoomTicketPrice ?? FRIEND_ROOM_TICKET_PRICE_VND)
+        : itemType === 'gacha_wish_1'
+        ? (cfgPay.gachaWish1Price ?? GACHA_WISH_1_PRICE_VND)
+        : itemType === 'gacha_wish_10'
+        ? (cfgPay.gachaWish10Price ?? GACHA_WISH_10_PRICE_VND)
         : itemType === 'test'
         ? (cfgPay.defaultExamPriceVnd ?? DEFAULT_EXAM_PRICE_VND)
         : cfgPay.coverUnlockPrice;
@@ -837,7 +851,11 @@ export default function App() {
         ? { itemType: 'title', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
         : reqOpts?.itemType === 'test' && reqOpts?.itemId
         ? { itemType: 'test', itemId: reqOpts.itemId, renew: Boolean(reqOpts.renew) }
-        : isComboRequest || reqOpts?.itemType === 'aieo_vip' || reqOpts?.itemType === 'room_ticket'
+        : isComboRequest ||
+          reqOpts?.itemType === 'aieo_vip' ||
+          reqOpts?.itemType === 'room_ticket' ||
+          reqOpts?.itemType === 'gacha_wish_1' ||
+          reqOpts?.itemType === 'gacha_wish_10'
         ? { itemType: reqOpts.itemType, renew: Boolean(reqOpts.renew) }
         : { itemType: 'cover', renew: Boolean(reqOpts.renew) };
     const snap = await dispatchSyncAction('REQUEST_COVER_UNLOCK', payload);

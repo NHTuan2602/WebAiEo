@@ -42,6 +42,10 @@ export default function CoverUnlockQrCard({
       ? comboMeta.price
       : itemType === 'room_ticket'
       ? cfg.friendRoomTicketPrice
+      : itemType === 'gacha_wish_1'
+      ? cfg.gachaWish1Price
+      : itemType === 'gacha_wish_10'
+      ? cfg.gachaWish10Price
       : itemType === 'aieo_vip'
       ? cfg.aieoVipPrice
       : cfg.coverUnlockPrice;
@@ -75,6 +79,10 @@ export default function CoverUnlockQrCard({
     ? `${comboMeta.label} · Thực Chiến Thi Thật 4 Kỹ Năng`
     : itemType === 'room_ticket'
     ? 'Mua 1 Lượt Tạo Phòng Đấu Riêng (5k/lần)'
+    : itemType === 'gacha_wish_1'
+    ? 'Mua 1 Lượt Quay Cầu Nguyện Gacha Hiệp Sĩ (5.000đ)'
+    : itemType === 'gacha_wish_10'
+    ? 'Mua Gói 10 Lượt Quay Gacha Hiệp Sĩ (50.000đ)'
     : itemType === 'aieo_vip'
     ? 'Đăng Ký Gói IELTS VIP Full Quyền (1 Tháng)'
     : 'Mở Khóa Tải Ảnh Nền Riêng (1 Tháng)';
@@ -86,6 +94,10 @@ export default function CoverUnlockQrCard({
     ? `Quét mã VietQR để nhận ngay +${comboMeta.credits} lượt mở đề Thực Chiến Thi Thật 4 Kỹ Năng (1 lượt/đề)!`
     : itemType === 'room_ticket'
     ? 'Quét mã VietQR để nhận ngay +1 lượt Tạo Phòng Đấu Trường Bạn Bè (tùy chỉnh số người & chia Team)!'
+    : itemType === 'gacha_wish_1'
+    ? 'Quét mã VietQR để cộng ngay +1 🌠 Lượt Quay Cầu Nguyện Gacha Nhân Vật & Vũ Khí trong Hiệp Sĩ Diệt Rồng!'
+    : itemType === 'gacha_wish_10'
+    ? 'Quét mã VietQR để cộng ngay +10 🌠 Lượt Quay Cầu Nguyện Gacha (Quay x10 chắc chắn nhận ít nhất 1 Nhân Vật hoặc Vũ Khí ≥ 4★)!'
     : itemType === 'aieo_vip'
     ? 'Đặc quyền 30 ngày: Danh Hiệu IELTS VIP + Tạo Phòng Đấu Bạn Bè (tùy chỉnh số người & chia Team) + Đổi Màu Chữ Tên & Nhãn IELTS VIP!'
     : autoVerifyEnabled

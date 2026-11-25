@@ -211,13 +211,19 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('game-vocab-bank-modal').getByRole('button', { name: /Đóng/i }).first().click();
     await expect(page.getByTestId('game-vocab-bank-modal')).toHaveCount(0);
 
-    // Open Character Skin Shop (10 distinct illustrated Male & Female skins + Revive Keys)
+    // Open Genshin-style Gacha & Inventory Modal (Characters cannot be bought directly; Gacha Banners + 4★/3★ Weapons + 5k/50k Wish Packs)
     await page.getByTestId('open-knight-shop-btn').click();
     await expect(page.getByTestId('knight-skin-shop-modal')).toBeVisible();
+    await expect(page.getByTestId('gacha-pull-1-btn')).toContainText(/10\.000/i);
+    await expect(page.getByTestId('gacha-pull-10-btn')).toContainText(/100\.000/i);
+
+    // Check Inventory tab: 10 distinct hero sprites load & locked heroes cannot be purchased directly with Gold
+    await page.getByTestId('gacha-tab-inventory').click();
     await expect(page.getByText(/Nữ Chiến Binh Valkyrie Freya/i)).toBeVisible();
     await expect(page.getByText(/Thánh Kỵ Sĩ Thái Dương Leon/i)).toBeVisible();
     await expect(page.getByText(/Kiếm Sĩ Lôi Kiếm Kenji/i)).toBeVisible();
     await expect(page.getByText(/Chiến Thần Cuồng Chiến Drake/i)).toBeVisible();
+    await expect(page.getByTestId('locked-gacha-hero-btn-valkyrie_freya')).toBeVisible();
     await expect
       .poll(async () =>
         page
@@ -225,9 +231,67 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
           .locator('img')
           .evaluateAll(imgs => imgs.filter(img => img.complete && img.naturalWidth > 0).length)
       )
-      .toBeGreaterThanOrEqual(10);
+      .toBeGreaterThanOrEqual(20);
+
+    // Check Wish Pack Shop tab (5.000đ = 1 lượt & 50.000đ = 10 lượt VietQR checkout)
+    await page.getByTestId('gacha-tab-shop').click();
+    await expect(page.getByTestId('buy-wish-1-vnd-btn')).toContainText(/5\.000/i);
+    await expect(page.getByTestId('buy-wish-10-vnd-btn')).toContainText(/50\.000/i);
+    await page.getByTestId('buy-wish-10-vnd-btn').click();
+    await expect(page.getByRole('dialog')).toContainText(/Mua \+10 Lượt Quay Gacha Hiệp Sĩ/i);
+    await page.getByRole('dialog').getByRole('button', { name: 'Đóng' }).first().click();
+
+    // Buy +1 Revive Key (100 Gold) & close modal, then seed Gold to test 5★ Gold vs Standard 10x / Whiff Gacha Cutscenes!
     await page.getByTestId('buy-revive-key-with-gold-btn').click();
-    await page.getByTestId('knight-skin-shop-modal').getByRole('button').first().click();
+    await page.getByTestId('close-knight-gacha-modal-btn').click();
+
+    await page.evaluate(() => {
+      const key = 'ielts_knight_rpg_profile_v1:teacher_ielts';
+      const cur = JSON.parse(localStorage.getItem(key) || '{}');
+      cur.gold = 150000;
+      localStorage.setItem(key, JSON.stringify(cur));
+    });
+    await page.getByTestId('knight-back-to-hub-btn').click();
+    await page.getByTestId('switch-to-knight-game-btn').click();
+    await page.getByTestId('open-knight-shop-btn').click();
+
+    // 1) Pull 1x on Character UP Banner forced 5★ -> verify distinct Golden 5★ Shooting Star Cutscene!
+    await page.evaluate(() => {
+      window.__FORCE_GACHA_RARITY__ = 5;
+    });
+    await page.getByTestId('gacha-pull-1-btn').click();
+    await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', '5');
+    await expect(page.getByTestId('knight-gacha-cutscene')).toContainText(/KIM QUANG 5 SAO/i);
+    await page.getByTestId('gacha-skip-cutscene-btn').click();
+    await expect(page.getByTestId('knight-gacha-results-view')).toBeVisible();
+    await page.getByTestId('gacha-close-results-btn').click();
+
+    // 2) Pull 1x on Standard Banner forced Whiff -> verify Tạch Gacha outcome + Pull 10x Standard Banner -> verify ≥ 4★ Genshin Pity!
+    await page.getByTestId('gacha-tab-standard').click();
+    await page.evaluate(() => {
+      window.__FORCE_GACHA_RARITY__ = 'whiff';
+    });
+    await page.getByTestId('gacha-std-pull-1-btn').click();
+    await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', '3');
+    await expect(page.getByTestId('knight-gacha-cutscene')).toContainText(/TẠCH GACHA/i);
+    await page.getByTestId('gacha-skip-cutscene-btn').click();
+    await expect(page.getByTestId('knight-gacha-results-view')).toContainText(/Tạch Gacha/i);
+    await page.getByTestId('gacha-close-results-btn').click();
+
+    await page.evaluate(() => {
+      delete window.__FORCE_GACHA_RARITY__;
+    });
+    await page.getByTestId('gacha-std-pull-10-btn').click();
+    await expect(page.getByTestId('knight-gacha-cutscene')).toBeVisible();
+    await page.getByTestId('gacha-skip-cutscene-btn').click();
+    await expect(page.getByTestId('knight-gacha-results-view')).toBeVisible();
+    const highRarityCount = await page
+      .getByTestId('knight-gacha-results-view')
+      .locator('[data-testid="gacha-result-card-4"], [data-testid="gacha-result-card-5"]')
+      .count();
+    expect(highRarityCount).toBeGreaterThanOrEqual(1);
+    await page.getByTestId('gacha-close-results-btn').click();
+    await page.getByTestId('close-knight-gacha-modal-btn').click();
 
     // Launch Stage 3 (Golem & Dark Mage) briefly to confirm zero NaN/undefined and monster-kill key drop percentage
     await page.getByTestId('start-knight-stage-3').click();

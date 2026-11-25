@@ -42,6 +42,8 @@ import {
   DEFAULT_EXAM_PRICE_VND,
   PERIODIC_MOCK_PRICE_VND,
   FRIEND_ROOM_TICKET_PRICE_VND,
+  GACHA_WISH_1_PRICE_VND,
+  GACHA_WISH_10_PRICE_VND,
   AIEO_VIP_PRICE_VND,
   MIN_DONATE_AMOUNT_VND,
   SUBSCRIPTION_DURATION_MS,
@@ -49,6 +51,7 @@ import {
   computeDailyLeaderboardTitleHolders,
   formatVndCurrency,
   getFriendRoomTicketCredits,
+  getGachaWishPurchasedCredits,
   getPurchasedExamCount,
   getRealExamComboMeta,
   getRealExamCredits,
@@ -764,6 +767,7 @@ function sanitizeUserForViewer(user, viewer) {
     skillPracticeExpiresAt: Number(user.skillPracticeExpiresAt) || 0,
     aieoVipExpiresAt: Number(user.aieoVipExpiresAt) || 0,
     roomCreateCredits: getFriendRoomTicketCredits(user),
+    gachaWishCredits: getGachaWishPurchasedCredits(user),
     realExamCredits: getRealExamCredits(user),
     vipRedNameEnabled: (() => {
       const isVip = Number(user.aieoVipExpiresAt) > Date.now();
@@ -3162,6 +3166,8 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         payload?.itemType === 'skill_pass' ||
         payload?.itemType === 'aieo_vip' ||
         payload?.itemType === 'room_ticket' ||
+        payload?.itemType === 'gacha_wish_1' ||
+        payload?.itemType === 'gacha_wish_10' ||
         Boolean(getRealExamComboMeta(payload?.itemType, store.paymentConfig))
       ) {
         return { allowed: true };
@@ -3520,6 +3526,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       skillPracticeExpiresAt: Number(prevUser.skillPracticeExpiresAt) || 0,
       aieoVipExpiresAt: Number(prevUser.aieoVipExpiresAt) || 0,
       roomCreateCredits: getFriendRoomTicketCredits(prevUser),
+      gachaWishCredits: getGachaWishPurchasedCredits(prevUser),
       realExamCredits: getRealExamCredits(prevUser),
       subscriptionRequested: prevUser.subscriptionRequested || null,
       knightRpgProfile:
@@ -3593,6 +3600,7 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       incoming.skillPracticeExpiresAt = Number(prevUser?.skillPracticeExpiresAt) || 0;
       incoming.aieoVipExpiresAt = Number(prevUser?.aieoVipExpiresAt) || 0;
       incoming.roomCreateCredits = getFriendRoomTicketCredits(prevUser);
+      incoming.gachaWishCredits = getGachaWishPurchasedCredits(prevUser);
       incoming.realExamCredits = getRealExamCredits(prevUser);
     } else {
       if (incoming.grantedTitleIds !== undefined) {
@@ -3633,6 +3641,10 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
         incoming.roomCreateCredits !== undefined
           ? Math.max(0, Math.floor(Number(incoming.roomCreateCredits) || 0))
           : getFriendRoomTicketCredits(prevUser);
+      incoming.gachaWishCredits =
+        incoming.gachaWishCredits !== undefined
+          ? Math.max(0, Math.floor(Number(incoming.gachaWishCredits) || 0))
+          : getGachaWishPurchasedCredits(prevUser);
       incoming.realExamCredits =
         incoming.realExamCredits !== undefined
           ? Math.max(0, Math.floor(Number(incoming.realExamCredits) || 0))
@@ -4888,6 +4900,41 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           );
         }
         changed = true;
+      } else if (kind === 'gacha_wish_1' || kind === 'gacha_wish_10') {
+        const addWishes = kind === 'gacha_wish_10' ? 10 : 1;
+        const currGacha = getGachaWishPurchasedCredits(targetUser);
+        const nextGachaCredits = active ? currGacha + addWishes : Math.max(0, currGacha - addWishes);
+        const prevRpg = targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
+          ? targetUser.knightRpgProfile
+          : {};
+        const nextRpgWishes = active
+          ? Math.max(0, (Number(prevRpg.wishes) || 0) + addWishes)
+          : Math.max(0, (Number(prevRpg.wishes) || 0) - addWishes);
+        store.users[targetKey] = {
+          ...targetUser,
+          gachaWishCredits: nextGachaCredits,
+          knightRpgProfile: {
+            ...prevRpg,
+            wishes: nextRpgWishes,
+            claimedServerWishCredits: nextGachaCredits
+          },
+          ...(active && targetUser.subscriptionRequested?.itemType === kind ? { subscriptionRequested: null } : {})
+        };
+        if (active && targetUser.role !== 'teacher') {
+          appendStoreNotification(
+            store,
+            {
+              title: `🌠 Đã cộng +${addWishes} Lượt Quay Gacha Hiệp Sĩ!`,
+              message: `Quản Trị Hệ Thống đã cấp +${addWishes} lượt Cầu Nguyện Gacha Nhân Vật & Vũ Khí trong Hiệp Sĩ Diệt Rồng.`,
+              type: 'announcement',
+              targetUsernames: [targetKey],
+              createdBy: viewer?.username || SUPER_ADMIN_USERNAME,
+              createdByName: viewer?.name || 'Quản Trị Hệ Thống'
+            },
+            viewer
+          );
+        }
+        changed = true;
       } else if (kind === 'aieo_vip') {
         const wasVipActive = Number(targetUser.aieoVipExpiresAt) > nowMs;
         const nextVipExp = extendFrom(targetUser.aieoVipExpiresAt);
@@ -5040,18 +5087,32 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         changed = true;
         break;
       }
-      if (payload?.itemType === 'skill_pass' || payload?.itemType === 'aieo_vip' || payload?.itemType === 'room_ticket') {
+      if (
+        payload?.itemType === 'skill_pass' ||
+        payload?.itemType === 'aieo_vip' ||
+        payload?.itemType === 'room_ticket' ||
+        payload?.itemType === 'gacha_wish_1' ||
+        payload?.itemType === 'gacha_wish_10'
+      ) {
         const reqLabel =
           payload.itemType === 'aieo_vip'
             ? 'Gói IELTS VIP (1 Tháng)'
             : payload.itemType === 'room_ticket'
             ? 'Vé Tạo 1 Phòng Đấu Riêng'
+            : payload.itemType === 'gacha_wish_1'
+            ? '1 Lượt Quay Gacha Hiệp Sĩ (5.000đ)'
+            : payload.itemType === 'gacha_wish_10'
+            ? 'Gói 10 Lượt Quay Gacha Hiệp Sĩ (50.000đ)'
             : 'Gói Daily Zone (1 Tháng)';
         const reqAmt =
           payload.itemType === 'aieo_vip'
             ? (Number(payCfgNow.aieoVipPrice) || AIEO_VIP_PRICE_VND)
             : payload.itemType === 'room_ticket'
             ? (Number(payCfgNow.friendRoomTicketPrice) || FRIEND_ROOM_TICKET_PRICE_VND)
+            : payload.itemType === 'gacha_wish_1'
+            ? (Number(payCfgNow.gachaWish1Price) || GACHA_WISH_1_PRICE_VND)
+            : payload.itemType === 'gacha_wish_10'
+            ? (Number(payCfgNow.gachaWish10Price) || GACHA_WISH_10_PRICE_VND)
             : (Number(payCfgNow.skillPassPrice) || SKILL_PASS_PRICE_VND);
         store.users[uname] = {
           ...targetUser,
@@ -5154,11 +5215,30 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
             }
           });
         }
+        const isGachaWishTx = updated.itemType === 'gacha_wish_1' || updated.itemType === 'gacha_wish_10';
+        const gachaTxAdd = updated.itemType === 'gacha_wish_10' ? 10 : 1;
+        const nextGachaTxCredits = isGachaWishTx
+          ? getGachaWishPurchasedCredits(targetUser) + gachaTxAdd
+          : getGachaWishPurchasedCredits(targetUser);
+        const prevRpgTx = targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
+          ? targetUser.knightRpgProfile
+          : {};
         store.users[userKey] = {
           ...targetUser,
           totalPaidVnd: (Number(targetUser.totalPaidVnd) || 0) + amt,
           paidCount: (Number(targetUser.paidCount) || 0) + 1,
           lastPaidAt: nowMs,
+          ...(isGachaWishTx
+            ? {
+                gachaWishCredits: nextGachaTxCredits,
+                knightRpgProfile: {
+                  ...prevRpgTx,
+                  wishes: Math.max(0, (Number(prevRpgTx.wishes) || 0) + gachaTxAdd),
+                  claimedServerWishCredits: nextGachaTxCredits
+                },
+                subscriptionRequested: null
+              }
+            : {}),
           ...(isDonateOrTitle
             ? {
                 donatedTotalVnd: nextDonatedTotal,
@@ -6835,6 +6915,8 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         const isSkillPassOrder = rawType === 'skill_pass';
         const isAieoVipOrder = rawType === 'aieo_vip';
         const isRoomTicketOrder = rawType === 'room_ticket';
+        const isGachaWish1Order = rawType === 'gacha_wish_1';
+        const isGachaWish10Order = rawType === 'gacha_wish_10';
         const isDonateOrder = rawType === 'donate';
         const comboMeta = getRealExamComboMeta(rawType, cfg);
         if (viewerUser?.isGuest && viewerUser.role !== 'teacher' && !isTestOrder && !comboMeta) {
@@ -6856,6 +6938,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           ? 'aieo_vip'
           : isRoomTicketOrder
           ? 'room_ticket'
+          : isGachaWish1Order
+          ? 'gacha_wish_1'
+          : isGachaWish10Order
+          ? 'gacha_wish_10'
           : isDonateOrder
           ? 'donate'
           : 'cover';
@@ -6914,6 +7000,14 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         } else if (isRoomTicketOrder) {
           itemLabel = 'Vé Tạo 1 Phòng Đấu Riêng';
           amount = Number(cfg.friendRoomTicketPrice) >= 0 ? cfg.friendRoomTicketPrice : FRIEND_ROOM_TICKET_PRICE_VND;
+          alreadyUnlocked = false;
+        } else if (isGachaWish1Order) {
+          itemLabel = '1 Lượt Quay Gacha Hiệp Sĩ';
+          amount = Number(cfg.gachaWish1Price) >= 0 ? cfg.gachaWish1Price : GACHA_WISH_1_PRICE_VND;
+          alreadyUnlocked = false;
+        } else if (isGachaWish10Order) {
+          itemLabel = 'Gói 10 Lượt Quay Gacha Hiệp Sĩ';
+          amount = Number(cfg.gachaWish10Price) >= 0 ? cfg.gachaWish10Price : GACHA_WISH_10_PRICE_VND;
           alreadyUnlocked = false;
         } else if (isDonateOrder) {
           const requestedAmt = Math.round(Number(body?.amount) || 0);
@@ -7055,7 +7149,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         ? hasSkillPracticeAccess(viewerUser)
         : matched?.itemType === 'aieo_vip'
         ? (isViewerSuperAdmin || Number(viewerUser?.aieoVipExpiresAt) > Date.now())
-        : matched?.itemType === 'room_ticket' || Boolean(getRealExamComboMeta(matched?.itemType, store.paymentConfig))
+        : matched?.itemType === 'room_ticket' ||
+          matched?.itemType === 'gacha_wish_1' ||
+          matched?.itemType === 'gacha_wish_10' ||
+          Boolean(getRealExamComboMeta(matched?.itemType, store.paymentConfig))
         ? Boolean(matched?.status === 'paid')
         : hasCustomCoverPermission(viewerUser);
       sendJsonResponse(res, 200, {
@@ -7391,6 +7488,35 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
               {
                 title: '🎫 Đã mở +1 Lượt Tạo Phòng Đấu Riêng!',
                 message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và cộng +1 vé tạo Phòng Đấu Riêng cùng bạn bè (hiện có ${nextCredits} lượt)! Cảm ơn bạn đã ủng hộ Tuấn!`,
+                type: 'announcement',
+                targetUsernames: [targetKey],
+                createdBy: SUPER_ADMIN_USERNAME,
+                createdByName: 'Hệ Thống Thanh Toán Tự Động'
+              },
+              null
+            );
+          } else if (matchedOrder.itemType === 'gacha_wish_1' || matchedOrder.itemType === 'gacha_wish_10') {
+            const wishAdd = matchedOrder.itemType === 'gacha_wish_10' ? 10 : 1;
+            const nextWishCredits = getGachaWishPurchasedCredits(targetUser) + wishAdd;
+            const prevRpg = targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
+              ? targetUser.knightRpgProfile
+              : {};
+            const nextRpgWishes = Math.max(0, (Number(prevRpg.wishes) || 0) + wishAdd);
+            store.users[targetKey] = {
+              ...targetUser,
+              gachaWishCredits: nextWishCredits,
+              knightRpgProfile: {
+                ...prevRpg,
+                wishes: nextRpgWishes,
+                claimedServerWishCredits: nextWishCredits
+              },
+              ...(targetUser.subscriptionRequested?.itemType === matchedOrder.itemType ? { subscriptionRequested: null } : {})
+            };
+            appendStoreNotification(
+              store,
+              {
+                title: `🌠 Đã cộng +${wishAdd} Lượt Quay Cầu Nguyện Gacha!`,
+                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và cộng ngay +${wishAdd} 🌠 Lượt Quay Cầu Nguyện vào game Hiệp Sĩ Diệt Rồng (hiện có ${nextRpgWishes} lượt)! Chúc bạn quay nổ Vàng 5★!`,
                 type: 'announcement',
                 targetUsernames: [targetKey],
                 createdBy: SUPER_ADMIN_USERNAME,

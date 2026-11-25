@@ -12,7 +12,6 @@ import {
   Moon,
   Music,
   RefreshCw,
-  ShoppingBag,
   Snowflake,
   Sparkles,
   Sun,
@@ -22,16 +21,21 @@ import {
   VolumeX
 } from 'lucide-react';
 import VipMemberName from '../common/VipMemberName';
+import KnightGachaModal from './KnightGachaModal';
 import {
   DEATH_REVIVE_DELAY_SEC,
   DEMON_KING_BOSS,
   KNIGHT_CHARACTER_SKINS,
+  KNIGHT_GACHA_GOLD_SINGLE,
   KNIGHT_HINT_SCORE_COST,
   KNIGHT_MONSTER_STAGES,
   REVIVE_KEY_GOLD_PRICE,
+  applyServerPurchasedWishes,
   computeMonsterGoldDrop,
   computeMonsterKeyDropChance,
+  getEquippedWeaponMeta,
   loadLocalKnightRpgProfile,
+  rollKnightGachaPulls,
   saveLocalKnightRpgProfile
 } from '../../constants/knightRpgData';
 import { DEFAULT_VOCAB_TEXT, VOCAB_PRESETS } from '../../constants/seedData';
@@ -116,8 +120,10 @@ export default function KnightDragonGame({
   onBackToGameHub,
   onBackToSpaceMode,
   onExitArena,
+  onOpenCheckoutModal = null,
   onOpenVocabManager = null,
   onSyncKnightResult,
+  paymentConfig = null,
   roomPin = '',
   roomRawVocab = '',
   setDarkMode = null,
@@ -300,6 +306,8 @@ export default function KnightDragonGame({
   const activeSkin =
     KNIGHT_CHARACTER_SKINS.find(s => s.id === rpgProfile.equippedSkin) ||
     KNIGHT_CHARACTER_SKINS[0];
+  const activeWeapon = getEquippedWeaponMeta(rpgProfile);
+  const activeHeroConstellation = Number(rpgProfile.heroConstellations?.[activeSkin.id]) || 0;
   const stageMeta = isDemonKingBattle
     ? DEMON_STAGE_META
     : KNIGHT_MONSTER_STAGES.find(s => s.round === round) || KNIGHT_MONSTER_STAGES[0];
@@ -307,10 +315,26 @@ export default function KnightDragonGame({
     ? DEMON_KING_BOSS
     : stageMeta.monsters[wordIdx % stageMeta.monsters.length] || stageMeta.monsters[0];
 
-  const expectedMonsterGold = computeMonsterGoldDrop(currentMonster, activeSkin, combo);
-  const expectedKeyDropPct = Math.round(
-    computeMonsterKeyDropChance(currentMonster, activeSkin) * 100
+  const expectedMonsterGold = computeMonsterGoldDrop(
+    currentMonster,
+    activeSkin,
+    combo,
+    activeWeapon,
+    activeHeroConstellation
   );
+  const expectedKeyDropPct = Math.round(
+    computeMonsterKeyDropChance(currentMonster, activeSkin, activeWeapon) * 100
+  );
+
+  // Sync newly purchased VietQR Gacha Wishes from server into local/server RPG profile automatically
+  useEffect(() => {
+    const serverCredits = Math.max(0, Math.floor(Number(currentUser?.gachaWishCredits) || 0));
+    if (serverCredits <= 0) return;
+    setRpgProfile(prev => {
+      if (serverCredits <= (prev?.claimedServerWishCredits || 0)) return prev;
+      return saveLocalKnightRpgProfile(username, applyServerPurchasedWishes(prev, currentUser));
+    });
+  }, [currentUser, currentUser?.gachaWishCredits, username]);
 
   // Sync key numeric states to runtimeRef safely inside effect
   useEffect(() => {
@@ -457,7 +481,8 @@ export default function KnightDragonGame({
 
   const setupQuestionClock = (combatRoundNum, qObj) => {
     const baseLim = getSpeedAdjustedTimeLimit(combatRoundNum, speedMode);
-    const skinBonus = Number(activeSkin.bonusTimeSec) || 0;
+    const skinBonus =
+      (Number(activeSkin.bonusTimeSec) || 0) + (Number(activeWeapon?.bonusTimeSec) || 0);
     const lim = baseLim + skinBonus;
     setTimeLimit(lim);
     setTimeLeft(lim);
@@ -836,8 +861,14 @@ export default function KnightDragonGame({
       return { goldGain: 0, droppedKey: 0 };
     }
 
-    const goldGain = computeMonsterGoldDrop(currentMonster, activeSkin, combo);
-    const keyChance = computeMonsterKeyDropChance(currentMonster, activeSkin);
+    const goldGain = computeMonsterGoldDrop(
+      currentMonster,
+      activeSkin,
+      combo,
+      activeWeapon,
+      activeHeroConstellation
+    );
+    const keyChance = computeMonsterKeyDropChance(currentMonster, activeSkin, activeWeapon);
     const droppedKey = Math.random() < keyChance ? 1 : 0;
 
     setSessionGoldEarned(prev => prev + goldGain);
@@ -2405,19 +2436,65 @@ export default function KnightDragonGame({
     };
   }, [round, wordIdx, activeQ, activeSkin, expectedMonsterGold, currentMonster, queues, effectiveCombatRound]);
 
-  const handleBuyOrEquipSkin = (skin) => {
+  const syncRpgProfileToServer = (profileToSync, mode = 'knight_gacha_sync') => {
+    if (!profileToSync) return;
+    onSyncKnightResult?.({
+      score: profileToSync.bestScore || 0,
+      passedCount: 1,
+      totalCount: 1,
+      topicId,
+      topicLabel: resolveSelectedTopicLabel(),
+      mode,
+      gameType: 'knight_rpg',
+      knightRpgProfile: profileToSync
+    });
+  };
+
+  const handleEquipSkin = (skin) => {
+    if (!skin) return;
     const isUnlocked = rpgProfile.unlockedSkins.includes(skin.id);
-    if (isUnlocked) {
-      updateAndPersistProfile(prev => ({
-        ...prev,
-        equippedSkin: skin.id
-      }));
-      showToast?.(`Đã trang bị nhân vật: ${skin.name}!`);
+    if (!isUnlocked) {
+      showToast?.('Nhân vật hiện không thể mua trực tiếp — Hãy quay Cầu Nguyện Gacha để sở hữu!', 'info');
       return;
     }
-    if ((rpgProfile.gold || 0) < skin.priceGold) {
+    let updatedProfile = null;
+    updateAndPersistProfile(prev => {
+      updatedProfile = {
+        ...prev,
+        equippedSkin: skin.id
+      };
+      return updatedProfile;
+    });
+    if (updatedProfile) syncRpgProfileToServer(updatedProfile, 'knight_equip_sync');
+    showToast?.(`⚔️ Đã trang bị nhân vật: ${skin.name}!`);
+  };
+
+  const handleEquipWeapon = (weaponObj) => {
+    const nextWpId = weaponObj?.id || '';
+    if (nextWpId && !(rpgProfile.unlockedWeapons || []).includes(nextWpId)) {
+      showToast?.('Bạn chưa mở khóa vũ khí này trong Gacha!', 'error');
+      return;
+    }
+    let updatedProfile = null;
+    updateAndPersistProfile(prev => {
+      updatedProfile = {
+        ...prev,
+        equippedWeapon: nextWpId
+      };
+      return updatedProfile;
+    });
+    if (updatedProfile) syncRpgProfileToServer(updatedProfile, 'knight_equip_sync');
+    showToast?.(
+      weaponObj ? `🗡️ Đã trang bị vũ khí: ${weaponObj.name}!` : 'Đã gỡ vũ khí phụ.'
+    );
+  };
+
+  const handleExchangeGoldForWishes = (wishCount = 1) => {
+    const count = wishCount === 10 ? 10 : 1;
+    const costGold = count * KNIGHT_GACHA_GOLD_SINGLE;
+    if ((rpgProfile.gold || 0) < costGold) {
       showToast?.(
-        `Chưa đủ Vàng! Cần ${skin.priceGold} 🪙 Vàng (Bạn đang có ${rpgProfile.gold || 0} 🪙). Hãy đánh quái để tích thêm vàng!`,
+        `Chưa đủ Vàng! Cần ${costGold.toLocaleString('vi-VN')} 🪙 Vàng để đổi +${count} 🌠 Lượt Quay (Hiện có ${(rpgProfile.gold || 0).toLocaleString('vi-VN')} 🪙).`,
         'error'
       );
       return;
@@ -2426,26 +2503,42 @@ export default function KnightDragonGame({
     updateAndPersistProfile(prev => {
       updatedProfile = {
         ...prev,
-        gold: Math.max(0, (prev.gold || 0) - skin.priceGold),
-        unlockedSkins: Array.from(new Set([...(prev.unlockedSkins || []), skin.id])),
-        equippedSkin: skin.id
+        gold: Math.max(0, (prev.gold || 0) - costGold),
+        wishes: (prev.wishes || 0) + count
       };
       return updatedProfile;
     });
-    if (updatedProfile) {
-      onSyncKnightResult?.({
-        score: updatedProfile.bestScore || 0,
-        passedCount: 1,
-        totalCount: 1,
-        topicId,
-        topicLabel: resolveSelectedTopicLabel(),
-        mode: 'knight_shop_sync',
-        gameType: 'knight_rpg',
-        knightRpgProfile: updatedProfile
-      });
-    }
+    if (updatedProfile) syncRpgProfileToServer(updatedProfile, 'knight_gacha_exchange');
     playSound('word_clear');
-    showToast?.(`🎉 Đã mở khóa & trang bị nhân vật mới: ${skin.name}!`);
+    showToast?.(`🌠 Đã đổi ${costGold.toLocaleString('vi-VN')} Vàng lấy +${count} Lượt Quay Cầu Nguyện!`);
+  };
+
+  const handleExecuteGachaPull = ({ bannerType, bannerId, count }) => {
+    const rollResult = rollKnightGachaPulls(rpgProfile, {
+      bannerType,
+      bannerId,
+      count
+    });
+    if (!rollResult.ok) {
+      showToast?.(rollResult.error, 'error');
+      return rollResult;
+    }
+    const saved = saveLocalKnightRpgProfile(username, rollResult.nextProfile);
+    setRpgProfile(saved);
+    syncRpgProfileToServer(saved, 'knight_gacha_pull');
+    return { ...rollResult, nextProfile: saved };
+  };
+
+  const handleOpenWishQrCheckout = (itemType) => {
+    if (!currentUser?.username || currentUser?.isGuest) {
+      showToast?.('Vui lòng đăng nhập tài khoản học viên để mua Lượt Quay Gacha bằng VietQR!', 'error');
+      return;
+    }
+    if (!onOpenCheckoutModal) {
+      showToast?.('Hệ thống thanh toán đang khởi tạo, vui lòng thử lại sau giây lát.', 'info');
+      return;
+    }
+    onOpenCheckoutModal({ itemType });
   };
 
   const handleBuyReviveKeyWithGold = () => {
@@ -2670,14 +2763,22 @@ export default function KnightDragonGame({
             <span>{rpgProfile.keys || 0} 🗝️ Chìa Khóa</span>
           </div>
 
+          <div
+            data-testid="knight-wishes-badge"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-fuchsia-50 dark:bg-fuchsia-500/15 border border-fuchsia-300 dark:border-fuchsia-400/40 text-fuchsia-800 dark:text-fuchsia-200 text-xs font-black"
+            title="Lượt Quay Cầu Nguyện Gacha (10.000 Vàng/lượt hoặc 5k = 1 lượt • 50k = 10 lượt)"
+          >
+            <span>🌠 {rpgProfile.wishes || 0} Lượt Quay</span>
+          </div>
+
           <button
             type="button"
             data-testid="open-knight-shop-btn"
             onClick={() => setShowShopModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-600 to-violet-600 hover:opacity-95 text-white text-xs font-extrabold shadow-sm transition"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-pink-600 to-violet-600 hover:opacity-95 text-white text-xs font-extrabold shadow-sm transition"
           >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            <span>Cửa Hàng Nhân Vật ({rpgProfile.unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Cầu Nguyện Gacha ({rpgProfile.unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
           </button>
         </div>
       </header>
@@ -2695,7 +2796,7 @@ export default function KnightDragonGame({
                   Hiệp Sĩ Diệt Rồng — Đấu Trường Từ Vựng RPG
                 </h1>
                 <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 max-w-2xl leading-relaxed">
-                  Hạ gục <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để thu <b>🪙 Tiền Vàng</b> mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực, săn tỉ lệ hiếm rớt <b>🗝️ Chìa Khóa Hồi Sinh</b> khi hạ quái và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
+                  Hạ gục <b>Slime, Goblin, Skeleton, Orc, Golem &amp; Boss Rồng Hắc Ám</b> để tích <b>🪙 Tiền Vàng</b> quay <b>🌠 Cầu Nguyện Gacha Nhân Vật 5★/4★ &amp; Vũ Khí 4★/3★</b> chuẩn tỉ lệ Genshin Impact (10.000 Vàng/lượt), săn <b>🗝️ Chìa Khóa Hồi Sinh</b> và né <b>Skill Tất Sát</b> của Rồng!
                 </p>
               </div>
 
@@ -2714,22 +2815,26 @@ export default function KnightDragonGame({
                     className="w-full h-full object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.75)]"
                   />
                 </div>
-                <div className="min-w-0 max-w-[205px]">
+                <div className="min-w-0 max-w-[215px]">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-black text-[#0F172B] dark:text-white truncate">{activeSkin.name}</span>
                     <span className="px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-[10px] font-extrabold shrink-0">
-                      {activeSkin.genderBadge}
+                      {activeSkin.starRarity || 4}★
                     </span>
                   </div>
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300 font-bold mt-0.5 truncate">{activeSkin.weaponName}</p>
-                  <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug line-clamp-2">{activeSkin.passiveText}</p>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 font-bold mt-0.5 truncate">
+                    {activeWeapon ? `⚔️ ${activeWeapon.name} (${activeWeapon.starRarity}★)` : activeSkin.weaponName}
+                  </p>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug line-clamp-2">
+                    {activeWeapon ? `${activeSkin.passiveText} • ${activeWeapon.passiveText}` : activeSkin.passiveText}
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowShopModal(true)}
-                  className="px-3 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-extrabold transition shrink-0"
+                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:opacity-95 text-white text-xs font-extrabold transition shrink-0"
                 >
-                  Đổi Skin
+                  🌠 Gacha
                 </button>
               </div>
             </div>
@@ -2857,7 +2962,7 @@ export default function KnightDragonGame({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {KNIGHT_MONSTER_STAGES.map(st => {
                   const stageKeyMinPct = Math.round(
-                    computeMonsterKeyDropChance(st.monsters[0], activeSkin) * 100
+                    computeMonsterKeyDropChance(st.monsters[0], activeSkin, activeWeapon) * 100
                   );
                   const cardContent = (
                     <div className="space-y-1.5">
@@ -3765,9 +3870,9 @@ export default function KnightDragonGame({
               <button
                 type="button"
                 onClick={() => setShowShopModal(true)}
-                className="px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-black flex items-center gap-1.5"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:opacity-95 text-white text-xs font-black flex items-center gap-1.5"
               >
-                <ShoppingBag className="w-4 h-4" /> Mở Cửa Hàng Mua Nhân Vật
+                <Sparkles className="w-4 h-4" /> Cầu Nguyện Gacha &amp; Tủ Đồ
               </button>
               <button
                 type="button"
@@ -3785,124 +3890,20 @@ export default function KnightDragonGame({
         </div>
       )}
 
-      {/* CHARACTER SKIN SHOP MODAL (10 DISTINCT ILLUSTRATED HEROES: 5 MALE & 5 FEMALE) */}
-      {showShopModal && (
-        <div
-          data-testid="knight-skin-shop-modal"
-          className="fixed inset-0 bg-slate-950/75 dark:bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
-        >
-          <div className="max-w-4xl w-full rounded-3xl border border-pink-300 dark:border-pink-500/40 bg-white dark:bg-slate-900 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-              <div>
-                <h2 className="text-lg sm:text-xl font-black text-[#0F172B] dark:text-white flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-pink-500 dark:text-pink-400" />
-                  <span>Cửa Hàng Nhân Vật &amp; Skin Hiệp Sĩ ({KNIGHT_CHARACTER_SKINS.length} Nhân Vật: 5 Nam / 5 Nữ)</span>
-                </h2>
-                <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
-                  Tích vàng từ đánh quái Slime, Goblin, Skeleton, Orc, Golem và Rồng để mở khóa nhân vật độc bản kèm hiệu ứng chém riêng biệt.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowShopModal(false)}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200"
-              >
-                Đóng ✕
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-4 text-xs font-black">
-                <span className="text-amber-700 dark:text-amber-300">🪙 Vàng của bạn: {rpgProfile.gold || 0}</span>
-                <span className="text-sky-700 dark:text-sky-300">🗝️ Chìa Khóa Hồi Sinh: {rpgProfile.keys || 0}</span>
-              </div>
-              <button
-                type="button"
-                data-testid="buy-revive-key-with-gold-btn"
-                onClick={handleBuyReviveKeyWithGold}
-                className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-black transition"
-              >
-                + Mua 1 🗝️ Chìa Khóa Hồi Sinh ({REVIVE_KEY_GOLD_PRICE} 🪙 Vàng)
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {KNIGHT_CHARACTER_SKINS.map(skin => {
-                const unlocked = rpgProfile.unlockedSkins.includes(skin.id);
-                const equipped = rpgProfile.equippedSkin === skin.id;
-                return (
-                  <div
-                    key={skin.id}
-                    data-testid={`knight-skin-card-${skin.id}`}
-                    className={`p-4 rounded-2xl border flex flex-col justify-between gap-3 transition ${
-                      equipped
-                        ? 'bg-pink-50 dark:bg-pink-950/35 border-pink-400 ring-1 ring-pink-400/40'
-                        : unlocked
-                        ? 'bg-white dark:bg-slate-950/90 border-slate-200 dark:border-slate-700'
-                        : 'bg-slate-50 dark:bg-slate-950/65 border-slate-200 dark:border-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div
-                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl flex items-center justify-center border-2 p-1.5 shrink-0 relative overflow-hidden shadow-lg"
-                        style={{
-                          background: `radial-gradient(circle at 50% 45%, ${skin.bladeColor}40, #090d16 78%)`,
-                          borderColor: equipped ? '#f472b6' : skin.armorSecondary
-                        }}
-                      >
-                        <img
-                          src={skin.spriteUrl}
-                          alt={skin.name}
-                          className="w-full h-full object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.8)]"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs sm:text-sm font-black text-[#0F172B] dark:text-white">{skin.name}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                              skin.gender === 'Nữ'
-                                ? 'bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-400/40'
-                                : 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-400/40'
-                            }`}
-                          >
-                            {skin.genderBadge}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 text-[10px] font-black">
-                            {skin.rarity}
-                          </span>
-                        </div>
-                        <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                          🗡️ {skin.weaponName}
-                        </p>
-                        <p className="text-[11px] text-[#475569] dark:text-slate-300 leading-snug">{skin.passiveText}</p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleBuyOrEquipSkin(skin)}
-                      className={`w-full py-2.5 rounded-xl text-xs font-black transition ${
-                        equipped
-                          ? 'bg-emerald-500 text-slate-950'
-                          : unlocked
-                          ? 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0F172B] dark:text-white'
-                          : 'bg-gradient-to-r from-amber-400 to-orange-500 hover:opacity-95 text-slate-950'
-                      }`}
-                    >
-                      {equipped
-                        ? '✓ Đang Trang Bị'
-                        : unlocked
-                        ? 'Trang Bị Nhân Vật Này'
-                        : `Mở Khóa Nhân Vật (${skin.priceGold} 🪙 Vàng)`}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* GENSHIN IMPACT-STYLE GACHA WISH & HERO/WEAPON INVENTORY MODAL */}
+      <KnightGachaModal
+        isOpen={showShopModal}
+        rpgProfile={rpgProfile}
+        paymentConfig={paymentConfig}
+        onClose={() => setShowShopModal(false)}
+        onExecutePull={handleExecuteGachaPull}
+        onEquipSkin={handleEquipSkin}
+        onEquipWeapon={handleEquipWeapon}
+        onExchangeGoldForWishes={handleExchangeGoldForWishes}
+        onBuyReviveKeyWithGold={handleBuyReviveKeyWithGold}
+        onOpenWishQrCheckout={handleOpenWishQrCheckout}
+        showToast={showToast}
+      />
     </div>
   );
 }

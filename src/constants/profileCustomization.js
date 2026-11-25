@@ -2819,6 +2819,8 @@ export const REAL_EXAM_COMBO_5_PRICE_VND = 399000; // Combo 5 đề Thực Chi�
 export const REAL_EXAM_COMBO_8_PRICE_VND = 599000; // Combo 8 đề Thực Chiến: 599.000đ
 export const REAL_EXAM_COMBO_10_PRICE_VND = 699000; // Combo 10 đề Thực Chiến: 699.000đ
 export const FRIEND_ROOM_TICKET_PRICE_VND = 5000;
+export const GACHA_WISH_1_PRICE_VND = 5000; // 1 lượt quay Gacha Hiệp Sĩ: 5.000đ
+export const GACHA_WISH_10_PRICE_VND = 50000; // 10 lượt quay Gacha Hiệp Sĩ: 50.000đ
 export const AIEO_VIP_PRICE_VND = 20000;
 
 export const REAL_EXAM_COMBOS = [
@@ -3051,6 +3053,11 @@ export function hasVipFriendRoomAccess(user, nowMs = Date.now()) {
 export function getFriendRoomTicketCredits(user) {
   if (!user || typeof user !== 'object') return 0;
   return Math.max(0, Math.floor(Number(user.roomCreateCredits) || 0));
+}
+
+export function getGachaWishPurchasedCredits(user) {
+  if (!user || typeof user !== 'object') return 0;
+  return Math.max(0, Math.floor(Number(user.gachaWishCredits) || 0));
 }
 
 export function canCreateFriendRoomNow(user, nowMs = Date.now()) {
@@ -3773,6 +3780,8 @@ export function normalizePaymentConfig(raw = {}) {
   let realExamCombo8Price = clampVnd(obj.realExamCombo8Price ?? obj.combo8ExamPriceVnd, REAL_EXAM_COMBO_8_PRICE_VND);
   let realExamCombo10Price = clampVnd(obj.realExamCombo10Price ?? obj.combo10ExamPriceVnd, REAL_EXAM_COMBO_10_PRICE_VND);
   const friendRoomTicketPrice = clampVnd(obj.friendRoomTicketPrice, FRIEND_ROOM_TICKET_PRICE_VND);
+  const gachaWish1Price = clampVnd(obj.gachaWish1Price, GACHA_WISH_1_PRICE_VND);
+  const gachaWish10Price = clampVnd(obj.gachaWish10Price, GACHA_WISH_10_PRICE_VND);
   let aieoVipPrice = clampVnd(obj.aieoVipPrice, AIEO_VIP_PRICE_VND);
 
   // Auto-migrate legacy persisted defaults to schema v3 (100k / 249k / 399k / 599k / 699k)
@@ -3835,6 +3844,8 @@ export function normalizePaymentConfig(raw = {}) {
     realExamCombo8Price,
     realExamCombo10Price,
     friendRoomTicketPrice,
+    gachaWish1Price,
+    gachaWish10Price,
     aieoVipPrice,
     bankCode,
     bankName,

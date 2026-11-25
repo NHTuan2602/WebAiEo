@@ -284,6 +284,7 @@ export default function GameArena({
         onBackToGameHub={() => setArenaGameMode('hub')}
         onBackToSpaceMode={() => setArenaGameMode('space_shooter')}
         onExitArena={exitGame}
+        onOpenCheckoutModal={onOpenCheckoutModal}
         onOpenVocabManager={
           isTeacher
             ? (selectedRawVocab) => {
@@ -293,6 +294,7 @@ export default function GameArena({
             : null
         }
         onSyncKnightResult={onSyncKnightResult}
+        paymentConfig={paymentConfig}
         roomPin={activePin}
         roomRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
         setDarkMode={setDarkMode}
@@ -873,12 +875,12 @@ export default function GameArena({
                 </div>
 
                 <p className="text-xs sm:text-sm text-[#334155] dark:text-slate-300 leading-relaxed">
-                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy mở khóa <b>10 nhân vật Nam &amp; Nữ</b> chân thực (<b>Arthur, Leon, Kenji, Drake, Valkyrie Freya, Kiếm Khách Tomoe...</b>), hạ quái có <b>tỉ lệ hiếm rớt 🗝️ Chìa Khóa Hồi Sinh</b> để mua mạng khi thua và né <b>Skill Tất Sát (Final Smash)</b> của Rồng!
+                  Đánh hạ quái vật để <b>quái rớt ra 🪙 Tiền Vàng</b> tích lũy <b>🌠 Cầu Nguyện Gacha Nhân Vật 5★/4★ &amp; Vũ Khí 4★/3★</b> chuẩn tỉ lệ Genshin Impact (<b>Ignis, Drake, Cyber Nova, Selena, Tomoe...</b>), săn <b>🗝️ Chìa Khóa Hồi Sinh</b> và né <b>Skill Tất Sát</b> của Rồng!
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-rose-200/80 dark:border-slate-800 text-amber-800 dark:text-amber-200 font-bold">
-                    🪙 Đánh quái rớt Vàng • 10 Nhân Vật Nam &amp; Nữ
+                    🌠 Gacha Nhân Vật 5★ &amp; Vũ Khí 3★–4★
                   </div>
                   <div className="p-2.5 rounded-xl bg-white/85 dark:bg-slate-950/70 border border-rose-200/80 dark:border-slate-800 text-sky-800 dark:text-sky-200 font-bold">
                     🗝️ Tỉ lệ hiếm rớt Chìa Khóa khi hạ quái

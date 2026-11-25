@@ -44,13 +44,20 @@ export default function CoverCheckoutModal({
   const isSkillPassOrder = itemType === 'skill_pass';
   const isAieoVipOrder = itemType === 'aieo_vip';
   const isRoomTicketOrder = itemType === 'room_ticket';
+  const isGachaWish1Order = itemType === 'gacha_wish_1';
+  const isGachaWish10Order = itemType === 'gacha_wish_10';
+  const isGachaWishOrder = isGachaWish1Order || isGachaWish10Order;
+  const gachaWishPackCount = isGachaWish10Order ? 10 : 1;
   const comboMeta = getRealExamComboMeta(itemType, effectiveCfg);
   const isComboOrder = Boolean(comboMeta);
   const [baselineCredits] = useState(() => Math.max(0, Math.floor(Number(currentUser?.roomCreateCredits) || 0)));
+  const [baselineGachaCredits] = useState(() => Math.max(0, Math.floor(Number(currentUser?.gachaWishCredits) || 0)));
   const [baselineRealExamCredits] = useState(() => getRealExamCredits(currentUser));
   const [orderPaidConfirmed, setOrderPaidConfirmed] = useState(false);
   const isUnlocked = orderPaidConfirmed || (
     isRoomTicketOrder && (Number(currentUser?.roomCreateCredits) || 0) > baselineCredits
+  ) || (
+    isGachaWishOrder && (Number(currentUser?.gachaWishCredits) || 0) > baselineGachaCredits
   ) || (
     isComboOrder && getRealExamCredits(currentUser) > baselineRealExamCredits
   ) || (!renew && (
@@ -63,7 +70,7 @@ export default function CoverCheckoutModal({
       ? hasSkillPracticeAccess(currentUser)
       : isAieoVipOrder
       ? (Boolean(currentUser?.isSuperAdmin || currentUser?.username === 'tuanpro123s') || hasActiveAieoVip(currentUser))
-      : (isRoomTicketOrder || isComboOrder)
+      : (isRoomTicketOrder || isGachaWishOrder || isComboOrder)
       ? false
       : hasCustomCoverPermission(currentUser)
   ));
@@ -81,6 +88,10 @@ export default function CoverCheckoutModal({
       ? comboMeta.price
       : isRoomTicketOrder
       ? effectiveCfg.friendRoomTicketPrice
+      : isGachaWish1Order
+      ? effectiveCfg.gachaWish1Price
+      : isGachaWish10Order
+      ? effectiveCfg.gachaWish10Price
       : isSkillPassOrder
       ? effectiveCfg.skillPassPrice
       : isAieoVipOrder
@@ -92,7 +103,7 @@ export default function CoverCheckoutModal({
     ? (currentUser?.paidTitleRequested?.titleId === itemId ? currentUser.paidTitleRequested.requestedAt : 0)
     : isTestOrder
     ? (currentUser?.subscriptionRequested?.itemId === itemId ? currentUser.subscriptionRequested.requestedAt : 0)
-    : (isSkillPassOrder || isAieoVipOrder || isRoomTicketOrder || isComboOrder)
+    : (isSkillPassOrder || isAieoVipOrder || isRoomTicketOrder || isGachaWishOrder || isComboOrder)
     ? (currentUser?.subscriptionRequested?.itemType === itemType ? currentUser.subscriptionRequested.requestedAt : 0)
     : (currentUser?.coverUnlockRequestedAt || 0);
 
@@ -219,6 +230,8 @@ export default function CoverCheckoutModal({
                     ? `${comboMeta.label} · Thực Chiến 4 Kỹ Năng`
                     : isRoomTicketOrder
                     ? 'Mua 1 Lượt Tạo Phòng Đấu Riêng'
+                    : isGachaWishOrder
+                    ? `Mua +${gachaWishPackCount} Lượt Quay Gacha Hiệp Sĩ`
                     : isAieoVipOrder
                     ? 'Đăng Ký Gói IELTS VIP (1 Tháng)'
                     : 'Mở Khóa Ảnh Nền Riêng (1 Tháng)'}
@@ -238,6 +251,8 @@ export default function CoverCheckoutModal({
                   ? 'Quét mã VietQR để mở 1 lượt thi thật đủ 4 kỹ năng L·R·W·S (chờ Ms. Như duyệt điểm)!'
                   : isRoomTicketOrder
                   ? 'Quét mã VietQR để cộng ngay +1 lượt tạo Phòng Đấu Trường Bạn Bè!'
+                  : isGachaWishOrder
+                  ? `Quét mã VietQR để cộng ngay +${gachaWishPackCount} 🌠 Lượt Quay Cầu Nguyện Gacha Nhân Vật & Vũ Khí!`
                   : 'Quét mã VietQR để mở khóa tự động trên hệ thống (Thời hạn 30 ngày)'}
               </p>
             </div>
@@ -267,6 +282,8 @@ export default function CoverCheckoutModal({
                   ? `Thanh toán thành công - Đã cộng +${comboMeta.credits} lượt Thực Chiến!`
                   : isRoomTicketOrder
                   ? 'Thanh toán thành công - Đã cộng +1 Lượt Tạo Phòng!'
+                  : isGachaWishOrder
+                  ? `Thanh toán thành công - Đã cộng +${gachaWishPackCount} 🌠 Lượt Quay Gacha!`
                   : isAieoVipOrder
                   ? 'Thanh toán thành công - Chào mừng thành viên IELTS VIP!'
                   : 'Thanh toán thành công - Đã mở khóa Ảnh Nền Riêng!'}
@@ -280,6 +297,8 @@ export default function CoverCheckoutModal({
                   ? `Tài khoản @${currentUser?.username} đã nhận +${comboMeta.credits} lượt Combo Thực Chiến 4 Kỹ Năng (hiện có ${Math.max(comboMeta.credits, getRealExamCredits(currentUser))} lượt). Bấm "Dùng 1 Lượt Combo" ngay tại Trang Chủ để vào thi!`
                   : isRoomTicketOrder
                   ? `Tài khoản @${currentUser?.username} đã nhận +1 lượt tạo Phòng Đấu Trường Bạn Bè (hiện có ${Math.max(1, Number(currentUser?.roomCreateCredits) || 1)} lượt).`
+                  : isGachaWishOrder
+                  ? `Tài khoản @${currentUser?.username} đã được cộng +${gachaWishPackCount} 🌠 Lượt Quay Cầu Nguyện Gacha! Bạn có thể đóng bảng này để quay Banner Nhân Vật UP hoặc Banner Thường ngay lập tức!`
                   : isAieoVipOrder
                   ? `Tài khoản @${currentUser?.username} đã sở hữu Gói IELTS VIP 1 tháng: Ảnh Avatar Động (.GIF/.WebP), Đổi Màu Chữ Tên + Nhãn IELTS VIP, Viền Bìa & Thẻ LED Neon, Ảnh Bìa Cá Nhân miễn phí, 3 Khung Avatar Neon, Danh hiệu 👑 IELTS VIP & Tạo phòng Game Team!`
                   : `Tài khoản @${currentUser?.username} đã mở khóa quyền tải ảnh nền từ máy, cắt khung & dán link ảnh riêng trong 1 tháng${expiryPreview ? ` (${expiryPreview})` : ''}.`}
@@ -323,6 +342,10 @@ export default function CoverCheckoutModal({
                   ) : isRoomTicketOrder ? (
                     <>
                       <Sparkles className="w-4 h-4" /> Vào Tạo Phòng Đấu Ngay
+                    </>
+                  ) : isGachaWishOrder ? (
+                    <>
+                      <Sparkles className="w-4 h-4" /> Vào Cầu Nguyện Gacha Ngay
                     </>
                   ) : isAieoVipOrder ? (
                     <>
