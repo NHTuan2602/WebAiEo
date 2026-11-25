@@ -155,6 +155,7 @@ export default function AiExamExtractorPanel({
   };
 
   const handleRunScreenshotsConversion = async (autoApply = true) => {
+    if (extracting || extractingAnswerKeyOnly) return;
     setErrorMsg('');
     setLastResultInfo(null);
     if (!hasGeminiAccess) {
@@ -328,6 +329,7 @@ export default function AiExamExtractorPanel({
   };
 
   const handleApplyPdfAnswerKeyNow = async () => {
+    if (extractingAnswerKeyOnly || extracting) return;
     setErrorMsg('');
     const hasText = Boolean(pdfAnswerKeyText.trim());
     const hasImages = pdfAnswerKeyImages.length > 0;
@@ -380,6 +382,7 @@ export default function AiExamExtractorPanel({
   };
 
   const handleRunReadingPdfExtract = async () => {
+    if (extracting || extractingAnswerKeyOnly) return;
     setErrorMsg('');
     setLastResultInfo(null);
     if (!hasGeminiAccess) {
@@ -447,6 +450,7 @@ export default function AiExamExtractorPanel({
   };
 
   const handleRunListeningPdfExtract = async () => {
+    if (extracting || extractingAnswerKeyOnly) return;
     setErrorMsg('');
     setLastResultInfo(null);
     if (!hasGeminiAccess) {
@@ -495,6 +499,7 @@ export default function AiExamExtractorPanel({
   };
 
   const handleRunAiExtract = async () => {
+    if (extracting || extractingAnswerKeyOnly) return;
     setErrorMsg('');
     setLastResultInfo(null);
 

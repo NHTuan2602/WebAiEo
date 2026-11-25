@@ -978,13 +978,31 @@ export function drawCroppedImageToContext(ctx, img, targetWidth, targetHeight, c
 export function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const mime = String(file?.type || '').toLowerCase();
-    if (!file || !mime.startsWith('image/') || mime === 'image/svg+xml') {
-      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP, GIF).'));
+    const fileName = String(file?.name || '').toLowerCase();
+    if (
+      !file ||
+      !mime.startsWith('image/') ||
+      mime === 'image/svg+xml' ||
+      fileName.endsWith('.svg') ||
+      fileName.endsWith('.svgz')
+    ) {
+      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP, GIF — không hỗ trợ SVG).'));
+      return;
+    }
+    if (Number(file.size) > 10 * 1024 * 1024) {
+      reject(new Error('Dung lượng tệp ảnh tối đa 10MB. Vui lòng chọn ảnh nhẹ hơn.'));
       return;
     }
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'));
-    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      if (!/^data:image\/(jpeg|jpg|png|webp|gif|apng);base64,/i.test(result)) {
+        reject(new Error('Định dạng dữ liệu ảnh không hợp lệ hoặc bị hỏng.'));
+        return;
+      }
+      resolve(result);
+    };
     reader.readAsDataURL(file);
   });
 }

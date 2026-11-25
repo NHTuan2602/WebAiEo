@@ -182,6 +182,7 @@ export default function DailyWritingBulkModal({
   // RUN AI PIPELINES
   // ==========================================
   const handleRunTask1Ai = async () => {
+    if (running) return;
     setErrorMsg('');
     setWarnings([]);
     if (t1Images.length === 0 && t1PdfFiles.length === 0) {
@@ -217,6 +218,7 @@ export default function DailyWritingBulkModal({
   };
 
   const handleRunTask2Ai = async () => {
+    if (running) return;
     setErrorMsg('');
     setWarnings([]);
     if (t2PdfFiles.length === 0 && !t2RawText.trim()) {

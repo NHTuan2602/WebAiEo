@@ -127,6 +127,7 @@ export default function QuickThreePdfImporter({
   };
 
   const handleRunBatchImport = async () => {
+    if (running) return;
     if (!hasGeminiAccess) {
       showToast?.('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước khi chạy AI.', 'error');
       setShowApiKeyModal?.(true);

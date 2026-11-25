@@ -90,8 +90,160 @@ import {
 import {
   KNIGHT_CHARACTER_SKINS,
   getVietnamMondayWeekState,
-  normalizeKnightGachaConfig
+  normalizeKnightGachaConfig,
+  normalizeKnightRpgProfile
 } from './src/constants/knightRpgData.js';
+
+const VALID_PAYMENT_ITEM_TYPES = new Set([
+  'cover',
+  'title',
+  'test',
+  'skill_pass',
+  'aieo_vip',
+  'room_ticket',
+  'gacha_wish_1',
+  'gacha_wish_10',
+  'donate',
+  'real_exam_combo_3',
+  'real_exam_combo_5',
+  'real_exam_combo_8',
+  'real_exam_combo_10'
+]);
+
+function parseStrictVndInt(rawVal) {
+  if (typeof rawVal === 'boolean' || rawVal === null || rawVal === undefined || rawVal === '') return NaN;
+  const num = typeof rawVal === 'number' ? rawVal : Number(String(rawVal).trim());
+  if (!Number.isFinite(num) || num <= 0 || !Number.isInteger(num)) return NaN;
+  return num;
+}
+
+function captureUserBalanceSnapshot(user) {
+  if (!user || typeof user !== 'object') {
+    return {
+      realExamCredits: 0,
+      roomCreateCredits: 0,
+      gachaWishCredits: 0,
+      totalPurchasedExams: 0,
+      aieoVipActive: false,
+      skillPassActive: false,
+      customCoverActive: false
+    };
+  }
+  const now = Date.now();
+  return {
+    realExamCredits: getRealExamCredits(user),
+    roomCreateCredits: getFriendRoomTicketCredits(user),
+    gachaWishCredits: getGachaWishPurchasedCredits(user),
+    totalPurchasedExams: getPurchasedExamCount(user),
+    aieoVipActive: Number(user.aieoVipExpiresAt) > now,
+    skillPassActive: Number(user.skillPracticeExpiresAt) > now,
+    customCoverActive: hasCustomCoverPermission(user)
+  };
+}
+
+function sanitizeClientKnightRpgUpdate(
+  prevRpgRaw,
+  incomingRpgRaw,
+  userRecord,
+  { isSuperAdmin = false, isTeacher = false, allowMatchLoot = false, allowGoldGain = false } = {}
+) {
+  const nowMs = Date.now();
+  const prev = normalizeKnightRpgProfile(prevRpgRaw || {}, nowMs);
+  const next = normalizeKnightRpgProfile({ ...(prevRpgRaw || {}), ...(incomingRpgRaw || {}) }, nowMs);
+  if (isSuperAdmin) {
+    return next;
+  }
+
+  // Wishes are strictly server-authoritative: client cannot mint wishes beyond server gachaWishCredits
+  const serverWishCredits = getGachaWishPurchasedCredits(userRecord);
+  const prevClaimed = Math.max(0, Math.floor(Number(prev.claimedServerWishCredits) || 0));
+  const unclaimedCredits = Math.max(0, serverWishCredits - prevClaimed);
+  const maxAllowedWishes = Math.max(0, (Number(prev.wishes) || 0) + unclaimedCredits);
+  next.wishes = Math.max(0, Math.min(next.wishes, maxAllowedWishes));
+  next.claimedServerWishCredits = Math.min(
+    Math.max(prevClaimed, next.claimedServerWishCredits),
+    serverWishCredits
+  );
+  next.firstGameGiftClaimed = Boolean(
+    prev.firstGameGiftClaimed || userRecord?.starterFirstGameGiftClaimed
+  );
+
+  // Non-SuperAdmin cannot unlock new Gacha heroes/weapons unless totalPulls increased
+  const prevTotalPulls = Math.max(0, Number(prev.gachaState?.totalPulls) || 0);
+  const nextTotalPulls = Math.max(prevTotalPulls, Number(next.gachaState?.totalPulls) || 0);
+  const pullsDelta = Math.max(0, nextTotalPulls - prevTotalPulls);
+  if (pullsDelta === 0 && prevRpgRaw && typeof prevRpgRaw === 'object') {
+    next.unlockedSkins = prev.unlockedSkins;
+    next.unlockedWeapons = prev.unlockedWeapons;
+    next.weaponCounts = prev.weaponCounts;
+    if (!prev.unlockedSkins.includes(next.equippedSkin)) {
+      next.equippedSkin = prev.equippedSkin || 'holy_paladin';
+    }
+    if (next.equippedWeapon && !prev.unlockedWeapons.includes(next.equippedWeapon)) {
+      next.equippedWeapon = prev.equippedWeapon || '';
+    }
+  }
+
+  const maxGoldDelta = isTeacher
+    ? 300_000
+    : (allowMatchLoot ? 25_000 : allowGoldGain ? 2_500 : 0) + pullsDelta * 200_000;
+  next.gold = Math.max(0, Math.min(next.gold, (Number(prev.gold) || 0) + maxGoldDelta));
+
+  const maxKeyDelta = isTeacher ? 50 : (allowMatchLoot ? 15 : 0);
+  next.keys = Math.max(0, Math.min(next.keys, (Number(prev.keys) || 0) + maxKeyDelta));
+  next.keysCollected = Math.max(
+    Number(prev.keysCollected) || 0,
+    Math.min(next.keysCollected, (Number(prev.keysCollected) || 0) + maxKeyDelta)
+  );
+
+  const maxDemonDelta = allowMatchLoot ? 1 : 0;
+  next.demonKingsSlain = Math.max(
+    Number(prev.demonKingsSlain) || 0,
+    Math.min(next.demonKingsSlain, (Number(prev.demonKingsSlain) || 0) + maxDemonDelta)
+  );
+  next.dragonsSlain = Math.max(
+    Number(prev.dragonsSlain) || 0,
+    Math.min(next.dragonsSlain, (Number(prev.dragonsSlain) || 0) + (allowMatchLoot ? 5 : 0))
+  );
+  next.monstersSlain = Math.max(
+    Number(prev.monstersSlain) || 0,
+    Math.min(next.monstersSlain, (Number(prev.monstersSlain) || 0) + (allowMatchLoot ? 200 : 0))
+  );
+
+  return next;
+}
+
+function sanitizeTestPayloadForStore(rawTest = {}) {
+  const cleanTitle = String(rawTest.title || '').trim().slice(0, 260) || 'Đề luyện IELTS';
+  const rawPrice = Number(rawTest.priceVnd);
+  const safePrice =
+    rawTest.testMode === 'single_skill'
+      ? 0
+      : Number.isFinite(rawPrice)
+      ? Math.max(0, Math.min(5_000_000, Math.round(rawPrice)))
+      : undefined;
+  const rawMaxAtt = Number(rawTest.maxAttempts);
+  const safeMaxAttempts = Number.isFinite(rawMaxAtt)
+    ? Math.max(0, Math.min(100, Math.round(rawMaxAtt)))
+    : rawTest.maxAttempts;
+  let safeDurations = rawTest.sectionDurations;
+  if (rawTest.sectionDurations && typeof rawTest.sectionDurations === 'object') {
+    safeDurations = { ...rawTest.sectionDurations };
+    ['listening', 'reading', 'writing', 'speaking'].forEach(sk => {
+      if (safeDurations[sk] !== undefined) {
+        const d = Number(safeDurations[sk]);
+        safeDurations[sk] = Number.isFinite(d) ? Math.max(1, Math.min(180, Math.round(d))) : 15;
+      }
+    });
+  }
+  return {
+    ...rawTest,
+    title: cleanTitle,
+    ...(safePrice !== undefined ? { priceVnd: safePrice } : {}),
+    ...(safeMaxAttempts !== undefined ? { maxAttempts: safeMaxAttempts } : {}),
+    ...(safeDurations ? { sectionDurations: safeDurations } : {})
+  };
+}
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -1402,6 +1554,7 @@ function createInitialStore(audioDir = '', mediaDir = '') {
     _otpChallenges: new Map(),
     _unlockedSpeakingRooms: new Map(),
     _unlockedExamRooms: new Map(),
+    _processedGameMatchIds: new Set(),
     _dailyRankCache: null,
     _audioDir: audioDir,
     _audioMem: new Map(),
@@ -2103,6 +2256,7 @@ export function createPersistentSyncStore(persistFile = '') {
         _otpChallenges,
         _unlockedSpeakingRooms,
         _unlockedExamRooms,
+        _processedGameMatchIds,
         _dailyRankCache,
         _bootId,
         _localMutated,
@@ -2276,7 +2430,14 @@ function buildPublicAdminSnapshotFields(store, viewer) {
     ? (Array.isArray(store.paymentTransactions) ? store.paymentTransactions : []).slice(0, 200)
     : [];
 
-  return { supportAdminProfile, adminFeedbacks, adminPaymentHistory };
+  const viewerKey = viewer?.username ? (findUserKeyInStore(store, viewer.username) || viewer.username) : '';
+  const myPaymentTransactions = viewerKey
+    ? (Array.isArray(store.paymentTransactions) ? store.paymentTransactions : [])
+        .filter(tx => tx && String(tx.username || '').toLowerCase() === viewerKey.toLowerCase())
+        .slice(0, 100)
+    : [];
+
+  return { supportAdminProfile, adminFeedbacks, adminPaymentHistory, myPaymentTransactions };
 }
 
 function normalizeClassIdList(rawIds) {
@@ -2375,13 +2536,18 @@ function recordPaymentTransactionAndNotifyAdmin(
     username = '',
     userName = '',
     itemType = 'donate',
+    itemId = '',
     itemLabel = 'Ủng hộ duy trì trang web',
     amount = 0,
     status = 'paid',
     gateway = 'auto',
     txId = '',
     note = '',
-    paidAt = 0
+    paidAt = 0,
+    balanceBefore = null,
+    balanceAfter = null,
+    confirmedBy = '',
+    suppressAdminNotify = false
   } = {}
 ) {
   const cleanUser = String(username || '').trim();
@@ -2395,29 +2561,63 @@ function recordPaymentTransactionAndNotifyAdmin(
   const cleanTxId = String(txId || '').trim().slice(0, 80);
   const cleanNote = String(note || '').trim().slice(0, 180);
   const cleanLabel = String(itemLabel || 'Thanh toán').trim().slice(0, 140);
+  const cleanItemType = String(itemType || 'donate').slice(0, 32);
+  const cleanItemId = String(itemId || '').trim().slice(0, 80);
 
   if (!Array.isArray(store.paymentTransactions)) store.paymentTransactions = [];
-  const existingIdx = store.paymentTransactions.findIndex(
-    t =>
-      t &&
-      ((cleanTxId && t.txId && t.txId === cleanTxId) ||
-        (cleanOrderCode && t.orderCode && t.orderCode === cleanOrderCode && t.username === userKey))
-  );
+  const existingIdx = store.paymentTransactions.findIndex(t => {
+    if (!t) return false;
+    if (cleanTxId && t.txId && t.txId === cleanTxId) return true;
+    if (cleanOrderCode && t.orderCode && t.orderCode === cleanOrderCode && t.username === userKey) return true;
+    // Upgrade a recent manual reported row for the exact same user + itemType + itemId so Admin cannot double-confirm
+    if (
+      status === 'paid' &&
+      t.status === 'reported' &&
+      t.username === userKey &&
+      t.itemType === cleanItemType &&
+      String(t.itemId || '') === cleanItemId &&
+      nowMs - (Number(t.createdAt) || 0) < 24 * 60 * 60 * 1000
+    ) {
+      return true;
+    }
+    // Deduplicate repeated manual 'reported' clicks within 15 minutes
+    if (
+      status === 'reported' &&
+      t.status === 'reported' &&
+      t.username === userKey &&
+      t.itemType === cleanItemType &&
+      String(t.itemId || '') === cleanItemId &&
+      Math.round(Number(t.amount) || 0) === cleanAmount &&
+      nowMs - (Number(t.createdAt) || 0) < 15 * 60 * 1000
+    ) {
+      return true;
+    }
+    return false;
+  });
+
+  const prevRecord = existingIdx >= 0 ? store.paymentTransactions[existingIdx] : null;
+  if (status === 'reported' && prevRecord && prevRecord.status === 'reported') {
+    return prevRecord;
+  }
 
   const record = {
-    id: existingIdx >= 0 ? store.paymentTransactions[existingIdx].id : `ptx_${nowMs}_${Math.random().toString(36).slice(2, 6)}`,
-    orderCode: cleanOrderCode || (existingIdx >= 0 ? store.paymentTransactions[existingIdx].orderCode : ''),
+    id: prevRecord ? prevRecord.id : `ptx_${nowMs}_${Math.random().toString(36).slice(2, 6)}`,
+    orderCode: cleanOrderCode || (prevRecord ? prevRecord.orderCode : ''),
     username: userKey,
     userName: displayName,
-    itemType: String(itemType || 'donate').slice(0, 32),
+    itemType: cleanItemType,
+    itemId: cleanItemId || (prevRecord?.itemId || ''),
     itemLabel: cleanLabel,
     amount: cleanAmount,
     status: status === 'paid' ? 'paid' : 'reported',
     gateway: String(gateway || 'auto').slice(0, 32),
-    txId: cleanTxId,
-    note: cleanNote,
+    txId: cleanTxId || (prevRecord?.txId || ''),
+    note: cleanNote || (prevRecord?.note || ''),
+    ...(balanceBefore ? { balanceBefore } : prevRecord?.balanceBefore ? { balanceBefore: prevRecord.balanceBefore } : {}),
+    ...(balanceAfter ? { balanceAfter } : prevRecord?.balanceAfter ? { balanceAfter: prevRecord.balanceAfter } : {}),
+    ...(confirmedBy ? { confirmedBy: String(confirmedBy).slice(0, 48) } : {}),
     paidAt: status === 'paid' ? (Number(paidAt) || nowMs) : 0,
-    createdAt: existingIdx >= 0 ? (Number(store.paymentTransactions[existingIdx].createdAt) || nowMs) : nowMs
+    createdAt: prevRecord ? (Number(prevRecord.createdAt) || nowMs) : nowMs
   };
 
   if (existingIdx >= 0) {
@@ -2435,9 +2635,11 @@ function recordPaymentTransactionAndNotifyAdmin(
       ? 'Ủng hộ tùy tâm'
       : gateway === 'manual_request'
       ? 'Chuyển khoản tay'
+      : gateway === 'credit_wallet'
+      ? 'Ví Lượt Combo'
       : 'Hệ thống';
 
-  if (userKey !== SUPER_ADMIN_USERNAME) {
+  if (!suppressAdminNotify && userKey !== SUPER_ADMIN_USERNAME) {
     const notifTitle =
       record.status === 'paid'
         ? `💰 +${formatVndCurrency(cleanAmount)} từ ${displayName} (@${userKey})`
@@ -2463,6 +2665,336 @@ function recordPaymentTransactionAndNotifyAdmin(
   }
 
   return record;
+}
+
+function fulfillPaidEntitlementForUser(
+  store,
+  {
+    userKey = '',
+    itemType = 'cover',
+    itemId = '',
+    itemLabel = '',
+    amount = 0,
+    orderCode = '',
+    gateway = 'auto',
+    txId = '',
+    confirmedBy = '',
+    nowMs = Date.now()
+  } = {}
+) {
+  const resolvedKey = findUserKeyInStore(store, userKey) || String(userKey || '').trim();
+  const targetUser = resolvedKey ? store.users?.[resolvedKey] : null;
+  if (!resolvedKey || !targetUser) {
+    return { fulfilled: false, balanceBefore: null, balanceAfter: null };
+  }
+
+  const cleanAmount = Math.max(0, Math.round(Number(amount) || 0));
+  const cleanType = String(itemType || 'cover').trim();
+  const cleanOrderCode = String(orderCode || '').trim();
+  const effectiveItemId = String(
+    itemId ||
+    (cleanType === 'title' ? targetUser.paidTitleRequested?.titleId : '') ||
+    (cleanType === 'test' ? targetUser.subscriptionRequested?.itemId : '') ||
+    ''
+  ).trim();
+
+  const balanceBefore = captureUserBalanceSnapshot(targetUser);
+  const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
+  const isManualAdmin = Boolean(confirmedBy);
+  const senderLabel = isManualAdmin ? 'Admin Tuấn' : 'Hệ Thống Thanh Toán Tự Động';
+  const codeSuffix = cleanOrderCode ? ` (mã đơn ${cleanOrderCode})` : '';
+
+  if (cleanType === 'title') {
+    const matchedTitleDef = effectiveItemId ? PAID_SHOP_TITLES.find(t => t.id === effectiveItemId) : null;
+    const isPermanentDonate = matchedTitleDef ? Boolean(matchedTitleDef.isPermanentDonateTitle) : true;
+    const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
+    const nextPurchasedSet = new Set(prevPurchased);
+    if (effectiveItemId) nextPurchasedSet.add(effectiveItemId);
+    const prevExpiries =
+      targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
+        ? { ...targetUser.purchasedTitleExpiries }
+        : {};
+    const nextDonatedTotal = isPermanentDonate
+      ? (Number(targetUser.donatedTotalVnd) || 0) + cleanAmount
+      : (Number(targetUser.donatedTotalVnd) || 0);
+    if (isPermanentDonate) {
+      if (effectiveItemId) delete prevExpiries[effectiveItemId];
+      PAID_SHOP_TITLES.forEach(t => {
+        if (t.isPermanentDonateTitle && nextDonatedTotal >= getTitlePriceVnd(t, payCfgNow)) {
+          nextPurchasedSet.add(t.id);
+          delete prevExpiries[t.id];
+        }
+      });
+    } else if (effectiveItemId) {
+      const baseExp = Math.max(nowMs, Number(prevExpiries[effectiveItemId]) || 0);
+      prevExpiries[effectiveItemId] = baseExp + SUBSCRIPTION_DURATION_MS;
+    }
+    store.users[resolvedKey] = {
+      ...targetUser,
+      donatedTotalVnd: nextDonatedTotal,
+      purchasedTitleIds: Array.from(nextPurchasedSet),
+      purchasedTitleExpiries: prevExpiries,
+      paidTitleRequested: null
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: isPermanentDonate
+          ? '💜 Đã mở khóa VĨNH VIỄN Danh Hiệu Phú Quý!'
+          : '🎉 Đã mở khóa Danh Hiệu VIP (1 Tháng)!',
+        message: isPermanentDonate
+          ? `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix} và mở khóa VĨNH VIỄN danh hiệu ${itemLabel || effectiveItemId}. Cảm ơn bạn đã ủng hộ Tuấn duy trì trang web & server học tập!`
+          : `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix} và kích hoạt danh hiệu ${itemLabel || effectiveItemId} trong 30 ngày. Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web & server học tập!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else if (cleanType === 'test' && effectiveItemId) {
+    const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
+    const alreadyOwned = prevTests.includes(effectiveItemId);
+    const nextTests = Array.from(new Set([...prevTests, effectiveItemId]));
+    const nextTotalPurchased = alreadyOwned
+      ? getPurchasedExamCount(targetUser)
+      : getPurchasedExamCount(targetUser) + 1;
+    store.users[resolvedKey] = {
+      ...targetUser,
+      purchasedTestIds: nextTests,
+      totalPurchasedExams: nextTotalPurchased,
+      ...(targetUser.subscriptionRequested?.itemId === effectiveItemId || targetUser.subscriptionRequested?.itemType === 'test'
+        ? { subscriptionRequested: null }
+        : {})
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: '🎉 Đã mở khóa Đề Thi Thực Chiến 4 Kỹ Năng!',
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix} và mở khóa ${itemLabel || effectiveItemId} (1 lượt thi thật đủ 4 kỹ năng L·R·W·S, chờ Ms. Như duyệt điểm sau khi nộp).`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else if (Boolean(getRealExamComboMeta(cleanType, store.paymentConfig))) {
+    const comboFulfilled = getRealExamComboMeta(cleanType, store.paymentConfig);
+    const nextCredits = getRealExamCredits(targetUser) + comboFulfilled.credits;
+    const nextTotalPurchased = getPurchasedExamCount(targetUser) + comboFulfilled.credits;
+    store.users[resolvedKey] = {
+      ...targetUser,
+      realExamCredits: nextCredits,
+      totalPurchasedExams: nextTotalPurchased,
+      ...(targetUser.subscriptionRequested?.itemType === cleanType ? { subscriptionRequested: null } : {})
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: `🎉 Đã kích hoạt ${comboFulfilled.label} (+${comboFulfilled.credits} lượt Thi Thật)!`,
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix} và cộng +${comboFulfilled.credits} lượt mở đề Thực Chiến Thi Thật 4 Kỹ Năng (hiện có ${nextCredits} lượt). Bạn có thể vào Trang Chủ bấm "Dùng 1 Lượt Combo" để vào thi ngay!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else if (cleanType === 'skill_pass') {
+    const baseExp = Math.max(nowMs, Number(targetUser.skillPracticeExpiresAt) || 0);
+    store.users[resolvedKey] = {
+      ...targetUser,
+      skillPracticeExpiresAt: baseExp + SUBSCRIPTION_DURATION_MS,
+      ...(targetUser.subscriptionRequested?.itemType === 'skill_pass' ? { subscriptionRequested: null } : {})
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: '🎉 Đã kích hoạt Gói Daily Zone (1 Tháng)!',
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix} và mở khóa 30 ngày sử dụng đầy đủ Khu Daily Zone! Cảm ơn bạn đã ủng hộ!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else if (cleanType === 'aieo_vip') {
+    const wasVipActive = Number(targetUser.aieoVipExpiresAt) > nowMs;
+    const baseVipExp = Math.max(nowMs, Number(targetUser.aieoVipExpiresAt) || 0);
+    const nextVipExp = baseVipExp + SUBSCRIPTION_DURATION_MS;
+    const nextSkillExp = Math.max(Number(targetUser.skillPracticeExpiresAt) || 0, nextVipExp);
+    const autoEquipVip = !targetUser.equippedTitleId || targetUser.equippedTitleId === 'newbie';
+    const keepCustomRed = Boolean(wasVipActive && targetUser.vipEffectsCustomizedAt);
+    store.users[resolvedKey] = {
+      ...targetUser,
+      aieoVipExpiresAt: nextVipExp,
+      skillPracticeExpiresAt: nextSkillExp,
+      vipRedNameEnabled: keepCustomRed ? (targetUser.vipRedNameEnabled ?? true) : true,
+      vipNameColor: normalizeVipNameColor(targetUser.vipNameColor || 'crimson'),
+      vipTagEnabled: keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true,
+      vipNeonCoverEnabled: keepCustomRed ? (targetUser.vipNeonCoverEnabled ?? true) : true,
+      vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'aurora_rgb'),
+      ...(!wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
+      ...(autoEquipVip ? { equippedTitleId: 'aieo_vip', showTitleBadge: true } : {}),
+      ...(targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: '👑 Chào mừng thành viên Gói IELTS VIP (1 Tháng)!',
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix}. Bạn đã mở khóa 30 ngày: Ảnh Avatar Động (.GIF/.WebP), Tùy chọn Màu Chữ Tên & Viền Bìa LED Neon Nhiều Màu, Ảnh Bìa Cá Nhân miễn phí, Khung Avatar VIP, Danh hiệu 👑 IELTS VIP & Tạo phòng Game bạn bè! Cảm ơn bạn đã ủng hộ!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else if (cleanType === 'room_ticket') {
+    const nextCredits = getFriendRoomTicketCredits(targetUser) + 1;
+    store.users[resolvedKey] = {
+      ...targetUser,
+      roomCreateCredits: nextCredits,
+      ...(targetUser.subscriptionRequested?.itemType === 'room_ticket' ? { subscriptionRequested: null } : {})
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: '🎫 Đã mở +1 Lượt Tạo Phòng Đấu Riêng!',
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix} và cộng +1 vé tạo Phòng Đấu Riêng cùng bạn bè (hiện có ${nextCredits} lượt)! Cảm ơn bạn đã ủng hộ Tuấn!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else if (cleanType === 'gacha_wish_1' || cleanType === 'gacha_wish_10') {
+    const wishAdd = cleanType === 'gacha_wish_10' ? 10 : 1;
+    const nextWishCredits = getGachaWishPurchasedCredits(targetUser) + wishAdd;
+    const prevRpg =
+      targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
+        ? targetUser.knightRpgProfile
+        : {};
+    const nextRpgWishes = Math.max(0, (Number(prevRpg.wishes) || 0) + wishAdd);
+    store.users[resolvedKey] = {
+      ...targetUser,
+      gachaWishCredits: nextWishCredits,
+      knightRpgProfile: {
+        ...prevRpg,
+        wishes: nextRpgWishes,
+        claimedServerWishCredits: nextWishCredits
+      },
+      ...(targetUser.subscriptionRequested?.itemType === cleanType ? { subscriptionRequested: null } : {})
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: `🌠 Đã cộng +${wishAdd} Lượt Quay Cầu Nguyện Gacha!`,
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix} và cộng ngay +${wishAdd} 🌠 Lượt Quay Cầu Nguyện vào game Hiệp Sĩ Diệt Rồng (hiện có ${nextRpgWishes} lượt)! Chúc bạn quay nổ Vàng 5★!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else if (cleanType === 'donate') {
+    const nextDonatedTotal = (Number(targetUser.donatedTotalVnd) || 0) + cleanAmount;
+    const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
+    const nextPurchasedSet = new Set(prevPurchased);
+    const prevExpiries =
+      targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
+        ? { ...targetUser.purchasedTitleExpiries }
+        : {};
+    const newlyPermanentTitles = [];
+    PAID_SHOP_TITLES.forEach(t => {
+      if (!t.isPermanentDonateTitle) return;
+      if (nextDonatedTotal >= getTitlePriceVnd(t, payCfgNow)) {
+        if (!nextPurchasedSet.has(t.id)) newlyPermanentTitles.push(t);
+        nextPurchasedSet.add(t.id);
+        delete prevExpiries[t.id];
+      }
+    });
+    store.users[resolvedKey] = {
+      ...targetUser,
+      donatedTotalVnd: nextDonatedTotal,
+      purchasedTitleIds: Array.from(nextPurchasedSet),
+      purchasedTitleExpiries: prevExpiries
+    };
+    const unlockedText =
+      newlyPermanentTitles.length > 0
+        ? ` Tự động mở khóa VĨNH VIỄN danh hiệu: ${newlyPermanentTitles.map(t => `${t.icon} ${t.label}`).join(', ')}!`
+        : '';
+    appendStoreNotification(
+      store,
+      {
+        title: '💜 Cảm ơn bạn đã ủng hộ duy trì website!',
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix}.${unlockedText} Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì máy chủ & phát triển website học tập!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  } else {
+    const baseCoverExp = Math.max(nowMs, Number(targetUser.customCoverExpiresAt) || 0);
+    store.users[resolvedKey] = {
+      ...targetUser,
+      customCoverUnlocked: true,
+      customCoverUnlockedAt: nowMs,
+      customCoverExpiresAt: baseCoverExp + SUBSCRIPTION_DURATION_MS,
+      customCoverUnlockedBy: confirmedBy || `auto_${gateway}`,
+      coverUnlockRequestedAt: 0
+    };
+    appendStoreNotification(
+      store,
+      {
+        title: '🎉 Đã mở khóa Ảnh Nền Riêng (1 Tháng)!',
+        message: `Hệ thống đã nhận ${formatVndCurrency(cleanAmount)}${codeSuffix}. Bạn có thể tải & cắt ảnh bìa hồ sơ trong 30 ngày! Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
+        type: 'announcement',
+        targetUsernames: [resolvedKey],
+        createdBy: SUPER_ADMIN_USERNAME,
+        createdByName: senderLabel
+      },
+      null
+    );
+  }
+
+  const latestUserRec = store.users[resolvedKey] || targetUser;
+  store.users[resolvedKey] = {
+    ...latestUserRec,
+    totalPaidVnd: (Number(latestUserRec.totalPaidVnd) || 0) + cleanAmount,
+    paidCount: (Number(latestUserRec.paidCount) || 0) + 1,
+    lastPaidAt: nowMs
+  };
+
+  // Mark any matching pending order in store.paymentOrders as paid to prevent webhook + manual double-crediting
+  if (Array.isArray(store.paymentOrders)) {
+    store.paymentOrders.forEach(o => {
+      if (!o || o.status !== 'pending') return;
+      const matchesCode = Boolean(cleanOrderCode && o.orderCode === cleanOrderCode);
+      const matchesSamePendingItem = Boolean(
+        !cleanOrderCode &&
+        String(o.username || '').toLowerCase() === resolvedKey.toLowerCase() &&
+        (o.itemType || 'cover') === cleanType &&
+        String(o.itemId || '') === effectiveItemId
+      );
+      if (matchesCode || matchesSamePendingItem) {
+        o.status = 'paid';
+        o.paidAt = nowMs;
+        o.paidAmount = cleanAmount;
+        if (txId) o.txId = txId;
+        o.gateway = gateway || o.gateway || 'manual_confirm';
+      }
+    });
+  }
+
+  const balanceAfter = captureUserBalanceSnapshot(store.users[resolvedKey]);
+  return { fulfilled: true, balanceBefore, balanceAfter, effectiveItemId };
 }
 
 function serializeNotificationItem(n, uname = '') {
@@ -2693,6 +3225,7 @@ function getSnapshotForViewer(store, viewer = null) {
       paymentConfig: null,
       supportAdminProfile: null,
       adminFeedbacks: [],
+      myPaymentTransactions: [],
       notifications: [],
       sentNotifications: []
     };
@@ -3273,6 +3806,13 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'REQUEST_COVER_UNLOCK': {
+      if (!checkRateLimit(store._rateLimits, `pay_req:${viewer.username.toLowerCase()}`, 12, 5 * 60 * 1000)) {
+        return { allowed: false, status: 429, error: 'Bạn gửi yêu cầu báo chuyển khoản quá nhanh. Vui lòng đợi ít phút rồi thử lại.' };
+      }
+      const reqType = payload?.itemType !== undefined && payload?.itemType !== '' ? String(payload.itemType).trim() : 'cover';
+      if (!VALID_PAYMENT_ITEM_TYPES.has(reqType)) {
+        return { allowed: false, status: 400, error: 'Loại gói mở khóa không hợp lệ.' };
+      }
       const me = store.users?.[viewer.username] || viewer;
       if (!isTeacher && viewer.isGuest) {
         const isAllowedGuestReq =
@@ -3546,6 +4086,9 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'SUBMIT_PRACTICE_GAME_SCORE': {
+      if (!checkRateLimit(store._rateLimits, `game_score:${viewer.username.toLowerCase()}`, 45, 60 * 1000)) {
+        return { allowed: false, status: 429, error: 'Gửi kết quả game quá nhanh. Vui lòng đợi vài giây.' };
+      }
       const targetUname = payload?.username;
       if (!isTeacher && targetUname && targetUname !== viewer.username) {
         return { allowed: false, status: 403, error: 'Không thể gửi điểm luyện tập dưới tên người khác.' };
@@ -3563,12 +4106,15 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     }
 
     case 'REPORT_DONATE_PAYMENT': {
-      const amount = Math.round(Number(payload?.amount) || 0);
+      if (!checkRateLimit(store._rateLimits, `donate_req:${viewer.username.toLowerCase()}`, 12, 5 * 60 * 1000)) {
+        return { allowed: false, status: 429, error: 'Bạn gửi thông báo ủng hộ quá nhanh. Vui lòng đợi ít phút.' };
+      }
+      const amount = parseStrictVndInt(payload?.amount);
       if (!Number.isFinite(amount) || amount < MIN_DONATE_AMOUNT_VND) {
         return {
           allowed: false,
           status: 400,
-          error: `Số tiền ủng hộ tùy tâm tối thiểu là ${formatVndCurrency(MIN_DONATE_AMOUNT_VND)}.`
+          error: `Số tiền ủng hộ tùy tâm tối thiểu là ${formatVndCurrency(MIN_DONATE_AMOUNT_VND)} (số nguyên dương).`
         };
       }
       if (amount > 50_000_000) {
@@ -3628,6 +4174,11 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
     const isSafeDataImage = /^data:image\/(jpeg|jpg|png|webp|gif|apng);base64,/i.test(str);
     if (!isHttps && !isSafeDataImage) {
       return prevVal || '';
+    }
+    if (isHttps) {
+      if (str.length > 2048 || /\.svgz?(?:[?#]|$)/i.test(str) || /svg\+xml/i.test(str)) {
+        return prevVal || '';
+      }
     }
     const animated = isAnimatedDataUrl(str);
     if (animated && !allowAnimated) {
@@ -3694,10 +4245,12 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       subscriptionRequested: prevUser.subscriptionRequested || null,
       knightRpgProfile:
         rawUser.knightRpgProfile && typeof rawUser.knightRpgProfile === 'object'
-          ? {
-              ...(prevUser.knightRpgProfile || {}),
-              ...rawUser.knightRpgProfile
-            }
+          ? sanitizeClientKnightRpgUpdate(prevUser.knightRpgProfile, rawUser.knightRpgProfile, prevUser, {
+              isSuperAdmin: false,
+              isTeacher: false,
+              allowMatchLoot: false,
+              allowGoldGain: false
+            })
           : (prevUser.knightRpgProfile || null),
       email: prevUser.email || '',
       emailVerified: Boolean(prevUser.email && prevUser.emailVerified),
@@ -3765,6 +4318,22 @@ function upsertSingleUserInStore(store, rawUname, rawUser, viewer) {
       incoming.roomCreateCredits = getFriendRoomTicketCredits(prevUser);
       incoming.gachaWishCredits = getGachaWishPurchasedCredits(prevUser);
       incoming.realExamCredits = getRealExamCredits(prevUser);
+      incoming.totalPurchasedExams = getPurchasedExamCount(prevUser);
+      incoming.totalPaidVnd = Math.max(0, Math.round(Number(prevUser?.totalPaidVnd) || 0));
+      incoming.donatedTotalVnd = Math.max(0, Math.round(Number(prevUser?.donatedTotalVnd) || 0));
+      incoming.paidCount = Math.max(0, Math.floor(Number(prevUser?.paidCount) || 0));
+      incoming.lastPaidAt = Number(prevUser?.lastPaidAt) || 0;
+      incoming.starterFirstGameGiftClaimed = Boolean(prevUser?.starterFirstGameGiftClaimed);
+      incoming.isGuest = Boolean(prevUser?.isGuest);
+      incoming.knightRpgProfile =
+        rawUser.knightRpgProfile && typeof rawUser.knightRpgProfile === 'object'
+          ? sanitizeClientKnightRpgUpdate(prevUser?.knightRpgProfile, rawUser.knightRpgProfile, prevUser, {
+              isSuperAdmin: false,
+              isTeacher: isSelfTeacherUpdate,
+              allowMatchLoot: false,
+              allowGoldGain: isSelfTeacherUpdate
+            })
+          : (prevUser?.knightRpgProfile || null);
     } else {
       if (incoming.grantedTitleIds !== undefined) {
         incoming.grantedTitleIds = Array.isArray(incoming.grantedTitleIds)
@@ -4434,17 +5003,31 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         }
       }
 
-      const clientBaseScore = entry.clientBaseScore !== undefined
-        ? Math.max(0, Number(entry.clientBaseScore) || 0)
-        : Math.max(0, Number(entry.score) || 0);
-      const effectiveScore = entry.clientBaseScore !== undefined
-        ? clientBaseScore + serverFirstBonusTotal
-        : Math.max(Number(entry.score) || 0, clientBaseScore + serverFirstBonusTotal);
+      const isRoomParticipant =
+        viewer?.role === 'teacher' ||
+        Boolean(base.lobbyPlayers?.[username] || base.liveMatch?.[username]);
+      if (!isRoomParticipant) break;
+      const roomEnded = base.status === 'ENDED';
+      const clampRoomScore = v => Math.max(0, Math.min(250_000, Math.round(Number(v) || 0)));
+      const rawClientBase = entry.clientBaseScore !== undefined
+        ? clampRoomScore(entry.clientBaseScore)
+        : clampRoomScore(entry.score);
+      const clientBaseScore = roomEnded
+        ? Math.min(rawClientBase, clampRoomScore(prevEntry.clientBaseScore ?? prevEntry.score))
+        : rawClientBase;
+      const rawEffectiveScore = entry.clientBaseScore !== undefined
+        ? clampRoomScore(clientBaseScore + serverFirstBonusTotal)
+        : Math.max(clampRoomScore(entry.score), clampRoomScore(clientBaseScore + serverFirstBonusTotal));
+      const effectiveScore = roomEnded
+        ? Math.min(rawEffectiveScore, clampRoomScore(prevEntry.score))
+        : rawEffectiveScore;
+      const cleanStreak = Math.max(0, Math.min(500, Math.round(Number(entry.streak) || 0)));
 
       base.liveMatch[username] = {
         ...prevEntry,
         ...entry,
         username,
+        streak: cleanStreak,
         teamId: entry.teamId || prevEntry.teamId || base.lobbyPlayers[username]?.teamId || '',
         clientBaseScore,
         serverFirstBonusTotal,
@@ -4462,7 +5045,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           name: entry.name || prevEntry.name || username,
           score: bestScore,
           status: entry.progressText || `Vòng ${entry.round || 1}`,
-          streak: Number(entry.streak) || 0,
+          streak: cleanStreak,
           missed: Array.isArray(entry.missed) ? entry.missed : [],
           updatedAt: new Date().toLocaleTimeString('vi-VN')
         };
@@ -4479,13 +5062,18 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const cleanPin = String(payload.pin || '').trim();
       const username = payload.username;
       const record = payload.record;
-      if (!cleanPin || !username || !record) break;
+      if (!cleanPin || !username || !record || !store.rooms?.[cleanPin]) break;
       const base = normalizeServerRoom(store.rooms[cleanPin] || {}, cleanPin);
+      if (viewer?.role !== 'teacher' && !base.lobbyPlayers?.[username] && !base.liveMatch?.[username]) break;
       const prevRec = base.players[username];
-      const liveBest = Number(base.liveMatch?.[username]?.score) || 0;
-      const bestScore = Math.max(Number(prevRec?.score) || 0, Number(record.score) || 0, liveBest);
+      const liveBest = Math.max(0, Math.min(250_000, Math.round(Number(base.liveMatch?.[username]?.score) || 0)));
+      const clampedIncoming = base.status === 'ENDED' && viewer?.role !== 'teacher'
+        ? Math.min(Math.max(0, Math.min(250_000, Math.round(Number(record.score) || 0))), liveBest || Number(prevRec?.score) || 0)
+        : Math.max(0, Math.min(250_000, Math.round(Number(record.score) || 0)));
+      const bestScore = Math.max(Number(prevRec?.score) || 0, clampedIncoming, liveBest);
       base.players[username] = {
         ...record,
+        streak: Math.max(0, Math.min(500, Math.round(Number(record.streak) || 0))),
         score: bestScore
       };
       store.rooms[cleanPin] = base;
@@ -4497,14 +5085,15 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
     case 'UPSERT_TEST': {
       const rawTest = payload.test;
       if (!rawTest?.id) break;
-      const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(rawTest.scheduleMode)
-        ? rawTest.scheduleMode
+      const sanitizedBaseTest = sanitizeTestPayloadForStore(rawTest);
+      const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(sanitizedBaseTest.scheduleMode)
+        ? sanitizedBaseTest.scheduleMode
         : 'flexible';
-      const openAt = parseScheduleTimestampServer(rawTest.openAt);
-      const dueAt = parseScheduleTimestampServer(rawTest.dueAt);
-      const assignedClassIds = normalizeClassIdList(rawTest.assignedClassIds);
+      const openAt = parseScheduleTimestampServer(sanitizedBaseTest.openAt);
+      const dueAt = parseScheduleTimestampServer(sanitizedBaseTest.dueAt);
+      const assignedClassIds = normalizeClassIdList(sanitizedBaseTest.assignedClassIds);
       const test = externalizeTestMedia(store, {
-        ...rawTest,
+        ...sanitizedBaseTest,
         assignedClassIds,
         scheduleMode,
         openAt,
@@ -4545,14 +5134,15 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
 
       incomingList.slice(0, 1000).forEach(rawTest => {
         if (!rawTest?.id) return;
-        const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(rawTest.scheduleMode)
-          ? rawTest.scheduleMode
+        const sanitizedBaseTest = sanitizeTestPayloadForStore(rawTest);
+        const scheduleMode = ['deadline_lock', 'deadline_track', 'flexible'].includes(sanitizedBaseTest.scheduleMode)
+          ? sanitizedBaseTest.scheduleMode
           : 'flexible';
-        const openAt = parseScheduleTimestampServer(rawTest.openAt);
-        const dueAt = parseScheduleTimestampServer(rawTest.dueAt);
-        const assignedClassIds = normalizeClassIdList(rawTest.assignedClassIds);
+        const openAt = parseScheduleTimestampServer(sanitizedBaseTest.openAt);
+        const dueAt = parseScheduleTimestampServer(sanitizedBaseTest.dueAt);
+        const assignedClassIds = normalizeClassIdList(sanitizedBaseTest.assignedClassIds);
         const test = externalizeTestMedia(store, {
-          ...rawTest,
+          ...sanitizedBaseTest,
           assignedClassIds,
           scheduleMode,
           openAt,
@@ -5162,6 +5752,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       if (currentCredits < 1) break;
       const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
       if (prevTests.includes(tid)) break;
+      const balanceBefore = captureUserBalanceSnapshot(targetUser);
       const nextTests = Array.from(new Set([...prevTests, tid]));
       const nextCredits = Math.max(0, currentCredits - 1);
       store.users[uname] = {
@@ -5169,6 +5760,20 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         realExamCredits: nextCredits,
         purchasedTestIds: nextTests
       };
+      const balanceAfter = captureUserBalanceSnapshot(store.users[uname]);
+      recordPaymentTransactionAndNotifyAdmin(store, {
+        username: uname,
+        userName: targetUser.name || uname,
+        itemType: 'credit_redeem',
+        itemId: tid,
+        itemLabel: `Đổi 1 lượt Combo mở đề: ${targetTest.title}`,
+        amount: 0,
+        status: 'paid',
+        gateway: 'credit_wallet',
+        balanceBefore,
+        balanceAfter,
+        suppressAdminNotify: true
+      });
       appendStoreNotification(
         store,
         {
@@ -5190,6 +5795,17 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const targetUser = uname ? store.users?.[uname] : null;
       if (!uname || !targetUser) break;
       const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
+      const findPendingOrderCode = (iType, iId = '') => {
+        const found = (Array.isArray(store.paymentOrders) ? store.paymentOrders : []).find(
+          o =>
+            o &&
+            o.status === 'pending' &&
+            String(o.username || '').toLowerCase() === uname.toLowerCase() &&
+            (o.itemType || 'cover') === iType &&
+            String(o.itemId || '') === String(iId || '')
+        );
+        return found?.orderCode || '';
+      };
       if (payload?.itemType === 'title') {
         const paidTitle = PAID_SHOP_TITLES.find(t => t.id === payload?.itemId);
         if (!paidTitle) break;
@@ -5202,9 +5818,11 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           }
         };
         recordPaymentTransactionAndNotifyAdmin(store, {
+          orderCode: findPendingOrderCode('title', paidTitle.id),
           username: uname,
           userName: targetUser.name || uname,
           itemType: 'title',
+          itemId: paidTitle.id,
           itemLabel: `${paidTitle.icon} ${paidTitle.label} (Donate Vĩnh Viễn)`,
           amount: getTitlePriceVnd(paidTitle, payCfgNow),
           status: 'reported',
@@ -5227,9 +5845,11 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           }
         };
         recordPaymentTransactionAndNotifyAdmin(store, {
+          orderCode: findPendingOrderCode('test', tid),
           username: uname,
           userName: targetUser.name || uname,
           itemType: 'test',
+          itemId: tid,
           itemLabel: `Chi phí test: ${targetTest.title}`,
           amount: getTestPurchasePriceVnd(targetTest, payCfgNow),
           status: 'reported',
@@ -5249,9 +5869,11 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           }
         };
         recordPaymentTransactionAndNotifyAdmin(store, {
+          orderCode: findPendingOrderCode(comboMetaReq.itemType, comboMetaReq.itemType),
           username: uname,
           userName: targetUser.name || uname,
           itemType: comboMetaReq.itemType,
+          itemId: comboMetaReq.itemType,
           itemLabel: comboMetaReq.label,
           amount: comboMetaReq.price,
           status: 'reported',
@@ -5296,6 +5918,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           }
         };
         recordPaymentTransactionAndNotifyAdmin(store, {
+          orderCode: findPendingOrderCode(payload.itemType, ''),
           username: uname,
           userName: targetUser.name || uname,
           itemType: payload.itemType,
@@ -5313,6 +5936,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         coverUnlockRequestedAt: Date.now()
       };
       recordPaymentTransactionAndNotifyAdmin(store, {
+        orderCode: findPendingOrderCode('cover', ''),
         username: uname,
         userName: targetUser.name || uname,
         itemType: 'cover',
@@ -5329,8 +5953,9 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const uname = viewer?.username ? findUserKeyInStore(store, viewer.username) || viewer.username : '';
       const targetUser = uname ? store.users?.[uname] : null;
       if (!uname || !targetUser) break;
-      const amount = Math.min(50_000_000, Math.round(Number(payload?.amount) || 0));
-      if (amount < MIN_DONATE_AMOUNT_VND) break;
+      const parsedAmt = parseStrictVndInt(payload?.amount);
+      if (!Number.isFinite(parsedAmt) || parsedAmt < MIN_DONATE_AMOUNT_VND || parsedAmt > 50_000_000) break;
+      const amount = parsedAmt;
       const note = String(payload?.note || '').trim().slice(0, 180);
       recordPaymentTransactionAndNotifyAdmin(store, {
         username: uname,
@@ -5354,91 +5979,29 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const existing = store.paymentTransactions[idx];
       if (existing.status === 'paid') break;
       const nowMs = Date.now();
-      const updated = {
+      const amt = Math.max(0, Math.round(Number(existing.amount) || 0));
+      const confirmedBy = viewer?.username || SUPER_ADMIN_USERNAME;
+      const fulfillRes = fulfillPaidEntitlementForUser(store, {
+        userKey: existing.username,
+        itemType: existing.itemType || 'cover',
+        itemId: existing.itemId || '',
+        itemLabel: existing.itemLabel || '',
+        amount: amt,
+        orderCode: existing.orderCode || '',
+        gateway: existing.gateway || 'manual_confirm',
+        txId: existing.txId || `manual:${txId}`,
+        confirmedBy,
+        nowMs
+      });
+      store.paymentTransactions[idx] = {
         ...existing,
+        ...(fulfillRes.effectiveItemId ? { itemId: fulfillRes.effectiveItemId } : {}),
+        ...(fulfillRes.balanceBefore ? { balanceBefore: fulfillRes.balanceBefore } : {}),
+        ...(fulfillRes.balanceAfter ? { balanceAfter: fulfillRes.balanceAfter } : {}),
+        confirmedBy,
         status: 'paid',
         paidAt: nowMs
       };
-      store.paymentTransactions[idx] = updated;
-      const userKey = findUserKeyInStore(store, updated.username);
-      const targetUser = userKey ? store.users?.[userKey] : null;
-      if (userKey && targetUser) {
-        const amt = Math.max(0, Math.round(Number(updated.amount) || 0));
-        const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
-        const isDonateOrTitle = updated.itemType === 'donate' || updated.itemType === 'title';
-        const nextDonatedTotal = isDonateOrTitle
-          ? (Number(targetUser.donatedTotalVnd) || 0) + amt
-          : (Number(targetUser.donatedTotalVnd) || 0);
-        const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
-        const prevExpiries = targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
-          ? { ...targetUser.purchasedTitleExpiries }
-          : {};
-        const newlyPermanentTitles = [];
-        const nextPurchasedSet = new Set(prevPurchased);
-        if (isDonateOrTitle) {
-          PAID_SHOP_TITLES.forEach(t => {
-            if (!t.isPermanentDonateTitle) return;
-            const threshold = getTitlePriceVnd(t, payCfgNow);
-            if (nextDonatedTotal >= threshold || (updated.itemId && updated.itemId === t.id)) {
-              if (!nextPurchasedSet.has(t.id)) {
-                newlyPermanentTitles.push(t);
-              }
-              nextPurchasedSet.add(t.id);
-              delete prevExpiries[t.id];
-            }
-          });
-        }
-        const isGachaWishTx = updated.itemType === 'gacha_wish_1' || updated.itemType === 'gacha_wish_10';
-        const gachaTxAdd = updated.itemType === 'gacha_wish_10' ? 10 : 1;
-        const nextGachaTxCredits = isGachaWishTx
-          ? getGachaWishPurchasedCredits(targetUser) + gachaTxAdd
-          : getGachaWishPurchasedCredits(targetUser);
-        const prevRpgTx = targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
-          ? targetUser.knightRpgProfile
-          : {};
-        store.users[userKey] = {
-          ...targetUser,
-          totalPaidVnd: (Number(targetUser.totalPaidVnd) || 0) + amt,
-          paidCount: (Number(targetUser.paidCount) || 0) + 1,
-          lastPaidAt: nowMs,
-          ...(isGachaWishTx
-            ? {
-                gachaWishCredits: nextGachaTxCredits,
-                knightRpgProfile: {
-                  ...prevRpgTx,
-                  wishes: Math.max(0, (Number(prevRpgTx.wishes) || 0) + gachaTxAdd),
-                  claimedServerWishCredits: nextGachaTxCredits
-                },
-                subscriptionRequested: null
-              }
-            : {}),
-          ...(isDonateOrTitle
-            ? {
-                donatedTotalVnd: nextDonatedTotal,
-                purchasedTitleIds: Array.from(nextPurchasedSet),
-                purchasedTitleExpiries: prevExpiries,
-                paidTitleRequested: null
-              }
-            : {})
-        };
-        const unlockedBonusText = newlyPermanentTitles.length > 0
-          ? ` Đã tự động mở khóa VĨNH VIỄN danh hiệu: ${newlyPermanentTitles.map(t => `${t.icon} ${t.label}`).join(', ')}!`
-          : '';
-        appendStoreNotification(
-          store,
-          {
-            title: isDonateOrTitle
-              ? '💜 Cảm ơn bạn đã ủng hộ duy trì website!'
-              : '✅ Admin đã xác nhận giao dịch của bạn!',
-            message: `Admin Tuấn đã xác nhận khoản ${formatVndCurrency(amt)} (${updated.itemLabel}).${unlockedBonusText} Cảm ơn ${targetUser.name || userKey} rất nhiều vì đã đồng hành cùng website!`,
-            type: 'announcement',
-            targetUsernames: [userKey],
-            createdBy: SUPER_ADMIN_USERNAME,
-            createdByName: 'Admin Tuấn'
-          },
-          null
-        );
-      }
       changed = true;
       break;
     }
@@ -5840,24 +6403,55 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
 
     case 'SUBMIT_PRACTICE_GAME_SCORE': {
       if (!viewer?.username) break;
-      const cleanScore = Math.max(0, Math.min(250_000, Math.round(Number(payload?.score) || 0)));
+      const isViewerSuperAdmin = Boolean(viewer.isSuperAdmin && viewer.username === SUPER_ADMIN_USERNAME);
+      const isViewerTeacher = viewer.role === 'teacher';
+      const matchId = String(payload?.matchId || '').trim().slice(0, 80);
+      if (matchId && payload?.gameCompleted) {
+        if (!(store._processedGameMatchIds instanceof Set)) {
+          store._processedGameMatchIds = new Set();
+        }
+        const dedupKey = `${viewer.username.toLowerCase()}:${matchId}`;
+        if (store._processedGameMatchIds.has(dedupKey)) {
+          break;
+        }
+        if (store._processedGameMatchIds.size >= 1000) {
+          const firstKey = store._processedGameMatchIds.values().next().value;
+          if (firstKey) store._processedGameMatchIds.delete(firstKey);
+        }
+        store._processedGameMatchIds.add(dedupKey);
+      }
       const topicId = String(payload?.topicId || 'core').trim().slice(0, 60);
       const topicLabel = String(payload?.topicLabel || 'IELTS Core').trim().slice(0, 80);
       const mode = String(payload?.mode || 'full_4').trim().slice(0, 32);
       const gameType = payload?.gameType === 'knight_rpg' || mode.startsWith('knight') ? 'knight_rpg' : 'space_shooter';
       const passedCount = Math.max(0, Math.min(200, Math.round(Number(payload?.passedCount) || 0)));
       const totalCount = Math.max(1, Math.min(200, Math.round(Number(payload?.totalCount) || 1)));
+      const rawSubmittedScore = Math.max(0, Math.min(250_000, Math.round(Number(payload?.score) || 0)));
+      const plausibleCap = isViewerSuperAdmin
+        ? 250_000
+        : passedCount <= 0
+        ? 0
+        : Math.min(250_000, passedCount * 3500 + 5000);
+      const cleanScore = Math.min(rawSubmittedScore, plausibleCap);
       const accuracyPct = Math.min(100, Math.max(0, Math.round((passedCount / totalCount) * 100)));
       const nowMs = Date.now();
       if (payload?.knightRpgProfile && typeof payload.knightRpgProfile === 'object') {
         const uKey = findUserKeyInStore(store, viewer.username) || viewer.username;
         if (store.users?.[uKey]) {
+          const prevUserRec = store.users[uKey];
           store.users[uKey] = {
-            ...store.users[uKey],
-            knightRpgProfile: {
-              ...(store.users[uKey].knightRpgProfile || {}),
-              ...payload.knightRpgProfile
-            }
+            ...prevUserRec,
+            knightRpgProfile: sanitizeClientKnightRpgUpdate(
+              prevUserRec.knightRpgProfile,
+              payload.knightRpgProfile,
+              prevUserRec,
+              {
+                isSuperAdmin: isViewerSuperAdmin,
+                isTeacher: isViewerTeacher,
+                allowMatchLoot: Boolean(payload?.gameCompleted),
+                allowGoldGain: isViewerTeacher
+              }
+            )
           };
           changed = true;
         }
@@ -6043,7 +6637,8 @@ async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 })
         body: JSON.stringify({
           contents: [{ parts: requestParts }],
           generationConfig
-        })
+        }),
+        signal: AbortSignal.timeout(90_000)
       });
     };
 
@@ -6170,6 +6765,10 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'DELETE_PAYMENT_TRANSACTION',
   'UPDATE_PAYMENT_CONFIG',
   'UPSERT_SPEAKING_FORECAST',
+  'UPSERT_ATTEMPT',
+  'ADMIN_GRANT_GACHA_WISHES',
+  'ADMIN_SET_GACHA_BANNER_CONFIG',
+  'SUBMIT_PRACTICE_GAME_SCORE',
   'SEED_DEFAULTS'
 ]);
 
@@ -7096,6 +7695,10 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         sendJsonResponse(res, 403, { ok: false, error: 'Chỉ Giáo viên hoặc Quản trị mới được dùng công cụ tạo/kiểm tra đề AI.' });
         return;
       }
+      if (!checkRateLimit(store._rateLimits, `ai_gen:${viewer.username.toLowerCase()}`, 35, 5 * 60 * 1000)) {
+        sendJsonResponse(res, 429, { ok: false, error: 'Bạn gửi quá nhiều yêu cầu tạo đề AI liên tiếp. Vui lòng đợi ít phút rồi thử lại.' });
+        return;
+      }
       try {
         const body = await readJsonBody(req, 40 * 1024 * 1024);
         const promptText = String(body?.promptText || body?.prompt || '');
@@ -7149,11 +7752,19 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
         sendJsonResponse(res, 401, { ok: false, error: 'Vui lòng đăng nhập để tạo mã thanh toán.' });
         return;
       }
+      if (!checkRateLimit(store._rateLimits, `create_order:${viewer.username.toLowerCase()}`, 30, 5 * 60 * 1000)) {
+        sendJsonResponse(res, 429, { ok: false, error: 'Bạn khởi tạo mã thanh toán quá nhanh. Vui lòng đợi ít phút.' });
+        return;
+      }
       try {
         const body = await readJsonBody(req);
         const viewerUser = store.users?.[viewer.username] || viewer;
         const cfg = getPublicPaymentConfigSummary(store);
-        const rawType = String(body?.itemType || 'cover').trim();
+        const rawType = body?.itemType !== undefined && body?.itemType !== '' ? String(body.itemType).trim() : 'cover';
+        if (!VALID_PAYMENT_ITEM_TYPES.has(rawType)) {
+          sendJsonResponse(res, 400, { ok: false, error: 'Loại gói thanh toán không hợp lệ.' });
+          return;
+        }
         const isTitleOrder = rawType === 'title';
         const isTestOrder = rawType === 'test';
         const isSkillPassOrder = rawType === 'skill_pass';
@@ -7254,15 +7865,22 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           amount = Number(cfg.gachaWish10Price) >= 0 ? cfg.gachaWish10Price : GACHA_WISH_10_PRICE_VND;
           alreadyUnlocked = false;
         } else if (isDonateOrder) {
-          const requestedAmt = Math.round(Number(body?.amount) || 0);
+          const requestedAmt = parseStrictVndInt(body?.amount);
           if (!Number.isFinite(requestedAmt) || requestedAmt < MIN_DONATE_AMOUNT_VND) {
             sendJsonResponse(res, 400, {
               ok: false,
-              error: `Mức ủng hộ tùy tâm tối thiểu là ${formatVndCurrency(MIN_DONATE_AMOUNT_VND)}.`
+              error: `Mức ủng hộ tùy tâm tối thiểu là ${formatVndCurrency(MIN_DONATE_AMOUNT_VND)} (số nguyên dương).`
             });
             return;
           }
-          amount = Math.min(50_000_000, requestedAmt);
+          if (requestedAmt > 50_000_000) {
+            sendJsonResponse(res, 400, {
+              ok: false,
+              error: 'Số tiền vượt quá giới hạn tối đa 50.000.000đ.'
+            });
+            return;
+          }
+          amount = requestedAmt;
           itemLabel = `Ủng hộ tùy tâm (${formatVndCurrency(amount)})`;
           alreadyUnlocked = false;
         }
@@ -7462,6 +8080,26 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           descriptionUpper = `${body?.code || ''} ${body?.content || ''} ${body?.description || ''}`.toUpperCase();
         }
 
+        const parsedWebhookAmount = Number(amount);
+        if (!Number.isFinite(parsedWebhookAmount) || parsedWebhookAmount <= 0) {
+          sendJsonResponse(res, 200, { error: 0, success: true, ignored: 'invalid_amount' });
+          return;
+        }
+        amount = Math.round(parsedWebhookAmount);
+
+        if (!txKey) {
+          const fallbackDigest = crypto
+            .createHash('sha256')
+            .update(
+              `${gateway}|${numericOrderCode || ''}|${amount}|${descriptionUpper.slice(0, 140)}|${String(
+                body?.transactionDate || body?.when || body?.data?.transactionDateTime || ''
+              )}`
+            )
+            .digest('hex')
+            .slice(0, 24);
+          txKey = `${gateway}:auto_${fallbackDigest}`;
+        }
+
         if (!Array.isArray(store.processedWebhookTxIds)) store.processedWebhookTxIds = [];
         if (txKey && store.processedWebhookTxIds.includes(txKey)) {
           sendJsonResponse(res, 200, { error: 0, success: true, duplicate: true });
@@ -7498,35 +8136,27 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
             if (txKey) {
               store.processedWebhookTxIds = [txKey, ...store.processedWebhookTxIds].slice(0, 500);
             }
-            const donorUser = store.users[matchedDonateUserKey];
-            store.users[matchedDonateUserKey] = {
-              ...donorUser,
-              totalPaidVnd: (Number(donorUser.totalPaidVnd) || 0) + amount,
-              donatedTotalVnd: (Number(donorUser.donatedTotalVnd) || 0) + amount,
-              paidCount: (Number(donorUser.paidCount) || 0) + 1,
-              lastPaidAt: nowMs
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: '💜 Cảm ơn bạn đã ủng hộ duy trì website!',
-                message: `Hệ thống đã tự động ghi nhận khoản ủng hộ ${formatVndCurrency(amount)} của bạn. Cảm ơn ${donorUser.name || matchedDonateUserKey} đã tiếp thêm động lực cho Admin Tuấn!`,
-                type: 'announcement',
-                targetUsernames: [matchedDonateUserKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
+            const donorName = store.users[matchedDonateUserKey]?.name || matchedDonateUserKey;
+            const fulfillDonate = fulfillPaidEntitlementForUser(store, {
+              userKey: matchedDonateUserKey,
+              itemType: 'donate',
+              itemLabel: `Ủng hộ tùy tâm (${formatVndCurrency(amount)})`,
+              amount,
+              gateway,
+              txId: txKey,
+              nowMs
+            });
             recordPaymentTransactionAndNotifyAdmin(store, {
               username: matchedDonateUserKey,
-              userName: donorUser.name || matchedDonateUserKey,
+              userName: donorName,
               itemType: 'donate',
               itemLabel: `Ủng hộ tùy tâm (${formatVndCurrency(amount)})`,
               amount,
               status: 'paid',
               gateway,
               txId: txKey,
+              balanceBefore: fulfillDonate.balanceBefore,
+              balanceAfter: fulfillDonate.balanceAfter,
               paidAt: nowMs
             });
             store.version += 1;
@@ -7551,6 +8181,11 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           return;
         }
 
+        if (matchedOrder.status === 'paid') {
+          sendJsonResponse(res, 200, { error: 0, success: true, duplicate: true });
+          return;
+        }
+
         if (amount < Number(matchedOrder.amount || 0)) {
           sendJsonResponse(res, 200, {
             error: 0,
@@ -7562,292 +8197,44 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           return;
         }
 
+        const nowMs = Date.now();
         const targetKey = findUserKeyInStore(store, matchedOrder.username);
         const targetUser = targetKey ? store.users?.[targetKey] : null;
         if (txKey) {
           store.processedWebhookTxIds = [txKey, ...store.processedWebhookTxIds].slice(0, 500);
         }
         matchedOrder.status = 'paid';
-        matchedOrder.paidAt = Date.now();
+        matchedOrder.paidAt = nowMs;
         matchedOrder.paidAmount = amount;
         matchedOrder.txId = txKey;
         matchedOrder.gateway = gateway;
 
         if (targetKey && targetUser) {
-          const nowMs = Date.now();
-          if (matchedOrder.itemType === 'title' && matchedOrder.itemId) {
-            const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
-            const matchedTitleDef = PAID_SHOP_TITLES.find(t => t.id === matchedOrder.itemId);
-            const isPermanentDonate = Boolean(matchedTitleDef?.isPermanentDonateTitle);
-            const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
-            const nextPurchasedSet = new Set([...prevPurchased, matchedOrder.itemId]);
-            const prevExpiries = targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
-              ? { ...targetUser.purchasedTitleExpiries }
-              : {};
-            const nextDonatedTotal = isPermanentDonate
-              ? (Number(targetUser.donatedTotalVnd) || 0) + amount
-              : (Number(targetUser.donatedTotalVnd) || 0);
-            if (isPermanentDonate) {
-              delete prevExpiries[matchedOrder.itemId];
-              PAID_SHOP_TITLES.forEach(t => {
-                if (t.isPermanentDonateTitle && nextDonatedTotal >= getTitlePriceVnd(t, payCfgNow)) {
-                  nextPurchasedSet.add(t.id);
-                  delete prevExpiries[t.id];
-                }
-              });
-            } else {
-              const baseExp = Math.max(nowMs, Number(prevExpiries[matchedOrder.itemId]) || 0);
-              prevExpiries[matchedOrder.itemId] = baseExp + SUBSCRIPTION_DURATION_MS;
-            }
-            store.users[targetKey] = {
-              ...targetUser,
-              donatedTotalVnd: nextDonatedTotal,
-              purchasedTitleIds: Array.from(nextPurchasedSet),
-              purchasedTitleExpiries: prevExpiries,
-              ...(targetUser.paidTitleRequested?.titleId === matchedOrder.itemId ? { paidTitleRequested: null } : {})
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: isPermanentDonate
-                  ? '💜 Đã mở khóa VĨNH VIỄN Danh Hiệu Phú Quý!'
-                  : '🎉 Đã mở khóa Danh Hiệu VIP (1 Tháng)!',
-                message: isPermanentDonate
-                  ? `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa VĨNH VIỄN danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId}. Cảm ơn bạn đã ủng hộ Tuấn duy trì trang web & server học tập!`
-                  : `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và kích hoạt danh hiệu ${matchedOrder.itemLabel || matchedOrder.itemId} trong 30 ngày. Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web & server học tập!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else if (matchedOrder.itemType === 'test' && matchedOrder.itemId) {
-            const prevTests = Array.isArray(targetUser.purchasedTestIds) ? targetUser.purchasedTestIds.map(String) : [];
-            const alreadyOwned = prevTests.includes(matchedOrder.itemId);
-            const nextTests = Array.from(new Set([...prevTests, matchedOrder.itemId]));
-            const nextTotalPurchased = alreadyOwned
-              ? getPurchasedExamCount(targetUser)
-              : getPurchasedExamCount(targetUser) + 1;
-            store.users[targetKey] = {
-              ...targetUser,
-              purchasedTestIds: nextTests,
-              totalPurchasedExams: nextTotalPurchased,
-              ...(targetUser.subscriptionRequested?.itemId === matchedOrder.itemId ? { subscriptionRequested: null } : {})
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: '🎉 Đã mở khóa Đề Thi Thực Chiến 4 Kỹ Năng!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa ${matchedOrder.itemLabel || matchedOrder.itemId} (1 lượt thi thật đủ 4 kỹ năng L·R·W·S, chờ Ms. Như duyệt điểm sau khi nộp).`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else if (Boolean(getRealExamComboMeta(matchedOrder.itemType, store.paymentConfig))) {
-            const comboFulfilled = getRealExamComboMeta(matchedOrder.itemType, store.paymentConfig);
-            const nextCredits = getRealExamCredits(targetUser) + comboFulfilled.credits;
-            const nextTotalPurchased = getPurchasedExamCount(targetUser) + comboFulfilled.credits;
-            store.users[targetKey] = {
-              ...targetUser,
-              realExamCredits: nextCredits,
-              totalPurchasedExams: nextTotalPurchased,
-              ...(targetUser.subscriptionRequested?.itemType === matchedOrder.itemType ? { subscriptionRequested: null } : {})
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: `🎉 Đã kích hoạt ${comboFulfilled.label} (+${comboFulfilled.credits} lượt Thi Thật)!`,
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và cộng +${comboFulfilled.credits} lượt mở đề Thực Chiến Thi Thật 4 Kỹ Năng (hiện có ${nextCredits} lượt). Bạn có thể vào Trang Chủ bấm "Dùng 1 Lượt Combo" để vào thi ngay!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else if (matchedOrder.itemType === 'skill_pass') {
-            const baseExp = Math.max(nowMs, Number(targetUser.skillPracticeExpiresAt) || 0);
-            store.users[targetKey] = {
-              ...targetUser,
-              skillPracticeExpiresAt: baseExp + SUBSCRIPTION_DURATION_MS,
-              ...(targetUser.subscriptionRequested?.itemType === 'skill_pass' ? { subscriptionRequested: null } : {})
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: '🎉 Đã kích hoạt Gói Daily Zone (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và mở khóa 30 ngày sử dụng đầy đủ Khu Daily Zone! Cảm ơn bạn đã ủng hộ!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else if (matchedOrder.itemType === 'aieo_vip') {
-            const wasVipActive = Number(targetUser.aieoVipExpiresAt) > nowMs;
-            const baseVipExp = Math.max(nowMs, Number(targetUser.aieoVipExpiresAt) || 0);
-            const nextVipExp = baseVipExp + SUBSCRIPTION_DURATION_MS;
-            const nextSkillExp = Math.max(Number(targetUser.skillPracticeExpiresAt) || 0, nextVipExp);
-            const autoEquipVip = !targetUser.equippedTitleId || targetUser.equippedTitleId === 'newbie';
-            const keepCustomRed = Boolean(wasVipActive && targetUser.vipEffectsCustomizedAt);
-            store.users[targetKey] = {
-              ...targetUser,
-              aieoVipExpiresAt: nextVipExp,
-              skillPracticeExpiresAt: nextSkillExp,
-              vipRedNameEnabled: keepCustomRed ? (targetUser.vipRedNameEnabled ?? true) : true,
-              vipNameColor: normalizeVipNameColor(targetUser.vipNameColor || 'crimson'),
-              vipTagEnabled: keepCustomRed ? (targetUser.vipTagEnabled ?? true) : true,
-              vipNeonCoverEnabled: keepCustomRed ? (targetUser.vipNeonCoverEnabled ?? true) : true,
-              vipNeonCoverColor: normalizeVipNeonCoverColor(targetUser.vipNeonCoverColor || 'aurora_rgb'),
-              ...(!wasVipActive ? { vipEffectsCustomizedAt: 0 } : {}),
-              ...(autoEquipVip ? { equippedTitleId: 'aieo_vip', showTitleBadge: true } : {}),
-              ...(targetUser.subscriptionRequested?.itemType === 'aieo_vip' ? { subscriptionRequested: null } : {})
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: '👑 Chào mừng thành viên Gói IELTS VIP (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn đã mở khóa 30 ngày: Ảnh Avatar Động (.GIF/.WebP), Tùy chọn Màu Chữ Tên & Viền Bìa LED Neon Nhiều Màu, Ảnh Bìa Cá Nhân miễn phí, Khung Avatar VIP, Danh hiệu 👑 IELTS VIP & Tạo phòng Game bạn bè! Cảm ơn bạn đã ủng hộ!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else if (matchedOrder.itemType === 'room_ticket') {
-            const nextCredits = getFriendRoomTicketCredits(targetUser) + 1;
-            store.users[targetKey] = {
-              ...targetUser,
-              roomCreateCredits: nextCredits,
-              ...(targetUser.subscriptionRequested?.itemType === 'room_ticket' ? { subscriptionRequested: null } : {})
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: '🎫 Đã mở +1 Lượt Tạo Phòng Đấu Riêng!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và cộng +1 vé tạo Phòng Đấu Riêng cùng bạn bè (hiện có ${nextCredits} lượt)! Cảm ơn bạn đã ủng hộ Tuấn!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else if (matchedOrder.itemType === 'gacha_wish_1' || matchedOrder.itemType === 'gacha_wish_10') {
-            const wishAdd = matchedOrder.itemType === 'gacha_wish_10' ? 10 : 1;
-            const nextWishCredits = getGachaWishPurchasedCredits(targetUser) + wishAdd;
-            const prevRpg = targetUser.knightRpgProfile && typeof targetUser.knightRpgProfile === 'object'
-              ? targetUser.knightRpgProfile
-              : {};
-            const nextRpgWishes = Math.max(0, (Number(prevRpg.wishes) || 0) + wishAdd);
-            store.users[targetKey] = {
-              ...targetUser,
-              gachaWishCredits: nextWishCredits,
-              knightRpgProfile: {
-                ...prevRpg,
-                wishes: nextRpgWishes,
-                claimedServerWishCredits: nextWishCredits
-              },
-              ...(targetUser.subscriptionRequested?.itemType === matchedOrder.itemType ? { subscriptionRequested: null } : {})
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: `🌠 Đã cộng +${wishAdd} Lượt Quay Cầu Nguyện Gacha!`,
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}) và cộng ngay +${wishAdd} 🌠 Lượt Quay Cầu Nguyện vào game Hiệp Sĩ Diệt Rồng (hiện có ${nextRpgWishes} lượt)! Chúc bạn quay nổ Vàng 5★!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else if (matchedOrder.itemType === 'donate') {
-            const payCfgNow = normalizePaymentConfig(store.paymentConfig || {});
-            const nextDonatedTotal = (Number(targetUser.donatedTotalVnd) || 0) + amount;
-            const prevPurchased = Array.isArray(targetUser.purchasedTitleIds) ? targetUser.purchasedTitleIds.map(String) : [];
-            const nextPurchasedSet = new Set(prevPurchased);
-            const prevExpiries = targetUser.purchasedTitleExpiries && typeof targetUser.purchasedTitleExpiries === 'object'
-              ? { ...targetUser.purchasedTitleExpiries }
-              : {};
-            const newlyPermanentTitles = [];
-            PAID_SHOP_TITLES.forEach(t => {
-              if (!t.isPermanentDonateTitle) return;
-              if (nextDonatedTotal >= getTitlePriceVnd(t, payCfgNow)) {
-                if (!nextPurchasedSet.has(t.id)) newlyPermanentTitles.push(t);
-                nextPurchasedSet.add(t.id);
-                delete prevExpiries[t.id];
-              }
-            });
-            store.users[targetKey] = {
-              ...targetUser,
-              donatedTotalVnd: nextDonatedTotal,
-              purchasedTitleIds: Array.from(nextPurchasedSet),
-              purchasedTitleExpiries: prevExpiries
-            };
-            const unlockedText = newlyPermanentTitles.length > 0
-              ? ` Tự động mở khóa VĨNH VIỄN danh hiệu: ${newlyPermanentTitles.map(t => `${t.icon} ${t.label}`).join(', ')}!`
-              : '';
-            appendStoreNotification(
-              store,
-              {
-                title: '💜 Cảm ơn bạn đã ủng hộ duy trì website!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}).${unlockedText} Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì máy chủ & phát triển website học tập!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          } else {
-            const baseCoverExp = Math.max(nowMs, Number(targetUser.customCoverExpiresAt) || 0);
-            store.users[targetKey] = {
-              ...targetUser,
-              customCoverUnlocked: true,
-              customCoverUnlockedAt: nowMs,
-              customCoverExpiresAt: baseCoverExp + SUBSCRIPTION_DURATION_MS,
-              customCoverUnlockedBy: `auto_${gateway}`,
-              coverUnlockRequestedAt: 0
-            };
-            appendStoreNotification(
-              store,
-              {
-                title: '🎉 Đã mở khóa Ảnh Nền Riêng (1 Tháng)!',
-                message: `Hệ thống đã nhận ${formatVndCurrency(amount)} (mã đơn ${matchedOrder.orderCode}). Bạn có thể tải & cắt ảnh bìa hồ sơ trong 30 ngày! Cảm ơn bạn đã ủng hộ Tuấn chi phí duy trì trang web!`,
-                type: 'announcement',
-                targetUsernames: [targetKey],
-                createdBy: SUPER_ADMIN_USERNAME,
-                createdByName: 'Hệ Thống Thanh Toán Tự Động'
-              },
-              null
-            );
-          }
-
-          // Always update cumulative payment stats on user record & log + notify Admin
+          const fulfillRes = fulfillPaidEntitlementForUser(store, {
+            userKey: targetKey,
+            itemType: matchedOrder.itemType || 'cover',
+            itemId: matchedOrder.itemId || '',
+            itemLabel: matchedOrder.itemLabel || matchedOrder.itemType || 'Thanh toán',
+            amount,
+            orderCode: matchedOrder.orderCode,
+            gateway,
+            txId: txKey,
+            nowMs
+          });
           const latestUserRec = store.users[targetKey] || targetUser;
-          store.users[targetKey] = {
-            ...latestUserRec,
-            totalPaidVnd: (Number(latestUserRec.totalPaidVnd) || 0) + amount,
-            paidCount: (Number(latestUserRec.paidCount) || 0) + 1,
-            lastPaidAt: nowMs
-          };
           recordPaymentTransactionAndNotifyAdmin(store, {
             orderCode: matchedOrder.orderCode,
             username: targetKey,
             userName: latestUserRec.name || targetKey,
             itemType: matchedOrder.itemType || 'cover',
+            itemId: matchedOrder.itemId || '',
             itemLabel: matchedOrder.itemLabel || matchedOrder.itemType || 'Thanh toán',
             amount,
             status: 'paid',
             gateway,
             txId: txKey,
+            balanceBefore: fulfillRes.balanceBefore,
+            balanceAfter: fulfillRes.balanceAfter,
             paidAt: nowMs
           });
         }

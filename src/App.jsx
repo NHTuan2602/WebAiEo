@@ -343,6 +343,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [sentNotifications, setSentNotifications] = useState([]);
   const [adminPaymentHistory, setAdminPaymentHistory] = useState([]);
+  const [myPaymentTransactions, setMyPaymentTransactions] = useState([]);
   const [classesDb, setClassesDb] = useState({});
   const [customTitles, setCustomTitles] = useState([]);
   const [speakingUnlockTokens, setSpeakingUnlockTokens] = useState(() => {
@@ -461,10 +462,14 @@ export default function App() {
   });
   const [tempNoteText, setTempNoteText] = useState('');
   const [globalToast, setGlobalToast] = useState({ text: '', visible: false, type: 'success' });
+  const globalToastTimerRef = useRef(null);
 
   const showToast = (text, type = 'success') => {
+    clearTimeout(globalToastTimerRef.current);
     setGlobalToast({ text, visible: true, type });
-    setTimeout(() => setGlobalToast(prev => ({ ...prev, visible: false })), 3000);
+    globalToastTimerRef.current = setTimeout(() => {
+      setGlobalToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
   };
 
   // Toggle permission for students to view correct answers (Teacher-controlled)
@@ -1511,6 +1516,7 @@ export default function App() {
     clearTimeout(autoNextTimerRef.current);
     clearInterval(wordTimerRef.current);
     clearInterval(lobbyCountdownTimerRef.current);
+    clearTimeout(gameToastTimerRef.current);
     setLobbyCountdown(null);
     setJoinedRoomPin(null);
     setGameSubState('JOIN');
@@ -1586,6 +1592,8 @@ export default function App() {
         seenNotifIdsRef.current = null;
         setNotifications([]);
         setSentNotifications([]);
+        setAdminPaymentHistory([]);
+        setMyPaymentTransactions([]);
         setClassesDb({});
         setCustomTitles([]);
         setSpeakingUnlockTokens({});
@@ -1685,6 +1693,9 @@ export default function App() {
     }
     if (Array.isArray(snap.adminPaymentHistory)) {
       setAdminPaymentHistory(prev => (JSON.stringify(prev) === JSON.stringify(snap.adminPaymentHistory) ? prev : snap.adminPaymentHistory));
+    }
+    if (Array.isArray(snap.myPaymentTransactions)) {
+      setMyPaymentTransactions(prev => (JSON.stringify(prev) === JSON.stringify(snap.myPaymentTransactions) ? prev : snap.myPaymentTransactions));
     }
     if (Array.isArray(snap.sentNotifications)) {
       setSentNotifications(prev => (JSON.stringify(prev) === JSON.stringify(snap.sentNotifications) ? prev : snap.sentNotifications));
@@ -2003,6 +2014,8 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      clearTimeout(globalToastTimerRef.current);
+      clearTimeout(gameToastTimerRef.current);
       window.removeEventListener('storage', handleStorageEvent);
       syncChannelRef.current?.close();
       syncChannelRef.current = null;
@@ -3815,6 +3828,8 @@ export default function App() {
   const examAutoAdvanceHandledRef = useRef(null);
   const autoAdvanceFnRef = useRef(null);
   const examSubmitLockRef = useRef(false);
+  const redeemCreditLockRef = useRef(false);
+  const saveBuilderLockRef = useRef(false);
 
   // Exam Countdown Timer (wall-clock based: accurately elapses time even if the tab is throttled or switched)
   useEffect(() => {
@@ -4152,6 +4167,7 @@ export default function App() {
     setNotifications([]);
     setSentNotifications([]);
     setAdminPaymentHistory([]);
+    setMyPaymentTransactions([]);
     setCustomTitles([]);
     setSpeakingUnlockTokens({});
     setExamUnlockTokens({});
@@ -4575,7 +4591,11 @@ export default function App() {
         return;
       }
 
-      clearExamDraft(currentUser?.username, activeTest.id);
+      if (syncedSnap) {
+        clearExamDraft(currentUser?.username, activeTest.id);
+      } else {
+        saveExamDraft(currentUser?.username, activeTest.id, examState);
+      }
       if (!syncedSnap || !Array.isArray(syncedSnap.attempts) || !syncedSnap.attempts.some(a => a?.id === newAttempt.id)) {
         setAttempts(prev => (prev.some(a => a.id === newAttempt.id) ? prev : [newAttempt, ...prev]));
       }
@@ -4592,7 +4612,9 @@ export default function App() {
       }
       setView('RESULT_VIEW');
 
-      if (isSingleObjective) {
+      if (!syncedSnap) {
+        showToast('Mất kết nối máy chủ: bài làm đã lưu dự phòng trên máy. Vui lòng kiểm tra mạng để đồng bộ!', 'info');
+      } else if (isSingleObjective) {
         showToast('Đã nộp bài Daily Zone! Xem ngay điểm Band, số câu đúng, thời gian và số lần làm bài.');
       } else {
         showToast('Đã nộp bài thành công! Điểm Nghe & Đọc hiển thị ngay, Writing/Speaking chờ Ms. Như duyệt.');
@@ -4604,7 +4626,7 @@ export default function App() {
 
   const handleRedeemRealExamCredit = async (testId) => {
     const cleanId = String(testId || '').trim();
-    if (!cleanId || !currentUser?.username) return false;
+    if (!cleanId || !currentUser?.username || redeemCreditLockRef.current) return false;
     const credits = getRealExamCredits(currentUser);
     if (credits < 1) {
       showToast('Bạn chưa còn lượt Combo Thực Chiến nào. Hãy chọn mua Combo 3/5/10 đề nhé!', 'info');
@@ -4612,36 +4634,50 @@ export default function App() {
     }
     const targetTest = tests.find(t => t.id === cleanId);
     if (!targetTest) return false;
+    redeemCreditLockRef.current = true;
     try {
-      await dispatchSyncAction('REDEEM_REAL_EXAM_CREDIT', { testId: cleanId });
-      const remaining = Math.max(0, credits - 1);
-      setUsersDb(prev => {
-        const u = prev[currentUser.username];
-        if (!u) return prev;
-        const prevPurchased = Array.isArray(u.purchasedTestIds) ? u.purchasedTestIds : [];
-        return {
-          ...prev,
-          [currentUser.username]: {
-            ...u,
-            realExamCredits: Math.max(0, getRealExamCredits(u) - 1),
+      const snap = await dispatchSyncAction('REDEEM_REAL_EXAM_CREDIT', { testId: cleanId });
+      if (!snap) {
+        if (lastSyncRejectionStatusRef.current === 0) {
+          showToast('Cần kết nối máy chủ để đổi lượt Combo an toàn. Vui lòng kiểm tra lại mạng!', 'error');
+        }
+        return false;
+      }
+      const updatedUserFromSnap = snap.users?.[currentUser.username];
+      const remaining = updatedUserFromSnap
+        ? getRealExamCredits(updatedUserFromSnap)
+        : Math.max(0, credits - 1);
+      if (!updatedUserFromSnap) {
+        setUsersDb(prev => {
+          const u = prev[currentUser.username];
+          if (!u) return prev;
+          const prevPurchased = Array.isArray(u.purchasedTestIds) ? u.purchasedTestIds : [];
+          return {
+            ...prev,
+            [currentUser.username]: {
+              ...u,
+              realExamCredits: Math.max(0, getRealExamCredits(u) - 1),
+              purchasedTestIds: Array.from(new Set([...prevPurchased, cleanId]))
+            }
+          };
+        });
+        setCurrentUser(prev => {
+          if (!prev) return prev;
+          const prevPurchased = Array.isArray(prev.purchasedTestIds) ? prev.purchasedTestIds : [];
+          return {
+            ...prev,
+            realExamCredits: Math.max(0, getRealExamCredits(prev) - 1),
             purchasedTestIds: Array.from(new Set([...prevPurchased, cleanId]))
-          }
-        };
-      });
-      setCurrentUser(prev => {
-        if (!prev) return prev;
-        const prevPurchased = Array.isArray(prev.purchasedTestIds) ? prev.purchasedTestIds : [];
-        return {
-          ...prev,
-          realExamCredits: Math.max(0, getRealExamCredits(prev) - 1),
-          purchasedTestIds: Array.from(new Set([...prevPurchased, cleanId]))
-        };
-      });
+          };
+        });
+      }
       showToast(`Đã trừ 1 lượt làm đề có phí (còn ${remaining} lượt) và mở khóa "${targetTest.title}"!`);
       return true;
     } catch (err) {
       showToast(err?.message || 'Không thể đổi lượt Combo lúc này.', 'error');
       return false;
+    } finally {
+      redeemCreditLockRef.current = false;
     }
   };
 
@@ -5866,6 +5902,7 @@ export default function App() {
   };
 
   const handleSaveTestBuilder = () => {
+    if (saveBuilderLockRef.current) return;
     if (!testForm.title.trim()) {
       setBuilderTab('general');
       showToast('Vui lòng nhập Tên Đề Thi ở tab Thông Tin Chung trước khi lưu!', 'error');
@@ -5883,6 +5920,8 @@ export default function App() {
       showToast('Giờ bắt đầu mở đề phải sớm hơn Hạn chót nộp bài!', 'error');
       return;
     }
+    saveBuilderLockRef.current = true;
+    try {
     const tracks = getListeningTracks(testForm.listening).map(tr => ({
       ...tr,
       clozeText: sortClozeTextSectionsByBlankNumber(tr.clozeText || '')
@@ -6028,6 +6067,11 @@ export default function App() {
       ? previousView
       : 'TEACHER_DASHBOARD';
     setView(returnAfterSaveView);
+    } finally {
+      setTimeout(() => {
+        saveBuilderLockRef.current = false;
+      }, 400);
+    }
   };
 
   const handleBulkCreateTests = async (rawTests = [], { summaryLabel = 'Daily Zone Writing', notify = true } = {}) => {
@@ -6247,6 +6291,7 @@ export default function App() {
     }
     dispatchSyncAction('SUBMIT_PRACTICE_GAME_SCORE', {
       username: currentUser.username,
+      matchId: gameRuntimeRef.current.matchId || `space_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       topicId: meta.topicId || 'core',
       topicLabel: meta.topicLabel || 'IELTS Core Academic',
       mode: meta.singleRoundOnly ? `round_${gameRuntimeRef.current.round}` : 'full_4',
@@ -6318,6 +6363,7 @@ export default function App() {
       queues,
       isSandbox: false,
       isPractice: true,
+      matchId: `space_p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       practiceMeta,
       paused: false,
       speedMode,
@@ -6385,6 +6431,7 @@ export default function App() {
       queues,
       isSandbox: false,
       isPractice: false,
+      matchId: `space_m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       practiceMeta: null,
       paused: false,
       speedMode,
@@ -8021,6 +8068,7 @@ export default function App() {
         <StudentProfile
           adminFeedbacks={adminFeedbacks}
           adminPaymentHistory={adminPaymentHistory}
+          myPaymentTransactions={myPaymentTransactions}
           attempts={attempts}
           classesDb={classesDb}
           currentRoomPin={currentRoomPin}
@@ -8170,6 +8218,7 @@ export default function App() {
             }
             dispatchSyncAction('SUBMIT_PRACTICE_GAME_SCORE', {
               username: currentUser.username,
+              matchId: payload?.matchId || `krpg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
               topicId: payload?.topicId || 'core',
               topicLabel: payload?.topicLabel || 'IELTS Core Academic',
               mode: payload?.mode || 'knight_full_4',

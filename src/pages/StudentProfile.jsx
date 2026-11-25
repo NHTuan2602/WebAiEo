@@ -93,6 +93,7 @@ import VipMemberName from '../components/common/VipMemberName';
 export default function StudentProfile({
   adminFeedbacks = [],
   adminPaymentHistory = [],
+  myPaymentTransactions = [],
   attempts = [],
   classesDb = {},
   currentRoomPin,
@@ -165,6 +166,9 @@ export default function StudentProfile({
   const [showTitlesModal, setShowTitlesModal] = useState(false);
   const [titleFilter, setTitleFilter] = useState('all');
   const [profileHistoryPage, setProfileHistoryPage] = useState(1);
+  const [attemptModeFilter, setAttemptModeFilter] = useState('all');
+  const [showAllTimelineCards, setShowAllTimelineCards] = useState(false);
+  const [myTxPage, setMyTxPage] = useState(1);
   const [donateAmount, setDonateAmount] = useState(MIN_DONATE_AMOUNT_VND);
   const [isCustomDonateMode, setIsCustomDonateMode] = useState(true);
   const [customDonateInput, setCustomDonateInput] = useState(MIN_DONATE_AMOUNT_VND.toLocaleString('vi-VN'));
@@ -2709,143 +2713,170 @@ export default function StudentProfile({
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Chronological Trajectory Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {chronologicalAttempts.map((att, idx) => {
-                const showScores = isAttemptApprovedForViewer(att);
-                return (
-                <div
-                  key={att.id}
-                  className={`rounded-xl p-5 border transition ${
-                    idx === chronologicalAttempts.length - 1
-                      ? 'bg-[#F8FAFC] dark:bg-zinc-800/80 border-slate-300 dark:border-zinc-600'
-                      : 'bg-[#F8FAFC] dark:bg-zinc-900 border-[#E2E8F0] dark:border-zinc-800'
-                  }`}
-                >
-                  <div className="flex justify-between items-start gap-2 mb-3">
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${
-                      idx === chronologicalAttempts.length - 1
-                        ? 'bg-[#0F766E] text-white'
-                        : 'bg-white dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 border border-[#E2E8F0] dark:border-zinc-700'
-                    }`}>
-                      Lần thi #{idx + 1} {idx === chronologicalAttempts.length - 1 ? '(Gần nhất)' : ''}
-                    </span>
-                    <div className="text-right">
-                      <span className="text-xs text-[#475569] dark:text-zinc-400 font-medium block">{att.submittedAt}</span>
-                      {Number(att.durationSeconds) > 0 && (
-                        <span className="text-xs font-bold text-[#0F766E] dark:text-zinc-200 block">
-                          {formatDurationVi(att.durationSeconds)}
-                          {att.timelinessStatus === 'late' ? ` • Trễ ${att.lateByMinutes || 1}p` : ''}
-                        </span>
-                      )}
+            {/* Chronological Trajectory Cards (capped at latest 12 by default to prevent DOM lag) */}
+            {(() => {
+              const visibleTimeline = showAllTimelineCards
+                ? chronologicalAttempts
+                : chronologicalAttempts.slice(-12);
+              const idxOffset = Math.max(0, chronologicalAttempts.length - visibleTimeline.length);
+              return (
+                <>
+                  {chronologicalAttempts.length > 12 && (
+                    <div className="flex items-center justify-between gap-2 text-xs text-[#475569] dark:text-zinc-400">
+                      <span>
+                        Đang hiển thị <b>{visibleTimeline.length}</b> / <b>{chronologicalAttempts.length}</b> lần thi gần nhất
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllTimelineCards(prev => !prev)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold transition"
+                      >
+                        {showAllTimelineCards
+                          ? 'Thu gọn 12 lần gần nhất'
+                          : `Xem tất cả ${chronologicalAttempts.length} lần thi`}
+                      </button>
                     </div>
-                  </div>
-
-                  <p className="font-bold text-[#0F172B] dark:text-zinc-100 text-sm mb-3 line-clamp-1">{att.testTitle}</p>
-
-                  <div className="flex items-center justify-between py-2 border-y border-[#E2E8F0] dark:border-zinc-800 mb-3">
-                    <span className="text-xs text-[#475569] dark:text-zinc-400 font-semibold">Band Overall:</span>
-                    <span className={`font-black bg-slate-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-zinc-700 ${showScores && typeof att.overallBand === 'number' ? 'text-xl text-[#0F172B] dark:text-[#F4F4F5]' : 'text-xs text-amber-700 dark:text-amber-300'}`}>
-                      {showScores ? (att.overallBand ?? 'Ms. Như đang check') : 'Ms. Như đang check'}
-                    </span>
-                  </div>
-
-                  {/* Skill breakdown mini bars */}
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <div className="flex justify-between text-slate-600 dark:text-zinc-300 font-semibold mb-1">
-                        <span className="flex items-center gap-1">
-                          <Headphones className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Listening
-                        </span>
-                        <span className="font-bold text-slate-900 dark:text-zinc-100">
-                          {typeof att.scores?.listening?.band === 'number'
-                            ? att.scores.listening.band
-                            : showScores
-                            ? '-'
-                            : 'Đang check'}
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{
-                            width: `${
-                              typeof att.scores?.listening?.band === 'number'
-                                ? (att.scores.listening.band / 9) * 100
-                                : 0
-                            }%`
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-slate-600 dark:text-zinc-300 font-semibold mb-1">
-                        <span className="flex items-center gap-1">
-                          <BookOpen className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Reading
-                        </span>
-                        <span className="font-bold text-slate-900 dark:text-zinc-100">
-                          {typeof att.scores?.reading?.band === 'number'
-                            ? att.scores.reading.band
-                            : showScores
-                            ? '-'
-                            : 'Đang check'}
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{
-                            width: `${
-                              typeof att.scores?.reading?.band === 'number'
-                                ? (att.scores.reading.band / 9) * 100
-                                : 0
-                            }%`
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-slate-600 dark:text-zinc-300 font-semibold mb-1">
-                        <span className="flex items-center gap-1">
-                          <PenTool className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> {att.singleSkill === 'speaking' ? 'Speaking' : (att.scores?.speaking ? 'Writing · Speaking' : 'Writing')}
-                        </span>
-                        <span className="font-bold text-slate-900 dark:text-zinc-100">
-                          {!showScores
-                            ? 'Ms. Như đang check'
-                            : att.singleSkill === 'speaking'
-                              ? (att.scores?.speaking?.band ?? '-')
-                              : att.scores?.speaking
-                                ? `${att.scores?.writing?.overallBand ?? '-'} · ${att.scores?.speaking?.band ?? '-'}`
-                                : (att.scores?.writing?.overallBand ?? '-')}
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
-                          style={{ width: `${showScores ? (((att.singleSkill === 'speaking' ? att.scores?.speaking?.band : att.scores?.writing?.overallBand) || 0) / 9) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {canInspectAttemptDetails && (
-                    <button
-                      onClick={() => {
-                        setSelectedAttemptId(att.id);
-                        setPreviousView('STUDENT_PROFILE');
-                        setView('RESULT_VIEW');
-                      }}
-                      className="mt-4 w-full bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold py-2 rounded-xl transition"
-                    >
-                      Xem Chi Tiết Bài Làm →
-                    </button>
                   )}
-                </div>
-                );
-              })}
-            </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {visibleTimeline.map((att, localIdx) => {
+                      const idx = idxOffset + localIdx;
+                      const showScores = isAttemptApprovedForViewer(att);
+                      return (
+                      <div
+                        key={att.id}
+                        className={`rounded-xl p-5 border transition ${
+                          idx === chronologicalAttempts.length - 1
+                            ? 'bg-[#F8FAFC] dark:bg-zinc-800/80 border-slate-300 dark:border-zinc-600'
+                            : 'bg-[#F8FAFC] dark:bg-zinc-900 border-[#E2E8F0] dark:border-zinc-800'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2 mb-3">
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${
+                            idx === chronologicalAttempts.length - 1
+                              ? 'bg-[#0F766E] text-white'
+                              : 'bg-white dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 border border-[#E2E8F0] dark:border-zinc-700'
+                          }`}>
+                            Lần thi #{idx + 1} {idx === chronologicalAttempts.length - 1 ? '(Gần nhất)' : ''}
+                          </span>
+                          <div className="text-right">
+                            <span className="text-xs text-[#475569] dark:text-zinc-400 font-medium block">{att.submittedAt}</span>
+                            {Number(att.durationSeconds) > 0 && (
+                              <span className="text-xs font-bold text-[#0F766E] dark:text-zinc-200 block">
+                                {formatDurationVi(att.durationSeconds)}
+                                {att.timelinessStatus === 'late' ? ` • Trễ ${att.lateByMinutes || 1}p` : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="font-bold text-[#0F172B] dark:text-zinc-100 text-sm mb-3 line-clamp-1">{att.testTitle}</p>
+
+                        <div className="flex items-center justify-between py-2 border-y border-[#E2E8F0] dark:border-zinc-800 mb-3">
+                          <span className="text-xs text-[#475569] dark:text-zinc-400 font-semibold">Band Overall:</span>
+                          <span className={`font-black bg-slate-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-zinc-700 ${showScores && typeof att.overallBand === 'number' ? 'text-xl text-[#0F172B] dark:text-[#F4F4F5]' : 'text-xs text-amber-700 dark:text-amber-300'}`}>
+                            {showScores ? (att.overallBand ?? 'Ms. Như đang check') : 'Ms. Như đang check'}
+                          </span>
+                        </div>
+
+                        {/* Skill breakdown mini bars */}
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <div className="flex justify-between text-slate-600 dark:text-zinc-300 font-semibold mb-1">
+                              <span className="flex items-center gap-1">
+                                <Headphones className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Listening
+                              </span>
+                              <span className="font-bold text-slate-900 dark:text-zinc-100">
+                                {typeof att.scores?.listening?.band === 'number'
+                                  ? att.scores.listening.band
+                                  : showScores
+                                  ? '-'
+                                  : 'Đang check'}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
+                                style={{
+                                  width: `${
+                                    typeof att.scores?.listening?.band === 'number'
+                                      ? (att.scores.listening.band / 9) * 100
+                                      : 0
+                                  }%`
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-slate-600 dark:text-zinc-300 font-semibold mb-1">
+                              <span className="flex items-center gap-1">
+                                <BookOpen className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> Reading
+                              </span>
+                              <span className="font-bold text-slate-900 dark:text-zinc-100">
+                                {typeof att.scores?.reading?.band === 'number'
+                                  ? att.scores.reading.band
+                                  : showScores
+                                  ? '-'
+                                  : 'Đang check'}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
+                                style={{
+                                  width: `${
+                                    typeof att.scores?.reading?.band === 'number'
+                                      ? (att.scores.reading.band / 9) * 100
+                                      : 0
+                                  }%`
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-slate-600 dark:text-zinc-300 font-semibold mb-1">
+                              <span className="flex items-center gap-1">
+                                <PenTool className="w-3.5 h-3.5 text-[#1E293B] dark:text-[#E4E4E7]" /> {att.singleSkill === 'speaking' ? 'Speaking' : (att.scores?.speaking ? 'Writing · Speaking' : 'Writing')}
+                              </span>
+                              <span className="font-bold text-slate-900 dark:text-zinc-100">
+                                {!showScores
+                                  ? 'Ms. Như đang check'
+                                  : att.singleSkill === 'speaking'
+                                    ? (att.scores?.speaking?.band ?? '-')
+                                    : att.scores?.speaking
+                                      ? `${att.scores?.writing?.overallBand ?? '-'} · ${att.scores?.speaking?.band ?? '-'}`
+                                      : (att.scores?.writing?.overallBand ?? '-')}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-slate-700 dark:bg-zinc-300 rounded-full transition-all"
+                                style={{ width: `${showScores ? (((att.singleSkill === 'speaking' ? att.scores?.speaking?.band : att.scores?.writing?.overallBand) || 0) / 9) * 100 : 0}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {canInspectAttemptDetails && (
+                          <button
+                            onClick={() => {
+                              setSelectedAttemptId(att.id);
+                              setPreviousView('STUDENT_PROFILE');
+                              setView('RESULT_VIEW');
+                            }}
+                            className="mt-4 w-full bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-xs font-bold py-2 rounded-xl transition"
+                          >
+                            Xem Chi Tiết Bài Làm →
+                          </button>
+                        )}
+                      </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Skill Growth Highlights */}
             {firstAttempt && latestAttempt && totalAttempts > 1 && (
@@ -2934,9 +2965,39 @@ export default function StudentProfile({
             Chưa có dữ liệu bài thi.
           </div>
         ) : (() => {
-          const profHistorySlice = paginateItems(studentAttempts, profileHistoryPage, 5);
+          const fullExamAttemptsCount = studentAttempts.filter(a => a?.testMode !== 'single_skill').length;
+          const singleSkillAttemptsCount = studentAttempts.filter(a => a?.testMode === 'single_skill').length;
+          const filteredAttemptsList = studentAttempts.filter(a => {
+            if (attemptModeFilter === 'full_exam') return a?.testMode !== 'single_skill';
+            if (attemptModeFilter === 'single_skill') return a?.testMode === 'single_skill';
+            return true;
+          });
+          const profHistorySlice = paginateItems(filteredAttemptsList, profileHistoryPage, 5);
           return (
           <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'all', label: `Tất cả (${studentAttempts.length})` },
+                { id: 'full_exam', label: `Đề Full 4KN (${fullExamAttemptsCount})` },
+                { id: 'single_skill', label: `Đề Lẻ Daily (${singleSkillAttemptsCount})` }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setAttemptModeFilter(tab.id);
+                    setProfileHistoryPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                    attemptModeFilter === tab.id
+                      ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                      : 'bg-slate-50 dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-slate-400'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <div className="px-6 pt-3">
               <ListPaginationBar
                 currentPage={profHistorySlice.safePage}
@@ -3139,55 +3200,208 @@ export default function StudentProfile({
         </>
       )}
 
-      {/* SECTION 4: THÀNH TÍCH ĐẤU TRƯỜNG TỪ VỰNG CHICKEN INVADERS (hidden for Guest accounts) */}
-      {!currentUser?.isGuest && (
-      <div className={`${profileCardCls} p-6 sm:p-8`}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-[#E2E8F0] dark:border-zinc-800">
-          <div>
-            <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
-              <Gamepad2 className="w-5 h-5 text-slate-700 dark:text-zinc-200" />
-              Thành Tích Đấu Trường Game Từ Vựng (IELTS Chicken Invaders)
-            </h2>
-            <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">Kết quả rèn luyện phản xạ từ vựng, ngữ nghĩa và chính tả qua game 4 vòng.</p>
-          </div>
-          <button
-            onClick={() => {
-              if (isTeacherViewer) {
-                handleTeacherOpenLobby(currentRoomPin);
-              } else {
-                openStudentGamePortal();
-              }
-            }}
-            className="bg-[#0F766E] hover:bg-[#0D9488] text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <Play className="w-3.5 h-3.5 fill-white" /> Vào Sảnh Chờ Đấu Trường
-          </button>
-        </div>
+      {/* SECTION 4: THÀNH TÍCH CẢ 2 TỰA GAME ĐẤU TRƯỜNG (hidden for Guest accounts) */}
+      {!currentUser?.isGuest && (() => {
+        const stuKeyLower = String(student.username || '').toLowerCase();
+        const practiceRows = (Array.isArray(gamePracticeLeaderboard) ? gamePracticeLeaderboard : []).filter(
+          e => String(e?.username || '').toLowerCase() === stuKeyLower
+        );
+        const spacePracticeBest = practiceRows
+          .filter(e => (e.gameType || 'space_shooter') === 'space_shooter')
+          .reduce((mx, e) => Math.max(mx, Number(e.score) || 0), 0);
+        const spaceBestTotal = Math.max(Number(playerGameRecord?.score) || 0, spacePracticeBest);
+        const knightPracticeBest = practiceRows
+          .filter(e => e.gameType === 'knight_rpg')
+          .reduce((mx, e) => Math.max(mx, Number(e.score) || 0), 0);
+        const rpgInfo = student.knightRpgProfile && typeof student.knightRpgProfile === 'object'
+          ? student.knightRpgProfile
+          : null;
+        const knightBestTotal = Math.max(knightPracticeBest, Number(rpgInfo?.bestScore) || 0);
+        const unlockedHeroCount = Array.isArray(rpgInfo?.unlockedSkins) ? rpgInfo.unlockedSkins.length : 1;
+        const monstersSlainCount = Number(rpgInfo?.monstersSlain) || 0;
+        const dragonsSlainCount = Number(rpgInfo?.dragonsSlain) || 0;
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800">
-          <div className="bg-transparent border-0 rounded-none py-3 sm:py-1 sm:pr-5">
-            <p className="text-xs text-[#475569] dark:text-[#A1A1AA] font-bold uppercase">Điểm Kỷ Lục Phòng Game</p>
-            <p className="text-2xl font-black text-[#0F172B] dark:text-[#FAFAFA] font-mono mt-1">
-              {playerGameRecord ? `${playerGameRecord.score} pts` : '0 pts'}
-            </p>
-          </div>
+        return (
+          <div className={`${profileCardCls} p-6 sm:p-8 mb-8`}>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-[#E2E8F0] dark:border-zinc-800">
+              <div>
+                <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
+                  <Gamepad2 className="w-5 h-5 text-slate-700 dark:text-zinc-200" />
+                  Thành Tích Đấu Trường Game Từ Vựng (Phi Thuyền &amp; Hiệp Sĩ Diệt Rồng)
+                </h2>
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                  Tổng hợp kỷ lục tuần ở cả 2 tựa game phản xạ từ vựng IELTS (reset điểm BXH 00:00 Thứ 2 hàng tuần).
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (isTeacherViewer) {
+                    handleTeacherOpenLobby(currentRoomPin);
+                  } else {
+                    openStudentGamePortal();
+                  }
+                }}
+                className="bg-[#0F766E] hover:bg-[#0D9488] text-white font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Play className="w-3.5 h-3.5 fill-white" /> Vào Sảnh Chờ Đấu Trường
+              </button>
+            </div>
 
-          <div className="bg-transparent border-0 rounded-none py-3 sm:py-1 sm:px-5">
-            <p className="text-xs text-[#475569] dark:text-[#A1A1AA] font-bold uppercase">Cấp Độ Cao Nhất Đạt Được</p>
-            <p className="text-sm font-extrabold text-[#0F172B] dark:text-[#FAFAFA] mt-1">
-              {playerGameRecord?.status || 'Chưa tham gia trận đấu nào'}
-            </p>
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-zinc-800">
+              <div className="bg-transparent border-0 rounded-none py-3 sm:py-1 sm:pr-5">
+                <p className="text-xs text-[#475569] dark:text-[#A1A1AA] font-bold uppercase">🚀 Phi Thuyền Từ Vựng</p>
+                <p className="text-2xl font-black text-[#0F172B] dark:text-[#FAFAFA] font-mono mt-1">
+                  {spaceBestTotal.toLocaleString('vi-VN')} pts
+                </p>
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                  {playerGameRecord ? `${playerGameRecord.streak || 0}x Combo · ${playerGameRecord.status || '4 Vòng'}` : 'Luyện tập & Phòng đấu'}
+                </p>
+              </div>
 
-          <div className="bg-transparent border-0 rounded-none py-3 sm:py-1 sm:pl-5">
-            <p className="text-xs text-[#475569] dark:text-[#A1A1AA] font-bold uppercase">Chuỗi Combo Từ Đúng</p>
-            <p className="text-2xl font-black text-[#0F172B] dark:text-[#FAFAFA] font-mono mt-1">
-              {playerGameRecord ? `${playerGameRecord.streak}x Combo` : '0x Combo'}
-            </p>
+              <div className="bg-transparent border-0 rounded-none py-3 sm:py-1 sm:px-5">
+                <p className="text-xs text-[#475569] dark:text-[#A1A1AA] font-bold uppercase">⚔️ Hiệp Sĩ Diệt Rồng</p>
+                <p className="text-2xl font-black text-[#0F172B] dark:text-[#FAFAFA] font-mono mt-1">
+                  {knightBestTotal.toLocaleString('vi-VN')} pts
+                </p>
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                  {rpgInfo ? `Hạ ${monstersSlainCount} quái · ${dragonsSlainCount} rồng` : 'Đấu Boss 4 Cửa Ải'}
+                </p>
+              </div>
+
+              <div className="bg-transparent border-0 rounded-none py-3 sm:py-1 sm:px-5">
+                <p className="text-xs text-[#475569] dark:text-[#A1A1AA] font-bold uppercase">🌠 Lượt Quay &amp; Tướng</p>
+                <p className="text-lg font-extrabold text-[#0F172B] dark:text-[#FAFAFA] mt-1">
+                  {isSelf && rpgInfo ? `${rpgInfo.wishes || 0} Lượt Quay · ${unlockedHeroCount} Nhân Vật` : `Đã sở hữu ≥ ${unlockedHeroCount} Nhân Vật`}
+                </p>
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                  {student.starterFirstGameGiftClaimed ? 'Đã nhận Quà Tân Thủ (+10 lượt)' : 'Chơi trận đầu nhận ngay +10 lượt quay'}
+                </p>
+              </div>
+
+              <div className="bg-transparent border-0 rounded-none py-3 sm:py-1 sm:pl-5">
+                <p className="text-xs text-[#475569] dark:text-[#A1A1AA] font-bold uppercase">🎫 Số Dư Lượt Học &amp; Phòng</p>
+                <p className="text-lg font-extrabold text-[#0F172B] dark:text-[#FAFAFA] mt-1">
+                  {studentRealExamCredits} Lượt Đề · {Number(student.roomCreateCredits) || 0} Vé Phòng
+                </p>
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                  Đã tích lũy {studentPurchasedCount} đề Thực Chiến
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      )}
+        );
+      })()}
+
+      {/* SECTION 5: NHẬT KÝ NẠP TIỀN & ĐỔI LƯỢT CÁ NHÂN (chỉ chính chủ hoặc SuperAdmin được xem) */}
+      {(isSelf || isViewerSuperAdmin) && !isTargetSystemAdmin && (() => {
+        const rawTxSource = isViewerSuperAdmin && !isSelf
+          ? (Array.isArray(adminPaymentHistory) ? adminPaymentHistory : []).filter(
+              tx => tx && String(tx.username || '').toLowerCase() === String(student.username || '').toLowerCase()
+            )
+          : (Array.isArray(myPaymentTransactions) ? myPaymentTransactions : []);
+        const txSlice = paginateItems(rawTxSource, myTxPage, 5);
+
+        return (
+          <div className={`${profileCardCls} p-6 sm:p-8`}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-4 border-b border-[#E2E8F0] dark:border-zinc-800">
+              <div>
+                <h2 className="text-lg font-extrabold text-[#0F172B] dark:text-[#F4F4F5] flex items-center gap-2">
+                  <History className="w-5 h-5 text-slate-700 dark:text-zinc-200" />
+                  Nhật Ký Giao Dịch, Nạp Gói &amp; Đổi Lượt Cá Nhân
+                </h2>
+                <p className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
+                  Bảo mật riêng tư: Chỉ {isSelf ? 'bạn' : 'Quản trị hệ thống'} mới nhìn thấy lịch sử nạp gói và biến động lượt của tài khoản này.
+                </p>
+              </div>
+              <span className="text-xs font-bold text-[#475569] dark:text-zinc-400">
+                Tổng cộng: {rawTxSource.length} giao dịch
+              </span>
+            </div>
+
+            {rawTxSource.length === 0 ? (
+              <div className="py-6 text-center text-xs text-[#475569] dark:text-zinc-400">
+                Chưa phát sinh giao dịch nạp gói hoặc đổi lượt Combo nào.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-[#334155] dark:text-zinc-300">
+                    <thead className="bg-[#F8FAFC] dark:bg-zinc-900 border-y border-[#E2E8F0] dark:border-zinc-800 uppercase">
+                      <tr>
+                        <th className="px-4 py-3">Thời Gian</th>
+                        <th className="px-4 py-3">Nội Dung / Mã Tham Chiếu</th>
+                        <th className="px-4 py-3 text-right">Số Tiền</th>
+                        <th className="px-4 py-3 text-center">Biến Động Số Dư</th>
+                        <th className="px-4 py-3 text-right">Trạng Thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E2E8F0]/70 dark:divide-zinc-800">
+                      {txSlice.pageItems.map(tx => {
+                        const tsMs = Number(tx.paidAt || tx.createdAt) || 0;
+                        const timeStr = tsMs ? new Date(tsMs).toLocaleString('vi-VN') : '-';
+                        const isPaid = tx.status === 'paid';
+                        const bBefore = tx.balanceBefore;
+                        const bAfter = tx.balanceAfter;
+                        let balanceDeltaLabel = '—';
+                        if (bBefore && bAfter) {
+                          if (bBefore.realExamCredits !== bAfter.realExamCredits) {
+                            balanceDeltaLabel = `Lượt Đề: ${bBefore.realExamCredits} → ${bAfter.realExamCredits}`;
+                          } else if (bBefore.gachaWishCredits !== bAfter.gachaWishCredits) {
+                            balanceDeltaLabel = `Gacha: ${bBefore.gachaWishCredits} → ${bAfter.gachaWishCredits}`;
+                          } else if (bBefore.roomCreateCredits !== bAfter.roomCreateCredits) {
+                            balanceDeltaLabel = `Vé Phòng: ${bBefore.roomCreateCredits} → ${bAfter.roomCreateCredits}`;
+                          } else if (!bBefore.aieoVipActive && bAfter.aieoVipActive) {
+                            balanceDeltaLabel = 'Mở Gói IELTS VIP';
+                          } else if (!bBefore.customCoverActive && bAfter.customCoverActive) {
+                            balanceDeltaLabel = 'Mở Ảnh Bìa Riêng';
+                          }
+                        }
+                        return (
+                          <tr key={tx.id} className="hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/40">
+                            <td className="px-4 py-3 whitespace-nowrap font-medium">{timeStr}</td>
+                            <td className="px-4 py-3">
+                              <p className="font-bold text-[#0F172B] dark:text-[#F4F4F5]">{tx.itemLabel || tx.itemType}</p>
+                              {tx.orderCode && (
+                                <span className="text-[11px] font-mono text-[#475569] dark:text-zinc-400">
+                                  Mã: {tx.orderCode}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold">
+                              {Number(tx.amount) > 0 ? formatVndCurrency(tx.amount) : '0đ (Đổi lượt)'}
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold text-[#0F766E] dark:text-teal-400">
+                              {balanceDeltaLabel}
+                            </td>
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-bold ${
+                                  isPaid
+                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                }`}
+                              >
+                                {isPaid ? 'Thành công' : 'Chờ đối soát'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <ListPaginationBar
+                  currentPage={txSlice.safePage}
+                  totalItems={txSlice.totalItems}
+                  pageSize={5}
+                  onPageChange={setMyTxPage}
+                  itemLabel="giao dịch"
+                />
+              </div>
+            )}
+          </div>
+        );
+      })()}
       </div>
 
       {/* Modal: Bảng Danh Hiệu & Cách Đạt Được (Học viên, Giáo viên & Quản trị) */}

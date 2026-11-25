@@ -284,16 +284,22 @@ export default function KnightDragonGame({
     round: 1,
     demonWheelStyle: 1,
     matchState: 'HUB',
+    questionResolved: false,
+    reviveBusy: false,
+    lastWrongAt: 0,
+    matchId: '',
     lives: 3,
     score: 0,
     combo: 0
   });
+  const reviveCelebrationTimerRef = useRef(null);
 
   const clearAllTimers = () => {
     clearInterval(timerRef.current);
     clearInterval(demonCurseTimerRef.current);
     clearTimeout(phaseTimerRef.current);
     clearInterval(phaseIntervalRef.current);
+    clearTimeout(reviveCelebrationTimerRef.current);
   };
 
   useEffect(
@@ -533,6 +539,7 @@ export default function KnightDragonGame({
     runtimeRef.current.timeLimit = lim;
     runtimeRef.current.timeRemainingFloat = lim;
     runtimeRef.current.round4MatchRatio = 0;
+    runtimeRef.current.questionResolved = false;
     setRound4Input('');
     const initTyped = qObj ? skipNonAlphaIndex(qObj.word, 0) : 0;
     setTypedProgress(initTyped);
@@ -540,9 +547,11 @@ export default function KnightDragonGame({
   };
 
   const finalizeMatchAndSync = (finalScoreVal, latestProfile, extraMode = '') => {
+    if (runtimeRef.current.matchState === 'GAMEOVER') return;
     clearAllTimers();
     setMatchState('GAMEOVER');
     runtimeRef.current.matchState = 'GAMEOVER';
+    runtimeRef.current.questionResolved = true;
     const alreadyClaimedGift = Boolean(
       latestProfile?.firstGameGiftClaimed ||
         rpgProfile?.firstGameGiftClaimed ||
@@ -566,7 +575,10 @@ export default function KnightDragonGame({
     }
     const passedCount = reviewLog.filter(item => item.passed).length;
     const totalCount = Math.max(1, reviewLog.length);
+    const currentMatchId =
+      runtimeRef.current.matchId || `krpg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     onSyncKnightResult?.({
+      matchId: currentMatchId,
       score: finalScoreVal,
       passedCount,
       totalCount,
@@ -763,6 +775,10 @@ export default function KnightDragonGame({
 
     runtimeRef.current.round = rNum;
     runtimeRef.current.matchState = 'PLAYING';
+    runtimeRef.current.questionResolved = false;
+    runtimeRef.current.reviveBusy = false;
+    runtimeRef.current.lastWrongAt = 0;
+    runtimeRef.current.matchId = `krpg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     runtimeRef.current.lives = 3;
     runtimeRef.current.score = 0;
     runtimeRef.current.combo = 0;
@@ -812,6 +828,9 @@ export default function KnightDragonGame({
     setBannerAlert(null);
     runtimeRef.current.score = 0;
     runtimeRef.current.combo = 0;
+    runtimeRef.current.questionResolved = false;
+    runtimeRef.current.reviveBusy = false;
+    runtimeRef.current.matchId = `krpg_demon_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     runtimeRef.current.droppedCoins = [];
     runtimeRef.current.droppedKeys = [];
     runtimeRef.current.slashes = [];
@@ -1119,13 +1138,21 @@ export default function KnightDragonGame({
 
   // Choice handler for Wave 1 (Meaning Shields) & Wave 3 (Syn/Ant/Context Spell Orbs)
   const handleSelectRuneChoice = (choiceText) => {
-    if (matchState !== 'PLAYING' || !activeQ) return;
+    if (
+      matchState !== 'PLAYING' ||
+      runtimeRef.current.matchState !== 'PLAYING' ||
+      runtimeRef.current.questionResolved ||
+      !activeQ
+    ) {
+      return;
+    }
     const targetAnswer =
       effectiveCombatRound === 1 ? activeQ.word : effectiveCombatRound === 3 ? activeQ.v3Target : '';
     const isCorrect =
       String(choiceText || '').trim().toLowerCase() === String(targetAnswer || '').trim().toLowerCase();
 
     if (isCorrect) {
+      runtimeRef.current.questionResolved = true;
       spawnHeroSlashEffects(true);
       playSound('word_clear');
       speakWord(activeQ.word);
@@ -1155,6 +1182,7 @@ export default function KnightDragonGame({
       );
       advanceToNextMonsterOrStage(nextScore);
     } else {
+      if (runtimeRef.current.lives <= 0) return;
       triggerDragonFinalSmashOrLifeLoss(
         `💥 Chém trượt "${choiceText}"! ${currentMonster.name} phản đòn (-1 ❤️)!`,
         false
@@ -1164,7 +1192,15 @@ export default function KnightDragonGame({
 
   // Wave 2: Continuous sword-combo typing to shatter armor
   const handleWave2KeyInput = (char) => {
-    if (matchState !== 'PLAYING' || effectiveCombatRound !== 2 || !activeQ) return;
+    if (
+      matchState !== 'PLAYING' ||
+      runtimeRef.current.matchState !== 'PLAYING' ||
+      runtimeRef.current.questionResolved ||
+      effectiveCombatRound !== 2 ||
+      !activeQ
+    ) {
+      return;
+    }
     const target = String(activeQ.word || '').toUpperCase();
     const expected = target[typedProgress];
     if (!expected) return;
@@ -1173,6 +1209,9 @@ export default function KnightDragonGame({
       playSound('type_hit');
       const nextProg = skipNonAlphaIndex(target, typedProgress + 1);
       const isFinishingBlow = nextProg >= target.length;
+      if (isFinishingBlow) {
+        runtimeRef.current.questionResolved = true;
+      }
       spawnHeroSlashEffects(isFinishingBlow);
       spawnMonsterCoinDrops(isFinishingBlow ? 4 : 1);
 
@@ -1246,7 +1285,15 @@ export default function KnightDragonGame({
 
   const handleWave4Submit = (e) => {
     if (e) e.preventDefault();
-    if (matchState !== 'PLAYING' || effectiveCombatRound !== 4 || !activeQ) return;
+    if (
+      matchState !== 'PLAYING' ||
+      runtimeRef.current.matchState !== 'PLAYING' ||
+      runtimeRef.current.questionResolved ||
+      effectiveCombatRound !== 4 ||
+      !activeQ
+    ) {
+      return;
+    }
     const rawTyped = round4Input.trim();
     if (!rawTyped) return;
 
@@ -1257,6 +1304,7 @@ export default function KnightDragonGame({
     const evalRes = matchRound4TypingAnswer(rawTyped, accepted);
 
     if (evalRes.matched) {
+      runtimeRef.current.questionResolved = true;
       spawnHeroSlashEffects(true);
       runtimeRef.current.round4MatchRatio = 1;
       playSound('word_clear');
@@ -1348,6 +1396,7 @@ export default function KnightDragonGame({
     rt.lives = 3;
     setMatchState('PLAYING');
     rt.matchState = 'PLAYING';
+    rt.reviveBusy = false;
     rt.finalSmashAnim = 0;
     rt.dragonFireAnim = 0;
     rt.tombstoneDropAnim = 0;
@@ -1383,17 +1432,26 @@ export default function KnightDragonGame({
       id: Date.now(),
       methodLabel
     });
-    setTimeout(() => {
+    clearTimeout(reviveCelebrationTimerRef.current);
+    reviveCelebrationTimerRef.current = setTimeout(() => {
       setReviveCelebration(null);
     }, 1450);
   };
 
   const handleReviveWithKeys = () => {
-    if (cannotReviveByDemon || round === 5) return;
+    if (
+      runtimeRef.current.reviveBusy ||
+      runtimeRef.current.matchState !== 'REVIVE_PROMPT' ||
+      cannotReviveByDemon ||
+      round === 5
+    ) {
+      return;
+    }
     if ((rpgProfile.keys || 0) < reviveKeyCost) {
       showToast?.(`Cần ${reviveKeyCost} 🗝️ Chìa Khóa Hồi Sinh! Bạn có thể dùng Vàng để hồi sinh.`, 'error');
       return;
     }
+    runtimeRef.current.reviveBusy = true;
     updateAndPersistProfile(prev => ({
       ...prev,
       keys: Math.max(0, (prev.keys || 0) - reviveKeyCost)
@@ -1405,11 +1463,19 @@ export default function KnightDragonGame({
   };
 
   const handleReviveWithGold = () => {
-    if (cannotReviveByDemon || round === 5) return;
+    if (
+      runtimeRef.current.reviveBusy ||
+      runtimeRef.current.matchState !== 'REVIVE_PROMPT' ||
+      cannotReviveByDemon ||
+      round === 5
+    ) {
+      return;
+    }
     if ((rpgProfile.gold || 0) < reviveGoldCost) {
       showToast?.(`Không đủ Vàng! Cần ${reviveGoldCost} 🪙 Vàng để mua mạng hồi sinh.`, 'error');
       return;
     }
+    runtimeRef.current.reviveBusy = true;
     updateAndPersistProfile(prev => ({
       ...prev,
       gold: Math.max(0, (prev.gold || 0) - reviveGoldCost)

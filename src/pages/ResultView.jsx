@@ -84,6 +84,33 @@ export default function ResultView({
   const targetTest = tests.find(t => t.id === attempt.testId) || tests[0];
   const targetTestCfg = targetTest ? normalizeExamConfig(targetTest) : null;
   const isTeacher = currentUser?.role === 'teacher';
+  const attemptOwnerLower = String(attempt.studentId || attempt.studentUsername || '').trim().toLowerCase();
+  const viewerUsernameLower = String(currentUser?.username || '').trim().toLowerCase();
+  if (!isTeacher && (!viewerUsernameLower || attemptOwnerLower !== viewerUsernameLower)) {
+    const fallbackView = 'HOME';
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16">
+        <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 rounded-3xl p-6 text-center shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h2 className="text-lg font-extrabold text-slate-900 dark:text-white mb-2">
+            Không có quyền xem bài thi này
+          </h2>
+          <p className="text-xs text-[#475569] dark:text-slate-400 leading-relaxed mb-5">
+            Bạn chỉ có thể xem chi tiết lịch sử bài thi và đáp án của chính tài khoản đang đăng nhập.
+          </p>
+          <button
+            type="button"
+            onClick={() => setView(previousView && previousView !== 'RESULT_VIEW' ? previousView : fallbackView)}
+            className="w-full py-2.5 px-4 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-sm font-bold transition"
+          >
+            Quay Lại
+          </button>
+        </div>
+      </div>
+    );
+  }
   const canShowApprovedScores = isTeacher || Boolean(attempt.teacherGraded);
   // Phần Đọc (Reading) & Nghe (Listening) luôn hiển thị điểm Band & số câu đúng ngay lập tức (cả Thực Chiến & Daily)
   const canShowObjectiveScores = true;

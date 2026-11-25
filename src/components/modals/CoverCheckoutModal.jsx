@@ -382,9 +382,13 @@ export default function CoverCheckoutModal({
                 requestedAt={pendingRequestedAt}
                 requesting={requestingManual}
                 onRequestUnlock={onRequestUnlock ? async () => {
+                  if (requestingManual) return;
                   setRequestingManual(true);
-                  await onRequestUnlock((isTitleOrder || isTestOrder) ? { itemType, itemId } : { itemType });
-                  setRequestingManual(false);
+                  try {
+                    await onRequestUnlock((isTitleOrder || isTestOrder) ? { itemType, itemId } : { itemType });
+                  } finally {
+                    setRequestingManual(false);
+                  }
                 } : null}
                 showToast={showToast}
               />
