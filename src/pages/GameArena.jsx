@@ -67,6 +67,7 @@ import { speakWord } from '../utils/mediaHelpers';
 import AnimalPilotAvatar from '../components/common/AnimalPilotAvatar';
 import UserAvatarBadge from '../components/common/UserAvatarBadge';
 import VipMemberName from '../components/common/VipMemberName';
+import VerticalPodiumLeaderboard from '../components/common/VerticalPodiumLeaderboard';
 import KnightDragonGame from '../components/game/KnightDragonGame';
 import {
   AIEO_VIP_PRICE_VND,
@@ -387,51 +388,20 @@ export default function GameArena({
           Chưa có kỷ lục điểm nào trong Đấu Trường Phi Thuyền — hãy thi đấu ngay để lên Top #1!
         </p>
       ) : (
-        <div
-          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 ${
-            compact ? 'max-h-40' : 'max-h-56'
-          } overflow-y-auto pr-1`}
-        >
-          {spaceShooterLeaderboardRows.map((row, idx) => {
-            const isMe =
+        <VerticalPodiumLeaderboard
+          compact={compact}
+          maxHeightClass={compact ? 'max-h-[380px] overflow-y-auto pr-1' : ''}
+          items={spaceShooterLeaderboardRows.map(row => ({
+            key: row.username,
+            userObj: row.userObj,
+            name: row.name || row.username,
+            isMe:
               String(row.username || '').toLowerCase() ===
-              String(currentUser?.username || '').toLowerCase();
-            const rankMedal =
-              idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`;
-            return (
-              <div
-                key={`${row.username}-${idx}`}
-                className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs ${
-                  isMe
-                    ? 'bg-[#EDFFFD] dark:bg-cyan-500/15 border-[#007A7A]/50 dark:border-cyan-400/50'
-                    : 'bg-slate-50 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800'
-                }`}
-              >
-                <div className="min-w-0 pr-2">
-                  <div className="font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1">
-                    <span className="text-amber-600 dark:text-amber-300 shrink-0">{rankMedal}</span>
-                    <VipMemberName
-                      user={row.userObj}
-                      fallbackName={row.name || row.username}
-                      badgeSize="xs"
-                    />
-                    {isMe && (
-                      <span className="text-[11px] font-bold text-[#007A7A] dark:text-cyan-300 shrink-0">
-                        (Bạn)
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-[#475569] dark:text-slate-400 truncate">
-                    {row.topicLabel} • {row.accuracyPct ?? 100}% đúng
-                  </p>
-                </div>
-                <span className="font-mono font-black text-amber-600 dark:text-amber-300 shrink-0">
-                  {Number(row.score || 0).toLocaleString('vi-VN')}đ
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              String(currentUser?.username || '').toLowerCase(),
+            subtitle: `${row.topicLabel} • ${row.accuracyPct ?? 100}% đúng`,
+            scoreText: `${Number(row.score || 0).toLocaleString('vi-VN')}đ`
+          }))}
+        />
       )}
     </div>
   );
@@ -3570,35 +3540,27 @@ export default function GameArena({
                 Điểm số: <b className="text-amber-600 dark:text-amber-400 text-base">{gameScore} điểm</b> • Đạt: <b className="text-emerald-600 dark:text-emerald-400">{passedWordsCount}/{gameReviewLog.length} từ</b> • Đã lưu vào Bảng Xếp Hạng!
               </p>
 
-              {/* Practice BXH OR Live Room Top 5 Standings */}
+              {/* Practice BXH OR Live Room Top 10 Standings */}
               {isPracticeGameSession ? (
-                gamePracticeLeaderboard.length > 0 && (
-                  <div className="max-w-xl w-full bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-indigo-500/30 rounded-xl p-3 mb-3 text-left text-xs shadow-sm">
-                    <p className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 mb-2 flex items-center gap-1.5">
-                      <Trophy className="w-3.5 h-3.5" /> BXH Khu Tự Luyện Tập (Top {Math.min(5, gamePracticeLeaderboard.length)})
+                (spaceShooterLeaderboardRows.length > 0 || gamePracticeLeaderboard.length > 0) && (
+                  <div className="max-w-2xl w-full bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-indigo-500/30 rounded-xl p-3.5 mb-3 text-left text-xs shadow-sm">
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 mb-2.5 flex items-center gap-1.5">
+                      <Trophy className="w-3.5 h-3.5" /> BXH Khu Tự Luyện Tập (Top {Math.min(10, spaceShooterLeaderboardRows.length || gamePracticeLeaderboard.length)})
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                      {gamePracticeLeaderboard.slice(0, 5).map((st, sIdx) => {
-                        const isMe = st.username === currentUser?.username;
-                        return (
-                          <div
-                            key={st.id || sIdx}
-                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border ${
-                              isMe
-                                ? 'bg-[#EDFFFD] dark:bg-cyan-500/15 border-[#007A7A]/50 dark:border-cyan-400/50 text-[#007A7A] dark:text-cyan-200'
-                                : 'bg-white dark:bg-slate-950/70 border-slate-200 dark:border-slate-800 text-[#0F172B] dark:text-slate-200'
-                            }`}
-                          >
-                            <span className="truncate font-semibold flex items-center gap-1 min-w-0">
-                              <span>#{sIdx + 1}</span>
-                              <VipMemberName user={usersDb[st.username] || st} fallbackName={st.name || st.username} badgeSize="xs" />
-                              <span className="text-xs text-slate-400">({st.topicLabel})</span>
-                            </span>
-                            <span className="font-mono font-extrabold text-amber-600 dark:text-amber-300 ml-2 shrink-0">{st.score}đ</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <VerticalPodiumLeaderboard
+                      compact
+                      items={(spaceShooterLeaderboardRows.length > 0
+                        ? spaceShooterLeaderboardRows
+                        : gamePracticeLeaderboard.slice(0, 10)
+                      ).map((st, sIdx) => ({
+                        key: st.id || st.username || String(sIdx),
+                        userObj: st.userObj || usersDb[st.username] || st,
+                        name: st.name || st.username,
+                        isMe: st.username === currentUser?.username,
+                        subtitle: st.topicLabel || 'Tự Luyện Tập',
+                        scoreText: `${Number(st.score || 0).toLocaleString('vi-VN')}đ`
+                      }))}
+                    />
                   </div>
                 )
               ) : (() => {
@@ -3607,13 +3569,13 @@ export default function GameArena({
                   matchEntries.length > 0
                     ? [...matchEntries].sort((a, b) => (b.score || 0) - (a.score || 0))
                     : leaderboardPlayers
-                ).slice(0, 5);
+                ).slice(0, 10);
                 const gameoverTeamStandings = isTeamRoom ? computeRoomTeamStandings(room) : [];
                 if (topStandings.length === 0 && gameoverTeamStandings.length === 0) return null;
                 return (
                   <>
                     {gameoverTeamStandings.length > 0 && (
-                      <div className="max-w-xl w-full bg-white/95 dark:bg-slate-900/90 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-3 mb-2.5 text-left text-xs shadow-sm">
+                      <div className="max-w-2xl w-full bg-white/95 dark:bg-slate-900/90 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-3 mb-2.5 text-left text-xs shadow-sm">
                         <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-2 flex items-center gap-1.5">
                           <Trophy className="w-3.5 h-3.5" /> Xếp Hạng Đội - Phòng #{activePin} ({room.teamCount} Team)
                         </p>
@@ -3637,41 +3599,44 @@ export default function GameArena({
                       </div>
                     )}
                     {topStandings.length > 0 && (
-                  <div className="max-w-xl w-full bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-indigo-500/30 rounded-xl p-3 mb-3 text-left text-xs shadow-sm">
-                    <p className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                  <div className="max-w-2xl w-full bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-indigo-500/30 rounded-xl p-3.5 mb-3 text-left text-xs shadow-sm">
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-300 mb-2.5 flex items-center gap-1.5">
                       <Trophy className="w-3.5 h-3.5" /> Bảng Xếp Hạng Phòng #{activePin} (Top {topStandings.length})
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                      {topStandings.map((st, sIdx) => {
+                    <VerticalPodiumLeaderboard
+                      compact
+                      items={topStandings.map((st, sIdx) => {
                         const isMe = st.username === currentUser?.username || st.name === currentUser?.name;
-                        const stTitle = st.username ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb, customTitles, paymentConfig, { gamePracticeLeaderboard, dailyRankTitles, usersDb }) : null;
-                        return (
-                          <div
-                            key={st.username || st.name || sIdx}
-                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border ${
-                              isMe
-                                ? 'bg-[#EDFFFD] dark:bg-cyan-500/15 border-[#007A7A]/50 dark:border-cyan-400/50 text-[#007A7A] dark:text-cyan-200'
-                                : 'bg-white dark:bg-slate-950/70 border-slate-200 dark:border-slate-800 text-[#0F172B] dark:text-slate-200'
-                            }`}
-                          >
-                            <span className="truncate font-semibold flex items-center gap-1.5 min-w-0">
-                              <span className="shrink-0">#{sIdx + 1}</span>
-                              <VipMemberName user={usersDb[st.username] || st} fallbackName={st.name || st.username} badgeSize="xs" />
-                              {isMe && <span className="text-xs font-bold shrink-0">(Bạn)</span>}
+                        const stTitle = st.username
+                          ? resolveVisibleTitleBadge(usersDb[st.username] || st, attempts, roomsDb, customTitles, paymentConfig, {
+                              gamePracticeLeaderboard,
+                              dailyRankTitles,
+                              usersDb
+                            })
+                          : null;
+                        return {
+                          key: st.username || st.name || String(sIdx),
+                          userObj: usersDb[st.username] || st,
+                          name: st.name || st.username,
+                          isMe,
+                          extraBadges: (
+                            <>
                               {stTitle && (
-                                <span className={`text-xs font-extrabold px-1.5 py-0.2 rounded-full border shrink-0 ${stTitle.gameBadgeClass}`}>
+                                <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full border shrink-0 ${stTitle.gameBadgeClass}`}>
                                   {stTitle.icon} {stTitle.label}
                                 </span>
                               )}
                               {(st.fastestWinsCount || 0) > 0 && (
-                                <span className="text-xs font-black text-amber-600 dark:text-amber-300 shrink-0">⚡{st.fastestWinsCount}</span>
+                                <span className="text-[10px] font-black text-amber-600 dark:text-amber-300 shrink-0">
+                                  ⚡{st.fastestWinsCount}
+                                </span>
                               )}
-                            </span>
-                            <span className="font-mono font-extrabold text-amber-600 dark:text-amber-300 ml-2 shrink-0">{st.score || 0}đ</span>
-                          </div>
-                        );
+                            </>
+                          ),
+                          scoreText: `${Number(st.score || 0).toLocaleString('vi-VN')}đ`
+                        };
                       })}
-                    </div>
+                    />
                   </div>
                     )}
                   </>

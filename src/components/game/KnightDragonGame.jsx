@@ -20,7 +20,7 @@ import {
   Volume2,
   VolumeX
 } from 'lucide-react';
-import VipMemberName from '../common/VipMemberName';
+import VerticalPodiumLeaderboard from '../common/VerticalPodiumLeaderboard';
 import KnightGachaModal from './KnightGachaModal';
 import {
   canHeroEquipWeapon,
@@ -3163,58 +3163,16 @@ export default function KnightDragonGame({
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
-                  {knightLeaderboardRows.map((row, idx) => {
-                    const isMe =
-                      String(row.username || '').toLowerCase() === String(username || '').toLowerCase();
-                    const rankMedal =
-                      idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`;
-                    return (
-                      <div
-                        key={`${row.username}-${idx}`}
-                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs transition ${
-                          isMe
-                            ? 'bg-rose-50 dark:bg-rose-950/50 border-amber-400 dark:border-amber-400/70 ring-1 ring-amber-400/30'
-                            : idx < 3
-                            ? 'bg-amber-50/60 dark:bg-slate-900/95 border-amber-300 dark:border-amber-500/30'
-                            : 'bg-slate-50 dark:bg-slate-900/70 border-slate-200 dark:border-slate-800'
-                        }`}
-                      >
-                        <div className="min-w-0 pr-2">
-                          <div className="font-extrabold text-[#0F172B] dark:text-white truncate flex items-center gap-1.5">
-                            <span
-                              className={`font-black shrink-0 ${
-                                idx === 0
-                                  ? 'text-amber-600 dark:text-amber-300'
-                                  : idx === 1
-                                  ? 'text-slate-600 dark:text-slate-200'
-                                  : idx === 2
-                                  ? 'text-orange-600 dark:text-orange-300'
-                                  : 'text-slate-500 dark:text-slate-400'
-                              }`}
-                            >
-                              {rankMedal}
-                            </span>
-                            <VipMemberName
-                              user={row.userObj}
-                              fallbackName={row.name || row.username}
-                              badgeSize="xs"
-                            />
-                            {isMe && (
-                              <span className="text-[11px] font-black text-amber-700 dark:text-amber-300 shrink-0">(Bạn)</span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-[#475569] dark:text-slate-400 truncate mt-0.5">
-                            {row.topicLabel} • ⚔️ {row.monstersSlain} quái • 🐉 {row.dragonsSlain} Rồng
-                          </p>
-                        </div>
-                        <span className="font-mono font-black text-sm text-amber-700 dark:text-amber-300 shrink-0">
-                          {Number(row.score || 0).toLocaleString('vi-VN')}đ
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <VerticalPodiumLeaderboard
+                  items={knightLeaderboardRows.map((row, idx) => ({
+                    key: `${row.username}-${idx}`,
+                    userObj: row.userObj,
+                    name: row.name || row.username,
+                    isMe: String(row.username || '').toLowerCase() === String(username || '').toLowerCase(),
+                    subtitle: `${row.topicLabel} • ⚔️ ${row.monstersSlain} quái • 🐉 ${row.dragonsSlain} Rồng`,
+                    scoreText: `${Number(row.score || 0).toLocaleString('vi-VN')}đ`
+                  }))}
+                />
               )}
             </div>
           </div>

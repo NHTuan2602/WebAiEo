@@ -28,7 +28,7 @@ import {
 } from '../utils/examHelpers';
 import { getQuestionDisplayNumber, stripLeadingQuestionNumber } from '../utils/examUiHelpers';
 import SpeakingQuestionLuyennoiCard from '../components/speaking/SpeakingQuestionLuyennoiCard';
-import VipMemberName from '../components/common/VipMemberName';
+import VerticalPodiumLeaderboard from '../components/common/VerticalPodiumLeaderboard';
 
 export default function ResultView({
   aiApiKey,
@@ -845,36 +845,17 @@ export default function ResultView({
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {rankedList.slice(0, 9).map((row, idx) => (
-                  <div
-                    key={row.studentId}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs ${
-                      row.isCurrentUser
-                        ? 'bg-[#EDFFFD] dark:bg-teal-950/40 border-[#007A7A] dark:border-[#1EE1D6] ring-1 ring-[#007A7A]/30'
-                        : 'bg-white dark:bg-slate-900 border-amber-200/80 dark:border-slate-700'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <p className="font-extrabold text-slate-900 dark:text-white truncate flex items-center gap-1 flex-wrap">
-                        <span>#{idx + 1}</span>
-                        <VipMemberName
-                          user={usersDb?.[row.studentId] || (row.studentId === currentUser?.username ? currentUser : null)}
-                          fallbackName={row.studentName}
-                          badgeSize="xs"
-                        />
-                        {row.isCurrentUser && <span className="text-xs text-[#007A7A] dark:text-[#1EE1D6]">(Bạn)</span>}
-                      </p>
-                      <p className="text-xs text-[#475569] dark:text-slate-400">
-                        {row.durationSeconds > 0 ? formatDurationVi(row.durationSeconds) : row.submittedAt}
-                      </p>
-                    </div>
-                    <span className="font-mono font-black text-sm text-[#007A7A] dark:text-[#1EE1D6] shrink-0 ml-2">
-                      {row.band}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <VerticalPodiumLeaderboard
+                accentTheme="teal"
+                items={rankedList.slice(0, 10).map(row => ({
+                  key: row.studentId,
+                  userObj: usersDb?.[row.studentId] || (row.studentId === currentUser?.username ? currentUser : null),
+                  name: row.studentName,
+                  isMe: row.isCurrentUser,
+                  subtitle: row.durationSeconds > 0 ? formatDurationVi(row.durationSeconds) : row.submittedAt,
+                  scoreText: `Band ${row.band}`
+                }))}
+              />
             </div>
           );
         })()}

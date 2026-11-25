@@ -473,4 +473,112 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
 
     healthGuard.assertHealthy('admin-secret-demon-king-access');
   });
+
+  test('Game Arena Space Shooter & Knight RPG render Top 1-3 podium row and vertical Top 4-10 list without horizontal overflow', async ({
+    page
+  }) => {
+    const spaceEntries = Array.from({ length: 12 }, (_, idx) => ({
+      id: `lb_space_${idx + 1}`,
+      username: `e2e_top_space_${idx + 1}`,
+      name: `Cao Thủ Phi Thuyền Số ${idx + 1} Tên Khá Dài`,
+      gameType: 'space_shooter',
+      mode: 'space_shooter',
+      score: 5000 - idx * 250,
+      accuracyPct: 100 - idx,
+      topicLabel: 'IELTS Academic',
+      updatedAtMs: Date.now() - idx * 1000
+    }));
+    const knightEntries = Array.from({ length: 12 }, (_, idx) => ({
+      id: `lb_knight_${idx + 1}`,
+      username: `e2e_top_knight_${idx + 1}`,
+      name: `Hiệp Sĩ Đồ Long Hạng ${idx + 1} Tên Dài`,
+      gameType: 'knight_rpg',
+      mode: 'knight_rpg',
+      score: 8000 - idx * 300,
+      accuracyPct: 100 - idx,
+      topicLabel: 'Hành Trình Đồ Long',
+      updatedAtMs: Date.now() - idx * 1000
+    }));
+
+    await page.route('**/api/sync/state', async route => {
+      const response = await route.fetch();
+      const json = await response.json();
+      json.gamePracticeLeaderboard = [
+        ...(Array.isArray(json.gamePracticeLeaderboard) ? json.gamePracticeLeaderboard : []),
+        ...spaceEntries,
+        ...knightEntries
+      ];
+      await route.fulfill({ response, json });
+    });
+
+    await mockExternalAndPaidApis(page);
+    const healthGuard = attachHealthGuards(page);
+
+    await loginViaUI(page, E2E_CREDENTIALS.student.username, E2E_CREDENTIALS.student.password);
+    await page.locator('header').getByRole('tab', { name: /Đấu Trường/i }).first().click();
+    await expect(page.getByTestId('arena-game-selection-hub')).toBeVisible({ timeout: 12_000 });
+
+    const assertLeaderboardGeometry = async (containerTestId, label) => {
+      const container = page.getByTestId(containerTestId);
+      await expect(container).toBeVisible({ timeout: 8_000 });
+
+      const podiumRow = container.getByTestId('leaderboard-podium-row');
+      await expect(podiumRow).toBeVisible();
+      const top1 = podiumRow.locator('[data-leaderboard-rank="1"]');
+      const top2 = podiumRow.locator('[data-leaderboard-rank="2"]');
+      const top3 = podiumRow.locator('[data-leaderboard-rank="3"]');
+      await expect(top1).toBeVisible();
+      await expect(top2).toBeVisible();
+      await expect(top3).toBeVisible();
+
+      const b1 = await top1.boundingBox();
+      const b2 = await top2.boundingBox();
+      const b3 = await top3.boundingBox();
+      expect(b1 && b2 && b3, `[${label}] Podium boxes missing`).toBeTruthy();
+      // Top 2 left, Top 1 center, Top 3 right on a single horizontal row
+      expect(b2.x).toBeLessThan(b1.x);
+      expect(b1.x).toBeLessThan(b3.x);
+      expect(Math.abs(b2.y + b2.height - (b3.y + b3.height))).toBeLessThan(12);
+
+      // Top 4..10 vertical list (1 rank per row, capped at #10)
+      const verticalList = container.getByTestId('leaderboard-vertical-list');
+      await expect(verticalList).toBeVisible();
+      await expect(verticalList.locator('[data-leaderboard-rank]')).toHaveCount(7);
+      await expect(container.locator('[data-leaderboard-rank="11"]')).toHaveCount(0);
+
+      let prevBox = null;
+      for (let rank = 4; rank <= 10; rank += 1) {
+        const rowLoc = verticalList.locator(`[data-leaderboard-rank="${rank}"]`);
+        await expect(rowLoc).toBeVisible();
+        const box = await rowLoc.boundingBox();
+        expect(box, `[${label}] Missing box for #${rank}`).toBeTruthy();
+        if (prevBox) {
+          expect(box.y).toBeGreaterThanOrEqual(prevBox.y + prevBox.height - 2);
+          expect(Math.abs(box.x - prevBox.x)).toBeLessThan(4);
+        }
+        prevBox = box;
+      }
+    };
+
+    // 1. Space Shooter Lobby Leaderboard (Desktop + 375px Mobile)
+    await page.getByTestId('select-space-shooter-game-btn').click();
+    await assertLeaderboardGeometry('space-lobby-leaderboard', 'Space-Desktop');
+    await assertNoHorizontalOverflow(page, 'SpaceLeaderboard-Desktop');
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await assertLeaderboardGeometry('space-lobby-leaderboard', 'Space-Mobile');
+    await assertNoHorizontalOverflow(page, 'SpaceLeaderboard-Mobile');
+
+    // 2. Knight RPG Hub Leaderboard (Mobile + Desktop)
+    await page.getByTestId('switch-to-knight-game-btn').click();
+    await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
+    await assertLeaderboardGeometry('knight-lobby-leaderboard', 'Knight-Mobile');
+    await assertNoHorizontalOverflow(page, 'KnightLeaderboard-Mobile');
+
+    await page.setViewportSize({ width: 1366, height: 820 });
+    await assertLeaderboardGeometry('knight-lobby-leaderboard', 'Knight-Desktop');
+    await assertNoHorizontalOverflow(page, 'KnightLeaderboard-Desktop');
+
+    healthGuard.assertHealthy('vertical-podium-leaderboard-desktop-mobile');
+  });
 });

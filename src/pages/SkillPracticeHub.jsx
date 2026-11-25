@@ -69,15 +69,14 @@ import {
   formatRemainingSubscriptionText,
   formatVndCurrency,
   hasActiveAieoVip,
-  normalizePaymentConfig,
-  resolveUserVipNameVisual
+  normalizePaymentConfig
 } from '../constants/profileCustomization';
 import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 import SpeakingForecastZone from '../components/speaking/SpeakingForecastZone';
 import AssignFolderModal from '../components/modals/AssignFolderModal';
 import DailyWritingBulkModal from '../components/teacher/DailyWritingBulkModal';
 import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
-import VipMemberName from '../components/common/VipMemberName';
+import VerticalPodiumLeaderboard from '../components/common/VerticalPodiumLeaderboard';
 import WritingTask2FilterBar from '../components/common/WritingTask2FilterBar';
 
 export default function SkillPracticeHub({
@@ -390,51 +389,21 @@ export default function SkillPracticeHub({
             Chưa có bài hoàn thành nào trong mục này - hãy làm ngay đề đầu tiên để giữ Top #1 BXH!
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {ranked.slice(0, 9).map((row, idx) => {
-              const isMe = row.username === currentUser?.username;
+          <VerticalPodiumLeaderboard
+            accentTheme="teal"
+            items={ranked.slice(0, 10).map(row => {
               const avgBand = Math.round(((row.totalBand / row.count) + 1e-9) * 2) / 2;
               const rowUserObj = usersDb?.[row.username] || (row.username === currentUser?.username ? currentUser : null);
-              const rowVipVisual = resolveUserVipNameVisual(rowUserObj);
-              const rankCard = (
-                <div
-                  key={rowVipVisual.showNeonCover ? undefined : row.username}
-                  className={`flex items-center justify-between gap-3 p-3.5 transition ${
-                    rowVipVisual.showNeonCover
-                      ? 'rounded-[10px] bg-[#F8FAFC] dark:bg-slate-900'
-                      : isMe
-                      ? 'rounded-lg border bg-[#EDFFFD] dark:bg-teal-950/35 border-[#007A7A] dark:border-[#1EE1D6]'
-                      : 'rounded-lg border bg-[#F8FAFC] dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-extrabold text-[#0F172B] dark:text-white truncate flex items-center gap-1 flex-wrap">
-                      <span>#{idx + 1}</span>
-                      <VipMemberName
-                        user={rowUserObj}
-                        fallbackName={row.name}
-                        badgeSize="xs"
-                      />
-                      {isMe && <span className="text-xs text-[#0F766E] dark:text-[#1EE1D6]">(Bạn)</span>}
-                    </p>
-                    <p className="text-xs text-[#475569] dark:text-slate-400 truncate mt-0.5">
-                      {row.count} bài • TB {avgBand.toFixed(1)} • {row.bestTestTitle}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span className="inline-block px-2.5 py-1 rounded-lg bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-300 font-mono font-black text-sm border border-amber-300 dark:border-amber-500/35">
-                      {row.bestBand}
-                    </span>
-                  </div>
-                </div>
-              );
-              return rowVipVisual.showNeonCover ? (
-                <div key={row.username} className={`rounded-lg p-[2px] transition-all ${rowVipVisual.neonCoverMeta.cardRimWrapClass}`}>
-                  {rankCard}
-                </div>
-              ) : rankCard;
+              return {
+                key: row.username,
+                userObj: rowUserObj,
+                name: row.name,
+                isMe: row.username === currentUser?.username,
+                subtitle: `${row.count} bài • TB ${avgBand.toFixed(1)} • ${row.bestTestTitle}`,
+                scoreText: `Band ${row.bestBand}`
+              };
             })}
-          </div>
+          />
         )}
       </section>
     );
