@@ -219,10 +219,10 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
 
     // Check Inventory tab: 10 distinct hero sprites load & locked heroes cannot be purchased directly with Gold
     await page.getByTestId('gacha-tab-inventory').click();
-    await expect(page.getByText(/Nữ Chiến Binh Valkyrie Freya/i)).toBeVisible();
-    await expect(page.getByText(/Thánh Kỵ Sĩ Thái Dương Leon/i)).toBeVisible();
-    await expect(page.getByText(/Kiếm Sĩ Lôi Kiếm Kenji/i)).toBeVisible();
-    await expect(page.getByText(/Chiến Thần Cuồng Chiến Drake/i)).toBeVisible();
+    await expect(page.getByText(/Thánh Mèo Mồm Chữ O Pop Cat/i)).toBeVisible();
+    await expect(page.getByText(/Thánh Nhây Trollface Huyền Thoại/i)).toBeVisible();
+    await expect(page.getByText(/Kiếm Sĩ Thông Thái Chỉ Đầu Roll Safe/i)).toBeVisible();
+    await expect(page.getByText(/Quý Ngài Gấu Pooh Đế Vương Tuxedo/i)).toBeVisible();
     await expect(page.getByTestId('locked-gacha-hero-btn-valkyrie_freya')).toBeVisible();
     await expect
       .poll(async () =>
@@ -465,9 +465,9 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await expect(page.getByText(/Tông Sư Gấu Trúc Kem Ốc Quế/i)).toBeVisible();
     await expect(page.getByText(/Chúa Tể Đầm Lầy Xanh/i)).toBeVisible();
     await expect(page.getByText(/Chuột Hamster Bản Năng Vô Cực/i)).toBeVisible();
-    await expect(page.getByText(/Đại Pháp Sư Tinh Không Zephyr/i)).toBeVisible();
-    await expect(page.getByText(/Thánh Nữ Thần Thương Celestia/i)).toBeVisible();
-    await expect(page.getByText(/Lôi Đế Huyết Kiếm Raiden/i)).toBeVisible();
+    await expect(page.getByText(/Đại Pháp Sư Não To Vũ Trụ Galaxy Brain/i)).toBeVisible();
+    await expect(page.getByText(/Thánh Nữ Tính Toán Vũ Trụ Math Lady/i)).toBeVisible();
+    await expect(page.getByText(/Lôi Đế Chuột Vàng Há Mồm Kinh Ngạc/i)).toBeVisible();
     const swordEquipBtn = page.locator('[data-testid^="equip-hero-wp-knight_arthur-"]').first();
     if (await swordEquipBtn.isVisible().catch(() => false)) {
       await swordEquipBtn.click();

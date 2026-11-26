@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="popAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.4"/>
+      <stop offset="65%" stop-color="#f472b6" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="popFur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff1f2"/>
+      <stop offset="55%" stop-color="#fbcfe8"/>
+      <stop offset="100%" stop-color="#f9a8d4"/>
+    </linearGradient>
+    <linearGradient id="popBlade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fce7f3"/>
+      <stop offset="55%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#9d174d"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="140" fill="url(#popAura)"/>
+
+  <!-- POP! comic speech burst -->
+  <rect x="218" y="34" width="76" height="36" rx="14" fill="#fef08a" stroke="#db2777" stroke-width="3.2"/>
+  <text x="256" y="59" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="22" fill="#be185d">POP!</text>
+
+  <!-- Pink Valkyrie Cape & Winged Knight Armor -->
+  <path d="M96 156 C60 184 52 246 72 284 L234 284 C248 242 238 186 206 156 Z" fill="#db2777" stroke="#500724" stroke-width="3.6"/>
+  <ellipse cx="152" cy="224" rx="54" ry="56" fill="url(#popFur)" stroke="#831843" stroke-width="3.8"/>
+  <path d="M114 176 L190 176 L180 238 L152 252 L124 238 Z" fill="#ec4899" stroke="#500724" stroke-width="3.4" stroke-linejoin="round"/>
+  <polygon points="152,190 162,206 152,224 142,206" fill="#fde047" stroke="#831843" stroke-width="2"/>
+
+  <!-- Cat Ears + Tiny Valkyrie Wing Hairpins -->
+  <polygon points="98,94 84,38 134,68" fill="url(#popFur)" stroke="#831843" stroke-width="3.6" stroke-linejoin="round"/>
+  <polygon points="206,94 220,38 170,68" fill="url(#popFur)" stroke="#831843" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M72 62 C52 54 48 76 74 84 Z" fill="#ffffff" stroke="#db2777" stroke-width="2.5"/>
+  <path d="M232 62 C252 54 256 76 230 84 Z" fill="#ffffff" stroke="#db2777" stroke-width="2.5"/>
+
+  <!-- Iconic Wide POP CAT Head -->
+  <ellipse cx="152" cy="118" rx="64" ry="54" fill="url(#popFur)" stroke="#831843" stroke-width="3.8"/>
+  <!-- Big Pop Cat Eyes -->
+  <circle cx="124" cy="96" r="10" fill="#0f172a"/>
+  <circle cx="127" cy="93" r="3.5" fill="#ffffff"/>
+  <circle cx="180" cy="96" r="10" fill="#0f172a"/>
+  <circle cx="183" cy="93" r="3.5" fill="#ffffff"/>
+  <!-- Tiny nose -->
+  <polygon points="146,108 158,108 152,115" fill="#db2777"/>
+  <!-- GIANT ICONIC O-SHAPED POP MOUTH! -->
+  <ellipse cx="152" cy="144" rx="28" ry="26" fill="#be123c" stroke="#500724" stroke-width="3.6"/>
+  <ellipse cx="152" cy="154" rx="16" ry="12" fill="#fb7185"/>
+  <ellipse cx="104" cy="126" rx="10" ry="6" fill="#f43f5e" opacity="0.45"/>
+  <ellipse cx="200" cy="126" rx="10" ry="6" fill="#f43f5e" opacity="0.45"/>
+
+  <!-- Twin Pop Pink Swords -->
+  <g transform="rotate(28 66 200)">
+    <polygon points="66,94 78,120 74,218 58,218 54,120" fill="url(#popBlade)" stroke="#500724" stroke-width="3"/>
+    <rect x="44" y="216" width="44" height="10" rx="4" fill="#fde047" stroke="#500724" stroke-width="2.6"/>
+  </g>
+  <g transform="rotate(-28 242 198)">
+    <polygon points="242,92 254,118 250,216 234,216 230,118" fill="url(#popBlade)" stroke="#500724" stroke-width="3"/>
+    <rect x="220" y="214" width="44" height="10" rx="4" fill="#fde047" stroke="#500724" stroke-width="2.6"/>
+  </g>
+</svg>

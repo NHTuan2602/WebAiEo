@@ -384,14 +384,21 @@ export default function App() {
   const [serverSyncConnected, setServerSyncConnected] = useState(false);
   const [maintenancePreviewMode, setMaintenancePreviewMode] = useState(() => {
     try {
-      if (typeof window === 'undefined') return false;
-      const p = new URLSearchParams(window.location.search).get('maintenance');
-      return p === '1' || p === 'true';
+      if (typeof window === 'undefined') return '';
+      const raw = String(new URLSearchParams(window.location.search).get('maintenance') || '')
+        .trim()
+        .toLowerCase();
+      if (!raw || raw === '0' || raw === 'false') return '';
+      if (raw === 'crash') return 'crash';
+      if (raw === 'error' || raw === 'server_error' || raw === '500' || raw === '502') return 'server_error';
+      if (raw === 'disconnected' || raw === 'offline') return 'disconnected';
+      return 'maintenance';
     } catch {
-      return false;
+      return '';
     }
   });
   const [serverOutageActive, setServerOutageActive] = useState(false);
+  const [serverOutageMeta, setServerOutageMeta] = useState({ mode: 'disconnected', statusCode: 0 });
   const [serverOutageDismissed, setServerOutageDismissed] = useState(false);
   const [serverOutageChecking, setServerOutageChecking] = useState(false);
   const consecutiveSyncFailuresRef = useRef(0);
@@ -1748,15 +1755,19 @@ export default function App() {
     if (serverOutageActiveRef.current) {
       serverOutageActiveRef.current = false;
       setServerOutageActive(false);
+      setServerOutageMeta({ mode: 'disconnected', statusCode: 0 });
       setServerOutageDismissed(false);
       showToast('Đã kết nối lại máy chủ thành công!', 'success');
     }
   };
 
-  const markServerSyncFailure = (immediate = false) => {
+  const markServerSyncFailure = (immediate = false, opts = {}) => {
     serverSyncConnectedRef.current = false;
     setServerSyncConnected(false);
     consecutiveSyncFailuresRef.current += 1;
+    const statusCode = Number(opts?.statusCode) || 0;
+    const mode = opts?.mode || (statusCode === 503 ? 'maintenance' : statusCode >= 500 ? 'server_error' : 'disconnected');
+    setServerOutageMeta({ mode, statusCode });
     if (immediate || consecutiveSyncFailuresRef.current >= 2) {
       serverOutageActiveRef.current = true;
       setServerOutageActive(true);
@@ -1765,7 +1776,7 @@ export default function App() {
 
   const verifyServerHealthNow = async (manualTrigger = false) => {
     if (maintenancePreviewMode && manualTrigger) {
-      setMaintenancePreviewMode(false);
+      setMaintenancePreviewMode('');
       try {
         const u = new URL(window.location.href);
         u.searchParams.delete('maintenance');
@@ -1783,10 +1794,13 @@ export default function App() {
           return true;
         }
       }
-      markServerSyncFailure(true);
+      markServerSyncFailure(true, {
+        statusCode: res.status || 503,
+        mode: res.status === 503 ? 'maintenance' : 'server_error'
+      });
       return false;
     } catch {
-      markServerSyncFailure(true);
+      markServerSyncFailure(true, { statusCode: 0, mode: 'disconnected' });
       return false;
     } finally {
       if (manualTrigger) setServerOutageChecking(false);
@@ -1826,7 +1840,10 @@ export default function App() {
       }
       if (!res.ok) {
         if (res.status >= 500) {
-          markServerSyncFailure(res.status === 503);
+          markServerSyncFailure(res.status === 503, {
+            statusCode: res.status,
+            mode: res.status === 503 ? 'maintenance' : 'server_error'
+          });
         }
         return null;
       }
@@ -1849,7 +1866,7 @@ export default function App() {
       if (responseEtag) lastSyncEtagRef.current = responseEtag;
       return snap;
     } catch (_err) {
-      markServerSyncFailure(false);
+      markServerSyncFailure(false, { statusCode: 0, mode: 'disconnected' });
       return null;
     }
   };
@@ -1864,7 +1881,10 @@ export default function App() {
       });
       if (res.status >= 500) {
         lastSyncRejectionStatusRef.current = res.status;
-        markServerSyncFailure(res.status === 503);
+        markServerSyncFailure(res.status === 503, {
+          statusCode: res.status,
+          mode: res.status === 503 ? 'maintenance' : 'server_error'
+        });
         return null;
       }
       markServerSyncSuccess();
@@ -8448,6 +8468,7 @@ export default function App() {
           }}
           onOpenMailConfig={() => setShowMailConfigModal(true)}
           onOpenPaymentConfig={currentUser?.isSuperAdmin ? () => setShowPaymentConfigModal(true) : undefined}
+          onPreviewMaintenance={currentUser?.isSuperAdmin ? (demoMode = 'server_error') => setMaintenancePreviewMode(demoMode) : undefined}
           onToggleUserCoverUnlock={currentUser?.isSuperAdmin ? handleToggleUserCoverUnlock : undefined}
           onToggleUserSubscription={currentUser?.isSuperAdmin ? handleToggleUserSubscription : undefined}
           paymentConfig={paymentConfig}
@@ -8787,17 +8808,26 @@ export default function App() {
         />
       )}
 
-      {(maintenancePreviewMode || (serverOutageActive && !serverOutageDismissed)) && (
+      {(Boolean(maintenancePreviewMode) || (serverOutageActive && !serverOutageDismissed)) && (
         <ServerMaintenanceOverlay
-          isOpen={true}
-          mode="disconnected"
+          mode={maintenancePreviewMode || serverOutageMeta.mode}
+          statusCode={
+            maintenancePreviewMode
+              ? maintenancePreviewMode === 'server_error'
+                ? 500
+                : 503
+              : serverOutageMeta.statusCode
+          }
+          isOffline={!maintenancePreviewMode && serverOutageMeta.mode === 'disconnected'}
+          isCrash={maintenancePreviewMode === 'crash'}
+          allowDemoSwitch={Boolean(maintenancePreviewMode)}
           checking={serverOutageChecking}
-          canDismiss={maintenancePreviewMode || view === 'EXAM_MODE'}
+          canDismiss={Boolean(maintenancePreviewMode) || view === 'EXAM_MODE'}
           dismissLabel={maintenancePreviewMode ? 'Đóng xem trước' : 'Tạm ẩn (giữ bài đang làm)'}
           onRetry={() => verifyServerHealthNow(true)}
           onDismiss={() => {
             if (maintenancePreviewMode) {
-              setMaintenancePreviewMode(false);
+              setMaintenancePreviewMode('');
               try {
                 const u = new URL(window.location.href);
                 u.searchParams.delete('maintenance');

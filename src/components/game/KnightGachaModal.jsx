@@ -951,7 +951,7 @@ export default function KnightGachaModal({
               )}
             </h2>
             <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
-              <span>10.000 Vàng / 1 lượt • Trùng nhân vật 5★ hoàn 200.000 Vàng, trùng nhân vật 4★ hoàn 10.000 Vàng • {KNIGHT_CHARACTER_SKINS.length} Nhân Vật Meme &amp; Hiệp Sĩ.</span>
+              <span>10.000 Vàng / 1 lượt • Trùng nhân vật 5★ hoàn 200.000 Vàng, trùng nhân vật 4★ hoàn 10.000 Vàng • {KNIGHT_CHARACTER_SKINS.length} Nhân Vật Meme Huyền Thoại.</span>
             </p>
           </div>
 

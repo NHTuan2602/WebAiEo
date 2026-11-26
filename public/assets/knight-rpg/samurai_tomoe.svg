@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="bongoAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#fb7185" stop-opacity="0.42"/>
+      <stop offset="65%" stop-color="#f43f5e" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bongoKatana" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe4e6"/>
+      <stop offset="55%" stop-color="#fb7185"/>
+      <stop offset="100%" stop-color="#be123c"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="142" fill="url(#bongoAura)"/>
+
+  <!-- Sakura Petals + Drum Beat Lines -->
+  <text x="58" y="64" font-family="Impact, sans-serif" font-size="18" fill="#fb7185" transform="rotate(-14 58 64)">BỤP!</text>
+  <text x="234" y="62" font-family="Impact, sans-serif" font-size="18" fill="#fb7185" transform="rotate(14 234 62)">BỤP!</text>
+
+  <!-- Crimson Samurai Haori & Bongo Cat Blob -->
+  <path d="M84 156 L220 156 L236 254 L70 254 Z" fill="#e11d48" stroke="#4c0519" stroke-width="3.6" stroke-linejoin="round"/>
+  <!-- Cute Round White Bongo Cat Head -->
+  <polygon points="94,102 82,52 126,76" fill="#ffffff" stroke="#1e293b" stroke-width="3.6" stroke-linejoin="round"/>
+  <polygon points="210,102 222,52 178,76" fill="#ffffff" stroke="#1e293b" stroke-width="3.6" stroke-linejoin="round"/>
+  <ellipse cx="152" cy="126" rx="64" ry="50" fill="#ffffff" stroke="#1e293b" stroke-width="3.8"/>
+
+  <!-- Sakura Headband -->
+  <rect x="92" y="78" width="120" height="14" rx="6" fill="#e11d48" stroke="#4c0519" stroke-width="2.8"/>
+  <circle cx="152" cy="85" r="7" fill="#fda4af"/>
+
+  <!-- Cute Determined Bongo Cat Face -->
+  <circle cx="126" cy="116" r="6.5" fill="#0f172a"/>
+  <circle cx="178" cy="116" r="6.5" fill="#0f172a"/>
+  <path d="M142 126 Q147 134 152 125 Q157 134 162 126" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="108" cy="130" rx="8" ry="4.5" fill="#fda4af" opacity="0.75"/>
+  <ellipse cx="196" cy="130" rx="8" ry="4.5" fill="#fda4af" opacity="0.75"/>
+
+  <!-- White Table & Wooden Bongo Drums + Slapping Paws! -->
+  <rect x="44" y="216" width="232" height="58" rx="14" fill="#f8fafc" stroke="#1e293b" stroke-width="3.6"/>
+  <ellipse cx="114" cy="238" rx="34" ry="18" fill="#d97706" stroke="#451a03" stroke-width="3.4"/>
+  <ellipse cx="114" cy="234" rx="28" ry="12" fill="#fef3c7" stroke="#78350f" stroke-width="2"/>
+  <ellipse cx="194" cy="238" rx="34" ry="18" fill="#d97706" stroke="#451a03" stroke-width="3.4"/>
+  <ellipse cx="194" cy="234" rx="28" ry="12" fill="#fef3c7" stroke="#78350f" stroke-width="2"/>
+
+  <!-- Rapidly Slapping Paws -->
+  <ellipse cx="114" cy="218" rx="16" ry="13" fill="#ffffff" stroke="#1e293b" stroke-width="3.2"/>
+  <ellipse cx="194" cy="196" rx="16" ry="13" fill="#ffffff" stroke="#1e293b" stroke-width="3.2"/>
+  <path d="M180 180 L208 180 M184 172 L204 172" stroke="#fb7185" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Sakura Katana Across Back -->
+  <g transform="rotate(-38 230 140)">
+    <path d="M226 30 Q238 92 234 198 L222 198 Q224 92 226 30 Z" fill="url(#bongoKatana)" stroke="#4c0519" stroke-width="3"/>
+    <ellipse cx="228" cy="198" rx="14" ry="5" fill="#fde047" stroke="#78350f" stroke-width="2.5"/>
+  </g>
+</svg>

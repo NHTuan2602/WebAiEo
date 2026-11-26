@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="kermitAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.45"/>
+      <stop offset="65%" stop-color="#06b6d4" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rgbClaymore" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="50%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="142" fill="url(#kermitAura)"/>
+
+  <!-- RGB Dark Neon Hooded Evil Kermit Cloak -->
+  <path d="M56 286 L86 92 C104 42 204 42 222 92 L252 286 Z" fill="#0f172a" stroke="#22d3ee" stroke-width="3.8" stroke-linejoin="round"/>
+  <path d="M84 114 C98 64 210 64 224 114 C216 174 198 242 154 248 C110 242 92 174 84 114 Z" fill="#020617" stroke="#0e7490" stroke-width="3"/>
+
+  <!-- Kermit Frog Face Inside Neon Hood -->
+  <ellipse cx="154" cy="144" rx="46" ry="34" fill="#22c55e" stroke="#14532d" stroke-width="3.2"/>
+  <circle cx="132" cy="108" r="14" fill="#ffffff" stroke="#0f172a" stroke-width="2.6"/>
+  <rect x="122" y="104" width="20" height="6" rx="2" fill="#0f172a"/>
+  <circle cx="176" cy="108" r="14" fill="#ffffff" stroke="#0f172a" stroke-width="2.6"/>
+  <rect x="166" y="104" width="20" height="6" rx="2" fill="#0f172a"/>
+  <!-- Sinister Green Frog Grin -->
+  <path d="M122 146 Q154 166 186 146" fill="none" stroke="#14532d" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Neon Cyber Halo Over Hood -->
+  <ellipse cx="154" cy="52" rx="46" ry="12" fill="none" stroke="#22d3ee" stroke-width="4.5"/>
+
+  <!-- RGB Cyber Greatsword -->
+  <g transform="rotate(-30 246 184)">
+    <polygon points="246,44 268,78 260,224 232,224 224,78" fill="url(#rgbClaymore)" stroke="#ffffff" stroke-width="2.8" stroke-linejoin="round"/>
+    <line x1="246" y1="62" x2="246" y2="216" stroke="#ffffff" stroke-width="3"/>
+    <rect x="214" y="222" width="64" height="12" rx="4" fill="#0f172a" stroke="#22d3ee" stroke-width="3"/>
+    <rect x="240" y="234" width="12" height="28" rx="3" fill="#475569"/>
+  </g>
+</svg>

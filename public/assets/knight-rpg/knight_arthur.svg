@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="gooseAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.4"/>
+      <stop offset="65%" stop-color="#ef4444" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gooseBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="65%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="gooseSword" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e0f2fe"/>
+      <stop offset="55%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="140" fill="url(#gooseAura)"/>
+
+  <!-- Comic QUAC! starburst -->
+  <polygon points="56,36 74,48 92,34 86,56 106,66 84,74 88,94 68,80 50,94 58,72 38,62 60,54" fill="#fef08a" stroke="#dc2626" stroke-width="3" stroke-linejoin="round"/>
+  <text x="72" y="70" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="14" fill="#dc2626" transform="rotate(-10 72 70)">QUẠC!</text>
+
+  <!-- Flowing Blue Starter Knight Cape -->
+  <path d="M98 168 C58 192 44 238 62 276 C94 268 118 270 138 250 Z" fill="#1d4ed8" stroke="#0f172a" stroke-width="3.6"/>
+
+  <!-- Goose Orange Feet -->
+  <path d="M128 254 L122 282 L104 288 L142 288 Z" fill="#f97316" stroke="#7c2d12" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M178 254 L176 282 L158 288 L196 288 Z" fill="#f97316" stroke="#7c2d12" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- Plump White Goose Torso & Steel Breastplate -->
+  <ellipse cx="152" cy="222" rx="64" ry="44" fill="url(#gooseBody)" stroke="#1e293b" stroke-width="3.8"/>
+  <path d="M114 202 L192 202 L182 246 L152 256 L122 246 Z" fill="#3b82f6" stroke="#0f172a" stroke-width="3.2" stroke-linejoin="round"/>
+  <polygon points="152,210 160,224 152,238 144,224" fill="#fde047" stroke="#78350f" stroke-width="2"/>
+  <!-- Flapping Wing -->
+  <path d="M100 198 C80 184 74 218 98 232 C112 238 134 226 122 204 Z" fill="#ffffff" stroke="#1e293b" stroke-width="3.2"/>
+
+  <!-- Long Goose Neck & Chaotic Head -->
+  <path d="M126 196 C122 146 132 104 148 86 C162 72 184 74 192 92 C196 106 184 120 172 124 C168 152 174 176 178 198 Z" fill="url(#gooseBody)" stroke="#1e293b" stroke-width="3.8" stroke-linejoin="round"/>
+
+  <!-- Tiny Crooked Iron Knight Helmet on Goose Head -->
+  <path d="M138 78 C142 50 188 48 192 78 Z" fill="#94a3b8" stroke="#0f172a" stroke-width="3"/>
+  <rect x="132" y="74" width="66" height="8" rx="4" fill="#cbd5e1" stroke="#0f172a" stroke-width="2.6"/>
+  <path d="M164 52 C170 30 194 34 186 52 Z" fill="#ef4444" stroke="#7f1d1d" stroke-width="2.4"/>
+
+  <!-- Menacing Goose Eyes -->
+  <circle cx="170" cy="92" r="5" fill="#0f172a"/>
+  <circle cx="172" cy="90" r="1.8" fill="#ffffff"/>
+  <line x1="158" y1="84" x2="180" y2="87" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Shining Sword Held Horizontally in Orange Beak ("Peace Was Never An Option") -->
+  <g transform="rotate(-14 234 102)">
+    <polygon points="298,100 264,88 184,92 184,112 264,114" fill="url(#gooseSword)" stroke="#0f172a" stroke-width="3.2" stroke-linejoin="round"/>
+    <line x1="194" y1="102" x2="278" y2="101" stroke="#ffffff" stroke-width="2.5"/>
+    <rect x="172" y="82" width="12" height="40" rx="4" fill="#fbbf24" stroke="#78350f" stroke-width="2.8"/>
+    <rect x="150" y="96" width="22" height="12" rx="3" fill="#1e293b" stroke="#0f172a" stroke-width="2.4"/>
+  </g>
+  <!-- Beak clamping sword handle -->
+  <path d="M180 94 L224 98 L216 112 L176 112 Z" fill="#f97316" stroke="#7c2d12" stroke-width="3" stroke-linejoin="round"/>
+</svg>

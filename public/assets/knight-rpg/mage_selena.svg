@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="owlAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.45"/>
+      <stop offset="65%" stop-color="#8b5cf6" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="owlGreen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#84cc16"/>
+      <stop offset="60%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="142" fill="url(#owlAura)"/>
+
+  <!-- Fiery Streak Warning Sign -->
+  <rect x="20" y="34" width="112" height="34" rx="12" fill="#fef08a" stroke="#15803d" stroke-width="3"/>
+  <text x="76" y="57" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="15" fill="#15803d">HỌC BÀI NGAY!</text>
+
+  <!-- Purple Mage Cape & Feather Body -->
+  <path d="M78 164 L224 164 L240 282 L64 282 Z" fill="#6d28d9" stroke="#1e1b4b" stroke-width="3.6" stroke-linejoin="round"/>
+  <ellipse cx="152" cy="176" rx="74" ry="86" fill="url(#owlGreen)" stroke="#14532d" stroke-width="3.8"/>
+  <!-- Lighter Green Belly Feathers -->
+  <ellipse cx="152" cy="212" rx="48" ry="44" fill="#bef264" stroke="#4d7c0f" stroke-width="2.6"/>
+
+  <!-- Owl Ear Tufts + Wizard Starry Tiara -->
+  <polygon points="90,104 72,56 124,78" fill="url(#owlGreen)" stroke="#14532d" stroke-width="3.4"/>
+  <polygon points="214,104 232,56 180,78" fill="url(#owlGreen)" stroke="#14532d" stroke-width="3.4"/>
+  <polygon points="152,44 159,64 180,64 163,75 169,94 152,82 135,94 141,75 124,64 145,64" fill="#fde047" stroke="#78350f" stroke-width="2.4"/>
+
+  <!-- Giant Staring Mascot Owl Eyes (Intense 23:59 Streak Pressure!) -->
+  <circle cx="122" cy="122" r="28" fill="#ffffff" stroke="#14532d" stroke-width="3.4"/>
+  <circle cx="182" cy="122" r="28" fill="#ffffff" stroke="#14532d" stroke-width="3.4"/>
+  <circle cx="126" cy="124" r="12" fill="#0f172a"/>
+  <circle cx="130" cy="118" r="4" fill="#ffffff"/>
+  <circle cx="178" cy="124" r="12" fill="#0f172a"/>
+  <circle cx="182" cy="118" r="4" fill="#ffffff"/>
+  <!-- Determined Angry Eyebrows -->
+  <path d="M96 98 L142 110" stroke="#14532d" stroke-width="4.2" stroke-linecap="round"/>
+  <path d="M208 98 L162 110" stroke="#14532d" stroke-width="4.2" stroke-linecap="round"/>
+
+  <!-- Orange Owl Beak -->
+  <polygon points="138,140 166,140 152,166" fill="#f97316" stroke="#7c2d12" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- Flaming Streak Spell Staff -->
+  <line x1="256" y1="88" x2="244" y2="286" stroke="#fde047" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="256" cy="82" r="24" fill="#f97316" stroke="#fde047" stroke-width="3.6"/>
+  <text x="256" y="89" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="18" fill="#ffffff">🔥</text>
+</svg>

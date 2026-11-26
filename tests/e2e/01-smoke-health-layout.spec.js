@@ -135,12 +135,16 @@ test.describe('1. Smoke, Health & Light/Dark Layout Integrity', () => {
     const overlayImg = overlay.locator('img[data-meme-idx]');
     await expect(overlayImg).toBeVisible();
     const overlayIdx1 = await overlayImg.getAttribute('data-meme-idx');
+    await overlay.getByTestId('outage-demo-mode-server_error').click();
+    await expect(overlay).toContainText(/Lỗi máy chủ/i);
+    const errorIdx = await overlayImg.getAttribute('data-meme-idx');
+    expect(errorIdx).not.toBe(overlayIdx1);
     await page.reload();
     await expect(overlay).toBeVisible();
     await expect(overlayImg).toBeVisible();
     const overlayIdx2 = await overlayImg.getAttribute('data-meme-idx');
     expect(overlayIdx2).not.toBeNull();
-    expect(overlayIdx2).not.toBe(overlayIdx1);
+    expect(overlayIdx2).not.toBe(errorIdx);
 
     healthGuard.assertHealthy('smoke-maintenance-meme-rotation');
   });

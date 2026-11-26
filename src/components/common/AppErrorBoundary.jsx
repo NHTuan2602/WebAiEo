@@ -21,8 +21,8 @@ export default class AppErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <ServerMaintenanceOverlay
-          isOpen={true}
           mode="crash"
+          isCrash={true}
           onRetry={() => {
             if (typeof window !== 'undefined') {
               window.location.reload();

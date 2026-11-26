@@ -133,6 +133,7 @@ export default function TeacherDashboard({
   onOpenApiKeyModal,
   onOpenMailConfig,
   onOpenPaymentConfig = null,
+  onPreviewMaintenance = null,
   onToggleUserCoverUnlock = null,
   onToggleUserSubscription = null,
   onUpdateClassMembers,
@@ -1277,6 +1278,16 @@ export default function TeacherDashboard({
                 <Crown className="w-3.5 h-3.5" /> Danh Hiệu
               </button>
             )}
+            {isViewerSuperAdmin && onPreviewMaintenance && (
+              <button
+                type="button"
+                data-testid="admin-preview-server-error-mobile-btn"
+                onClick={() => onPreviewMaintenance('server_error')}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-500/15 border border-rose-300 dark:border-rose-500/35 text-[#9F1239] dark:text-rose-200 inline-flex items-center gap-1.5"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" /> Mẫu Sập Server
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1385,6 +1396,17 @@ export default function TeacherDashboard({
                 >
                   <Crown className="w-4 h-4 text-[#92400E] dark:text-amber-300 shrink-0" />
                   <span className="truncate">Quản Lý &amp; Tạo Danh Hiệu</span>
+                </button>
+              )}
+              {isViewerSuperAdmin && onPreviewMaintenance && (
+                <button
+                  type="button"
+                  data-testid="admin-preview-server-error-btn"
+                  onClick={() => onPreviewMaintenance('server_error')}
+                  className="w-full px-2.5 py-2.5 rounded-lg text-xs font-bold text-[#9F1239] dark:text-rose-200 bg-rose-50/80 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-300 dark:border-rose-500/35 transition flex items-center gap-2"
+                >
+                  <ShieldAlert className="w-4 h-4 text-[#9F1239] dark:text-rose-300 shrink-0" />
+                  <span className="truncate">Ví dụ Lỗi / Sập Server</span>
                 </button>
               )}
             </div>

@@ -864,8 +864,8 @@ export default function GameArena({
                 <div className="flex items-center gap-4 bg-white/90 dark:bg-slate-950/80 border border-rose-200 dark:border-rose-500/25 rounded-2xl p-4 shadow-xs">
                   <div className="w-20 h-16 rounded-2xl bg-gradient-to-br from-slate-900 via-[#2a0c1d] to-slate-950 border-2 border-amber-400/60 flex items-center justify-center relative overflow-hidden shadow-md shrink-0">
                     <img
-                      src="/assets/knight-rpg/knight_arthur.png"
-                      alt="Hiệp Sĩ Arthur"
+                      src="/assets/knight-rpg/knight_arthur.svg"
+                      alt="Chiến Thần Ngỗng Ngậm Kiếm"
                       className="w-11 h-11 object-contain -mr-2 z-10 drop-shadow-[0_2px_6px_rgba(56,189,248,0.65)]"
                     />
                     <img

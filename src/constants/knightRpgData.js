@@ -152,18 +152,18 @@ function buildWeaponSvgDataUrl({ kind = 'sword', primary = '#a855f7', secondary 
 }
 
 // ==========================================
-// 13 HEROES:
-// - 1 Starter: Arthur (4★)
-// - 4 Standard 4★ Heroes (pool: 'standard')
-// - 3 Standard 5★ Heroes (pool: 'standard' — obtainable on Standard Banner AND 50/50 loss on Limited Banner)
-// - 5 Exclusive Limited 5★ Heroes (pool: 'limited' — ONLY obtainable on their 7-day Weekly Limited Banner, NEVER on Standard Banner!)
+// 33 HEROES (100% MEME ROSTER!):
+// - 1 Starter: Chiến Thần Ngỗng Trắng Ngậm Kiếm (4★)
+// - 13 Standard 4★ Meme Heroes (pool: 'standard')
+// - 10 Standard 5★ Meme Heroes (pool: 'standard' — Banner Thường & lệch 50/50 ở Banner Giới Hạn)
+// - 9 Exclusive Limited 5★ Meme Heroes (pool: 'limited' — ONLY obtainable on 7-day Weekly Limited Banner)
 // ==========================================
 export const KNIGHT_CHARACTER_SKINS = [
   {
     id: 'knight_arthur',
-    name: 'Hiệp Sĩ Ánh Sáng Arthur',
-    gender: 'Nam',
-    genderBadge: '♂ Nam',
+    name: 'Chiến Thần Ngỗng Trắng Ngậm Kiếm',
+    gender: 'Meme',
+    genderBadge: '🪿 Meme',
     rarity: 'Mặc Định',
     starRarity: 4,
     pool: 'starter',
@@ -172,10 +172,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: 0,
-    weaponName: 'Thánh Kiếm Excalibur (Bản Tập Sự)',
-    memeQuote: '“Người bình thường duy nhất giữa ổ Meme”',
-    passiveText: 'Nhân vật mặc định • Tâm lý ổn định',
-    spriteUrl: '/assets/knight-rpg/knight_arthur.png',
+    weaponName: 'Thánh Kiếm Ngậm Mỏ (Peace Was Never An Option)',
+    memeQuote: '“Quạc! Hòa bình chưa bao giờ là lựa chọn, vào chém quái ngay!”',
+    passiveText: 'Nhân vật tân thủ • Cắn quái không trượt phát nào',
+    spriteUrl: '/assets/knight-rpg/knight_arthur.svg',
     slashStyle: 'holy',
     goldBonusPct: 0,
     keyDropBonusPct: 0,
@@ -193,9 +193,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   // ---- 4★ STANDARD POOL ----
   {
     id: 'valkyrie_freya',
-    name: 'Nữ Chiến Binh Valkyrie Freya',
-    gender: 'Nữ',
-    genderBadge: '♀ Nữ',
+    name: 'Thánh Mèo Mồm Chữ O Pop Cat',
+    gender: 'Meme',
+    genderBadge: '😮 Meme',
     rarity: '4★ Thường',
     starRarity: 4,
     pool: 'standard',
@@ -203,10 +203,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
-    weaponName: 'Song Kiếm Gánh Team Còng Lưng',
-    memeQuote: '“Đừng lo để chị gánh hết 4 ải!”',
-    passiveText: '+15% Vàng khi hạ quái • Hệ Gánh Team',
-    spriteUrl: '/assets/knight-rpg/valkyrie_freya.png',
+    weaponName: 'Song Kiếm Mồm Rộng POP-POP-POP',
+    memeQuote: '“POP! POP! POP! Mở mồm 1 cái bay hết đáp án sai!”',
+    passiveText: '+15% Vàng khi hạ quái • Sức mạnh POP liên hoàn',
+    spriteUrl: '/assets/knight-rpg/valkyrie_freya.svg',
     slashStyle: 'holy',
     goldBonusPct: 15,
     keyDropBonusPct: 2,
@@ -222,9 +222,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'paladin_leon',
-    name: 'Thánh Kỵ Sĩ Thái Dương Leon',
-    gender: 'Nam',
-    genderBadge: '♂ Nam',
+    name: 'Thánh Nhây Trollface Huyền Thoại',
+    gender: 'Meme',
+    genderBadge: '😈 Meme',
     rarity: '4★ Thường',
     starRarity: 4,
     pool: 'standard',
@@ -232,9 +232,9 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Đại Kiếm Chói Mù Mắt Quái',
-    memeQuote: '“Bật sáng màn hình 100% lúc 2 giờ sáng”',
-    passiveText: '+18% Vàng khi hạ quái • Hào quang chói lóa',
+    weaponName: 'Đại Kiếm Tấu Hài (Problem, Boss Rồng?)',
+    memeQuote: '“Ủa Boss Rồng cay cú à? Problem? Hahaha!”',
+    passiveText: '+18% Vàng khi hạ quái • Nụ cười chọc tức Boss',
     spriteUrl: '/assets/knight-rpg/paladin_leon.svg',
     slashStyle: 'solar',
     goldBonusPct: 18,
@@ -251,9 +251,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'samurai_tomoe',
-    name: 'Nữ Kiếm Khách Anh Đào Tomoe',
-    gender: 'Nữ',
-    genderBadge: '♀ Nữ',
+    name: 'Kiếm Khách Mèo Gõ Bongo Cat',
+    gender: 'Meme',
+    genderBadge: '🥁 Meme',
     rarity: '4★ Thường',
     starRarity: 4,
     pool: 'standard',
@@ -261,10 +261,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'polearm',
     weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
-    weaponName: 'Katana Chém Deadline Bay Màu',
-    memeQuote: '“Lưỡi đao nhanh hơn tốc độ mạng rớt”',
-    passiveText: '+25% Vàng khi hạ quái • Chém lốc anh đào',
-    spriteUrl: '/assets/knight-rpg/samurai_tomoe.png',
+    weaponName: 'Đao Gõ Trống Bongo Tốc Độ Ánh Sáng',
+    memeQuote: '“Bụp bụp bụp! Tay gõ 300 phím/phút né luôn deadline!”',
+    passiveText: '+25% Vàng khi hạ quái • Gõ nhịp anh đào siêu tốc',
+    spriteUrl: '/assets/knight-rpg/samurai_tomoe.svg',
     slashStyle: 'sakura',
     goldBonusPct: 25,
     keyDropBonusPct: 3,
@@ -280,9 +280,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'mage_selena',
-    name: 'Nữ Pháp Sư Tinh Tú Selena',
-    gender: 'Nữ',
-    genderBadge: '♀ Nữ',
+    name: 'Pháp Sư Cú Xanh Nhắc Học Bài',
+    gender: 'Meme',
+    genderBadge: '🦉 Meme',
     rarity: '4★ Thường',
     starRarity: 4,
     pool: 'standard',
@@ -290,10 +290,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'catalyst',
     weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
-    weaponName: 'Quyền Trượng Cú Đêm 23:59',
-    memeQuote: '“Nước đến chân mới nhảy nhưng vẫn kịp giờ!”',
-    passiveText: '+20% Vàng • +3 giây mỗi câu (Trùm kéo giờ)',
-    spriteUrl: '/assets/knight-rpg/mage_selena.png',
+    weaponName: 'Quyền Trượng Giữ Chuỗi Streak 365 Ngày',
+    memeQuote: '“23:59 rồi mà chưa học từ mới hả?? Chết với ta!”',
+    passiveText: '+20% Vàng • +3 giây mỗi câu (Áp lực nhắc học bài)',
+    spriteUrl: '/assets/knight-rpg/mage_selena.svg',
     slashStyle: 'arcane',
     goldBonusPct: 20,
     keyDropBonusPct: 2,
@@ -572,9 +572,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   // ---- 5★ STANDARD POOL (Banner Thường & lệch 50/50 ở Banner Giới Hạn) ----
   {
     id: 'ronin_kenji',
-    name: 'Kiếm Sĩ Lôi Kiếm Kenji',
-    gender: 'Nam',
-    genderBadge: '♂ Nam',
+    name: 'Kiếm Sĩ Thông Thái Chỉ Đầu Roll Safe',
+    gender: 'Meme',
+    genderBadge: '🧠 Meme',
     rarity: '5★ Thường',
     starRarity: 5,
     pool: 'standard',
@@ -583,8 +583,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'polearm',
     weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
-    weaponName: 'Lôi Đao Múa Thông Thạo 7',
-    memeQuote: '“Hasagi!! Đừng cản anh bật thông thạo!”',
+    weaponName: 'Thương Mẹo Thi Không Cần Nháp (Suy Nghĩ Lên!)',
+    memeQuote: '“Không thể làm sai câu này nếu bạn đọc kỹ đáp án C!”',
     passiveText: '+32% Vàng • +1 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/ronin_kenji.svg',
     slashStyle: 'thunder',
@@ -602,9 +602,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'assassin_kael',
-    name: 'Sát Thủ Bóng Đêm Kael',
-    gender: 'Nam',
-    genderBadge: '♂ Nam',
+    name: 'Sát Thủ Cười Gượng Hide The Pain',
+    gender: 'Meme',
+    genderBadge: '☕ Meme',
     rarity: '5★ Thường',
     starRarity: 5,
     pool: 'standard',
@@ -613,10 +613,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
-    weaponName: 'Song Đao Chúa Tể Góc Tối',
-    memeQuote: '“Lạnh lùng ít nói nhưng rớt Vàng là nhặt hết”',
+    weaponName: 'Song Đao Cười Cho Qua Nỗi Đau Đọc Hiểu',
+    memeQuote: '“Ngoài mặt cười tươi nhưng trong lòng đang cắn răng nhớ từ vựng!”',
     passiveText: '+34% Vàng • +1 giây mỗi câu',
-    spriteUrl: '/assets/knight-rpg/assassin_kael.png',
+    spriteUrl: '/assets/knight-rpg/assassin_kael.svg',
     slashStyle: 'crimson',
     goldBonusPct: 34,
     keyDropBonusPct: 4,
@@ -632,9 +632,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'cyber_nova',
-    name: 'Nữ Thánh Kỵ Sĩ Cyber Nova',
-    gender: 'Nữ',
-    genderBadge: '♀ Nữ',
+    name: 'Hiệp Sĩ Ếch Áo Choàng Hắc Ám Kermit',
+    gender: 'Meme',
+    genderBadge: '🕶️ Meme',
     rarity: '5★ Thường',
     starRarity: 5,
     pool: 'standard',
@@ -643,10 +643,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Đại Kiếm RGB Tăng 200% FPS',
-    memeQuote: '“Đèn LED càng nhiều màu chém càng mạnh!”',
+    weaponName: 'Đại Kiếm RGB Xúi Nghỉ Học Nhưng Vẫn Cày',
+    memeQuote: '“Bản thân: đi ngủ đi • Nội tâm hắc ám: bật gacha thêm 10 nháy nữa!”',
     passiveText: '+38% Vàng • +2 giây mỗi câu',
-    spriteUrl: '/assets/knight-rpg/cyber_nova.png',
+    spriteUrl: '/assets/knight-rpg/cyber_nova.svg',
     slashStyle: 'plasma',
     goldBonusPct: 38,
     keyDropBonusPct: 4,
@@ -871,12 +871,12 @@ export const KNIGHT_CHARACTER_SKINS = [
     slashColor: '#fca5a5'
   },
 
-  // ---- 5 EXCLUSIVE LIMITED 5★ POOL (CHỈ XUẤT HIỆN Ở BANNER GIỚI HẠN 7 NGÀY/LẦN — KHÔNG RƠI Ở BANNER THƯỜNG) ----
+  // ---- 9 EXCLUSIVE LIMITED 5★ MEME HEROES (CHỈ XUẤT HIỆN Ở BANNER GIỚI HẠN 7 NGÀY/LẦN — KHÔNG RƠI Ở BANNER THƯỜNG) ----
   {
     id: 'dragon_empress',
-    name: 'Nữ Hoàng Long Tộc Ignis',
-    gender: 'Nữ',
-    genderBadge: '♀ Nữ',
+    name: 'Rồng Ba Đầu Ngáo Ngơ Kevin',
+    gender: 'Meme',
+    genderBadge: '🐉 Meme',
     rarity: '5★ Giới Hạn',
     starRarity: 5,
     pool: 'limited',
@@ -885,10 +885,10 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Long Vương Hỏa Kiếm (Nóc Nhà Tối Cao)',
-    memeQuote: '“Quái vật cãi 1 câu là bay màu!”',
+    weaponName: 'Hỏa Kiếm 2 Đầu Nghiêm Túc + 1 Đầu Lè Lưỡi',
+    memeQuote: '“Hai đầu trái phải đang gồng ngầu lòi, đầu thứ 3 thì... blep 😛!”',
     passiveText: '+50% Vàng • +3 giây mỗi câu',
-    spriteUrl: '/assets/knight-rpg/dragon_empress.png',
+    spriteUrl: '/assets/knight-rpg/dragon_empress.svg',
     slashStyle: 'dragon',
     goldBonusPct: 50,
     keyDropBonusPct: 6,
@@ -904,9 +904,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'berserker_drake',
-    name: 'Chiến Thần Cuồng Chiến Drake',
-    gender: 'Nam',
-    genderBadge: '♂ Nam',
+    name: 'Quý Ngài Gấu Pooh Đế Vương Tuxedo',
+    gender: 'Meme',
+    genderBadge: '🎩 Meme',
     rarity: '5★ Giới Hạn',
     starRarity: 5,
     pool: 'limited',
@@ -915,8 +915,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Chiến Rìu Cục Súc Vô Cực',
-    memeQuote: '“Không nói nhiều, bổ trước tính sau!”',
+    weaponName: 'Chiến Rìu Quý Tộc Điểm 9.0 Reading',
+    memeQuote: '“Pooh thường học tủ từ đơn — Pooh Quý Tộc xài luôn Collocation 8.5!”',
     passiveText: '+44% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/berserker_drake.svg',
     slashStyle: 'magma',
@@ -934,9 +934,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'archmage_zephyr',
-    name: 'Đại Pháp Sư Tinh Không Zephyr',
-    gender: 'Nam',
-    genderBadge: '♂ Nam',
+    name: 'Đại Pháp Sư Não To Vũ Trụ Galaxy Brain',
+    gender: 'Meme',
+    genderBadge: '🌌 Meme',
     rarity: '5★ Giới Hạn',
     starRarity: 5,
     pool: 'limited',
@@ -945,8 +945,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'catalyst',
     weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
-    weaponName: 'Quyền Trượng Out Trình Vũ Trụ',
-    memeQuote: '“Não to thiên hà — nhìn đề biết ngay đáp án”',
+    weaponName: 'Quyền Trượng Thiên Hà IQ Vô Cực',
+    memeQuote: '“Đọc câu hỏi trong 0.5 giây — Tia chớp trí tuệ quét sạch 4 ải!”',
     passiveText: '+46% Vàng • +3 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/archmage_zephyr.svg',
     slashStyle: 'arcane',
@@ -964,9 +964,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'valkyrie_celestia',
-    name: 'Thánh Nữ Thần Thương Celestia',
-    gender: 'Nữ',
-    genderBadge: '♀ Nữ',
+    name: 'Thánh Nữ Tính Toán Vũ Trụ Math Lady',
+    gender: 'Meme',
+    genderBadge: '📐 Meme',
     rarity: '5★ Giới Hạn',
     starRarity: 5,
     pool: 'limited',
@@ -975,8 +975,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'polearm',
     weaponClassLabel: 'Hệ Thương & Đao',
     priceGold: null,
-    weaponName: 'Thánh Thương Con Nhà Người Ta',
-    memeQuote: '“Điểm 9.0 nhưng vẫn kêu làm bài dở lắm”',
+    weaponName: 'Thánh Thương Công Thức Hình Học Đa Chiều',
+    memeQuote: '“Khoan đã... sin² + cos² = 1 vậy suy ra đáp án câu IELTS này là B!”',
     passiveText: '+48% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/valkyrie_celestia.svg',
     slashStyle: 'solar',
@@ -994,9 +994,9 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'emperor_raiden',
-    name: 'Lôi Đế Huyết Kiếm Raiden',
-    gender: 'Nam',
-    genderBadge: '♂ Nam',
+    name: 'Lôi Đế Chuột Vàng Há Mồm Kinh Ngạc',
+    gender: 'Meme',
+    genderBadge: '⚡ Meme',
     rarity: '5★ Giới Hạn',
     starRarity: 5,
     pool: 'limited',
@@ -1005,8 +1005,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
-    weaponName: 'Huyết Lôi Thần Kiếm (Cấm Vào Bếp)',
-    memeQuote: '“Chém đứt không gian nhưng luộc trứng cháy nồi”',
+    weaponName: 'Lôi Thần Kiếm Ơ Kìa Bất Ngờ Chưa?!',
+    memeQuote: '“Quái vật vừa khè lửa xong thấy mình trả lời đúng liền há hốc mồm :O!”',
     passiveText: '+45% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/emperor_raiden.svg',
     slashStyle: 'crimson',
@@ -1173,31 +1173,31 @@ export const KNIGHT_LIMITED_BANNERS = [
   {
     id: 'limited_ignis',
     featuredHeroId: 'dragon_empress',
-    bannerTitle: 'Banner Giới Hạn: Nữ Hoàng Long Tộc Ignis',
+    bannerTitle: 'Banner Giới Hạn: Rồng Ba Đầu Ngáo Ngơ Kevin',
     featured4StarIds: ['this_is_fine_dog', 'mage_selena', 'samurai_tomoe']
   },
   {
     id: 'limited_drake',
     featuredHeroId: 'berserker_drake',
-    bannerTitle: 'Banner Giới Hạn: Chiến Thần Drake',
+    bannerTitle: 'Banner Giới Hạn: Quý Ngài Gấu Pooh Tuxedo',
     featured4StarIds: ['smudge_cat', 'question_mark_guy', 'paladin_leon']
   },
   {
     id: 'limited_zephyr',
     featuredHeroId: 'archmage_zephyr',
-    bannerTitle: 'Banner Giới Hạn: Đại Pháp Sư Zephyr',
+    bannerTitle: 'Banner Giới Hạn: Đại Pháp Sư Não To Galaxy Brain',
     featured4StarIds: ['nyan_cat_mage', 'mage_selena', 'valkyrie_freya']
   },
   {
     id: 'limited_celestia',
     featuredHeroId: 'valkyrie_celestia',
-    bannerTitle: 'Banner Giới Hạn: Thánh Nữ Celestia',
+    bannerTitle: 'Banner Giới Hạn: Thánh Nữ Tính Toán Math Lady',
     featured4StarIds: ['el_gato_boots', 'samurai_tomoe', 'valkyrie_freya']
   },
   {
     id: 'limited_raiden',
     featuredHeroId: 'emperor_raiden',
-    bannerTitle: 'Banner Giới Hạn: Lôi Đế Raiden',
+    bannerTitle: 'Banner Giới Hạn: Lôi Đế Chuột Vàng Há Mồm',
     featured4StarIds: ['stonks_meme_man', 'pointing_laugh_cat', 'samurai_tomoe']
   }
 ];
@@ -1826,7 +1826,7 @@ export function rollKnightGachaPulls(
   const activeBannerMeta = weeklyState.activeBanner;
 
   // STRICT POOL SEPARATION:
-  // - Standard 5★ pool: ONLY pool === 'standard' & starRarity === 5 (Kenji, Kael, Cyber Nova)
+  // - Standard 5★ pool: ONLY pool === 'standard' & starRarity === 5 (10 Meme 5★ Thường)
   // - Limited 5★ hero: ONLY this week's single active Limited 5★ hero (NEVER drops on Standard Banner!)
   const standardHeroes5 = KNIGHT_CHARACTER_SKINS.filter(
     h => h.obtainMethod === 'gacha' && h.pool === 'standard' && h.starRarity === 5

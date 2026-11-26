@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="painAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#ef4444" stop-opacity="0.4"/>
+      <stop offset="65%" stop-color="#64748b" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="haroldFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="142" fill="url(#painAura)"/>
+
+  <!-- Comic Internal Pain Tag -->
+  <rect x="198" y="34" width="102" height="34" rx="12" fill="#fee2e2" stroke="#b91c1c" stroke-width="3"/>
+  <text x="249" y="57" text-anchor="middle" font-family="Impact, Arial Black, sans-serif" font-size="16" fill="#b91c1c">CƯỜI GƯỢNG</text>
+
+  <!-- Dark Assassin Cloak + Crimson Scarf -->
+  <path d="M74 170 L216 170 L232 290 L60 290 Z" fill="#1e293b" stroke="#0f172a" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M106 168 Q146 196 186 168 L178 206 Q146 226 114 206 Z" fill="#dc2626" stroke="#7f1d1d" stroke-width="3"/>
+
+  <!-- White Beard & Fluffy White Hair (Hide The Pain Harold) -->
+  <ellipse cx="146" cy="112" rx="48" ry="52" fill="#fed7aa" stroke="#7c2d12" stroke-width="3.5"/>
+  <path d="M98 92 C98 48 192 48 194 90 C180 72 114 72 98 92 Z" fill="#e2e8f0" stroke="#475569" stroke-width="3"/>
+  <!-- Rounded Beard -->
+  <path d="M102 126 C104 168 188 168 190 126 C178 148 114 148 102 126 Z" fill="#e2e8f0" stroke="#475569" stroke-width="2.8"/>
+
+  <!-- Iconic pained forced smile + sad eyebrows + glistening eyes! -->
+  <path d="M114 96 L136 90" stroke="#7c2d12" stroke-width="3" stroke-linecap="round"/>
+  <path d="M178 96 L156 90" stroke="#7c2d12" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="126" cy="105" rx="7" ry="6" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
+  <circle cx="127" cy="106" r="3" fill="#0f172a"/>
+  <ellipse cx="166" cy="105" rx="7" ry="6" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
+  <circle cx="167" cy="106" r="3" fill="#0f172a"/>
+  <!-- Tiny Sweat Tear -->
+  <circle cx="106" cy="114" r="4" fill="#38bdf8"/>
+  <!-- Forced Tight-Lipped Smile -->
+  <path d="M122 132 Q146 146 170 132" fill="#ffffff" stroke="#7c2d12" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Holding "OK" Coffee Mug + Crimson Assassin Dagger! -->
+  <rect x="168" y="218" width="40" height="44" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="3"/>
+  <path d="M208 228 C222 228 222 252 208 252" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  <text x="188" y="246" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="13" fill="#dc2626">OK</text>
+
+  <!-- Crimson Shadow Dagger -->
+  <g transform="rotate(-32 70 198)">
+    <polygon points="70,86 84,122 78,220 62,220 56,122" fill="#ef4444" stroke="#450a0a" stroke-width="3.2"/>
+    <rect x="46" y="218" width="48" height="10" rx="4" fill="#cbd5e1" stroke="#0f172a" stroke-width="2.6"/>
+  </g>
+</svg>

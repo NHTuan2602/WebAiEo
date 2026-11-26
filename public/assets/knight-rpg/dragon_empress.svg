@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <defs>
+    <radialGradient id="kevinAura" cx="50%" cy="50%" r="52%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.5"/>
+      <stop offset="60%" stop-color="#f97316" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldScale" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="55%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+  </defs>
+  <circle cx="160" cy="160" r="144" fill="url(#kevinAura)"/>
+
+  <!-- Dragon Emperor Cape & Golden Scales -->
+  <path d="M84 176 L236 176 L252 290 L68 290 Z" fill="#dc2626" stroke="#450a0a" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M104 180 L216 180 L204 268 L160 286 L116 268 Z" fill="url(#goldScale)" stroke="#78350f" stroke-width="3.6"/>
+
+  <!-- 3 Dragon Necks -->
+  <path d="M126 196 C112 162 90 144 82 118 L108 114 C116 140 134 156 142 190 Z" fill="url(#goldScale)" stroke="#78350f" stroke-width="3.2"/>
+  <path d="M150 192 L150 108 L174 108 L174 192 Z" fill="url(#goldScale)" stroke="#78350f" stroke-width="3.2"/>
+  <path d="M194 196 C208 162 230 144 238 118 L212 114 C204 140 186 156 178 190 Z" fill="url(#goldScale)" stroke="#78350f" stroke-width="3.2"/>
+
+  <!-- HEAD 1 (LEFT - SUPER SERIOUS & ANGRY!) -->
+  <g transform="translate(82, 92) rotate(-14)">
+    <polygon points="-28,-10 -34,-34 -10,-16 8,-36 16,-14 34,-4 26,18 -20,18" fill="url(#goldScale)" stroke="#78350f" stroke-width="3" stroke-linejoin="round"/>
+    <line x1="-14" y1="-2" x2="6" y2="3" stroke="#7f1d1d" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="-2" cy="4" r="4" fill="#ef4444"/>
+  </g>
+
+  <!-- HEAD 2 (CENTER - KING DRAGON GLARING!) -->
+  <g transform="translate(160, 74)">
+    <polygon points="-32,-12 -38,-40 -14,-20 0,-42 14,-20 38,-40 32,-12 28,22 -28,22" fill="url(#goldScale)" stroke="#78350f" stroke-width="3.2" stroke-linejoin="round"/>
+    <line x1="-18" y1="-4" x2="-4" y2="2" stroke="#7f1d1d" stroke-width="3.6" stroke-linecap="round"/>
+    <line x1="18" y1="-4" x2="4" y2="2" stroke="#7f1d1d" stroke-width="3.6" stroke-linecap="round"/>
+    <circle cx="-10" cy="4" r="4" fill="#dc2626"/>
+    <circle cx="10" cy="4" r="4" fill="#dc2626"/>
+    <polygon points="-14,14 0,20 14,14" fill="none" stroke="#451a03" stroke-width="2.6"/>
+  </g>
+
+  <!-- HEAD 3 (RIGHT - ICONIC GOOFY KEVIN WITH CROSS-EYES & BLEP TONGUE!!) -->
+  <g transform="translate(236, 98) rotate(12)">
+    <ellipse cx="0" cy="2" rx="30" ry="22" fill="url(#goldScale)" stroke="#78350f" stroke-width="3.2"/>
+    <circle cx="-11" cy="-5" r="8" fill="#ffffff" stroke="#0f172a" stroke-width="2.2"/>
+    <circle cx="-8" cy="-4" r="3" fill="#0f172a"/>
+    <circle cx="12" cy="-5" r="8" fill="#ffffff" stroke="#0f172a" stroke-width="2.2"/>
+    <circle cx="8" cy="-6" r="3" fill="#0f172a"/>
+    <!-- Big Pink Derpy Tongue Sticking Out! -->
+    <path d="M-8 14 C-10 34 10 34 8 14 Z" fill="#f43f5e" stroke="#881337" stroke-width="2.5"/>
+    <text x="26" y="-14" font-family="Comic Sans MS, Arial, sans-serif" font-weight="900" font-size="14" fill="#fde047">blep😛</text>
+  </g>
+</svg>

@@ -1,66 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
   <defs>
-    <radialGradient id="zephyrAura" cx="52%" cy="48%" r="48%">
-      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.45"/>
-      <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#090d16" stop-opacity="0"/>
+    <radialGradient id="galaxyAura" cx="50%" cy="40%" r="54%">
+      <stop offset="0%" stop-color="#e879f9" stop-opacity="0.65"/>
+      <stop offset="45%" stop-color="#38bdf8" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="astralRobe" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#312e81"/>
-      <stop offset="55%" stop-color="#1e1b4b"/>
-      <stop offset="100%" stop-color="#0f172a"/>
-    </linearGradient>
-    <linearGradient id="goldTrim" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fef08a"/>
-      <stop offset="55%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#b45309"/>
-    </linearGradient>
-    <linearGradient id="mageSkin" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#fef2e8"/>
-      <stop offset="100%" stop-color="#e5b899"/>
-    </linearGradient>
+    <radialGradient id="cosmosHead" cx="45%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#38bdf8"/>
+      <stop offset="70%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </radialGradient>
   </defs>
+  <circle cx="160" cy="148" r="144" fill="url(#galaxyAura)"/>
 
-  <circle cx="160" cy="156" r="138" fill="url(#zephyrAura)"/>
-  <circle cx="160" cy="148" r="106" fill="none" stroke="#c084fc" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="6 6"/>
-
-  <!-- Flowing Starlight Archmage Cloak -->
-  <path d="M116 108 C72 122 44 176 34 256 C76 244 98 258 124 238 Z" fill="#4c1d95" stroke="#0f172a" stroke-width="3"/>
-  <path d="M186 108 C228 126 250 182 258 258 C220 246 196 254 176 236 Z" fill="#3b0764" stroke="#0f172a" stroke-width="3"/>
-
-  <!-- Boots & Leggings -->
-  <path d="M124 206 L104 288 L130 294 L146 218 Z" fill="#1e293b" stroke="#fbbf24" stroke-width="2.2"/>
-  <path d="M162 206 L180 292 L206 288 L184 206 Z" fill="#1e293b" stroke="#fbbf24" stroke-width="2.2"/>
-
-  <!-- Royal Astral Tunic -->
-  <path d="M114 110 L190 110 L204 226 L102 226 Z" fill="url(#astralRobe)" stroke="#fbbf24" stroke-width="2.8" stroke-linejoin="round"/>
-  <polygon points="152,114 168,148 152,218 136,148" fill="#6d28d9" stroke="#fde047" stroke-width="2"/>
-  <rect x="114" y="176" width="76" height="12" rx="4" fill="url(#goldTrim)"/>
-
-  <!-- Ornate Pauldrons -->
-  <path d="M92 112 Q118 94 134 116 L124 142 L90 134 Z" fill="#4c1d95" stroke="#fde047" stroke-width="2.6"/>
-  <path d="M212 112 Q186 94 170 116 L180 142 L214 134 Z" fill="#4c1d95" stroke="#fde047" stroke-width="2.6"/>
-
-  <!-- Head & Silver-Blue Hair -->
-  <rect x="142" y="92" width="20" height="18" fill="url(#mageSkin)"/>
-  <path d="M132 62 C132 44 172 44 172 64 C172 84 162 98 152 98 C142 98 132 84 132 62 Z" fill="url(#mageSkin)" stroke="#0f172a" stroke-width="2.6"/>
-  <circle cx="145" cy="72" r="2.8" fill="#38bdf8"/>
-  <circle cx="160" cy="72" r="2.8" fill="#38bdf8"/>
-  <path d="M147 85 Q152 88 158 85" fill="none" stroke="#7c2d12" stroke-width="2" stroke-linecap="round"/>
-
-  <!-- Silver Astral Hair & Crown -->
-  <path d="M124 76 C118 44 138 26 160 30 C182 34 188 58 176 78 C170 58 158 50 144 54 C134 56 130 68 124 76 Z" fill="#e0f2fe" stroke="#38bdf8" stroke-width="2.2"/>
-  <polygon points="134,42 144,24 152,36 160,20 168,36 176,24 170,44" fill="url(#goldTrim)" stroke="#0f172a" stroke-width="1.8"/>
-
-  <!-- Floating Celestial Grimoire & Grand Scepter -->
-  <g transform="translate(72, 162) rotate(-14)">
-    <rect x="-22" y="-26" width="44" height="52" rx="6" fill="#581c87" stroke="#fde047" stroke-width="2.6"/>
-    <polygon points="0,-12 4,-3 14,-3 6,3 9,12 0,6 -9,12 -6,3 -14,-3 -4,-3" fill="#38bdf8"/>
+  <!-- Radiating Cosmic Enlightenment Beams -->
+  <g stroke="#fde047" stroke-width="3" opacity="0.75">
+    <line x1="152" y1="88" x2="62" y2="26"/>
+    <line x1="152" y1="88" x2="152" y2="10"/>
+    <line x1="152" y1="88" x2="246" y2="26"/>
+    <line x1="152" y1="88" x2="282" y2="96"/>
+    <line x1="152" y1="88" x2="26" y2="96"/>
   </g>
 
-  <g transform="translate(232, 156) rotate(14)">
-    <rect x="-4" y="-58" width="8" height="168" rx="3" fill="url(#goldTrim)" stroke="#0f172a" stroke-width="2"/>
-    <circle cx="0" cy="-74" r="22" fill="none" stroke="#fde047" stroke-width="3.5"/>
-    <polygon points="0,-90 12,-74 0,-58 -12,-74" fill="#38bdf8" stroke="#ffffff" stroke-width="2"/>
-  </g>
+  <!-- Astral Mage Robe & Floating Orbit Rings -->
+  <path d="M78 176 L224 176 L240 290 L64 290 Z" fill="#312e81" stroke="#c084fc" stroke-width="3.6" stroke-linejoin="round"/>
+  <ellipse cx="152" cy="176" rx="92" ry="22" fill="none" stroke="#38bdf8" stroke-width="3" stroke-dasharray="10 6"/>
+
+  <!-- Translucent Cosmic Galaxy Brain Profile Head -->
+  <path d="M114 96 C114 40 202 40 204 98 C206 132 184 162 152 166 C122 164 108 134 114 96 Z" fill="url(#cosmosHead)" stroke="#ffffff" stroke-width="3.2"/>
+  <!-- Glowing Stars & Spiral Inside Brain -->
+  <circle cx="144" cy="76" r="14" fill="#ffffff" opacity="0.65"/>
+  <circle cx="176" cy="84" r="4" fill="#fde047"/>
+  <circle cx="132" cy="64" r="3" fill="#fde047"/>
+  <circle cx="164" cy="62" r="3" fill="#22d3ee"/>
+  <!-- Pure White Laser Eyes -->
+  <ellipse cx="134" cy="112" rx="8" ry="5" fill="#ffffff"/>
+  <ellipse cx="172" cy="112" rx="8" ry="5" fill="#ffffff"/>
+  <text x="234" y="64" font-family="Impact, sans-serif" font-size="18" fill="#fde047">IQ ∞</text>
+
+  <!-- Cosmic Galaxy Scepter -->
+  <line x1="252" y1="106" x2="244" y2="288" stroke="#c084fc" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="252" cy="100" r="24" fill="#7c3aed" stroke="#fde047" stroke-width="3.5"/>
+  <polygon points="252,84 257,95 268,95 259,102 262,114 252,107 242,114 245,102 236,95 247,95" fill="#fde047"/>
 </svg>
