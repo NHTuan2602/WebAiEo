@@ -156,8 +156,38 @@ test.describe('7. Security & Business Logic Regression Audit', () => {
       expect(paidTx.balanceBefore?.roomCreateCredits).toBe(initialRoomCredits);
       expect(paidTx.balanceAfter?.roomCreateCredits).toBe(initialRoomCredits + 1);
 
-      // 5. Subsystem 3: Game anti-cheat bounds & matchId replay deduplication
+      // 5. Subsystem 3: Monthly 20k Pass Gate + Game anti-cheat bounds & matchId replay deduplication
       const uniqueTopic = 'e2e_sec_audit_topic';
+      const unpaidKnightRes = await studentApi.post('/api/sync/action', {
+        data: {
+          type: 'SUBMIT_PRACTICE_GAME_SCORE',
+          payload: {
+            gameType: 'knight_rpg',
+            mode: 'knight_endless',
+            topicId: uniqueTopic,
+            topicLabel: 'Security Audit',
+            passedCount: 3,
+            totalCount: 10,
+            score: 1200,
+            matchId: `e2e_unpaid_${Date.now()}`,
+            gameCompleted: true
+          }
+        }
+      });
+      expect(unpaidKnightRes.status()).toBe(403);
+
+      const grantVipForAudit = await adminApi.post('/api/sync/action', {
+        data: {
+          type: 'TOGGLE_USER_SUBSCRIPTION',
+          payload: {
+            username: E2E_CREDENTIALS.student.username,
+            kind: 'aieo_vip',
+            active: true
+          }
+        }
+      });
+      expect(grantVipForAudit.status()).toBe(200);
+
       const zeroPassRes = await studentApi.post('/api/sync/action', {
         data: {
           type: 'SUBMIT_PRACTICE_GAME_SCORE',
@@ -213,6 +243,18 @@ test.describe('7. Security & Business Logic Regression Audit', () => {
       expect(capEntry.score).toBeLessThanOrEqual(12_000);
       expect(capEntry.runsCount).toBe(1);
     } finally {
+      await adminApi
+        .post('/api/sync/action', {
+          data: {
+            type: 'TOGGLE_USER_SUBSCRIPTION',
+            payload: {
+              username: E2E_CREDENTIALS.student.username,
+              kind: 'aieo_vip',
+              active: false
+            }
+          }
+        })
+        .catch(() => {});
       if (createdTxId) {
         await adminApi
           .post('/api/sync/action', {

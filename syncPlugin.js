@@ -96,6 +96,7 @@ import {
 import {
   KNIGHT_PVP_FREEZE_MS,
   KNIGHT_PVP_LIVES_PER_ROUND,
+  KNIGHT_PVP_QUESTION_TIMEOUT_MS,
   KNIGHT_PVP_READY_CHECK_SEC,
   KNIGHT_PVP_TOTAL_ROUNDS,
   getKnightPvpRankTier,
@@ -4400,7 +4401,15 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     case 'KNIGHT_PVP_SYNC_COMBAT':
     case 'KNIGHT_PVP_FINISH_NPC_MATCH': {
       if (viewer.isGuest) {
-        return { allowed: false, status: 403, error: 'Tài khoản khách không thể tham gia Đấu Trường 1 vs 1.' };
+        return { allowed: false, status: 403, error: 'Tài khoản khách không thể tham gia Hiệp Sĩ Diệt Rồng.' };
+      }
+      const viewerRecord = store.users?.[viewer.username] || viewer;
+      if (!isTeacher && !hasGamePracticeAccess(viewerRecord)) {
+        return {
+          allowed: false,
+          status: 403,
+          error: `Vui lòng đăng ký Thẻ Tháng (${formatVndCurrency(store.paymentConfig?.aieoVipPrice ?? AIEO_VIP_PRICE_VND)}/tháng) để chơi Hiệp Sĩ Diệt Rồng!`
+        };
       }
       if (!checkRateLimit(store._rateLimits, `knight_pvp:${viewer.username.toLowerCase()}`, 180, 60 * 1000)) {
         return { allowed: false, status: 429, error: 'Thao tác Đấu Trường 1v1 quá nhanh. Vui lòng thử lại sau vài giây.' };
@@ -4417,12 +4426,11 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
         return { allowed: false, status: 403, error: 'Không thể gửi điểm luyện tập dưới tên người khác.' };
       }
       const viewerRecord = store.users?.[viewer.username] || viewer;
-      const isKnightRpgSync = payload?.gameType === 'knight_rpg' || Boolean(payload?.knightRpgProfile);
-      if (!isTeacher && !isKnightRpgSync && !hasGamePracticeAccess(viewerRecord)) {
+      if (!isTeacher && !hasGamePracticeAccess(viewerRecord)) {
         return {
           allowed: false,
           status: 403,
-          error: `Vui lòng đăng ký Gói Tháng (${formatVndCurrency(store.paymentConfig?.aieoVipPrice ?? AIEO_VIP_PRICE_VND)}/tháng) để vào Luyện Tập Game Từ Vựng.`
+          error: `Vui lòng đăng ký Thẻ Tháng (${formatVndCurrency(store.paymentConfig?.aieoVipPrice ?? AIEO_VIP_PRICE_VND)}/tháng) để chơi Hiệp Sĩ Diệt Rồng & Luyện Tập Game!`
         };
       }
       return { allowed: true };
@@ -7160,6 +7168,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       if (m.p1?.accepted && m.p2?.accepted) {
         m.status = 'PLAYING';
         m.startedAt = nowMs;
+        m.roundReadyAtMs = nowMs + 2500;
+        m.questionStartedAtMs = nowMs + 2500;
         m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
         m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
         m.p1.frozenUntilMs = 0;
@@ -7186,9 +7196,104 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const oppSlotKey = mySlotKey === 'p1' ? 'p2' : 'p1';
       const event = String(payload?.event || '');
 
+      const advanceHumanPvpRound = (winnerSlotKey) => {
+        m[winnerSlotKey].roundsWon = (Number(m[winnerSlotKey].roundsWon) || 0) + 1;
+        m.roundHistory = [...(m.roundHistory || []), { round: m.round, winner: winnerSlotKey }];
+        m.lastRoundKo = {
+          round: m.round,
+          winnerSlot: winnerSlotKey,
+          atMs: nowMs
+        };
+
+        if (m.round < 4) {
+          m.round += 1;
+          m.questionIdx = 0;
+          m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+          m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+          m.p1.frozenUntilMs = 0;
+          m.p2.frozenUntilMs = 0;
+          m.roundReadyAtMs = nowMs + 4000;
+          m.questionStartedAtMs = nowMs + 4000;
+        } else if (m.round === 4 && m.p1.roundsWon === 2 && m.p2.roundsWon === 2) {
+          m.round = 5;
+          m.tiebreakerTriggered = true;
+          m.tiebreakerStartedAtMs = nowMs;
+          m.questionIdx = 0;
+          m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+          m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+          m.p1.frozenUntilMs = 0;
+          m.p2.frozenUntilMs = 0;
+          m.roundReadyAtMs = nowMs + 6200;
+          m.questionStartedAtMs = nowMs + 6200;
+        } else {
+          const finalWinnerSlot = m.p1.roundsWon >= m.p2.roundsWon ? 'p1' : 'p2';
+          const finalLoserSlot = finalWinnerSlot === 'p1' ? 'p2' : 'p1';
+          m.status = 'FINISHED';
+          m.winnerSlot = finalWinnerSlot;
+          m.finishReason =
+            m.mode === 'casual_room'
+              ? 'Trận giao hữu giải trí hoàn tất (Không tính điểm BXH & Danh hiệu).'
+              : m.tiebreakerTriggered
+              ? 'Đoạt chiến thắng nghẹt thở ở Vòng Quyết Định (3 - 2)!'
+              : `Chiến thắng chung cuộc (${m[finalWinnerSlot].roundsWon} - ${m[finalLoserSlot].roundsWon})!`;
+          if (m.mode === 'ranked_human') {
+            m.rewards = {
+              [finalWinnerSlot]: settleKnightPvpRankedRewards(store, m[finalWinnerSlot].username, {
+                didWin: true,
+                isDemonTiebreaker: Boolean(m.tiebreakerTriggered),
+                opponentName: m[finalLoserSlot].name,
+                mode: 'ranked_human',
+                nowMs
+              }),
+              [finalLoserSlot]: settleKnightPvpRankedRewards(store, m[finalLoserSlot].username, {
+                didWin: false,
+                isDemonTiebreaker: false,
+                opponentName: m[finalWinnerSlot].name,
+                mode: 'ranked_human',
+                nowMs
+              })
+            };
+          }
+        }
+      };
+
       if (event === 'WRONG_ANSWER') {
         m[mySlotKey].frozenUntilMs = nowMs + KNIGHT_PVP_FREEZE_MS;
         m[mySlotKey].freezes = (Number(m[mySlotKey].freezes) || 0) + 1;
+        m.updatedAtMs = nowMs;
+        changed = true;
+        break;
+      }
+
+      if (event === 'THUNDER_TIMEOUT') {
+        const clientQIdx = Math.floor(Number(payload?.questionIdx) ?? -1);
+        if (clientQIdx !== m.questionIdx) break;
+        const qStart = Number(m.questionStartedAtMs) || Number(m.startedAt) || nowMs;
+        if (nowMs - qStart < KNIGHT_PVP_QUESTION_TIMEOUT_MS - 1200) break;
+
+        m.lastThunderAtMs = nowMs;
+        const rawP1 = (Number(m.p1.lives) || KNIGHT_PVP_LIVES_PER_ROUND) - 1;
+        const rawP2 = (Number(m.p2.lives) || KNIGHT_PVP_LIVES_PER_ROUND) - 1;
+
+        if (rawP1 <= 0 && rawP2 <= 0) {
+          m.p1.lives = 1;
+          m.p2.lives = 1;
+          m.questionIdx += 1;
+          m.questionStartedAtMs = nowMs;
+        } else if (rawP2 <= 0 && rawP1 > 0) {
+          m.p1.lives = rawP1;
+          m.p2.lives = 0;
+          advanceHumanPvpRound('p1');
+        } else if (rawP1 <= 0 && rawP2 > 0) {
+          m.p1.lives = 0;
+          m.p2.lives = rawP2;
+          advanceHumanPvpRound('p2');
+        } else {
+          m.p1.lives = rawP1;
+          m.p2.lives = rawP2;
+          m.questionIdx += 1;
+          m.questionStartedAtMs = nowMs;
+        }
         m.updatedAtMs = nowMs;
         changed = true;
         break;
@@ -7202,6 +7307,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         m[mySlotKey].hits = (Number(m[mySlotKey].hits) || 0) + 1;
         m[oppSlotKey].lives = Math.max(0, (Number(m[oppSlotKey].lives) || KNIGHT_PVP_LIVES_PER_ROUND) - 1);
         m.questionIdx += 1;
+        m.questionStartedAtMs = nowMs;
         m.lastStrike = {
           bySlot: mySlotKey,
           byName: m[mySlotKey].name,
@@ -7210,56 +7316,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         };
 
         if (m[oppSlotKey].lives <= 0) {
-          m[mySlotKey].roundsWon = (Number(m[mySlotKey].roundsWon) || 0) + 1;
-          m.roundHistory = [...(m.roundHistory || []), { round: m.round, winner: mySlotKey }];
-
-          if (m.round < 4) {
-            m.round += 1;
-            m.questionIdx = 0;
-            m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
-            m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
-            m.p1.frozenUntilMs = 0;
-            m.p2.frozenUntilMs = 0;
-          } else if (m.round === 4 && m.p1.roundsWon === 2 && m.p2.roundsWon === 2) {
-            // 2 - 2 Tie after Round 4 -> Demon King Malakor spins Wheel of Fate for Round 5!
-            m.round = 5;
-            m.tiebreakerTriggered = true;
-            m.tiebreakerStartedAtMs = nowMs;
-            m.questionIdx = 0;
-            m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
-            m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
-            m.p1.frozenUntilMs = 0;
-            m.p2.frozenUntilMs = 0;
-          } else {
-            const finalWinnerSlot = m.p1.roundsWon >= m.p2.roundsWon ? 'p1' : 'p2';
-            const finalLoserSlot = finalWinnerSlot === 'p1' ? 'p2' : 'p1';
-            m.status = 'FINISHED';
-            m.winnerSlot = finalWinnerSlot;
-            m.finishReason =
-              m.mode === 'casual_room'
-                ? 'Trận giao hữu giải trí hoàn tất (Không tính điểm BXH & Danh hiệu).'
-                : m.tiebreakerTriggered
-                ? 'Đoạt chiến thắng nghẹt thở ở Vòng Quyết Định (3 - 2)!'
-                : `Chiến thắng chung cuộc (${m[finalWinnerSlot].roundsWon} - ${m[finalLoserSlot].roundsWon})!`;
-            if (m.mode === 'ranked_human') {
-              m.rewards = {
-                [finalWinnerSlot]: settleKnightPvpRankedRewards(store, m[finalWinnerSlot].username, {
-                  didWin: true,
-                  isDemonTiebreaker: Boolean(m.tiebreakerTriggered),
-                  opponentName: m[finalLoserSlot].name,
-                  mode: 'ranked_human',
-                  nowMs
-                }),
-                [finalLoserSlot]: settleKnightPvpRankedRewards(store, m[finalLoserSlot].username, {
-                  didWin: false,
-                  isDemonTiebreaker: false,
-                  opponentName: m[finalWinnerSlot].name,
-                  mode: 'ranked_human',
-                  nowMs
-                })
-              };
-            }
-          }
+          advanceHumanPvpRound(mySlotKey);
         }
         m.updatedAtMs = nowMs;
         changed = true;
@@ -7285,6 +7342,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const p1Rounds = Math.max(0, Math.min(4, Math.floor(Number(payload?.p1RoundsWon) || 0)));
       const p2Rounds = Math.max(0, Math.min(4, Math.floor(Number(payload?.p2RoundsWon) || 0)));
       const totalCorrectHits = Math.max(0, Math.min(60, Math.floor(Number(payload?.totalCorrectHits) || 0)));
+      const totalThunderStrikes = Math.max(0, Math.min(20, Math.floor(Number(payload?.totalThunderStrikes) || 0)));
       const tiebreakerTriggered = Boolean(
         m.forceTie22Test || payload?.tiebreakerTriggered || (p1Rounds + p2Rounds === 5)
       );
@@ -7294,8 +7352,8 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         break;
       }
       const didWin = p1Rounds > p2Rounds;
-      const minRequiredHits = m.forceTie22Test ? 3 : didWin ? p1Rounds * KNIGHT_PVP_LIVES_PER_ROUND : 0;
-      if (didWin && totalCorrectHits < minRequiredHits) {
+      const minRequiredDamage = m.forceTie22Test ? 3 : didWin ? p1Rounds * KNIGHT_PVP_LIVES_PER_ROUND : 0;
+      if (didWin && (totalCorrectHits < 1 || totalCorrectHits + totalThunderStrikes < minRequiredDamage)) {
         break;
       }
 
@@ -7797,6 +7855,7 @@ export function attachSyncMiddleware(middlewares, store, sseClients, onChanged =
           res.end(JSON.stringify({ ok: false, error: 'Sai tên đăng nhập hoặc mật khẩu!' }));
           return;
         }
+        store._rateLimits?.delete(rateKey);
 
         if (recordUserLoginDay(store, user)) {
           store.version += 1;

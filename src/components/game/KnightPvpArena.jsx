@@ -6,14 +6,18 @@ import {
   Snowflake,
   Swords,
   Trophy,
-  Users
+  Users,
+  Zap
 } from 'lucide-react';
 import { KNIGHT_CHARACTER_SKINS } from '../../constants/knightRpgData';
 import {
   DEMON_KING_ROULETTE_SECTORS,
+  KNIGHT_PVP_COUNTDOWN_STEP_MS,
   KNIGHT_PVP_FREEZE_MS,
   KNIGHT_PVP_LIVES_PER_ROUND,
+  KNIGHT_PVP_QUESTION_TIMEOUT_MS,
   KNIGHT_PVP_READY_CHECK_SEC,
+  KNIGHT_PVP_SLOWMO_KO_MS,
   getKnightPvpRankTier,
   hashDeterministicSeed,
   normalizeKnightPvpProfile
@@ -59,7 +63,6 @@ function playPvpDramaticSfx(kind = 'hit', muted = false) {
     };
 
     if (kind === 'enter_arena') {
-      // Heroic war-horn fanfare on entering 1v1 Arena
       tone(196, 0, 0.28, 'sawtooth', 0.12);
       tone(293.66, 0.1, 0.34, 'sawtooth', 0.13);
       tone(392, 0.22, 0.55, 'triangle', 0.16);
@@ -71,8 +74,14 @@ function playPvpDramaticSfx(kind = 'hit', muted = false) {
       tone(440, 0, 0.14, 'sawtooth', 0.13);
       tone(659.25, 0.07, 0.18, 'triangle', 0.15);
       tone(1046.5, 0.15, 0.38, 'sine', 0.17);
+    } else if (kind === 'countdown_tick') {
+      tone(523.25, 0, 0.14, 'triangle', 0.15);
+      tone(1046.5, 0.02, 0.08, 'sine', 0.09);
+    } else if (kind === 'countdown_go') {
+      tone(392, 0, 0.2, 'sawtooth', 0.15);
+      tone(587.33, 0.06, 0.26, 'sawtooth', 0.16);
+      tone(783.99, 0.12, 0.44, 'triangle', 0.19);
     } else if (kind === 'hit') {
-      // Heavy steel cleave + sub-impact!
       tone(150, 0, 0.16, 'sine', 0.18, 52);
       tone(740, 0, 0.09, 'sawtooth', 0.15, 320);
       tone(1174.66, 0.04, 0.16, 'triangle', 0.14);
@@ -80,12 +89,20 @@ function playPvpDramaticSfx(kind = 'hit', muted = false) {
       tone(190, 0, 0.24, 'sawtooth', 0.17, 65);
       tone(130, 0.06, 0.26, 'square', 0.12, 55);
     } else if (kind === 'freeze') {
-      // Ice crystal shatter + deep chill lock
       tone(1320, 0, 0.1, 'sine', 0.12, 880);
       tone(987.77, 0.06, 0.12, 'triangle', 0.12, 587);
       tone(240, 0.08, 0.36, 'sawtooth', 0.14, 110);
+    } else if (kind === 'thunder_smite') {
+      // Twin sky-lightning crackle + heavy thunder sub-boom!
+      tone(1480, 0, 0.09, 'sawtooth', 0.18, 210);
+      tone(960, 0.05, 0.14, 'square', 0.14, 140);
+      tone(98, 0.03, 0.58, 'sawtooth', 0.22, 38);
+    } else if (kind === 'slowmo_ko') {
+      // Cinematic time-dilation bass drop + resonant katana ring!
+      tone(220, 0, 0.72, 'sawtooth', 0.2, 42);
+      tone(880, 0.02, 0.48, 'triangle', 0.16, 440);
+      tone(1318.5, 0.08, 0.65, 'sine', 0.12);
     } else if (kind === 'mystery_rift') {
-      // Enigmatic cosmic entity rift chord (2-2 tie)
       tone(110, 0, 0.65, 'sawtooth', 0.13, 82.4);
       tone(311.13, 0.12, 0.55, 'sine', 0.13, 466.16);
       tone(622.25, 0.26, 0.65, 'triangle', 0.12);
@@ -96,7 +113,7 @@ function playPvpDramaticSfx(kind = 'hit', muted = false) {
     }
     setTimeout(() => {
       ctx.close().catch(() => {});
-    }, 1300);
+    }, 1500);
   } catch {}
 }
 
@@ -180,7 +197,11 @@ export default function KnightPvpArena({
   const [combatAlert, setCombatAlert] = useState(null);
   const [demonWheelSpinning, setDemonWheelSpinning] = useState(false);
   const [demonWheelRevealedForMatch, setDemonWheelRevealedForMatch] = useState('');
-  const [vsSplashForMatch, setVsSplashForMatch] = useState('');
+
+  // New Combat Sequence States: 3-2-1 Ready Countdown, 10s Divine Lightning, & Slow-Motion KO Finisher
+  const [countdownStep, setCountdownStep] = useState('');
+  const [slowMoKo, setSlowMoKo] = useState(null);
+  const [questionDeadlineMs, setQuestionDeadlineMs] = useState(0);
 
   // 60FPS Duel Canvas refs & animation state (Hero vs Hero like Stages 1-4!)
   const battleCanvasRef = useRef(null);
@@ -192,6 +213,9 @@ export default function KnightPvpArena({
     oppHurt: 0,
     shake: 0,
     roadOffset: 0,
+    slowMoUntilMs: 0,
+    thunderAnim: 0,
+    koWinner: '',
     slashes: [],
     sparks: [],
     popups: []
@@ -204,20 +228,37 @@ export default function KnightPvpArena({
   const selectedTopicRef = useRef(selectedTopicObj);
   const prevOppLivesRef = useRef(KNIGHT_PVP_LIVES_PER_ROUND);
   const prevMyLivesRef = useRef(KNIGHT_PVP_LIVES_PER_ROUND);
+  const countdownTimerIdsRef = useRef([]);
+  const countedRoundsRef = useRef('');
+  const slowMoTimerRef = useRef(null);
+  const lastSeenServerKoAtRef = useRef(0);
+  const lastSeenServerThunderAtRef = useRef(0);
+  const thunderFiredKeyRef = useRef('');
+  const questionDeadlineRef = useRef(0);
+
   npcCombatRef.current = npcCombat;
   dispatchActionRef.current = dispatchSyncAction;
   selectedTopicRef.current = selectedTopicObj;
 
-  // Play arena entry horn once on mount
+  const clearRoundCountdownTimers = () => {
+    countdownTimerIdsRef.current.forEach(clearTimeout);
+    countdownTimerIdsRef.current = [];
+  };
+
+  // Play arena entry horn once on mount + cleanup timers on unmount
   useEffect(() => {
     playPvpDramaticSfx('enter_arena', bgmMuted);
+    return () => {
+      clearRoundCountdownTimers();
+      if (slowMoTimerRef.current) clearTimeout(slowMoTimerRef.current);
+    };
   }, []);
 
   const inQueue = Boolean(knightPvpRealtime?.inQueue);
   const queuedAt = Number(knightPvpRealtime?.queuedAt) || 0;
   const activeRoom = knightPvpRealtime?.activeRoom || null;
   const serverMatch = knightPvpRealtime?.activeMatch || null;
-  const isActivelyFighting = Boolean(serverMatch?.status === 'PLAYING');
+  const isActivelyFighting = Boolean(serverMatch?.status === 'PLAYING' || Boolean(slowMoKo));
 
   // Switch parent BGM between 'pvp_lobby' and high-energy 'pvp_battle'
   useEffect(() => {
@@ -228,12 +269,12 @@ export default function KnightPvpArena({
   }, [isActivelyFighting, onPvpCombatStateChange]);
 
   useEffect(() => {
-    if (!inQueue && !serverMatch && !npcCombat) return undefined;
+    if (!inQueue && !serverMatch && !npcCombat && !slowMoKo) return undefined;
     const id = setInterval(() => {
       setNowTickMs(Date.now());
     }, 100);
     return () => clearInterval(id);
-  }, [inQueue, Boolean(serverMatch), Boolean(npcCombat)]);
+  }, [inQueue, Boolean(serverMatch), Boolean(npcCombat), Boolean(slowMoKo)]);
 
   // Poll matchmaking queue -> seamlessly match opponent after 3.0s if queue empty
   useEffect(() => {
@@ -305,17 +346,91 @@ export default function KnightPvpArena({
     }
   };
 
+  // Twin Divine Punishment Sky-Lightning striking BOTH players simultaneously!
+  const spawnCanvasThunderSmite = () => {
+    const rt = duelAnimRef.current;
+    rt.thunderAnim = 1.0;
+    rt.myHurt = 1.0;
+    rt.oppHurt = 1.0;
+    rt.shake = 16;
+    rt.popups.push({ text: '⚡ -1 ❤️', xRatio: 0.24, yRatio: 0.31, color: '#fde047', life: 1.25 });
+    rt.popups.push({ text: '⚡ -1 ❤️', xRatio: 0.76, yRatio: 0.31, color: '#fde047', life: 1.25 });
+    [0.24, 0.76].forEach(rx => {
+      for (let i = 0; i < 22; i += 1) {
+        const ang = (Math.PI * 2 * i) / 22;
+        rt.sparks.push({
+          xRatio: rx,
+          yRatio: 0.58,
+          vx: Math.cos(ang) * (2.6 + Math.random() * 3.4),
+          vy: Math.sin(ang) * (2.6 + Math.random() * 3.4),
+          color: i % 2 === 0 ? '#fde047' : '#38bdf8',
+          life: 1.15
+        });
+      }
+    });
+  };
+
+  // Cinematic Slow-Motion Finisher VFX on the final blow of EVERY round!
+  const spawnCanvasSlowMoFinisher = (winner = 'me') => {
+    const slowDurMs =
+      typeof window !== 'undefined' && Number(window.__PVP_SLOWMO_MS__) >= 150
+        ? Number(window.__PVP_SLOWMO_MS__)
+        : KNIGHT_PVP_SLOWMO_KO_MS;
+    const rt = duelAnimRef.current;
+    rt.slowMoUntilMs = Date.now() + slowDurMs;
+    rt.koWinner = winner;
+    rt.shake = 18;
+    const tx = winner === 'me' ? 0.75 : 0.25;
+    const mainColor = winner === 'me' ? '#fde047' : '#fb7185';
+    rt.slashes.push({ xRatio: tx, yRatio: 0.54, dir: winner === 'me' ? 1 : -1, color: mainColor, life: 1.35 });
+    rt.slashes.push({ xRatio: tx, yRatio: 0.54, dir: winner === 'me' ? -1 : 1, color: '#ffffff', life: 1.25 });
+    rt.popups.push({
+      text: '⚡ KẾT LIỄU! ⚡',
+      xRatio: tx,
+      yRatio: 0.26,
+      color: '#fde047',
+      life: 1.35
+    });
+    for (let i = 0; i < 34; i += 1) {
+      const ang = (Math.PI * 2 * i) / 34;
+      rt.sparks.push({
+        xRatio: tx,
+        yRatio: 0.55,
+        vx: Math.cos(ang) * (3.2 + Math.random() * 4.5),
+        vy: Math.sin(ang) * (3.2 + Math.random() * 4.5),
+        color: i % 3 === 0 ? '#ffffff' : mainColor,
+        life: 1.35
+      });
+    }
+    return slowDurMs;
+  };
+
+  const computeNextNpcDelayMs = (npcObj, styleRound, qObj) => {
+    const minD = Math.max(1650, Number(npcObj?.minDelayMs) || 4500);
+    const maxD = Math.max(minD + 600, Number(npcObj?.maxDelayMs) || 7500);
+    const base = minD + Math.random() * (maxD - minD);
+    if (styleRound === 2 || styleRound === 4) {
+      const targetLen = String(
+        styleRound === 4 ? qObj?.v4Display || qObj?.word || '' : qObj?.word || ''
+      ).length;
+      const cps = Math.max(1.8, Number(npcObj?.typingCps) || 3.0);
+      return Math.round(Math.max(minD, (targetLen / cps) * 1000 + base * 0.45));
+    }
+    return Math.round(base);
+  };
+
   useEffect(() => {
     if (!serverMatch || serverMatch.mode !== 'ranked_npc') {
       if (npcCombat) setNpcCombat(null);
-      return;
+      return undefined;
     }
     if (serverMatch.status === 'PLAYING' && (!npcCombat || npcCombat.matchId !== serverMatch.id)) {
       const startTie22 = Boolean(serverMatch.forceTie22Test || serverMatch.round === 5);
-      setVsSplashForMatch(serverMatch.id);
-      const splashTimer = setTimeout(() => {
-        setVsSplashForMatch(prev => (prev === serverMatch.id ? '' : prev));
-      }, startTie22 ? 550 : 1100);
+      countedRoundsRef.current = '';
+      clearRoundCountdownTimers();
+      setCountdownStep('');
+      setSlowMoKo(null);
+      setQuestionDeadlineMs(0);
 
       if (startTie22) {
         setDemonWheelSpinning(true);
@@ -337,15 +452,16 @@ export default function KnightPvpArena({
         p1FrozenUntilMs: 0,
         p2FrozenUntilMs: 0,
         totalCorrectHits: 0,
+        totalThunderStrikes: 0,
         totalFreezes: 0,
         tiebreakerTriggered: startTie22,
+        roundEnding: false,
         roundBanner: '',
-        npcNextActionAtMs: Date.now() + (startTie22 ? 5800 : 4800),
+        npcNextActionAtMs: Date.now() + (startTie22 ? 7500 : 5500),
         finished: false
       });
       setTypedProgress(0);
       setRound4Input('');
-      return () => clearTimeout(splashTimer);
     }
     return undefined;
   }, [serverMatch?.id, serverMatch?.status, serverMatch?.mode]);
@@ -357,7 +473,8 @@ export default function KnightPvpArena({
       serverMatch.status === 'PLAYING' &&
       serverMatch.round === 5 &&
       demonWheelRevealedForMatch !== serverMatch.id &&
-      !demonWheelSpinning
+      !demonWheelSpinning &&
+      !slowMoKo
     ) {
       setDemonWheelSpinning(true);
       playPvpDramaticSfx('mystery_rift', bgmMuted);
@@ -368,7 +485,16 @@ export default function KnightPvpArena({
       return () => clearTimeout(t);
     }
     return undefined;
-  }, [serverMatch?.id, serverMatch?.mode, serverMatch?.status, serverMatch?.round, demonWheelRevealedForMatch, demonWheelSpinning, bgmMuted]);
+  }, [
+    serverMatch?.id,
+    serverMatch?.mode,
+    serverMatch?.status,
+    serverMatch?.round,
+    demonWheelRevealedForMatch,
+    demonWheelSpinning,
+    Boolean(slowMoKo),
+    bgmMuted
+  ]);
 
   const mySlotKey = useMemo(() => {
     if (!serverMatch) return 'p1';
@@ -404,6 +530,111 @@ export default function KnightPvpArena({
     setRound4Input('');
   }, [effectiveRound, effectiveCombatStyle, effectiveQIdx, activeQuestion?.word]);
 
+  const isShowingDemonWheelModal = Boolean(
+    serverMatch?.status === 'PLAYING' &&
+      effectiveRound === 5 &&
+      !slowMoKo &&
+      demonWheelRevealedForMatch !== serverMatch?.id
+  );
+
+  // ==========================================
+  // PRE-ROUND 3 -> 2 -> 1 -> CHIẾN! COUNTDOWN CONTROLLER (ROUNDS 1, 2, 3, 4 & 5!)
+  // ==========================================
+  useEffect(() => {
+    if (
+      !serverMatch ||
+      serverMatch.status !== 'PLAYING' ||
+      Boolean(slowMoKo) ||
+      isShowingDemonWheelModal ||
+      npcCombat?.finished ||
+      npcCombat?.roundEnding
+    ) {
+      return undefined;
+    }
+    const roundKey = `${serverMatch.id}:r${effectiveRound}`;
+    if (countedRoundsRef.current === roundKey) return undefined;
+    countedRoundsRef.current = roundKey;
+
+    clearRoundCountdownTimers();
+    const stepMs =
+      typeof window !== 'undefined' && Number(window.__PVP_COUNTDOWN_STEP_MS__) >= 60
+        ? Number(window.__PVP_COUNTDOWN_STEP_MS__)
+        : KNIGHT_PVP_COUNTDOWN_STEP_MS;
+    const goHoldMs = Math.min(360, Math.max(120, Math.round(stepMs * 0.55)));
+
+    setCountdownStep('3');
+    playPvpDramaticSfx('countdown_tick', bgmMuted);
+
+    const t1 = setTimeout(() => {
+      setCountdownStep('2');
+      playPvpDramaticSfx('countdown_tick', bgmMuted);
+    }, stepMs);
+
+    const t2 = setTimeout(() => {
+      setCountdownStep('1');
+      playPvpDramaticSfx('countdown_tick', bgmMuted);
+    }, stepMs * 2);
+
+    const t3 = setTimeout(() => {
+      setCountdownStep('CHIẾN!');
+      playPvpDramaticSfx('countdown_go', bgmMuted);
+    }, stepMs * 3);
+
+    const t4 = setTimeout(() => {
+      setCountdownStep('');
+      setNpcCombat(prev => {
+        if (!prev || prev.finished || prev.roundEnding) return prev;
+        const npcObj = serverMatch?.p2;
+        const styleR = prev.round === 5 ? Number(serverMatch?.demonRoundType) || 1 : prev.round;
+        const pool = sharedQueues[styleR] || sharedQueues[1] || [];
+        const curQ = pool[prev.questionIdx % Math.max(1, pool.length)];
+        return {
+          ...prev,
+          npcNextActionAtMs: Date.now() + computeNextNpcDelayMs(npcObj, styleR, curQ)
+        };
+      });
+    }, stepMs * 3 + goHoldMs);
+
+    countdownTimerIdsRef.current = [t1, t2, t3, t4];
+    return undefined;
+  }, [
+    serverMatch?.id,
+    serverMatch?.status,
+    effectiveRound,
+    Boolean(slowMoKo),
+    isShowingDemonWheelModal,
+    npcCombat?.finished,
+    npcCombat?.roundEnding,
+    bgmMuted,
+    sharedQueues
+  ]);
+
+  const isCombatInteractive = Boolean(
+    serverMatch?.status === 'PLAYING' &&
+      !isShowingDemonWheelModal &&
+      !slowMoKo &&
+      !countdownStep &&
+      !npcCombat?.finished &&
+      !npcCombat?.roundEnding
+  );
+
+  // Reset / arm the 10-second Divine Punishment ("Thiên Phạt Sấm Sét") clock whenever combat is live on a question
+  useEffect(() => {
+    if (!isCombatInteractive || !serverMatch) {
+      questionDeadlineRef.current = 0;
+      setQuestionDeadlineMs(0);
+      return;
+    }
+    const thunderLimitMs =
+      typeof window !== 'undefined' && Number(window.__PVP_THUNDER_TIMEOUT_MS__) >= 1000
+        ? Number(window.__PVP_THUNDER_TIMEOUT_MS__)
+        : KNIGHT_PVP_QUESTION_TIMEOUT_MS;
+    const nextDeadline = Date.now() + thunderLimitMs;
+    thunderFiredKeyRef.current = '';
+    questionDeadlineRef.current = nextDeadline;
+    setQuestionDeadlineMs(nextDeadline);
+  }, [isCombatInteractive, serverMatch?.id, effectiveRound, effectiveQIdx]);
+
   const myLives =
     serverMatch?.mode === 'ranked_npc' && npcCombat
       ? npcCombat.p1Lives
@@ -413,22 +644,56 @@ export default function KnightPvpArena({
       ? npcCombat.p2Lives
       : Number(serverMatch?.[oppSlotKey]?.lives ?? KNIGHT_PVP_LIVES_PER_ROUND);
 
-  // Trigger canvas slash FX when human-vs-human server state updates lives!
+  // Trigger canvas slash / slow-mo KO / thunder FX when human-vs-human server state updates!
   useEffect(() => {
     if (!serverMatch || serverMatch.mode === 'ranked_npc') {
       prevMyLivesRef.current = myLives;
       prevOppLivesRef.current = oppLives;
       return;
     }
-    if (oppLives < prevOppLivesRef.current) {
+    const srvThunderAt = Number(serverMatch.lastThunderAtMs) || 0;
+    if (srvThunderAt > 0 && srvThunderAt > lastSeenServerThunderAtRef.current) {
+      lastSeenServerThunderAtRef.current = srvThunderAt;
+      playPvpDramaticSfx('thunder_smite', bgmMuted);
+      spawnCanvasThunderSmite();
+    } else if (oppLives < prevOppLivesRef.current) {
       spawnCanvasAttackFx('me', myHeroSkin.slashColor || '#fbbf24');
     } else if (myLives < prevMyLivesRef.current) {
       playPvpDramaticSfx('hurt', bgmMuted);
       spawnCanvasAttackFx('opp', '#f43f5e');
     }
+
+    const srvKo = serverMatch.lastRoundKo;
+    if (srvKo?.atMs && srvKo.atMs > lastSeenServerKoAtRef.current) {
+      lastSeenServerKoAtRef.current = srvKo.atMs;
+      const didWinKo = srvKo.winnerSlot === mySlotKey;
+      playPvpDramaticSfx('slowmo_ko', bgmMuted);
+      const slowDurMs = spawnCanvasSlowMoFinisher(didWinKo ? 'me' : 'opp');
+      setSlowMoKo({
+        round: srvKo.round || 1,
+        winner: didWinKo ? 'me' : 'opp',
+        bannerText: didWinKo
+          ? `⚡ KẾT LIỄU VÒNG ${srvKo.round || 1}! ⚡`
+          : `💥 THẤT THỦ VÒNG ${srvKo.round || 1}! 💥`
+      });
+      if (slowMoTimerRef.current) clearTimeout(slowMoTimerRef.current);
+      slowMoTimerRef.current = setTimeout(() => {
+        setSlowMoKo(null);
+      }, slowDurMs);
+    }
+
     prevMyLivesRef.current = myLives;
     prevOppLivesRef.current = oppLives;
-  }, [myLives, oppLives, serverMatch?.mode]);
+  }, [
+    myLives,
+    oppLives,
+    serverMatch?.mode,
+    serverMatch?.lastThunderAtMs,
+    serverMatch?.lastRoundKo?.atMs,
+    mySlotKey,
+    myHeroSkin.slashColor,
+    bgmMuted
+  ]);
 
   const myRoundsWon =
     serverMatch?.mode === 'ranked_npc' && npcCombat
@@ -449,9 +714,7 @@ export default function KnightPvpArena({
       : Number(serverMatch?.[oppSlotKey]?.frozenUntilMs || 0);
 
   const myFreezeRemSec = Math.max(0, (myFrozenUntilMs - nowTickMs) / 1000);
-  const oppFreezeRemSec = Math.max(0, (oppFrozenUntilMs - nowTickMs) / 1000);
   const isMeFrozen = myFreezeRemSec > 0.05;
-  const isOppFrozen = oppFreezeRemSec > 0.05;
 
   const myFighterObj = serverMatch?.[mySlotKey] || {
     name: currentUser?.name || username,
@@ -473,9 +736,9 @@ export default function KnightPvpArena({
     });
   }, [myHeroSkin.spriteUrl, oppSkin.spriteUrl]);
 
-  // 60FPS HERO-VS-HERO BATTLEFIELD CANVAS (MATCHING STAGES 1->4 FANTASY ARENA!)
+  // 60FPS HERO-VS-HERO BATTLEFIELD CANVAS (WITH TWIN LIGHTNING & BULLET-TIME SLOW-MO KO!)
   useEffect(() => {
-    if (!serverMatch || serverMatch.status !== 'PLAYING') return undefined;
+    if (!serverMatch || (serverMatch.status !== 'PLAYING' && !slowMoKo)) return undefined;
     let rafId = 0;
 
     const renderFrame = () => {
@@ -495,18 +758,20 @@ export default function KnightPvpArena({
           ctx.scale(dpr, dpr);
           const now = Date.now();
           const rt = duelAnimRef.current;
+          const isSlowMo = now < (rt.slowMoUntilMs || 0);
+          const dtScale = isSlowMo ? 0.2 : 1.0;
           const groundY = h * 0.8;
           const isRiftRound = effectiveRound === 5;
           const isCrimsonRound = effectiveRound === 4;
 
           if (rt.shake > 0.1) {
             ctx.translate((Math.random() - 0.5) * rt.shake, (Math.random() - 0.5) * rt.shake);
-            rt.shake *= 0.86;
+            rt.shake *= isSlowMo ? 0.94 : 0.86;
           } else {
             rt.shake = 0;
           }
 
-          // 1. Atmospheric Sky Backdrop (Stage 1->4 aesthetic)
+          // 1. Atmospheric Sky Backdrop
           const sky = ctx.createLinearGradient(0, 0, 0, groundY);
           if (isRiftRound) {
             sky.addColorStop(0, '#130424');
@@ -526,6 +791,12 @@ export default function KnightPvpArena({
           }
           ctx.fillStyle = sky;
           ctx.fillRect(0, 0, w, h);
+
+          // Sky Thunder Flash during Divine Punishment
+          if (rt.thunderAnim > 0.45) {
+            ctx.fillStyle = `rgba(224, 242, 254, ${(rt.thunderAnim - 0.45) * 0.65})`;
+            ctx.fillRect(0, 0, w, h);
+          }
 
           // 2. Center Moon / Rift Orb
           const moonX = w * 0.5;
@@ -567,7 +838,7 @@ export default function KnightPvpArena({
             const px = w * rx;
             ctx.fillStyle = 'rgba(30, 41, 59, 0.65)';
             ctx.fillRect(px - 10, h * 0.18, 20, groundY - h * 0.18);
-            const fl = Math.sin(now * 0.015 + idx * 1.9) * 3;
+            const fl = Math.sin(now * (isSlowMo ? 0.003 : 0.015) + idx * 1.9) * 3;
             const tg = ctx.createRadialGradient(px, h * 0.44, 2, px, h * 0.44, 28 + fl);
             tg.addColorStop(0, isRiftRound ? 'rgba(240,171,252,0.9)' : 'rgba(253,224,71,0.9)');
             tg.addColorStop(1, 'rgba(0,0,0,0)');
@@ -590,17 +861,20 @@ export default function KnightPvpArena({
           ctx.lineTo(w, groundY);
           ctx.stroke();
 
-          // Decay combat animations
+          // Decay combat animations (scaled by 0.2x during Slow-Motion KO!)
           const myAtkSin = Math.sin(rt.myAttack * Math.PI);
           const oppAtkSin = Math.sin(rt.oppAttack * Math.PI);
-          if (rt.myAttack > 0) rt.myAttack = Math.max(0, rt.myAttack - 0.06);
-          if (rt.oppAttack > 0) rt.oppAttack = Math.max(0, rt.oppAttack - 0.06);
-          if (rt.myHurt > 0) rt.myHurt = Math.max(0, rt.myHurt - 0.065);
-          if (rt.oppHurt > 0) rt.oppHurt = Math.max(0, rt.oppHurt - 0.065);
+          if (rt.myAttack > 0) rt.myAttack = Math.max(0, rt.myAttack - 0.06 * dtScale);
+          if (rt.oppAttack > 0) rt.oppAttack = Math.max(0, rt.oppAttack - 0.06 * dtScale);
+          if (rt.myHurt > 0) rt.myHurt = Math.max(0, rt.myHurt - 0.065 * dtScale);
+          if (rt.oppHurt > 0) rt.oppHurt = Math.max(0, rt.oppHurt - 0.065 * dtScale);
+          if (rt.thunderAnim > 0) rt.thunderAnim = Math.max(0, rt.thunderAnim - 0.042 * dtScale);
 
           const heroDrawH = Math.min(126, h * 0.56);
-          const myX = w * 0.24 + myAtkSin * Math.min(120, w * 0.18) - rt.myHurt * 16;
-          const oppX = w * 0.76 - oppAtkSin * Math.min(120, w * 0.18) + rt.oppHurt * 16;
+          const myKoKnock = isSlowMo && rt.koWinner === 'opp' ? 28 : 0;
+          const oppKoKnock = isSlowMo && rt.koWinner === 'me' ? 28 : 0;
+          const myX = w * 0.24 + myAtkSin * Math.min(120, w * 0.18) - rt.myHurt * 16 - myKoKnock;
+          const oppX = w * 0.76 - oppAtkSin * Math.min(120, w * 0.18) + rt.oppHurt * 16 + oppKoKnock;
 
           const drawFighter = ({
             x,
@@ -611,7 +885,8 @@ export default function KnightPvpArena({
             attackSin,
             hurtVal,
             frozenSec,
-            auraColor
+            auraColor,
+            isDefeatedKo
           }) => {
             const img = spriteCacheRef.current.get(skin.spriteUrl);
             const aspect =
@@ -619,17 +894,26 @@ export default function KnightPvpArena({
                 ? img.naturalWidth / img.naturalHeight
                 : 1;
             const drawW = heroDrawH * aspect;
-            const bobY = frozenSec > 0.05 ? 0 : Math.sin(now * 0.0055 + (isRightSide ? 1.7 : 0)) * 2.8;
-            const topY = groundY + 4 - heroDrawH + bobY - hurtVal * 5;
+            const bobY =
+              frozenSec > 0.05 || isSlowMo
+                ? 0
+                : Math.sin(now * 0.0055 + (isRightSide ? 1.7 : 0)) * 2.8;
+            const topY = groundY + 4 - heroDrawH + bobY - hurtVal * 5 - (isDefeatedKo ? 10 : 0);
 
-            // Shadow & Aura
             ctx.save();
             ctx.fillStyle = 'rgba(0,0,0,0.52)';
             ctx.beginPath();
             ctx.ellipse(x, groundY + 3, drawW * 0.36, 7, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            const aura = ctx.createRadialGradient(x, topY + heroDrawH * 0.55, 8, x, topY + heroDrawH * 0.55, heroDrawH * 0.65);
+            const aura = ctx.createRadialGradient(
+              x,
+              topY + heroDrawH * 0.55,
+              8,
+              x,
+              topY + heroDrawH * 0.55,
+              heroDrawH * 0.65
+            );
             aura.addColorStop(0, frozenSec > 0.05 ? 'rgba(34,211,238,0.45)' : auraColor);
             aura.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = aura;
@@ -637,17 +921,20 @@ export default function KnightPvpArena({
             ctx.arc(x, topY + heroDrawH * 0.55, heroDrawH * 0.65, 0, Math.PI * 2);
             ctx.fill();
 
-            // Sprite (mirrored on right side so both heroes face each other!)
             if (img && img.complete && img.naturalWidth > 0) {
               ctx.save();
               ctx.translate(x, topY + heroDrawH);
               if (isRightSide) ctx.scale(-1, 1);
-              if (attackSin > 0) ctx.rotate(attackSin * 0.14);
+              if (isDefeatedKo) {
+                ctx.rotate(-0.42);
+                ctx.globalAlpha = 0.85;
+              } else if (attackSin > 0) {
+                ctx.rotate(attackSin * 0.14);
+              }
               ctx.drawImage(img, -drawW / 2, -heroDrawH, drawW, heroDrawH);
               ctx.restore();
             }
 
-            // 5-Second Ice Crystal Prism Overlay on Frozen Fighter!
             if (frozenSec > 0.05) {
               ctx.save();
               ctx.fillStyle = 'rgba(34, 211, 238, 0.34)';
@@ -670,7 +957,6 @@ export default function KnightPvpArena({
               ctx.restore();
             }
 
-            // Overhead Nameplate & 3 Hearts (just like Monster/Hero HUD in Stages 1-4)
             const plateY = Math.max(22, topY - 14);
             ctx.font = 'bold 11px sans-serif';
             const textW = Math.max(96, ctx.measureText(nameLabel).width + 20);
@@ -705,7 +991,8 @@ export default function KnightPvpArena({
             attackSin: myAtkSin,
             hurtVal: rt.myHurt,
             frozenSec: curMyFreeze,
-            auraColor: 'rgba(251, 191, 36, 0.34)'
+            auraColor: 'rgba(251, 191, 36, 0.34)',
+            isDefeatedKo: Boolean(isSlowMo && rt.koWinner === 'opp')
           });
 
           drawFighter({
@@ -717,13 +1004,66 @@ export default function KnightPvpArena({
             attackSin: oppAtkSin,
             hurtVal: rt.oppHurt,
             frozenSec: curOppFreeze,
-            auraColor: 'rgba(244, 63, 94, 0.34)'
+            auraColor: 'rgba(244, 63, 94, 0.34)',
+            isDefeatedKo: Boolean(isSlowMo && rt.koWinner === 'me')
           });
+
+          // 5. TWIN DIVINE LIGHTNING BOLTS ("THIÊN PHẠT SẤM SÉT") STRIKING BOTH HEROES!
+          if (rt.thunderAnim > 0.02) {
+            const drawBolt = (targetX, seedShift) => {
+              ctx.save();
+              ctx.globalCompositeOperation = 'lighter';
+              ctx.globalAlpha = Math.min(1, rt.thunderAnim * 1.35);
+
+              // Outer cyan-gold plasma pillar
+              const pillar = ctx.createLinearGradient(targetX - 24, 0, targetX + 24, 0);
+              pillar.addColorStop(0, 'rgba(56, 189, 248, 0)');
+              pillar.addColorStop(0.5, `rgba(253, 224, 71, ${0.42 * rt.thunderAnim})`);
+              pillar.addColorStop(1, 'rgba(56, 189, 248, 0)');
+              ctx.fillStyle = pillar;
+              ctx.fillRect(targetX - 24, 0, 48, groundY + 4);
+
+              // Jagged main lightning bolt from y=0 to groundY
+              ctx.strokeStyle = '#fde047';
+              ctx.shadowColor = '#38bdf8';
+              ctx.shadowBlur = 20;
+              ctx.lineWidth = 4.5;
+              ctx.beginPath();
+              ctx.moveTo(targetX + Math.sin(now * 0.05 + seedShift) * 10, 0);
+              const segments = 7;
+              for (let s = 1; s <= segments; s += 1) {
+                const py = (groundY * s) / segments;
+                const jag =
+                  s === segments
+                    ? 0
+                    : Math.sin(now * 0.08 + s * 2.7 + seedShift) * (s % 2 === 0 ? 18 : -18);
+                ctx.lineTo(targetX + jag, py);
+              }
+              ctx.stroke();
+
+              // White-hot inner core
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+
+              // Ground impact shockwave ring
+              const ringProg = 1 - rt.thunderAnim;
+              ctx.strokeStyle = `rgba(253, 224, 71, ${rt.thunderAnim})`;
+              ctx.lineWidth = 3 * rt.thunderAnim;
+              ctx.beginPath();
+              ctx.ellipse(targetX, groundY + 2, 18 + ringProg * 58, 6 + ringProg * 14, 0, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            };
+
+            drawBolt(myX, 0.4);
+            drawBolt(oppX, 3.1);
+          }
 
           // Crescent Sword Slashes
           for (let i = rt.slashes.length - 1; i >= 0; i -= 1) {
             const sl = rt.slashes[i];
-            sl.life -= 0.08;
+            sl.life -= 0.08 * dtScale;
             if (sl.life <= 0) {
               rt.slashes.splice(i, 1);
               continue;
@@ -732,10 +1072,10 @@ export default function KnightPvpArena({
             ctx.translate(sl.xRatio * w, sl.yRatio * h);
             ctx.scale(sl.dir, 1);
             ctx.strokeStyle = sl.color;
-            ctx.globalAlpha = sl.life;
-            ctx.lineWidth = 6 * sl.life;
+            ctx.globalAlpha = Math.min(1, sl.life);
+            ctx.lineWidth = 6 * Math.min(1.2, sl.life);
             ctx.beginPath();
-            ctx.arc(0, 0, 46, -Math.PI * 0.45, Math.PI * 0.45);
+            ctx.arc(0, 0, isSlowMo ? 58 : 46, -Math.PI * 0.45, Math.PI * 0.45);
             ctx.stroke();
             ctx.restore();
           }
@@ -743,18 +1083,18 @@ export default function KnightPvpArena({
           // Sparks
           for (let i = rt.sparks.length - 1; i >= 0; i -= 1) {
             const sp = rt.sparks[i];
-            sp.xRatio += sp.vx / w;
-            sp.yRatio += sp.vy / h;
-            sp.life -= 0.06;
+            sp.xRatio += (sp.vx * dtScale) / w;
+            sp.yRatio += (sp.vy * dtScale) / h;
+            sp.life -= 0.06 * dtScale;
             if (sp.life <= 0) {
               rt.sparks.splice(i, 1);
               continue;
             }
             ctx.save();
-            ctx.globalAlpha = sp.life;
+            ctx.globalAlpha = Math.min(1, sp.life);
             ctx.fillStyle = sp.color;
             ctx.beginPath();
-            ctx.arc(sp.xRatio * w, sp.yRatio * h, 3, 0, Math.PI * 2);
+            ctx.arc(sp.xRatio * w, sp.yRatio * h, isSlowMo ? 3.6 : 3, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }
@@ -762,8 +1102,8 @@ export default function KnightPvpArena({
           // Floating Damage Popups
           for (let i = rt.popups.length - 1; i >= 0; i -= 1) {
             const p = rt.popups[i];
-            p.yRatio -= 0.004;
-            p.life -= 0.035;
+            p.yRatio -= 0.004 * dtScale;
+            p.life -= 0.035 * dtScale;
             if (p.life <= 0) {
               rt.popups.splice(i, 1);
               continue;
@@ -777,6 +1117,29 @@ export default function KnightPvpArena({
             ctx.restore();
           }
 
+          // 6. CINEMATIC SLOW-MOTION FINISHER OVERLAY (Letterbox + Katana Horizon Cut!)
+          if (isSlowMo) {
+            const remRatio = Math.max(0, Math.min(1, ((rt.slowMoUntilMs || now) - now) / KNIGHT_PVP_SLOWMO_KO_MS));
+            ctx.save();
+            // Horizon razor slash gleam across battlefield
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.strokeStyle = rt.koWinner === 'me' ? 'rgba(253, 224, 71, 0.85)' : 'rgba(251, 113, 133, 0.85)';
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 22;
+            ctx.lineWidth = Math.max(1.5, remRatio * 5.5);
+            ctx.beginPath();
+            ctx.moveTo(0, h * 0.64);
+            ctx.lineTo(w, h * 0.36);
+            ctx.stroke();
+            ctx.restore();
+
+            // Widescreen cinema letterbox bars
+            const barH = Math.round(h * 0.11);
+            ctx.fillStyle = 'rgba(4, 6, 12, 0.92)';
+            ctx.fillRect(0, 0, w, barH);
+            ctx.fillRect(0, h - barH, w, barH);
+          }
+
           ctx.restore();
         }
       }
@@ -788,6 +1151,7 @@ export default function KnightPvpArena({
   }, [
     serverMatch?.id,
     serverMatch?.status,
+    Boolean(slowMoKo),
     effectiveRound,
     myHeroSkin,
     oppSkin,
@@ -800,29 +1164,6 @@ export default function KnightPvpArena({
     username
   ]);
 
-  const isShowingDemonWheelModal = Boolean(
-    serverMatch?.status === 'PLAYING' &&
-      effectiveRound === 5 &&
-      demonWheelRevealedForMatch !== serverMatch?.id
-  );
-  const isShowingVsSplash = Boolean(
-    serverMatch?.status === 'PLAYING' && vsSplashForMatch === serverMatch?.id && !isShowingDemonWheelModal
-  );
-
-  const computeNextNpcDelayMs = (npcObj, styleRound, qObj) => {
-    const minD = Math.max(1650, Number(npcObj?.minDelayMs) || 4500);
-    const maxD = Math.max(minD + 600, Number(npcObj?.maxDelayMs) || 7500);
-    const base = minD + Math.random() * (maxD - minD);
-    if (styleRound === 2 || styleRound === 4) {
-      const targetLen = String(
-        styleRound === 4 ? qObj?.v4Display || qObj?.word || '' : qObj?.word || ''
-      ).length;
-      const cps = Math.max(1.8, Number(npcObj?.typingCps) || 3.0);
-      return Math.round(Math.max(minD, (targetLen / cps) * 1000 + base * 0.45));
-    }
-    return Math.round(base);
-  };
-
   const settleNpcMatchWithServer = async (finalState) => {
     if (!serverMatch || npcSettlingRef.current === serverMatch.id) return;
     npcSettlingRef.current = serverMatch.id;
@@ -831,6 +1172,7 @@ export default function KnightPvpArena({
       p1RoundsWon: finalState.p1RoundsWon,
       p2RoundsWon: finalState.p2RoundsWon,
       totalCorrectHits: finalState.totalCorrectHits,
+      totalThunderStrikes: finalState.totalThunderStrikes || 0,
       totalFreezes: finalState.totalFreezes,
       tiebreakerTriggered: finalState.tiebreakerTriggered
     });
@@ -866,8 +1208,9 @@ export default function KnightPvpArena({
           p2RoundsWon: nextP2Rounds,
           p1FrozenUntilMs: 0,
           p2FrozenUntilMs: 0,
+          roundEnding: false,
           roundBanner: bannerMsg,
-          npcNextActionAtMs: Date.now() + 1400 + computeNextNpcDelayMs(npcSlotObj, nextRound, nextPool[0])
+          npcNextActionAtMs: Date.now() + 3400 + computeNextNpcDelayMs(npcSlotObj, nextRound, nextPool[0])
         },
         shouldFinish: false,
         triggerDemonWheel: false
@@ -875,7 +1218,6 @@ export default function KnightPvpArena({
     }
 
     if (prev.round === 4 && nextP1Rounds === 2 && nextP2Rounds === 2) {
-      // 2 - 2 Tiebreaker -> Mysterious Entity spins Wheel of Fate and vanishes!
       const style5 = Number(serverMatch?.demonRoundType) || 1;
       const pool5 = sharedQueues[style5] || sharedQueues[1] || [];
       return {
@@ -890,8 +1232,9 @@ export default function KnightPvpArena({
           p1FrozenUntilMs: 0,
           p2FrozenUntilMs: 0,
           tiebreakerTriggered: true,
+          roundEnding: false,
           roundBanner: '👁️‍🗨️ Hòa 2 – 2! Một thực thể bí ẩn vừa xoay Vòng Quay Định Mệnh!',
-          npcNextActionAtMs: Date.now() + 3600 + computeNextNpcDelayMs(npcSlotObj, style5, pool5[0])
+          npcNextActionAtMs: Date.now() + 5600 + computeNextNpcDelayMs(npcSlotObj, style5, pool5[0])
         },
         shouldFinish: false,
         triggerDemonWheel: true
@@ -905,6 +1248,7 @@ export default function KnightPvpArena({
         p2RoundsWon: nextP2Rounds,
         p1Lives: roundWinnerSlot === 'p1' ? prev.p1Lives : 0,
         p2Lives: roundWinnerSlot === 'p2' ? prev.p2Lives : 0,
+        roundEnding: false,
         finished: true,
         roundBanner: bannerMsg
       },
@@ -913,23 +1257,171 @@ export default function KnightPvpArena({
     };
   };
 
-  // Stealth Opponent reaction loop (completely indistinguishable from a human opponent!)
+  // Run Slow-Motion KO Finisher on the killing blow of EVERY round, THEN advance round (which starts 3-2-1!)
+  const triggerNpcRoundSlowMoFinisher = (stateAtKill, winnerSlot, npcSlotObj) => {
+    const didWinRound = winnerSlot === 'p1';
+    const koSnapshot = {
+      ...stateAtKill,
+      p1Lives: didWinRound ? Math.max(1, stateAtKill.p1Lives) : 0,
+      p2Lives: didWinRound ? 0 : Math.max(1, stateAtKill.p2Lives),
+      roundEnding: true
+    };
+    setNpcCombat(koSnapshot);
+
+    const trans = applyLocalNpcRoundTransition(koSnapshot, winnerSlot, npcSlotObj);
+    playPvpDramaticSfx('slowmo_ko', bgmMuted);
+    const slowDurMs = spawnCanvasSlowMoFinisher(didWinRound ? 'me' : 'opp');
+    setSlowMoKo({
+      round: stateAtKill.round,
+      winner: didWinRound ? 'me' : 'opp',
+      bannerText: didWinRound
+        ? `⚡ KẾT LIỄU VÒNG ${stateAtKill.round}! ⚡`
+        : `💥 THẤT THỦ VÒNG ${stateAtKill.round}! 💥`
+    });
+    setCombatAlert({
+      tone: didWinRound ? 'success' : 'danger',
+      text: trans.nextState.roundBanner
+    });
+
+    if (slowMoTimerRef.current) clearTimeout(slowMoTimerRef.current);
+    slowMoTimerRef.current = setTimeout(() => {
+      if (trans.triggerDemonWheel) {
+        setDemonWheelSpinning(true);
+        playPvpDramaticSfx('mystery_rift', bgmMuted);
+        setTimeout(() => {
+          setDemonWheelSpinning(false);
+          setDemonWheelRevealedForMatch(serverMatch?.id || '');
+        }, 2200);
+      }
+      setSlowMoKo(null);
+      setNpcCombat(trans.nextState);
+      if (trans.shouldFinish) {
+        settleNpcMatchWithServer(trans.nextState);
+      }
+    }, slowDurMs);
+  };
+
+  // ==========================================
+  // 10-SECOND DIVINE PUNISHMENT ("THIÊN PHẠT SẤM SÉT") CHECK
+  // ==========================================
+  useEffect(() => {
+    const activeDeadline = questionDeadlineRef.current;
+    if (!isCombatInteractive || !serverMatch || activeDeadline <= 0) return;
+    if (nowTickMs < activeDeadline) return;
+
+    const fireKey = `${serverMatch.id}:r${effectiveRound}:q${effectiveQIdx}:${activeDeadline}`;
+    if (thunderFiredKeyRef.current === fireKey) return;
+    thunderFiredKeyRef.current = fireKey;
+    const nextLimitMs =
+      typeof window !== 'undefined' && Number(window.__PVP_THUNDER_TIMEOUT_MS__) >= 1000
+        ? Number(window.__PVP_THUNDER_TIMEOUT_MS__)
+        : KNIGHT_PVP_QUESTION_TIMEOUT_MS;
+    questionDeadlineRef.current = Date.now() + nextLimitMs;
+
+    if (serverMatch.mode === 'ranked_npc') {
+      const cur = npcCombatRef.current;
+      if (!cur || cur.finished || cur.roundEnding) return;
+      const npcObj = serverMatch.p2;
+      playPvpDramaticSfx('thunder_smite', bgmMuted);
+      spawnCanvasThunderSmite();
+
+      const rawP1 = cur.p1Lives - 1;
+      const rawP2 = cur.p2Lives - 1;
+      const styleR = cur.round === 5 ? Number(serverMatch.demonRoundType) || 1 : cur.round;
+      const pool = sharedQueues[styleR] || sharedQueues[1] || [];
+
+      if (rawP1 <= 0 && rawP2 <= 0) {
+        const nextQIdx = cur.questionIdx + 1;
+        const nextQ = pool[nextQIdx % Math.max(1, pool.length)];
+        setCombatAlert({
+          tone: 'danger',
+          text: '⚡ THIÊN PHẠT! Quá 10s không ai giải được — Cả 2 chạm ngưỡng 1 ❤️ sinh tử!'
+        });
+        setNpcCombat({
+          ...cur,
+          p1Lives: 1,
+          p2Lives: 1,
+          questionIdx: nextQIdx,
+          npcNextActionAtMs: Date.now() + computeNextNpcDelayMs(npcObj, styleR, nextQ)
+        });
+      } else if (rawP2 <= 0 && rawP1 >= 1) {
+        triggerNpcRoundSlowMoFinisher(
+          {
+            ...cur,
+            p1Lives: rawP1,
+            p2Lives: 0,
+            totalThunderStrikes: (cur.totalThunderStrikes || 0) + 1
+          },
+          'p1',
+          npcObj
+        );
+      } else if (rawP1 <= 0 && rawP2 >= 1) {
+        triggerNpcRoundSlowMoFinisher(
+          {
+            ...cur,
+            p1Lives: 0,
+            p2Lives: rawP2,
+            totalThunderStrikes: (cur.totalThunderStrikes || 0) + 1
+          },
+          'p2',
+          npcObj
+        );
+      } else {
+        const nextQIdx = cur.questionIdx + 1;
+        const nextQ = pool[nextQIdx % Math.max(1, pool.length)];
+        setCombatAlert({
+          tone: 'danger',
+          text: '⚡ THIÊN PHẠT SẤM SÉT! Quá 10 giây không ai giải được — Cả 2 bị sét đánh mất -1 ❤️!'
+        });
+        setNpcCombat({
+          ...cur,
+          p1Lives: rawP1,
+          p2Lives: rawP2,
+          totalThunderStrikes: (cur.totalThunderStrikes || 0) + 1,
+          questionIdx: nextQIdx,
+          npcNextActionAtMs: Date.now() + computeNextNpcDelayMs(npcObj, styleR, nextQ)
+        });
+      }
+      return;
+    }
+
+    lastSeenServerThunderAtRef.current = Date.now() + 3000;
+    playPvpDramaticSfx('thunder_smite', bgmMuted);
+    spawnCanvasThunderSmite();
+    setCombatAlert({
+      tone: 'danger',
+      text: '⚡ THIÊN PHẠT SẤM SÉT! Quá 10 giây không ai giải được — Cả 2 mất -1 ❤️!'
+    });
+    dispatchActionRef.current?.('KNIGHT_PVP_SYNC_COMBAT', {
+      matchId: serverMatch.id,
+      event: 'THUNDER_TIMEOUT',
+      questionIdx: effectiveQIdx
+    });
+  }, [
+    nowTickMs,
+    isCombatInteractive,
+    questionDeadlineMs,
+    serverMatch?.id,
+    serverMatch?.mode,
+    effectiveRound,
+    effectiveQIdx,
+    bgmMuted,
+    sharedQueues
+  ]);
+
+  // Stealth Opponent reaction loop (paused cleanly during 3-2-1 countdown, Slow-Mo KO, & 2-2 Wheel!)
   useEffect(() => {
     if (
       !serverMatch ||
       serverMatch.mode !== 'ranked_npc' ||
-      serverMatch.status !== 'PLAYING' ||
-      !npcCombat ||
-      npcCombat.finished ||
-      isShowingDemonWheelModal ||
-      isShowingVsSplash
+      !isCombatInteractive
     ) {
       return undefined;
     }
     const npcObj = serverMatch.p2;
     const aiTimer = setInterval(() => {
       const cur = npcCombatRef.current;
-      if (!cur || cur.finished) return;
+      if (!cur || cur.finished || cur.roundEnding) return;
       const now = Date.now();
       if (now < cur.p2FrozenUntilMs) return;
       if (now < cur.npcNextActionAtMs) return;
@@ -941,7 +1433,9 @@ export default function KnightPvpArena({
 
       if (!oppHits) {
         playPvpDramaticSfx('freeze', bgmMuted);
-        const nextDelay = KNIGHT_PVP_FREEZE_MS + computeNextNpcDelayMs(npcObj, styleRound, pool[cur.questionIdx % Math.max(1, pool.length)]);
+        const nextDelay =
+          KNIGHT_PVP_FREEZE_MS +
+          computeNextNpcDelayMs(npcObj, styleRound, pool[cur.questionIdx % Math.max(1, pool.length)]);
         setCombatAlert({
           tone: 'info',
           text: `❄️ ${npcObj?.name || 'Đối thủ'} trả lời sai — Đóng băng 5s!`
@@ -963,20 +1457,7 @@ export default function KnightPvpArena({
 
       const nextP1Lives = Math.max(0, cur.p1Lives - 1);
       if (nextP1Lives <= 0) {
-        const trans = applyLocalNpcRoundTransition(cur, 'p2', npcObj);
-        setCombatAlert({ tone: 'danger', text: trans.nextState.roundBanner });
-        setNpcCombat(trans.nextState);
-        if (trans.triggerDemonWheel) {
-          setDemonWheelSpinning(true);
-          playPvpDramaticSfx('mystery_rift', bgmMuted);
-          setTimeout(() => {
-            setDemonWheelSpinning(false);
-            setDemonWheelRevealedForMatch(serverMatch.id);
-          }, 2200);
-        }
-        if (trans.shouldFinish) {
-          settleNpcMatchWithServer(trans.nextState);
-        }
+        triggerNpcRoundSlowMoFinisher(cur, 'p2', npcObj);
       } else {
         const nextQIdx = cur.questionIdx + 1;
         const nextQ = pool[nextQIdx % Math.max(1, pool.length)];
@@ -1001,16 +1482,13 @@ export default function KnightPvpArena({
   }, [
     serverMatch?.id,
     serverMatch?.mode,
-    serverMatch?.status,
-    npcCombat?.finished,
-    isShowingDemonWheelModal,
-    isShowingVsSplash,
+    isCombatInteractive,
     bgmMuted,
     sharedQueues
   ]);
 
   const triggerMyCorrectStrike = () => {
-    if (!serverMatch || serverMatch.status !== 'PLAYING' || isMeFrozen || isShowingDemonWheelModal) return;
+    if (!serverMatch || !isCombatInteractive || isMeFrozen) return;
     playPvpDramaticSfx('hit', bgmMuted);
     spawnCanvasAttackFx('me', myHeroSkin.slashColor || '#fbbf24');
 
@@ -1022,20 +1500,7 @@ export default function KnightPvpArena({
         totalCorrectHits: npcCombat.totalCorrectHits + 1
       };
       if (nextOppLives <= 0) {
-        const trans = applyLocalNpcRoundTransition(updatedBase, 'p1', npcObj);
-        setCombatAlert({ tone: 'success', text: trans.nextState.roundBanner });
-        setNpcCombat(trans.nextState);
-        if (trans.triggerDemonWheel) {
-          setDemonWheelSpinning(true);
-          playPvpDramaticSfx('mystery_rift', bgmMuted);
-          setTimeout(() => {
-            setDemonWheelSpinning(false);
-            setDemonWheelRevealedForMatch(serverMatch.id);
-          }, 2200);
-        }
-        if (trans.shouldFinish) {
-          settleNpcMatchWithServer(trans.nextState);
-        }
+        triggerNpcRoundSlowMoFinisher(updatedBase, 'p1', npcObj);
       } else {
         const nextQIdx = npcCombat.questionIdx + 1;
         const styleRound = npcCombat.round === 5 ? Number(serverMatch.demonRoundType) || 1 : npcCombat.round;
@@ -1067,7 +1532,7 @@ export default function KnightPvpArena({
   };
 
   const triggerMyWrongFreeze = () => {
-    if (!serverMatch || serverMatch.status !== 'PLAYING' || isMeFrozen || isShowingDemonWheelModal) return;
+    if (!serverMatch || !isCombatInteractive || isMeFrozen) return;
     playPvpDramaticSfx('freeze', bgmMuted);
     const freezeUntil = Date.now() + KNIGHT_PVP_FREEZE_MS;
     setCombatAlert({
@@ -1095,7 +1560,7 @@ export default function KnightPvpArena({
   };
 
   const handleSelectChoice = (choiceText) => {
-    if (!activeQuestion || isMeFrozen || isShowingDemonWheelModal) return;
+    if (!activeQuestion || isMeFrozen || !isCombatInteractive) return;
     const expected = effectiveCombatStyle === 3 ? activeQuestion.v3Target : activeQuestion.word;
     const ok = String(choiceText || '').trim().toLowerCase() === String(expected || '').trim().toLowerCase();
     if (ok) triggerMyCorrectStrike();
@@ -1103,7 +1568,7 @@ export default function KnightPvpArena({
   };
 
   const handleRound2Letter = (letter) => {
-    if (!activeQuestion || effectiveCombatStyle !== 2 || isMeFrozen || isShowingDemonWheelModal) return;
+    if (!activeQuestion || effectiveCombatStyle !== 2 || isMeFrozen || !isCombatInteractive) return;
     const target = String(activeQuestion.word || '').toUpperCase();
     const expected = target[typedProgress];
     if (!expected) return;
@@ -1119,10 +1584,9 @@ export default function KnightPvpArena({
   useEffect(() => {
     if (
       !serverMatch ||
-      serverMatch.status !== 'PLAYING' ||
+      !isCombatInteractive ||
       effectiveCombatStyle !== 2 ||
-      isMeFrozen ||
-      isShowingDemonWheelModal
+      isMeFrozen
     ) {
       return undefined;
     }
@@ -1139,7 +1603,7 @@ export default function KnightPvpArena({
 
   const handleRound4Submit = (e) => {
     if (e) e.preventDefault();
-    if (!activeQuestion || effectiveCombatStyle !== 4 || isMeFrozen || isShowingDemonWheelModal) return;
+    if (!activeQuestion || effectiveCombatStyle !== 4 || isMeFrozen || !isCombatInteractive) return;
     const trimmed = round4Input.trim();
     if (!trimmed) return;
     const accepted =
@@ -1155,11 +1619,22 @@ export default function KnightPvpArena({
     }
   };
 
+  const resetLocalArenaTransientState = () => {
+    npcSettlingRef.current = '';
+    countedRoundsRef.current = '';
+    questionDeadlineRef.current = 0;
+    clearRoundCountdownTimers();
+    if (slowMoTimerRef.current) clearTimeout(slowMoTimerRef.current);
+    setCountdownStep('');
+    setSlowMoKo(null);
+    setQuestionDeadlineMs(0);
+    setDemonWheelRevealedForMatch('');
+  };
+
   const handleStartMatchmaking = async (forceTie22Test = false) => {
     if (busyAction) return;
     setBusyAction('queue');
-    npcSettlingRef.current = '';
-    setDemonWheelRevealedForMatch('');
+    resetLocalArenaTransientState();
     await dispatchActionRef.current?.('KNIGHT_PVP_FIND_MATCH', {
       topicId: selectedTopicObj.id,
       topicLabel: selectedTopicObj.title,
@@ -1204,6 +1679,7 @@ export default function KnightPvpArena({
 
   const handleLeaveRoomOrMatch = async () => {
     setBusyAction('leave');
+    resetLocalArenaTransientState();
     setNpcCombat(null);
     await dispatchActionRef.current?.('KNIGHT_PVP_LEAVE_ROOM', {});
     setBusyAction('');
@@ -1231,14 +1707,26 @@ export default function KnightPvpArena({
     DEMON_KING_ROULETTE_SECTORS[Number(serverMatch?.demonSectorIdx) || 0] ||
     DEMON_KING_ROULETTE_SECTORS[0];
 
+  const thunderLimitMsDisplay =
+    typeof window !== 'undefined' && Number(window.__PVP_THUNDER_TIMEOUT_MS__) >= 1000
+      ? Number(window.__PVP_THUNDER_TIMEOUT_MS__)
+      : KNIGHT_PVP_QUESTION_TIMEOUT_MS;
+  const thunderRemMs =
+    isCombatInteractive && questionDeadlineMs > 0
+      ? Math.max(0, questionDeadlineMs - nowTickMs)
+      : thunderLimitMsDisplay;
+  const thunderRemSec = Math.ceil(thunderRemMs / 1000);
+  const thunderPct = Math.max(0, Math.min(100, (thunderRemMs / thunderLimitMsDisplay) * 100));
+
   // ==========================================
   // VIEW 1: ACTIVE / FINISHED DUEL VIEW (WITH HERO-VS-HERO CANVAS!)
   // ==========================================
   if (serverMatch && (serverMatch.status === 'PLAYING' || serverMatch.status === 'FINISHED')) {
-    const isFinished = serverMatch.status === 'FINISHED';
+    const showFinishedSummary = serverMatch.status === 'FINISHED' && !slowMoKo;
     const didIWin = serverMatch.winnerSlot === mySlotKey;
     const myReward = serverMatch.rewards?.[mySlotKey] || null;
     const activeStageMeta = ROUND_STAGE_META[effectiveCombatStyle] || ROUND_STAGE_META[1];
+    const inputsDisabled = isMeFrozen || !isCombatInteractive;
 
     const mcqChoices =
       activeQuestion && (effectiveCombatStyle === 1 || effectiveCombatStyle === 3)
@@ -1285,7 +1773,7 @@ export default function KnightPvpArena({
             >
               {myRoundsWon} – {oppRoundsWon}
             </div>
-            {!isFinished && (
+            {!showFinishedSummary && (
               <button
                 type="button"
                 onClick={handleLeaveRoomOrMatch}
@@ -1297,8 +1785,8 @@ export default function KnightPvpArena({
           </div>
         </div>
 
-        {/* 60FPS HERO VS HERO BATTLEFIELD CANVAS (JUST LIKE SOLO STAGES 1->4!) */}
-        {!isFinished && (
+        {/* 60FPS HERO VS HERO BATTLEFIELD CANVAS */}
+        {!showFinishedSummary && (
           <div className="vip-pvp-card relative rounded-2xl overflow-hidden border border-zinc-800 bg-[#090d16] shadow-lg">
             <canvas
               ref={battleCanvasRef}
@@ -1325,15 +1813,46 @@ export default function KnightPvpArena({
               </div>
             </div>
 
-            {/* VS Intro Splash */}
-            {isShowingVsSplash && (
-              <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-4 text-center space-y-1.5">
-                <p className="text-xs font-black uppercase tracking-widest text-amber-400">
-                  QUYẾT ĐẤU KHỞI TRANH
+            {/* CINEMATIC SLOW-MOTION KO BANNER (Pointer-events-none so Bullet-Time Canvas shines!) */}
+            {slowMoKo && (
+              <div
+                data-testid="knight-pvp-slowmo-ko"
+                className="pointer-events-none absolute inset-x-0 top-6 z-20 flex flex-col items-center justify-center text-center px-4"
+              >
+                <span
+                  className={`px-4 py-1.5 rounded-full border-2 text-xs sm:text-sm font-black uppercase tracking-widest shadow-[0_0_30px_rgba(251,191,36,0.65)] ${
+                    slowMoKo.winner === 'me'
+                      ? 'bg-zinc-950/90 border-amber-400 text-amber-300'
+                      : 'bg-zinc-950/90 border-rose-500 text-rose-300'
+                  }`}
+                >
+                  {slowMoKo.bannerText} • SLOW MOTION
+                </span>
+              </div>
+            )}
+
+            {/* PRE-ROUND 3 -> 2 -> 1 -> CHIẾN! READY COUNTDOWN OVERLAY */}
+            {countdownStep && !slowMoKo && (
+              <div
+                data-testid="knight-pvp-countdown-overlay"
+                className="absolute inset-0 bg-zinc-950/70 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center p-4 text-center space-y-2"
+              >
+                <span className="px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/60 text-amber-300 text-[11px] font-black uppercase tracking-widest">
+                  {effectiveRound === 5 ? 'VÒNG QUYẾT ĐỊNH — CHUẨN BỊ SẴN SÀNG' : `VÒNG ${effectiveRound} — CHUẨN BỊ SẴN SÀNG`}
+                </span>
+                <p className="text-xs sm:text-sm font-extrabold text-zinc-200">
+                  {myFighterObj.name || username} <span className="text-amber-400 px-1.5">VS</span> {oppFighterObj?.name}
                 </p>
-                <h3 className="text-xl sm:text-2xl font-black text-white">
-                  {myFighterObj.name || username} <span className="text-amber-400 px-2">VS</span> {oppFighterObj?.name}
-                </h3>
+                <div
+                  data-testid="knight-pvp-countdown-number"
+                  className={`font-black tracking-tight drop-shadow-[0_0_28px_rgba(251,191,36,0.85)] ${
+                    countdownStep === 'CHIẾN!'
+                      ? 'text-4xl sm:text-5xl text-emerald-300 scale-110'
+                      : 'text-5xl sm:text-6xl text-amber-300 tabular-nums'
+                  } transition-transform`}
+                >
+                  {countdownStep === 'CHIẾN!' ? '⚔️ CHIẾN!' : countdownStep}
+                </div>
               </div>
             )}
           </div>
@@ -1403,7 +1922,7 @@ export default function KnightPvpArena({
         )}
 
         {/* POST-MATCH SUMMARY OR SHARED QUESTION PANEL */}
-        {isFinished ? (
+        {showFinishedSummary ? (
           <div
             data-testid="knight-pvp-result-panel"
             className="vip-pvp-card rounded-3xl bg-white dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 p-6 text-center space-y-4 shadow-md"
@@ -1471,6 +1990,42 @@ export default function KnightPvpArena({
         ) : (
           activeQuestion && (
             <div className="vip-pvp-card relative rounded-2xl bg-white dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 p-4 space-y-3 shadow-sm">
+              {/* 10-Second Divine Punishment ("Thiên Phạt Sấm Sét") Countdown Bar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                    Câu #{effectiveQIdx + 1} • {serverMatch.topicLabel}
+                  </span>
+                  <span
+                    data-testid="knight-pvp-thunder-timer"
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black tabular-nums border ${
+                      !isCombatInteractive
+                        ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-500'
+                        : thunderRemSec <= 3
+                        ? 'bg-rose-600 text-white border-rose-400 animate-pulse'
+                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/50'
+                    }`}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>
+                      {isCombatInteractive
+                        ? `Thiên Phạt Sấm Sét: ${thunderRemSec}s`
+                        : 'Đang chuẩn bị...'}
+                    </span>
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                  <div
+                    style={{ width: `${isCombatInteractive ? thunderPct : 100}%` }}
+                    className={`h-full transition-all duration-100 ${
+                      thunderRemSec <= 3
+                        ? 'bg-gradient-to-r from-rose-600 to-amber-400'
+                        : 'bg-gradient-to-r from-cyan-400 via-amber-400 to-amber-500'
+                    }`}
+                  />
+                </div>
+              </div>
+
               {isMeFrozen && (
                 <div
                   data-testid="knight-pvp-freeze-banner"
@@ -1482,15 +2037,6 @@ export default function KnightPvpArena({
                   </span>
                 </div>
               )}
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                  Câu #{effectiveQIdx + 1}
-                </span>
-                <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">
-                  {serverMatch.topicLabel}
-                </span>
-              </div>
 
               {(effectiveCombatStyle === 1 || effectiveCombatStyle === 3) && (
                 <div className="space-y-2.5">
@@ -1507,12 +2053,12 @@ export default function KnightPvpArena({
                       <button
                         key={`${choiceText}-${idx}`}
                         type="button"
-                        disabled={isMeFrozen}
+                        disabled={inputsDisabled}
                         data-testid={`knight-pvp-choice-${idx}`}
                         data-choice-value={choiceText}
                         onClick={() => handleSelectChoice(choiceText)}
                         className={`p-3 rounded-xl border text-left flex items-center gap-3 transition ${
-                          isMeFrozen
+                          inputsDisabled
                             ? 'opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-800'
                             : 'bg-zinc-50 hover:bg-amber-50 dark:bg-zinc-900 dark:hover:bg-amber-500/15 border-zinc-200 dark:border-zinc-700 hover:border-amber-400'
                         }`}
@@ -1574,7 +2120,7 @@ export default function KnightPvpArena({
                       <button
                         key={letter}
                         type="button"
-                        disabled={isMeFrozen}
+                        disabled={inputsDisabled}
                         data-testid={`knight-pvp-key-${letter}`}
                         onClick={() => handleRound2Letter(letter)}
                         className="w-8 h-9 rounded-lg bg-zinc-100 hover:bg-amber-400 hover:text-zinc-950 disabled:opacity-45 dark:bg-zinc-800 dark:hover:bg-amber-400 dark:hover:text-zinc-950 text-xs font-mono font-black text-zinc-900 dark:text-white transition"
@@ -1604,16 +2150,22 @@ export default function KnightPvpArena({
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      disabled={isMeFrozen}
+                      disabled={inputsDisabled}
                       data-testid="knight-pvp-round4-input"
                       value={round4Input}
                       onChange={e => setRound4Input(e.target.value)}
-                      placeholder={isMeFrozen ? 'Đang đóng băng 5s...' : 'Nhập cụm từ còn thiếu...'}
+                      placeholder={
+                        isMeFrozen
+                          ? 'Đang đóng băng 5s...'
+                          : !isCombatInteractive
+                          ? 'Đang đếm ngược chuẩn bị...'
+                          : 'Nhập cụm từ còn thiếu...'
+                      }
                       className="flex-1 px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-white focus:outline-none focus:border-amber-500"
                     />
                     <button
                       type="submit"
-                      disabled={isMeFrozen || !round4Input.trim()}
+                      disabled={inputsDisabled || !round4Input.trim()}
                       data-testid="knight-pvp-round4-submit"
                       className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-45 text-zinc-950 font-black text-sm transition shrink-0"
                     >
@@ -1706,7 +2258,7 @@ export default function KnightPvpArena({
               Ghép Trận 1 vs 1
             </h3>
 
-            {/* Concise 3-Chip Rule Summary */}
+            {/* Concise 4-Chip Rule Summary */}
             <div className="flex flex-wrap gap-2 text-xs font-bold">
               <span className="px-3 py-1.5 rounded-xl bg-white/10 text-zinc-200">
                 ⚔️ 4 Vòng • 3 ❤️ / vòng
@@ -1716,6 +2268,9 @@ export default function KnightPvpArena({
               </span>
               <span className="px-3 py-1.5 rounded-xl bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
                 ❄️ Sai: Đóng băng 5s
+              </span>
+              <span className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-400/30">
+                🌩️ Quá 10s: Thiên phạt -1 ❤️ cả 2
               </span>
             </div>
           </div>

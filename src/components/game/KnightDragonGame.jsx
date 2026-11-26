@@ -54,6 +54,12 @@ import {
 } from '../../utils/examHelpers';
 import { playSound, speakWord } from '../../utils/mediaHelpers';
 import { KNIGHT_BGM_TRACKS, knightRpgBgm } from '../../utils/knightRpgBgm';
+import {
+  AIEO_VIP_PRICE_VND,
+  formatVndCurrency,
+  hasGamePracticeAccess,
+  normalizePaymentConfig
+} from '../../constants/profileCustomization';
 
 function skipNonAlphaIndex(word, startIdx = 0) {
   const upper = String(word || '').toUpperCase();
@@ -118,6 +124,7 @@ const DEMON_STAGE_META = {
 };
 
 export default function KnightDragonGame({
+  canAccessKnightGame = false,
   currentUser,
   customVocabTopics = [],
   darkMode = false,
@@ -185,6 +192,34 @@ export default function KnightDragonGame({
     Math.floor(Number(currentUser?.gachaWishCredits) || 0),
     Math.floor(Number(liveServerUser?.gachaWishCredits) || 0)
   );
+  const hasKnightPass = Boolean(
+    isTeacherOrAdmin ||
+      canAccessKnightGame ||
+      hasGamePracticeAccess(liveServerUser) ||
+      hasGamePracticeAccess(currentUser)
+  );
+  const knightMonthlyPriceVnd =
+    normalizePaymentConfig(paymentConfig || {}).aieoVipPrice ?? AIEO_VIP_PRICE_VND;
+
+  const promptBuyKnightMonthlyPass = () => {
+    if (!currentUser?.username || currentUser?.isGuest) {
+      showToast?.(
+        `Vui lòng đăng nhập và đăng ký Thẻ Tháng (${formatVndCurrency(knightMonthlyPriceVnd)}/tháng) để chơi Hiệp Sĩ Diệt Rồng!`,
+        'error'
+      );
+      return;
+    }
+    showToast?.(
+      `Vui lòng đăng ký Thẻ Tháng (${formatVndCurrency(knightMonthlyPriceVnd)}/tháng) để chơi Hiệp Sĩ Diệt Rồng!`,
+      'info'
+    );
+    onOpenCheckoutModal?.({
+      itemType: 'aieo_vip',
+      itemId: '',
+      itemLabel: 'Thẻ Tháng Hiệp Sĩ Diệt Rồng (1 Tháng)',
+      itemPrice: knightMonthlyPriceVnd
+    });
+  };
   const liveStarterGiftClaimed = Boolean(
     currentUser?.starterFirstGameGiftClaimed ||
       liveServerUser?.starterFirstGameGiftClaimed ||
@@ -763,6 +798,10 @@ export default function KnightDragonGame({
   };
 
   const startKnightCampaign = (startRoundNum = 1, onlyOneRound = false) => {
+    if (!hasKnightPass) {
+      promptBuyKnightMonthlyPass();
+      return;
+    }
     clearAllTimers();
     const rawVocab = resolveSelectedRawVocab();
     const builtQueues = buildPracticeRoundQueues({
@@ -3304,6 +3343,33 @@ export default function KnightDragonGame({
 
             {/* Start Full 4-Stage Campaign + Admin/Teacher Per-Map Practice Controls */}
             <div className="space-y-3">
+              {!hasKnightPass && (
+                <div
+                  data-testid="knight-monthly-pass-gate"
+                  className="vip-pvp-card rounded-2xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-fuchsia-500/15 border-2 border-amber-400/70 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm"
+                >
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500 text-zinc-950 text-[11px] font-black uppercase">
+                      <Lock className="w-3 h-3" /> Yêu Cầu Thẻ Tháng {formatVndCurrency(knightMonthlyPriceVnd)}
+                    </div>
+                    <p className="text-sm font-black text-[#0F172B] dark:text-white">
+                      Mở khóa trọn gói Hiệp Sĩ Diệt Rồng &amp; Đấu Trường 1 vs 1 chỉ {formatVndCurrency(knightMonthlyPriceVnd)} / tháng
+                    </p>
+                    <p className="text-xs text-[#475569] dark:text-slate-300">
+                      Bao gồm vượt 4 Ải RPG, Song Đấu 1v1 Xếp Hạng, tích Vàng quay Gacha Meme và đặc quyền Hồ Sơ VIP.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="buy-knight-monthly-pass-btn"
+                    onClick={promptBuyKnightMonthlyPass}
+                    className="w-full sm:w-auto py-3 px-5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-rose-500 hover:opacity-95 text-zinc-950 font-black text-xs sm:text-sm shadow-lg shrink-0 transition"
+                  >
+                    👑 Mua Thẻ Tháng ({formatVndCurrency(knightMonthlyPriceVnd)})
+                  </button>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row gap-2.5">
                 <button
                   type="button"
@@ -3311,18 +3377,28 @@ export default function KnightDragonGame({
                   onClick={() => startKnightCampaign(1, false)}
                   className="flex-1 py-4 px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 hover:opacity-95 text-slate-950 font-black text-sm sm:text-base shadow-xl flex items-center justify-center gap-2 transition"
                 >
-                  <Swords className="w-5 h-5" />
-                  <span>XUẤT CHINH TỪ ẢI 1 ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG</span>
+                  {hasKnightPass ? <Swords className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
+                  <span>
+                    {hasKnightPass
+                      ? 'XUẤT CHINH TỪ ẢI 1 ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG'
+                      : `🔒 MỞ KHÓA XUẤT CHINH (THẺ THÁNG ${formatVndCurrency(knightMonthlyPriceVnd)})`}
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   data-testid="open-knight-pvp-btn"
-                  onClick={() => setHubSubPage('PVP')}
+                  onClick={() => {
+                    if (!hasKnightPass) {
+                      promptBuyKnightMonthlyPass();
+                      return;
+                    }
+                    setHubSubPage('PVP');
+                  }}
                   className="sm:w-auto py-4 px-5 rounded-2xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-amber-500 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition shrink-0"
                 >
-                  <Swords className="w-4 h-4" />
-                  <span>⚔️ ĐẤU TRƯỜNG 1 VS 1</span>
+                  {hasKnightPass ? <Swords className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                  <span>{hasKnightPass ? '⚔️ ĐẤU TRƯỜNG 1 VS 1' : '🔒 1 VS 1 (THẺ THÁNG)'}</span>
                 </button>
 
                 {isStrictAdmin && (

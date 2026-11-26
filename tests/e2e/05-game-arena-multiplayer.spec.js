@@ -5,6 +5,7 @@ import {
   ensureE2EBootstrap,
   mockExternalAndPaidApis,
   attachHealthGuards,
+  dismissOptionalPopups,
   loginViaUI,
   assertNoHorizontalOverflow
 } from './fixtures.js';
@@ -444,7 +445,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await page.getByTestId('gacha-std-pull-10-btn').click();
       await page.getByTestId('gacha-skip-cutscene-btn').click();
       const stdResText = await page.getByTestId('knight-gacha-results-view').textContent();
-      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden|GigaChad|Gấu Trúc|Đầm Lầy|Hamster|Bộ Trưởng|Chill Guy|Pedro|Maxwell|Khiêng Hòm|Uno Reverse|Sigma|Thánh Cười/i);
+      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden|GigaChad|Gấu Trúc|Đầm Lầy|Hamster|Bộ Trưởng|Chill Guy|Pedro|Xoay 3D Maxwell|Khiêng Hòm|Uno Reverse|Sigma|Thánh Cười/i);
       await page.getByTestId('gacha-close-results-btn').click();
     }
 
@@ -512,8 +513,11 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
   });
 
   test('Game Arena Space Shooter & Knight RPG render Top 1-3 podium row and vertical Top 4-10 list without horizontal overflow', async ({
-    page
+    page,
+    playwright,
+    baseURL
   }) => {
+    const adminApi = await playwright.request.newContext({ baseURL });
     const staleLastWeekTs = 1700000000000; // Older than Monday 00:00 of current week -> must be excluded (reset to 0)!
     const spaceEntries = [
       {
@@ -644,40 +648,89 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await expect(page.getByTestId('knight-lobby-leaderboard')).not.toContainText(/Tuần Cũ Đã Reset|99\.999/i);
     await assertNoHorizontalOverflow(page, 'KnightLeaderboard-Desktop');
 
-    // Verify Student received the +7 wishes granted by Admin earlier AND sees unclaimed Starter Gift (+10 wishes) before first game!
-    await expect(page.getByTestId('knight-hub-starter-gift-banner')).toBeVisible();
-    await page.getByTestId('open-knight-shop-btn').click();
-    const beforeGiftText = (await page.getByTestId('gacha-wishes-count').textContent()) || '';
-    const beforeGiftMatch = beforeGiftText.match(/(\d+)\s*Lượt/i);
-    const wishesBeforeFirstGame = beforeGiftMatch ? Number(beforeGiftMatch[1]) : 0;
-    expect(wishesBeforeFirstGame).toBeGreaterThanOrEqual(7);
-    await expect(page.getByTestId('gacha-tab-admin')).toHaveCount(0);
-    await page.getByTestId('close-knight-gacha-modal-btn').click();
+    try {
+      // Verify unpaid Student sees the 20.000đ Monthly Pass gate & cannot start Knight RPG without purchasing
+      await expect(page.getByTestId('knight-monthly-pass-gate')).toBeVisible();
+      await expect(page.getByTestId('knight-monthly-pass-gate')).toContainText(/20\.000/i);
+      await page.getByTestId('start-knight-campaign-btn').click();
+      await expect(page.getByTestId('knight-choice-1')).toHaveCount(0);
 
-    // Finish Student's VERY FIRST game run -> MUST unlock Starter Gift (+10 free wishes) strictly ONCE!
-    await page.getByTestId('start-knight-campaign-btn').click();
-    await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
-    await page.getByTestId('knight-choice-1').click();
-    await page.getByTestId('knight-choice-1').click();
-    await page.getByTestId('knight-choice-1').click();
-    await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
-    await page.getByTestId('knight-skip-revive-btn').click();
-    await expect(page.getByTestId('starter-gift-10-wishes-banner')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByTestId('knight-wishes-badge')).toContainText(`${wishesBeforeFirstGame + 10} Lượt`);
-    await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
-    await expect(page.getByTestId('knight-hub-starter-gift-banner')).toHaveCount(0);
+      // Admin activates the 20.000đ Monthly Pass (aieo_vip) for Student so Student can play & claim Starter Gift
+      const admLogin = await adminApi.post('/api/sync/auth/login', {
+        data: {
+          username: E2E_CREDENTIALS.admin.username,
+          password: E2E_CREDENTIALS.admin.password
+        }
+      });
+      expect(admLogin.status()).toBe(200);
+      const grantVip = await adminApi.post('/api/sync/action', {
+        data: {
+          type: 'TOGGLE_USER_SUBSCRIPTION',
+          payload: {
+            username: E2E_CREDENTIALS.student.username,
+            kind: 'aieo_vip',
+            active: true
+          }
+        }
+      });
+      expect(grantVip.status()).toBe(200);
 
-    // Finish a SECOND game run -> MUST NOT grant another +10 wishes!
-    await page.getByTestId('start-knight-campaign-btn').click();
-    await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
-    await page.getByTestId('knight-choice-1').click();
-    await page.getByTestId('knight-choice-1').click();
-    await page.getByTestId('knight-choice-1').click();
-    await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
-    await page.getByTestId('knight-skip-revive-btn').click();
-    await expect(page.getByTestId('starter-gift-10-wishes-banner')).toHaveCount(0);
-    await expect(page.getByTestId('knight-wishes-badge')).toContainText(`${wishesBeforeFirstGame + 10} Lượt`);
+      await page.reload();
+      await expect(page.getByTestId('arena-game-selection-hub')).toBeVisible({ timeout: 12_000 });
+      await dismissOptionalPopups(page);
+      await page.getByTestId('switch-to-knight-game-btn').click();
+      await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 8_000 });
+      await expect(page.getByTestId('knight-monthly-pass-gate')).toHaveCount(0);
 
-    healthGuard.assertHealthy('vertical-podium-leaderboard-desktop-mobile');
+      // Verify Student received the +7 wishes granted by Admin earlier AND sees unclaimed Starter Gift (+10 wishes) before first game!
+      await expect(page.getByTestId('knight-hub-starter-gift-banner')).toBeVisible();
+      await page.getByTestId('open-knight-shop-btn').click();
+      const beforeGiftText = (await page.getByTestId('gacha-wishes-count').textContent()) || '';
+      const beforeGiftMatch = beforeGiftText.match(/(\d+)\s*Lượt/i);
+      const wishesBeforeFirstGame = beforeGiftMatch ? Number(beforeGiftMatch[1]) : 0;
+      expect(wishesBeforeFirstGame).toBeGreaterThanOrEqual(7);
+      await expect(page.getByTestId('gacha-tab-admin')).toHaveCount(0);
+      await page.getByTestId('close-knight-gacha-modal-btn').click();
+
+      // Finish Student's VERY FIRST game run -> MUST unlock Starter Gift (+10 free wishes) strictly ONCE!
+      await page.getByTestId('start-knight-campaign-btn').click();
+      await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
+      await page.getByTestId('knight-choice-1').click();
+      await page.getByTestId('knight-choice-1').click();
+      await page.getByTestId('knight-choice-1').click();
+      await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId('knight-skip-revive-btn').click();
+      await expect(page.getByTestId('starter-gift-10-wishes-banner')).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByTestId('knight-wishes-badge')).toContainText(`${wishesBeforeFirstGame + 10} Lượt`);
+      await page.getByRole('button', { name: /Về Sảnh Hiệp Sĩ/i }).click();
+      await expect(page.getByTestId('knight-hub-starter-gift-banner')).toHaveCount(0);
+
+      // Finish a SECOND game run -> MUST NOT grant another +10 wishes!
+      await page.getByTestId('start-knight-campaign-btn').click();
+      await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
+      await page.getByTestId('knight-choice-1').click();
+      await page.getByTestId('knight-choice-1').click();
+      await page.getByTestId('knight-choice-1').click();
+      await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId('knight-skip-revive-btn').click();
+      await expect(page.getByTestId('starter-gift-10-wishes-banner')).toHaveCount(0);
+      await expect(page.getByTestId('knight-wishes-badge')).toContainText(`${wishesBeforeFirstGame + 10} Lượt`);
+
+      healthGuard.assertHealthy('vertical-podium-leaderboard-desktop-mobile');
+    } finally {
+      await adminApi
+        .post('/api/sync/action', {
+          data: {
+            type: 'TOGGLE_USER_SUBSCRIPTION',
+            payload: {
+              username: E2E_CREDENTIALS.student.username,
+              kind: 'aieo_vip',
+              active: false
+            }
+          }
+        })
+        .catch(() => {});
+      await adminApi.dispose();
+    }
   });
 });

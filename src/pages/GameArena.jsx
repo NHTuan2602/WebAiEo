@@ -294,6 +294,7 @@ export default function GameArena({
   if (arenaGameMode === 'knight_rpg') {
     return (
       <KnightDragonGame
+        canAccessKnightGame={canAccessPracticeGame}
         currentUser={currentUser}
         customVocabTopics={customVocabTopics}
         darkMode={darkMode}
@@ -863,7 +864,7 @@ export default function GameArena({
                     ⚔️ GAME 2 • NHẬP VAI DIỆT RỒNG (MỚI)
                   </span>
                   <span className="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-300 text-xs font-extrabold">
-                    🐉 Boss Cuối Final Smash
+                    {canAccessPracticeGame ? '🐉 Boss Rồng & Đối Kháng 1v1' : `🔒 Thẻ Tháng ${aieoVipPriceLabel}`}
                   </span>
                 </div>
 

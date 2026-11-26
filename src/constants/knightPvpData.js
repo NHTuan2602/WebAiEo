@@ -8,6 +8,9 @@ import { KNIGHT_CHARACTER_SKINS } from './knightRpgData.js';
 
 export const KNIGHT_PVP_LIVES_PER_ROUND = 3;
 export const KNIGHT_PVP_FREEZE_MS = 5000;
+export const KNIGHT_PVP_QUESTION_TIMEOUT_MS = 10000; // 10s không ai trả lời -> Thiên Phạt Sấm Sét -1 ❤️ cả 2!
+export const KNIGHT_PVP_COUNTDOWN_STEP_MS = 720; // Đếm ngược 3 - 2 - 1 trước mỗi vòng
+export const KNIGHT_PVP_SLOWMO_KO_MS = 1600; // Hiệu ứng Slow-Motion khi kết liễu kẻ thù mỗi vòng
 export const KNIGHT_PVP_TOTAL_ROUNDS = 4;
 export const KNIGHT_PVP_READY_CHECK_SEC = 10;
 
