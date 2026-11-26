@@ -43,10 +43,55 @@ export const KNIGHT_BGM_TRACKS = {
     harmonyGain: 0.045,
     bassGain: 0.068,
     percussion: 'celestial',
-    // Dreamy F Lydian / Starlight Celesta progression inside Gacha Banner Modal
+    // Dreamy F Lydian / Starlight Celesta progression inside Gacha Page
     lead: ['C5', 'E5', 'G5', 'B5', 'C6', 'B5', 'G5', 'E5', 'A4', 'C5', 'E5', 'G5', 'Fs5', 'G5', 'B5', 'D6'],
     harmony: ['E4', null, 'B4', null, 'E5', null, 'B4', null, 'C4', null, 'G4', null, 'D4', null, 'Fs4', null],
     bass: ['F3', null, 'C3', null, 'F3', null, 'C3', null, 'D3', null, 'A2', null, 'G3', null, 'D3', null]
+  },
+  roster: {
+    label: 'Sảnh Nhân Vật',
+    bpm: 104,
+    leadWave: 'triangle',
+    harmonyWave: 'sine',
+    bassWave: 'sine',
+    leadGain: 0.086,
+    harmonyGain: 0.048,
+    bassGain: 0.072,
+    percussion: 'showcase',
+    // Proud, stylish E Major / Lydian hero gallery theme
+    lead: ['E5', 'Gs5', 'B5', 'Fs5', 'Gs5', 'E5', 'Cs5', 'B4', 'A4', 'Cs5', 'E5', 'Gs5', 'Fs5', 'E5', 'Eb5', 'B4'],
+    harmony: ['Gs4', null, 'E5', null, 'B4', null, 'Gs4', null, 'E4', null, 'A4', null, 'B4', null, 'Fs4', null],
+    bass: ['E3', null, 'B2', null, 'Cs3', null, 'Gs2', null, 'A2', null, 'E3', null, 'B2', null, 'B2', null]
+  },
+  pvp_lobby: {
+    label: 'Đấu Trường 1 vs 1',
+    bpm: 122,
+    leadWave: 'sawtooth',
+    harmonyWave: 'triangle',
+    bassWave: 'square',
+    leadGain: 0.058,
+    harmonyGain: 0.042,
+    bassGain: 0.068,
+    percussion: 'duel_drums',
+    // Gladiator war-room D Phrygian Dominant tension ostinato
+    lead: ['D4', 'A4', 'Bb4', 'A4', 'Fs4', 'G4', 'A4', null, 'D4', 'A4', 'C5', 'Bb4', 'A4', 'G4', 'Fs4', null],
+    harmony: ['A3', null, 'D4', null, 'D4', null, 'Fs4', null, 'A3', null, 'Eb4', null, 'D4', null, 'A3', null],
+    bass: ['D3', 'D3', null, 'A2', 'Bb2', null, 'A2', 'D3', 'D3', 'D3', null, 'G2', 'Bb2', null, 'A2', null]
+  },
+  pvp_battle: {
+    label: 'Quyết Đấu 1 vs 1',
+    bpm: 158,
+    leadWave: 'sawtooth',
+    harmonyWave: 'square',
+    bassWave: 'sawtooth',
+    leadGain: 0.072,
+    harmonyGain: 0.036,
+    bassGain: 0.074,
+    percussion: 'duel_intense',
+    // High-adrenaline E Minor / Phrygian duel battle theme
+    lead: ['E5', 'E5', 'G5', 'A5', 'B5', 'A5', 'G5', 'Fs5', 'E5', 'B5', 'C6', 'B5', 'A5', 'G5', 'Fs5', 'Eb5'],
+    harmony: ['B4', null, 'E5', null, 'G5', null, 'E5', null, 'G4', null, 'E5', null, 'Fs4', null, 'B4', null],
+    bass: ['E3', 'E3', 'B2', 'E3', 'C3', 'C3', 'G2', 'C3', 'A2', 'A2', 'E3', 'A2', 'B2', 'B2', 'Eb3', 'B2']
   },
   stage1: {
     label: 'Ải 1: Rừng Slime',
@@ -306,6 +351,15 @@ class KnightRpgBgmController {
 
       if (activeTrack.percussion === 'celestial') {
         if (idx % 4 === 0) this.playTickHat(0.015);
+      } else if (activeTrack.percussion === 'showcase') {
+        if (idx % 8 === 0) this.playKick(0.065);
+        if (idx % 4 === 2) this.playTickHat(0.018);
+      } else if (activeTrack.percussion === 'duel_drums') {
+        if (idx % 4 === 0 || idx % 8 === 3) this.playKick(0.125);
+        if (idx % 2 === 1) this.playTickHat(0.026);
+      } else if (activeTrack.percussion === 'duel_intense') {
+        if (idx % 2 === 0) this.playKick(0.145);
+        if (idx % 2 === 1) this.playTickHat(0.036);
       } else if (activeTrack.percussion === 'light') {
         if (idx % 4 === 0) this.playKick(0.08);
         if (idx % 2 === 1) this.playTickHat(0.018);

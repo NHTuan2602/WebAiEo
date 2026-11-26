@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <radialGradient id="coffinGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fde047" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#ca8a04" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="80" cy="82" r="68" fill="url(#coffinGlow)"/>
+  <!-- Musical Notes -->
+  <text x="24" y="54" font-size="22" fill="#fde047" font-weight="bold">♪</text>
+  <text x="124" y="48" font-size="24" fill="#38bdf8" font-weight="bold">♫</text>
+  <!-- Sharp Formal Suit + Gold Epaulettes -->
+  <path d="M40 144 L48 92 L112 92 L120 144 Z" fill="#18181b" stroke="#fde047" stroke-width="2.5"/>
+  <polygon points="68,92 80,122 92,92" fill="#f8fafc"/>
+  <polygon points="77,96 83,96 82,120 78,120" fill="#dc2626"/>
+  <rect x="42" y="88" width="18" height="8" rx="4" fill="#fbbf24"/>
+  <rect x="100" y="88" width="18" height="8" rx="4" fill="#fbbf24"/>
+  <!-- Head -->
+  <ellipse cx="80" cy="68" rx="22" ry="24" fill="#78350f" stroke="#18181b" stroke-width="2.5"/>
+  <!-- Iconic Tall Hat with Gold Trim -->
+  <rect x="48" y="44" width="64" height="7" rx="3.5" fill="#18181b" stroke="#fbbf24" stroke-width="2"/>
+  <rect x="58" y="22" width="44" height="24" rx="4" fill="#18181b" stroke="#fbbf24" stroke-width="2"/>
+  <rect x="58" y="38" width="44" height="5" fill="#fbbf24"/>
+  <!-- Iconic Cool Black Sunglasses & Grin -->
+  <rect x="59" y="58" width="19" height="11" rx="3" fill="#09090b" stroke="#fde047" stroke-width="1.8"/>
+  <rect x="82" y="58" width="19" height="11" rx="3" fill="#09090b" stroke="#fde047" stroke-width="1.8"/>
+  <line x1="78" y1="62" x2="82" y2="62" stroke="#fde047" stroke-width="2"/>
+  <path d="M70 78 Q80 86 90 78 Z" fill="#ffffff"/>
+</svg>

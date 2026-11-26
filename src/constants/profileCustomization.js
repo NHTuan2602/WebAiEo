@@ -1176,11 +1176,11 @@ export const STUDENT_TITLES = [
   },
   {
     id: 'pvp_demon_roulette',
-    label: 'Định Mệnh Ma Vương 2-2',
+    label: 'Định Mệnh Sinh Tử 2-2',
     icon: '🎡',
     tier: 'Đối Kháng 1v1',
     difficulty: 'Khó',
-    conditionText: 'Chiến thắng Vòng Chung Kết Ma Vương sau khi hòa 2-2 và quay Vòng Quay Định Mệnh ở Ghép Trận 1v1.',
+    conditionText: 'Chiến thắng Vòng Quyết Định sau khi hòa 2-2 và xoay Vòng Quay Định Mệnh ở Ghép Trận 1v1.',
     badgeClass: 'bg-fuchsia-50 text-fuchsia-900 border-fuchsia-400 dark:bg-fuchsia-500/25 dark:text-fuchsia-100 dark:border-fuchsia-400/65',
     heroBadgeClass: 'bg-fuchsia-600/40 text-fuchsia-100 border-fuchsia-300/80',
     gameBadgeClass: 'bg-fuchsia-100 text-fuchsia-950 border-fuchsia-400 dark:bg-fuchsia-500/30 dark:text-fuchsia-100 dark:border-fuchsia-400/65',

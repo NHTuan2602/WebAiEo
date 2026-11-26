@@ -1,10 +1,10 @@
 // ==========================================
-// KNIGHT & DRAGON 1v1 PVP ARENA ("ĐẤU TRƯỜNG SONG ĐẤU 1V1")
-// Ranked Matchmaking (Scaling 4★ -> 5★ -> Limited 5★ NPCs + Real Player Queue),
-// Casual 1v1 Friend Rooms (For-Fun Only), 5s Wrong-Answer Freeze, & 2-2 Demon King Wheel
+// KNIGHT & DRAGON 1v1 PVP ARENA ("ĐẤU TRƯỜNG 1 VS 1")
+// Stealth Ranked Matchmaking Opponents (Zero NPC labels),
+// Casual 1v1 Friend Rooms, 5s Wrong-Answer Freeze, & 2-2 Mysterious Entity Wheel
 // ==========================================
 
-import { KNIGHT_CHARACTER_SKINS, KNIGHT_GACHA_WEAPONS } from './knightRpgData.js';
+import { KNIGHT_CHARACTER_SKINS } from './knightRpgData.js';
 
 export const KNIGHT_PVP_LIVES_PER_ROUND = 3;
 export const KNIGHT_PVP_FREEZE_MS = 5000;
@@ -84,143 +84,143 @@ export function getKnightPvpRankTier(rp = 0) {
   return KNIGHT_PVP_RANK_TIERS[0];
 }
 
-// NPC opponents scale progressively with player's RP: faster reaction, higher accuracy, and 5★ / Limited 5★ Meme Heroes!
+// Stealth scaling opponents: realistic student/player names, ZERO "NPC" clues anywhere!
 export const KNIGHT_PVP_NPCS = [
   {
-    id: 'npc_goose_rookie',
-    name: 'NPC Ngỗng Tập Chém',
+    id: 'duel_minh_khoi',
+    name: 'Minh Khôi',
     tierId: 'rookie',
     minRp: 0,
-    rpDisplay: 80,
+    rpDisplay: 85,
     skinId: 'knight_arthur',
-    weaponId: 'wp3_harbinger_dawn',
-    titleLabel: '🛡️ Tân Binh Nhập Môn',
+    weaponId: '',
+    titleLabel: '🛡️ Tân Binh Đấu Trường',
     minDelayMs: 6200,
-    maxDelayMs: 9600,
+    maxDelayMs: 9500,
     accuracy: 0.60,
     typingCps: 1.9
   },
   {
-    id: 'npc_banana_cry',
-    name: 'NPC Mèo Chuối Run Tay',
+    id: 'duel_bao_ngoc',
+    name: 'Bảo Ngọc',
     tierId: 'rookie',
     minRp: 0,
     rpDisplay: 145,
     skinId: 'crying_banana_cat',
-    weaponId: 'wp3_skyrider_sword',
-    titleLabel: '🍌 Khóc Nhưng Vẫn Đánh',
+    weaponId: '',
+    titleLabel: '🛡️ Tân Binh Đấu Trường',
     minDelayMs: 5600,
-    maxDelayMs: 8800,
+    maxDelayMs: 8700,
     accuracy: 0.64,
     typingCps: 2.2
   },
   {
-    id: 'npc_bonk_patrol',
-    name: 'NPC Đội Trưởng Cheems Bonk',
+    id: 'duel_hoang_nam',
+    name: 'Hoàng Nam',
     tierId: 'fighter',
     minRp: 200,
     rpDisplay: 290,
     skinId: 'cheems_bonk',
-    weaponId: 'wp4_bonk_club',
-    titleLabel: '⚔️ Đấu Sĩ Gõ Đầu',
+    weaponId: '',
+    titleLabel: '⚔️ Đấu Sĩ Tinh Anh',
     minDelayMs: 4500,
-    maxDelayMs: 7200,
+    maxDelayMs: 7100,
     accuracy: 0.72,
     typingCps: 2.9
   },
   {
-    id: 'npc_stonks_trader',
-    name: 'NPC Cá Mập Từ Vựng Stonks',
+    id: 'duel_phuong_thao',
+    name: 'Phương Thảo',
     tierId: 'fighter',
     minRp: 200,
     rpDisplay: 395,
     skinId: 'stonks_meme_man',
-    weaponId: 'wp4_stonks_spear',
-    titleLabel: '📈 Đấu Sĩ Bắt Đáy',
+    weaponId: '',
+    titleLabel: '⚔️ Đấu Sĩ Tinh Anh',
     minDelayMs: 4100,
-    maxDelayMs: 6700,
+    maxDelayMs: 6600,
     accuracy: 0.76,
     typingCps: 3.2
   },
   {
-    id: 'npc_pepe_sage',
-    name: 'NPC Pháp Sư Pepe 5★',
+    id: 'duel_gia_huy',
+    name: 'Gia Huy',
     tierId: 'master',
     minRp: 450,
     rpDisplay: 560,
     skinId: 'pepe_wizard',
-    weaponId: 'wp4_widsith_codex',
-    titleLabel: '🔥 Cao Thủ 5★ Thường',
+    weaponId: '',
+    titleLabel: '🔥 Cao Thủ Song Đấu',
     minDelayMs: 3300,
     maxDelayMs: 5400,
     accuracy: 0.82,
     typingCps: 3.9
   },
   {
-    id: 'npc_swole_doge',
-    name: 'NPC Chiến Thần Shiba 8 Múi',
+    id: 'duel_khanh_linh',
+    name: 'Khánh Linh',
     tierId: 'master',
     minRp: 450,
     rpDisplay: 710,
     skinId: 'buff_doge_titan',
-    weaponId: 'wp4_skyward_claymore',
-    titleLabel: '💪 Cao Thủ Cơ Bắp 5★',
+    weaponId: '',
+    titleLabel: '🔥 Cao Thủ Song Đấu',
     minDelayMs: 3000,
     maxDelayMs: 4900,
     accuracy: 0.85,
     typingCps: 4.3
   },
   {
-    id: 'npc_swamp_lord',
-    name: 'NPC Chúa Tể Đầm Lầy (Giới Hạn)',
+    id: 'duel_tuan_kiet',
+    name: 'Tuấn Kiệt',
     tierId: 'grandmaster',
     minRp: 800,
     rpDisplay: 940,
-    skinId: 'shrek_swamp_king',
-    weaponId: 'wp4_serpent_spine',
-    titleLabel: '👑 Đại Cao Thủ 5★ Giới Hạn',
+    skinId: 'capybara_chill_minister',
+    weaponId: '',
+    titleLabel: '👑 Đại Cao Thủ 1v1',
     minDelayMs: 2400,
     maxDelayMs: 4100,
     accuracy: 0.89,
     typingCps: 5.0
   },
   {
-    id: 'npc_kevin_dragon',
-    name: 'NPC Rồng Ba Đầu Kevin (Giới Hạn)',
+    id: 'duel_thao_vy',
+    name: 'Thảo Vy',
     tierId: 'grandmaster',
     minRp: 800,
     rpDisplay: 1110,
-    skinId: 'dragon_empress',
-    weaponId: 'wp4_skyward_claymore',
-    titleLabel: '🐉 Đại Cao Thủ Long Tộc',
+    skinId: 'pedro_spinning_raccoon',
+    weaponId: '',
+    titleLabel: '👑 Đại Cao Thủ 1v1',
     minDelayMs: 2200,
     maxDelayMs: 3800,
     accuracy: 0.91,
     typingCps: 5.4
   },
   {
-    id: 'npc_gigachad_apex',
-    name: 'NPC Đại Đế GigaChad (5★ Giới Hạn)',
+    id: 'duel_quoc_anh',
+    name: 'Quốc Anh',
     tierId: 'overlord',
     minRp: 1200,
     rpDisplay: 1450,
     skinId: 'gigachad_knight',
-    weaponId: 'wp4_skyward_claymore',
-    titleLabel: '🗿 Bá Chủ Bất Bại 1v1',
+    weaponId: '',
+    titleLabel: '🐉 Bá Chủ Đối Kháng',
     minDelayMs: 1850,
     maxDelayMs: 3200,
     accuracy: 0.94,
     typingCps: 6.2
   },
   {
-    id: 'npc_galaxy_overlord',
-    name: 'NPC Não To Vũ Trụ IQ ∞ (5★ Giới Hạn)',
+    id: 'duel_hai_dang',
+    name: 'Hải Đăng',
     tierId: 'overlord',
     minRp: 1200,
     rpDisplay: 1680,
-    skinId: 'archmage_zephyr',
-    weaponId: 'wp4_astral_scepter',
-    titleLabel: '🌌 Thần Thoại Đấu Trường',
+    skinId: 'patrick_sigma_suit',
+    weaponId: '',
+    titleLabel: '🐉 Bá Chủ Đối Kháng',
     minDelayMs: 1750,
     maxDelayMs: 2950,
     accuracy: 0.95,
@@ -237,48 +237,47 @@ export function pickScaledNpcForRp(playerRp = 0, seedNum = Date.now()) {
   const skin =
     KNIGHT_CHARACTER_SKINS.find(s => s.id === chosen.skinId) ||
     KNIGHT_CHARACTER_SKINS[0];
-  const weapon = KNIGHT_GACHA_WEAPONS.find(w => w.id === chosen.weaponId) || null;
   return {
     ...chosen,
     isNpc: true,
     skin,
-    weapon,
+    weapon: null,
     tierMeta: getKnightPvpRankTier(chosen.rpDisplay)
   };
 }
 
-// 4-Sector Wheel of Fate spun by Demon King Malakor when tied 2 - 2 after Round 4!
+// 4-Sector Wheel of Fate spun by a Mysterious Entity when tied 2 - 2 after Round 4 (Zero Secret Boss Spoilers!)
 export const DEMON_KING_ROULETTE_SECTORS = [
   {
     id: 'sector_r1',
     roundType: 1,
-    shortLabel: 'Vòng 1: Khiên Nghĩa',
+    shortLabel: 'Khiên Nghĩa',
     title: 'Trắc Nghiệm Nghĩa Thần Tốc',
-    desc: 'Ai chọn đúng nghĩa tiếng Anh trước sẽ chém đối thủ -1 ❤️; chọn sai đóng băng 5 giây!',
+    desc: 'Chọn đúng nghĩa trước đối phương để chém -1 ❤️ • Sai đóng băng 5s',
     color: '#e11d48'
   },
   {
     id: 'sector_r2',
     roundType: 2,
-    shortLabel: 'Vòng 2: Phá Giáp',
-    title: 'Gõ Ký Tự Phá Giáp Tốc Độ',
-    desc: 'Đua gõ từng chữ cái hoàn thành từ vựng trước để chém -1 ❤️; gõ sai ký tự đóng băng 5 giây!',
+    shortLabel: 'Phá Giáp',
+    title: 'Gõ Ký Tự Tốc Độ',
+    desc: 'Gõ hoàn tất từ vựng trước để chém -1 ❤️ • Gõ sai đóng băng 5s',
     color: '#d97706'
   },
   {
     id: 'sector_r3',
     roundType: 3,
-    shortLabel: 'Vòng 3: Phản Xạ Từ',
-    title: 'Đồng Nghĩa & Trái Nghĩa Sinh Tử',
-    desc: 'Chọn nhanh từ đồng nghĩa / trái nghĩa chuẩn xác để đoạt mạng đối phương!',
+    shortLabel: 'Phản Xạ Từ',
+    title: 'Đồng Nghĩa & Trái Nghĩa',
+    desc: 'Chọn nhanh đáp án Đồng / Trái nghĩa chuẩn xác để đoạt mạng!',
     color: '#7c3aed'
   },
   {
     id: 'sector_r4',
     roundType: 4,
-    shortLabel: 'Vòng 4: Collocation',
-    title: 'Tuyệt Kỹ Cụm Từ Học Thuật',
-    desc: 'Gõ chính xác cụm Collocation để tung đòn kết liễu cuối cùng dưới sự chứng kiến của Ma Vương!',
+    shortLabel: 'Cụm Từ',
+    title: 'Điền Cụm Từ Học Thuật',
+    desc: 'Điền chuẩn cụm Collocation vào câu để tung đòn kết liễu cuối cùng!',
     color: '#0284c7'
   }
 ];

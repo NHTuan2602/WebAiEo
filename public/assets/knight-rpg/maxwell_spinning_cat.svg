@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <radialGradient id="maxGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#3b0764" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="80" cy="82" r="68" fill="url(#maxGlow)"/>
+  <!-- 3D Spin Orbit Ring -->
+  <ellipse cx="80" cy="96" rx="64" ry="18" fill="none" stroke="#38bdf8" stroke-width="3" stroke-dasharray="8 6"/>
+  <!-- Loaf Tuxedo Cat Body -->
+  <path d="M28 98 Q26 64 68 64 L112 66 Q136 68 134 98 Q134 114 108 114 L46 114 Q28 114 28 98 Z" fill="#18181b" stroke="#f8fafc" stroke-width="2.5"/>
+  <!-- White Chest Bib -->
+  <ellipse cx="54" cy="98" rx="16" ry="14" fill="#f8fafc"/>
+  <!-- Cat Head & Pointy Ears -->
+  <polygon points="36,68 32,42 52,56" fill="#18181b" stroke="#f8fafc" stroke-width="2"/>
+  <polygon points="72,66 80,40 60,54" fill="#18181b" stroke="#f8fafc" stroke-width="2"/>
+  <ellipse cx="55" cy="72" rx="22" ry="18" fill="#18181b"/>
+  <!-- Cute Red Bowtie -->
+  <polygon points="54,88 44,82 44,94" fill="#ef4444"/>
+  <polygon points="54,88 64,82 64,94" fill="#ef4444"/>
+  <circle cx="54" cy="88" r="3.5" fill="#fde047"/>
+  <!-- Big Golden Eyes & Whiskers -->
+  <circle cx="46" cy="70" r="4.5" fill="#fde047"/>
+  <circle cx="63" cy="70" r="4.5" fill="#fde047"/>
+  <circle cx="46" cy="70" r="2" fill="#09090b"/>
+  <circle cx="63" cy="70" r="2" fill="#09090b"/>
+  <polygon points="54,75 51,79 57,79" fill="#f472b6"/>
+  <line x1="22" y1="74" x2="36" y2="76" stroke="#f8fafc" stroke-width="1.8"/>
+  <line x1="22" y1="80" x2="36" y2="80" stroke="#f8fafc" stroke-width="1.8"/>
+  <!-- Tail -->
+  <path d="M132 92 Q148 76 140 60" fill="none" stroke="#18181b" stroke-width="9" stroke-linecap="round"/>
+</svg>

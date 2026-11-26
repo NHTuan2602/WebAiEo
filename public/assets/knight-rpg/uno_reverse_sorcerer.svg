@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <linearGradient id="unoCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <circle cx="80" cy="80" r="68" fill="#f59e0b" opacity="0.22"/>
+  <!-- Arcane Cape & Wizard Hat -->
+  <path d="M36 142 Q80 84 124 142 Z" fill="#4f46e5" stroke="#fde047" stroke-width="2.5"/>
+  <circle cx="64" cy="74" r="20" fill="#fde68a" stroke="#1e1b4b" stroke-width="2.5"/>
+  <polygon points="36,60 64,20 92,60" fill="#7c3aed" stroke="#fde047" stroke-width="2.5"/>
+  <ellipse cx="64" cy="60" rx="32" ry="7" fill="#6d28d9" stroke="#fde047" stroke-width="2"/>
+  <circle cx="58" cy="72" r="3" fill="#1e1b4b"/>
+  <circle cx="71" cy="72" r="3" fill="#1e1b4b"/>
+  <path d="M58 81 Q65 86 72 80" fill="none" stroke="#1e1b4b" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Giant Glowing Reverse Card Held Forward! -->
+  <g transform="translate(106,86) rotate(12)">
+    <rect x="-28" y="-42" width="56" height="84" rx="9" fill="url(#unoCard)" stroke="#ffffff" stroke-width="4"/>
+    <ellipse cx="0" cy="0" rx="20" ry="30" transform="rotate(24)" fill="#ffffff" opacity="0.92"/>
+    <path d="M-8,-10 L6,-10 L6,-16 L15,-6 L6,4 L6,-2 L-8,-2 Z" fill="#ef4444"/>
+    <path d="M8,10 L-6,10 L-6,16 L-15,6 L-6,-4 L-6,2 L8,2 Z" fill="#2563eb"/>
+  </g>
+</svg>

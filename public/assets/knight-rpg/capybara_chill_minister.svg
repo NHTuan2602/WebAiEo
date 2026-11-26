@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b45309"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </linearGradient>
+  </defs>
+  <circle cx="80" cy="84" r="70" fill="url(#aura)"/>
+  <!-- Hot spring steam -->
+  <path d="M36 58 Q30 44 38 34" fill="none" stroke="#e0f2fe" stroke-width="3.5" stroke-linecap="round" opacity="0.8"/>
+  <path d="M124 56 Q130 42 122 32" fill="none" stroke="#e0f2fe" stroke-width="3.5" stroke-linecap="round" opacity="0.8"/>
+  <!-- Bamboo Katana on back -->
+  <g transform="translate(112,86) rotate(28)">
+    <rect x="-4" y="-56" width="8" height="90" rx="4" fill="#84cc16" stroke="#365314" stroke-width="2.5"/>
+    <line x1="-4" y1="-32" x2="4" y2="-32" stroke="#365314" stroke-width="2"/>
+    <line x1="-4" y1="-8" x2="4" y2="-8" stroke="#365314" stroke-width="2"/>
+    <rect x="-11" y="14" width="22" height="5" rx="2" fill="#fbbf24"/>
+  </g>
+  <!-- Body in wooden tub / cape -->
+  <ellipse cx="80" cy="118" rx="44" ry="28" fill="url(#fur)" stroke="#451a03" stroke-width="3"/>
+  <path d="M40 124 Q80 142 120 124 L116 144 Q80 154 44 144 Z" fill="#0284c7" stroke="#0c4a6e" stroke-width="2.5"/>
+  <!-- Capybara Head -->
+  <rect x="46" y="54" width="68" height="54" rx="24" fill="#a16207" stroke="#451a03" stroke-width="3"/>
+  <rect x="74" y="68" width="44" height="34" rx="15" fill="#854d0e" stroke="#451a03" stroke-width="2.5"/>
+  <!-- Ears -->
+  <ellipse cx="56" cy="56" rx="8" ry="6" fill="#713f12" stroke="#451a03" stroke-width="2.5"/>
+  <ellipse cx="88" cy="54" rx="8" ry="6" fill="#713f12" stroke="#451a03" stroke-width="2.5"/>
+  <!-- Ultra chill half-closed eye -->
+  <line x1="62" y1="74" x2="76" y2="74" stroke="#1c1917" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="69" cy="75" r="2.2" fill="#1c1917"/>
+  <!-- Snout nostrils & zen smile -->
+  <ellipse cx="108" cy="78" rx="3.2" ry="2" fill="#292524"/>
+  <path d="M98 90 Q106 94 113 89" fill="none" stroke="#292524" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- Iconic Mandarin Orange on head! -->
+  <circle cx="72" cy="41" r="14" fill="#f97316" stroke="#9a3412" stroke-width="2.8"/>
+  <ellipse cx="78" cy="27" rx="7" ry="3.5" transform="rotate(-20 78 27)" fill="#22c55e" stroke="#14532d" stroke-width="2"/>
+  <circle cx="67" cy="37" r="3" fill="#fed7aa" opacity="0.7"/>
+</svg>

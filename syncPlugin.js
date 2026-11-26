@@ -982,9 +982,17 @@ function sanitizeUserForViewer(user, viewer) {
   safe.allTimeBestGameScore = Math.max(0, Math.floor(Number(user.allTimeBestGameScore) || 0));
   safe.hasAllTimeGamePerfectRun = Boolean(user.hasAllTimeGamePerfectRun);
   safe.knightPvpProfile = normalizeKnightPvpProfile(user.knightPvpProfile || {});
-  if (user.knightRpgProfile && typeof user.knightRpgProfile === 'object') {
+  const isTargetSuperAdminHeroUnlock = Boolean(
+    user.isSuperAdmin || user.username === SUPER_ADMIN_USERNAME
+  );
+  if (isTargetSuperAdminHeroUnlock || (user.knightRpgProfile && typeof user.knightRpgProfile === 'object')) {
+    const baseRpgObj =
+      user.knightRpgProfile && typeof user.knightRpgProfile === 'object' ? user.knightRpgProfile : {};
+    const effectiveRpgObj = isTargetSuperAdminHeroUnlock
+      ? { ...baseRpgObj, unlockedSkins: KNIGHT_CHARACTER_SKINS.map(s => s.id) }
+      : baseRpgObj;
     if (viewer && viewer.username === user.username) {
-      safe.knightRpgProfile = user.knightRpgProfile;
+      safe.knightRpgProfile = effectiveRpgObj;
     } else {
       safe.knightRpgProfile = {
         bestScore: Math.max(0, Math.floor(Number(user.knightRpgProfile.bestScore) || 0)),
@@ -996,9 +1004,9 @@ function sanitizeUserForViewer(user, viewer) {
         dragonsSlain: Math.max(0, Math.floor(Number(user.knightRpgProfile.dragonsSlain) || 0)),
         demonKingsSlain: Math.max(0, Math.floor(Number(user.knightRpgProfile.demonKingsSlain) || 0)),
         keysCollected: Math.max(0, Math.floor(Number(user.knightRpgProfile.keysCollected) || 0)),
-        unlockedSkins: Array.isArray(user.knightRpgProfile.unlockedSkins)
-          ? user.knightRpgProfile.unlockedSkins
-          : ['holy_paladin'],
+        unlockedSkins: Array.isArray(effectiveRpgObj.unlockedSkins)
+          ? effectiveRpgObj.unlockedSkins
+          : ['knight_arthur'],
         equippedSkin: String(user.knightRpgProfile.equippedSkin || 'holy_paladin'),
         equippedWeapon: String(user.knightRpgProfile.equippedWeapon || '')
       };
@@ -7231,7 +7239,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
               m.mode === 'casual_room'
                 ? 'Trận giao hữu giải trí hoàn tất (Không tính điểm BXH & Danh hiệu).'
                 : m.tiebreakerTriggered
-                ? 'Đoạt chiến thắng nghẹt thở ở Vòng Chung Kết Ma Vương (3 - 2)!'
+                ? 'Đoạt chiến thắng nghẹt thở ở Vòng Quyết Định (3 - 2)!'
                 : `Chiến thắng chung cuộc (${m[finalWinnerSlot].roundsWon} - ${m[finalLoserSlot].roundsWon})!`;
             if (m.mode === 'ranked_human') {
               m.rewards = {
@@ -7300,7 +7308,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       m.updatedAtMs = nowMs;
       m.finishReason = didWin
         ? tiebreakerTriggered
-          ? `Hạ gục ${m.p2.name} tại Vòng Quay Ma Vương (3 - 2)!`
+          ? `Chiến thắng ${m.p2.name} ở Vòng Quyết Định (3 - 2)!`
           : `Chiến thắng ${m.p2.name} (${p1Rounds} - ${p2Rounds})!`
         : `Thất bại trước ${m.p2.name} (${p1Rounds} - ${p2Rounds}).`;
       m.rewards = {

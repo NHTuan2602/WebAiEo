@@ -17,10 +17,12 @@ import {
   Sun,
   Swords,
   Trophy,
+  Users,
   Volume2,
   VolumeX
 } from 'lucide-react';
 import VerticalPodiumLeaderboard from '../common/VerticalPodiumLeaderboard';
+import KnightCharacterPage from './KnightCharacterPage';
 import KnightGachaModal from './KnightGachaModal';
 import KnightPvpArena from './KnightPvpArena';
 import {
@@ -158,13 +160,16 @@ export default function KnightDragonGame({
   const [rpgProfile, setRpgProfile] = useState(() =>
     loadLocalKnightRpgProfile(username, currentUser)
   );
-  const [showShopModal, setShowShopModal] = useState(() => Boolean(initialOpenShop));
-  const [showPvpArena, setShowPvpArena] = useState(false);
+  // Sub-page inside Knight RPG: 'MAIN' | 'PVP' | 'CHARACTERS' | 'GACHA' (full pages, NOT modal popups!)
+  const [hubSubPage, setHubSubPage] = useState(() => (initialOpenShop ? 'GACHA' : 'MAIN'));
+  const [gachaInitialTab, setGachaInitialTab] = useState('character_event');
+  const [isGachaCutsceneActive, setIsGachaCutsceneActive] = useState(false);
+  const [isPvpFighting, setIsPvpFighting] = useState(false);
   const [starterGiftJustUnlocked, setStarterGiftJustUnlocked] = useState(false);
 
   useEffect(() => {
     if (initialOpenShop) {
-      setShowShopModal(true);
+      setHubSubPage('GACHA');
       onConsumedInitialOpenShop?.();
     }
   }, [initialOpenShop, onConsumedInitialOpenShop]);
@@ -222,7 +227,7 @@ export default function KnightDragonGame({
   useEffect(() => {
     const st = knightPvpRealtime?.activeMatch?.status;
     if ((st === 'READY_CHECK' || st === 'PLAYING') && matchState === 'HUB') {
-      setShowPvpArena(true);
+      setHubSubPage('PVP');
     }
   }, [knightPvpRealtime?.activeMatch?.status, matchState]);
   const [round, setRound] = useState(1);
@@ -322,11 +327,20 @@ export default function KnightDragonGame({
     []
   );
 
-  // Per-stage + Gacha Banner procedural RPG Background Music (BGM) switcher
-  const activeBgmTrackId = showShopModal
-    ? 'gacha'
+  // Per-page & per-stage procedural RPG Background Music (BGM) switcher
+  // Immediately mutes BGM during Gacha Summon Cutscene!
+  const activeBgmTrackId = isGachaCutsceneActive
+    ? null
     : matchState === 'HUB'
-    ? 'hub'
+    ? hubSubPage === 'GACHA'
+      ? 'gacha'
+      : hubSubPage === 'CHARACTERS'
+      ? 'roster'
+      : hubSubPage === 'PVP'
+      ? isPvpFighting
+        ? 'pvp_battle'
+        : 'pvp_lobby'
+      : 'hub'
     : matchState === 'DEMON_WARNING'
     ? 'demon_warning'
     : matchState === 'DEMON_WHEEL' || (round === 5 && matchState === 'PLAYING')
@@ -2880,20 +2894,9 @@ export default function KnightDragonGame({
       data-testid="knight-dragon-game-root"
       className="min-h-[100dvh] w-full bg-[#F8FAFC] dark:bg-[#090D16] text-[#0F172B] dark:text-white flex flex-col select-none relative overflow-x-hidden transition-colors duration-200"
     >
-      {/* Top Bar */}
-      <header className="shrink-0 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 flex-wrap z-30">
+      {/* Redesigned Sleek RPG Command Bar */}
+      <header className="shrink-0 bg-white/95 dark:bg-[#11131A]/95 border-b border-zinc-200 dark:border-zinc-800 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2.5 flex-wrap z-30">
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              clearAllTimers();
-              onExitArena?.();
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
-          >
-            <ChevronLeft className="w-4 h-4" /> Thoát Đấu Trường
-          </button>
-
           {onBackToGameHub && (
             <button
               type="button"
@@ -2902,9 +2905,10 @@ export default function KnightDragonGame({
                 clearAllTimers();
                 onBackToGameHub();
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/30 border border-indigo-200 dark:border-indigo-400/40 text-xs font-extrabold text-indigo-700 dark:text-indigo-200 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-extrabold text-zinc-800 dark:text-zinc-100 transition"
             >
-              <span>🎮 Chọn Game Đấu Trường</span>
+              <ChevronLeft className="w-4 h-4" />
+              <span>Đổi Game</span>
             </button>
           )}
 
@@ -2915,27 +2919,97 @@ export default function KnightDragonGame({
               clearAllTimers();
               onBackToSpaceMode?.();
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDFFFD] hover:bg-[#D5FBF7] dark:bg-cyan-500/15 dark:hover:bg-cyan-500/25 border border-[#B5F5F1] dark:border-cyan-500/40 text-xs font-extrabold text-[#007A7A] dark:text-cyan-300 transition"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-cyan-50 dark:bg-zinc-800/80 dark:hover:bg-cyan-950/40 text-xs font-bold text-zinc-700 dark:text-cyan-300 transition"
           >
-            <span>🚀 Đổi sang Game Phi Thuyền Vũ Trụ</span>
+            <span>🚀 Phi Thuyền</span>
           </button>
 
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 text-white text-xs font-black shadow-sm">
-            <Swords className="w-3.5 h-3.5" /> HIỆP SĨ DIỆT RỒNG (RPG QUEST)
-          </span>
+          <button
+            type="button"
+            onClick={() => {
+              if (matchState === 'HUB') setHubSubPage('MAIN');
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 text-white text-xs font-black shadow-xs transition"
+          >
+            <Swords className="w-3.5 h-3.5" />
+            <span>Hiệp Sĩ Diệt Rồng</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {setDarkMode && (
+          {/* Unified Economy Capsule */}
+          <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-black tabular-nums">
+            <span data-testid="knight-gold-badge" className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-300">
+              <Coins className="w-3.5 h-3.5 text-amber-500" />
+              <span>{Number(rpgProfile.gold || 0).toLocaleString('vi-VN')} Vàng</span>
+            </span>
+            <span className="text-zinc-300 dark:text-zinc-700">|</span>
+            <span data-testid="knight-keys-badge" className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-300" title="Chìa Khóa Hồi Sinh">
+              <KeyRound className="w-3.5 h-3.5 text-sky-500" />
+              <span>{rpgProfile.keys || 0}</span>
+            </span>
+            <span className="text-zinc-300 dark:text-zinc-700">|</span>
+            <span data-testid="knight-wishes-badge" className="text-fuchsia-700 dark:text-fuchsia-300" title="Lượt Quay Gacha">
+              🌠 {rpgProfile.wishes || 0} Lượt
+            </span>
+          </div>
+
+          {/* Dedicated Page 1: NHÂN VẬT */}
+          <button
+            type="button"
+            data-testid="open-knight-characters-btn"
+            onClick={() => {
+              if (matchState !== 'HUB') {
+                clearAllTimers();
+                setMatchState('HUB');
+                runtimeRef.current.matchState = 'HUB';
+              }
+              setHubSubPage('CHARACTERS');
+            }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition ${
+              matchState === 'HUB' && hubSubPage === 'CHARACTERS'
+                ? 'bg-violet-600 text-white border-violet-400 shadow-sm'
+                : 'bg-zinc-100 hover:bg-violet-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-100'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-violet-500 dark:text-violet-300" />
+            <span>
+              Nhân Vật ({isStrictAdmin ? KNIGHT_CHARACTER_SKINS.length : rpgProfile.unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})
+            </span>
+          </button>
+
+          {/* Dedicated Page 2: VÒNG QUAY GACHA */}
+          <button
+            type="button"
+            data-testid="open-knight-shop-btn"
+            onClick={() => {
+              if (matchState !== 'HUB') {
+                clearAllTimers();
+                setMatchState('HUB');
+                runtimeRef.current.matchState = 'HUB';
+              }
+              setGachaInitialTab('character_event');
+              setHubSubPage('GACHA');
+            }}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition shadow-xs ${
+              matchState === 'HUB' && hubSubPage === 'GACHA'
+                ? 'bg-amber-400 text-zinc-950 ring-2 ring-amber-200'
+                : 'bg-gradient-to-r from-amber-500 to-rose-600 hover:opacity-95 text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Gacha</span>
+          </button>
+
+          {isTeacherOrAdmin && onOpenVocabManager && (
             <button
               type="button"
-              data-testid="knight-theme-toggle-btn"
-              onClick={() => setDarkMode(d => !d)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-slate-200 shadow-xs transition"
-              title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+              data-testid="knight-open-vocab-manager-btn"
+              onClick={() => onOpenVocabManager(resolveSelectedRawVocab())}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition"
             >
-              {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-[#007A7A]" />}
-              <span>{darkMode ? 'Sáng' : 'Tối'}</span>
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Bộ Đề</span>
             </button>
           )}
 
@@ -2943,12 +3017,12 @@ export default function KnightDragonGame({
             type="button"
             data-testid="knight-bgm-toggle-btn"
             onClick={handleToggleBgm}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-extrabold transition ${
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-extrabold transition ${
               bgmMuted
-                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                : 'bg-violet-50 hover:bg-violet-100 dark:bg-violet-500/20 dark:hover:bg-violet-500/30 border-violet-300 dark:border-violet-400/50 text-violet-700 dark:text-violet-200'
+                ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-500'
+                : 'bg-violet-50 dark:bg-violet-500/15 border-violet-300 dark:border-violet-400/40 text-violet-700 dark:text-violet-200'
             }`}
-            title={bgmMuted ? 'Bật nhạc nền theo từng màn' : 'Tắt nhạc nền'}
+            title={bgmMuted ? 'Bật nhạc nền' : 'Tắt nhạc nền'}
           >
             {bgmMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Music className="w-3.5 h-3.5" />}
             <span>
@@ -2958,57 +3032,33 @@ export default function KnightDragonGame({
             </span>
           </button>
 
-          {isTeacherOrAdmin && onOpenVocabManager && (
+          {setDarkMode && (
             <button
               type="button"
-              data-testid="knight-open-vocab-manager-btn"
-              onClick={() => onOpenVocabManager(resolveSelectedRawVocab())}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/50 text-white text-xs font-extrabold shadow-sm transition"
+              data-testid="knight-theme-toggle-btn"
+              onClick={() => setDarkMode(d => !d)}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 transition"
+              title={darkMode ? 'Chế độ Sáng' : 'Chế độ Tối'}
             >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Quản Lý Bộ Đề / Ra Đề (GV)</span>
+              {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-zinc-700" />}
             </button>
           )}
 
-          <div
-            data-testid="knight-gold-badge"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-400/40 text-amber-800 dark:text-amber-300 text-xs font-black"
-          >
-            <Coins className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-            <span>{Number(rpgProfile.gold || 0).toLocaleString('vi-VN')} Vàng</span>
-          </div>
-
-          <div
-            data-testid="knight-keys-badge"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-sky-500/15 border border-sky-300 dark:border-sky-400/40 text-sky-800 dark:text-sky-300 text-xs font-black"
-            title="Chìa Khóa Hồi Sinh"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
-            <span>{rpgProfile.keys || 0} 🗝️ Chìa Khóa</span>
-          </div>
-
-          <div
-            data-testid="knight-wishes-badge"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-fuchsia-50 dark:bg-fuchsia-500/15 border border-fuchsia-300 dark:border-fuchsia-400/40 text-fuchsia-800 dark:text-fuchsia-200 text-xs font-black"
-            title="Lượt Quay Gacha"
-          >
-            <span>🌠 {rpgProfile.wishes || 0} Lượt</span>
-          </div>
-
           <button
             type="button"
-            data-testid="open-knight-shop-btn"
-            onClick={() => setShowShopModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-pink-600 to-violet-600 hover:opacity-95 text-white text-xs font-extrabold shadow-sm transition"
+            onClick={() => {
+              clearAllTimers();
+              onExitArena?.();
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-rose-100 dark:bg-zinc-800 dark:hover:bg-rose-950/50 text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:text-rose-600 transition"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Gacha &amp; Tủ Đồ ({rpgProfile.unlockedSkins.length}/{KNIGHT_CHARACTER_SKINS.length})</span>
+            Thoát
           </button>
         </div>
       </header>
 
-      {/* 1 VS 1 PVP ARENA SCREEN */}
-      {matchState === 'HUB' && showPvpArena && (
+      {/* PAGE 1: 1 VS 1 PVP ARENA */}
+      {matchState === 'HUB' && hubSubPage === 'PVP' && (
         <KnightPvpArena
           bgmMuted={bgmMuted}
           currentUser={currentUser}
@@ -3017,7 +3067,8 @@ export default function KnightDragonGame({
           isStrictAdmin={isStrictAdmin}
           knightPvpLeaderboard={knightPvpLeaderboard}
           knightPvpRealtime={knightPvpRealtime}
-          onBackToKnightHub={() => setShowPvpArena(false)}
+          onBackToKnightHub={() => setHubSubPage('MAIN')}
+          onPvpCombatStateChange={setIsPvpFighting}
           onRewardGoldSynced={goldAdded => {
             updateAndPersistProfile(prev => ({
               ...prev,
@@ -3029,7 +3080,7 @@ export default function KnightDragonGame({
           showToast={showToast}
           topicId={topicId}
           topicOptions={[
-            { id: 'core', title: '🎯 IELTS Core Academic (Mặc định)' },
+            { id: 'core', title: '🎯 IELTS Core Academic' },
             ...Object.entries(VOCAB_PRESETS || {}).map(([k, preset]) => ({
               id: k,
               title: `📚 ${preset.label}`
@@ -3043,8 +3094,52 @@ export default function KnightDragonGame({
         />
       )}
 
-      {/* HUB SCREEN */}
-      {matchState === 'HUB' && !showPvpArena && (
+      {/* PAGE 2: DEDICATED CHARACTER ROSTER PAGE */}
+      {matchState === 'HUB' && hubSubPage === 'CHARACTERS' && (
+        <KnightCharacterPage
+          bgmMuted={bgmMuted}
+          isStrictAdmin={isStrictAdmin}
+          onBackToHub={() => setHubSubPage('MAIN')}
+          onEquipSkin={handleEquipSkin}
+          onOpenGachaTab={tabName => {
+            setGachaInitialTab(tabName || 'character_event');
+            setHubSubPage('GACHA');
+          }}
+          onToggleBgm={handleToggleBgm}
+          rpgProfile={rpgProfile}
+          showToast={showToast}
+        />
+      )}
+
+      {/* PAGE 3: DEDICATED FULL-PAGE MEME GACHA SHRINE */}
+      {matchState === 'HUB' && hubSubPage === 'GACHA' && (
+        <KnightGachaModal
+          isOpen
+          initialTab={gachaInitialTab}
+          isStrictAdmin={isStrictAdmin}
+          bgmMuted={bgmMuted}
+          onToggleBgm={handleToggleBgm}
+          onCutsceneActiveChange={setIsGachaCutsceneActive}
+          onOpenCharactersPage={() => setHubSubPage('CHARACTERS')}
+          knightGachaConfig={knightGachaConfig}
+          usersDb={usersDb}
+          currentUsername={username}
+          rpgProfile={rpgProfile}
+          paymentConfig={paymentConfig}
+          onClose={() => setHubSubPage('MAIN')}
+          onExecutePull={handleExecuteGachaPull}
+          onAdminResetHeroes={handleAdminResetHeroes}
+          onAdminGrantGachaWishes={onAdminGrantGachaWishes}
+          onAdminSetGachaBannerConfig={onAdminSetGachaBannerConfig}
+          onExchangeGoldForWishes={handleExchangeGoldForWishes}
+          onBuyReviveKeyWithGold={handleBuyReviveKeyWithGold}
+          onOpenWishQrCheckout={handleOpenWishQrCheckout}
+          showToast={showToast}
+        />
+      )}
+
+      {/* PAGE 4: MAIN SOLO CAMPAIGN HUB */}
+      {matchState === 'HUB' && hubSubPage === 'MAIN' && (
         <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-5">
           <div className="rounded-3xl border border-rose-200 dark:border-rose-500/35 bg-gradient-to-br from-white via-[#FFF5F7] to-[#FEFCE8]/70 dark:from-slate-900 dark:via-[#1a1025] dark:to-slate-900 p-5 sm:p-7 shadow-xl dark:shadow-2xl space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
@@ -3075,12 +3170,12 @@ export default function KnightDragonGame({
                 )}
               </div>
 
-              {/* Active Hero Showcase Card */}
+              {/* Active Hero Showcase Card (Clean, Zero Weapons) */}
               <div className="shrink-0 rounded-2xl border border-pink-300 dark:border-pink-500/40 bg-white/95 dark:bg-slate-950/90 p-3 flex items-center gap-3.5 shadow-md dark:shadow-lg">
                 <div
                   className="w-20 h-20 rounded-2xl flex items-center justify-center border-2 p-1 shadow-inner relative overflow-hidden shrink-0"
                   style={{
-                    background: `radial-gradient(circle at 50% 45%, ${(activeWeapon?.bladeColor || activeSkin.bladeColor)}33, #090d16 80%)`,
+                    background: `radial-gradient(circle at 50% 45%, ${activeSkin.bladeColor}33, #090d16 80%)`,
                     borderColor: activeSkin.armorSecondary
                   }}
                 >
@@ -3089,36 +3184,37 @@ export default function KnightDragonGame({
                     alt={activeSkin.name}
                     className="w-full h-full object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.75)]"
                   />
-                  {activeWeapon && (
-                    <img
-                      src={activeWeapon.iconUrl}
-                      alt={activeWeapon.name}
-                      title={`Vũ khí cầm tay: ${activeWeapon.name}`}
-                      className="absolute bottom-1 right-1 w-7 h-7 rounded-lg border border-amber-300 bg-slate-950/90 object-contain shadow"
-                    />
-                  )}
                 </div>
                 <div className="min-w-0 max-w-[215px]">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-black text-[#0F172B] dark:text-white truncate">{activeSkin.name}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-[10px] font-extrabold shrink-0">
+                    <span className="px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-extrabold shrink-0">
                       {activeSkin.starRarity || 4}★
                     </span>
                   </div>
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300 font-bold mt-0.5 truncate">
-                    {activeWeapon ? `🗡️ ${activeWeapon.name} (Trang trí)` : activeSkin.weaponName}
-                  </p>
-                  <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-snug line-clamp-2">
+                  <p className="text-xs text-[#475569] dark:text-slate-400 leading-snug line-clamp-2 mt-1">
                     {activeSkin.passiveText}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowShopModal(true)}
-                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:opacity-95 text-white text-xs font-extrabold transition shrink-0"
-                >
-                  🌠 Gacha
-                </button>
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setHubSubPage('CHARACTERS')}
+                    className="px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-extrabold transition"
+                  >
+                    Nhân Vật
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGachaInitialTab('character_event');
+                      setHubSubPage('GACHA');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:opacity-95 text-white text-xs font-extrabold transition"
+                  >
+                    🌠 Gacha
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -3222,11 +3318,11 @@ export default function KnightDragonGame({
                 <button
                   type="button"
                   data-testid="open-knight-pvp-btn"
-                  onClick={() => setShowPvpArena(true)}
+                  onClick={() => setHubSubPage('PVP')}
                   className="sm:w-auto py-4 px-5 rounded-2xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-amber-500 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition shrink-0"
                 >
                   <Swords className="w-4 h-4" />
-                  <span>⚔️ ĐỐI KHÁNG 1 VS 1 (GHÉP TRẬN &amp; PHÒNG)</span>
+                  <span>⚔️ ĐẤU TRƯỜNG 1 VS 1</span>
                 </button>
 
                 {isStrictAdmin && (
@@ -4129,10 +4225,15 @@ export default function KnightDragonGame({
               </button>
               <button
                 type="button"
-                onClick={() => setShowShopModal(true)}
+                onClick={() => {
+                  clearAllTimers();
+                  setMatchState('HUB');
+                  runtimeRef.current.matchState = 'HUB';
+                  setHubSubPage('GACHA');
+                }}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-pink-600 hover:opacity-95 text-white text-xs font-black flex items-center gap-1.5"
               >
-                <Sparkles className="w-4 h-4" /> Vòng Quay Gacha &amp; Tủ Đồ
+                <Sparkles className="w-4 h-4" /> Vòng Quay Gacha
               </button>
               <button
                 type="button"
@@ -4140,6 +4241,7 @@ export default function KnightDragonGame({
                   clearAllTimers();
                   setMatchState('HUB');
                   runtimeRef.current.matchState = 'HUB';
+                  setHubSubPage('MAIN');
                 }}
                 className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 text-xs font-bold"
               >
@@ -4149,30 +4251,6 @@ export default function KnightDragonGame({
           </div>
         </div>
       )}
-
-      {/* GACHA & INVENTORY MODAL */}
-      <KnightGachaModal
-        isOpen={showShopModal}
-        isStrictAdmin={isStrictAdmin}
-        bgmMuted={bgmMuted}
-        onToggleBgm={handleToggleBgm}
-        knightGachaConfig={knightGachaConfig}
-        usersDb={usersDb}
-        currentUsername={username}
-        rpgProfile={rpgProfile}
-        paymentConfig={paymentConfig}
-        onClose={() => setShowShopModal(false)}
-        onExecutePull={handleExecuteGachaPull}
-        onAdminResetHeroes={handleAdminResetHeroes}
-        onAdminGrantGachaWishes={onAdminGrantGachaWishes}
-        onAdminSetGachaBannerConfig={onAdminSetGachaBannerConfig}
-        onEquipSkin={handleEquipSkin}
-        onEquipHeroWeapon={handleEquipHeroWeapon}
-        onExchangeGoldForWishes={handleExchangeGoldForWishes}
-        onBuyReviveKeyWithGold={handleBuyReviveKeyWithGold}
-        onOpenWishQrCheckout={handleOpenWishQrCheckout}
-        showToast={showToast}
-      />
     </div>
   );
 }

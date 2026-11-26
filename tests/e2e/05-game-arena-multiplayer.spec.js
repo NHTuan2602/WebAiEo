@@ -283,7 +283,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await expect(page.getByTestId('knight-gacha-results-view')).toBeVisible();
     await page.getByTestId('gacha-close-results-btn').click();
 
-    // 2) Pull 1x on Standard Banner forced Whiff -> skip -> verify Tạch Gacha + Pull 10x Standard -> verify ≥ 4★!
+    // 2) Pull 1x on Standard Banner forced Whiff (3★) -> skip -> verify Tạch Gacha (+500 Vàng) + Pull 10x Standard -> verify ≥ 4★!
     await page.getByTestId('gacha-tab-standard').click();
     await page.evaluate(() => {
       window.__FORCE_GACHA_RARITY__ = 'whiff';
@@ -292,6 +292,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await expect(page.getByTestId('knight-gacha-cutscene')).toHaveAttribute('data-rarity', 'neutral');
     await page.getByTestId('gacha-skip-cutscene-btn').click();
     await expect(page.getByTestId('knight-gacha-results-view')).toContainText(/Tạch Gacha/i);
+    await expect(page.getByTestId('knight-gacha-results-view')).toContainText(/\+500/i);
     await page.getByTestId('gacha-close-results-btn').click();
 
     await page.evaluate(() => {
@@ -443,7 +444,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await page.getByTestId('gacha-std-pull-10-btn').click();
       await page.getByTestId('gacha-skip-cutscene-btn').click();
       const stdResText = await page.getByTestId('knight-gacha-results-view').textContent();
-      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden|GigaChad|Gấu Trúc|Đầm Lầy|Hamster/i);
+      expect(stdResText).not.toMatch(/Ignis|Drake|Zephyr|Celestia|Raiden|GigaChad|Gấu Trúc|Đầm Lầy|Hamster|Bộ Trưởng|Chill Guy|Pedro|Maxwell|Khiêng Hòm|Uno Reverse|Sigma|Thánh Cười/i);
       await page.getByTestId('gacha-close-results-btn').click();
     }
 

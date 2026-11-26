@@ -60,7 +60,7 @@ test.describe('8. Admin/Teacher UI Polish, Titles System & Knight 1v1 PvP Arena'
       await expect(page.getByText('Chiến Binh Khởi Đầu 1v1')).toBeVisible();
       await expect(page.getByText('Bậc Thầy Đóng Băng 1v1')).toBeVisible();
       await expect(page.getByText('Cao Thủ Song Đấu 1v1')).toBeVisible();
-      await expect(page.getByText('Định Mệnh Ma Vương 2-2')).toBeVisible();
+      await expect(page.getByText('Định Mệnh Sinh Tử 2-2')).toBeVisible();
       await expect(page.getByText('Độc Cô Cầu Bại 1v1')).toBeVisible();
 
       const memeFilterBtn = page.getByRole('button', { name: /Game & Meme RPG/i }).first();
@@ -73,20 +73,50 @@ test.describe('8. Admin/Teacher UI Polish, Titles System & Knight 1v1 PvP Arena'
       await page.locator('.apple-backdrop-enter').first().click({ position: { x: 8, y: 8 } });
       await expect(page.getByText('Nhà Sưu Tập Meme')).toHaveCount(0);
 
-      // 3. Navigate to Game Arena -> Hiệp Sĩ Diệt Rồng -> 1 vs 1 Arena
+      // 3. Navigate to Game Arena -> Hiệp Sĩ Diệt Rồng -> Verify Redesigned HUD, Admin 41/41 Auto-Unlock, Dedicated Character Page & Full-Page Meme Gacha!
       await page.locator('header').getByRole('tab', { name: /Đấu Trường/i }).first().click();
       await expect(page.getByTestId('arena-game-selection-hub')).toBeVisible({ timeout: 12_000 });
       await page.getByTestId('switch-to-knight-game-btn').click();
       await expect(page.getByTestId('knight-dragon-game-root')).toBeVisible({ timeout: 10_000 });
 
+      // Admin MUST automatically have all 41/41 heroes unlocked forever
+      await expect(page.getByTestId('open-knight-characters-btn')).toContainText('41/41');
+      await page.getByTestId('open-knight-characters-btn').click();
+      await expect(page.getByTestId('knight-characters-page')).toBeVisible();
+      await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Sảnh Nhân Vật/i);
+      await expect(page.getByText('Bộ Trưởng Ngoại Giao Capybara Đội Quýt')).toBeVisible();
+      await expect(page.getByText('Gấu Mèo Pedro Xoay Vòng Disco')).toBeVisible();
+      await expect(page.getByText('Quý Ông Lạnh Lùng Nhíu Mày Sigma')).toBeVisible();
+
+      // Switch to Full-Page Meme Gacha -> verify zero weapon/footer clutter & 3★ Tạch Gacha +500 Vàng with BGM stopped during cutscene
+      await page.getByTestId('open-knight-shop-btn').click();
+      await expect(page.getByTestId('knight-skin-shop-modal')).toBeVisible();
+      const gachaPageTxt = (await page.getByTestId('knight-skin-shop-modal').textContent()) || '';
+      expect(gachaPageTxt).not.toContain('Vũ khí dùng trang trí theo Hệ');
+
+      await page.evaluate(() => {
+        window.__FORCE_GACHA_RARITY__ = 3;
+      });
+      await page.getByTestId('gacha-pull-1-btn').click();
+      await expect(page.getByTestId('knight-gacha-cutscene')).toBeVisible();
+      await page.getByTestId('gacha-skip-cutscene-btn').click();
+      await expect(page.getByTestId('knight-gacha-results-view')).toContainText(/Tạch Gacha/i);
+      await expect(page.getByTestId('knight-gacha-results-view')).toContainText(/\+500/i);
+      await page.getByTestId('gacha-close-results-btn').click();
+      await page.evaluate(() => {
+        delete window.__FORCE_GACHA_RARITY__;
+      });
+      await page.getByTestId('close-knight-gacha-modal-btn').click();
+
+      // 4. Open 1 vs 1 Arena -> Verify distinct PvP BGM, ZERO "NPC" clue, ZERO "Ma Vương" spoiler, & ZERO MOBA branding
       await page.getByTestId('open-knight-pvp-btn').click();
       await expect(page.getByTestId('knight-pvp-lobby')).toBeVisible({ timeout: 8_000 });
+      await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Đấu Trường 1 vs 1/i);
       await expect(page.getByTestId('knight-pvp-leaderboard')).toBeVisible();
       await assertNoHorizontalOverflow(page, 'KnightPvp-Lobby');
 
-      // Verify zero third-party MOBA copyright terms in 1v1 Lobby
-      const lobbyText = await page.getByTestId('knight-pvp-lobby').textContent();
-      expect(lobbyText).not.toMatch(/Liên Minh|Huyền Thoại|\bLoL\b|Hextech|Summoner|Riot/i);
+      const lobbyText = (await page.getByTestId('knight-pvp-lobby').textContent()) || '';
+      expect(lobbyText).not.toMatch(/Liên Minh|Huyền Thoại|\bLoL\b|Hextech|Summoner|Riot|\bNPC\b|Ma Vương|Malakor/i);
 
       // 4. Verify Casual 1v1 Room ("Chỉ để giải trí") creates 6-digit code & does not spawn NPC or award RP
       await page.getByTestId('knight-pvp-create-room-btn').click();
@@ -114,12 +144,19 @@ test.describe('8. Admin/Teacher UI Polish, Titles System & Knight 1v1 PvP Arena'
       await expect(page.getByTestId('knight-pvp-ready-modal')).toBeVisible({ timeout: 8_000 });
       await page.getByTestId('knight-pvp-accept-btn').click();
 
-      // Demon King Malakor's Wheel of Fate must appear on 2 - 2 tie
+      // Mysterious Entity's Wheel of Fate must appear on 2 - 2 tie WITHOUT spoiling Ma Vương!
       await expect(page.getByTestId('knight-pvp-demon-wheel')).toBeVisible({ timeout: 8_000 });
+      const wheelModalTxt = (await page.getByTestId('knight-pvp-demon-wheel').textContent()) || '';
+      expect(wheelModalTxt).toContain('Thực Thể Bí Ẩn');
+      expect(wheelModalTxt).not.toMatch(/Ma Vương|Malakor|\bNPC\b/i);
 
-      // Wait for wheel spin to finish (~2.2s) so combat begins
+      // Wait for wheel spin to finish (~2.2s) so Hero-vs-Hero Canvas combat begins
       await expect(page.getByTestId('knight-pvp-demon-wheel')).toHaveCount(0, { timeout: 8_000 });
       await expect(page.getByTestId('knight-pvp-round-score')).toContainText('2 – 2');
+      await expect(page.getByTestId('knight-bgm-toggle-btn')).toContainText(/Quyết Đấu 1 vs 1/i);
+      await expect(page.getByTestId('knight-pvp-battle-canvas')).toBeVisible();
+      const combatTxt = (await page.getByTestId('knight-pvp-combat-screen').textContent()) || '';
+      expect(combatTxt).not.toMatch(/\bNPC\b|Ma Vương|Malakor/i);
 
       // Fetch active match seed & demonRoundType from session state to verify deterministic shared queue
       const stateJson = await page.evaluate(async () => {

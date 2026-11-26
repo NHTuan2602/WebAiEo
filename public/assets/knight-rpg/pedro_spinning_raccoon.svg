@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <defs>
+    <radialGradient id="disco" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f472b6"/>
+      <stop offset="55%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </radialGradient>
+  </defs>
+  <!-- Iconic circular peephole disco frame -->
+  <circle cx="80" cy="80" r="68" fill="url(#disco)" stroke="#fde047" stroke-width="5"/>
+  <circle cx="80" cy="80" r="56" fill="none" stroke="#38bdf8" stroke-dasharray="10 8" stroke-width="3"/>
+  <!-- Sparkles -->
+  <polygon points="32,46 36,54 44,58 36,62 32,70 28,62 20,58 28,54" fill="#fde047"/>
+  <polygon points="128,42 131,49 138,52 131,55 128,62 125,55 118,52 125,49" fill="#67e8f9"/>
+  <!-- Raccoon Body & Raised Paws -->
+  <ellipse cx="80" cy="118" rx="34" ry="26" fill="#64748b" stroke="#0f172a" stroke-width="3"/>
+  <ellipse cx="44" cy="94" rx="11" ry="18" transform="rotate(-28 44 94)" fill="#475569" stroke="#0f172a" stroke-width="2.8"/>
+  <ellipse cx="116" cy="90" rx="11" ry="18" transform="rotate(28 116 90)" fill="#475569" stroke="#0f172a" stroke-width="2.8"/>
+  <!-- Raccoon Head & Bandit Mask -->
+  <polygon points="50,56 44,32 66,46" fill="#475569" stroke="#0f172a" stroke-width="2.8"/>
+  <polygon points="110,56 116,32 94,46" fill="#475569" stroke="#0f172a" stroke-width="2.8"/>
+  <ellipse cx="80" cy="74" rx="34" ry="28" fill="#94a3b8" stroke="#0f172a" stroke-width="3"/>
+  <ellipse cx="64" cy="72" rx="13" ry="9" fill="#1e293b"/>
+  <ellipse cx="96" cy="72" rx="13" ry="9" fill="#1e293b"/>
+  <circle cx="65" cy="71" r="5" fill="#ffffff"/>
+  <circle cx="95" cy="71" r="5" fill="#ffffff"/>
+  <circle cx="66" cy="71" r="2.5" fill="#0f172a"/>
+  <circle cx="94" cy="71" r="2.5" fill="#0f172a"/>
+  <ellipse cx="80" cy="84" rx="12" ry="9" fill="#f1f5f9"/>
+  <circle cx="80" cy="81" r="4.5" fill="#0f172a"/>
+  <path d="M73 89 Q80 96 87 89" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
