@@ -439,7 +439,7 @@ export default function KnightPvpArena({
         playPvpDramaticSfx('mystery_rift', bgmMuted);
         setTimeout(() => {
           setDemonWheelSpinning(false);
-          setDemonWheelRevealedForMatch(serverMatch.id);
+          setDemonWheelRevealedForMatch(`${serverMatch.id}:spin0`);
         }, 2200);
       }
 
@@ -457,6 +457,9 @@ export default function KnightPvpArena({
         totalThunderStrikes: 0,
         totalFreezes: 0,
         tiebreakerTriggered: startTie22,
+        tiebreakerSpinSeq: 0,
+        demonSectorIdx: Number(serverMatch?.demonSectorIdx) || 0,
+        demonRoundType: Number(serverMatch?.demonRoundType) || 1,
         roundEnding: false,
         roundBanner: '',
         npcNextActionAtMs: Date.now() + (startTie22 ? 7500 : 5500),
@@ -468,13 +471,27 @@ export default function KnightPvpArena({
     return undefined;
   }, [serverMatch?.id, serverMatch?.status, serverMatch?.mode]);
 
+  const effectiveTiebreakerSpinSeq =
+    serverMatch?.mode === 'ranked_npc' && npcCombat
+      ? Number(npcCombat.tiebreakerSpinSeq) || 0
+      : Number(serverMatch?.tiebreakerSpinSeq) || 0;
+  const effectiveDemonSectorIdx =
+    serverMatch?.mode === 'ranked_npc' && npcCombat && npcCombat.demonSectorIdx !== undefined
+      ? Number(npcCombat.demonSectorIdx) || 0
+      : Number(serverMatch?.demonSectorIdx) || 0;
+  const effectiveDemonRoundType =
+    serverMatch?.mode === 'ranked_npc' && npcCombat && npcCombat.demonRoundType !== undefined
+      ? Number(npcCombat.demonRoundType) || 1
+      : Number(serverMatch?.demonRoundType) || 1;
+  const activeWheelSpinKey = serverMatch ? `${serverMatch.id}:spin${effectiveTiebreakerSpinSeq}` : '';
+
   useEffect(() => {
     if (
       serverMatch &&
       serverMatch.mode !== 'ranked_npc' &&
       serverMatch.status === 'PLAYING' &&
       serverMatch.round === 5 &&
-      demonWheelRevealedForMatch !== serverMatch.id &&
+      demonWheelRevealedForMatch !== activeWheelSpinKey &&
       !demonWheelSpinning &&
       !slowMoKo
     ) {
@@ -482,7 +499,7 @@ export default function KnightPvpArena({
       playPvpDramaticSfx('mystery_rift', bgmMuted);
       const t = setTimeout(() => {
         setDemonWheelSpinning(false);
-        setDemonWheelRevealedForMatch(serverMatch.id);
+        setDemonWheelRevealedForMatch(activeWheelSpinKey);
       }, 2300);
       return () => clearTimeout(t);
     }
@@ -492,6 +509,7 @@ export default function KnightPvpArena({
     serverMatch?.mode,
     serverMatch?.status,
     serverMatch?.round,
+    activeWheelSpinKey,
     demonWheelRevealedForMatch,
     demonWheelSpinning,
     Boolean(slowMoKo),
@@ -511,7 +529,7 @@ export default function KnightPvpArena({
     : Number(serverMatch?.round) || 1;
   const effectiveCombatStyle =
     effectiveRound === 5
-      ? Number(serverMatch?.demonRoundType) || 1
+      ? effectiveDemonRoundType
       : Math.min(4, Math.max(1, effectiveRound));
 
   const effectiveQIdx = serverMatch?.mode === 'ranked_npc' && npcCombat
@@ -536,7 +554,7 @@ export default function KnightPvpArena({
     serverMatch?.status === 'PLAYING' &&
       effectiveRound === 5 &&
       !slowMoKo &&
-      demonWheelRevealedForMatch !== serverMatch?.id
+      demonWheelRevealedForMatch !== activeWheelSpinKey
   );
 
   // ==========================================
@@ -553,7 +571,7 @@ export default function KnightPvpArena({
     ) {
       return undefined;
     }
-    const roundKey = `${serverMatch.id}:r${effectiveRound}`;
+    const roundKey = `${serverMatch.id}:r${effectiveRound}:s${effectiveTiebreakerSpinSeq}`;
     if (countedRoundsRef.current === roundKey) return undefined;
     countedRoundsRef.current = roundKey;
 
@@ -603,6 +621,7 @@ export default function KnightPvpArena({
     serverMatch?.id,
     serverMatch?.status,
     effectiveRound,
+    effectiveTiebreakerSpinSeq,
     Boolean(slowMoKo),
     isShowingDemonWheelModal,
     npcCombat?.finished,
@@ -1250,8 +1269,12 @@ export default function KnightPvpArena({
     }
 
     if (prev.round === 5 && isDraw) {
-      const style5 = Number(serverMatch?.demonRoundType) || 1;
-      const pool5 = sharedQueues[style5] || sharedQueues[1] || [];
+      const prevSectorIdx = Number(prev.demonSectorIdx ?? serverMatch?.demonSectorIdx) || 0;
+      const nextSectorIdx =
+        (prevSectorIdx + 1 + Math.floor(Math.random() * 3)) % DEMON_KING_ROULETTE_SECTORS.length;
+      const nextSector = DEMON_KING_ROULETTE_SECTORS[nextSectorIdx] || DEMON_KING_ROULETTE_SECTORS[0];
+      const nextStyle5 = Number(nextSector.round) || 1;
+      const pool5 = sharedQueues[nextStyle5] || sharedQueues[1] || [];
       const nextQIdx = (prev.questionIdx || 0) + 1;
       return {
         nextState: {
@@ -1262,12 +1285,16 @@ export default function KnightPvpArena({
           p2Lives: KNIGHT_PVP_LIVES_PER_ROUND,
           p1FrozenUntilMs: 0,
           p2FrozenUntilMs: 0,
+          tiebreakerSpinSeq: (Number(prev.tiebreakerSpinSeq) || 0) + 1,
+          demonSectorIdx: nextSectorIdx,
+          demonRoundType: nextStyle5,
           roundEnding: false,
-          roundBanner: '⚡ Thiên Đạo hòa ở Vòng Quyết Định — Hồi 3 ❤️ đấu lại phân thắng bại!',
-          npcNextActionAtMs: Date.now() + 2600 + computeNextNpcDelayMs(npcSlotObj, style5, pool5[nextQIdx % Math.max(1, pool5.length)])
+          roundBanner: '👁️‍🗨️ Thiên Đạo hòa ở Vòng Quyết Định — Thực Thể Bí Ẩn xoay vòng quay thể thức mới!',
+          npcNextActionAtMs:
+            Date.now() + 5600 + computeNextNpcDelayMs(npcSlotObj, nextStyle5, pool5[nextQIdx % Math.max(1, pool5.length)])
         },
         shouldFinish: false,
-        triggerDemonWheel: false
+        triggerDemonWheel: true
       };
     }
 
@@ -1320,11 +1347,13 @@ export default function KnightPvpArena({
     if (slowMoTimerRef.current) clearTimeout(slowMoTimerRef.current);
     slowMoTimerRef.current = setTimeout(() => {
       if (trans.triggerDemonWheel) {
+        const nextSpinSeq = Number(trans.nextState?.tiebreakerSpinSeq) || 0;
+        const spinKey = `${serverMatch?.id || ''}:spin${nextSpinSeq}`;
         setDemonWheelSpinning(true);
         playPvpDramaticSfx('mystery_rift', bgmMuted);
         setTimeout(() => {
           setDemonWheelSpinning(false);
-          setDemonWheelRevealedForMatch(serverMatch?.id || '');
+          setDemonWheelRevealedForMatch(spinKey);
         }, 2200);
       }
       setSlowMoKo(null);
@@ -1735,7 +1764,7 @@ export default function KnightPvpArena({
   const oppAccepted = Boolean(serverMatch?.[oppSlotKey]?.accepted);
 
   const demonSectorMeta =
-    DEMON_KING_ROULETTE_SECTORS[Number(serverMatch?.demonSectorIdx) || 0] ||
+    DEMON_KING_ROULETTE_SECTORS[effectiveDemonSectorIdx] ||
     DEMON_KING_ROULETTE_SECTORS[0];
 
   const thunderLimitMsDisplay =
@@ -1917,8 +1946,8 @@ export default function KnightPvpArena({
                   style={{
                     transform: `rotate(${
                       demonWheelSpinning
-                        ? 1080 + (Number(serverMatch?.demonSectorIdx) || 0) * 90 + 45
-                        : (Number(serverMatch?.demonSectorIdx) || 0) * 90 + 45
+                        ? 1080 + effectiveDemonSectorIdx * 90 + 45
+                        : effectiveDemonSectorIdx * 90 + 45
                     }deg)`,
                     transition: demonWheelSpinning ? 'transform 2s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
                     background:
@@ -1942,7 +1971,7 @@ export default function KnightPvpArena({
                 <button
                   type="button"
                   data-testid="knight-pvp-enter-round5-btn"
-                  onClick={() => setDemonWheelRevealedForMatch(serverMatch.id)}
+                  onClick={() => setDemonWheelRevealedForMatch(activeWheelSpinKey)}
                   className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-fuchsia-600 to-amber-500 hover:opacity-95 text-white font-black text-sm shadow-lg transition"
                 >
                   ⚔️ BẮT ĐẦU VÒNG QUYẾT ĐỊNH

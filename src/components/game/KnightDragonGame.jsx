@@ -3380,7 +3380,7 @@ export default function KnightDragonGame({
                   {hasKnightPass ? <Swords className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
                   <span>
                     {hasKnightPass
-                      ? 'XUẤT CHINH TỪ ẢI 1 ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG'
+                      ? 'XUẤT CHINH (4 ẢI)'
                       : `🔒 MỞ KHÓA XUẤT CHINH (THẺ THÁNG ${formatVndCurrency(knightMonthlyPriceVnd)})`}
                   </span>
                 </button>
@@ -3834,7 +3834,9 @@ export default function KnightDragonGame({
               {(effectiveCombatRound === 1 || effectiveCombatRound === 3) && (() => {
                 const choices =
                   effectiveCombatRound === 1
-                    ? [activeQ.word, ...(activeQ.distractors || [])].slice(0, 4)
+                    ? (Array.isArray(activeQ.v1Choices) && activeQ.v1Choices.length > 0
+                        ? activeQ.v1Choices
+                        : [activeQ.word, ...(activeQ.distractors || [])].slice(0, 4))
                     : activeQ.v3Choices || [];
                 return (
                   <div className="space-y-3">

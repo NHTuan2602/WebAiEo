@@ -7229,13 +7229,18 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           m.roundReadyAtMs = nowMs + 6200;
           m.questionStartedAtMs = nowMs + 6200;
         } else if (m.round === 5 && isDrawRound) {
+          const prevSectorIdx = Number(m.demonSectorIdx) || 0;
+          const nextSectorIdx = (prevSectorIdx + 1 + Math.floor(Math.random() * 3)) % 4;
+          m.demonSectorIdx = nextSectorIdx;
+          m.demonRoundType = [1, 2, 3, 4][nextSectorIdx] || 1;
+          m.tiebreakerSpinSeq = (Number(m.tiebreakerSpinSeq) || 0) + 1;
           m.questionIdx += 1;
           m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
           m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
           m.p1.frozenUntilMs = 0;
           m.p2.frozenUntilMs = 0;
-          m.roundReadyAtMs = nowMs + 4000;
-          m.questionStartedAtMs = nowMs + 4000;
+          m.roundReadyAtMs = nowMs + 6200;
+          m.questionStartedAtMs = nowMs + 6200;
         } else {
           const finalWinnerSlot = m.p1.roundsWon >= m.p2.roundsWon ? 'p1' : 'p2';
           const finalLoserSlot = finalWinnerSlot === 'p1' ? 'p2' : 'p1';

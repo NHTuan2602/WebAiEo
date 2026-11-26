@@ -1432,7 +1432,13 @@ export function buildSeededRoundQueues(roomInput, pinKey = '', username = '', fa
   };
 
   return {
-    1: pickRoundSlice(1),
+    1: pickRoundSlice(1).map((item, idx) => ({
+      ...item,
+      v1Choices: shuffleArrayWithSeed(
+        [item.word, ...(item.distractors || []).slice(0, 3)],
+        `${seed}:v1c:${item.word}:${idx}`
+      )
+    })),
     2: pickRoundSlice(2),
     3: pickRoundSlice(3).map((item, idx) => decorateV3Question(item, idx, seed)),
     4: pickRoundSlice(4).map(item => decorateV4Question(item))
@@ -1461,7 +1467,13 @@ export function buildPracticeRoundQueues({ rawVocab = DEFAULT_VOCAB_TEXT, roundS
     return shuffled.slice(0, takeCount);
   };
   return {
-    1: pickRoundSlice(1),
+    1: pickRoundSlice(1).map((item, idx) => ({
+      ...item,
+      v1Choices: shuffleArrayWithSeed(
+        [item.word, ...(item.distractors || []).slice(0, 3)],
+        `${seed}:v1c:${item.word}:${idx}`
+      )
+    })),
     2: pickRoundSlice(2),
     3: pickRoundSlice(3).map((item, idx) => decorateV3Question(item, idx, seed)),
     4: pickRoundSlice(4).map(item => decorateV4Question(item))

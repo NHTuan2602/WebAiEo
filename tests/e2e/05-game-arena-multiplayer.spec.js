@@ -9,6 +9,8 @@ import {
   loginViaUI,
   assertNoHorizontalOverflow
 } from './fixtures.js';
+import { DEFAULT_VOCAB_TEXT } from '../../src/constants/seedData.js';
+import { parseRawVocabText } from '../../src/utils/examHelpers.js';
 
 test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () => {
   test.beforeAll(async ({ baseURL }) => {
@@ -692,12 +694,31 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       await expect(page.getByTestId('gacha-tab-admin')).toHaveCount(0);
       await page.getByTestId('close-knight-gacha-modal-btn').click();
 
+      const parsedBank = parseRawVocabText(DEFAULT_VOCAB_TEXT);
+      const clickWrongKnightStage1Choice = async () => {
+        const promptTxt =
+          (await page.getByTestId('knight-dragon-game-root').locator('p').filter({ hasText: /Nghĩa tiếng Việt:/i }).textContent()) || '';
+        const qMatch = promptTxt.match(/"([^"]+)"/);
+        const vnMeaning = qMatch ? qMatch[1].trim() : '';
+        const matchedItem = parsedBank.find(v => String(v.prompt || '').trim() === vnMeaning);
+        const rightWord = matchedItem ? String(matchedItem.word || '').trim().toLowerCase() : '';
+        for (let i = 0; i < 4; i += 1) {
+          const btn = page.getByTestId(`knight-choice-${i}`);
+          const txt = String((await btn.textContent()) || '').replace(/^[A-D]/, '').trim().toLowerCase();
+          if (txt && txt !== rightWord) {
+            await btn.click();
+            return;
+          }
+        }
+        await page.getByTestId('knight-choice-1').click();
+      };
+
       // Finish Student's VERY FIRST game run -> MUST unlock Starter Gift (+10 free wishes) strictly ONCE!
       await page.getByTestId('start-knight-campaign-btn').click();
       await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
-      await page.getByTestId('knight-choice-1').click();
-      await page.getByTestId('knight-choice-1').click();
-      await page.getByTestId('knight-choice-1').click();
+      await clickWrongKnightStage1Choice();
+      await clickWrongKnightStage1Choice();
+      await clickWrongKnightStage1Choice();
       await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
       await page.getByTestId('knight-skip-revive-btn').click();
       await expect(page.getByTestId('starter-gift-10-wishes-banner')).toBeVisible({ timeout: 5_000 });
@@ -708,9 +729,9 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
       // Finish a SECOND game run -> MUST NOT grant another +10 wishes!
       await page.getByTestId('start-knight-campaign-btn').click();
       await expect(page.getByTestId('knight-choice-1')).toBeVisible({ timeout: 8_000 });
-      await page.getByTestId('knight-choice-1').click();
-      await page.getByTestId('knight-choice-1').click();
-      await page.getByTestId('knight-choice-1').click();
+      await clickWrongKnightStage1Choice();
+      await clickWrongKnightStage1Choice();
+      await clickWrongKnightStage1Choice();
       await expect(page.getByTestId('knight-revive-modal')).toBeVisible({ timeout: 10_000 });
       await page.getByTestId('knight-skip-revive-btn').click();
       await expect(page.getByTestId('starter-gift-10-wishes-banner')).toHaveCount(0);
