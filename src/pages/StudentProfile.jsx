@@ -3416,9 +3416,13 @@ export default function StudentProfile({
         const secretTitleCount = allTitleItems.filter(i => i.isSecretTitle || i.difficulty === 'Bí Ẩn').length;
         const holidayTitleCount = allTitleItems.filter(i => i.isHolidayTitle).length;
         const vipTitleCount = allTitleItems.filter(i => i.isPaidTitle || i.isVipBundleTitle).length;
+        const gameAndRpgTitleCount = allTitleItems.filter(i => i.tier === 'Game' || i.tier === 'Hiệp Sĩ RPG').length;
+        const pvpTitleCount = allTitleItems.filter(i => i.tier === 'Đối Kháng 1v1').length;
         const filteredTitles = allTitleItems.filter(item => {
           if (titleFilter === 'unlocked') return item.unlocked;
           if (titleFilter === 'locked') return !item.unlocked;
+          if (titleFilter === 'game_rpg') return item.tier === 'Game' || item.tier === 'Hiệp Sĩ RPG';
+          if (titleFilter === 'pvp_1v1') return item.tier === 'Đối Kháng 1v1';
           if (titleFilter === 'easy') return item.difficulty === 'Dễ' || item.difficulty === 'Khởi Đầu' || item.difficulty === 'Cơ Bản';
           if (titleFilter === 'normal') return item.difficulty === 'Bình Thường' || item.difficulty === 'Thử Thách';
           if (titleFilter === 'hard') return item.difficulty === 'Khó';
@@ -3493,6 +3497,7 @@ export default function StudentProfile({
                     <span>🎯 Band cao nhất: <b className="text-[#0F172B] dark:text-[#F4F4F5]">{titleSummary.stats?.highestBand ? titleSummary.stats.highestBand.toFixed(1) : '0.0'}</b></span>
                     <span>✨ Lượt 7.0+: <b className="text-amber-700 dark:text-amber-300">{titleSummary.stats?.band70Count || 0} lần</b></span>
                     <span>🎮 Game kỷ lục: <b className="text-amber-700 dark:text-amber-300">{titleSummary.stats?.bestGameScore || 0}đ</b></span>
+                    <span>⚔️ Đối kháng 1v1: <b className="text-rose-700 dark:text-rose-300">{titleSummary.stats?.pvpPeakRp || 0} Điểm</b> ({titleSummary.stats?.pvpWins || 0} thắng)</span>
                     <span>📅 Đăng nhập: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.totalLoginDays || 0}N</b> (Chuỗi {titleSummary.stats?.bestLoginStreak || 0}N)</span>
                     <span>🌟 Kỹ năng: <b className="text-slate-900 dark:text-[#F4F4F5]">{titleSummary.stats?.coveredSkillsCount || 0}/4</b></span>
                   </div>
@@ -3521,10 +3526,12 @@ export default function StudentProfile({
                 )}
               </div>
 
-              {/* Filter Tabs — Tách riêng rõ Dễ, Bình Thường, Khó, Cực Khó, BXH Theo Ngày, Điểm Danh, Bí Ẩn... */}
+              {/* Filter Tabs — Tách riêng rõ Game & RPG, Đối Kháng 1v1, Dễ, Bình Thường, Khó, Cực Khó, BXH Theo Ngày... */}
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { id: 'all', label: `Tất cả (${allTitleItems.length})` },
+                  { id: 'pvp_1v1', label: `⚔️ Đối Kháng 1v1 (${pvpTitleCount})` },
+                  { id: 'game_rpg', label: `🎮 Game & Meme RPG (${gameAndRpgTitleCount})` },
                   { id: 'easy', label: `🌱 Dễ (${easyCount})` },
                   { id: 'normal', label: `⚡ Bình Thường (${normalCount})` },
                   { id: 'hard', label: `🔥 Khó (${hardTitleCount})` },

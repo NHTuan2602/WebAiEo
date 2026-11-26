@@ -93,6 +93,16 @@ import {
   normalizeKnightGachaConfig,
   normalizeKnightRpgProfile
 } from './src/constants/knightRpgData.js';
+import {
+  KNIGHT_PVP_FREEZE_MS,
+  KNIGHT_PVP_LIVES_PER_ROUND,
+  KNIGHT_PVP_READY_CHECK_SEC,
+  KNIGHT_PVP_TOTAL_ROUNDS,
+  getKnightPvpRankTier,
+  normalizeKnightPvpProfile,
+  pickDemonRouletteSector,
+  pickScaledNpcForRp
+} from './src/constants/knightPvpData.js';
 
 const VALID_PAYMENT_ITEM_TYPES = new Set([
   'cover',
@@ -969,8 +979,30 @@ function sanitizeUserForViewer(user, viewer) {
   if (viewer && viewer.username === user.username && Array.isArray(user.acknowledgedTitleIds)) {
     safe.acknowledgedTitleIds = user.acknowledgedTitleIds;
   }
-  if (viewer && viewer.username === user.username && user.knightRpgProfile && typeof user.knightRpgProfile === 'object') {
-    safe.knightRpgProfile = user.knightRpgProfile;
+  safe.allTimeBestGameScore = Math.max(0, Math.floor(Number(user.allTimeBestGameScore) || 0));
+  safe.hasAllTimeGamePerfectRun = Boolean(user.hasAllTimeGamePerfectRun);
+  safe.knightPvpProfile = normalizeKnightPvpProfile(user.knightPvpProfile || {});
+  if (user.knightRpgProfile && typeof user.knightRpgProfile === 'object') {
+    if (viewer && viewer.username === user.username) {
+      safe.knightRpgProfile = user.knightRpgProfile;
+    } else {
+      safe.knightRpgProfile = {
+        bestScore: Math.max(0, Math.floor(Number(user.knightRpgProfile.bestScore) || 0)),
+        allTimeBestScore: Math.max(
+          Math.floor(Number(user.knightRpgProfile.bestScore) || 0),
+          Math.floor(Number(user.knightRpgProfile.allTimeBestScore) || 0)
+        ),
+        monstersSlain: Math.max(0, Math.floor(Number(user.knightRpgProfile.monstersSlain) || 0)),
+        dragonsSlain: Math.max(0, Math.floor(Number(user.knightRpgProfile.dragonsSlain) || 0)),
+        demonKingsSlain: Math.max(0, Math.floor(Number(user.knightRpgProfile.demonKingsSlain) || 0)),
+        keysCollected: Math.max(0, Math.floor(Number(user.knightRpgProfile.keysCollected) || 0)),
+        unlockedSkins: Array.isArray(user.knightRpgProfile.unlockedSkins)
+          ? user.knightRpgProfile.unlockedSkins
+          : ['holy_paladin'],
+        equippedSkin: String(user.knightRpgProfile.equippedSkin || 'holy_paladin'),
+        equippedWeapon: String(user.knightRpgProfile.equippedWeapon || '')
+      };
+    }
   }
   if (viewer?.isSuperAdmin && user.isSuperAdmin) {
     safe.isSuperAdmin = true;
@@ -1524,6 +1556,7 @@ function createInitialStore(audioDir = '', mediaDir = '') {
     speakingForecast: createDefaultSpeakingForecastBank(),
     customTitles: [],
     gamePracticeLeaderboard: [],
+    knightPvpLeaderboard: [],
     archivedPrevWeekGameEntries: [],
     knightGachaConfig: normalizeKnightGachaConfig({}),
     adminFeedbacks: [],
@@ -1555,6 +1588,9 @@ function createInitialStore(audioDir = '', mediaDir = '') {
     _unlockedSpeakingRooms: new Map(),
     _unlockedExamRooms: new Map(),
     _processedGameMatchIds: new Set(),
+    _knightPvpQueue: new Map(),
+    _knightPvpMatches: new Map(),
+    _knightPvpRooms: new Map(),
     _dailyRankCache: null,
     _audioDir: audioDir,
     _audioMem: new Map(),
@@ -2089,6 +2125,11 @@ function applyParsedStoreSnapshot(store, parsed) {
       .filter(e => e && e.username && Number.isFinite(Number(e.score)))
       .slice(0, 300);
   }
+  if (Array.isArray(parsed.knightPvpLeaderboard)) {
+    store.knightPvpLeaderboard = parsed.knightPvpLeaderboard
+      .filter(e => e && e.username && Number.isFinite(Number(e.rp)))
+      .slice(0, 250);
+  }
   if (Array.isArray(parsed.archivedPrevWeekGameEntries)) {
     store.archivedPrevWeekGameEntries = parsed.archivedPrevWeekGameEntries
       .filter(e => e && e.username && Number.isFinite(Number(e.score)))
@@ -2257,6 +2298,9 @@ export function createPersistentSyncStore(persistFile = '') {
         _unlockedSpeakingRooms,
         _unlockedExamRooms,
         _processedGameMatchIds,
+        _knightPvpQueue,
+        _knightPvpMatches,
+        _knightPvpRooms,
         _dailyRankCache,
         _bootId,
         _localMutated,
@@ -3144,25 +3188,63 @@ function ensureWeeklyMondayReset(store, nowMs = Date.now()) {
 
   // 2) Archive ending week's game leaderboard so Monday's Daily Top 1/2/3 titles from Sunday still settle,
   //    then reset ONLY Game Leaderboard scores back to 0 (NEVER touch IELTS / academic attempts!)
+  const endingGameBestByUser = new Map();
   if (Array.isArray(store.gamePracticeLeaderboard) && store.gamePracticeLeaderboard.length > 0) {
     store.archivedPrevWeekGameEntries = store.gamePracticeLeaderboard.slice(0, 250);
+    store.gamePracticeLeaderboard.forEach(entry => {
+      if (!entry?.username) return;
+      const k = String(entry.username).toLowerCase();
+      const s = Math.max(0, Math.floor(Number(entry.score) || 0));
+      const perf = Number(entry.totalCount) >= 4 && Number(entry.passedCount) >= Number(entry.totalCount);
+      const prev = endingGameBestByUser.get(k) || { score: 0, perfect: false };
+      endingGameBestByUser.set(k, {
+        score: Math.max(prev.score, s),
+        perfect: Boolean(prev.perfect || perf)
+      });
+    });
   }
   store.gamePracticeLeaderboard = [];
+  store.knightPvpLeaderboard = [];
 
   if (store.users && typeof store.users === 'object') {
     Object.keys(store.users).forEach(uKey => {
       const u = store.users[uKey];
       if (!u || typeof u !== 'object') return;
-      if (u.knightRpgProfile && typeof u.knightRpgProfile === 'object') {
-        store.users[uKey] = {
-          ...u,
-          knightRpgProfile: {
-            ...u.knightRpgProfile,
-            bestScore: 0,
-            bestScoreWeekKey: weekKey
-          }
+      const endingRec = endingGameBestByUser.get(String(u.username || uKey).toLowerCase());
+      const nextAllTimeGame = Math.max(
+        Math.floor(Number(u.allTimeBestGameScore) || 0),
+        endingRec?.score || 0
+      );
+      const nextHasPerfect = Boolean(u.hasAllTimeGamePerfectRun || endingRec?.perfect);
+      let nextRpg = u.knightRpgProfile;
+      if (nextRpg && typeof nextRpg === 'object') {
+        nextRpg = {
+          ...nextRpg,
+          allTimeBestScore: Math.max(
+            Math.floor(Number(nextRpg.allTimeBestScore) || 0),
+            Math.floor(Number(nextRpg.bestScore) || 0)
+          ),
+          bestScore: 0,
+          bestScoreWeekKey: weekKey
         };
       }
+      let nextPvp = u.knightPvpProfile;
+      if (nextPvp && typeof nextPvp === 'object') {
+        const normPvp = normalizeKnightPvpProfile(nextPvp);
+        nextPvp = {
+          ...normPvp,
+          peakRp: Math.max(normPvp.peakRp, normPvp.rp),
+          rp: 0,
+          winStreak: 0
+        };
+      }
+      store.users[uKey] = {
+        ...u,
+        allTimeBestGameScore: nextAllTimeGame,
+        hasAllTimeGamePerfectRun: nextHasPerfect,
+        ...(nextRpg ? { knightRpgProfile: nextRpg } : {}),
+        ...(nextPvp ? { knightPvpProfile: nextPvp } : {})
+      };
     });
   }
 
@@ -3186,6 +3268,196 @@ function ensureWeeklyMondayReset(store, nowMs = Date.now()) {
 
   store._localMutated = true;
   return true;
+}
+
+function ensureKnightPvpMaps(store) {
+  if (!(store._knightPvpQueue instanceof Map)) store._knightPvpQueue = new Map();
+  if (!(store._knightPvpMatches instanceof Map)) store._knightPvpMatches = new Map();
+  if (!(store._knightPvpRooms instanceof Map)) store._knightPvpRooms = new Map();
+}
+
+function pruneStaleKnightPvpRuntime(store, nowMs = Date.now()) {
+  ensureKnightPvpMaps(store);
+  for (const [unameLower, q] of store._knightPvpQueue.entries()) {
+    if (!q || nowMs - (Number(q.queuedAt) || 0) > 90_000) {
+      store._knightPvpQueue.delete(unameLower);
+    }
+  }
+  for (const [mId, m] of store._knightPvpMatches.entries()) {
+    if (!m) {
+      store._knightPvpMatches.delete(mId);
+      continue;
+    }
+    if (m.status === 'READY_CHECK' && nowMs > (Number(m.readyDeadlineMs) || 0) + 2500) {
+      m.status = 'CANCELLED';
+      m.finishReason = 'Hết thời gian xác nhận vào trận.';
+      m.updatedAtMs = nowMs;
+    }
+    const ageMs = nowMs - (Number(m.updatedAtMs || m.createdAt) || 0);
+    if ((m.status === 'FINISHED' || m.status === 'CANCELLED') && ageMs > 180_000) {
+      store._knightPvpMatches.delete(mId);
+    } else if (ageMs > 900_000) {
+      store._knightPvpMatches.delete(mId);
+    }
+  }
+  for (const [code, room] of store._knightPvpRooms.entries()) {
+    if (!room || nowMs - (Number(room.updatedAtMs || room.createdAt) || 0) > 1_800_000) {
+      store._knightPvpRooms.delete(code);
+    }
+  }
+}
+
+function buildFighterSlotFromUser(userRecord, fallbackUsername = '') {
+  const uname = String(userRecord?.username || fallbackUsername || 'player');
+  const rpg = normalizeKnightRpgProfile(userRecord?.knightRpgProfile || {});
+  const pvp = normalizeKnightPvpProfile(userRecord?.knightPvpProfile || {});
+  return {
+    username: uname,
+    name: userRecord?.name || uname,
+    avatarUrl: userRecord?.avatarUrl || '',
+    isNpc: false,
+    rp: pvp.rp,
+    skinId: rpg.equippedSkin || 'holy_paladin',
+    weaponId: rpg.equippedWeapon || '',
+    accepted: false,
+    lives: KNIGHT_PVP_LIVES_PER_ROUND,
+    roundsWon: 0,
+    hits: 0,
+    freezes: 0,
+    frozenUntilMs: 0
+  };
+}
+
+function settleKnightPvpRankedRewards(
+  store,
+  username,
+  { didWin = false, isDemonTiebreaker = false, opponentName = 'Đối thủ', mode = 'ranked_npc', nowMs = Date.now() } = {}
+) {
+  if (mode !== 'ranked_npc' && mode !== 'ranked_human') return null;
+  const uKey = findUserKeyInStore(store, username);
+  const userRec = uKey ? store.users?.[uKey] : null;
+  if (!uKey || !userRec || userRec.isGuest) return null;
+
+  const prevPvp = normalizeKnightPvpProfile(userRec.knightPvpProfile || {});
+  const tier = getKnightPvpRankTier(prevPvp.rp);
+  const streakBonusRp = didWin && prevPvp.winStreak >= 2 ? 5 : 0;
+  const demonBonusRp = didWin && isDemonTiebreaker ? 8 : 0;
+  const rpDelta = didWin
+    ? tier.winRp + streakBonusRp + demonBonusRp
+    : -Math.min(prevPvp.rp, tier.lossRp);
+  const nextRp = Math.max(0, prevPvp.rp + rpDelta);
+  const nextWinStreak = didWin ? prevPvp.winStreak + 1 : 0;
+  const nextPvp = normalizeKnightPvpProfile({
+    rp: nextRp,
+    peakRp: Math.max(prevPvp.peakRp, nextRp),
+    wins: prevPvp.wins + (didWin ? 1 : 0),
+    losses: prevPvp.losses + (didWin ? 0 : 1),
+    winStreak: nextWinStreak,
+    bestWinStreak: Math.max(prevPvp.bestWinStreak, nextWinStreak),
+    demonTiebreakerWins: prevPvp.demonTiebreakerWins + (didWin && isDemonTiebreaker ? 1 : 0),
+    matchesPlayed: prevPvp.matchesPlayed + 1
+  });
+
+  const goldGain = didWin ? tier.goldWin + (isDemonTiebreaker ? 80 : 0) : 45;
+  const prevRpg = normalizeKnightRpgProfile(userRec.knightRpgProfile || {}, nowMs);
+  const nextRpg = {
+    ...prevRpg,
+    gold: Math.max(0, (Number(prevRpg.gold) || 0) + goldGain)
+  };
+
+  store.users[uKey] = {
+    ...userRec,
+    knightPvpProfile: nextPvp,
+    knightRpgProfile: nextRpg
+  };
+
+  // Upsert weekly 1v1 PvP Leaderboard (resets every Monday 00:00 Vietnam time)
+  const list = Array.isArray(store.knightPvpLeaderboard) ? [...store.knightPvpLeaderboard] : [];
+  const existingIdx = list.findIndex(
+    e => String(e?.username || '').toLowerCase() === String(userRec.username || uKey).toLowerCase()
+  );
+  const nextTier = getKnightPvpRankTier(nextPvp.rp);
+  const rowEntry = {
+    id: existingIdx >= 0 ? list[existingIdx].id : `kpvp_${userRec.username || uKey}`,
+    username: userRec.username || uKey,
+    name: userRec.name || userRec.username || uKey,
+    rp: nextPvp.rp,
+    peakRp: nextPvp.peakRp,
+    wins: nextPvp.wins,
+    losses: nextPvp.losses,
+    winStreak: nextPvp.winStreak,
+    bestWinStreak: nextPvp.bestWinStreak,
+    demonTiebreakerWins: nextPvp.demonTiebreakerWins,
+    tierId: nextTier.id,
+    tierLabel: nextTier.label,
+    skinId: nextRpg.equippedSkin || 'holy_paladin',
+    lastOpponent: String(opponentName || '').slice(0, 60),
+    updatedAtMs: nowMs
+  };
+  if (existingIdx >= 0) list[existingIdx] = rowEntry;
+  else list.push(rowEntry);
+  list.sort(
+    (a, b) =>
+      (Number(b.rp) || 0) - (Number(a.rp) || 0) ||
+      (Number(b.wins) || 0) - (Number(a.wins) || 0) ||
+      (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0)
+  );
+  store.knightPvpLeaderboard = list.slice(0, 200);
+
+  if (grantFirstGameStarterGiftIfEligible(store, userRec.username || uKey)) {
+    // Starter gift applied if this was the player's very first completed game
+  }
+
+  return {
+    didWin,
+    rpDelta,
+    nextRp: nextPvp.rp,
+    goldGain,
+    winStreak: nextPvp.winStreak,
+    tierLabel: nextTier.label,
+    isDemonTiebreaker
+  };
+}
+
+function buildKnightPvpRealtimeForViewer(store, viewer, nowMs = Date.now()) {
+  if (!viewer?.username || viewer.isGuest) return null;
+  pruneStaleKnightPvpRuntime(store, nowMs);
+  const vLower = String(viewer.username).toLowerCase();
+  const qEntry = store._knightPvpQueue.get(vLower) || null;
+
+  let activeMatch = null;
+  for (const m of store._knightPvpMatches.values()) {
+    if (!m) continue;
+    const isP1 = String(m.p1?.username || '').toLowerCase() === vLower;
+    const isP2 = !m.p2?.isNpc && String(m.p2?.username || '').toLowerCase() === vLower;
+    if (!isP1 && !isP2) continue;
+    if (
+      !activeMatch ||
+      (m.status === 'PLAYING' || m.status === 'READY_CHECK') ||
+      (Number(m.updatedAtMs) || 0) > (Number(activeMatch.updatedAtMs) || 0)
+    ) {
+      activeMatch = m;
+    }
+  }
+
+  let activeRoom = null;
+  for (const r of store._knightPvpRooms.values()) {
+    if (!r) continue;
+    const isHost = String(r.hostUsername || '').toLowerCase() === vLower;
+    const isGuest = String(r.guestUsername || '').toLowerCase() === vLower;
+    if (isHost || isGuest) {
+      activeRoom = r;
+      break;
+    }
+  }
+
+  return {
+    inQueue: Boolean(qEntry),
+    queuedAt: qEntry ? Number(qEntry.queuedAt) || nowMs : 0,
+    queueTopicId: qEntry?.topicId || 'core',
+    activeMatch: activeMatch ? { ...activeMatch } : null,
+    activeRoom: activeRoom ? { ...activeRoom } : null
+  };
 }
 
 function getSnapshotForViewer(store, viewer = null) {
@@ -3221,6 +3493,8 @@ function getSnapshotForViewer(store, viewer = null) {
       speakingForecast: null,
       customTitles: [],
       gamePracticeLeaderboard: [],
+      knightPvpLeaderboard: [],
+      knightPvpRealtime: null,
       dailyRankTitles: null,
       paymentConfig: null,
       supportAdminProfile: null,
@@ -3307,6 +3581,10 @@ function getSnapshotForViewer(store, viewer = null) {
       speakingForecast: normalizeSpeakingForecastBank(store.speakingForecast),
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
       gamePracticeLeaderboard: Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : [],
+      knightPvpLeaderboard: (Array.isArray(store.knightPvpLeaderboard) ? store.knightPvpLeaderboard : []).filter(
+        e => viewer.isSuperAdmin || e?.username !== SUPER_ADMIN_USERNAME
+      ),
+      knightPvpRealtime: buildKnightPvpRealtimeForViewer(store, viewer, nowMs),
       dailyRankTitles: globalDailyRankTitles,
       paymentConfig: getPublicPaymentConfigSummary(store),
       ...adminFields,
@@ -3365,6 +3643,8 @@ function getSnapshotForViewer(store, viewer = null) {
       speakingForecast: null,
       customTitles: [],
       gamePracticeLeaderboard: [],
+      knightPvpLeaderboard: [],
+      knightPvpRealtime: null,
       dailyRankTitles: null,
       paymentConfig: getPublicPaymentConfigSummary(store),
       ...adminFields,
@@ -3511,6 +3791,23 @@ function getSnapshotForViewer(store, viewer = null) {
       if (sameClassPeerSet.has(uLower)) return true;
       return store.users?.[entry.username]?.role === 'teacher';
     }),
+    knightPvpLeaderboard: (Array.isArray(store.knightPvpLeaderboard) ? store.knightPvpLeaderboard : [])
+      .filter(entry => {
+        if (!entry?.username) return false;
+        if (entry.username === SUPER_ADMIN_USERNAME) return false;
+        return true;
+      })
+      .map(entry => {
+        const uLower = String(entry.username).trim().toLowerCase();
+        const canReveal =
+          uLower === viewerLower ||
+          sameClassPeerSet.has(uLower) ||
+          store.users?.[entry.username]?.role === 'teacher';
+        return canReveal
+          ? entry
+          : { ...entry, name: `Đấu Sĩ #${String(entry.username).slice(0, 3).toUpperCase()}` };
+      }),
+    knightPvpRealtime: buildKnightPvpRealtimeForViewer(store, viewer, nowMs),
     dailyRankTitles: studentDailyRankTitles,
     paymentConfig: getPublicPaymentConfigSummary(store),
     ...adminFields,
@@ -4081,6 +4378,24 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     case 'ADMIN_SET_GACHA_BANNER_CONFIG': {
       if (!isSuperAdmin) {
         return { allowed: false, status: 403, error: 'Chỉ Quản trị hệ thống (Admin) mới có quyền chọn nhân vật Banner Giới Hạn!' };
+      }
+      return { allowed: true };
+    }
+
+    case 'KNIGHT_PVP_FIND_MATCH':
+    case 'KNIGHT_PVP_CANCEL_QUEUE':
+    case 'KNIGHT_PVP_CREATE_ROOM':
+    case 'KNIGHT_PVP_JOIN_ROOM':
+    case 'KNIGHT_PVP_LEAVE_ROOM':
+    case 'KNIGHT_PVP_ACCEPT_READY':
+    case 'KNIGHT_PVP_DECLINE_READY':
+    case 'KNIGHT_PVP_SYNC_COMBAT':
+    case 'KNIGHT_PVP_FINISH_NPC_MATCH': {
+      if (viewer.isGuest) {
+        return { allowed: false, status: 403, error: 'Tài khoản khách không thể tham gia Đấu Trường 1 vs 1.' };
+      }
+      if (!checkRateLimit(store._rateLimits, `knight_pvp:${viewer.username.toLowerCase()}`, 180, 60 * 1000)) {
+        return { allowed: false, status: 429, error: 'Thao tác Đấu Trường 1v1 quá nhanh. Vui lòng thử lại sau vài giây.' };
       }
       return { allowed: true };
     }
@@ -6486,6 +6801,19 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         else list.push(nextEntry);
         list.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || (Number(b.updatedAtMs) || 0) - (Number(a.updatedAtMs) || 0));
         store.gamePracticeLeaderboard = list.slice(0, 250);
+        const uKeyScore = findUserKeyInStore(store, viewer.username) || viewer.username;
+        if (store.users?.[uKeyScore]) {
+          const prevURec = store.users[uKeyScore];
+          const isPerfRun = Boolean(payload?.gameCompleted && totalCount >= 4 && passedCount >= totalCount);
+          store.users[uKeyScore] = {
+            ...prevURec,
+            allTimeBestGameScore: Math.max(
+              Math.floor(Number(prevURec.allTimeBestGameScore) || 0),
+              cleanScore
+            ),
+            hasAllTimeGamePerfectRun: Boolean(prevURec.hasAllTimeGamePerfectRun || isPerfRun)
+          };
+        }
         changed = true;
       }
       if (payload?.gameCompleted) {
@@ -6493,6 +6821,498 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           changed = true;
         }
       }
+      break;
+    }
+
+    case 'KNIGHT_PVP_FIND_MATCH': {
+      const nowMs = Date.now();
+      pruneStaleKnightPvpRuntime(store, nowMs);
+      const isViewerSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer?.username === SUPER_ADMIN_USERNAME);
+      const vKey = findUserKeyInStore(store, viewer.username) || viewer.username;
+      const viewerRec = store.users?.[vKey] || viewer;
+      const vLower = String(viewer.username).toLowerCase();
+      const topicId = String(payload?.topicId || 'core').trim().slice(0, 60) || 'core';
+      const topicLabel = String(payload?.topicLabel || 'IELTS Core Academic').trim().slice(0, 100) || 'IELTS Core Academic';
+      const forceTie22Test = Boolean(isViewerSuperAdmin && payload?.forceTie22Test);
+
+      // Clear any finished/cancelled old match for this viewer before starting new search
+      for (const [mId, m] of store._knightPvpMatches.entries()) {
+        const isMine =
+          String(m?.p1?.username || '').toLowerCase() === vLower ||
+          (!m?.p2?.isNpc && String(m?.p2?.username || '').toLowerCase() === vLower);
+        if (isMine && (m.status === 'FINISHED' || m.status === 'CANCELLED')) {
+          store._knightPvpMatches.delete(mId);
+        }
+      }
+
+      // Check if another real player is waiting in the matchmaking queue
+      let matchedOther = null;
+      if (!forceTie22Test) {
+        for (const [otherLower, q] of store._knightPvpQueue.entries()) {
+          if (otherLower !== vLower && q && nowMs - (Number(q.queuedAt) || 0) <= 60_000) {
+            matchedOther = q;
+            break;
+          }
+        }
+      }
+
+      if (matchedOther) {
+        store._knightPvpQueue.delete(String(matchedOther.username).toLowerCase());
+        store._knightPvpQueue.delete(vLower);
+        const otherKey = findUserKeyInStore(store, matchedOther.username) || matchedOther.username;
+        const otherRec = store.users?.[otherKey] || { username: matchedOther.username, name: matchedOther.name };
+        const matchId = `kpvpm_${nowMs}_${crypto.randomBytes(4).toString('hex')}`;
+        const seed = `${matchId}:seed`;
+        const demonPick = pickDemonRouletteSector(seed);
+        store._knightPvpMatches.set(matchId, {
+          id: matchId,
+          mode: 'ranked_human',
+          status: 'READY_CHECK',
+          seed,
+          topicId: matchedOther.topicId || topicId,
+          topicLabel: matchedOther.topicLabel || topicLabel,
+          createdAt: nowMs,
+          updatedAtMs: nowMs,
+          readyDeadlineMs: nowMs + KNIGHT_PVP_READY_CHECK_SEC * 1000,
+          round: 1,
+          maxRounds: KNIGHT_PVP_TOTAL_ROUNDS,
+          questionIdx: 0,
+          tiebreakerTriggered: false,
+          demonSectorIdx: demonPick.sectorIndex,
+          demonRoundType: demonPick.sector.roundType,
+          p1: buildFighterSlotFromUser(otherRec, matchedOther.username),
+          p2: buildFighterSlotFromUser(viewerRec, viewer.username),
+          roundHistory: [],
+          winnerSlot: '',
+          finishReason: '',
+          rewards: {}
+        });
+        changed = true;
+        break;
+      }
+
+      if (payload?.spawnNpcNow) {
+        store._knightPvpQueue.delete(vLower);
+        const p1Slot = buildFighterSlotFromUser(viewerRec, viewer.username);
+        const npcMeta = pickScaledNpcForRp(p1Slot.rp, nowMs + vLower.length * 17);
+        const matchId = `kpvpm_npc_${nowMs}_${crypto.randomBytes(4).toString('hex')}`;
+        const seed = `${matchId}:seed`;
+        const demonPick = pickDemonRouletteSector(seed);
+        store._knightPvpMatches.set(matchId, {
+          id: matchId,
+          mode: 'ranked_npc',
+          status: 'READY_CHECK',
+          seed,
+          topicId,
+          topicLabel,
+          forceTie22Test,
+          createdAt: nowMs,
+          updatedAtMs: nowMs,
+          readyDeadlineMs: nowMs + KNIGHT_PVP_READY_CHECK_SEC * 1000,
+          round: forceTie22Test ? 5 : 1,
+          maxRounds: KNIGHT_PVP_TOTAL_ROUNDS,
+          questionIdx: 0,
+          tiebreakerTriggered: forceTie22Test,
+          demonSectorIdx: demonPick.sectorIndex,
+          demonRoundType: demonPick.sector.roundType,
+          p1: {
+            ...p1Slot,
+            roundsWon: forceTie22Test ? 2 : 0
+          },
+          p2: {
+            username: npcMeta.id,
+            name: npcMeta.name,
+            avatarUrl: '',
+            isNpc: true,
+            npcId: npcMeta.id,
+            tierId: npcMeta.tierId,
+            titleLabel: npcMeta.titleLabel,
+            rp: npcMeta.rpDisplay,
+            skinId: npcMeta.skinId,
+            weaponId: npcMeta.weaponId,
+            minDelayMs: npcMeta.minDelayMs,
+            maxDelayMs: npcMeta.maxDelayMs,
+            accuracy: npcMeta.accuracy,
+            typingCps: npcMeta.typingCps,
+            accepted: true,
+            lives: KNIGHT_PVP_LIVES_PER_ROUND,
+            roundsWon: forceTie22Test ? 2 : 0,
+            hits: 0,
+            freezes: 0,
+            frozenUntilMs: 0
+          },
+          roundHistory: forceTie22Test
+            ? [
+                { round: 1, winner: 'p1' },
+                { round: 2, winner: 'p2' },
+                { round: 3, winner: 'p1' },
+                { round: 4, winner: 'p2' }
+              ]
+            : [],
+          winnerSlot: '',
+          finishReason: '',
+          rewards: {}
+        });
+        changed = true;
+        break;
+      }
+
+      store._knightPvpQueue.set(vLower, {
+        username: viewer.username,
+        name: viewerRec.name || viewer.username,
+        topicId,
+        topicLabel,
+        queuedAt: store._knightPvpQueue.get(vLower)?.queuedAt || nowMs
+      });
+      changed = true;
+      break;
+    }
+
+    case 'KNIGHT_PVP_CANCEL_QUEUE': {
+      const nowMs = Date.now();
+      ensureKnightPvpMaps(store);
+      const vLower = String(viewer.username).toLowerCase();
+      store._knightPvpQueue.delete(vLower);
+      for (const [mId, m] of store._knightPvpMatches.entries()) {
+        const isMine =
+          String(m?.p1?.username || '').toLowerCase() === vLower ||
+          (!m?.p2?.isNpc && String(m?.p2?.username || '').toLowerCase() === vLower);
+        if (isMine && m.status === 'READY_CHECK') {
+          m.status = 'CANCELLED';
+          m.finishReason = 'Đã hủy tìm trận.';
+          m.updatedAtMs = nowMs;
+          if (m.mode === 'ranked_npc') store._knightPvpMatches.delete(mId);
+        }
+      }
+      changed = true;
+      break;
+    }
+
+    case 'KNIGHT_PVP_CREATE_ROOM': {
+      const nowMs = Date.now();
+      pruneStaleKnightPvpRuntime(store, nowMs);
+      const vLower = String(viewer.username).toLowerCase();
+      store._knightPvpQueue.delete(vLower);
+      for (const [c, r] of store._knightPvpRooms.entries()) {
+        if (String(r?.hostUsername || '').toLowerCase() === vLower) {
+          store._knightPvpRooms.delete(c);
+        }
+      }
+      let code = '';
+      for (let tries = 0; tries < 20; tries += 1) {
+        const cand = String(Math.floor(100000 + Math.random() * 900000));
+        if (!store._knightPvpRooms.has(cand)) {
+          code = cand;
+          break;
+        }
+      }
+      if (!code) code = String(Date.now()).slice(-6);
+      const topicId = String(payload?.topicId || 'core').trim().slice(0, 60) || 'core';
+      const topicLabel = String(payload?.topicLabel || 'IELTS Core Academic').trim().slice(0, 100) || 'IELTS Core Academic';
+      store._knightPvpRooms.set(code, {
+        code,
+        mode: 'casual_room',
+        hostUsername: viewer.username,
+        hostName: viewer.name || viewer.username,
+        guestUsername: '',
+        guestName: '',
+        topicId,
+        topicLabel,
+        matchId: '',
+        createdAt: nowMs,
+        updatedAtMs: nowMs
+      });
+      changed = true;
+      break;
+    }
+
+    case 'KNIGHT_PVP_JOIN_ROOM': {
+      const nowMs = Date.now();
+      pruneStaleKnightPvpRuntime(store, nowMs);
+      const code = String(payload?.roomCode || '').trim().replace(/\D/g, '').slice(0, 6);
+      const room = code ? store._knightPvpRooms.get(code) : null;
+      if (!room || String(room.hostUsername || '').toLowerCase() === String(viewer.username).toLowerCase()) {
+        break;
+      }
+      const hostKey = findUserKeyInStore(store, room.hostUsername) || room.hostUsername;
+      const guestKey = findUserKeyInStore(store, viewer.username) || viewer.username;
+      const hostRec = store.users?.[hostKey] || { username: room.hostUsername, name: room.hostName };
+      const guestRec = store.users?.[guestKey] || viewer;
+      const matchId = `kpvpm_room_${code}_${nowMs}`;
+      const seed = `${matchId}:seed`;
+      const demonPick = pickDemonRouletteSector(seed);
+      room.guestUsername = viewer.username;
+      room.guestName = viewer.name || viewer.username;
+      room.matchId = matchId;
+      room.updatedAtMs = nowMs;
+      store._knightPvpMatches.set(matchId, {
+        id: matchId,
+        mode: 'casual_room',
+        roomCode: code,
+        status: 'READY_CHECK',
+        seed,
+        topicId: room.topicId || 'core',
+        topicLabel: room.topicLabel || 'IELTS Core Academic',
+        createdAt: nowMs,
+        updatedAtMs: nowMs,
+        readyDeadlineMs: nowMs + KNIGHT_PVP_READY_CHECK_SEC * 1000,
+        round: 1,
+        maxRounds: KNIGHT_PVP_TOTAL_ROUNDS,
+        questionIdx: 0,
+        tiebreakerTriggered: false,
+        demonSectorIdx: demonPick.sectorIndex,
+        demonRoundType: demonPick.sector.roundType,
+        p1: buildFighterSlotFromUser(hostRec, room.hostUsername),
+        p2: buildFighterSlotFromUser(guestRec, viewer.username),
+        roundHistory: [],
+        winnerSlot: '',
+        finishReason: '',
+        rewards: {}
+      });
+      changed = true;
+      break;
+    }
+
+    case 'KNIGHT_PVP_LEAVE_ROOM': {
+      const nowMs = Date.now();
+      ensureKnightPvpMaps(store);
+      const vLower = String(viewer.username).toLowerCase();
+      store._knightPvpQueue.delete(vLower);
+      for (const [code, r] of store._knightPvpRooms.entries()) {
+        if (String(r?.hostUsername || '').toLowerCase() === vLower) {
+          store._knightPvpRooms.delete(code);
+        } else if (String(r?.guestUsername || '').toLowerCase() === vLower) {
+          r.guestUsername = '';
+          r.guestName = '';
+          r.matchId = '';
+          r.updatedAtMs = nowMs;
+        }
+      }
+      for (const [mId, m] of store._knightPvpMatches.entries()) {
+        const isP1 = String(m?.p1?.username || '').toLowerCase() === vLower;
+        const isP2 = !m?.p2?.isNpc && String(m?.p2?.username || '').toLowerCase() === vLower;
+        if (!isP1 && !isP2) continue;
+        if (m.status === 'PLAYING' && m.mode === 'ranked_human') {
+          const winnerSlot = isP1 ? 'p2' : 'p1';
+          const loserSlot = isP1 ? 'p1' : 'p2';
+          m.status = 'FINISHED';
+          m.winnerSlot = winnerSlot;
+          m.finishReason = `${viewer.name || viewer.username} đã rời trận đấu.`;
+          m.updatedAtMs = nowMs;
+          m.rewards = {
+            [winnerSlot]: settleKnightPvpRankedRewards(store, m[winnerSlot].username, {
+              didWin: true,
+              isDemonTiebreaker: Boolean(m.tiebreakerTriggered),
+              opponentName: m[loserSlot].name,
+              mode: 'ranked_human',
+              nowMs
+            }),
+            [loserSlot]: settleKnightPvpRankedRewards(store, m[loserSlot].username, {
+              didWin: false,
+              isDemonTiebreaker: false,
+              opponentName: m[winnerSlot].name,
+              mode: 'ranked_human',
+              nowMs
+            })
+          };
+        } else {
+          store._knightPvpMatches.delete(mId);
+        }
+      }
+      changed = true;
+      break;
+    }
+
+    case 'KNIGHT_PVP_ACCEPT_READY':
+    case 'KNIGHT_PVP_DECLINE_READY': {
+      const nowMs = Date.now();
+      ensureKnightPvpMaps(store);
+      const matchId = String(payload?.matchId || '');
+      const m = matchId ? store._knightPvpMatches.get(matchId) : null;
+      if (!m || m.status !== 'READY_CHECK') break;
+      const vLower = String(viewer.username).toLowerCase();
+      const mySlotKey =
+        String(m.p1?.username || '').toLowerCase() === vLower
+          ? 'p1'
+          : !m.p2?.isNpc && String(m.p2?.username || '').toLowerCase() === vLower
+          ? 'p2'
+          : '';
+      if (!mySlotKey) break;
+
+      if (type === 'KNIGHT_PVP_DECLINE_READY') {
+        m.status = 'CANCELLED';
+        m.finishReason = `${viewer.name || viewer.username} đã từ chối giao đấu.`;
+        m.updatedAtMs = nowMs;
+        changed = true;
+        break;
+      }
+
+      m[mySlotKey].accepted = true;
+      m.updatedAtMs = nowMs;
+      if (m.p1?.accepted && m.p2?.accepted) {
+        m.status = 'PLAYING';
+        m.startedAt = nowMs;
+        m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+        m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+        m.p1.frozenUntilMs = 0;
+        m.p2.frozenUntilMs = 0;
+      }
+      changed = true;
+      break;
+    }
+
+    case 'KNIGHT_PVP_SYNC_COMBAT': {
+      const nowMs = Date.now();
+      ensureKnightPvpMaps(store);
+      const matchId = String(payload?.matchId || '');
+      const m = matchId ? store._knightPvpMatches.get(matchId) : null;
+      if (!m || m.status !== 'PLAYING' || m.mode === 'ranked_npc') break;
+      const vLower = String(viewer.username).toLowerCase();
+      const mySlotKey =
+        String(m.p1?.username || '').toLowerCase() === vLower
+          ? 'p1'
+          : !m.p2?.isNpc && String(m.p2?.username || '').toLowerCase() === vLower
+          ? 'p2'
+          : '';
+      if (!mySlotKey) break;
+      const oppSlotKey = mySlotKey === 'p1' ? 'p2' : 'p1';
+      const event = String(payload?.event || '');
+
+      if (event === 'WRONG_ANSWER') {
+        m[mySlotKey].frozenUntilMs = nowMs + KNIGHT_PVP_FREEZE_MS;
+        m[mySlotKey].freezes = (Number(m[mySlotKey].freezes) || 0) + 1;
+        m.updatedAtMs = nowMs;
+        changed = true;
+        break;
+      }
+
+      if (event === 'STRIKE_HIT') {
+        if (nowMs < (Number(m[mySlotKey].frozenUntilMs) || 0)) break;
+        const clientQIdx = Math.floor(Number(payload?.questionIdx) ?? -1);
+        if (clientQIdx !== m.questionIdx) break; // Other player already answered this shared question!
+
+        m[mySlotKey].hits = (Number(m[mySlotKey].hits) || 0) + 1;
+        m[oppSlotKey].lives = Math.max(0, (Number(m[oppSlotKey].lives) || KNIGHT_PVP_LIVES_PER_ROUND) - 1);
+        m.questionIdx += 1;
+        m.lastStrike = {
+          bySlot: mySlotKey,
+          byName: m[mySlotKey].name,
+          round: m.round,
+          atMs: nowMs
+        };
+
+        if (m[oppSlotKey].lives <= 0) {
+          m[mySlotKey].roundsWon = (Number(m[mySlotKey].roundsWon) || 0) + 1;
+          m.roundHistory = [...(m.roundHistory || []), { round: m.round, winner: mySlotKey }];
+
+          if (m.round < 4) {
+            m.round += 1;
+            m.questionIdx = 0;
+            m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+            m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+            m.p1.frozenUntilMs = 0;
+            m.p2.frozenUntilMs = 0;
+          } else if (m.round === 4 && m.p1.roundsWon === 2 && m.p2.roundsWon === 2) {
+            // 2 - 2 Tie after Round 4 -> Demon King Malakor spins Wheel of Fate for Round 5!
+            m.round = 5;
+            m.tiebreakerTriggered = true;
+            m.tiebreakerStartedAtMs = nowMs;
+            m.questionIdx = 0;
+            m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+            m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+            m.p1.frozenUntilMs = 0;
+            m.p2.frozenUntilMs = 0;
+          } else {
+            const finalWinnerSlot = m.p1.roundsWon >= m.p2.roundsWon ? 'p1' : 'p2';
+            const finalLoserSlot = finalWinnerSlot === 'p1' ? 'p2' : 'p1';
+            m.status = 'FINISHED';
+            m.winnerSlot = finalWinnerSlot;
+            m.finishReason =
+              m.mode === 'casual_room'
+                ? 'Trận giao hữu giải trí hoàn tất (Không tính điểm BXH & Danh hiệu).'
+                : m.tiebreakerTriggered
+                ? 'Đoạt chiến thắng nghẹt thở ở Vòng Chung Kết Ma Vương (3 - 2)!'
+                : `Chiến thắng chung cuộc (${m[finalWinnerSlot].roundsWon} - ${m[finalLoserSlot].roundsWon})!`;
+            if (m.mode === 'ranked_human') {
+              m.rewards = {
+                [finalWinnerSlot]: settleKnightPvpRankedRewards(store, m[finalWinnerSlot].username, {
+                  didWin: true,
+                  isDemonTiebreaker: Boolean(m.tiebreakerTriggered),
+                  opponentName: m[finalLoserSlot].name,
+                  mode: 'ranked_human',
+                  nowMs
+                }),
+                [finalLoserSlot]: settleKnightPvpRankedRewards(store, m[finalLoserSlot].username, {
+                  didWin: false,
+                  isDemonTiebreaker: false,
+                  opponentName: m[finalWinnerSlot].name,
+                  mode: 'ranked_human',
+                  nowMs
+                })
+              };
+            }
+          }
+        }
+        m.updatedAtMs = nowMs;
+        changed = true;
+      }
+      break;
+    }
+
+    case 'KNIGHT_PVP_FINISH_NPC_MATCH': {
+      const nowMs = Date.now();
+      ensureKnightPvpMaps(store);
+      const isViewerSuperAdmin = Boolean(viewer?.isSuperAdmin && viewer?.username === SUPER_ADMIN_USERNAME);
+      const matchId = String(payload?.matchId || '');
+      const m = matchId ? store._knightPvpMatches.get(matchId) : null;
+      if (!m || m.mode !== 'ranked_npc' || m.status !== 'PLAYING') break;
+      if (String(m.p1?.username || '').toLowerCase() !== String(viewer.username).toLowerCase()) break;
+
+      // Anti-cheat elapsed time validation (minimum realistic duration unless SuperAdmin test mode)
+      const elapsedMs = nowMs - (Number(m.startedAt) || nowMs);
+      if (!isViewerSuperAdmin && elapsedMs < 3500) {
+        break;
+      }
+
+      const p1Rounds = Math.max(0, Math.min(4, Math.floor(Number(payload?.p1RoundsWon) || 0)));
+      const p2Rounds = Math.max(0, Math.min(4, Math.floor(Number(payload?.p2RoundsWon) || 0)));
+      const totalCorrectHits = Math.max(0, Math.min(60, Math.floor(Number(payload?.totalCorrectHits) || 0)));
+      const tiebreakerTriggered = Boolean(
+        m.forceTie22Test || payload?.tiebreakerTriggered || (p1Rounds + p2Rounds === 5)
+      );
+
+      const totalRoundsPlayed = p1Rounds + p2Rounds;
+      if (totalRoundsPlayed < 4 || totalRoundsPlayed > 5 || p1Rounds === p2Rounds) {
+        break;
+      }
+      const didWin = p1Rounds > p2Rounds;
+      const minRequiredHits = m.forceTie22Test ? 3 : didWin ? p1Rounds * KNIGHT_PVP_LIVES_PER_ROUND : 0;
+      if (didWin && totalCorrectHits < minRequiredHits) {
+        break;
+      }
+
+      m.p1.roundsWon = p1Rounds;
+      m.p2.roundsWon = p2Rounds;
+      m.p1.hits = totalCorrectHits;
+      m.tiebreakerTriggered = tiebreakerTriggered;
+      m.status = 'FINISHED';
+      m.winnerSlot = didWin ? 'p1' : 'p2';
+      m.updatedAtMs = nowMs;
+      m.finishReason = didWin
+        ? tiebreakerTriggered
+          ? `Hạ gục ${m.p2.name} tại Vòng Quay Ma Vương (3 - 2)!`
+          : `Chiến thắng ${m.p2.name} (${p1Rounds} - ${p2Rounds})!`
+        : `Thất bại trước ${m.p2.name} (${p1Rounds} - ${p2Rounds}).`;
+      m.rewards = {
+        p1: settleKnightPvpRankedRewards(store, viewer.username, {
+          didWin,
+          isDemonTiebreaker: Boolean(didWin && tiebreakerTriggered),
+          opponentName: m.p2.name,
+          mode: 'ranked_npc',
+          nowMs
+        })
+      };
+      changed = true;
       break;
     }
 
@@ -6769,6 +7589,8 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'ADMIN_GRANT_GACHA_WISHES',
   'ADMIN_SET_GACHA_BANNER_CONFIG',
   'SUBMIT_PRACTICE_GAME_SCORE',
+  'KNIGHT_PVP_SYNC_COMBAT',
+  'KNIGHT_PVP_FINISH_NPC_MATCH',
   'SEED_DEFAULTS'
 ]);
 

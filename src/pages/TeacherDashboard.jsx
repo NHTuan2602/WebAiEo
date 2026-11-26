@@ -404,7 +404,7 @@ export default function TeacherDashboard({
   const SKILL_EXERCISE_BUTTONS = [
     { id: 'speaking_daily', skill: 'speaking', subOpts: { dailySubCategory: 'speaking_daily' }, label: '+ Daily Speaking', shortLabel: 'Daily Speaking', icon: Mic, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
     { id: 'speaking_forecast', skill: 'speaking', subOpts: { dailySubCategory: 'speaking_forecast' }, label: '+ Cày Forecast', shortLabel: 'Cày Forecast', icon: Sparkles, cls: 'bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border-amber-300 dark:border-amber-500/30 hover:bg-amber-600 hover:text-white' },
-    { id: 'reading', skill: 'reading', subOpts: { dailySubCategory: 'shw_1' }, label: '+ Reading (SHW 1-14)', shortLabel: 'Reading', icon: BookOpen, cls: 'bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-200 border-[#CBD5E1] dark:border-slate-700 hover:bg-slate-700 hover:text-white' },
+    { id: 'reading', skill: 'reading', subOpts: { dailySubCategory: 'shw_1' }, label: '+ Reading (SHW 1-14)', shortLabel: 'Reading', icon: BookOpen, cls: 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#0F172B] dark:text-zinc-200 border-[#CBD5E1] dark:border-zinc-700 hover:bg-slate-700 hover:text-white' },
     { id: 'listening', skill: 'listening', subOpts: { dailySubCategory: 'listening_shw' }, label: '+ Listening', shortLabel: 'Listening', icon: Headphones, cls: 'bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
     { id: 'writing_task1', skill: 'writing', subOpts: { writingTaskScope: 'task1', dailySubCategory: 'w1_map' }, label: '+ Writing Task 1 (W1)', shortLabel: 'Writing W1', icon: PenTool, cls: 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-[#047857] hover:text-white' },
     { id: 'writing_task2', skill: 'writing', subOpts: { writingTaskScope: 'task2', dailySubCategory: 'w2_essay' }, label: '+ Writing Task 2 (W2)', shortLabel: 'Writing W2', icon: PenTool, cls: 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-[#047857] hover:text-white' }
@@ -425,10 +425,10 @@ export default function TeacherDashboard({
     return (
       <div
         key={t.id}
-        className={`bg-white dark:bg-slate-900 rounded-lg border transition-colors ${
+        className={`bg-white dark:bg-[#18181B] rounded-lg border transition-colors ${
           isExpanded
             ? 'border-[#007A7A] dark:border-[#1EE1D6]/45 ring-2 ring-[#007A7A]/12 p-5 sm:p-6'
-            : 'border-slate-200 dark:border-slate-800 hover:border-[#007A7A]/60 dark:hover:border-slate-700'
+            : 'border-slate-200 dark:border-zinc-800 hover:border-[#007A7A]/60 dark:hover:border-slate-700'
         }`}
       >
         {/* Clean Header Row with Non-Nested Sibling Interactive Controls (WCAG A11y safe) */}
@@ -453,7 +453,7 @@ export default function TeacherDashboard({
                     }
                   }}
                   placeholder={`Nhập tên ${entityLabel} mới...`}
-                  className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border-2 border-[#007A7A] dark:border-[#1EE1D6] text-xs sm:text-sm font-bold text-[#0F172B] dark:text-white"
+                  className="flex-1 min-w-[180px] px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 border-2 border-[#007A7A] dark:border-[#1EE1D6] text-xs sm:text-sm font-bold text-[#0F172B] dark:text-white"
                 />
                 <button
                   type="button"
@@ -470,7 +470,7 @@ export default function TeacherDashboard({
                     setRenameDraft('');
                   }}
                   aria-label="Hủy đổi tên"
-                  className="px-2.5 py-1.5 min-h-[34px] rounded-lg bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#334155] dark:text-slate-300 text-xs font-bold flex items-center gap-1"
+                  className="px-2.5 py-1.5 min-h-[34px] rounded-lg bg-[#F1F5F9] dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-[#334155] dark:text-zinc-300 text-xs font-bold flex items-center gap-1"
                   title="Hủy (Esc)"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -490,7 +490,7 @@ export default function TeacherDashboard({
                         ? 'bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30'
                         : cfg.examCategory === 'periodic_mock'
                           ? 'bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border-amber-300 dark:border-amber-500/30'
-                          : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-[#CBD5E1] dark:border-slate-700'
+                          : 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 border-[#CBD5E1] dark:border-zinc-700'
                     }`}
                   >
                     {isExercise
@@ -549,7 +549,7 @@ export default function TeacherDashboard({
                     setRenameDraft(t.title || '');
                   }}
                   title={`Đổi nhanh tên ${entityLabel} ngay tại đây`}
-                  className="min-h-[32px] text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-teal-500/20 text-[#0F172B] dark:text-slate-300 hover:text-[#0F766E] dark:hover:text-[#1EE1D6] border border-[#CBD5E1] dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
+                  className="min-h-[32px] text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-teal-500/20 text-[#0F172B] dark:text-zinc-300 hover:text-[#0F766E] dark:hover:text-[#1EE1D6] border border-[#CBD5E1] dark:border-zinc-700 transition inline-flex items-center gap-1 shrink-0"
                 >
                   <Edit className="w-3 h-3" /> Đổi tên
                 </button>
@@ -580,7 +580,7 @@ export default function TeacherDashboard({
               title="Kiểm tra học sinh đã làm và chưa làm bài này"
               className={`min-h-[32px] text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition border ${
                 stats.totalStudents === 0
-                  ? 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                  ? 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-400 border-slate-200 dark:border-zinc-700'
                   : stats.missingList.length > 0
                   ? 'bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border-rose-200 dark:border-rose-500/30 hover:bg-rose-100 dark:hover:bg-rose-500/25'
                   : 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-500/25'
@@ -621,7 +621,7 @@ export default function TeacherDashboard({
               data-testid={`teacher-quick-delete-${t.id}`}
               title={`Xóa ${entityLabel} này`}
               aria-label={`Xóa ${t.title}`}
-              className="min-h-[32px] text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-rose-400 border border-[#FECACA] dark:border-slate-700 transition inline-flex items-center gap-1 shrink-0"
+              className="min-h-[32px] text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-rose-400 border border-[#FECACA] dark:border-zinc-700 transition inline-flex items-center gap-1 shrink-0"
             >
               <Trash2 className="w-3.5 h-3.5" /> Xóa
             </button>
@@ -631,10 +631,10 @@ export default function TeacherDashboard({
               onClick={toggleExpandCard}
               aria-label={isExpanded ? `Thu gọn ${t.title}` : `Mở rộng ${t.title}`}
               aria-expanded={isExpanded}
-              className="p-1.5 min-h-[32px] min-w-[32px] rounded-lg hover:bg-[#F1F5F9] dark:hover:bg-slate-800 flex items-center justify-center transition"
+              className="p-1.5 min-h-[32px] min-w-[32px] rounded-lg hover:bg-[#F1F5F9] dark:hover:bg-zinc-800 flex items-center justify-center transition"
             >
               <ChevronDown
-                className={`w-4 h-4 text-[#475569] dark:text-slate-400 transition-transform duration-200 ${
+                className={`w-4 h-4 text-[#475569] dark:text-zinc-400 transition-transform duration-200 ${
                   isExpanded ? 'rotate-180 text-[#0F766E] dark:text-[#1EE1D6]' : ''
                 }`}
               />
@@ -652,7 +652,7 @@ export default function TeacherDashboard({
           const hasReadingImg = getReadingPassages(t.reading).some(p => !!p.imageUrl);
 
           return (
-            <div className="mt-4 pt-5 border-t border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="mt-4 pt-5 border-t border-slate-200 dark:border-zinc-800 space-y-4">
               <div className="space-y-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   {isExercise ? (
@@ -670,12 +670,12 @@ export default function TeacherDashboard({
                       <span className="text-xs bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 font-bold px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-500/30">
                         Listening: {t.listening?.questions?.length || 0} • Reading: {t.reading?.questions?.length || 0} • Speaking: {getSpeakingQuestionItems(t.speaking, 'all').length}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 font-bold px-2.5 py-1 rounded-md">
+                      <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 font-bold px-2.5 py-1 rounded-md">
                         <Clock className="w-3 h-3 text-[#475569]" /> {cfg.durations.listening}p L • {cfg.durations.reading}p R • {cfg.durations.writing}p W • {cfg.durations.speaking}p S
                       </span>
                     </>
                   )}
-                  <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 font-bold px-2.5 py-1 rounded-md">
+                  <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 font-bold px-2.5 py-1 rounded-md">
                     {cfg.maxAttempts === 0 ? <InfinityIcon className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                     {cfg.maxAttempts === 0 ? 'Luyện tự do' : `Tối đa ${cfg.maxAttempts} lần`}
                   </span>
@@ -694,7 +694,7 @@ export default function TeacherDashboard({
                         <Headphones className="w-3 h-3" /> {listeningTracksCount} chủ đề nghe {hasListeningImg ? '(có ảnh)' : '(AI Voice)'}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-slate-800 text-[#475569] dark:text-slate-400 font-medium px-2.5 py-1 rounded-md">
+                      <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-zinc-800 text-[#475569] dark:text-zinc-400 font-medium px-2.5 py-1 rounded-md">
                         <Volume2 className="w-3 h-3" /> Dùng AI Voice (TTS)
                       </span>
                     )
@@ -705,7 +705,7 @@ export default function TeacherDashboard({
                     </span>
                   )}
                   {(!isExercise || cfg.focusSkill === 'writing') && t.writing?.task1?.imageUrl && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+                    <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-700">
                       <BarChart2 className="w-3 h-3" /> Có biểu đồ Task 1
                     </span>
                   )}
@@ -719,7 +719,7 @@ export default function TeacherDashboard({
                       </span>
                     ))
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 font-bold px-2.5 py-1 rounded-md">
+                    <span className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 font-bold px-2.5 py-1 rounded-md">
                       <Globe className="w-3 h-3" /> Tất cả lớp
                     </span>
                   )}
@@ -751,12 +751,12 @@ export default function TeacherDashboard({
                   );
                 })()}
                 {t.description && (
-                  <p className="text-sm text-[#475569] dark:text-slate-400 leading-relaxed max-w-2xl">{t.description}</p>
+                  <p className="text-sm text-[#475569] dark:text-zinc-400 leading-relaxed max-w-2xl">{t.description}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                <div className="p-3.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/60 space-y-2.5">
+                <div className="p-3.5 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/60 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-extrabold text-[#0F172B] dark:text-[#1EE1D6] flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" /> {isExercise ? 'Thời gian làm bài (phút)' : 'Thời gian từng phần (phút)'}
@@ -771,8 +771,8 @@ export default function TeacherDashboard({
                   </div>
                   <div className={`grid gap-1.5 ${cfg.order.length === 1 ? 'grid-cols-1 max-w-[200px]' : 'grid-cols-3'}`}>
                     {cfg.order.map((sId, sIdx) => (
-                      <div key={sId} className="bg-white dark:bg-slate-900 rounded-md p-2 text-center">
-                        <span className="block text-xs font-bold text-[#475569] dark:text-slate-400 uppercase">
+                      <div key={sId} className="bg-white dark:bg-[#18181B] rounded-md p-2 text-center">
+                        <span className="block text-xs font-bold text-[#475569] dark:text-zinc-400 uppercase">
                           {cfg.order.length > 1 ? `${sIdx + 1}. ` : ''}{sId === 'listening' ? 'Nghe' : sId === 'reading' ? 'Đọc' : sId === 'speaking' ? 'Nói AI' : 'Viết'}
                         </span>
                         <div className="flex items-center justify-center gap-1 mt-1">
@@ -793,7 +793,7 @@ export default function TeacherDashboard({
                               if (e.key === 'Enter') e.currentTarget.blur();
                             }}
                             title="Nhập số phút rồi bấm ra ngoài hoặc nhấn Enter để lưu"
-                            className="w-12 px-1 py-0.5 text-center bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-extrabold text-[#0F172B] dark:text-white"
+                            className="w-12 px-1 py-0.5 text-center bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-md text-xs font-extrabold text-[#0F172B] dark:text-white"
                           />
                           <span className="text-xs text-[#475569] font-bold">p</span>
                         </div>
@@ -801,7 +801,7 @@ export default function TeacherDashboard({
                     ))}
                   </div>
                   {!isExercise && (
-                    <p className="text-xs text-[#475569] dark:text-slate-300 font-medium">
+                    <p className="text-xs text-[#475569] dark:text-zinc-300 font-medium">
                       {cfg.sequentialMode
                         ? 'Hết giờ từng phần sẽ tự động chuyển sang phần tiếp theo.'
                         : 'Đang cho phép chuyển tự do giữa các phần.'}
@@ -811,10 +811,10 @@ export default function TeacherDashboard({
 
                 {/* 4 Quick Toggles */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/70 flex items-center justify-between gap-2">
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/70 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-bold text-[#0F172B] dark:text-slate-100">Hiển thị {entityLabel} cho HS</p>
-                      <p className="text-xs text-[#475569] dark:text-slate-400">
+                      <p className="text-xs text-[#475569] dark:text-zinc-400">
                         {isPrivate ? 'Đang ẩn - HS chưa thấy' : 'Công khai - HS làm được'}
                       </p>
                     </div>
@@ -832,10 +832,10 @@ export default function TeacherDashboard({
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/70 flex items-center justify-between gap-2">
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/70 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-bold text-[#0F172B] dark:text-slate-100">Chế độ Luyện / Thi thật</p>
-                      <p className="text-xs text-[#475569] dark:text-slate-400">
+                      <p className="text-xs text-[#475569] dark:text-zinc-400">
                         {cfg.maxAttempts === 1
                           ? 'Thi thật: Chỉ làm 1 lần'
                           : cfg.maxAttempts === 0
@@ -856,10 +856,10 @@ export default function TeacherDashboard({
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/70 flex items-center justify-between gap-2">
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/70 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-bold text-[#0F172B] dark:text-slate-100">Xem đáp án đúng</p>
-                      <p className="text-xs text-[#475569] dark:text-slate-400">
+                      <p className="text-xs text-[#475569] dark:text-zinc-400">
                         {t.allowViewAnswers ? 'HS xem được sau khi nộp' : 'Đang ẩn đáp án đúng'}
                       </p>
                     </div>
@@ -869,7 +869,7 @@ export default function TeacherDashboard({
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition flex-shrink-0 ${
                         t.allowViewAnswers
                           ? 'bg-[#047857] hover:bg-[#065F46] text-white'
-                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-[#0F172B] dark:text-slate-200'
+                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-[#0F172B] dark:text-zinc-200'
                       }`}
                     >
                       {t.allowViewAnswers ? (
@@ -884,10 +884,10 @@ export default function TeacherDashboard({
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/70 flex items-center justify-between gap-2">
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/70 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-bold text-[#0F172B] dark:text-slate-100">Chống gian lận (Ẩn với HS)</p>
-                      <p className="text-xs text-[#475569] dark:text-slate-400">
+                      <p className="text-xs text-[#475569] dark:text-zinc-400">
                         {cfg.antiCheatEnabled ? 'Đếm tab, khóa chuột phải & Extension' : 'Đang tắt - làm tự do'}
                       </p>
                     </div>
@@ -897,7 +897,7 @@ export default function TeacherDashboard({
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition flex-shrink-0 ${
                         cfg.antiCheatEnabled
                           ? 'bg-[#007A7A] hover:bg-[#065B5B] text-white'
-                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-[#0F172B] dark:text-slate-200'
+                          : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-[#0F172B] dark:text-zinc-200'
                       }`}
                     >
                       {cfg.antiCheatEnabled ? (
@@ -915,7 +915,7 @@ export default function TeacherDashboard({
               </div>
 
               {/* Class Student Completion Tracker Box */}
-              <div className="p-3.5 sm:p-4 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/60 space-y-2.5">
+              <div className="p-3.5 sm:p-4 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/60 space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-extrabold text-[#0F172B] dark:text-slate-100 flex items-center gap-1.5">
@@ -929,7 +929,7 @@ export default function TeacherDashboard({
                       className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${
                         stats.missingList.length > 0
                           ? 'bg-rose-100 dark:bg-rose-500/20 text-[#B91C1C] dark:text-rose-300'
-                          : 'bg-[#F1F5F9] dark:bg-slate-700 text-[#334155] dark:text-slate-300'
+                          : 'bg-[#F1F5F9] dark:bg-slate-700 text-[#334155] dark:text-zinc-300'
                       }`}
                     >
                       Chưa làm: {stats.missingList.length} HS
@@ -941,7 +941,7 @@ export default function TeacherDashboard({
                       <button
                         type="button"
                         onClick={() => handleCopyMissingList(t, stats.missingList)}
-                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border border-[#FECACA] dark:border-rose-500/30 text-xs font-bold transition flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#18181B] hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border border-[#FECACA] dark:border-rose-500/30 text-xs font-bold transition flex items-center gap-1"
                       >
                         <Copy className="w-3 h-3" /> Copy DS Chưa Làm
                       </button>
@@ -968,7 +968,7 @@ export default function TeacherDashboard({
                 )}
 
                 {stats.totalStudents === 0 ? (
-                  <p className="text-xs text-[#475569] dark:text-slate-400">
+                  <p className="text-xs text-[#475569] dark:text-zinc-400">
                     Chưa có tài khoản học sinh nào trong danh sách tài khoản.
                   </p>
                 ) : stats.missingList.length > 0 ? (
@@ -977,7 +977,7 @@ export default function TeacherDashboard({
                     {stats.missingList.slice(0, 6).map(({ account }) => (
                       <span
                         key={account.username}
-                        className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-500/30 text-[#0F172B] dark:text-slate-200 font-semibold"
+                        className="px-2 py-0.5 rounded-md bg-white dark:bg-[#18181B] border border-rose-200 dark:border-rose-500/30 text-[#0F172B] dark:text-zinc-200 font-semibold"
                       >
                         {account.name || account.username}
                       </span>
@@ -999,19 +999,19 @@ export default function TeacherDashboard({
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 dark:border-slate-800 pt-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 dark:border-zinc-800 pt-3 text-xs">
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => openExamBuilder(t, 'general')}
-                    className="bg-white dark:bg-slate-800 hover:bg-[#F1F5F9] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1"
+                    className="bg-white dark:bg-zinc-800 hover:bg-[#F1F5F9] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1"
                   >
                     <Clock className="w-3.5 h-3.5" /> Sửa Tên &amp; Cài Đặt Chung
                   </button>
                   <button
                     type="button"
                     onClick={() => openExamBuilder(t, isExercise && cfg.focusSkill ? cfg.focusSkill : 'reading')}
-                    className="bg-white dark:bg-slate-800 hover:bg-[#F1F5F9] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1"
+                    className="bg-white dark:bg-zinc-800 hover:bg-[#F1F5F9] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1"
                   >
                     <Edit className="w-3.5 h-3.5" /> Soạn Câu Hỏi &amp; Nội Dung
                   </button>
@@ -1028,7 +1028,7 @@ export default function TeacherDashboard({
                   <button
                     type="button"
                     onClick={() => handleDuplicateTest(t)}
-                    className="p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#EFF6FF] dark:hover:bg-blue-500/15 text-[#334155] dark:text-slate-300 hover:text-[#1D4ED8] dark:hover:text-blue-300 border border-[#CBD5E1] dark:border-slate-700 transition"
+                    className="p-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-[#EFF6FF] dark:hover:bg-blue-500/15 text-[#334155] dark:text-zinc-300 hover:text-[#1D4ED8] dark:hover:text-blue-300 border border-[#CBD5E1] dark:border-zinc-700 transition"
                     title={`Nhân bản ${entityLabel} (Bản sao tự động ở chế độ Riêng tư)`}
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -1036,7 +1036,7 @@ export default function TeacherDashboard({
                   <button
                     type="button"
                     onClick={() => handleDeleteTest(t)}
-                    className="p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-rose-400 border border-[#FECACA] dark:border-slate-700 transition"
+                    className="p-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-rose-400 border border-[#FECACA] dark:border-zinc-700 transition"
                     title={`Xóa ${entityLabel} này`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -1044,7 +1044,7 @@ export default function TeacherDashboard({
                   <button
                     type="button"
                     onClick={() => setExpandedTeacherTestId(null)}
-                    className="px-2.5 py-1.5 rounded-lg bg-[#F1F5F9] dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#334155] dark:text-slate-300 font-semibold transition"
+                    className="px-2.5 py-1.5 rounded-lg bg-[#F1F5F9] dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-[#334155] dark:text-zinc-300 font-semibold transition"
                   >
                     Thu gọn
                   </button>
@@ -1091,9 +1091,9 @@ export default function TeacherDashboard({
   const allNavItems = navSections.flatMap(sec => sec.items);
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-7 pb-10 space-y-5 scroll-mt-20">
       {/* Compact Workspace Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-zinc-800">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-extrabold text-[#0F172B] dark:text-white tracking-tight">
@@ -1102,13 +1102,13 @@ export default function TeacherDashboard({
             {isViewerSuperAdmin && (
               <span
                 title="Super Admin"
-                className="inline-flex items-center gap-1 bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 px-2.5 py-0.5 rounded-full text-xs font-bold"
+                className="inline-flex items-center gap-1 bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 px-2.5 py-0.5 rounded-full text-xs font-bold"
               >
                 <ShieldCheck className="w-3.5 h-3.5" /> ADMIN
               </span>
             )}
           </div>
-          <p className="text-sm text-[#475569] dark:text-slate-400 mt-0.5 max-w-2xl">
+          <p className="text-sm text-[#475569] dark:text-zinc-400 mt-0.5 max-w-2xl">
             IELTS Nha Trang - {fullExamTests.length} đề thi · {skillExercises.length} bài tập kỹ năng · {studentAccountsCount} học viên{guestAccountsCount > 0 ? ` · ${guestAccountsCount} khách` : ''}
           </p>
         </div>
@@ -1139,11 +1139,11 @@ export default function TeacherDashboard({
           <button
             type="button"
             onClick={() => setShowNotifyModal(true)}
-            className="bg-white dark:bg-slate-900 hover:bg-[#F8FAFC] dark:hover:bg-slate-800 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
+            className="bg-white dark:bg-[#18181B] hover:bg-[#F8FAFC] dark:hover:bg-zinc-800 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 text-xs font-bold px-3.5 py-2.5 rounded-lg transition flex items-center gap-1.5"
           >
             <Bell className="w-3.5 h-3.5 text-amber-500" /> Thông Báo
             {notifications.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 text-xs font-bold tabular-nums">
+              <span className="px-2 py-0.5 rounded-full bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200 text-xs font-bold tabular-nums">
                 {notifications.length}
               </span>
             )}
@@ -1198,7 +1198,7 @@ export default function TeacherDashboard({
                 setExerciseSkillFilter('speaking');
                 setTeacherHubTab('skill_exercises');
               }}
-              className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold transition"
+              className="px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 text-xs font-bold transition"
             >
               Xem chi tiết
             </button>
@@ -1220,12 +1220,12 @@ export default function TeacherDashboard({
                 className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 flex items-center gap-1.5 border transition ${
                   isActive
                     ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                    : 'bg-white dark:bg-slate-900 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-800'
+                    : 'bg-white dark:bg-[#18181B] text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-800'
                 }`}
               >
                 <IconComp className="w-3.5 h-3.5" />
                 <span>{tab.label}</span>
-                <span className={`text-xs font-bold tabular-nums ${isActive ? 'opacity-90' : 'text-[#334155] dark:text-slate-400'}`}>
+                <span className={`text-xs font-bold tabular-nums ${isActive ? 'opacity-90' : 'text-[#334155] dark:text-zinc-400'}`}>
                   ({tab.count})
                 </span>
               </button>
@@ -1264,7 +1264,7 @@ export default function TeacherDashboard({
               <button
                 type="button"
                 onClick={onOpenApiKeyModal}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 border border-[#CBD5E1] dark:border-slate-800 text-[#0F172B] dark:text-slate-200 inline-flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-[#18181B] border border-[#CBD5E1] dark:border-zinc-800 text-[#0F172B] dark:text-zinc-200 inline-flex items-center gap-1.5"
               >
                 <Key className="w-3.5 h-3.5 text-amber-600" /> Gemini AI Key
               </button>
@@ -1294,10 +1294,10 @@ export default function TeacherDashboard({
 
       {/* Main 2-Column Workspace (Desktop Sidebar + Content Area) */}
       <div className="grid grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)] gap-5 xl:gap-6 items-start">
-        <aside className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-5 sticky top-20">
+        <aside className="hidden lg:block bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-lg p-3 space-y-5 sticky top-20">
           {navSections.map(section => (
             <div key={section.title} className="space-y-1">
-              <p className="px-2.5 pb-1 text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-slate-300">
+              <p className="px-2.5 pb-1 text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-zinc-300">
                 {section.title}
               </p>
               {section.items.map(tab => {
@@ -1312,7 +1312,7 @@ export default function TeacherDashboard({
                     className={`w-full px-2.5 py-2.5 rounded-lg text-xs font-bold transition flex items-center justify-between gap-1.5 ${
                       isActive
                         ? 'bg-[#007A7A] text-white'
-                        : 'text-[#334155] dark:text-slate-200 hover:bg-[#F1F5F9] dark:hover:bg-slate-800 hover:text-[#0F172B] dark:hover:text-white'
+                        : 'text-[#334155] dark:text-zinc-200 hover:bg-[#F1F5F9] dark:hover:bg-zinc-800 hover:text-[#0F172B] dark:hover:text-white'
                     }`}
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -1325,7 +1325,7 @@ export default function TeacherDashboard({
                           ? 'bg-white/25 text-white'
                           : tab.highlightCount
                           ? 'bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/40'
-                          : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200'
+                          : 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200'
                       }`}
                     >
                       {tab.count}
@@ -1337,15 +1337,15 @@ export default function TeacherDashboard({
           ))}
 
           {(onOpenMailConfig || (isViewerSuperAdmin && onOpenPaymentConfig) || onOpenApiKeyModal || (isViewerSuperAdmin && onOpenAdminTitleManager)) && (
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-1">
-              <p className="px-2.5 pb-1 text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-slate-300">
+            <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 space-y-1">
+              <p className="px-2.5 pb-1 text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-zinc-300">
                 Cài Đặt &amp; Quản Trị
               </p>
               {onOpenMailConfig && (
                 <button
                   type="button"
                   onClick={onOpenMailConfig}
-                  className="w-full px-2.5 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-slate-200 hover:bg-[#F1F5F9] dark:hover:bg-slate-800 transition flex items-center justify-between gap-1.5"
+                  className="w-full px-2.5 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-zinc-200 hover:bg-[#F1F5F9] dark:hover:bg-zinc-800 transition flex items-center justify-between gap-1.5"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <Mail className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0" />
@@ -1361,7 +1361,7 @@ export default function TeacherDashboard({
                 <button
                   type="button"
                   onClick={onOpenPaymentConfig}
-                  className="w-full px-2.5 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-slate-200 hover:bg-[#F1F5F9] dark:hover:bg-slate-800 transition flex items-center justify-between gap-1.5"
+                  className="w-full px-2.5 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-zinc-200 hover:bg-[#F1F5F9] dark:hover:bg-zinc-800 transition flex items-center justify-between gap-1.5"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <QrCode className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6] shrink-0" />
@@ -1377,7 +1377,7 @@ export default function TeacherDashboard({
                 <button
                   type="button"
                   onClick={onOpenApiKeyModal}
-                  className="w-full px-2.5 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-slate-200 hover:bg-[#F1F5F9] dark:hover:bg-slate-800 transition flex items-center justify-between gap-1.5"
+                  className="w-full px-2.5 py-2.5 rounded-lg text-xs font-bold text-[#334155] dark:text-zinc-200 hover:bg-[#F1F5F9] dark:hover:bg-zinc-800 transition flex items-center justify-between gap-1.5"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <Key className="w-4 h-4 text-amber-600 shrink-0" />
@@ -1438,13 +1438,13 @@ export default function TeacherDashboard({
       {/* Tab 2: Kho Bài Tập Daily Zone (Miễn Phí - Từng Kỹ Năng Riêng) */}
       {teacherHubTab === 'skill_exercises' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-3">
+          <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-lg p-5 space-y-3">
             <div>
               <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" />
                 Tạo Bài Tập Daily Zone (Miễn Phí - Làm Lại Không Giới Hạn)
               </h2>
-              <p className="text-sm text-[#475569] dark:text-slate-400 mt-0.5 max-w-2xl">
+              <p className="text-sm text-[#475569] dark:text-zinc-400 mt-0.5 max-w-2xl">
                 Chọn đúng phân mục để soạn bài tập lẻ có thể cài Mật Khẩu Team: Daily Speaking, Cày Forecast, Reading SHW 1-14, Listening, Writing Task 1 (W1) hoặc Writing Task 2 (W2).
               </p>
             </div>
@@ -1467,7 +1467,7 @@ export default function TeacherDashboard({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold">
+            <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-[#18181B] p-1 rounded-lg border border-slate-200 dark:border-zinc-800 text-xs font-bold">
               {[
                 { id: 'all', label: `Tất cả Daily (${skillExercises.length})` },
                 { id: 'speaking', label: `Speaking (${skillExercises.filter(t => normalizeExamConfig(t).focusSkill === 'speaking').length})` },
@@ -1486,7 +1486,7 @@ export default function TeacherDashboard({
                   className={`px-3 py-1.5 rounded-md transition ${
                     exerciseSkillFilter === tab.id
                       ? 'bg-[#007A7A] text-white'
-                      : 'text-[#334155] dark:text-slate-300 hover:text-[#0F172B] dark:hover:text-white'
+                      : 'text-[#334155] dark:text-zinc-300 hover:text-[#0F172B] dark:hover:text-white'
                   }`}
                 >
                   {tab.label}
@@ -1496,7 +1496,7 @@ export default function TeacherDashboard({
 
             <div className="flex flex-wrap items-center gap-2 flex-1 sm:flex-initial justify-end">
               <div className="relative flex-1 sm:w-52">
-                <Search className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-[#475569] dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={itemSearchQuery}
@@ -1506,7 +1506,7 @@ export default function TeacherDashboard({
                   }}
                   placeholder="Tìm bài tập..."
                   aria-label="Tìm kiếm bài tập theo tiêu đề"
-                  className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
                 />
               </div>
               <button
@@ -1518,7 +1518,7 @@ export default function TeacherDashboard({
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
                   onlyIncompleteFilter
                     ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                    : 'bg-white dark:bg-slate-900 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
+                    : 'bg-white dark:bg-[#18181B] text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:border-rose-300'
                 }`}
               >
                 <AlertCircle className="w-3.5 h-3.5" />
@@ -1544,7 +1544,7 @@ export default function TeacherDashboard({
           )}
 
           {filteredSkillExercises.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-lg border border-slate-200 dark:border-slate-800 text-center text-sm text-[#475569] dark:text-slate-400">
+            <div className="bg-white dark:bg-[#18181B] p-8 rounded-lg border border-slate-200 dark:border-zinc-800 text-center text-sm text-[#475569] dark:text-zinc-400">
               {onlyIncompleteFilter
                 ? 'Tất cả bài tập trong mục này đã được 100% học sinh hoàn thành!'
                 : 'Chưa có bài tập nào cho bộ lọc này. Hãy bấm các nút kỹ năng phía trên để tạo ngay.'}
@@ -1577,25 +1577,25 @@ export default function TeacherDashboard({
       {/* Tab 1: Kho Đề Thi Full 4 Kỹ Năng (Thực Chiến & Mock Định Kỳ - Có Phí) */}
       {teacherHubTab === 'tests' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 sm:px-5 space-y-3">
+          <div className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-lg p-4 sm:px-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white">
                   Thực Chiến &amp; Mock Định Kỳ - Full 4 Kỹ Năng ({fullExamTests.length})
                 </h2>
-                <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
+                <p className="text-sm text-[#475569] dark:text-zinc-400 max-w-2xl">
                   Kho đề thi có phí chuẩn Full 4 kỹ năng Listening · Reading · Writing · Speaking (1 lượt thi thật · {publicFullExamsCount} đề công khai).
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative w-44 sm:w-52">
-                  <Search className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-3.5 h-3.5 text-[#475569] dark:text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={itemSearchQuery}
                     onChange={e => setItemSearchQuery(e.target.value)}
                     placeholder="Tìm đề thi..."
-                    className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
+                    className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
                   />
                 </div>
                 <button
@@ -1604,7 +1604,7 @@ export default function TeacherDashboard({
                   className={`px-3 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
                     onlyIncompleteFilter
                       ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                      : 'bg-white dark:bg-slate-900 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-rose-300'
+                      : 'bg-white dark:bg-[#18181B] text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:border-rose-300'
                   }`}
                 >
                   <AlertCircle className="w-3.5 h-3.5" />
@@ -1612,8 +1612,8 @@ export default function TeacherDashboard({
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex flex-wrap items-center gap-1 bg-[#F8FAFC] dark:bg-slate-800/70 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+              <div className="flex flex-wrap items-center gap-1 bg-[#F8FAFC] dark:bg-zinc-800/70 p-1 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs font-bold">
                 {[
                   { id: 'all', label: `Tất cả (${fullExamTests.length})` },
                   { id: 'real_exam', label: `Thực Chiến 100k (${realExamFullTests.length})` },
@@ -1626,22 +1626,22 @@ export default function TeacherDashboard({
                     className={`px-3 py-1.5 rounded-md transition ${
                       fullExamCategoryFilter === cat.id
                         ? 'bg-[#007A7A] text-white'
-                        : 'text-[#334155] dark:text-slate-300 hover:text-[#0F172B] dark:hover:text-white'
+                        : 'text-[#334155] dark:text-zinc-300 hover:text-[#0F172B] dark:hover:text-white'
                     }`}
                   >
                     {cat.label}
                   </button>
                 ))}
               </div>
-              <span className="text-xs font-semibold text-[#475569] dark:text-slate-400">
+              <span className="text-xs font-semibold text-[#475569] dark:text-zinc-400">
                 Thực Chiến áp dụng Combo 3/5/10 đề · Mock Định Kỳ là đề riêng 3 tháng/lần
               </span>
             </div>
           </div>
 
           {filteredFullExamTests.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-lg border border-slate-200 dark:border-slate-800 text-center space-y-3">
-              <p className="text-sm text-[#475569] dark:text-slate-400">
+            <div className="bg-white dark:bg-[#18181B] p-8 rounded-lg border border-slate-200 dark:border-zinc-800 text-center space-y-3">
+              <p className="text-sm text-[#475569] dark:text-zinc-400">
                 {onlyIncompleteFilter
                   ? 'Tất cả đề thi IELTS đã được 100% học sinh trong lớp hoàn thành!'
                   : fullExamCategoryFilter === 'periodic_mock'
@@ -1722,36 +1722,36 @@ export default function TeacherDashboard({
         <div className="space-y-4">
           {/* 4 Analytics KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-slate-400">Tổng bài đã nộp</p>
+            <div className="bg-white dark:bg-[#18181B] rounded-lg border border-slate-200 dark:border-zinc-800 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-zinc-400">Tổng bài đã nộp</p>
               <p className="text-2xl font-black text-[#0F172B] dark:text-white mt-1 tabular-nums">{attempts.length}</p>
             </div>
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-amber-300 dark:border-amber-500/30 p-4">
+            <div className="bg-white dark:bg-[#18181B] rounded-lg border border-amber-300 dark:border-amber-500/30 p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-[#92400E] dark:text-amber-400">Chờ chấm điểm</p>
               <p className="text-2xl font-black text-[#92400E] dark:text-amber-300 mt-1 tabular-nums">{pendingCount}</p>
             </div>
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-blue-200 dark:border-blue-500/30 p-4">
+            <div className="bg-white dark:bg-[#18181B] rounded-lg border border-blue-200 dark:border-blue-500/30 p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-[#1D4ED8] dark:text-blue-400">Band TB toàn lớp</p>
               <p className="text-2xl font-black text-[#1D4ED8] dark:text-blue-300 mt-1 tabular-nums">{avgBandDisplay}</p>
             </div>
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-rose-200 dark:border-rose-500/30 p-4">
+            <div className="bg-white dark:bg-[#18181B] rounded-lg border border-rose-200 dark:border-rose-500/30 p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-[#B91C1C] dark:text-rose-400">Cảnh báo tab (≥3)</p>
               <p className="text-2xl font-black text-[#B91C1C] dark:text-rose-400 mt-1 tabular-nums">{highRiskCount}</p>
             </div>
           </div>
 
           {/* Unified Filter Bar + Submissions Table Card */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+          <div className="bg-white dark:bg-[#18181B] rounded-lg border border-slate-200 dark:border-zinc-800 p-5 space-y-4">
             <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2.5">
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 min-w-0">
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-[#334155] dark:text-slate-300 shrink-0">
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-[#334155] dark:text-zinc-300 shrink-0">
                   <Filter className="w-3.5 h-3.5" /> Lọc:
                 </span>
                 <select
                   aria-label="Lọc theo đề thi hoặc bài tập"
                   value={gradingFilters.testId}
                   onChange={e => setGradingFilters(prev => ({ ...prev, testId: e.target.value }))}
-                  className="px-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 min-w-0 max-w-[180px]"
+                  className="px-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 min-w-0 max-w-[180px]"
                 >
                   <option value="all">Tất cả đề thi &amp; bài tập</option>
                   {uniqueAttemptTests.map(([tid, title]) => (
@@ -1762,7 +1762,7 @@ export default function TeacherDashboard({
                   aria-label="Lọc theo trạng thái chấm"
                   value={gradingFilters.status}
                   onChange={e => setGradingFilters(prev => ({ ...prev, status: e.target.value }))}
-                  className="px-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 shrink-0"
+                  className="px-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 shrink-0"
                 >
                   <option value="all">Tất cả trạng thái</option>
                   <option value="pending">Chờ duyệt &amp; chấm (Viết / Nói / 4 Kỹ Năng)</option>
@@ -1772,20 +1772,20 @@ export default function TeacherDashboard({
                   aria-label="Lọc theo mức cảnh báo chuyển tab"
                   value={gradingFilters.risk}
                   onChange={e => setGradingFilters(prev => ({ ...prev, risk: e.target.value }))}
-                  className="px-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 shrink-0"
+                  className="px-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 shrink-0"
                 >
                   <option value="all">Mọi mức độ tab</option>
                   <option value="risk">Nghi gian lận (≥3 tab)</option>
                 </select>
                 <div className="relative flex-1 min-w-[140px] max-w-[220px]">
-                  <Search className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Search className="w-3.5 h-3.5 text-[#475569] dark:text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     aria-label="Tìm theo tên học viên"
                     placeholder="Tên học viên..."
                     value={gradingFilters.search}
                     onChange={e => setGradingFilters(prev => ({ ...prev, search: e.target.value }))}
-                    className="w-full pl-8 pr-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-[#0F172B] dark:text-slate-100"
+                    className="w-full pl-8 pr-2.5 py-2 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs text-[#0F172B] dark:text-slate-100"
                   />
                 </div>
               </div>
@@ -1826,20 +1826,20 @@ export default function TeacherDashboard({
                   />
 
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-[#334155] dark:text-slate-300">
-                      <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 border-y border-slate-200 dark:border-slate-700 text-xs font-bold tracking-wider text-[#334155] dark:text-slate-300 uppercase whitespace-nowrap">
+                    <table className="w-full text-left text-sm text-[#334155] dark:text-zinc-300">
+                      <thead className="bg-[#F8FAFC] dark:bg-zinc-800/80 border-y border-slate-200 dark:border-zinc-700 text-xs font-bold tracking-wider text-[#334155] dark:text-zinc-300 uppercase whitespace-nowrap">
                         <tr>
                           <th className="px-3.5 py-3">Học Sinh &amp; Thời Gian</th>
                           <th className="px-3.5 py-3">Đề Thi / Bài Tập</th>
                           <th className="px-3 py-3 text-center">Trạng Thái &amp; Giám Sát</th>
                           <th className="px-3 py-3 text-center">Điểm Band</th>
-                          <th className="px-3.5 py-3 text-right sticky right-0 bg-[#F8FAFC] dark:bg-slate-800 z-10">Chấm &amp; Thao Tác</th>
+                          <th className="px-3.5 py-3 text-right ">Chấm &amp; Thao Tác</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
                         {filteredAttempts.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-slate-400">
+                            <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-zinc-400">
                               Không có bài nộp nào khớp bộ lọc hiện tại.{' '}
                               <button
                                 type="button"
@@ -1856,7 +1856,7 @@ export default function TeacherDashboard({
                           const RiskIcon = risk.icon;
 
                           return (
-                            <tr key={att.id} className="group hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
+                            <tr key={att.id} className="group hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/50 transition">
                               <td className="px-3.5 py-3 font-bold text-[#0F172B] dark:text-white">
                                 <div className="flex items-start gap-2.5">
                                   <UserAvatarBadge
@@ -1890,19 +1890,19 @@ export default function TeacherDashboard({
                                         </span>
                                       ) : null}
                                     </div>
-                                    <p className="text-xs font-normal text-[#475569] dark:text-slate-400 tabular-nums whitespace-nowrap">
+                                    <p className="text-xs font-normal text-[#475569] dark:text-zinc-400 tabular-nums whitespace-nowrap">
                                       {att.submittedAt}
                                       {Number(att.durationSeconds) > 0 ? ` · ${formatDurationVi(att.durationSeconds)}` : ''}
                                     </p>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-3.5 py-3 text-sm text-[#334155] dark:text-slate-300 max-w-[230px]">
+                              <td className="px-3.5 py-3 text-sm text-[#334155] dark:text-zinc-300 max-w-[230px]">
                                 <div className="space-y-1">
                                   <span
                                     className={`inline-block text-xs font-bold uppercase px-2 py-0.5 rounded border whitespace-nowrap ${
                                       att.testMode === 'single_skill'
-                                        ? 'bg-[#F1F5F9] text-[#334155] dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                        ? 'bg-[#F1F5F9] text-[#334155] dark:bg-zinc-800 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
                                         : 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30'
                                     }`}
                                   >
@@ -1951,7 +1951,7 @@ export default function TeacherDashboard({
                                 <div className="text-base font-black text-[#0F766E] dark:text-[#1EE1D6] tabular-nums leading-tight">
                                   {att.overallBand ?? '-'}
                                 </div>
-                                <div className="text-xs font-medium text-[#475569] dark:text-slate-400 mt-0.5 tabular-nums whitespace-nowrap">
+                                <div className="text-xs font-medium text-[#475569] dark:text-zinc-400 mt-0.5 tabular-nums whitespace-nowrap">
                                   {att.testMode === 'single_skill' && att.focusSkill === 'speaking'
                                     ? `Speaking ${att.scores?.speaking?.band ?? att.overallBand ?? '-'}`
                                     : att.testMode === 'single_skill'
@@ -1959,7 +1959,7 @@ export default function TeacherDashboard({
                                     : `L ${att.scores?.listening?.band ?? '-'} · R ${att.scores?.reading?.band ?? '-'} · W ${att.scores?.writing?.overallBand ?? '-'}${att.scores?.speaking ? ` · S ${att.scores?.speaking?.band ?? '-'}` : ''}`}
                                 </div>
                               </td>
-                              <td className="px-3.5 py-3 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-[#F8FAFC] dark:group-hover:bg-slate-800 transition z-10">
+                              <td className="px-3.5 py-3 text-right whitespace-nowrap ">
                                 <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                                   <button
                                     type="button"
@@ -1976,7 +1976,7 @@ export default function TeacherDashboard({
                                       setView('RESULT_VIEW');
                                     }}
                                     aria-label={`Xem chi tiết bài làm của ${att.studentName}`}
-                                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-teal-500/15 text-[#0F172B] hover:text-[#0F766E] dark:text-slate-300 dark:hover:text-[#1EE1D6] border border-[#CBD5E1] dark:border-slate-700 transition"
+                                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-teal-500/15 text-[#0F172B] hover:text-[#0F766E] dark:text-zinc-300 dark:hover:text-[#1EE1D6] border border-[#CBD5E1] dark:border-zinc-700 transition"
                                     title="Xem chi tiết từng câu & bài làm"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
@@ -1985,7 +1985,7 @@ export default function TeacherDashboard({
                                     type="button"
                                     onClick={() => handleDeleteAttempt(att)}
                                     aria-label={`Xóa lượt thi của ${att.studentName}`}
-                                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-slate-400 dark:hover:text-rose-400 border border-[#FECACA] dark:border-slate-700 transition"
+                                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-rose-50 dark:hover:bg-rose-500/15 text-[#B91C1C] dark:text-zinc-400 dark:hover:text-rose-400 border border-[#FECACA] dark:border-zinc-700 transition"
                                     title="Xóa lượt thi này để mở khóa cho học viên thi lại"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -2018,14 +2018,14 @@ export default function TeacherDashboard({
       {teacherHubTab === 'game_room' && (
         <div className="space-y-6">
           {/* Room Switcher + Create Room */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white dark:bg-[#18181B] rounded-lg p-4 border border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-[#334155] dark:text-slate-400 mr-1">Danh sách phòng:</span>
+              <span className="text-xs font-bold text-[#334155] dark:text-zinc-400 mr-1">Danh sách phòng:</span>
               {allRoomsList.map(r => {
                 const isActiveRoom = r.pin === currentRoomPin;
                 const rLobbyCount = Object.keys(r.lobbyPlayers || {}).length;
                 return (
-                  <div key={r.pin} className="inline-flex items-center rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                  <div key={r.pin} className="inline-flex items-center rounded-lg overflow-hidden border border-slate-200 dark:border-zinc-700">
                     <button
                       onClick={() => {
                         setCurrentRoomPin(r.pin);
@@ -2034,13 +2034,13 @@ export default function TeacherDashboard({
                       className={`px-3 py-1.5 text-xs font-bold transition flex items-center gap-2 ${
                         isActiveRoom
                           ? 'bg-[#007A7A] text-white'
-                          : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-200 hover:bg-[#F1F5F9] dark:hover:bg-slate-700'
+                          : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#0F172B] dark:text-zinc-200 hover:bg-[#F1F5F9] dark:hover:bg-zinc-700'
                       }`}
                     >
                       <span className="font-mono">#{r.pin}</span>
                       <span className={`w-1.5 h-1.5 rounded-full ${r.status === 'PLAYING' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                       {rLobbyCount > 0 && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${isActiveRoom ? 'bg-white/20 text-white' : 'bg-[#F1F5F9] dark:bg-slate-700 text-[#334155] dark:text-slate-200'}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${isActiveRoom ? 'bg-white/20 text-white' : 'bg-[#F1F5F9] dark:bg-slate-700 text-[#334155] dark:text-zinc-200'}`}>
                           {rLobbyCount} chờ
                         </span>
                       )}
@@ -2049,7 +2049,7 @@ export default function TeacherDashboard({
                       <button
                         type="button"
                         onClick={() => handleDeleteRoom(r.pin)}
-                        className="px-2 py-1.5 bg-[#F1F5F9] dark:bg-slate-900 hover:bg-rose-600 text-[#475569] hover:text-white border-l border-slate-200 dark:border-slate-700 transition"
+                        className="px-2 py-1.5 bg-[#F1F5F9] dark:bg-[#18181B] hover:bg-rose-600 text-[#475569] hover:text-white border-l border-slate-200 dark:border-zinc-700 transition"
                         title={`Xóa phòng #${r.pin}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -2166,9 +2166,9 @@ export default function TeacherDashboard({
 
           {/* Live Lobby Crewmates Preview */}
           {lobbyPlayersList.length > 0 && (
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+            <div className="bg-white dark:bg-[#18181B] rounded-lg border border-slate-200 dark:border-zinc-800 p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-extrabold uppercase tracking-wider text-[#334155] dark:text-slate-300 flex items-center gap-2">
+                <h2 className="text-xs font-extrabold uppercase tracking-wider text-[#334155] dark:text-zinc-300 flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#047857]" /> Phi Hành Đoàn Đang Chờ Trong Sảnh ({lobbyPlayersList.length})
                 </h2>
                 <button
@@ -2182,7 +2182,7 @@ export default function TeacherDashboard({
                 {lobbyPlayersList.map(lp => (
                   <div
                     key={lp.username}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-[#007A7A] dark:hover:border-teal-500 transition"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#007A7A] dark:hover:border-teal-500 transition"
                   >
                     <button
                       type="button"
@@ -2226,17 +2226,17 @@ export default function TeacherDashboard({
           )}
 
           {/* Leaderboard Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+          <div className="bg-white dark:bg-[#18181B] rounded-lg border border-slate-200 dark:border-zinc-800 p-5 space-y-4">
             <div className="flex justify-between items-center gap-3 flex-wrap">
               <h2 className="font-extrabold text-sm text-[#0F172B] dark:text-white flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-500" /> Bảng Xếp Hạng Học Sinh Trong Phòng (Real-time)
               </h2>
-              <span className="text-xs text-[#475569] dark:text-slate-400 font-medium">Tự động đồng bộ điểm số</span>
+              <span className="text-xs text-[#475569] dark:text-zinc-400 font-medium">Tự động đồng bộ điểm số</span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-[#334155] dark:text-slate-300">
-                <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 text-xs text-[#334155] dark:text-slate-300 uppercase border-y border-slate-200 dark:border-slate-700">
+              <table className="w-full text-left text-sm text-[#334155] dark:text-zinc-300">
+                <thead className="bg-[#F8FAFC] dark:bg-zinc-800/80 text-xs text-[#334155] dark:text-zinc-300 uppercase border-y border-slate-200 dark:border-zinc-700">
                   <tr>
                     <th className="px-4 py-3">Hạng</th>
                     <th className="px-4 py-3">Tên Học Sinh</th>
@@ -2246,32 +2246,32 @@ export default function TeacherDashboard({
                     <th className="px-4 py-3 text-right">Cập Nhật</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
                   {leaderboardPlayers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-sm text-[#475569] dark:text-slate-400">
+                      <td colSpan={6} className="text-center py-8 text-sm text-[#475569] dark:text-zinc-400">
                         Chưa có học sinh nào nộp điểm vào phòng. Hãy chia sẻ mã PIN <b>{currentRoomPin}</b> cho học sinh!
                       </td>
                     </tr>
                   ) : (
                     leaderboardPlayers.map((p, idx) => (
-                      <tr key={idx} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
+                      <tr key={idx} className="hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/50 transition">
                         <td className="px-4 py-3.5 font-bold">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-black tabular-nums ${
                             idx === 0
                               ? 'bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-300'
                               : idx === 1
-                              ? 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200'
+                              ? 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-200'
                               : idx === 2
                               ? 'bg-orange-100 dark:bg-orange-500/20 text-[#9A3412] dark:text-orange-300'
-                              : 'text-[#475569] dark:text-slate-400'
+                              : 'text-[#475569] dark:text-zinc-400'
                           }`}>
                             {idx === 0 && <Crown className="w-3 h-3" />}
                             #{idx + 1}
                           </span>
                         </td>
                         <td className="px-4 py-3.5 font-bold text-[#0F172B] dark:text-white">{p.name}</td>
-                        <td className="px-4 py-3.5 text-sm text-[#334155] dark:text-slate-300">
+                        <td className="px-4 py-3.5 text-sm text-[#334155] dark:text-zinc-300">
                           <div>{p.status}</div>
                           {Array.isArray(p.missed) && p.missed.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mt-1">
@@ -2292,7 +2292,7 @@ export default function TeacherDashboard({
                             <Flame className="w-3.5 h-3.5" /> {p.streak}
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-right text-xs text-[#475569] dark:text-slate-400">{p.updatedAt}</td>
+                        <td className="px-4 py-3.5 text-right text-xs text-[#475569] dark:text-zinc-400">{p.updatedAt}</td>
                       </tr>
                     ))
                   )}
@@ -2315,14 +2315,14 @@ export default function TeacherDashboard({
         return (
         <div className="space-y-4">
           {/* Unified Header, Role Filters, Actions & Accounts Table */}
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-lg border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="bg-white dark:bg-[#18181B] p-5 rounded-lg border border-slate-200 dark:border-zinc-800 space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <h2 className="font-extrabold text-base text-[#0F172B] dark:text-white flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" />
                   Tạo &amp; Quản Lý Tài Khoản Hệ Thống ({allAccounts.length})
                 </h2>
-                <p className="text-sm text-[#475569] dark:text-slate-400 mt-0.5 max-w-2xl">
+                <p className="text-sm text-[#475569] dark:text-zinc-400 mt-0.5 max-w-2xl">
                   Tạo, cấp mật khẩu, phân quyền hoặc xem hồ sơ học viên.
                 </p>
               </div>
@@ -2353,14 +2353,14 @@ export default function TeacherDashboard({
                     setAddStudentMode('bulk');
                     setShowAddStudentModal(true);
                   }}
-                  className="px-3.5 py-2 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-100 border border-[#CBD5E1] dark:border-slate-700 text-xs font-bold transition flex items-center gap-1.5"
+                  className="px-3.5 py-2 rounded-lg bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-slate-100 border border-[#CBD5E1] dark:border-zinc-700 text-xs font-bold transition flex items-center gap-1.5"
                 >
                   <Users className="w-3.5 h-3.5" /> Nhập Hàng Loạt
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-slate-200 dark:border-zinc-800">
               <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
                 <button
                   type="button"
@@ -2368,7 +2368,7 @@ export default function TeacherDashboard({
                   className={`px-3 py-1.5 rounded-lg border transition ${
                     accountRoleFilter === 'all'
                       ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#F1F5F9]'
+                      : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:bg-[#F1F5F9]'
                   }`}
                 >
                   Tất cả ({allAccounts.length})
@@ -2379,7 +2379,7 @@ export default function TeacherDashboard({
                   className={`px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 ${
                     accountRoleFilter === 'student'
                       ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#F1F5F9]'
+                      : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:bg-[#F1F5F9]'
                   }`}
                 >
                   <GraduationCap className="w-3.5 h-3.5" /> Học viên ({studentAccountsCount})
@@ -2390,7 +2390,7 @@ export default function TeacherDashboard({
                   className={`px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 ${
                     accountRoleFilter === 'guest'
                       ? 'bg-amber-600 text-white border-amber-600'
-                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#F1F5F9]'
+                      : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:bg-[#F1F5F9]'
                   }`}
                 >
                   <User className="w-3.5 h-3.5" /> Tài khoản khách ({guestAccountsCount})
@@ -2401,7 +2401,7 @@ export default function TeacherDashboard({
                   className={`px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 ${
                     accountRoleFilter === 'teacher'
                       ? 'bg-[#B45309] text-white border-[#B45309]'
-                      : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-[#F1F5F9]'
+                      : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:bg-[#F1F5F9]'
                   }`}
                 >
                   <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên ({teacherAccountsCount})
@@ -2422,14 +2422,14 @@ export default function TeacherDashboard({
               </div>
 
               <div className="relative w-full sm:w-72">
-                <Search className="w-3.5 h-3.5 text-[#475569] dark:text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-3.5 h-3.5 text-[#475569] dark:text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   aria-label="Tìm theo tên hoặc tên đăng nhập"
                   placeholder="Tìm theo tên hoặc @username..."
                   value={studentSearchQuery}
                   onChange={e => setStudentSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-xs bg-[#F8FAFC] dark:bg-slate-800 text-[#0F172B] dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-lg font-medium"
+                  className="w-full pl-9 pr-4 py-2 text-xs bg-[#F8FAFC] dark:bg-zinc-800 text-[#0F172B] dark:text-slate-100 border border-slate-300 dark:border-zinc-700 rounded-lg font-medium"
                 />
               </div>
             </div>
@@ -2443,7 +2443,7 @@ export default function TeacherDashboard({
                   <button
                     type="button"
                     onClick={() => setSelectedUsernames([])}
-                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-300 hover:bg-[#F8FAFC] transition"
+                    className="px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-xs font-semibold text-[#0F172B] dark:text-zinc-300 hover:bg-[#F8FAFC] transition"
                   >
                     Bỏ chọn
                   </button>
@@ -2473,11 +2473,11 @@ export default function TeacherDashboard({
                     itemLabel="tài khoản"
                   />
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-[#334155] dark:text-slate-300">
-                      <thead className="bg-[#F8FAFC] dark:bg-slate-800/80 border-y border-slate-200 dark:border-slate-700 text-xs text-[#334155] dark:text-slate-300 uppercase whitespace-nowrap">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-zinc-800">
+                    <table className="w-full text-left text-sm text-[#334155] dark:text-zinc-300">
+                      <thead className="bg-[#F8FAFC] dark:bg-zinc-900/90 border-b border-slate-200 dark:border-zinc-800 text-xs font-bold tracking-wider text-[#334155] dark:text-zinc-300 uppercase">
                         <tr>
-                          <th className="pl-4 pr-2 py-4 w-10">
+                          <th className="pl-4 pr-2 py-3.5 w-9">
                             <input
                               type="checkbox"
                               aria-label="Chọn tất cả tài khoản đang hiển thị"
@@ -2494,18 +2494,16 @@ export default function TeacherDashboard({
                               className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:opacity-40"
                             />
                           </th>
-                          <th className="px-4 py-4">Tài Khoản</th>
-                          <th className="px-4 py-4 text-center">Vai Trò</th>
-                          <th className="px-4 py-4 text-center">Mục Tiêu / Ghi Chú</th>
-                          <th className="px-4 py-4 text-center">Hoạt Động</th>
-                          <th className="px-4 py-4 text-center">Ngày Tạo</th>
-                          <th className="px-4 py-4 text-right sticky right-0 bg-[#F8FAFC] dark:bg-slate-800 z-10">Thao Tác</th>
+                          <th className="px-3.5 py-3.5">Tài Khoản</th>
+                          <th className="px-3.5 py-3.5">Vai Trò &amp; Quyền Gói</th>
+                          <th className="px-3.5 py-3.5 text-center">Mục Tiêu &amp; Tiến Độ</th>
+                          <th className="px-3.5 py-3.5 text-right">Thao Tác</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      <tbody className="divide-y divide-slate-200 dark:divide-zinc-800/90">
                         {filteredAccounts.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-slate-400">
+                            <td colSpan={5} className="px-6 py-10 text-center text-sm text-[#475569] dark:text-zinc-400">
                               Không tìm thấy tài khoản nào phù hợp với bộ lọc hiện tại.
                             </td>
                           </tr>
@@ -2524,8 +2522,8 @@ export default function TeacherDashboard({
                         : null;
 
                       return (
-                        <tr key={account.username} className="group hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50 transition">
-                          <td className="pl-4 pr-2 py-4 w-10">
+                        <tr key={account.username} className="group hover:bg-[#F8FAFC] dark:hover:bg-zinc-800/45 transition align-middle">
+                          <td className="pl-4 pr-2 py-4 w-9">
                             <input
                               type="checkbox"
                               aria-label={`Chọn tài khoản ${account.username}`}
@@ -2543,174 +2541,50 @@ export default function TeacherDashboard({
                               className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                             />
                           </td>
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-3">
-                              <UserAvatarBadge user={account} sizeClass="w-10 h-10" textClass="text-sm" rounded="rounded-lg" />
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
+                          <td className="px-3.5 py-4 min-w-[230px]">
+                            <div className="flex items-start gap-3">
+                              <UserAvatarBadge user={account} sizeClass="w-10 h-10" textClass="text-sm" rounded="rounded-xl" />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   {openMemberProfile ? (
                                     <button
                                       type="button"
                                       onClick={() => openMemberProfile(account.username, 'TEACHER_DASHBOARD')}
                                       title="Mở trang hồ sơ chi tiết"
-                                      className="font-bold text-[#0F172B] dark:text-white hover:text-[#0F766E] dark:hover:text-teal-400 hover:underline leading-tight text-left transition"
+                                      className="font-bold text-[#0F172B] dark:text-zinc-100 hover:text-[#0F766E] dark:hover:text-teal-400 hover:underline leading-snug text-left transition"
                                     >
                                       <VipMemberName user={account} fallbackName={account.name} badgeSize="xs" />
                                     </button>
                                   ) : (
-                                    <p className="font-bold text-[#0F172B] dark:text-white leading-tight">
+                                    <p className="font-bold text-[#0F172B] dark:text-zinc-100 leading-snug">
                                       <VipMemberName user={account} fallbackName={account.name} badgeSize="xs" />
                                     </p>
                                   )}
                                   {isSelfAccount && (
-                                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300">
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#D1FAE5] dark:bg-emerald-500/20 text-[#065F46] dark:text-emerald-300">
                                       Bạn
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[13px] text-[#475569] dark:text-slate-400 font-mono mt-0.5">@{account.username}</p>
-                                <p className={`text-xs font-semibold mt-0.5 ${account.emailVerified ? 'text-[#065F46] dark:text-emerald-400' : 'text-[#475569] dark:text-slate-400'}`}>
+                                <p className="text-xs text-[#475569] dark:text-zinc-400 font-mono mt-0.5 truncate">
+                                  @{account.username}
+                                  {account.joinedDate ? ` · ${account.joinedDate}` : ''}
+                                </p>
+                                <p className={`text-xs font-medium mt-0.5 truncate max-w-[260px] ${account.emailVerified ? 'text-[#065F46] dark:text-emerald-400' : 'text-[#64748B] dark:text-zinc-500'}`} title={account.email || account.maskedEmail || ''}>
                                   {account.emailVerified
-                                    ? `✓ Email OTP: ${account.email || account.maskedEmail}`
+                                    ? `✓ OTP: ${account.email || account.maskedEmail}`
                                     : 'Chưa liên kết Email OTP'}
                                 </p>
-                                {isViewerSuperAdmin && isTeacherAccount && onToggleUserSubscription && (() => {
-                                  const hasVip = hasActiveAieoVip(account);
-                                  return (
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                      {hasVip && (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30">
-                                          <Crown className="w-3 h-3" /> IELTS VIP · {formatRemainingSubscriptionText(account.aieoVipExpiresAt)}
-                                        </span>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (hasVip && !window.confirm(`Thu hồi gói IELTS VIP của ${account.name || account.username}?`)) return;
-                                          onToggleUserSubscription(account.username, 'aieo_vip', !hasVip);
-                                        }}
-                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
-                                          hasVip
-                                            ? 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 hover:bg-rose-50 dark:hover:bg-rose-500/10'
-                                            : 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
-                                        }`}
-                                        title={hasVip ? 'Thu hồi gói IELTS VIP' : 'Cấp gói IELTS VIP trong 30 ngày'}
-                                      >
-                                        {hasVip ? 'Thu hồi' : <><Crown className="w-3 h-3" /> + Cấp IELTS VIP (30 ngày)</>}
-                                      </button>
-                                    </div>
-                                  );
-                                })()}
-                                {isViewerSuperAdmin && account.role === 'student' && onToggleUserCoverUnlock && (() => {
-                                  const isCoverUnlocked = hasCustomCoverPermission(account);
-                                  const isPendingCover = !isCoverUnlocked && Number(account.coverUnlockRequestedAt) > 0;
-                                  return (
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (isCoverUnlocked && !window.confirm(`Khóa lại quyền tải Ảnh Nền Riêng của ${account.name || account.username}?`)) {
-                                            return;
-                                          }
-                                          onToggleUserCoverUnlock(account.username, !isCoverUnlocked);
-                                        }}
-                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition ${
-                                          isCoverUnlocked
-                                            ? 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35 hover:bg-emerald-200'
-                                            : isPendingCover
-                                            ? 'bg-[#FEF3C7] text-[#92400E] border-amber-300 hover:bg-amber-200'
-                                            : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-[#CBD5E1] dark:border-slate-700 hover:border-amber-500'
-                                        }`}
-                                        title={isCoverUnlocked ? 'Bấm để khóa lại quyền tải ảnh nền' : `Bấm để mở khóa quyền Ảnh Nền Riêng (${coverPriceLabel})`}
-                                      >
-                                        {isCoverUnlocked ? (
-                                          <>
-                                            <CheckCircle2 className="w-3 h-3" /> Mở Ảnh Nền
-                                          </>
-                                        ) : isPendingCover ? (
-                                          <>
-                                            <Unlock className="w-3 h-3" /> Duyệt Mở Ảnh Nền ({coverPriceLabel})
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Lock className="w-3 h-3" /> Khóa Ảnh Nền ({coverPriceLabel})
-                                          </>
-                                        )}
-                                      </button>
-                                      {onToggleUserSubscription && (() => {
-                                        const hasVip = hasActiveAieoVip(account);
-                                        const stuCredits = getRealExamCredits(account);
-                                        const pendingSubReq = account.subscriptionRequested || null;
-                                        const isPendingComboOrTest = Boolean(
-                                          pendingSubReq &&
-                                          (pendingSubReq.itemType === 'test' ||
-                                            Boolean(getRealExamComboMeta(pendingSubReq.itemType, paymentConfig)))
-                                        );
-                                        return (
-                                          <>
-                                            <button
-                                              type="button"
-                                              onClick={() => onToggleUserSubscription(account.username, 'aieo_vip', !hasVip)}
-                                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition ${
-                                                hasVip
-                                                  ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                                                  : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] border-[#CBD5E1] dark:border-slate-700 hover:border-rose-500'
-                                              }`}
-                                              title="Bật/Tắt gói IELTS VIP 1 tháng"
-                                            >
-                                              {hasVip ? 'IELTS VIP' : '+ IELTS VIP'}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => onToggleUserSubscription(account.username, 'real_exam_credit', true)}
-                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white transition"
-                                              title="Cộng thêm +1 lượt làm đề có phí (Thực Chiến)"
-                                            >
-                                              {stuCredits} lượt (+1)
-                                            </button>
-                                            {stuCredits > 0 && (
-                                              <button
-                                                type="button"
-                                                onClick={() => onToggleUserSubscription(account.username, 'real_exam_credit', false)}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border-[#FECACA] dark:border-rose-500/30 hover:bg-[#B91C1C] hover:text-white transition"
-                                                title="Trừ bớt -1 lượt làm đề có phí nếu cộng nhầm"
-                                              >
-                                                -1 lượt
-                                              </button>
-                                            )}
-                                            {isPendingComboOrTest && (
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  onToggleUserSubscription(
-                                                    account.username,
-                                                    pendingSubReq.itemType,
-                                                    true,
-                                                    pendingSubReq.itemId || ''
-                                                  )
-                                                }
-                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-200 border-amber-400 hover:bg-amber-200 transition"
-                                                title="Duyệt yêu cầu mua đề lẻ / Combo Thực Chiến"
-                                              >
-                                                Duyệt: {pendingSubReq.itemLabel || pendingSubReq.itemType}
-                                              </button>
-                                            )}
-                                          </>
-                                        );
-                                      })()}
-                                    </div>
-                                  );
-                                })()}
                                 {account.role === 'student' && (() => {
                                   const clsIds = getUserClassIds(classesDb, account.username);
                                   const clsNames = getAssignedClassNames(clsIds, classesDb);
                                   if (clsNames.length === 0) return null;
                                   return (
-                                    <div className="flex flex-wrap gap-2 mt-2">
+                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
                                       {clsNames.map(c => (
                                         <span
                                           key={c.id}
-                                          className="text-xs font-semibold px-2.5 py-1 rounded-md bg-[#EFF6FF] dark:bg-blue-500/20 text-[#1D4ED8] dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
+                                          className="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
                                         >
                                           {c.name}
                                         </span>
@@ -2721,108 +2595,233 @@ export default function TeacherDashboard({
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-center whitespace-nowrap">
-                            {isSuperAdminAccount ? (
-                              <span
-                                title="Super Admin"
-                                className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 whitespace-nowrap"
-                              >
-                                <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> ADMIN
-                              </span>
-                            ) : isTeacherAccount ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 whitespace-nowrap">
-                                <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Giáo viên
-                              </span>
-                            ) : account.isGuest ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 whitespace-nowrap">
-                                <User className="w-3.5 h-3.5 shrink-0" /> Tài khoản khách
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 whitespace-nowrap">
-                                <GraduationCap className="w-3.5 h-3.5 shrink-0" /> Học viên
-                              </span>
-                            )}
-                            {(() => {
-                              const accTitle = resolveVisibleTitleBadge(account, attempts, roomsDb, customTitles, paymentConfig, {
-                                gamePracticeLeaderboard,
-                                dailyRankTitles,
-                                usersDb
-                              });
-                              if (!accTitle || accTitle.isRoleBuiltIn) return null;
-                              return (
-                                <div className="mt-2">
-                                  <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border ${accTitle.badgeClass}`}>
-                                    <span>{accTitle.icon}</span>
-                                    <span>{accTitle.label}</span>
+                          <td className="px-3.5 py-4 min-w-[210px]">
+                            <div className="flex flex-col items-start gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {isSuperAdminAccount ? (
+                                  <span
+                                    title="Super Admin"
+                                    className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/35 whitespace-nowrap"
+                                  >
+                                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> ADMIN TỐI CAO
                                   </span>
-                                </div>
-                              );
-                            })()}
+                                ) : isTeacherAccount ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 whitespace-nowrap">
+                                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Giáo viên
+                                  </span>
+                                ) : account.isGuest ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 whitespace-nowrap">
+                                    <User className="w-3.5 h-3.5 shrink-0" /> Khách
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border border-[#B5F5F1] dark:border-teal-500/30 whitespace-nowrap">
+                                    <GraduationCap className="w-3.5 h-3.5 shrink-0" /> Học viên
+                                  </span>
+                                )}
+                                {(() => {
+                                  const accTitle = resolveVisibleTitleBadge(account, attempts, roomsDb, customTitles, paymentConfig, {
+                                    gamePracticeLeaderboard,
+                                    dailyRankTitles,
+                                    usersDb
+                                  });
+                                  if (!accTitle || accTitle.isRoleBuiltIn) return null;
+                                  return (
+                                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${accTitle.badgeClass}`}>
+                                      <span>{accTitle.icon}</span>
+                                      <span>{accTitle.label}</span>
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+
+                              {isSuperAdminAccount ? (
+                                <span className="text-xs font-semibold text-[#475569] dark:text-zinc-400">
+                                  Đã mở khóa vĩnh viễn mọi gói &amp; VIP
+                                </span>
+                              ) : isViewerSuperAdmin && isTeacherAccount && onToggleUserSubscription ? (() => {
+                                const hasVip = hasActiveAieoVip(account);
+                                return (
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    {hasVip && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30">
+                                        <Crown className="w-3 h-3 shrink-0" /> VIP · {formatRemainingSubscriptionText(account.aieoVipExpiresAt)}
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (hasVip && !window.confirm(`Thu hồi gói IELTS VIP của ${account.name || account.username}?`)) return;
+                                        onToggleUserSubscription(account.username, 'aieo_vip', !hasVip);
+                                      }}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold border transition ${
+                                        hasVip
+                                          ? 'bg-white dark:bg-zinc-800 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 hover:bg-rose-50'
+                                          : 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700'
+                                      }`}
+                                      title={hasVip ? 'Thu hồi gói IELTS VIP' : 'Cấp gói IELTS VIP trong 30 ngày'}
+                                    >
+                                      {hasVip ? 'Thu hồi VIP' : '+ Cấp VIP (30N)'}
+                                    </button>
+                                  </div>
+                                );
+                              })() : null}
+
+                              {isViewerSuperAdmin && account.role === 'student' && onToggleUserCoverUnlock && (() => {
+                                const isCoverUnlocked = hasCustomCoverPermission(account);
+                                const isPendingCover = !isCoverUnlocked && Number(account.coverUnlockRequestedAt) > 0;
+                                const hasVip = hasActiveAieoVip(account);
+                                const stuCredits = getRealExamCredits(account);
+                                const pendingSubReq = account.subscriptionRequested || null;
+                                const isPendingComboOrTest = Boolean(
+                                  pendingSubReq &&
+                                  (pendingSubReq.itemType === 'test' ||
+                                    Boolean(getRealExamComboMeta(pendingSubReq.itemType, paymentConfig)))
+                                );
+                                return (
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (isCoverUnlocked && !window.confirm(`Khóa lại quyền tải Ảnh Nền Riêng của ${account.name || account.username}?`)) {
+                                          return;
+                                        }
+                                        onToggleUserCoverUnlock(account.username, !isCoverUnlocked);
+                                      }}
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border transition ${
+                                        isCoverUnlocked
+                                          ? 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
+                                          : isPendingCover
+                                          ? 'bg-[#FEF3C7] text-[#92400E] border-amber-300'
+                                          : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-[#CBD5E1] dark:border-zinc-700 hover:border-amber-500'
+                                      }`}
+                                      title={isCoverUnlocked ? 'Bấm để khóa lại quyền tải ảnh nền' : `Bấm để mở khóa quyền Ảnh Nền Riêng (${coverPriceLabel})`}
+                                    >
+                                      {isCoverUnlocked ? (
+                                        <>
+                                          <CheckCircle2 className="w-3 h-3" /> Ảnh Nền: Mở
+                                        </>
+                                      ) : isPendingCover ? (
+                                        <>
+                                          <Unlock className="w-3 h-3" /> Duyệt Ảnh Nền
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Lock className="w-3 h-3" /> Ảnh Nền
+                                        </>
+                                      )}
+                                    </button>
+                                    {onToggleUserSubscription && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => onToggleUserSubscription(account.username, 'aieo_vip', !hasVip)}
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border transition ${
+                                            hasVip
+                                              ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
+                                              : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-[#CBD5E1] dark:border-zinc-700 hover:border-rose-500'
+                                          }`}
+                                          title="Bật/Tắt gói IELTS VIP 1 tháng"
+                                        >
+                                          {hasVip ? 'VIP: Bật' : '+ VIP'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => onToggleUserSubscription(account.username, 'real_exam_credit', true)}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white transition"
+                                          title="Cộng thêm +1 lượt làm đề có phí (Thực Chiến)"
+                                        >
+                                          {stuCredits} lượt (+1)
+                                        </button>
+                                        {stuCredits > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onToggleUserSubscription(account.username, 'real_exam_credit', false)}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border bg-rose-50 dark:bg-rose-500/15 text-[#B91C1C] dark:text-rose-300 border-[#FECACA] dark:border-rose-500/30 hover:bg-[#B91C1C] hover:text-white transition"
+                                            title="Trừ bớt -1 lượt làm đề có phí"
+                                          >
+                                            -1
+                                          </button>
+                                        )}
+                                        {isPendingComboOrTest && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              onToggleUserSubscription(
+                                                account.username,
+                                                pendingSubReq.itemType,
+                                                true,
+                                                pendingSubReq.itemId || ''
+                                              )
+                                            }
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border bg-[#FEF3C7] dark:bg-amber-500/20 text-[#92400E] dark:text-amber-200 border-amber-400 hover:bg-amber-200 transition"
+                                          >
+                                            Duyệt: {pendingSubReq.itemLabel || pendingSubReq.itemType}
+                                          </button>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </td>
-                          <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <td className="px-3.5 py-4 text-center whitespace-nowrap">
                             {isTeacherAccount ? (
-                              <span className="text-xs font-semibold text-[#475569] dark:text-slate-400">
-                                Quản trị &amp; Ra đề
-                              </span>
+                              <div className="space-y-0.5">
+                                <p className="text-xs font-bold text-[#92400E] dark:text-amber-300">
+                                  Quản trị &amp; Ra đề
+                                </p>
+                                <p className="text-xs text-[#64748B] dark:text-zinc-400">
+                                  Toàn quyền hệ thống
+                                </p>
+                              </div>
                             ) : (
-                              <div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setEditingTargetUser({
-                                      username: account.username,
-                                      name: account.name || '',
-                                      role: account.role || 'student',
-                                      targetBand: account.targetBand || 7.5,
-                                      studyGoal: account.studyGoal || '',
-                                      avatarUrl: account.avatarUrl || ''
-                                    })
-                                  }
-                                  title="Chỉnh sửa Target Band & thông tin tài khoản"
-                                  className="inline-flex items-center gap-1.5 text-xs font-bold bg-[#FEF3C7] dark:bg-amber-500/15 hover:bg-amber-200 dark:hover:bg-amber-500/25 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 px-2.5 py-1 rounded-full whitespace-nowrap transition"
-                                >
-                                  <Target className="w-3.5 h-3.5 text-[#B45309] shrink-0" />
-                                  Band {account.targetBand || '7.5'}
-                                  <Edit className="w-3 h-3 opacity-70 shrink-0" />
-                                </button>
-                                {account.studyGoal && (
-                                  <p className="text-[13px] text-[#475569] dark:text-slate-400 mt-1.5 max-w-[160px] mx-auto truncate" title={account.studyGoal}>
-                                    {account.studyGoal}
-                                  </p>
+                              <div className="space-y-1.5">
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEditingTargetUser({
+                                        username: account.username,
+                                        name: account.name || '',
+                                        role: account.role || 'student',
+                                        targetBand: account.targetBand || 7.5,
+                                        studyGoal: account.studyGoal || '',
+                                        avatarUrl: account.avatarUrl || ''
+                                      })
+                                    }
+                                    title="Chỉnh sửa Target Band & thông tin tài khoản"
+                                    className="inline-flex items-center gap-1 text-xs font-bold bg-[#FEF3C7] dark:bg-amber-500/15 hover:bg-amber-200 dark:hover:bg-amber-500/25 text-[#92400E] dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 px-2.5 py-0.5 rounded-full whitespace-nowrap transition"
+                                  >
+                                    <Target className="w-3 h-3 text-[#B45309] shrink-0" />
+                                    Band {account.targetBand || '7.5'}
+                                    <Edit className="w-3 h-3 opacity-70 shrink-0" />
+                                  </button>
+                                </div>
+                                {studentAttempts.length > 0 ? (
+                                  <div className="inline-flex items-center gap-1.5 text-xs whitespace-nowrap">
+                                    <span className="bg-[#F1F5F9] dark:bg-zinc-800 text-[#0F172B] dark:text-zinc-200 px-2 py-0.5 rounded-md font-bold tabular-nums">
+                                      {studentAttempts.length} bài
+                                    </span>
+                                    {bestBand !== null ? (
+                                      <span className="font-bold text-[#065F46] dark:text-emerald-300 bg-[#D1FAE5] dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 rounded-md tabular-nums">
+                                        Best {bestBand}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-[#64748B] dark:text-zinc-500">Chưa làm bài</p>
                                 )}
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-4 text-center whitespace-nowrap">
-                            {isTeacherAccount ? (
-                              <span className="text-xs font-bold text-[#92400E] dark:text-amber-300">
-                                Toàn quyền quản lý
-                              </span>
-                            ) : studentAttempts.length > 0 ? (
-                              <div className="inline-flex items-center gap-2 text-xs whitespace-nowrap">
-                                <span className="bg-[#F1F5F9] dark:bg-slate-800 text-[#0F172B] dark:text-slate-200 px-2.5 py-1 rounded-md font-bold tabular-nums">
-                                  {studentAttempts.length} bài
-                                </span>
-                                {bestBand !== null ? (
-                                  <span className="font-bold text-[#065F46] dark:text-emerald-300 bg-[#D1FAE5] dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 px-2.5 py-1 rounded-md tabular-nums">
-                                    Best {bestBand}
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-[#475569] dark:text-slate-400">Chưa làm bài</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-center text-[13px] font-mono text-[#475569] dark:text-slate-400 whitespace-nowrap tabular-nums">
-                            {account.joinedDate || '-'}
-                          </td>
-                          <td className="px-4 py-4 text-right whitespace-nowrap sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-[#F8FAFC] dark:group-hover:bg-slate-800 transition z-10">
-                            <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <td className="px-3.5 py-4 text-right">
+                            <div className="inline-flex items-center justify-end gap-1.5 flex-wrap max-w-[290px] ml-auto">
                               {openMemberProfile && (
                                 <button
                                   type="button"
                                   onClick={() => openMemberProfile(account.username, 'TEACHER_DASHBOARD')}
-                                  className="min-h-[34px] inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 whitespace-nowrap transition"
+                                  className="min-h-[32px] inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 whitespace-nowrap transition"
                                 >
                                   <Eye className="w-3.5 h-3.5 shrink-0" /> Hồ sơ
                                 </button>
@@ -2831,10 +2830,10 @@ export default function TeacherDashboard({
                                 <button
                                   type="button"
                                   onClick={() => onOpenAdminTitleManager(account.username)}
-                                  className="min-h-[34px] inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 whitespace-nowrap transition"
+                                  className="min-h-[32px] inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 whitespace-nowrap transition"
                                   title="Tặng hoặc gỡ danh hiệu cho tài khoản này"
                                 >
-                                  <Crown className="w-3.5 h-3.5 shrink-0" /> Danh Hiệu
+                                  <Crown className="w-3.5 h-3.5 shrink-0 text-amber-500" /> Danh hiệu
                                 </button>
                               )}
                               <button
@@ -2849,7 +2848,7 @@ export default function TeacherDashboard({
                                     avatarUrl: account.avatarUrl || ''
                                   })
                                 }
-                                className="min-h-[34px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 text-xs font-semibold whitespace-nowrap transition inline-flex items-center gap-1"
+                                className="min-h-[32px] px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 text-xs font-semibold whitespace-nowrap transition inline-flex items-center gap-1"
                                 title="Sửa thông tin & phân quyền tài khoản"
                               >
                                 <Edit className="w-3.5 h-3.5 shrink-0" /> Sửa
@@ -2862,10 +2861,10 @@ export default function TeacherDashboard({
                                   setEditingStudentAccount(account);
                                   setStudentPasswordDraft('');
                                 }}
-                                className={`min-h-[34px] px-3 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap transition inline-flex items-center gap-1 ${
+                                className={`min-h-[32px] px-2.5 py-1 rounded-lg border text-xs font-semibold whitespace-nowrap transition inline-flex items-center gap-1 ${
                                   canResetAccountPass
-                                    ? 'bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border-[#CBD5E1] dark:border-slate-700'
-                                    : 'bg-[#F1F5F9] dark:bg-slate-800/50 text-[#64748B] dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                                    ? 'bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border-[#CBD5E1] dark:border-zinc-700'
+                                    : 'bg-[#F1F5F9] dark:bg-zinc-900 text-[#64748B] dark:text-zinc-600 border-slate-200 dark:border-zinc-800 cursor-not-allowed'
                                 }`}
                                 title={
                                   canResetAccountPass
@@ -2879,9 +2878,9 @@ export default function TeacherDashboard({
                                 type="button"
                                 disabled={disableDelete}
                                 onClick={() => !disableDelete && handleDeleteAccount(account)}
-                                className={`min-h-[34px] px-3 py-1.5 rounded-lg border text-xs font-semibold whitespace-nowrap transition inline-flex items-center gap-1 ${
+                                className={`min-h-[32px] px-2.5 py-1 rounded-lg border text-xs font-semibold whitespace-nowrap transition inline-flex items-center gap-1 ${
                                   disableDelete
-                                    ? 'bg-[#F1F5F9] dark:bg-slate-800/50 text-[#64748B] dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed'
+                                    ? 'bg-[#F1F5F9] dark:bg-zinc-900 text-[#64748B] dark:text-zinc-600 border-slate-200 dark:border-zinc-800 cursor-not-allowed'
                                     : 'bg-white dark:bg-rose-500/10 hover:bg-rose-50 dark:hover:bg-rose-500/20 text-[#B91C1C] dark:text-rose-300 border-[#FECACA] dark:border-rose-500/30'
                                 }`}
                                 title={
@@ -2975,25 +2974,25 @@ export default function TeacherDashboard({
               role="dialog"
               aria-modal="true"
               aria-label={`Kiểm tra tiến độ: ${targetItem.title}`}
-              className="apple-modal-sheet bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88dvh] flex flex-col overflow-hidden"
+              className="apple-modal-sheet bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88dvh] flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-[#F8FAFC] dark:bg-slate-900">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-zinc-800 flex items-start justify-between gap-4 bg-[#F8FAFC] dark:bg-[#18181B]">
                 <div className="space-y-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`text-xs font-bold uppercase px-2 py-0.5 rounded-md border ${
                         isExercise
                           ? 'bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1]'
-                          : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-[#1EE1D6] border-[#CBD5E1] dark:border-teal-500/30'
+                          : 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-[#1EE1D6] border-[#CBD5E1] dark:border-teal-500/30'
                       }`}
                     >
                       {isExercise
                         ? `BÀI TẬP • ${cfg.focusSkill === 'speaking' ? 'SPEAKING AI' : (cfg.focusSkill || 'SKILL').toUpperCase()}`
                         : 'ĐỀ THI IELTS'}
                     </span>
-                    <span className="text-xs font-bold text-[#475569] dark:text-slate-400">
+                    <span className="text-xs font-bold text-[#475569] dark:text-zinc-400">
                       Kiểm tra tiến độ học sinh
                     </span>
                   </div>
@@ -3005,7 +3004,7 @@ export default function TeacherDashboard({
                   type="button"
                   onClick={() => setCompletionModalTestId(null)}
                   aria-label="Đóng hộp thoại kiểm tra tiến độ"
-                  className="min-h-[36px] min-w-[36px] flex items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-800 border border-[#CBD5E1] dark:border-slate-700 text-[#475569] hover:text-[#0F172B] dark:hover:text-white transition"
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center p-2 rounded-lg bg-white dark:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#475569] hover:text-[#0F172B] dark:hover:text-white transition"
                   title="Đóng"
                 >
                   <X className="w-4 h-4" />
@@ -3013,10 +3012,10 @@ export default function TeacherDashboard({
               </div>
 
               {/* KPI Strip & Controls */}
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-zinc-800 space-y-3">
                 <div className="grid grid-cols-3 gap-2.5">
-                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/70 text-center">
-                    <div className="text-xs font-bold text-[#475569] dark:text-slate-400">Tổng học sinh</div>
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/70 text-center">
+                    <div className="text-xs font-bold text-[#475569] dark:text-zinc-400">Tổng học sinh</div>
                     <div className="text-xl font-black text-[#0F172B] dark:text-white tabular-nums">{stats.totalStudents}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-[#D1FAE5]/60 dark:bg-emerald-500/10 text-center">
@@ -3030,7 +3029,7 @@ export default function TeacherDashboard({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1 bg-[#F1F5F9] dark:bg-slate-800 p-1 rounded-lg text-xs font-bold">
+                  <div className="flex flex-wrap items-center gap-1 bg-[#F1F5F9] dark:bg-zinc-800 p-1 rounded-lg text-xs font-bold">
                     {[
                       { id: 'missing', label: `Chưa làm (${stats.missingList.length})` },
                       { id: 'done', label: `Đã làm (${stats.doneList.length})` },
@@ -3047,7 +3046,7 @@ export default function TeacherDashboard({
                               : tab.id === 'done'
                               ? 'bg-[#047857] text-white'
                               : 'bg-[#007A7A] text-white'
-                            : 'text-[#334155] dark:text-slate-300 hover:text-[#0F172B] dark:hover:text-white'
+                            : 'text-[#334155] dark:text-zinc-300 hover:text-[#0F172B] dark:hover:text-white'
                         }`}
                       >
                         {tab.label}
@@ -3063,7 +3062,7 @@ export default function TeacherDashboard({
                         value={completionSearch}
                         onChange={e => setCompletionSearch(e.target.value)}
                         placeholder="Tìm tên học sinh..."
-                        className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
+                        className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-[#0F172B] dark:text-slate-100 focus:outline-none focus:border-[#007A7A]"
                       />
                     </div>
                     {stats.missingList.length > 0 && (
@@ -3083,11 +3082,11 @@ export default function TeacherDashboard({
               {/* Student List Body */}
               <div className="flex-1 overflow-y-auto p-6 space-y-2.5">
                 {stats.totalStudents === 0 ? (
-                  <div className="text-center py-10 text-sm text-[#475569] dark:text-slate-400">
+                  <div className="text-center py-10 text-sm text-[#475569] dark:text-zinc-400">
                     Chưa có tài khoản học sinh nào. Hãy tạo tài khoản học sinh ở mục <strong>Tài Khoản Lớp</strong>.
                   </div>
                 ) : rowsToRender.length === 0 ? (
-                  <div className="text-center py-10 text-sm text-[#475569] dark:text-slate-400">
+                  <div className="text-center py-10 text-sm text-[#475569] dark:text-zinc-400">
                     {completionFilter === 'missing' && !q
                       ? 'Tất cả học sinh trong lớp đều đã làm bài này!'
                       : 'Không tìm thấy học sinh phù hợp với bộ lọc.'}
@@ -3112,7 +3111,7 @@ export default function TeacherDashboard({
                               <span className="font-bold text-sm text-[#0F172B] dark:text-white truncate">
                                 {stu.name || stu.username}
                               </span>
-                              <span className="text-xs font-mono text-[#475569] dark:text-slate-400">
+                              <span className="text-xs font-mono text-[#475569] dark:text-zinc-400">
                                 @{stu.username}
                               </span>
                               {isMissing ? (
@@ -3125,7 +3124,7 @@ export default function TeacherDashboard({
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                            <div className="text-xs text-[#475569] dark:text-zinc-400 mt-0.5">
                               {isMissing ? (
                                 <span>Mục tiêu: Band {stu.targetBand || 7.5}</span>
                               ) : (
@@ -3156,7 +3155,7 @@ export default function TeacherDashboard({
                                 setCompletionModalTestId(null);
                                 openMemberProfile(stu.username, 'TEACHER_DASHBOARD');
                               }}
-                              className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172B] dark:text-slate-200 border border-[#CBD5E1] dark:border-slate-700 text-xs font-semibold flex items-center gap-1 transition"
+                              className="px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-[#F8FAFC] dark:hover:bg-zinc-700 text-[#0F172B] dark:text-zinc-200 border border-[#CBD5E1] dark:border-zinc-700 text-xs font-semibold flex items-center gap-1 transition"
                             >
                               <Eye className="w-3.5 h-3.5" /> Hồ sơ
                             </button>
@@ -3205,22 +3204,22 @@ export default function TeacherDashboard({
           onClick={() => setShowNotifyModal(false)}
         >
           <div
-            className="apple-modal-sheet bg-white dark:bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90dvh] flex flex-col border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden"
+            className="apple-modal-sheet bg-white dark:bg-[#18181B] rounded-lg max-w-2xl w-full max-h-[90dvh] flex flex-col border border-slate-200 dark:border-zinc-700 shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            <div className="px-6 py-4 bg-[#F8FAFC] dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+            <div className="px-6 py-4 bg-[#F8FAFC] dark:bg-zinc-800/80 border-b border-slate-200 dark:border-zinc-700 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
                   <Megaphone className="w-4 h-4 text-amber-600" /> Gửi Thông Báo Học Tập Tới Lớp
                 </h2>
-                <p className="text-xs text-[#475569] dark:text-slate-400">
+                <p className="text-xs text-[#475569] dark:text-zinc-400">
                   Mọi thông báo được đồng bộ real-time lên thanh chuông của toàn bộ học viên. (Khi bạn tạo hoặc mở công khai đề thi mới, hệ thống cũng tự động thông báo!)
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowNotifyModal(false)}
-                className="p-2 rounded-lg text-[#475569] hover:text-[#0F172B] dark:hover:text-white hover:bg-[#F1F5F9] dark:hover:bg-slate-800"
+                className="p-2 rounded-lg text-[#475569] hover:text-[#0F172B] dark:hover:text-white hover:bg-[#F1F5F9] dark:hover:bg-zinc-800"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3238,15 +3237,15 @@ export default function TeacherDashboard({
                     setNotifyForm({ title: '', message: '', type: 'announcement', testId: '', roomPin: '', targetClassIds: [] });
                   }
                 }}
-                className="space-y-3.5 bg-[#F8FAFC] dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4"
+                className="space-y-3.5 bg-[#F8FAFC] dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-700 rounded-lg p-4"
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">Loại thông báo</label>
+                    <label className="block text-xs font-bold text-[#334155] dark:text-zinc-300 mb-1">Loại thông báo</label>
                     <select
                       value={notifyForm.type}
                       onChange={e => setNotifyForm(prev => ({ ...prev, type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-[#0F172B] dark:text-slate-100"
+                      className="w-full px-3 py-2 bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-bold text-[#0F172B] dark:text-slate-100"
                     >
                       <option value="announcement">Thông báo chung</option>
                       <option value="exam">Giao Đề Thi IELTS</option>
@@ -3255,7 +3254,7 @@ export default function TeacherDashboard({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-[#334155] dark:text-zinc-300 mb-1">
                       Đính kèm Đề / Bài tập (tùy chọn)
                     </label>
                     <select
@@ -3271,7 +3270,7 @@ export default function TeacherDashboard({
                           title: !prev.title && matched ? `Nhắc làm bài: ${matched.title}` : prev.title
                         }));
                       }}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-[#0F172B] dark:text-slate-100"
+                      className="w-full px-3 py-2 bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-semibold text-[#0F172B] dark:text-slate-100"
                     >
                       <option value="">-- Không đính kèm đề thi --</option>
                       {tests
@@ -3288,44 +3287,44 @@ export default function TeacherDashboard({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">Tiêu đề thông báo *</label>
+                    <label className="block text-xs font-bold text-[#334155] dark:text-zinc-300 mb-1">Tiêu đề thông báo *</label>
                     <input
                       type="text"
                       required
                       value={notifyForm.title}
                       onChange={e => setNotifyForm(prev => ({ ...prev, title: e.target.value }))}
                       placeholder="VD: Hoàn thành Mock Test 02 trước 21h tối nay!"
-                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 rounded-lg text-xs text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">Hoặc PIN Game (nếu mời)</label>
+                    <label className="block text-xs font-bold text-[#334155] dark:text-zinc-300 mb-1">Hoặc PIN Game (nếu mời)</label>
                     <input
                       type="text"
                       value={notifyForm.roomPin}
                       onChange={e => setNotifyForm(prev => ({ ...prev, roomPin: e.target.value, testId: e.target.value ? '' : prev.testId }))}
                       placeholder={`VD: ${currentRoomPin}`}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-[#0F172B] dark:text-white"
+                      className="w-full px-3 py-2 bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 rounded-lg text-xs font-mono text-[#0F172B] dark:text-white"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#334155] dark:text-slate-300 mb-1">Nội dung chi tiết *</label>
+                  <label className="block text-xs font-bold text-[#334155] dark:text-zinc-300 mb-1">Nội dung chi tiết *</label>
                   <textarea
                     rows={3}
                     required
                     value={notifyForm.message}
                     onChange={e => setNotifyForm(prev => ({ ...prev, message: e.target.value }))}
                     placeholder="Nhập dặn dò, hạn nộp bài hoặc phần thưởng danh hiệu cho học viên..."
-                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
+                    className="w-full px-3.5 py-2 bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 rounded-lg text-xs text-[#0F172B] dark:text-white focus:ring-2 focus:ring-[#007A7A] focus:outline-none"
                   />
                 </div>
 
                 {Object.keys(classesDb || {}).length > 0 && (
-                  <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="p-3 rounded-lg bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-700 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-[#334155] dark:text-slate-300 flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#334155] dark:text-zinc-300 flex items-center gap-1.5">
                         <Layers className="w-3.5 h-3.5 text-[#0F766E]" />
                         Đối tượng nhận thông báo
                       </span>
@@ -3335,7 +3334,7 @@ export default function TeacherDashboard({
                         className={`text-xs font-bold px-2.5 py-0.5 rounded-md transition ${
                           !notifyForm.targetClassIds?.length
                             ? 'bg-[#007A7A] text-white'
-                            : 'bg-[#F1F5F9] dark:bg-slate-800 text-[#334155] dark:text-slate-300 hover:bg-slate-200'
+                            : 'bg-[#F1F5F9] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 hover:bg-slate-200'
                         }`}
                       >
                         Tất cả học viên
@@ -3360,7 +3359,7 @@ export default function TeacherDashboard({
                             className={`px-2.5 py-1 rounded-md text-xs font-bold border transition ${
                               selected
                                 ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                                : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                                : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-[#007A7A]'
                             }`}
                           >
                             {selected ? '✓ ' : ''}{cls.name} ({cls.studentUsernames?.length || 0} HS)
@@ -3388,7 +3387,7 @@ export default function TeacherDashboard({
               </form>
 
               <div className="space-y-2.5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-slate-400">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#334155] dark:text-zinc-400">
                   Lịch Sử Thông Báo Đã Gửi ({notifications.length})
                 </h3>
                 {notifications.length === 0 ? (
@@ -3398,12 +3397,12 @@ export default function TeacherDashboard({
                     {notifications.map(n => (
                       <div
                         key={n.id}
-                        className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-start justify-between gap-3"
+                        className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 flex items-start justify-between gap-3"
                       >
                         <div className="min-w-0">
                           <p className="text-xs font-extrabold text-[#0F172B] dark:text-white">{n.title}</p>
-                          <p className="text-xs text-[#334155] dark:text-slate-300 mt-0.5">{n.message}</p>
-                          <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
+                          <p className="text-xs text-[#334155] dark:text-zinc-300 mt-0.5">{n.message}</p>
+                          <p className="text-xs text-[#475569] dark:text-zinc-400 mt-1">
                             {n.createdAt} • {n.readCount || 0} học viên đã xem
                           </p>
                         </div>

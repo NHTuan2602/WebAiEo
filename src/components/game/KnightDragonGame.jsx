@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import VerticalPodiumLeaderboard from '../common/VerticalPodiumLeaderboard';
 import KnightGachaModal from './KnightGachaModal';
+import KnightPvpArena from './KnightPvpArena';
 import {
   canHeroEquipWeapon,
   DEATH_REVIVE_DELAY_SEC,
@@ -118,7 +119,10 @@ export default function KnightDragonGame({
   currentUser,
   customVocabTopics = [],
   darkMode = false,
+  dispatchSyncAction = null,
   gamePracticeLeaderboard = [],
+  knightPvpLeaderboard = [],
+  knightPvpRealtime = null,
   initialRawVocab = DEFAULT_VOCAB_TEXT,
   initialTopicId = 'core',
   initialTopicLabel = 'IELTS Core Academic',
@@ -155,6 +159,7 @@ export default function KnightDragonGame({
     loadLocalKnightRpgProfile(username, currentUser)
   );
   const [showShopModal, setShowShopModal] = useState(() => Boolean(initialOpenShop));
+  const [showPvpArena, setShowPvpArena] = useState(false);
   const [starterGiftJustUnlocked, setStarterGiftJustUnlocked] = useState(false);
 
   useEffect(() => {
@@ -213,6 +218,13 @@ export default function KnightDragonGame({
   // 'HUB' | 'PLAYING' | 'DEATH_COUNTDOWN' | 'REVIVE_PROMPT' | 'FINAL_SMASH' |
   // 'DEMON_WARNING' | 'DEMON_WHEEL' | 'DEMON_EXECUTION' | 'TRANSITION' | 'GAMEOVER'
   const [matchState, setMatchState] = useState('HUB');
+
+  useEffect(() => {
+    const st = knightPvpRealtime?.activeMatch?.status;
+    if ((st === 'READY_CHECK' || st === 'PLAYING') && matchState === 'HUB') {
+      setShowPvpArena(true);
+    }
+  }, [knightPvpRealtime?.activeMatch?.status, matchState]);
   const [round, setRound] = useState(1);
   const [singleRoundOnly, setSingleRoundOnly] = useState(false);
   const [queues, setQueues] = useState({ 1: [], 2: [], 3: [], 4: [], 5: [] });
@@ -2995,8 +3007,44 @@ export default function KnightDragonGame({
         </div>
       </header>
 
+      {/* 1 VS 1 PVP ARENA SCREEN */}
+      {matchState === 'HUB' && showPvpArena && (
+        <KnightPvpArena
+          bgmMuted={bgmMuted}
+          currentUser={currentUser}
+          dispatchSyncAction={dispatchSyncAction}
+          effectiveRawVocab={resolveSelectedRawVocab()}
+          isStrictAdmin={isStrictAdmin}
+          knightPvpLeaderboard={knightPvpLeaderboard}
+          knightPvpRealtime={knightPvpRealtime}
+          onBackToKnightHub={() => setShowPvpArena(false)}
+          onRewardGoldSynced={goldAdded => {
+            updateAndPersistProfile(prev => ({
+              ...prev,
+              gold: (prev.gold || 0) + goldAdded
+            }));
+          }}
+          onSelectTopicId={setTopicId}
+          rpgProfile={rpgProfile}
+          showToast={showToast}
+          topicId={topicId}
+          topicOptions={[
+            { id: 'core', title: '🎯 IELTS Core Academic (Mặc định)' },
+            ...Object.entries(VOCAB_PRESETS || {}).map(([k, preset]) => ({
+              id: k,
+              title: `📚 ${preset.label}`
+            })),
+            ...(customVocabTopics || []).map(t => ({
+              id: `custom:${t.id}`,
+              title: `⭐ ${t.label}`
+            }))
+          ]}
+          usersDb={usersDb}
+        />
+      )}
+
       {/* HUB SCREEN */}
-      {matchState === 'HUB' && (
+      {matchState === 'HUB' && !showPvpArena && (
         <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-5">
           <div className="rounded-3xl border border-rose-200 dark:border-rose-500/35 bg-gradient-to-br from-white via-[#FFF5F7] to-[#FEFCE8]/70 dark:from-slate-900 dark:via-[#1a1025] dark:to-slate-900 p-5 sm:p-7 shadow-xl dark:shadow-2xl space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
@@ -3169,6 +3217,16 @@ export default function KnightDragonGame({
                 >
                   <Swords className="w-5 h-5" />
                   <span>XUẤT CHINH TỪ ẢI 1 ĐỦ 4 ẢI: SLIME ➔ GOBLIN ➔ ORC ➔ BOSS RỒNG</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="open-knight-pvp-btn"
+                  onClick={() => setShowPvpArena(true)}
+                  className="sm:w-auto py-4 px-5 rounded-2xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-amber-500 hover:opacity-95 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition shrink-0"
+                >
+                  <Swords className="w-4 h-4" />
+                  <span>⚔️ ĐỐI KHÁNG 1 VS 1 (GHÉP TRẬN &amp; PHÒNG)</span>
                 </button>
 
                 {isStrictAdmin && (

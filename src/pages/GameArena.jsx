@@ -104,6 +104,9 @@ export default function GameArena({
   gameOutcome,
   gamePaused,
   gamePracticeLeaderboard = [],
+  knightPvpLeaderboard = [],
+  knightPvpRealtime = null,
+  dispatchSyncAction = null,
   knightGachaConfig = null,
   onAdminGrantGachaWishes = null,
   onAdminSetGachaBannerConfig = null,
@@ -295,6 +298,9 @@ export default function GameArena({
         customVocabTopics={customVocabTopics}
         darkMode={darkMode}
         gamePracticeLeaderboard={gamePracticeLeaderboard}
+        knightPvpLeaderboard={knightPvpLeaderboard}
+        knightPvpRealtime={knightPvpRealtime}
+        dispatchSyncAction={dispatchSyncAction}
         initialRawVocab={room.rawVocab || DEFAULT_VOCAB_TEXT}
         initialTopicId={practiceTopicId}
         initialOpenShop={autoOpenKnightShopOnEnter}

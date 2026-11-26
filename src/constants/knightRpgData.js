@@ -2225,9 +2225,12 @@ export function normalizeKnightRpgProfile(raw = {}, nowMs = Date.now()) {
   const rawScoreWeekKey = /^\d{4}-\d{2}-\d{2}$/.test(String(obj.bestScoreWeekKey || ''))
     ? String(obj.bestScoreWeekKey)
     : '';
-  // Reset weekly game high-score back to 0 whenever Monday 00:00 Vietnam week rolls over
+  // Reset weekly game high-score back to 0 whenever Monday 00:00 Vietnam week rolls over,
+  // while preserving lifetime allTimeBestScore so unlocked Titles are never lost!
+  const rawBestScore = Math.max(0, Math.floor(Number(obj.bestScore) || 0));
+  const allTimeBestScore = Math.max(rawBestScore, Math.floor(Number(obj.allTimeBestScore) || 0));
   const isStaleScoreWeek = Boolean(rawScoreWeekKey && rawScoreWeekKey !== currentWeekKey);
-  const bestScore = isStaleScoreWeek ? 0 : Math.max(0, Math.floor(Number(obj.bestScore) || 0));
+  const bestScore = isStaleScoreWeek ? 0 : rawBestScore;
   const bestScoreWeekKey = currentWeekKey;
   const firstGameGiftClaimed = Boolean(obj.firstGameGiftClaimed);
 
@@ -2250,6 +2253,7 @@ export function normalizeKnightRpgProfile(raw = {}, nowMs = Date.now()) {
     demonKingsSlain,
     keysCollected,
     bestScore,
+    allTimeBestScore,
     bestScoreWeekKey
   };
 }
@@ -2346,6 +2350,11 @@ export function loadLocalKnightRpgProfile(username = 'guest', userRecord = null,
         demonKingsSlain: Math.max(localProfile.demonKingsSlain, serverProfile.demonKingsSlain),
         keysCollected: Math.max(localProfile.keysCollected, serverProfile.keysCollected),
         bestScore: mergedBestScore,
+        allTimeBestScore: Math.max(
+          localProfile.allTimeBestScore || 0,
+          serverProfile.allTimeBestScore || 0,
+          mergedBestScore
+        ),
         bestScoreWeekKey: currentWeekKey
       },
       nowMs

@@ -1061,18 +1061,18 @@ export const STUDENT_TITLES = [
   },
   {
     id: 'knight_hero_collector',
-    label: 'Nhà Sưu Tập Anh Hùng',
-    icon: '👗',
+    label: 'Nhà Sưu Tập Meme',
+    icon: '🎭',
     tier: 'Hiệp Sĩ RPG',
     difficulty: 'Khó',
-    conditionText: 'Tích vàng đánh quái để mở khóa ít nhất 2 nhân vật / skin mới (Nữ Chiến Binh Valkyrie, Nữ Kiếm Khách Sakura...) trong Cửa Hàng Hiệp Sĩ.',
+    conditionText: 'Mở khóa từ 3 Nhân Vật Meme trở lên trong Vòng Quay Gacha Hiệp Sĩ Diệt Rồng.',
     badgeClass: 'bg-pink-50 text-pink-800 border-pink-300 dark:bg-pink-500/20 dark:text-pink-200 dark:border-pink-400/55',
     heroBadgeClass: 'bg-pink-500/30 text-pink-100 border-pink-300/70',
     gameBadgeClass: 'bg-pink-100 text-pink-900 border-pink-300 dark:bg-pink-500/25 dark:text-pink-200 dark:border-pink-400/55',
-    isUnlocked: (stats) => stats.knightUnlockedSkinsCount >= 2,
+    isUnlocked: (stats) => stats.knightUnlockedSkinsCount >= 3,
     getProgress: (stats) => ({
-      pct: Math.min(100, Math.round((stats.knightUnlockedSkinsCount / 2) * 100)),
-      text: `${Math.min(stats.knightUnlockedSkinsCount, 2)}/2 nhân vật đã mở khóa`
+      pct: Math.min(100, Math.round((stats.knightUnlockedSkinsCount / 3) * 100)),
+      text: `${Math.min(stats.knightUnlockedSkinsCount, 3)}/3 Nhân Vật Meme đã mở`
     })
   },
   {
@@ -1093,25 +1093,123 @@ export const STUDENT_TITLES = [
   },
   {
     id: 'knight_dragon_empress',
-    label: 'Huyền Thoại Long Kỵ Sĩ',
+    label: 'Bá Chủ Gacha & Đồ Long',
     icon: '👑',
     tier: 'Hiệp Sĩ RPG',
     difficulty: 'Cực Khó',
-    conditionText: 'Hạ gục Boss Cuối Rồng Hắc Ám từ 5 lần trở lên hoặc mở khóa từ 4 nhân vật trong Cửa Hàng Hiệp Sĩ.',
+    conditionText: 'Hạ gục Boss Cuối Rồng Hắc Ám từ 5 lần trở lên hoặc mở khóa từ 8 Nhân Vật Meme trong Gacha Hiệp Sĩ.',
     badgeClass: 'bg-gradient-to-r from-amber-100 via-rose-50 to-amber-100 text-rose-950 border-amber-400 dark:from-amber-500/30 dark:via-rose-500/25 dark:to-amber-500/30 dark:text-amber-100 dark:border-amber-400/75 font-bold',
     heroBadgeClass: 'bg-gradient-to-r from-amber-500/45 to-rose-500/45 text-amber-50 border-amber-300/85',
     gameBadgeClass: 'bg-amber-100 text-rose-950 border-amber-400 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/75',
-    isUnlocked: (stats) => stats.knightDragonsSlain >= 5 || stats.knightUnlockedSkinsCount >= 4 || stats.knightBestScore >= 3000,
+    isUnlocked: (stats) => stats.knightDragonsSlain >= 5 || stats.knightUnlockedSkinsCount >= 8 || stats.knightBestScore >= 3000,
     getProgress: (stats) => ({
       pct: Math.min(
         100,
         Math.max(
           Math.round((stats.knightDragonsSlain / 5) * 100),
-          Math.round((stats.knightUnlockedSkinsCount / 4) * 100),
+          Math.round((stats.knightUnlockedSkinsCount / 8) * 100),
           Math.round((stats.knightBestScore / 3000) * 100)
         )
       ),
-      text: `${Math.min(stats.knightDragonsSlain, 5)}/5 Rồng • ${Math.min(stats.knightUnlockedSkinsCount, 4)}/4 Nhân vật`
+      text: `${Math.min(stats.knightDragonsSlain, 5)}/5 Rồng • ${Math.min(stats.knightUnlockedSkinsCount, 8)}/8 Meme`
+    })
+  },
+  {
+    id: 'pvp_first_blood',
+    label: 'Chiến Binh Khởi Đầu 1v1',
+    icon: '⚔️',
+    tier: 'Đối Kháng 1v1',
+    difficulty: 'Dễ',
+    conditionText: 'Giành chiến thắng đầu tiên trong chế độ Ghép Trận Đối Kháng 1v1 (Hiệp Sĩ Diệt Rồng).',
+    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/50',
+    heroBadgeClass: 'bg-emerald-500/30 text-emerald-100 border-emerald-300/60',
+    gameBadgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/25 dark:text-emerald-200 dark:border-emerald-400/50',
+    isUnlocked: (stats) => (stats.pvpWins || 0) >= 1,
+    getProgress: (stats) => ({
+      pct: Math.min(100, Math.round(((stats.pvpWins || 0) / 1) * 100)),
+      text: `${Math.min(stats.pvpWins || 0, 1)}/1 trận thắng Ghép Trận 1v1`
+    })
+  },
+  {
+    id: 'pvp_ice_breaker',
+    label: 'Bậc Thầy Đóng Băng 1v1',
+    icon: '❄️',
+    tier: 'Đối Kháng 1v1',
+    difficulty: 'Bình Thường',
+    conditionText: 'Thắng từ 5 trận Ghép Trận Đối Kháng 1v1 trở lên hoặc đạt mốc 250+ Điểm Đối Kháng.',
+    badgeClass: 'bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-400/55',
+    heroBadgeClass: 'bg-sky-500/30 text-sky-100 border-sky-300/65',
+    gameBadgeClass: 'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-500/25 dark:text-sky-200 dark:border-sky-400/55',
+    isUnlocked: (stats) => (stats.pvpWins || 0) >= 5 || (stats.pvpPeakRp || 0) >= 250,
+    getProgress: (stats) => ({
+      pct: Math.min(
+        100,
+        Math.max(
+          Math.round(((stats.pvpWins || 0) / 5) * 100),
+          Math.round(((stats.pvpPeakRp || 0) / 250) * 100)
+        )
+      ),
+      text: `${Math.min(stats.pvpWins || 0, 5)}/5 thắng • ${Math.min(stats.pvpPeakRp || 0, 250)}/250 Điểm`
+    })
+  },
+  {
+    id: 'pvp_gladiator_pro',
+    label: 'Cao Thủ Song Đấu 1v1',
+    icon: '🔥',
+    tier: 'Đối Kháng 1v1',
+    difficulty: 'Khó',
+    conditionText: 'Đạt mốc 500+ Điểm Đối Kháng hoặc chiến thắng tích lũy 15 trận Ghép Trận 1v1.',
+    badgeClass: 'bg-violet-50 text-violet-900 border-violet-400 dark:bg-violet-500/25 dark:text-violet-100 dark:border-violet-400/65',
+    heroBadgeClass: 'bg-violet-500/35 text-violet-100 border-violet-300/75',
+    gameBadgeClass: 'bg-violet-100 text-violet-950 border-violet-400 dark:bg-violet-500/30 dark:text-violet-100 dark:border-violet-400/65',
+    isUnlocked: (stats) => (stats.pvpPeakRp || 0) >= 500 || (stats.pvpWins || 0) >= 15,
+    getProgress: (stats) => ({
+      pct: Math.min(
+        100,
+        Math.max(
+          Math.round(((stats.pvpPeakRp || 0) / 500) * 100),
+          Math.round(((stats.pvpWins || 0) / 15) * 100)
+        )
+      ),
+      text: `${Math.min(stats.pvpPeakRp || 0, 500)}/500 Điểm • ${Math.min(stats.pvpWins || 0, 15)}/15 thắng`
+    })
+  },
+  {
+    id: 'pvp_demon_roulette',
+    label: 'Định Mệnh Ma Vương 2-2',
+    icon: '🎡',
+    tier: 'Đối Kháng 1v1',
+    difficulty: 'Khó',
+    conditionText: 'Chiến thắng Vòng Chung Kết Ma Vương sau khi hòa 2-2 và quay Vòng Quay Định Mệnh ở Ghép Trận 1v1.',
+    badgeClass: 'bg-fuchsia-50 text-fuchsia-900 border-fuchsia-400 dark:bg-fuchsia-500/25 dark:text-fuchsia-100 dark:border-fuchsia-400/65',
+    heroBadgeClass: 'bg-fuchsia-600/40 text-fuchsia-100 border-fuchsia-300/80',
+    gameBadgeClass: 'bg-fuchsia-100 text-fuchsia-950 border-fuchsia-400 dark:bg-fuchsia-500/30 dark:text-fuchsia-100 dark:border-fuchsia-400/65',
+    isUnlocked: (stats) => (stats.pvpDemonTiebreakerWins || 0) >= 1,
+    getProgress: (stats) => ({
+      pct: (stats.pvpDemonTiebreakerWins || 0) >= 1 ? 100 : 0,
+      text: `${Math.min(stats.pvpDemonTiebreakerWins || 0, 1)}/1 lần thắng Vòng Quay Ma Vương (2-2)`
+    })
+  },
+  {
+    id: 'pvp_supreme_champion',
+    label: 'Độc Cô Cầu Bại 1v1',
+    icon: '🏆',
+    tier: 'Đối Kháng 1v1',
+    difficulty: 'Cực Khó',
+    conditionText: 'CỰC KHÓ: Đạt 1,000+ Điểm Đối Kháng hoặc lập chuỗi thắng 5 trận liên tiếp ở Ghép Trận 1v1.',
+    badgeClass: 'bg-amber-100 text-rose-950 border-amber-500 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/80 font-bold',
+    heroBadgeClass: 'bg-amber-500/45 text-amber-50 border-amber-300/85',
+    gameBadgeClass: 'bg-amber-100 text-rose-950 border-amber-500 dark:bg-amber-500/30 dark:text-amber-100 dark:border-amber-400/80',
+    isUnlocked: (stats) => (stats.pvpPeakRp || 0) >= 1000 || (stats.pvpBestStreak || 0) >= 5,
+    getProgress: (stats) => ({
+      pct: Math.min(
+        100,
+        Math.max(
+          Math.round(((stats.pvpPeakRp || 0) / 1000) * 100),
+          Math.round(((stats.pvpBestStreak || 0) / 5) * 100)
+        )
+      ),
+      text: `${Math.min(stats.pvpPeakRp || 0, 1000)}/1,000 Điểm • Chuỗi ${Math.min(stats.pvpBestStreak || 0, 5)}/5 thắng`
     })
   },
   {
@@ -2709,8 +2807,12 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     maxBandJump = Math.max(0, Number((peakAfter - firstBand).toFixed(2)));
   }
 
-  let bestGameScore = 0;
-  let knightBestScore = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.bestScore) || 0));
+  let bestGameScore = Math.max(0, Math.floor(Number(user?.allTimeBestGameScore) || 0));
+  let knightBestScore = Math.max(
+    0,
+    Math.floor(Number(user?.knightRpgProfile?.allTimeBestScore) || 0),
+    Math.floor(Number(user?.knightRpgProfile?.bestScore) || 0)
+  );
   const knightMonstersSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.monstersSlain) || 0));
   const knightDragonsSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.dragonsSlain) || 0));
   const knightDemonKingsSlain = Math.max(0, Math.floor(Number(user?.knightRpgProfile?.demonKingsSlain) || 0));
@@ -2721,7 +2823,18 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
   const knightUnlockedSkinsCount = Array.isArray(user?.knightRpgProfile?.unlockedSkins)
     ? Math.max(0, user.knightRpgProfile.unlockedSkins.filter(id => id && id !== 'knight_arthur').length)
     : 0;
-  let hasGamePerfectRun = false;
+  const pvpProfile = user?.knightPvpProfile && typeof user.knightPvpProfile === 'object' ? user.knightPvpProfile : {};
+  const pvpRp = Math.max(0, Math.floor(Number(pvpProfile.rp) || 0));
+  const pvpPeakRp = Math.max(pvpRp, Math.floor(Number(pvpProfile.peakRp) || 0));
+  const pvpWins = Math.max(0, Math.floor(Number(pvpProfile.wins) || 0));
+  const pvpLosses = Math.max(0, Math.floor(Number(pvpProfile.losses) || 0));
+  const pvpBestStreak = Math.max(
+    0,
+    Math.floor(Number(pvpProfile.bestWinStreak) || 0),
+    Math.floor(Number(pvpProfile.winStreak) || 0)
+  );
+  const pvpDemonTiebreakerWins = Math.max(0, Math.floor(Number(pvpProfile.demonTiebreakerWins) || 0));
+  let hasGamePerfectRun = Boolean(user?.hasAllTimeGamePerfectRun);
   Object.values(roomsDb || {}).forEach(room => {
     const pScore = Number(room?.players?.[uname]?.score) || 0;
     const liveScore = Number(room?.liveMatch?.[uname]?.score) || 0;
@@ -2773,6 +2886,12 @@ export function computeStudentStats(username, attempts = [], roomsDb = {}, user 
     knightDemonKingsSlain,
     knightKeysCollected,
     knightUnlockedSkinsCount,
+    pvpRp,
+    pvpPeakRp,
+    pvpWins,
+    pvpLosses,
+    pvpBestStreak,
+    pvpDemonTiebreakerWins,
     band65Count,
     band70Count,
     exactBand70Count,
@@ -3479,7 +3598,9 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
       unlockedByDailyRank,
       progressPct: unlocked ? 100 : progress.pct,
       progressText: unlockAll
-        ? (hideAdminPrivilegeText ? 'Đã sở hữu' : 'Mở khóa tự động (Đặc quyền Quản trị)')
+        ? (hideAdminPrivilegeText
+            ? `${progress?.text || 'Đã sở hữu'}`
+            : `${progress?.text ? `${progress.text} · ` : ''}Đặc quyền QT`)
         : unlockedByGrant
         ? '👑 Quản trị trao tặng'
         : unlockedByDailyRank
@@ -3495,7 +3616,7 @@ export function computeStudentTitleProgress(username, attempts = [], roomsDb = {
         : unlocked && t.isHolidayTitle && progress?.text
         ? progress.text
         : unlocked
-        ? 'Đã mở khóa'
+        ? (progress?.text ? `${progress.text} · Đã đạt` : 'Đã mở khóa')
         : progress.text
     };
   });

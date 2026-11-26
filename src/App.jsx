@@ -420,6 +420,8 @@ export default function App() {
   const [paymentConfig, setPaymentConfig] = useState(null);
   const [knightGachaConfig, setKnightGachaConfig] = useState(null);
   const [gamePracticeLeaderboard, setGamePracticeLeaderboard] = useState([]);
+  const [knightPvpLeaderboard, setKnightPvpLeaderboard] = useState([]);
+  const [knightPvpRealtime, setKnightPvpRealtime] = useState(null);
   const [dailyRankTitles, setDailyRankTitles] = useState(null);
   const [syncHydrated, setSyncHydrated] = useState(false);
   const [localSeenTitlesMap, setLocalSeenTitlesMap] = useState(() => {
@@ -1715,6 +1717,12 @@ export default function App() {
     }
     if (Array.isArray(snap.gamePracticeLeaderboard)) {
       setGamePracticeLeaderboard(prev => (JSON.stringify(prev) === JSON.stringify(snap.gamePracticeLeaderboard) ? prev : snap.gamePracticeLeaderboard));
+    }
+    if (Array.isArray(snap.knightPvpLeaderboard)) {
+      setKnightPvpLeaderboard(prev => (JSON.stringify(prev) === JSON.stringify(snap.knightPvpLeaderboard) ? prev : snap.knightPvpLeaderboard));
+    }
+    if (snap.knightPvpRealtime !== undefined) {
+      setKnightPvpRealtime(prev => (JSON.stringify(prev) === JSON.stringify(snap.knightPvpRealtime) ? prev : snap.knightPvpRealtime));
     }
     if (snap.dailyRankTitles !== undefined) {
       setDailyRankTitles(prev => (JSON.stringify(prev) === JSON.stringify(snap.dailyRankTitles) ? prev : snap.dailyRankTitles));
@@ -8155,6 +8163,9 @@ export default function App() {
           gamePaused={gamePaused}
           gameQueues={gameQueues}
           gamePracticeLeaderboard={gamePracticeLeaderboard}
+          knightPvpLeaderboard={knightPvpLeaderboard}
+          knightPvpRealtime={knightPvpRealtime}
+          dispatchSyncAction={dispatchSyncAction}
           gameReviewLog={gameReviewLog}
           gameRound={gameRound}
           gameRuntimeRef={gameRuntimeRef}

@@ -135,15 +135,15 @@ export default function AdminTitleManagerModal({
         aria-modal="true"
         aria-label="Quản Trị Tạo & Tặng Danh Hiệu"
         onClick={e => e.stopPropagation()}
-        className="bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-500/35 rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-800 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
       >
-        <div className="px-6 py-4 bg-gradient-to-r from-[#2E1065] via-[#4C1D95] to-[#0F766E] text-white flex items-center justify-between gap-3">
+        <div className="px-6 py-4 bg-zinc-900 text-white border-b border-zinc-800 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
-              <Crown className="w-5 h-5 text-amber-300" />
+              <Crown className="w-5 h-5 text-amber-400" />
               Quản Trị: Tạo &amp; Tặng Danh Hiệu Cho Giáo Viên &amp; Học Sinh
             </h3>
-            <p className="text-xs text-purple-100/90 mt-0.5">
+            <p className="text-xs text-zinc-300 mt-0.5">
               Chỉ Quản trị hệ thống mới có quyền tạo danh hiệu mới hoặc trao tặng/gỡ danh hiệu cho Giáo viên và Học viên.
             </p>
           </div>
@@ -160,8 +160,8 @@ export default function AdminTitleManagerModal({
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Left: Target Teacher / Student Selector + Create Custom Title */}
           <div className="lg:col-span-5 space-y-5">
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
-              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 space-y-3">
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-zinc-200 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-purple-600" />
                 Chọn Giáo Viên / Học Viên Nhận Danh Hiệu
               </label>
@@ -172,7 +172,7 @@ export default function AdminTitleManagerModal({
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                   placeholder="Tìm tên hoặc @username..."
-                  className="w-full pl-8 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
+                  className="w-full pl-8 pr-3 py-2 rounded-xl bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-700 text-xs text-slate-900 dark:text-white"
                 />
               </div>
               <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
@@ -187,14 +187,14 @@ export default function AdminTitleManagerModal({
                       className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-left transition ${
                         selected
                           ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-500 ring-1 ring-purple-500/30'
-                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                          : 'bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-700 hover:border-purple-300'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <UserAvatarBadge user={u} sizeClass="w-8 h-8" textClass="text-xs" rounded="rounded-xl" />
                         <div className="min-w-0">
                           <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{u.name || u.username}</p>
-                          <p className="text-xs font-mono text-[#475569] dark:text-slate-400 truncate">
+                          <p className="text-xs font-mono text-[#475569] dark:text-zinc-400 truncate">
                             @{u.username} · {u.role === 'teacher' ? '👩‍🏫 Giáo viên' : u.isGuest ? '👤 Tài khoản khách' : '🎓 Học viên'}
                           </p>
                         </div>
@@ -216,7 +216,7 @@ export default function AdminTitleManagerModal({
             {/* Create New Custom Title Form */}
             <form
               onSubmit={handleCreateCustomTitleSubmit}
-              className="p-4 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-3"
+              className="p-4 rounded-lg bg-[#F8FAFC] dark:bg-zinc-800/70 border border-slate-200 dark:border-zinc-700 space-y-3"
             >
               <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#0F172B] dark:text-white flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -224,24 +224,24 @@ export default function AdminTitleManagerModal({
               </h3>
               <div className="grid grid-cols-12 gap-2">
                 <div className="col-span-3">
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Icon</label>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-zinc-300 mb-1">Icon</label>
                   <input
                     type="text"
                     value={newIcon}
                     onChange={e => setNewIcon(e.target.value)}
                     maxLength={8}
-                    className="w-full px-2 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-center text-base"
+                    className="w-full px-2 py-2 rounded-xl bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 text-center text-base"
                   />
                 </div>
                 <div className="col-span-9">
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Tên danh hiệu *</label>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-zinc-300 mb-1">Tên danh hiệu *</label>
                   <input
                     type="text"
                     required
                     value={newLabel}
                     onChange={e => setNewLabel(e.target.value)}
                     placeholder="VD: Cô Giáo Tâm Huyết / Thủ Khoa..."
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 text-xs font-bold text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -255,7 +255,7 @@ export default function AdminTitleManagerModal({
                     className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center border transition ${
                       newIcon === em
                         ? 'bg-purple-600 text-white border-purple-600 scale-105'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                        : 'bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-700'
                     }`}
                   >
                     {em}
@@ -265,11 +265,11 @@ export default function AdminTitleManagerModal({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Màu thẻ</label>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-zinc-300 mb-1">Màu thẻ</label>
                   <select
                     value={newColorKey}
                     onChange={e => setNewColorKey(e.target.value)}
-                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100"
+                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 text-xs font-bold text-slate-800 dark:text-slate-100"
                   >
                     {Object.entries(CUSTOM_TITLE_THEMES).map(([k, val]) => (
                       <option key={k} value={k}>{val.label}</option>
@@ -277,23 +277,23 @@ export default function AdminTitleManagerModal({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Nhãn hạng</label>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-zinc-300 mb-1">Nhãn hạng</label>
                   <input
                     type="text"
                     value={newDifficulty}
                     onChange={e => setNewDifficulty(e.target.value)}
-                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100"
+                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 text-xs font-bold text-slate-800 dark:text-slate-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Mô tả danh hiệu</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-zinc-300 mb-1">Mô tả danh hiệu</label>
                 <input
                   type="text"
                   value={newCondition}
                   onChange={e => setNewCondition(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#18181B] border border-slate-300 dark:border-zinc-700 text-xs text-slate-800 dark:text-slate-100"
                 />
               </div>
 
@@ -311,17 +311,17 @@ export default function AdminTitleManagerModal({
           {/* Right: Title Catalog to Grant/Revoke for Selected User + Delete Custom Titles */}
           <div className="lg:col-span-7 space-y-4">
             {activeTargetUser && (
-              <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
+              <div className="p-4 rounded-2xl bg-white dark:bg-zinc-800/70 border border-slate-200 dark:border-zinc-700 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <Trophy className="w-4 h-4 text-amber-500" />
                     Kho Danh Hiệu Của: {activeTargetUser.name} ({activeTargetUser.role === 'teacher' ? 'Giáo viên' : activeTargetUser.isGuest ? 'Tài khoản khách' : 'Học viên'})
                   </p>
-                  <p className="text-xs text-[#475569] dark:text-slate-400">
+                  <p className="text-xs text-[#475569] dark:text-zinc-400">
                     Bấm vào danh hiệu bên dưới để <strong>Trao Tặng</strong> hoặc <strong>Gỡ Bỏ</strong> danh hiệu do Quản trị cấp.
                   </p>
                 </div>
-                <span className="text-xs font-black px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[#007A7A] dark:text-[#1EE1D6]">
+                <span className="text-xs font-black px-2.5 py-1 rounded-full bg-white dark:bg-[#18181B] border border-slate-200 dark:border-zinc-700 text-[#007A7A] dark:text-[#1EE1D6]">
                   Đã mở: {targetSummary?.unlockedIds?.length || 1}/{catalog.length}
                 </span>
               </div>
@@ -340,11 +340,11 @@ export default function AdminTitleManagerModal({
                         ? 'bg-purple-50/90 dark:bg-purple-950/35 border-purple-400 dark:border-purple-500/50'
                         : isAlreadyUnlocked
                         ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-500/30'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                        : 'bg-white dark:bg-[#18181B] border-slate-200 dark:border-zinc-700'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-9 h-9 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-lg shrink-0">
+                      <span className="w-9 h-9 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-zinc-700 flex items-center justify-center text-lg shrink-0">
                         {item.icon}
                       </span>
                       <div className="min-w-0">
@@ -407,7 +407,7 @@ export default function AdminTitleManagerModal({
             </div>
 
             {customOnly.length > 0 && (
-              <p className="text-xs text-[#475569] dark:text-slate-400 italic">
+              <p className="text-xs text-[#475569] dark:text-zinc-400 italic">
                 Đang có {customOnly.length} danh hiệu tùy chỉnh do Quản trị hệ thống tạo thêm.
               </p>
             )}
