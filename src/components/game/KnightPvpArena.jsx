@@ -380,28 +380,30 @@ export default function KnightPvpArena({
     rt.slowMoUntilMs = Date.now() + slowDurMs;
     rt.koWinner = winner;
     rt.shake = 18;
-    const tx = winner === 'me' ? 0.75 : 0.25;
-    const mainColor = winner === 'me' ? '#fde047' : '#fb7185';
-    rt.slashes.push({ xRatio: tx, yRatio: 0.54, dir: winner === 'me' ? 1 : -1, color: mainColor, life: 1.35 });
-    rt.slashes.push({ xRatio: tx, yRatio: 0.54, dir: winner === 'me' ? -1 : 1, color: '#ffffff', life: 1.25 });
+    const targets = winner === 'draw' ? [0.25, 0.75] : [winner === 'me' ? 0.75 : 0.25];
+    const mainColor = winner === 'draw' ? '#fde047' : winner === 'me' ? '#fde047' : '#fb7185';
+    targets.forEach((tx, idx) => {
+      rt.slashes.push({ xRatio: tx, yRatio: 0.54, dir: idx === 0 ? 1 : -1, color: mainColor, life: 1.35 });
+      rt.slashes.push({ xRatio: tx, yRatio: 0.54, dir: idx === 0 ? -1 : 1, color: '#ffffff', life: 1.25 });
+      for (let i = 0; i < 24; i += 1) {
+        const ang = (Math.PI * 2 * i) / 24;
+        rt.sparks.push({
+          xRatio: tx,
+          yRatio: 0.55,
+          vx: Math.cos(ang) * (3.2 + Math.random() * 4.5),
+          vy: Math.sin(ang) * (3.2 + Math.random() * 4.5),
+          color: i % 3 === 0 ? '#ffffff' : mainColor,
+          life: 1.35
+        });
+      }
+    });
     rt.popups.push({
-      text: '⚡ KẾT LIỄU! ⚡',
-      xRatio: tx,
+      text: winner === 'draw' ? '⚡ HÒA VÒNG! ⚡' : '⚡ KẾT LIỄU! ⚡',
+      xRatio: winner === 'draw' ? 0.5 : targets[0],
       yRatio: 0.26,
       color: '#fde047',
       life: 1.35
     });
-    for (let i = 0; i < 34; i += 1) {
-      const ang = (Math.PI * 2 * i) / 34;
-      rt.sparks.push({
-        xRatio: tx,
-        yRatio: 0.55,
-        vx: Math.cos(ang) * (3.2 + Math.random() * 4.5),
-        vy: Math.sin(ang) * (3.2 + Math.random() * 4.5),
-        color: i % 3 === 0 ? '#ffffff' : mainColor,
-        life: 1.35
-      });
-    }
     return slowDurMs;
   };
 
@@ -666,13 +668,17 @@ export default function KnightPvpArena({
     const srvKo = serverMatch.lastRoundKo;
     if (srvKo?.atMs && srvKo.atMs > lastSeenServerKoAtRef.current) {
       lastSeenServerKoAtRef.current = srvKo.atMs;
+      const isDrawKo = srvKo.winnerSlot === 'draw';
       const didWinKo = srvKo.winnerSlot === mySlotKey;
+      const koMode = isDrawKo ? 'draw' : didWinKo ? 'me' : 'opp';
       playPvpDramaticSfx('slowmo_ko', bgmMuted);
-      const slowDurMs = spawnCanvasSlowMoFinisher(didWinKo ? 'me' : 'opp');
+      const slowDurMs = spawnCanvasSlowMoFinisher(koMode);
       setSlowMoKo({
         round: srvKo.round || 1,
-        winner: didWinKo ? 'me' : 'opp',
-        bannerText: didWinKo
+        winner: koMode,
+        bannerText: isDrawKo
+          ? `⚡ THIÊN ĐẠO HÒA VÒNG ${srvKo.round || 1}! ⚡`
+          : didWinKo
           ? `⚡ KẾT LIỄU VÒNG ${srvKo.round || 1}! ⚡`
           : `💥 THẤT THỦ VÒNG ${srvKo.round || 1}! 💥`
       });
@@ -871,8 +877,8 @@ export default function KnightPvpArena({
           if (rt.thunderAnim > 0) rt.thunderAnim = Math.max(0, rt.thunderAnim - 0.042 * dtScale);
 
           const heroDrawH = Math.min(126, h * 0.56);
-          const myKoKnock = isSlowMo && rt.koWinner === 'opp' ? 28 : 0;
-          const oppKoKnock = isSlowMo && rt.koWinner === 'me' ? 28 : 0;
+          const myKoKnock = isSlowMo && (rt.koWinner === 'opp' || rt.koWinner === 'draw') ? 28 : 0;
+          const oppKoKnock = isSlowMo && (rt.koWinner === 'me' || rt.koWinner === 'draw') ? 28 : 0;
           const myX = w * 0.24 + myAtkSin * Math.min(120, w * 0.18) - rt.myHurt * 16 - myKoKnock;
           const oppX = w * 0.76 - oppAtkSin * Math.min(120, w * 0.18) + rt.oppHurt * 16 + oppKoKnock;
 
@@ -992,7 +998,7 @@ export default function KnightPvpArena({
             hurtVal: rt.myHurt,
             frozenSec: curMyFreeze,
             auraColor: 'rgba(251, 191, 36, 0.34)',
-            isDefeatedKo: Boolean(isSlowMo && rt.koWinner === 'opp')
+            isDefeatedKo: Boolean(isSlowMo && (rt.koWinner === 'opp' || rt.koWinner === 'draw'))
           });
 
           drawFighter({
@@ -1005,7 +1011,7 @@ export default function KnightPvpArena({
             hurtVal: rt.oppHurt,
             frozenSec: curOppFreeze,
             auraColor: 'rgba(244, 63, 94, 0.34)',
-            isDefeatedKo: Boolean(isSlowMo && rt.koWinner === 'me')
+            isDefeatedKo: Boolean(isSlowMo && (rt.koWinner === 'me' || rt.koWinner === 'draw'))
           });
 
           // 5. TWIN DIVINE LIGHTNING BOLTS ("THIÊN PHẠT SẤM SÉT") STRIKING BOTH HEROES!
@@ -1187,12 +1193,14 @@ export default function KnightPvpArena({
   };
 
   const applyLocalNpcRoundTransition = (prev, roundWinnerSlot, npcSlotObj) => {
+    const isDraw = roundWinnerSlot === 'draw';
     const nextP1Rounds = prev.p1RoundsWon + (roundWinnerSlot === 'p1' ? 1 : 0);
     const nextP2Rounds = prev.p2RoundsWon + (roundWinnerSlot === 'p2' ? 1 : 0);
-    const bannerMsg =
-      roundWinnerSlot === 'p1'
-        ? `🏆 Thắng Vòng ${prev.round}! (${nextP1Rounds} – ${nextP2Rounds})`
-        : `💥 ${npcSlotObj?.name || 'Đối thủ'} thắng Vòng ${prev.round}! (${nextP1Rounds} – ${nextP2Rounds})`;
+    const bannerMsg = isDraw
+      ? `⚡ Thiên Đạo giáng xuống — Hòa Vòng ${prev.round}! (${nextP1Rounds} – ${nextP2Rounds})`
+      : roundWinnerSlot === 'p1'
+      ? `🏆 Thắng Vòng ${prev.round}! (${nextP1Rounds} – ${nextP2Rounds})`
+      : `💥 ${npcSlotObj?.name || 'Đối thủ'} thắng Vòng ${prev.round}! (${nextP1Rounds} – ${nextP2Rounds})`;
 
     if (prev.round < 4) {
       const nextRound = prev.round + 1;
@@ -1217,7 +1225,7 @@ export default function KnightPvpArena({
       };
     }
 
-    if (prev.round === 4 && nextP1Rounds === 2 && nextP2Rounds === 2) {
+    if (prev.round === 4 && nextP1Rounds === nextP2Rounds) {
       const style5 = Number(serverMatch?.demonRoundType) || 1;
       const pool5 = sharedQueues[style5] || sharedQueues[1] || [];
       return {
@@ -1227,17 +1235,39 @@ export default function KnightPvpArena({
           questionIdx: 0,
           p1Lives: KNIGHT_PVP_LIVES_PER_ROUND,
           p2Lives: KNIGHT_PVP_LIVES_PER_ROUND,
-          p1RoundsWon: 2,
-          p2RoundsWon: 2,
+          p1RoundsWon: nextP1Rounds,
+          p2RoundsWon: nextP2Rounds,
           p1FrozenUntilMs: 0,
           p2FrozenUntilMs: 0,
           tiebreakerTriggered: true,
           roundEnding: false,
-          roundBanner: '👁️‍🗨️ Hòa 2 – 2! Một thực thể bí ẩn vừa xoay Vòng Quay Định Mệnh!',
+          roundBanner: `👁️‍🗨️ Hòa ${nextP1Rounds} – ${nextP2Rounds}! Một thực thể bí ẩn vừa xoay Vòng Quay Định Mệnh!`,
           npcNextActionAtMs: Date.now() + 5600 + computeNextNpcDelayMs(npcSlotObj, style5, pool5[0])
         },
         shouldFinish: false,
         triggerDemonWheel: true
+      };
+    }
+
+    if (prev.round === 5 && isDraw) {
+      const style5 = Number(serverMatch?.demonRoundType) || 1;
+      const pool5 = sharedQueues[style5] || sharedQueues[1] || [];
+      const nextQIdx = (prev.questionIdx || 0) + 1;
+      return {
+        nextState: {
+          ...prev,
+          round: 5,
+          questionIdx: nextQIdx,
+          p1Lives: KNIGHT_PVP_LIVES_PER_ROUND,
+          p2Lives: KNIGHT_PVP_LIVES_PER_ROUND,
+          p1FrozenUntilMs: 0,
+          p2FrozenUntilMs: 0,
+          roundEnding: false,
+          roundBanner: '⚡ Thiên Đạo hòa ở Vòng Quyết Định — Hồi 3 ❤️ đấu lại phân thắng bại!',
+          npcNextActionAtMs: Date.now() + 2600 + computeNextNpcDelayMs(npcSlotObj, style5, pool5[nextQIdx % Math.max(1, pool5.length)])
+        },
+        shouldFinish: false,
+        triggerDemonWheel: false
       };
     }
 
@@ -1259,27 +1289,31 @@ export default function KnightPvpArena({
 
   // Run Slow-Motion KO Finisher on the killing blow of EVERY round, THEN advance round (which starts 3-2-1!)
   const triggerNpcRoundSlowMoFinisher = (stateAtKill, winnerSlot, npcSlotObj) => {
+    const isDraw = winnerSlot === 'draw';
     const didWinRound = winnerSlot === 'p1';
     const koSnapshot = {
       ...stateAtKill,
-      p1Lives: didWinRound ? Math.max(1, stateAtKill.p1Lives) : 0,
-      p2Lives: didWinRound ? 0 : Math.max(1, stateAtKill.p2Lives),
+      p1Lives: isDraw ? 0 : didWinRound ? Math.max(1, stateAtKill.p1Lives) : 0,
+      p2Lives: isDraw ? 0 : didWinRound ? 0 : Math.max(1, stateAtKill.p2Lives),
       roundEnding: true
     };
     setNpcCombat(koSnapshot);
 
     const trans = applyLocalNpcRoundTransition(koSnapshot, winnerSlot, npcSlotObj);
     playPvpDramaticSfx('slowmo_ko', bgmMuted);
-    const slowDurMs = spawnCanvasSlowMoFinisher(didWinRound ? 'me' : 'opp');
+    const koMode = isDraw ? 'draw' : didWinRound ? 'me' : 'opp';
+    const slowDurMs = spawnCanvasSlowMoFinisher(koMode);
     setSlowMoKo({
       round: stateAtKill.round,
-      winner: didWinRound ? 'me' : 'opp',
-      bannerText: didWinRound
+      winner: koMode,
+      bannerText: isDraw
+        ? `⚡ THIÊN ĐẠO HÒA VÒNG ${stateAtKill.round}! ⚡`
+        : didWinRound
         ? `⚡ KẾT LIỄU VÒNG ${stateAtKill.round}! ⚡`
         : `💥 THẤT THỦ VÒNG ${stateAtKill.round}! 💥`
     });
     setCombatAlert({
-      tone: didWinRound ? 'success' : 'danger',
+      tone: isDraw ? 'info' : didWinRound ? 'success' : 'danger',
       text: trans.nextState.roundBanner
     });
 
@@ -1331,19 +1365,16 @@ export default function KnightPvpArena({
       const pool = sharedQueues[styleR] || sharedQueues[1] || [];
 
       if (rawP1 <= 0 && rawP2 <= 0) {
-        const nextQIdx = cur.questionIdx + 1;
-        const nextQ = pool[nextQIdx % Math.max(1, pool.length)];
-        setCombatAlert({
-          tone: 'danger',
-          text: '⚡ THIÊN PHẠT! Quá 10s không ai giải được — Cả 2 chạm ngưỡng 1 ❤️ sinh tử!'
-        });
-        setNpcCombat({
-          ...cur,
-          p1Lives: 1,
-          p2Lives: 1,
-          questionIdx: nextQIdx,
-          npcNextActionAtMs: Date.now() + computeNextNpcDelayMs(npcObj, styleR, nextQ)
-        });
+        triggerNpcRoundSlowMoFinisher(
+          {
+            ...cur,
+            p1Lives: 0,
+            p2Lives: 0,
+            totalThunderStrikes: (cur.totalThunderStrikes || 0) + 1
+          },
+          'draw',
+          npcObj
+        );
       } else if (rawP2 <= 0 && rawP1 >= 1) {
         triggerNpcRoundSlowMoFinisher(
           {

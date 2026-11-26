@@ -7197,7 +7197,10 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       const event = String(payload?.event || '');
 
       const advanceHumanPvpRound = (winnerSlotKey) => {
-        m[winnerSlotKey].roundsWon = (Number(m[winnerSlotKey].roundsWon) || 0) + 1;
+        const isDrawRound = winnerSlotKey === 'draw';
+        if (!isDrawRound) {
+          m[winnerSlotKey].roundsWon = (Number(m[winnerSlotKey].roundsWon) || 0) + 1;
+        }
         m.roundHistory = [...(m.roundHistory || []), { round: m.round, winner: winnerSlotKey }];
         m.lastRoundKo = {
           round: m.round,
@@ -7214,7 +7217,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           m.p2.frozenUntilMs = 0;
           m.roundReadyAtMs = nowMs + 4000;
           m.questionStartedAtMs = nowMs + 4000;
-        } else if (m.round === 4 && m.p1.roundsWon === 2 && m.p2.roundsWon === 2) {
+        } else if (m.round === 4 && m.p1.roundsWon === m.p2.roundsWon) {
           m.round = 5;
           m.tiebreakerTriggered = true;
           m.tiebreakerStartedAtMs = nowMs;
@@ -7225,6 +7228,14 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
           m.p2.frozenUntilMs = 0;
           m.roundReadyAtMs = nowMs + 6200;
           m.questionStartedAtMs = nowMs + 6200;
+        } else if (m.round === 5 && isDrawRound) {
+          m.questionIdx += 1;
+          m.p1.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+          m.p2.lives = KNIGHT_PVP_LIVES_PER_ROUND;
+          m.p1.frozenUntilMs = 0;
+          m.p2.frozenUntilMs = 0;
+          m.roundReadyAtMs = nowMs + 4000;
+          m.questionStartedAtMs = nowMs + 4000;
         } else {
           const finalWinnerSlot = m.p1.roundsWon >= m.p2.roundsWon ? 'p1' : 'p2';
           const finalLoserSlot = finalWinnerSlot === 'p1' ? 'p2' : 'p1';
@@ -7276,10 +7287,9 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         const rawP2 = (Number(m.p2.lives) || KNIGHT_PVP_LIVES_PER_ROUND) - 1;
 
         if (rawP1 <= 0 && rawP2 <= 0) {
-          m.p1.lives = 1;
-          m.p2.lives = 1;
-          m.questionIdx += 1;
-          m.questionStartedAtMs = nowMs;
+          m.p1.lives = 0;
+          m.p2.lives = 0;
+          advanceHumanPvpRound('draw');
         } else if (rawP2 <= 0 && rawP1 > 0) {
           m.p1.lives = rawP1;
           m.p2.lives = 0;
@@ -7348,7 +7358,7 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       );
 
       const totalRoundsPlayed = p1Rounds + p2Rounds;
-      if (totalRoundsPlayed < 4 || totalRoundsPlayed > 5 || p1Rounds === p2Rounds) {
+      if (totalRoundsPlayed < 1 || totalRoundsPlayed > 5 || p1Rounds === p2Rounds) {
         break;
       }
       const didWin = p1Rounds > p2Rounds;
