@@ -90,6 +90,7 @@ export default function SkillPracticeHub({
   currentUser,
   focusedTestId = null,
   onAssignFolderClasses = null,
+  onBulkUpdateTestHashtags = null,
   onBackToTeacherDashboard = null,
   onBulkCreateTests = null,
   onChangeTab,
@@ -149,6 +150,9 @@ export default function SkillPracticeHub({
   });
   const [skillSearchQuery, setSkillSearchQuery] = useState('');
   const [onlyImportWarnings, setOnlyImportWarnings] = useState(false);
+  const [showBulkHashtagBar, setShowBulkHashtagBar] = useState(false);
+  const [bulkHashtagInput, setBulkHashtagInput] = useState('');
+  const [bulkHashtagBusy, setBulkHashtagBusy] = useState(false);
   const [skillListPageState, setSkillListPageState] = useState({ scopeKey: '', page: 1 });
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
@@ -1334,77 +1338,302 @@ export default function SkillPracticeHub({
                   </button>
                 </div>
               )}
-              {(availableHashtagFilters.length > 0 || list.length > 6) && !focusedMatch && (
-                <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800">
-                  {availableHashtagFilters.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs font-extrabold text-[#334155] dark:text-slate-300 inline-flex items-center gap-1 px-1.5">
-                        <Hash className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
-                        Lọc theo Hashtag:
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSpeakingHashtag('all')}
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
-                          selectedSpeakingHashtag === 'all'
-                            ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                            : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                        }`}
-                      >
-                        Tất cả ({list.length})
-                      </button>
-                      {availableHashtagFilters.map(item => {
-                        const isSelected = selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase();
-                        return (
-                          <button
-                            key={item.tag}
-                            type="button"
-                            onClick={() =>
-                              setSelectedSpeakingHashtag(prev =>
-                                prev.toLowerCase() === item.tag.toLowerCase() ? 'all' : item.tag
-                              )
-                            }
-                            className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
-                              isSelected
-                                ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
-                                : item.kind === 'real_exam'
-                                ? 'bg-rose-50 dark:bg-rose-500/15 text-[#991B1B] dark:text-rose-300 border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
-                                : item.kind === 'password'
-                                ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40 hover:border-indigo-500'
-                                : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
-                            }`}
-                          >
-                            {item.tag} ({item.count})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <span />
-                  )}
-
-                  {list.length > 6 && (
-                    <div className="relative w-full sm:w-64">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        data-testid="daily-skill-search-input"
-                        value={skillSearchQuery}
-                        onChange={e => setSkillSearchQuery(e.target.value)}
-                        placeholder="Tìm nhanh theo tên đề / từ khóa..."
-                        className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-white focus:outline-none focus:border-[#007A7A]"
-                      />
-                      {skillSearchQuery && (
+              {(availableHashtagFilters.length > 0 || list.length > 6 || (isTeacher && onBulkUpdateTestHashtags && list.length > 0)) && !focusedMatch && (
+                <div className="space-y-2.5 p-2.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
+                    {availableHashtagFilters.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-extrabold text-[#334155] dark:text-slate-300 inline-flex items-center gap-1 px-1.5">
+                          <Hash className="w-3.5 h-3.5 text-[#0F766E] dark:text-[#1EE1D6]" />
+                          Lọc theo Hashtag:
+                        </span>
                         <button
                           type="button"
-                          onClick={() => setSkillSearchQuery('')}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          onClick={() => setSelectedSpeakingHashtag('all')}
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                            selectedSpeakingHashtag === 'all'
+                              ? 'bg-[#007A7A] text-white border-[#007A7A]'
+                              : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                          }`}
                         >
-                          <X className="w-3.5 h-3.5" />
+                          Tất cả ({list.length})
                         </button>
-                      )}
-                    </div>
-                  )}
+                        {availableHashtagFilters.map(item => {
+                          const isSelected = selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase();
+                          const removableTests = list.filter(t =>
+                            (normalizeExamConfig(t).hashtags || []).some(
+                              h => h.toLowerCase() === item.tag.toLowerCase()
+                            )
+                          );
+                          const canBulkRemoveTag = Boolean(isTeacher && onBulkUpdateTestHashtags && removableTests.length > 0);
+                          return (
+                            <span
+                              key={item.tag}
+                              className={`inline-flex items-center rounded-full border transition overflow-hidden ${
+                                isSelected
+                                  ? 'bg-[#0F172B] dark:bg-white text-white dark:text-[#0F172B] border-[#0F172B] dark:border-white'
+                                  : item.kind === 'real_exam'
+                                  ? 'bg-rose-50 dark:bg-rose-500/15 text-[#991B1B] dark:text-rose-300 border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
+                                  : item.kind === 'password'
+                                  ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40 hover:border-indigo-500'
+                                  : 'bg-[#F8FAFC] dark:bg-slate-800 text-[#334155] dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedSpeakingHashtag(prev =>
+                                    prev.toLowerCase() === item.tag.toLowerCase() ? 'all' : item.tag
+                                  )
+                                }
+                                className="text-xs font-bold px-2.5 py-1"
+                              >
+                                {item.tag} ({item.count})
+                              </button>
+                              {canBulkRemoveTag && (
+                                <button
+                                  type="button"
+                                  data-testid={`bulk-remove-hashtag-${item.tag.replace(/^#/, '')}`}
+                                  disabled={bulkHashtagBusy}
+                                  onClick={async e => {
+                                    e.stopPropagation();
+                                    if (
+                                      !window.confirm(
+                                        `Tắt / xóa nhanh hashtag "${item.tag}" khỏi tất cả ${removableTests.length} bài trong mục ${meta.name}?`
+                                      )
+                                    ) {
+                                      return;
+                                    }
+                                    setBulkHashtagBusy(true);
+                                    try {
+                                      await onBulkUpdateTestHashtags(
+                                        removableTests.map(t => t.id),
+                                        { removeTags: [item.tag], scopeLabel: meta.name }
+                                      );
+                                      if (selectedSpeakingHashtag.toLowerCase() === item.tag.toLowerCase()) {
+                                        setSelectedSpeakingHashtag('all');
+                                      }
+                                    } finally {
+                                      setBulkHashtagBusy(false);
+                                    }
+                                  }}
+                                  className="pr-2 pl-0.5 py-1 opacity-75 hover:opacity-100 hover:text-rose-600 dark:hover:text-rose-400"
+                                  title={`Xóa nhanh ${item.tag} khỏi ${removableTests.length} bài`}
+                                  aria-label={`Xóa hàng loạt hashtag ${item.tag}`}
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </span>
+                          );
+                        })}
+                        {isTeacher && onBulkUpdateTestHashtags && list.length > 0 && (
+                          <button
+                            type="button"
+                            data-testid="toggle-bulk-hashtag-bar-btn"
+                            onClick={() => setShowBulkHashtagBar(prev => !prev)}
+                            className={`text-xs font-extrabold px-2.5 py-1 rounded-full border inline-flex items-center gap-1 transition ${
+                              showBulkHashtagBar
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/40 hover:border-indigo-500'
+                            }`}
+                            title="Bật hoặc tắt nhanh hashtag cho toàn bộ các bài đang hiển thị"
+                          >
+                            <Hash className="w-3 h-3" />
+                            <span>Bật/Tắt Hashtag hàng loạt</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {isTeacher && onBulkUpdateTestHashtags && list.length > 0 && (
+                          <button
+                            type="button"
+                            data-testid="toggle-bulk-hashtag-bar-btn"
+                            onClick={() => setShowBulkHashtagBar(prev => !prev)}
+                            className="text-xs font-extrabold px-2.5 py-1 rounded-full border bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/40 inline-flex items-center gap-1"
+                          >
+                            <Hash className="w-3 h-3" />
+                            <span>Bật/Tắt Hashtag hàng loạt</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {list.length > 6 && (
+                      <div className="relative w-full sm:w-64">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          data-testid="daily-skill-search-input"
+                          value={skillSearchQuery}
+                          onChange={e => setSkillSearchQuery(e.target.value)}
+                          placeholder="Tìm nhanh theo tên đề / từ khóa..."
+                          className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-[#0F172B] dark:text-white focus:outline-none focus:border-[#007A7A]"
+                        />
+                        {skillSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setSkillSearchQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Teacher Bulk Hashtag Toggle Bar */}
+                  {isTeacher && showBulkHashtagBar && onBulkUpdateTestHashtags && finalSkillList.length > 0 && (() => {
+                    const targetScopeLabel =
+                      activeSubCatFilter !== 'all'
+                        ? getDailySubCategoryLabel(activeSubCatFilter) || activeSubCatFilter
+                        : meta.name;
+                    const targetIds = finalSkillList.map(t => t.id);
+                    const presetTags = ['#ThiThật', '#DailyZone', '#TeamSắpThi', '#Forecast'];
+                    const customExisting = availableHashtagFilters
+                      .map(f => f.tag)
+                      .filter(tag => {
+                        const low = tag.toLowerCase();
+                        return low !== '#luyệntậptựdo' && low !== '#cópass' && !presetTags.some(p => p.toLowerCase() === low);
+                      });
+                    const allToggleTags = [...presetTags, ...customExisting];
+
+                    return (
+                      <div
+                        data-testid="daily-bulk-hashtag-panel"
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-indigo-200 dark:border-indigo-800/60 space-y-2.5"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="font-extrabold text-[#0F172B] dark:text-white flex items-center gap-1.5">
+                            <Hash className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            Bật / Tắt Hashtag 1 lần cho {finalSkillList.length} bài đang hiển thị ({targetScopeLabel})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowBulkHashtagBar(false)}
+                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            aria-label="Đóng thanh bật tắt hashtag"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {allToggleTags.map(tag => {
+                            const hasTagCount = finalSkillList.filter(t =>
+                              (normalizeExamConfig(t).hashtags || []).some(h => h.toLowerCase() === tag.toLowerCase())
+                            ).length;
+                            const isMostlyOn = hasTagCount > 0;
+                            return (
+                              <div
+                                key={tag}
+                                className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden text-xs"
+                              >
+                                <span className="px-2.5 py-1 font-extrabold text-[#0F172B] dark:text-slate-100">
+                                  {tag} <span className="text-[10px] font-semibold text-slate-400">({hasTagCount}/{finalSkillList.length})</span>
+                                </span>
+                                {hasTagCount < finalSkillList.length && (
+                                  <button
+                                    type="button"
+                                    disabled={bulkHashtagBusy}
+                                    data-testid={`bulk-tag-on-${tag.replace(/^#/, '')}`}
+                                    onClick={async () => {
+                                      setBulkHashtagBusy(true);
+                                      try {
+                                        await onBulkUpdateTestHashtags(targetIds, {
+                                          addTags: [tag],
+                                          scopeLabel: targetScopeLabel
+                                        });
+                                      } finally {
+                                        setBulkHashtagBusy(false);
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-l border-slate-200 dark:border-slate-700"
+                                  >
+                                    Bật hết
+                                  </button>
+                                )}
+                                {isMostlyOn && (
+                                  <button
+                                    type="button"
+                                    disabled={bulkHashtagBusy}
+                                    data-testid={`bulk-tag-off-${tag.replace(/^#/, '')}`}
+                                    onClick={async () => {
+                                      setBulkHashtagBusy(true);
+                                      try {
+                                        await onBulkUpdateTestHashtags(targetIds, {
+                                          removeTags: [tag],
+                                          scopeLabel: targetScopeLabel
+                                        });
+                                        if (selectedSpeakingHashtag.toLowerCase() === tag.toLowerCase()) {
+                                          setSelectedSpeakingHashtag('all');
+                                        }
+                                      } finally {
+                                        setBulkHashtagBusy(false);
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold border-l border-slate-200 dark:border-slate-700"
+                                  >
+                                    Tắt hết
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200/70 dark:border-slate-800">
+                          <input
+                            type="text"
+                            value={bulkHashtagInput}
+                            onChange={e => setBulkHashtagInput(e.target.value)}
+                            placeholder="Nhập hashtag tùy ý (VD: #IELTS2026, #LopA1)..."
+                            className="flex-1 min-w-[200px] px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            disabled={bulkHashtagBusy || !bulkHashtagInput.trim()}
+                            onClick={async () => {
+                              setBulkHashtagBusy(true);
+                              try {
+                                await onBulkUpdateTestHashtags(targetIds, {
+                                  addTags: bulkHashtagInput,
+                                  scopeLabel: targetScopeLabel
+                                });
+                                setBulkHashtagInput('');
+                              } finally {
+                                setBulkHashtagBusy(false);
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-45 text-white text-xs font-extrabold"
+                          >
+                            + Bật cho {finalSkillList.length} bài
+                          </button>
+                          <button
+                            type="button"
+                            disabled={bulkHashtagBusy || !bulkHashtagInput.trim()}
+                            onClick={async () => {
+                              setBulkHashtagBusy(true);
+                              try {
+                                await onBulkUpdateTestHashtags(targetIds, {
+                                  removeTags: bulkHashtagInput,
+                                  scopeLabel: targetScopeLabel
+                                });
+                                setBulkHashtagInput('');
+                              } finally {
+                                setBulkHashtagBusy(false);
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-45 text-white text-xs font-extrabold"
+                          >
+                            - Tắt ở {finalSkillList.length} bài
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

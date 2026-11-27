@@ -724,6 +724,16 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       await expect(
         page.getByTestId('bulk-import-history-panel').getByText(/OPINIONS OF FULL TIME AND ITS SERVICES\.docx/i).first()
       ).toBeVisible();
+      await page.getByRole('button', { name: 'Đóng', exact: true }).first().click();
+
+      // Clear warning filter so all 3 imported tests are visible, then bulk-toggle #ThiThật ON then OFF in 1 click
+      await page.getByTestId('daily-filter-import-warnings-btn').click();
+      await page.getByTestId('toggle-bulk-hashtag-bar-btn').click();
+      await expect(page.getByTestId('daily-bulk-hashtag-panel')).toBeVisible();
+      await page.getByTestId('bulk-tag-on-ThiThật').click();
+      await expect(page.getByTestId('bulk-tag-off-ThiThật')).toBeVisible({ timeout: 8_000 });
+      await page.getByTestId('bulk-tag-off-ThiThật').click();
+      await expect(page.getByTestId('bulk-tag-off-ThiThật')).toHaveCount(0, { timeout: 8_000 });
 
       // Verify saved tests in server state have embedded images & exact folder routing
       const loginRes = await request.post(`${baseURL}/api/sync/auth/login`, {

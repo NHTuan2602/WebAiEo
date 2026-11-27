@@ -3862,6 +3862,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'UPDATE_CLASS_MEMBERS',
     'ASSIGN_TEST_CLASSES',
     'ASSIGN_FOLDER_CLASSES',
+    'BULK_UPDATE_TEST_HASHTAGS',
     'DELETE_ATTEMPT',
     'PURGE_ORPHAN_ATTEMPTS',
     'UPSERT_NOTE',
@@ -6534,6 +6535,66 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       break;
     }
 
+    case 'BULK_UPDATE_TEST_HASHTAGS': {
+      const rawIds = Array.isArray(payload.testIds) ? payload.testIds : [];
+      const testIdSet = new Set(rawIds.map(id => String(id || '').trim()).filter(Boolean));
+      if (testIdSet.size === 0) break;
+
+      const normalizeTag = (raw) => {
+        const cleaned = String(raw || '').trim().replace(/^#+/, '').replace(/\s+/g, '');
+        return cleaned ? `#${cleaned.slice(0, 40)}` : '';
+      };
+      const addList = (Array.isArray(payload.addTags) ? payload.addTags : [])
+        .map(normalizeTag)
+        .filter(Boolean);
+      const removeSet = new Set(
+        (Array.isArray(payload.removeTags) ? payload.removeTags : [])
+          .map(normalizeTag)
+          .filter(Boolean)
+          .map(t => t.toLowerCase())
+      );
+      if (addList.length === 0 && removeSet.size === 0) break;
+
+      const updateTagArray = (arr) => {
+        const base = Array.isArray(arr)
+          ? arr.map(normalizeTag).filter(Boolean)
+          : typeof arr === 'string'
+          ? arr.split(/[,;\s]+/).map(normalizeTag).filter(Boolean)
+          : [];
+        const filtered = base.filter(t => !removeSet.has(t.toLowerCase()));
+        const seen = new Set(filtered.map(t => t.toLowerCase()));
+        addList.forEach(tag => {
+          const k = tag.toLowerCase();
+          if (!seen.has(k)) {
+            seen.add(k);
+            filtered.push(tag);
+          }
+        });
+        return filtered.slice(0, 12);
+      };
+
+      let updatedCount = 0;
+      store.tests = (store.tests || []).map(t => {
+        if (!t || !testIdSet.has(t.id)) return t;
+        updatedCount += 1;
+        const nextHashtags = updateTagArray(t.hashtags);
+        const nextSpeaking =
+          t.speaking && typeof t.speaking === 'object' && Array.isArray(t.speaking.hashtags)
+            ? { ...t.speaking, hashtags: updateTagArray(t.speaking.hashtags) }
+            : t.speaking;
+        return {
+          ...t,
+          hashtags: nextHashtags,
+          ...(nextSpeaking !== t.speaking ? { speaking: nextSpeaking } : {})
+        };
+      });
+
+      if (updatedCount > 0) {
+        changed = true;
+      }
+      break;
+    }
+
     case 'DELETE_ATTEMPT': {
       const attemptId = payload.attemptId;
       if (!attemptId) break;
@@ -7695,6 +7756,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'UPDATE_CLASS_MEMBERS',
   'ASSIGN_TEST_CLASSES',
   'ASSIGN_FOLDER_CLASSES',
+  'BULK_UPDATE_TEST_HASHTAGS',
   'UPSERT_CUSTOM_TITLE',
   'DELETE_CUSTOM_TITLE',
   'GRANT_USER_TITLES',

@@ -41,6 +41,7 @@ import {
   createEmptySingleSkillTestForm,
   createDefaultSpeakingSection,
   normalizeSpeakingSection,
+  normalizeTestHashtags,
   DEFAULT_ROOMS
 } from './constants/seedData';
 import {
@@ -2672,6 +2673,59 @@ export default function App() {
       );
     } else {
       showToast('Đã gỡ bài khỏi lớp học.');
+    }
+    return true;
+  };
+
+  const handleBulkUpdateTestHashtags = async (testIds = [], { addTags = [], removeTags = [], scopeLabel = 'các bài đã chọn' } = {}) => {
+    if (currentUser?.role !== 'teacher') return false;
+    const cleanTestIds = Array.from(
+      new Set((Array.isArray(testIds) ? testIds : []).map(id => String(id || '').trim()).filter(Boolean))
+    );
+    if (cleanTestIds.length === 0) {
+      showToast('Không có bài tập nào để cập nhật hashtag.', 'info');
+      return false;
+    }
+    const cleanAdd = normalizeTestHashtags(addTags);
+    const cleanRemove = normalizeTestHashtags(removeTags);
+    if (cleanAdd.length === 0 && cleanRemove.length === 0) return false;
+
+    const removeSet = new Set(cleanRemove.map(t => t.toLowerCase()));
+    const idSet = new Set(cleanTestIds);
+    const applyTags = (raw) => {
+      const existing = normalizeTestHashtags(raw);
+      const kept = existing.filter(t => !removeSet.has(t.toLowerCase()));
+      return normalizeTestHashtags([...kept, ...cleanAdd]);
+    };
+
+    setTests(prev =>
+      prev.map(t => {
+        if (!t || !idSet.has(t.id)) return t;
+        const nextHashtags = applyTags(t.hashtags);
+        const nextSpeaking =
+          t.speaking && typeof t.speaking === 'object' && Array.isArray(t.speaking.hashtags)
+            ? { ...t.speaking, hashtags: applyTags(t.speaking.hashtags) }
+            : t.speaking;
+        return {
+          ...t,
+          hashtags: nextHashtags,
+          ...(nextSpeaking !== t.speaking ? { speaking: nextSpeaking } : {})
+        };
+      })
+    );
+
+    await dispatchSyncAction('BULK_UPDATE_TEST_HASHTAGS', {
+      testIds: cleanTestIds,
+      addTags: cleanAdd,
+      removeTags: cleanRemove
+    });
+
+    if (cleanRemove.length > 0 && cleanAdd.length === 0) {
+      showToast(`Đã tắt hashtag ${cleanRemove.join(', ')} khỏi ${cleanTestIds.length} bài (${scopeLabel})!`);
+    } else if (cleanAdd.length > 0 && cleanRemove.length === 0) {
+      showToast(`Đã bật hashtag ${cleanAdd.join(', ')} cho ${cleanTestIds.length} bài (${scopeLabel})!`);
+    } else {
+      showToast(`Đã cập nhật hashtag cho ${cleanTestIds.length} bài (${scopeLabel})!`);
     }
     return true;
   };
@@ -8092,6 +8146,7 @@ export default function App() {
           onOpenSkillBuilder={(skill, testToEdit = null, subOpts = {}) => openSingleSkillBuilder(skill, testToEdit, [], subOpts)}
           onDeleteTest={handleDeleteTest}
           onAssignFolderClasses={handleAssignFolderClasses}
+          onBulkUpdateTestHashtags={handleBulkUpdateTestHashtags}
           onBackToTeacherDashboard={() => setView('TEACHER_DASHBOARD')}
           onBulkCreateTests={handleBulkCreateTests}
           onSaveSpeakingForecast={handleSaveSpeakingForecast}

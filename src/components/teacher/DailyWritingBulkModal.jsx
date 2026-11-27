@@ -96,7 +96,7 @@ export default function DailyWritingBulkModal({
   const [t2Page, setT2Page] = useState(1);
 
   // Shared execution state
-  const [hashtagsInput, setHashtagsInput] = useState('#ThiThật, #DailyZone');
+  const [hashtagsInput, setHashtagsInput] = useState('#DailyZone');
   const [running, setRunning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState({ phase: '', done: 0, total: 0, message: '' });
