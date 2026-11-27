@@ -354,7 +354,7 @@ export default function PaymentConfigModal({
             <QrCode className="w-5 h-5 text-[#1EE1D6]" />
             <div>
               <h3 id="payment-config-title" className="text-sm sm:text-base font-extrabold">
-                Quản Trị Giá Tiền, VietQR &amp; Tự Động Mở Khóa ({formatVndCurrency(draft.coverUnlockPrice)})
+                Quản Trị Giá Tiền, VietQR &amp; Tự Động Mở Khóa (VIP {formatVndCurrency(draft.aieoVipPrice ?? AIEO_VIP_PRICE_VND)})
               </h3>
               <p className="text-xs text-slate-300">
                 Chỉ Quản Trị Hệ Thống mới có quyền sửa bảng giá, tài khoản nhận tiền &amp; hỗ trợ giao dịch (SĐT/Zalo: {ADMIN_PAYMENT_CONTACT.phoneRaw}).
@@ -380,42 +380,22 @@ export default function PaymentConfigModal({
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
             <div className="space-y-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Giá mở Ảnh Nền Riêng (VNĐ)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={10000000}
-                    step={1000}
-                    value={draft.coverUnlockPrice}
-                    onChange={e => setDraft(prev => ({
-                      ...prev,
-                      coverUnlockPrice: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value) || 0)
-                    }))}
-                    placeholder={String(CUSTOM_COVER_UNLOCK_PRICE_VND)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold tabular-nums"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Ngân hàng (VietQR tự động)
-                  </label>
-                  <select
-                    value={draft.bankCode}
-                    onChange={e => handleBankChange(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold"
-                  >
-                    <option value="">-- Chọn ngân hàng --</option>
-                    {VIETQR_BANK_OPTIONS.map(bank => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.name} ({bank.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Ngân hàng (VietQR tự động)
+                </label>
+                <select
+                  value={draft.bankCode}
+                  onChange={e => handleBankChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold"
+                >
+                  <option value="">-- Chọn ngân hàng --</option>
+                  {VIETQR_BANK_OPTIONS.map(bank => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.name} ({bank.code})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

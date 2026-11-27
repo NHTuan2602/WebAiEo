@@ -711,29 +711,50 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return matchedCount;
   };
 
-  const handleSyncOptionsToGroup = (skill, scopeField, scopeIdx, sourceQuestionId) => {
+  const handleSyncOptionsToGroup = (skill, scopeField, scopeIdx, sourceQuestionId, overrideOptions = null) => {
     let syncedCount = 0;
     setTestForm(prev => {
       const prevQs = Array.isArray(prev[skill]?.questions) ? prev[skill].questions : [];
       const sourceQ = prevQs.find(q => q.id === sourceQuestionId);
-      if (!sourceQ || !Array.isArray(sourceQ.options) || sourceQ.options.length === 0) return prev;
+      const effectiveSourceOpts =
+        Array.isArray(overrideOptions) && overrideOptions.length > 0
+          ? overrideOptions
+          : sourceQ?.options;
+      if (!sourceQ || !Array.isArray(effectiveSourceOpts) || effectiveSourceOpts.length === 0) return prev;
       const targetType = sourceQ.type;
+      const isMapLike = targetType === 'map_diagram' || targetType === 'diagram_label';
       const targetScope = sourceQ[scopeField];
-      const nextOpts = [...sourceQ.options];
-      const nextInstruction = sourceQ.instruction || '';
+      const nextOpts = [...effectiveSourceOpts];
+      const lastLetter = nextOpts[nextOpts.length - 1] || 'I';
+      const rawInst = sourceQ.instruction || '';
+      const nextInstruction =
+        isMapLike && rawInst
+          ? rawInst.replace(/\bA\s*[-–—]\s*[F-L]\b/g, `A–${lastLetter}`)
+          : rawInst;
+      const sharedImageUrl = isMapLike ? (sourceQ.imageUrl || '') : '';
 
       const nextQs = prevQs.map(q => {
-        if (q.id === sourceQuestionId) return q;
+        if (q.id === sourceQuestionId) {
+          return {
+            ...q,
+            options: [...nextOpts],
+            ...(nextInstruction ? { instruction: nextInstruction } : {})
+          };
+        }
         const sameScope =
           typeof targetScope !== 'number' ||
           typeof q[scopeField] !== 'number' ||
           q[scopeField] === targetScope;
-        if (!sameScope || q.type !== targetType) return q;
+        const sameTypeGroup =
+          q.type === targetType ||
+          (isMapLike && (q.type === 'map_diagram' || q.type === 'diagram_label'));
+        if (!sameScope || !sameTypeGroup) return q;
         syncedCount += 1;
         return {
           ...q,
           options: [...nextOpts],
-          ...(nextInstruction ? { instruction: nextInstruction } : {})
+          ...(nextInstruction ? { instruction: nextInstruction } : {}),
+          ...(sharedImageUrl && !q.imageUrl ? { imageUrl: sharedImageUrl } : {})
         };
       });
       return {
@@ -746,7 +767,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     });
     if (syncedCount > 0) {
       showToast?.(`Đã đồng bộ Khung Đáp Án (A, B, C...) sang ${syncedCount} câu cùng nhóm để hiển thị 1 khung chung chuẩn Cambridge!`);
-    } else {
+    } else if (!overrideOptions) {
       showToast?.('Chưa có câu hỏi nào khác cùng dạng trong phần này để đồng bộ khung đáp án.', 'info');
     }
   };
@@ -1961,25 +1982,10 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => applyQuickPreset('speaking_daily')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition ${
-                        !normalizeSpeakingSection(testForm.speaking).isForecast
-                          ? 'bg-orange-600 text-white border-orange-600'
-                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                      }`}
-                    >
-                      🔥 1. Daily Speaking
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => applyQuickPreset('speaking_forecast')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition ${
-                        normalizeSpeakingSection(testForm.speaking).isForecast
-                          ? 'bg-teal-600 text-white border-teal-600'
-                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                      }`}
+                      className="px-3 py-1.5 rounded-lg text-xs font-extrabold border transition bg-teal-600 text-white border-teal-600"
                     >
-                      🌟 2. Cày Forecast Cùng Ms. Như
+                      🌟 Cày Forecast Cùng Ms. Như
                     </button>
                   </div>
                 )}
@@ -3350,7 +3356,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onAssignImageToRange={(fromNum, toNum, imgUrl, opts) => handleAssignImageToQuestionRange('listening', fromNum, toNum, imgUrl, opts)}
             onApplyFlowchartBoxTemplate={(tpl, boxOpts) => handleApplyFlowchartBoxTemplate('listening', 'trackIdx', activeIdx, tpl, boxOpts)}
             onInsertCambridgePattern={patId => handleInsertCambridgePattern('listening', 'trackIdx', activeIdx, patId)}
-            onSyncOptionsToGroup={qId => handleSyncOptionsToGroup('listening', 'trackIdx', activeIdx, qId)}
+            onSyncOptionsToGroup={(qId, overrideOpts) => handleSyncOptionsToGroup('listening', 'trackIdx', activeIdx, qId, overrideOpts)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('listening', 'trackIdx', activeIdx, extracted, opts)
             }
@@ -3626,7 +3632,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             onAssignImageToRange={(fromNum, toNum, imgUrl, opts) => handleAssignImageToQuestionRange('reading', fromNum, toNum, imgUrl, opts)}
             onApplyFlowchartBoxTemplate={(tpl, boxOpts) => handleApplyFlowchartBoxTemplate('reading', 'passageIdx', activeIdx, tpl, boxOpts)}
             onInsertCambridgePattern={patId => handleInsertCambridgePattern('reading', 'passageIdx', activeIdx, patId)}
-            onSyncOptionsToGroup={qId => handleSyncOptionsToGroup('reading', 'passageIdx', activeIdx, qId)}
+            onSyncOptionsToGroup={(qId, overrideOpts) => handleSyncOptionsToGroup('reading', 'passageIdx', activeIdx, qId, overrideOpts)}
             onApplyAiExtraction={(extracted, opts) =>
               handleApplyAiExtraction('reading', 'passageIdx', activeIdx, extracted, opts)
             }
@@ -3682,7 +3688,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
                   Hình Ảnh Biểu Đồ / Bản Đồ Writing Task 1 (Tùy chọn)
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="cursor-pointer inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Tải Ảnh Biểu Đồ Task 1</span>
@@ -3693,6 +3699,41 @@ Write ONE WORD AND/OR A NUMBER for each answer.
                       className="hidden"
                     />
                   </label>
+                  <button
+                    type="button"
+                    data-testid="ai-generate-task1-image-btn"
+                    onClick={async () => {
+                      const defaultPrompt = String(testForm.writing?.task1?.prompt || 'IELTS Writing Task 1 Chart').trim();
+                      const userPrompt =
+                        typeof window !== 'undefined' && typeof window.prompt === 'function'
+                          ? window.prompt('Nhập mô tả Biểu đồ / Bản đồ Task 1 để AI tự vẽ hình minh họa:', defaultPrompt)
+                          : defaultPrompt;
+                      if (userPrompt === null) return;
+                      try {
+                        const { generateAiIllustrationDataUrl } = await import('../utils/geminiGrader.js');
+                        const dataUrl = await generateAiIllustrationDataUrl({
+                          apiKey: aiApiKey,
+                          prompt: userPrompt || defaultPrompt,
+                          kind: /map|plan|island|town|park|floor/i.test(userPrompt || defaultPrompt) ? 'map_diagram' : 'chart',
+                          title: (userPrompt || defaultPrompt).slice(0, 64)
+                        });
+                        setTestForm(prev => ({
+                          ...prev,
+                          writing: {
+                            ...prev.writing,
+                            task1: { ...prev.writing?.task1, imageUrl: dataUrl }
+                          }
+                        }));
+                        showToast?.('✨ Đã tạo hình ảnh Biểu đồ / Bản đồ Task 1 bằng AI!');
+                      } catch (err) {
+                        showToast?.(err?.message || 'Không thể tạo ảnh AI.', 'error');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-extrabold px-3.5 py-2 rounded-xl transition"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>✨ Tạo AI Hình Ảnh</span>
+                  </button>
                   {testForm.writing?.task1?.imageUrl && (
                     <button
                       type="button"

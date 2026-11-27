@@ -216,7 +216,7 @@ export default function StudentHome({
                 {!currentUser?.isGuest && (
                   <button
                     type="button"
-                    onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('speaking_daily') : setView('SKILL_HUB'))}
+                    onClick={() => (openSkillPracticeHub ? openSkillPracticeHub('forecast') : setView('SKILL_HUB'))}
                     className="bg-white dark:bg-[#18181B] hover:bg-slate-50 dark:hover:bg-zinc-800 border border-[#CBD5E1] dark:border-zinc-700 text-[#0F172A] dark:text-[#FAFAFA] font-bold text-xs sm:text-sm px-5 py-3 rounded-lg transition flex items-center gap-2"
                   >
                     <Mic className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" />
@@ -530,9 +530,9 @@ export default function StudentHome({
             >
               {[
                 {
-                  tab: 'speaking_daily',
-                  title: '1. Daily Speaking & Cày Forecast',
-                  desc: 'Bài nói bắt buộc hàng ngày & kho đề Forecast Speaking chuẩn của Ms. Như.'
+                  tab: 'forecast',
+                  title: '1. Cày Forecast Cùng Ms. Như',
+                  desc: 'Kho đề Forecast Speaking chuẩn của Ms. Như, luyện từng Part hoặc Full Test.'
                 },
                 {
                   tab: 'reading',

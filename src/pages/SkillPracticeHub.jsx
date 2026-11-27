@@ -315,19 +315,11 @@ export default function SkillPracticeHub({
   };
 
   const navItems = [
-    {
-      id: 'speaking_daily',
-      label: '1. Daily Speaking',
-      icon: Flame,
-      badge: !isTeacher && dailyCompliance.myPendingDailyTests.length > 0
-        ? `${dailyCompliance.myPendingDailyTests.length} mới`
-        : dailySpeakingTests.length
-    },
-    { id: 'forecast', label: '2. Cày Forecast Cùng Ms. Như', icon: Sparkles, badge: forecastTests.length },
-    { id: 'reading', label: '3. Đọc (SHW 1–14)', icon: BookOpen, badge: readingTests.length },
-    { id: 'listening', label: '4. Nghe (SHW · Sec1 · Map)', icon: Headphones, badge: listeningTests.length },
-    { id: 'writing_task1', label: '5. Viết Task 1 (W1)', icon: PenTool, badge: writingTask1Tests.length },
-    { id: 'writing_task2', label: '6. Viết Task 2 (W2)', icon: PenTool, badge: writingTask2Tests.length }
+    { id: 'forecast', label: '1. Cày Forecast Cùng Ms. Như', icon: Sparkles, badge: forecastTests.length || speakingTests.length },
+    { id: 'reading', label: '2. Đọc (SHW 1–14)', icon: BookOpen, badge: readingTests.length },
+    { id: 'listening', label: '3. Nghe (SHW · Sec1 · Map)', icon: Headphones, badge: listeningTests.length },
+    { id: 'writing_task1', label: '4. Viết Task 1 (W1)', icon: PenTool, badge: writingTask1Tests.length },
+    { id: 'writing_task2', label: '5. Viết Task 2 (W2)', icon: PenTool, badge: writingTask2Tests.length }
   ];
 
   const renderSingleSkillLeaderboard = (skillFilter = 'all') => {
@@ -1561,6 +1553,51 @@ export default function SkillPracticeHub({
                           </button>
                           {isTeacher && (
                             <>
+                              {onAssignFolderClasses && (
+                                <button
+                                  type="button"
+                                  data-testid={`daily-toggle-privacy-btn-${test.id}`}
+                                  onClick={() => {
+                                    if (cfg.visibility === 'private') {
+                                      setBulkFolderAssignTarget({
+                                        label: test.title,
+                                        testIds: [test.id],
+                                        initialClassIds: cfg.assignedClassIds || []
+                                      });
+                                    } else {
+                                      onAssignFolderClasses([test.id], {
+                                        visibility: 'private',
+                                        assignedClassIds: [],
+                                        mode: 'replace',
+                                        notify: false,
+                                        folderLabel: test.title
+                                      });
+                                    }
+                                  }}
+                                  className={`px-2.5 py-2 rounded-lg border text-xs font-bold inline-flex items-center gap-1 transition ${
+                                    cfg.visibility === 'private'
+                                      ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-500/40 hover:bg-amber-100'
+                                      : 'bg-white dark:bg-slate-800 text-[#0F766E] dark:text-[#1EE1D6] border-[#CBD5E1] dark:border-slate-700 hover:border-[#007A7A]'
+                                  }`}
+                                  title={
+                                    cfg.visibility === 'private'
+                                      ? 'Đang ở chế độ Chỉ mình tôi — Bấm để Mở & Giao bài cho lớp'
+                                      : 'Bấm để chuyển bài tập này thành Chỉ mình tôi'
+                                  }
+                                >
+                                  {cfg.visibility === 'private' ? (
+                                    <>
+                                      <Share2 className="w-3.5 h-3.5" />
+                                      <span>Mở &amp; Giao</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <EyeOff className="w-3.5 h-3.5" />
+                                      <span>Chỉ mình tôi</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => onOpenSkillBuilder?.(actualSkill, test)}
@@ -1664,7 +1701,9 @@ export default function SkillPracticeHub({
 
                 {navItems.map(item => {
                   const IconComp = item.icon;
-                  const isActive = activeTab === item.id;
+                  const isActive =
+                    activeTab === item.id ||
+                    (item.id === 'forecast' && ['speaking', 'speaking_daily', 'speaking_exam_room'].includes(activeTab));
                   return (
                     <button
                       key={item.id}
@@ -1770,6 +1809,66 @@ export default function SkillPracticeHub({
             }
           }}
         >
+          {isTeacher && onAssignFolderClasses && singleSkillTests.length > 0 && (
+            <div className="rounded-xl bg-white dark:bg-[#0F172B] border border-amber-300/80 dark:border-amber-500/40 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold text-[#0F172B] dark:text-white">
+                    Chế Độ Giáo Viên Quản Lý Kho Daily Zone ({singleSkillTests.length} bài tập)
+                  </p>
+                  <p className="text-[11px] text-[#475569] dark:text-slate-400">
+                    Bật tất cả thành <b>Chỉ mình tôi</b> để tạm ẩn với học sinh, sau đó bấm <b>Giao lớp / Mở bài</b> trên từng thư mục hoặc từng bài để mở dần.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="daily-zone-set-all-private-btn"
+                  onClick={() =>
+                    onAssignFolderClasses(
+                      singleSkillTests.map(t => t.id),
+                      {
+                        visibility: 'private',
+                        assignedClassIds: [],
+                        mode: 'replace',
+                        notify: false,
+                        folderLabel: 'Toàn bộ Daily Zone'
+                      }
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-xs transition"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Bật Tất Cả Thành Chỉ Mình Tôi ({singleSkillTests.length})</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="daily-zone-set-all-public-btn"
+                  onClick={() =>
+                    onAssignFolderClasses(
+                      singleSkillTests.map(t => t.id),
+                      {
+                        visibility: 'public',
+                        publish: true,
+                        assignedClassIds: [],
+                        mode: 'replace',
+                        notify: false,
+                        folderLabel: 'Toàn bộ Daily Zone'
+                      }
+                    )
+                  }
+                  className="px-3 py-2 rounded-lg bg-[#EDFFFD] hover:bg-[#007A7A] text-[#0F766E] hover:text-white dark:bg-teal-500/15 dark:text-[#1EE1D6] dark:hover:bg-[#007A7A] dark:hover:text-white border border-[#B5F5F1] dark:border-teal-500/35 text-xs font-bold inline-flex items-center gap-1.5 transition"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Mở Tất Cả Cho Học Sinh</span>
+                </button>
+              </div>
+            </div>
+          )}
           {!isTeacher && (
             <div className="rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="font-bold text-[#065F46] dark:text-emerald-200 flex items-center gap-2">
@@ -1794,10 +1893,8 @@ export default function SkillPracticeHub({
           )}
           {['speaking', 'speaking_daily', 'speaking_exam_room', 'forecast'].includes(activeTab) ? (() => {
             const activeSpeakingList =
-              activeTab === 'forecast'
+              forecastTests.length > 0
                 ? forecastTests
-                : dailySpeakingTests.length > 0
-                ? dailySpeakingTests
                 : speakingTests;
             const featuredSpeakingTest = activeSpeakingList[0] || null;
             const featuredSpMeta = featuredSpeakingTest ? normalizeSpeakingSection(featuredSpeakingTest.speaking) : null;
@@ -1811,55 +1908,10 @@ export default function SkillPracticeHub({
 
             return (
             <>
-              {/* 2 Core Speaking Sections in Daily Zone: Daily Speaking + Cày Forecast Cùng Ms. Như */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => onChangeTab?.('speaking_daily')}
-                  className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
-                    activeTab !== 'forecast'
-                      ? 'bg-[#C2410C] text-white border-[#C2410C]'
-                      : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-[#C2410C]'
-                  }`}
-                >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab !== 'forecast' ? 'bg-white/20 text-white' : 'bg-orange-50 text-[#C2410C] dark:bg-orange-500/20 dark:text-orange-300'}`}>
-                    <Flame className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-extrabold flex items-center gap-1.5">
-                      <span>1. Daily Speaking ({dailySpeakingTests.length})</span>
-                    </p>
-                    <p className={`text-xs mt-0.5 leading-snug ${activeTab !== 'forecast' ? 'text-orange-50' : 'text-[#475569] dark:text-slate-400'}`}>
-                      Bài luyện nói hàng ngày cho Team · Nhắc người chưa hoàn thành
-                    </p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onChangeTab?.('forecast')}
-                  className={`p-3.5 rounded-lg border text-left transition flex items-start gap-3 ${
-                    activeTab === 'forecast'
-                      ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                      : 'bg-white dark:bg-[#0F172B] border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
-                  }`}
-                >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activeTab === 'forecast' ? 'bg-white/20 text-white' : 'bg-[#EDFFFD] text-[#0F766E] dark:text-[#1EE1D6]'}`}>
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-extrabold">2. Cày Forecast Cùng Ms. Như ({forecastTests.length})</p>
-                    <p className={`text-xs mt-0.5 leading-snug ${activeTab === 'forecast' ? 'text-teal-50' : 'text-[#475569] dark:text-slate-400'}`}>
-                      Bộ đề Forecast Speaking cập nhật · Luyện ghi âm từng Part hoặc Full
-                    </p>
-                  </div>
-                </button>
-              </div>
-
               {/* Structured 3-Part Speaking Zone (Google Drive Folder Explorer + Bulk Class Assign) */}
               {!focusedSpeakingMatch && (
                 <SpeakingForecastZone
-                  zoneKey={activeTab === 'forecast' ? 'forecast' : 'daily'}
+                  zoneKey="forecast"
                   speakingForecast={speakingForecast}
                   bank={speakingForecast}
                   classesDb={classesDb}
@@ -1870,106 +1922,6 @@ export default function SkillPracticeHub({
                   onStartPracticeTest={onStartSpeakingPracticeTest}
                   showToast={showToast}
                 />
-              )}
-
-              {/* Daily Compliance Alert Strip for Students OR Teacher Missing Tracker */}
-              {!isTeacher && dailyCompliance.myPendingDailyTests.length > 0 && (
-                <div className="rounded-lg bg-[#FFFBEB] dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-[#C2410C] text-white flex items-center justify-center shrink-0">
-                      <AlertTriangle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-extrabold text-[#9A3412] dark:text-amber-200">
-                        Bắt Buộc Hôm Nay: Bạn còn {dailyCompliance.myPendingDailyTests.length} bài Speaking Daily chưa hoàn thành!
-                      </p>
-                      <p className="text-xs sm:text-sm text-[#334155] dark:text-slate-300 mt-0.5 max-w-2xl">
-                        Đề chờ hoàn thành: <strong>{dailyCompliance.myPendingDailyTests.map(d => d.title).join(', ')}</strong>. Hãy hoàn thành sớm để hệ thống ghi nhận đạt Daily!
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleTriggerSpeakingStart(dailyCompliance.myPendingDailyTests[0], 'full')}
-                    className="px-4 py-2.5 rounded-lg bg-[#C2410C] hover:bg-[#9A3412] text-white text-xs font-bold shrink-0 inline-flex items-center gap-1.5 transition"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" /> Làm Bài Daily Ngay →
-                  </button>
-                </div>
-              )}
-
-              {!isTeacher && activeTab === 'speaking_daily' && dailyCompliance.myDailyTests.length > 0 && dailyCompliance.myPendingDailyTests.length === 0 && (
-                <div className="rounded-lg bg-[#D1FAE5] dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/40 px-4 py-3 flex items-center gap-2.5 text-xs font-bold text-[#065F46] dark:text-emerald-300">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" /> Tuyệt vời! Bạn đã hoàn thành toàn bộ Speaking Daily bắt buộc hôm nay.
-                </div>
-              )}
-
-              {isTeacher && activeTab === 'speaking_daily' && dailyCompliance.perTest.length > 0 && (
-                <div className="rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800 p-5 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white flex items-center gap-2">
-                        <Users className="w-4 h-4 text-[#C2410C]" />
-                        Báo Cáo Speaking Daily: Ai Chưa Hoàn Thành ({dailyCompliance.missingStudentSummaries.length} HS)
-                      </h2>
-                      <p className="text-sm text-[#475569] dark:text-slate-400 mt-0.5 max-w-2xl">
-                        Tự động đối chiếu học viên trong lớp/hệ thống với bài nộp Speaking Daily. Học viên chưa nộp sẽ hiển thị bên dưới để báo nhắc ngay.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {dailyCompliance.perTest.map(row => (
-                      <div
-                        key={row.test.id}
-                        className="py-3.5 first:pt-0 last:pb-0 space-y-2.5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-bold text-[#0F172B] dark:text-white">{row.test.title}</span>
-                            {row.dailyDate && (
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 inline-flex items-center gap-1">
-                                <Calendar className="w-3 h-3" /> {row.dailyDate}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs font-bold">
-                            <span className="px-2.5 py-0.5 rounded-full bg-[#D1FAE5] text-[#065F46] dark:bg-emerald-500/20 dark:text-emerald-300">
-                              ✓ Đã nộp: {row.doneStudents.length}/{row.targetStudents.length}
-                            </span>
-                            {row.missingStudents.length > 0 && onNotifyMissingDaily && (
-                              <button
-                                type="button"
-                                onClick={() => onNotifyMissingDaily(row.test, row.missingStudents)}
-                                className="px-3 py-1 rounded-lg bg-[#B91C1C] hover:bg-[#991B1B] text-white text-xs font-bold inline-flex items-center gap-1 transition"
-                              >
-                                <Send className="w-3 h-3" /> Báo &amp; Nhắc {row.missingStudents.length} HS Chưa Làm
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {row.missingStudents.length === 0 ? (
-                          <p className="text-xs font-bold text-[#065F46] dark:text-emerald-400">
-                            ✓ 100% học viên mục tiêu đã hoàn thành bài Daily này!
-                          </p>
-                        ) : (
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className="text-xs font-bold text-[#B91C1C] dark:text-rose-400 mr-1">Chưa hoàn thành:</span>
-                            {row.missingStudents.map(stu => (
-                              <span
-                                key={stu.username}
-                                className="text-xs font-semibold px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/20 text-[#991B1B] dark:text-rose-200 border border-rose-200 dark:border-rose-500/40"
-                              >
-                                {stu.name || stu.username} (@{stu.username})
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
               )}
 
               {focusedSpeakingMatch && onClearFocusedTest && (
@@ -1993,20 +1945,14 @@ export default function SkillPracticeHub({
                 <div className="xl:col-span-7 space-y-4">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EDFFFD] dark:bg-teal-500/15 border border-[#B5F5F1] dark:border-teal-500/30 text-[#0F766E] dark:text-[#1EE1D6] text-xs font-bold">
                     <Mic className="w-3.5 h-3.5" />
-                    <span>
-                      {activeTab === 'forecast'
-                        ? 'Mục 2: Cày Forecast Cùng Ms. Như • Bộ Đề Speaking Mới Nhất'
-                        : 'Mục 1: Daily Speaking • Hoàn Thành Hàng Ngày Theo Team'}
-                    </span>
+                    <span>Mục 1: Cày Forecast Cùng Ms. Như • Bộ Đề Speaking Mới Nhất</span>
                   </div>
 
                   <h1 className="text-3xl sm:text-4xl font-extrabold text-[#0F172B] dark:text-white tracking-tight">
-                    {activeTab === 'forecast' ? 'Cày Forecast Cùng Ms. Như' : 'Daily Speaking'}
+                    Cày Forecast Cùng Ms. Như
                   </h1>
                   <p className="text-sm text-[#475569] dark:text-slate-300 leading-relaxed max-w-2xl">
-                    {activeTab === 'forecast'
-                      ? 'Luyện phản xạ từng Part 1, Cue Card Part 2 và Discussion Part 3 theo bộ câu hỏi Forecast do Ms. Như biên soạn. File ghi âm được gửi thẳng tới Ms. Như kiểm tra & nhận xét.'
-                      : 'Bài luyện nói cập nhật hàng ngày cho các Team. Toàn bộ file ghi âm được lưu trữ và gửi về Ms. Như check & duyệt điểm.'}
+                    Luyện phản xạ từng Part 1, Cue Card Part 2 và Discussion Part 3 theo bộ câu hỏi Forecast do Ms. Như biên soạn. File ghi âm được gửi thẳng tới Ms. Như kiểm tra &amp; nhận xét.
                   </p>
 
                   {featuredSpeakingTest ? (
@@ -2119,9 +2065,7 @@ export default function SkillPracticeHub({
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172B] dark:text-white">
-                            {activeTab === 'forecast'
-                              ? 'Kho Đề Cày Forecast Cùng Ms. Như'
-                              : 'Danh Sách Bài Daily Speaking'}
+                            Kho Đề Cày Forecast Cùng Ms. Như
                           </h2>
                           <p className="text-sm text-[#475569] dark:text-slate-400 max-w-2xl">
                             Làm lại không giới hạn số lượt · Cần thi Thực Chiến full 4 kỹ năng (L·R·W·S)? Quay về trang chủ mục <b>Thực Chiến Thi Thật</b>!

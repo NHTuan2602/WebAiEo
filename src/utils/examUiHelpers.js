@@ -250,6 +250,11 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
         : isMatchingInfoType
         ? ['A', 'B', 'C', 'D', 'E', 'F']
         : [];
+    const isSingleLetterOptionList = list =>
+      Array.isArray(list) &&
+      list.length >= 2 &&
+      list.length <= 12 &&
+      list.every(item => /^[A-L]$/i.test(String(item || '').trim()));
     const signature =
       (MATRIX_ELIGIBLE_TYPES.has(q?.type) || isMapDiagramType || isMatchingInfoType) &&
       isShortMatrixOptionList(effectiveMatrixOpts)
@@ -274,9 +279,14 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
               (nextQ?.type === 'matching_information' || nextQ?.type === 'matching_info' || nextQ?.type === 'matching')
             ? ['A', 'B', 'C', 'D', 'E', 'F']
             : [];
+        const canMergeMapOrLetterGroup =
+          ((isMapDiagramType && nextIsMapDiagram) ||
+            (Boolean(q?.imageUrl) && nextQ?.imageUrl === q?.imageUrl) ||
+            (nextQ?.type === q?.type && isSingleLetterOptionList(effectiveMatrixOpts))) &&
+          isSingleLetterOptionList(nextEffectiveOpts);
         if (
           (MATRIX_ELIGIBLE_TYPES.has(nextQ?.type) || nextIsMapDiagram || isMatchingInfoType) &&
-          nextEffectiveOpts.join('||') === signature
+          (nextEffectiveOpts.join('||') === signature || canMergeMapOrLetterGroup)
         ) {
           j++;
         } else {
@@ -290,13 +300,47 @@ export function groupQuestionsForRendering(questions = [], baseOffset = 0) {
 
       if (j - i >= minMatrixGroupSize || (isMapDiagramType && Boolean(groupImageUrl) && j - i >= 1)) {
         const resolvedGroupType = isMapDiagramType ? 'map_diagram' : q.type;
+        let unifiedMatrixOpts = effectiveMatrixOpts;
+        if (isSingleLetterOptionList(effectiveMatrixOpts)) {
+          let maxCharCode = 65;
+          groupItems.forEach(item => {
+            const itemOpts = Array.isArray(item?.options) && item.options.length > 0
+              ? item.options
+              : effectiveMatrixOpts;
+            itemOpts.forEach(o => {
+              const clean = String(o || '').trim().toUpperCase();
+              if (/^[A-L]$/.test(clean)) {
+                maxCharCode = Math.max(maxCharCode, clean.charCodeAt(0));
+              }
+            });
+            const ansClean = String(item?.correctAnswer || '').trim().toUpperCase();
+            if (/^[A-L]$/.test(ansClean)) {
+              maxCharCode = Math.max(maxCharCode, ansClean.charCodeAt(0));
+            }
+          });
+          if (maxCharCode >= 66) {
+            const built = [];
+            for (let c = 65; c <= maxCharCode; c += 1) {
+              built.push(String.fromCharCode(c));
+            }
+            unifiedMatrixOpts = built;
+          }
+        }
+        const lastUnifiedLetter = unifiedMatrixOpts[unifiedMatrixOpts.length - 1] || 'I';
+        const rawGroupInstruction =
+          q.instruction || getStandardGroupInstruction({ ...q, type: resolvedGroupType }, unifiedMatrixOpts);
+        const normalizedInstruction =
+          isSingleLetterOptionList(unifiedMatrixOpts) && rawGroupInstruction
+            ? rawGroupInstruction.replace(/\bA\s*[-–—]\s*[F-L]\b/g, `A–${lastUnifiedLetter}`)
+            : rawGroupInstruction;
+
         groups.push({
           kind: 'matrix',
           key: `matrix-${q.id}`,
           groupType: resolvedGroupType,
-          options: effectiveMatrixOpts,
+          options: unifiedMatrixOpts,
           imageUrl: groupImageUrl,
-          instruction: q.instruction || getStandardGroupInstruction({ ...q, type: resolvedGroupType }, effectiveMatrixOpts),
+          instruction: normalizedInstruction,
           hasNB: Boolean(
             q.hasNB ||
               (!isMapDiagramType && isMatchingInfoType) ||

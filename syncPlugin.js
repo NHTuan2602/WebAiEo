@@ -5660,7 +5660,12 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
         } else {
           nextAssigned = incomingClasses;
         }
-        const nextVis = publish ? 'public' : (t.visibility || 'public');
+        const nextVis =
+          payload.visibility === 'private'
+            ? 'private'
+            : publish || payload.visibility === 'public'
+              ? 'public'
+              : (t.visibility || 'public');
         const nextObj = { ...t, assignedClassIds: nextAssigned, visibility: nextVis };
         if (!firstUpdatedTest) firstUpdatedTest = nextObj;
         updatedCount += 1;

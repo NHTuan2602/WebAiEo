@@ -56,6 +56,7 @@ export default function IntegratedSpeakingSection({
   const [micLevel, setMicLevel] = useState(0);
   const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
   const [autoRecordCountdown, setAutoRecordCountdown] = useState(null);
+  const [part2PrepCountdown, setPart2PrepCountdown] = useState(null);
   const [promptPlayBlocked, setPromptPlayBlocked] = useState(false);
 
   const mediaRecorderRef = useRef(null);
@@ -66,6 +67,8 @@ export default function IntegratedSpeakingSection({
   const audioChunksRef = useRef([]);
   const recordTimerRef = useRef(null);
   const autoRecordTimerRef = useRef(null);
+  const part2PrepTimerRef = useRef(null);
+  const goQuestionRef = useRef(null);
   const promptFallbackTimerRef = useRef(null);
   const promptAudioRef = useRef(null);
   const promptCycleRef = useRef(0);
@@ -143,6 +146,7 @@ export default function IntegratedSpeakingSection({
     return () => {
       promptCycleRef.current += 1;
       if (autoRecordTimerRef.current) clearInterval(autoRecordTimerRef.current);
+      if (part2PrepTimerRef.current) clearInterval(part2PrepTimerRef.current);
       if (promptFallbackTimerRef.current) clearTimeout(promptFallbackTimerRef.current);
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         try {
@@ -271,6 +275,53 @@ export default function IntegratedSpeakingSection({
     setAutoRecordCountdown(null);
   };
 
+  const clearPart2PrepTimer = () => {
+    if (part2PrepTimerRef.current) {
+      clearInterval(part2PrepTimerRef.current);
+      part2PrepTimerRef.current = null;
+    }
+    setPart2PrepCountdown(null);
+  };
+
+  const formatMmSs = (sec) => {
+    const s = Math.max(0, Math.floor(Number(sec) || 0));
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  };
+
+  const startPart2PrepTimer = (questionId, initialPrepSec = 60) => {
+    clearPart2PrepTimer();
+    clearAutoRecordTimer();
+    if (
+      !questionId ||
+      currentQuestionIdRef.current !== questionId ||
+      isRecordingRef.current ||
+      recordingsMapRef.current?.[questionId]
+    ) {
+      return;
+    }
+    let remaining = Math.max(1, Number(initialPrepSec) || 60);
+    setPart2PrepCountdown(remaining);
+    part2PrepTimerRef.current = setInterval(() => {
+      if (
+        currentQuestionIdRef.current !== questionId ||
+        isRecordingRef.current ||
+        recordingsMapRef.current?.[questionId]
+      ) {
+        clearPart2PrepTimer();
+        return;
+      }
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearPart2PrepTimer();
+        startRecordingRef.current?.();
+      } else {
+        setPart2PrepCountdown(remaining);
+      }
+    }, 1000);
+  };
+
   const cancelPromptPlayback = () => {
     promptCycleRef.current += 1;
     if (promptFallbackTimerRef.current) {
@@ -345,7 +396,11 @@ export default function IntegratedSpeakingSection({
         promptFallbackTimerRef.current = null;
       }
       setIsSpeakingPrompt(false);
-      if (autoRecord && !recordingsMapRef.current?.[questionId]) {
+      if (question.part === 2 && !recordingsMapRef.current?.[questionId]) {
+        if (!part2PrepTimerRef.current) {
+          startPart2PrepTimer(questionId, question.prepSec || 60);
+        }
+      } else if (autoRecord && !recordingsMapRef.current?.[questionId]) {
         startAutoRecordCountdown(questionId);
       }
     };
@@ -416,6 +471,8 @@ export default function IntegratedSpeakingSection({
       return;
     }
     try {
+      clearPart2PrepTimer();
+      clearAutoRecordTimer();
       const existingStream = mediaStreamRef.current;
       const hasLiveAudioTrack = existingStream?.getAudioTracks().some(track => track.readyState === 'live');
       const stream = hasLiveAudioTrack ? existingStream : await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -452,6 +509,16 @@ export default function IntegratedSpeakingSection({
         });
         stopHardwareAndTimers();
         setIsRecording(false);
+        if (capturedQuestion.part === 2) {
+          const capturedIdx = questions.findIndex(q => q.id === capturedQuestion.id);
+          const nextPart3Idx = questions.findIndex((q, i) => i > capturedIdx && q.part === 3);
+          const targetNext = nextPart3Idx !== -1 ? nextPart3Idx : capturedIdx + 1;
+          if (targetNext > capturedIdx && targetNext < questions.length) {
+            setTimeout(() => {
+              goQuestionRef.current?.(targetNext);
+            }, 350);
+          }
+        }
       };
 
       // Optional live speech-to-text helper for Ms. Nhu's grading reference
@@ -480,12 +547,19 @@ export default function IntegratedSpeakingSection({
         }
       }
 
+      const maxRecordSecForQuestion =
+        capturedQuestion.part === 2
+          ? (Number(capturedQuestion.speakSec) > 0 ? Number(capturedQuestion.speakSec) : 120)
+          : 0;
       recordStartMsRef.current = Date.now();
       recorder.start(250);
       setIsRecording(true);
       recordTimerRef.current = setInterval(() => {
         const sec = Math.max(0, Math.floor((Date.now() - recordStartMsRef.current) / 1000));
         setRecordElapsedSec(sec);
+        if (maxRecordSecForQuestion > 0 && sec >= maxRecordSecForQuestion) {
+          stopRecording();
+        }
       }, 300);
     } catch (err) {
       stopHardwareAndTimers();
@@ -505,15 +579,37 @@ export default function IntegratedSpeakingSection({
   const goQuestion = (nextIdx) => {
     const targetIdx = Math.min(Math.max(0, nextIdx), Math.max(0, questions.length - 1));
     if (isRecordingRef.current) stopRecording();
+    clearPart2PrepTimer();
     setMicError('');
-    currentQuestionIdRef.current = questions[targetIdx]?.id || '';
+    const nextQ = questions[targetIdx] || null;
+    currentQuestionIdRef.current = nextQ?.id || '';
     setCurrentIdx(targetIdx);
+    if (nextQ?.part === 2 && !recordingsMapRef.current?.[nextQ.id]) {
+      startPart2PrepTimer(nextQ.id, nextQ.prepSec || 60);
+    }
     if (autoExaminerMode && isSpeakingSectionStartedRef.current) {
-      readPromptAndAutoRecord(questions[targetIdx], true, targetIdx);
+      readPromptAndAutoRecord(nextQ, true, targetIdx);
     } else {
       cancelPromptPlayback();
     }
   };
+  goQuestionRef.current = goQuestion;
+
+  useEffect(() => {
+    if (
+      isSpeakingSectionStarted &&
+      currentQ?.part === 2 &&
+      !isRecording &&
+      !currentRec &&
+      part2PrepCountdown === null &&
+      !part2PrepTimerRef.current
+    ) {
+      startPart2PrepTimer(currentQ.id, currentQ.prepSec || 60);
+    }
+    if (currentQ?.part !== 2 && part2PrepCountdown !== null) {
+      clearPart2PrepTimer();
+    }
+  }, [currentQ?.id, currentQ?.part, currentQ?.prepSec, isSpeakingSectionStarted, isRecording, currentRec, part2PrepCountdown]);
 
   const handleReadCurrentPrompt = () => {
     if (isRecordingRef.current) stopRecording();
@@ -780,19 +876,89 @@ export default function IntegratedSpeakingSection({
           </div>
         )}
 
-        {/* Scratchpad Notes for Part 2 */}
+        {/* Scratchpad Notes & Automated 1m Prep -> 2m Record Countdown for Part 2 */}
         {currentQ.part === 2 && (
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
-              Giấy nháp ý tưởng Part 2 (1 phút chuẩn bị - tùy chọn):
-            </label>
-            <textarea
-              rows={3}
-              value={speakingNotes[currentQ.id] || ''}
-              onChange={e => onSpeakingNotesChange?.(currentQ.id, e.target.value)}
-              placeholder="Ghi nhanh từ khóa / cấu trúc câu bạn sẽ nói trong 2 phút..."
-              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-sm text-slate-900 dark:text-zinc-100 outline-none focus:border-teal-600"
-            />
+          <div className="space-y-3">
+            {!isRecording && !currentRec && (
+              <div
+                data-testid="part2-prep-countdown-banner"
+                className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-700/70 flex flex-wrap items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                      Đồng Hồ Đếm Ngược 1 Phút Chuẩn Bị Part 2
+                    </p>
+                    <p className="text-xs text-amber-800/90 dark:text-amber-300/90">
+                      Hết 1 phút chuẩn bị hệ thống sẽ tự động chuyển sang <strong>Đồng hồ đếm ngược 2 phút ghi âm</strong>!
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    data-testid="part2-prep-timer-value"
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 font-mono text-lg font-black tracking-wider"
+                  >
+                    {formatMmSs(part2PrepCountdown ?? 60)}
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="part2-skip-prep-record-btn"
+                    onClick={() => {
+                      clearPart2PrepTimer();
+                      clearAutoRecordTimer();
+                      startRecordingRef.current?.();
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition"
+                  >
+                    Ghi Âm 2 Phút Ngay →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isRecording && (
+              <div
+                data-testid="part2-record-countdown-banner"
+                className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-700/70 flex flex-wrap items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center justify-center shrink-0 animate-pulse">
+                    <Mic className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-rose-900 dark:text-rose-200">
+                      Đồng Hồ Đếm Ngược 2 Phút Ghi Âm Part 2 (Tự động chuyển qua Phần 3)
+                    </p>
+                    <p className="text-xs text-rose-800/90 dark:text-rose-300/90">
+                      Khi hết 2 phút hoặc khi bạn bấm Dừng Ghi Âm, hệ thống sẽ lưu bài nói và tự chuyển sang <strong>Part 3</strong>.
+                    </p>
+                  </div>
+                </div>
+                <span
+                  data-testid="part2-record-timer-value"
+                  className="px-4 py-1.5 rounded-lg bg-rose-600 text-white font-mono text-lg font-black tracking-wider"
+                >
+                  {formatMmSs(Math.max(0, maxTargetSec - recordElapsedSec))}
+                </span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                Giấy nháp ý tưởng Part 2 (1 phút chuẩn bị - tùy chọn):
+              </label>
+              <textarea
+                rows={3}
+                value={speakingNotes[currentQ.id] || ''}
+                onChange={e => onSpeakingNotesChange?.(currentQ.id, e.target.value)}
+                placeholder="Ghi nhanh từ khóa / cấu trúc câu bạn sẽ nói trong 2 phút..."
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-sm text-slate-900 dark:text-zinc-100 outline-none focus:border-teal-600"
+              />
+            </div>
           </div>
         )}
 
@@ -832,7 +998,10 @@ export default function IntegratedSpeakingSection({
                   onClick={stopRecording}
                   className="px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-sm font-bold flex items-center gap-2 transition animate-pulse"
                 >
-                  <Square className="w-4 h-4 fill-current" /> Dừng Ghi Âm ({recordElapsedSec}s)
+                  <Square className="w-4 h-4 fill-current" />{' '}
+                  {currentQ.part === 2
+                    ? `Dừng Ghi Âm & Qua Part 3 (Còn ${formatMmSs(Math.max(0, maxTargetSec - recordElapsedSec))})`
+                    : `Dừng Ghi Âm (${recordElapsedSec}s)`}
                 </button>
               )}
 

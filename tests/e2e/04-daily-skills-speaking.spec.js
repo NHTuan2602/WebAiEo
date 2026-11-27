@@ -99,7 +99,7 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
 
     // --- 4D. Daily Speaking Room (SpeakingExamRoom.jsx with fake mic) ---
     await page.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
-    await page.locator('aside').getByRole('button', { name: /1\. Daily Speaking/i }).first().click();
+    await page.locator('aside').getByRole('button', { name: /Cày Forecast/i }).first().click();
 
     // Start from Speaking Drive folder or Daily Speaking test card
     let expectedDriveQuestionSnippet = '';
@@ -434,9 +434,10 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
         localStorage.removeItem('ielts_gemini_api_key');
       });
 
-      // Navigate to Daily Zone -> 5. Viết Task 1 (W1)
+      // Navigate to Daily Zone -> Viết Task 1 (W1)
       await page.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
-      await page.locator('aside').getByRole('button', { name: /5\. Viết Task 1/i }).first().click();
+      await expect(page.getByTestId('daily-zone-set-all-private-btn')).toBeVisible();
+      await page.locator('aside').getByRole('button', { name: /Viết Task 1/i }).first().click();
 
       // Verify each Task 1 folder card has its own "+ AI Hàng Loạt" button
       await expect(page.getByTestId('w1-folder-bulk-ai-w1_map')).toBeVisible();
@@ -473,8 +474,8 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       });
       await expect(page.getByText(/Map • 20p/i).first()).toBeVisible();
 
-      // Switch to 6. Viết Task 2 (W2) and click "Tạo Đề Task 2 Nhanh (AI PDF)" beside "+ Tạo Bài W2"
-      await page.locator('aside').getByRole('button', { name: /6\. Viết Task 2/i }).first().click();
+      // Switch to Viết Task 2 (W2) and click "Tạo Đề Task 2 Nhanh (AI PDF)" beside "+ Tạo Bài W2"
+      await page.locator('aside').getByRole('button', { name: /Viết Task 2/i }).first().click();
       const bulkW2Btn = page.getByTestId('open-bulk-w2-ai-btn');
       await expect(bulkW2Btn).toBeVisible();
       await bulkW2Btn.click();
@@ -531,7 +532,7 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       try {
         await loginViaUI(studentPage, E2E_CREDENTIALS.student.username, E2E_CREDENTIALS.student.password);
         await studentPage.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
-        await studentPage.locator('aside').getByRole('button', { name: /6\. Viết Task 2/i }).first().click();
+        await studentPage.locator('aside').getByRole('button', { name: /Viết Task 2/i }).first().click();
         await studentPage.getByRole('button', { name: /^Education \(\d+\)$/i }).click();
         await studentPage.getByRole('button', { name: /^Agree \/ Disagree \(\d+\)$/i }).click();
         await expect(

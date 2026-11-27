@@ -1088,27 +1088,6 @@ export default function StudentProfile({
 
           {canEditTargetInfo && !currentUser?.isGuest && (
             <div className="absolute bottom-3 right-3 sm:bottom-3.5 sm:right-4 z-10 flex flex-wrap items-center justify-end gap-2">
-              {isSelf && !studentHasCoverPermission && (
-                <button
-                  type="button"
-                  onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Ảnh Nền Riêng (1 Tháng)', itemPrice: normalizedPayCfg.coverUnlockPrice })}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-slate-100/95 hover:bg-white dark:bg-zinc-800/95 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold transition"
-                >
-                  <Lock className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
-                  <span>Mở Ảnh Nền ({unlockPriceLabel}/1 tháng)</span>
-                </button>
-              )}
-              {isSelf && studentHasCoverPermission && !isTargetTeacher && !isTargetSystemAdmin && student.customCoverExpiresAt > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Gia Hạn Ảnh Nền Riêng (+1 Tháng)', itemPrice: normalizedPayCfg.coverUnlockPrice, renew: true })}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-slate-100/95 hover:bg-white dark:bg-zinc-800/95 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold transition"
-                  title="Gia hạn thêm 30 ngày quyền Ảnh Nền Riêng"
-                >
-                  <Clock className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
-                  <span>Gia hạn ({coverRemainingText || '30 ngày'})</span>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={openCustomizeModal}
@@ -1287,34 +1266,6 @@ export default function StudentProfile({
                       className={profileActionBtnCls}
                     >
                       <Crown className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Tặng Danh Hiệu
-                    </button>
-                  )}
-                  {isViewerSuperAdmin && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserCoverUnlock && (
-                    <button
-                      type="button"
-                      disabled={isTogglingCoverUnlock}
-                      onClick={async () => {
-                        if (studentHasCoverPermission && !window.confirm(`Khóa lại quyền tải Ảnh Nền Riêng của ${student.name || student.username}?`)) {
-                          return;
-                        }
-                        setIsTogglingCoverUnlock(true);
-                        await onToggleUserCoverUnlock(student.username, !studentHasCoverPermission);
-                        setIsTogglingCoverUnlock(false);
-                      }}
-                      className={profileActionBtnCls}
-                    >
-                      {studentHasCoverPermission ? (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> Đã Mở Ảnh Nền
-                        </>
-                      ) : (
-                        <>
-                          <Unlock className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />{' '}
-                          {student.coverUnlockRequestedAt > 0
-                            ? `Duyệt Mở Ảnh Nền (${unlockPriceLabel})`
-                            : `Mở Khóa Ảnh Nền (${unlockPriceLabel})`}
-                        </>
-                      )}
                     </button>
                   )}
                   {isViewerSuperAdmin && !isTargetTeacher && !isTargetSystemAdmin && onToggleUserSubscription && (
@@ -2524,7 +2475,7 @@ export default function StudentProfile({
                 Gói Thành Viên 1 Tháng &amp; Đặc Quyền IELTS VIP
               </h2>
               <p className="text-xs text-slate-600 dark:text-zinc-300 mt-0.5">
-                Mua đề lẻ hoặc gói Combo Lượt Thi Thực Chiến 4 Kỹ Năng (3 · 5 · 10 đề), mở Ảnh Nền Cá Nhân hoặc nâng cấp trọn bộ IELTS VIP cùng bạn bè.
+                Mua đề lẻ hoặc gói Combo Lượt Thi Thực Chiến 4 Kỹ Năng (3 · 5 · 10 đề) hoặc nâng cấp trọn bộ IELTS VIP ({aieoVipPriceLabel}/1 tháng) mở khóa Kho Từ Vựng, Đấu Trường Game &amp; Ảnh Bìa Hồ Sơ.
               </p>
             </div>
             {studentHasAieoVip && (
@@ -2535,7 +2486,7 @@ export default function StudentProfile({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 dark:divide-zinc-800 mt-4">
             {/* Card 1: Đề Lẻ & Combo Thực Chiến 4 Kỹ Năng */}
             <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:pr-5 flex flex-col justify-between gap-3">
               <div className="space-y-1.5">
@@ -2582,101 +2533,56 @@ export default function StudentProfile({
               )}
             </div>
 
-            {/* Card 2: Gói Tháng 20k (hidden for Guest accounts) */}
+            {/* Card 2: Gói Tháng IELTS VIP 35k (hidden for Guest accounts) */}
             {!currentUser?.isGuest && (
-            <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:px-5 flex flex-col justify-between gap-3">
+            <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:pl-5 flex flex-col justify-between gap-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-black text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
-                    <Crown className="w-4 h-4 text-amber-500" /> Gói Tháng Game &amp; Hồ Sơ
+                    <Crown className="w-4 h-4 text-amber-500" /> Gói Tháng IELTS VIP (Chỉ hơn 1.000đ/ngày)
                   </span>
                   <span className="text-xs font-semibold text-[#09090B] bg-[#F59E0B] px-2.5 py-0.5 rounded-full whitespace-nowrap">
                     {aieoVipPriceLabel}/1 tháng
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  • Truy cập <b>Luyện Tập Game Từ Vựng</b> (14 kho từ &amp; Collocation) • Quyền <b>Tạo Phòng Luyện Tập Từ Vựng theo Chủ Đề</b> • <b>Chỉnh Màu Chữ Tên</b> • <b>Chọn Khung Viền Avatar</b> • <b>Thêm &amp; Đổi Ảnh Bìa Hồ Sơ</b>.
+                  • Truy cập <b>Kho Từ Vựng Writing + Speaking + Collocation + Idiomatic Expression</b> • Truy cập <b>Đấu Trường Game + Chức Năng Solo + Team</b> • <b>Chỉnh Màu Chữ Tên, Khung Viền Avatar &amp; Ảnh Bìa Hồ Sơ</b>.
                 </p>
                 <p className={`text-xs font-bold ${studentHasAieoVip ? 'text-[#0F172B] dark:text-[#FAFAFA]' : 'text-slate-600 dark:text-zinc-300'}`}>
                   {studentHasAieoVip
                     ? `✓ Đang mở VIP (${aieoVipRemainingText || '30 ngày'})`
-                    : 'Gói đầy đủ đặc quyền tháng'}
+                    : 'Gói đầy đủ đặc quyền tháng (bao gồm mở khóa Ảnh Bìa riêng)'}
                 </p>
               </div>
               {isSelf && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCheckoutModalState({
-                      itemType: 'aieo_vip',
-                      itemId: '',
-                      itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
-                      itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND,
-                      renew: studentHasAieoVip
-                    })
-                  }
-                  className="w-full py-2 rounded-lg bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] text-xs font-semibold transition"
-                >
-                  {studentHasAieoVip
-                    ? `Gia hạn VIP +30N (${aieoVipPriceLabel})`
-                    : `Đăng Ký IELTS VIP (${aieoVipPriceLabel})`}
-                </button>
-              )}
-            </div>
-            )}
-
-            {/* Card 3: Ảnh Nền Riêng (5k / 1 tháng - hidden for Guest accounts) */}
-            {!currentUser?.isGuest && (
-            <div className="bg-transparent border-0 rounded-none py-3 md:py-1 md:pl-5 flex flex-col justify-between gap-3">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-[#0F172B] dark:text-[#FAFAFA] flex items-center gap-1">
-                    <Camera className="w-4 h-4 text-[#1E293B] dark:text-[#E4E4E7]" /> Ảnh Nền Cá Nhân
-                  </span>
-                  <span className="text-xs font-bold text-[#1E293B] dark:text-[#E4E4E7] bg-[#F1F5F9] dark:bg-[#27272A] border border-[#E2E8F0] dark:border-zinc-700 px-2.5 py-0.5 rounded-full whitespace-nowrap">
-                    {unlockPriceLabel}/1 tháng
-                  </span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCheckoutModalState({
+                        itemType: 'aieo_vip',
+                        itemId: '',
+                        itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
+                        itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND,
+                        renew: studentHasAieoVip
+                      })
+                    }
+                    className="flex-1 py-2 px-3 rounded-lg bg-[#991B1B] hover:bg-[#B91C1C] text-[#FFFFFF] text-xs font-semibold transition"
+                  >
+                    {studentHasAieoVip
+                      ? `Gia hạn VIP +30N (${aieoVipPriceLabel})`
+                      : `Đăng Ký IELTS VIP (${aieoVipPriceLabel})`}
+                  </button>
+                  {studentHasAieoVip && (
+                    <button
+                      type="button"
+                      onClick={openCustomizeModal}
+                      className="py-2 px-3 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
+                    >
+                      Đổi Ảnh Bìa Ngay
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                  Tải &amp; cắt ảnh bìa cá nhân tùy thích cho hồ sơ (gói 1 tháng).
-                </p>
-                <p className={`text-xs font-bold ${studentHasCoverPermission ? 'text-[#0F172B] dark:text-[#FAFAFA]' : 'text-[#475569] dark:text-zinc-400'}`}>
-                  {studentHasCoverPermission
-                    ? coverRemainingText
-                      ? `✓ Đang mở (${coverRemainingText})`
-                      : studentHasAieoVip
-                      ? `✓ Đã gồm miễn phí trong IELTS VIP (${aieoVipRemainingText || '30 ngày'})`
-                      : '✓ Đang mở khóa'
-                    : 'Chưa mở khóa'}
-                </p>
-              </div>
-              {isSelf && !studentHasAieoVip && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCheckoutModalState({
-                      itemType: 'cover',
-                      itemId: '',
-                      itemLabel: studentHasCoverPermission ? 'Gia Hạn Ảnh Nền Riêng (+1 Tháng)' : 'Ảnh Nền Riêng (1 Tháng)',
-                      itemPrice: normalizedPayCfg.coverUnlockPrice,
-                      renew: studentHasCoverPermission && student.customCoverExpiresAt > 0
-                    })
-                  }
-                  className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
-                >
-                  {studentHasCoverPermission && student.customCoverExpiresAt > 0
-                    ? `Gia hạn +30N (${unlockPriceLabel})`
-                    : `Mở Ảnh Nền (${unlockPriceLabel})`}
-                </button>
-              )}
-              {isSelf && studentHasAieoVip && (
-                <button
-                  type="button"
-                  onClick={openCustomizeModal}
-                  className="w-full py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold transition"
-                >
-                  Đổi Ảnh Bìa Ngay
-                </button>
               )}
             </div>
             )}
@@ -3974,20 +3880,25 @@ export default function StudentProfile({
                     <div className="space-y-1">
                       <p className="text-xs font-extrabold text-slate-900 dark:text-[#F4F4F5] flex items-center gap-1.5">
                         <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        <span>Mở khóa tải &amp; cắt ảnh nền riêng ({unlockPriceLabel})</span>
+                        <span>Tính năng Tải &amp; Cắt Ảnh Bìa Riêng thuộc Gói IELTS VIP ({aieoVipPriceLabel}/1 tháng)</span>
                       </p>
                       <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">
-                        {paymentConfig?.autoVerifyEnabled
-                          ? 'Bấm nút bên cạnh để hiện mã VietQR - chuyển khoản xong hệ thống tự động mở khóa sau vài giây.'
-                          : 'Bấm nút bên cạnh để mở mã VietQR chuyển khoản nhanh (6 nền Gradient phía trên vẫn miễn phí).'}
+                        Đăng ký Gói IELTS VIP để mở khóa tải Ảnh Bìa riêng, chỉnh Màu Chữ Tên, Khung Viền Avatar, Kho Từ Vựng &amp; Đấu Trường Game (6 nền Gradient phía trên vẫn miễn phí).
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setCheckoutModalState({ itemType: 'cover', itemId: '', itemLabel: 'Ảnh Nền Riêng', itemPrice: normalizedPayCfg.coverUnlockPrice })}
-                      className="shrink-0 px-4 py-2.5 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold transition inline-flex items-center justify-center gap-1.5"
+                      onClick={() =>
+                        setCheckoutModalState({
+                          itemType: 'aieo_vip',
+                          itemId: '',
+                          itemLabel: 'Gói IELTS VIP Full Quyền (1 Tháng)',
+                          itemPrice: normalizedPayCfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND
+                        })
+                      }
+                      className="shrink-0 px-4 py-2.5 rounded-xl bg-[#991B1B] hover:bg-[#B91C1C] text-white text-xs font-extrabold transition inline-flex items-center justify-center gap-1.5"
                     >
-                      <Sparkles className="w-3.5 h-3.5" /> Mở QR Thanh Toán ({unlockPriceLabel})
+                      <Crown className="w-3.5 h-3.5" /> Đăng Ký IELTS VIP ({aieoVipPriceLabel})
                     </button>
                   </div>
                 )}

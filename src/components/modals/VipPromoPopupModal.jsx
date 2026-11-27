@@ -33,20 +33,19 @@ export default function VipPromoPopupModal({
 
   const cfg = normalizePaymentConfig(paymentConfig || {});
   const vipPriceLabel = formatVndCurrency(cfg.aieoVipPrice ?? AIEO_VIP_PRICE_VND);
-  const coverPriceLabel = formatVndCurrency(cfg.coverUnlockPrice ?? 5000);
 
   const vipPerks = [
     {
-      title: 'Truy Cập Luyện Tập Game Từ Vựng (14 Kho Từ + Collocation)',
-      desc: 'Luyện tập Game từ vựng cá nhân theo 14 chủ đề IELTS & Collocation, chọn số lượng từ tùy ý không giới hạn.'
+      title: 'Truy Cập Kho Từ Vựng Writing + Speaking + Collocation + Idiomatic Expression',
+      desc: 'Mở khóa trọn bộ kho từ vựng học thuật Writing, Speaking, Collocation & Idiomatic Expression chọn lọc theo chủ đề.'
     },
     {
-      title: 'Quyền Tạo Phòng Luyện Tập Từ Vựng Theo Chủ Đề',
-      desc: 'Tự tạo phòng đấu trường riêng cùng bạn bè (2–30 người, chia Team), tùy chọn kho từ và số từ mỗi vòng trong suốt 30 ngày.'
+      title: 'Truy Cập Vào Đấu Trường Game + Chức Năng Solo + Team',
+      desc: 'Tham gia toàn bộ Đấu Trường Từ Vựng, Hiệp Sĩ Diệt Rồng, Song Đấu 1 vs 1, luyện tập Solo và tạo phòng đấu Team cùng bạn bè.'
     },
     {
       title: 'Chỉnh Màu Chữ Tên, Khung Viền Avatar & Ảnh Bìa Hồ Sơ',
-      desc: `Tự do chọn màu chữ tên (kèm mã màu tự chọn), chọn Khung Viền Avatar nổi bật và miễn phí tải, cắt Ảnh Bìa riêng (trị giá ${coverPriceLabel}/tháng).`
+      desc: 'Tự do chọn màu chữ tên (kèm mã màu tự chọn), chọn Khung Viền Avatar nổi bật và miễn phí tải, cắt Ảnh Bìa riêng.'
     }
   ];
 
@@ -158,8 +157,8 @@ export default function VipPromoPopupModal({
             <Crown className="w-6 h-6 text-amber-200 shrink-0" />
             <span>Nâng Cấp Gói IELTS VIP - Chỉ {vipPriceLabel}/1 tháng</span>
           </h2>
-          <p className="text-xs text-rose-50/95 mt-1 leading-relaxed">
-            Mở khóa toàn bộ đặc quyền nổi bật suốt 1 tháng cho tài khoản <strong>{currentUser.name || currentUser.username}</strong> ngay hôm nay!
+          <p className="text-xs sm:text-sm font-extrabold text-amber-200 uppercase tracking-wide mt-1 leading-relaxed">
+            CHỈ HƠN 1.000Đ/1 NGÀY BẠN CÓ THỂ ĐẠT ĐƯỢC NHỮNG QUYỀN LỢI SAU:
           </p>
         </div>
 

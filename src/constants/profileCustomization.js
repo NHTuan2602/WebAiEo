@@ -2435,7 +2435,7 @@ export const STUDENT_TITLES = [
     isVipBundleTitle: true,
     defaultPriceVnd: 20000,
     vipHaloClass: 'vip-avatar-aura ring-2 ring-red-500',
-    conditionText: 'Đặc quyền Gói IELTS VIP (20.000đ/1 tháng): Ảnh Avatar Động (.GIF/.WebP), Tự do Đổi Màu Chữ, Viền Bìa & Thẻ LED Neon Nhiều Màu, Ảnh Nền Cá Nhân miễn phí, 3 Khung Avatar Neon, Tạo Phòng Game Bạn Bè vô hạn & Danh hiệu IELTS VIP.',
+    conditionText: 'Đặc quyền Gói IELTS VIP (35.000đ/1 tháng): Truy cập kho từ vựng Writing + Speaking + Collocation + Idiomatic Expression, Đấu Trường Game + Solo + Team, Đổi Màu Chữ, Khung Avatar & Ảnh Bìa Hồ Sơ.',
     badgeClass: 'vip-paid-badge vip-paid-vip bg-[#991B1B] text-[#FFFFFF] border-[#F59E0B] font-semibold',
     heroBadgeClass: 'vip-paid-badge vip-paid-vip bg-[#991B1B] text-[#FFFFFF] border-[#F59E0B] font-semibold',
     gameBadgeClass: 'vip-paid-badge vip-paid-vip bg-[#991B1B] text-[#FFFFFF] border-[#F59E0B] font-semibold',
@@ -2940,7 +2940,7 @@ export const REAL_EXAM_COMBO_10_PRICE_VND = 699000; // Combo 10 đề Thực Chi
 export const FRIEND_ROOM_TICKET_PRICE_VND = 5000;
 export const GACHA_WISH_1_PRICE_VND = 5000; // 1 lượt quay Gacha Hiệp Sĩ: 5.000đ
 export const GACHA_WISH_10_PRICE_VND = 50000; // 10 lượt quay Gacha Hiệp Sĩ: 50.000đ
-export const AIEO_VIP_PRICE_VND = 20000;
+export const AIEO_VIP_PRICE_VND = 35000;
 
 export const REAL_EXAM_COMBOS = [
   {
@@ -3916,6 +3916,9 @@ export function normalizePaymentConfig(raw = {}) {
     if (realExamCombo5Price === 70000 || realExamCombo5Price === 75000) realExamCombo5Price = REAL_EXAM_COMBO_5_PRICE_VND;
     if (realExamCombo10Price === 150000) realExamCombo10Price = REAL_EXAM_COMBO_10_PRICE_VND;
   }
+  if (rawSchemaVersion < 4) {
+    if (aieoVipPrice === 20000 || aieoVipPrice === 80000) aieoVipPrice = AIEO_VIP_PRICE_VND;
+  }
 
   const bankCode = String(obj.bankCode || '')
     .trim()
@@ -3955,7 +3958,7 @@ export function normalizePaymentConfig(raw = {}) {
   });
 
   return {
-    pricingSchemaVersion: 3,
+    pricingSchemaVersion: 4,
     coverUnlockPrice,
     skillPassPrice,
     defaultExamPriceVnd,

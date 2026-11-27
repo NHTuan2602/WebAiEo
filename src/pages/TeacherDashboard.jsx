@@ -124,6 +124,7 @@ export default function TeacherDashboard({
   initGameCampaign,
   mailConfigured = false,
   notifications = [],
+  onAssignFolderClasses = null,
   onAssignTestClasses,
   onCreateSkillForClass,
   onCreateTestForClass,
@@ -242,16 +243,9 @@ export default function TeacherDashboard({
   const guestAccountsCount = guestAccounts.length;
   const normalizedPayCfg = normalizePaymentConfig(paymentConfig || {});
   const qrConfigured = Boolean(normalizedPayCfg.customQrUrl || (normalizedPayCfg.bankCode && normalizedPayCfg.accountNumber));
-  const coverPriceLabel = formatVndCurrency(normalizedPayCfg.coverUnlockPrice);
-  const pendingCoverRequestCount = studentAccounts.filter(
-    u => !hasCustomCoverPermission(u) && Number(u.coverUnlockRequestedAt) > 0
-  ).length;
+  const coverPriceLabel = formatVndCurrency(normalizedPayCfg.aieoVipPrice);
   const filteredAccounts = allAccounts.filter(u => {
-    if (accountRoleFilter === 'cover_pending') {
-      if (u.role !== 'student' || hasCustomCoverPermission(u) || !(Number(u.coverUnlockRequestedAt) > 0)) {
-        return false;
-      }
-    } else if (accountRoleFilter === 'guest') {
+    if (accountRoleFilter === 'guest') {
       if (u.role === 'teacher' || !u.isGuest) return false;
     } else if (accountRoleFilter === 'student') {
       if (u.role !== 'student' || u.isGuest) return false;
@@ -402,7 +396,6 @@ export default function TeacherDashboard({
   const filteredSkillExercises = task2FilteredSkillList.filter(matchesItemFilters);
 
   const SKILL_EXERCISE_BUTTONS = [
-    { id: 'speaking_daily', skill: 'speaking', subOpts: { dailySubCategory: 'speaking_daily' }, label: '+ Daily Speaking', shortLabel: 'Daily Speaking', icon: Mic, cls: 'bg-[#EDFFFD] dark:bg-teal-500/15 text-[#0F766E] dark:text-[#1EE1D6] border-[#B5F5F1] dark:border-teal-500/30 hover:bg-[#007A7A] hover:text-white' },
     { id: 'speaking_forecast', skill: 'speaking', subOpts: { dailySubCategory: 'speaking_forecast' }, label: '+ Cày Forecast', shortLabel: 'Cày Forecast', icon: Sparkles, cls: 'bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-300 border-amber-300 dark:border-amber-500/30 hover:bg-amber-600 hover:text-white' },
     { id: 'reading', skill: 'reading', subOpts: { dailySubCategory: 'shw_1' }, label: '+ Reading (SHW 1-14)', shortLabel: 'Reading', icon: BookOpen, cls: 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#0F172B] dark:text-zinc-200 border-[#CBD5E1] dark:border-zinc-700 hover:bg-slate-700 hover:text-white' },
     { id: 'listening', skill: 'listening', subOpts: { dailySubCategory: 'listening_shw' }, label: '+ Listening', shortLabel: 'Listening', icon: Headphones, cls: 'bg-[#EFF6FF] dark:bg-blue-500/15 text-[#1D4ED8] dark:text-blue-300 border-blue-200 dark:border-blue-500/30 hover:bg-blue-600 hover:text-white' },
@@ -1448,21 +1441,76 @@ export default function TeacherDashboard({
                 Chọn đúng phân mục để soạn bài tập lẻ có thể cài Mật Khẩu Team: Daily Speaking, Cày Forecast, Reading SHW 1-14, Listening, Writing Task 1 (W1) hoặc Writing Task 2 (W2).
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {SKILL_EXERCISE_BUTTONS.map(sk => {
-                const IconComp = sk.icon;
-                return (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {SKILL_EXERCISE_BUTTONS.map(sk => {
+                  const IconComp = sk.icon;
+                  return (
+                    <button
+                      key={sk.id}
+                      type="button"
+                      onClick={() => openSingleSkillBuilder?.(sk.skill, null, [], sk.subOpts)}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${sk.cls}`}
+                    >
+                      <IconComp className="w-3.5 h-3.5" />
+                      <span>{sk.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {onAssignFolderClasses && filteredSkillExercises.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    key={sk.id}
                     type="button"
-                    onClick={() => openSingleSkillBuilder?.(sk.skill, null, [], sk.subOpts)}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${sk.cls}`}
+                    data-testid="teacher-daily-set-all-private-btn"
+                    onClick={() =>
+                      onAssignFolderClasses(
+                        filteredSkillExercises.map(t => t.id),
+                        {
+                          visibility: 'private',
+                          assignedClassIds: [],
+                          mode: 'replace',
+                          notify: false,
+                          folderLabel:
+                            exerciseSkillFilter === 'all'
+                              ? 'Toàn bộ Daily Zone'
+                              : `Daily Zone (${exerciseSkillFilter.toUpperCase()})`
+                        }
+                      )
+                    }
+                    className="px-3.5 py-2 rounded-lg text-xs font-extrabold border border-amber-400 dark:border-amber-500/50 bg-amber-50 hover:bg-amber-600 text-amber-900 hover:text-white dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-600 dark:hover:text-white transition flex items-center gap-1.5"
+                    title="Chuyển toàn bộ bài tập Daily Zone đang lọc thành Chỉ mình tôi để giáo viên tự mở và giao dần cho lớp"
                   >
-                    <IconComp className="w-3.5 h-3.5" />
-                    <span>{sk.label}</span>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Bật Tất Cả Thành Chỉ Mình Tôi ({filteredSkillExercises.length})</span>
                   </button>
-                );
-              })}
+                  <button
+                    type="button"
+                    data-testid="teacher-daily-set-all-public-btn"
+                    onClick={() =>
+                      onAssignFolderClasses(
+                        filteredSkillExercises.map(t => t.id),
+                        {
+                          visibility: 'public',
+                          publish: true,
+                          assignedClassIds: [],
+                          mode: 'replace',
+                          notify: false,
+                          folderLabel:
+                            exerciseSkillFilter === 'all'
+                              ? 'Toàn bộ Daily Zone'
+                              : `Daily Zone (${exerciseSkillFilter.toUpperCase()})`
+                        }
+                      )
+                    }
+                    className="px-3 py-2 rounded-lg text-xs font-bold border border-teal-300 dark:border-teal-500/40 bg-[#EDFFFD] hover:bg-[#007A7A] text-[#0F766E] hover:text-white dark:bg-teal-500/15 dark:text-[#1EE1D6] dark:hover:bg-[#007A7A] dark:hover:text-white transition flex items-center gap-1.5"
+                    title="Mở công khai toàn bộ bài tập đang lọc cho học sinh"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Mở Tất Cả</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2406,19 +2454,6 @@ export default function TeacherDashboard({
                 >
                   <ShieldCheck className="w-3.5 h-3.5" /> Giáo viên ({teacherAccountsCount})
                 </button>
-                {isViewerSuperAdmin && pendingCoverRequestCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setAccountRoleFilter('cover_pending')}
-                    className={`px-3 py-1.5 rounded-lg border transition flex items-center gap-1.5 ${
-                      accountRoleFilter === 'cover_pending'
-                        ? 'bg-[#B91C1C] text-white border-[#B91C1C]'
-                        : 'bg-[#FEF3C7] dark:bg-amber-500/15 text-[#92400E] dark:text-amber-200 border-amber-300 dark:border-amber-500/40 hover:bg-amber-200'
-                    }`}
-                  >
-                    <Unlock className="w-3.5 h-3.5" /> Chờ duyệt ảnh nền {coverPriceLabel} ({pendingCoverRequestCount})
-                  </button>
-                )}
               </div>
 
               <div className="relative w-full sm:w-72">
@@ -2666,9 +2701,7 @@ export default function TeacherDashboard({
                                 );
                               })() : null}
 
-                              {isViewerSuperAdmin && account.role === 'student' && onToggleUserCoverUnlock && (() => {
-                                const isCoverUnlocked = hasCustomCoverPermission(account);
-                                const isPendingCover = !isCoverUnlocked && Number(account.coverUnlockRequestedAt) > 0;
+                              {isViewerSuperAdmin && account.role === 'student' && onToggleUserSubscription && (() => {
                                 const hasVip = hasActiveAieoVip(account);
                                 const stuCredits = getRealExamCredits(account);
                                 const pendingSubReq = account.subscriptionRequested || null;
@@ -2679,37 +2712,6 @@ export default function TeacherDashboard({
                                 );
                                 return (
                                   <div className="flex flex-wrap items-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (isCoverUnlocked && !window.confirm(`Khóa lại quyền tải Ảnh Nền Riêng của ${account.name || account.username}?`)) {
-                                          return;
-                                        }
-                                        onToggleUserCoverUnlock(account.username, !isCoverUnlocked);
-                                      }}
-                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border transition ${
-                                        isCoverUnlocked
-                                          ? 'bg-[#D1FAE5] dark:bg-emerald-500/15 text-[#065F46] dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/35'
-                                          : isPendingCover
-                                          ? 'bg-[#FEF3C7] text-[#92400E] border-amber-300'
-                                          : 'bg-[#F8FAFC] dark:bg-zinc-800 text-[#334155] dark:text-zinc-300 border-[#CBD5E1] dark:border-zinc-700 hover:border-amber-500'
-                                      }`}
-                                      title={isCoverUnlocked ? 'Bấm để khóa lại quyền tải ảnh nền' : `Bấm để mở khóa quyền Ảnh Nền Riêng (${coverPriceLabel})`}
-                                    >
-                                      {isCoverUnlocked ? (
-                                        <>
-                                          <CheckCircle2 className="w-3 h-3" /> Ảnh Nền: Mở
-                                        </>
-                                      ) : isPendingCover ? (
-                                        <>
-                                          <Unlock className="w-3 h-3" /> Duyệt Ảnh Nền
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Lock className="w-3 h-3" /> Ảnh Nền
-                                        </>
-                                      )}
-                                    </button>
                                     {onToggleUserSubscription && (
                                       <>
                                         <button

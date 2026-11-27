@@ -340,6 +340,103 @@ export function repairInlineWordBoxAndFlowchart(clozeText = '', questions = []) 
   return { clozeText: nextCloze, questions: nextQuestions };
 }
 
+/**
+ * Unifies contiguous Map/Diagram Labelling questions so every question in the same Map group
+ * shares the exact same A..maxLetter options array, strips redundant leading question numbers
+ * from `q.question` (e.g. "16 Library" -> "Library"), and removes un-blanked Map stem dumps from `clozeText`.
+ */
+export function unifyMapDiagramQuestionsAndCloze(clozeText = '', questions = []) {
+  let nextCloze = String(clozeText || '').trim();
+  const nextQuestions = Array.isArray(questions) ? questions.map(q => ({ ...q })) : [];
+
+  const mapQs = nextQuestions.filter(q => q?.type === 'map_diagram' || q?.type === 'diagram_label');
+  if (mapQs.length > 0) {
+    let maxCode = 73; // Default 'I' (A-I)
+    let hasExplicitLetterOpts = false;
+    mapQs.forEach(q => {
+      const opts = Array.isArray(q.options) ? q.options : [];
+      opts.forEach(o => {
+        const clean = String(o || '').trim().toUpperCase();
+        if (/^[A-L]$/.test(clean)) {
+          if (!hasExplicitLetterOpts) {
+            maxCode = clean.charCodeAt(0);
+            hasExplicitLetterOpts = true;
+          } else {
+            maxCode = Math.max(maxCode, clean.charCodeAt(0));
+          }
+        }
+      });
+      const ans = String(q.correctAnswer || '').trim().toUpperCase();
+      if (/^[A-L]$/.test(ans)) {
+        maxCode = Math.max(maxCode, ans.charCodeAt(0));
+      }
+    });
+    maxCode = Math.max(70, Math.min(76, maxCode)); // Clamp between F and L
+    const unifiedLetters = [];
+    for (let c = 65; c <= maxCode; c += 1) {
+      unifiedLetters.push(String.fromCharCode(c));
+    }
+    const lastLetter = unifiedLetters[unifiedLetters.length - 1] || 'I';
+
+    mapQs.forEach(q => {
+      q.options = [...unifiedLetters];
+      delete q.blankNum;
+      const qNum = Number(q.questionNumber);
+      if (Number.isFinite(qNum) && qNum > 0) {
+        const stripped = String(q.question || '')
+          .trim()
+          .replace(new RegExp(`^${qNum}\\s*[.):\\-–]?\\s*`, 'i'), '')
+          .trim();
+        if (stripped) q.question = stripped;
+      }
+      if (q.instruction) {
+        q.instruction = String(q.instruction).replace(/\bA\s*[-–—]\s*[F-L]\b/g, `A–${lastLetter}`);
+      }
+    });
+  }
+
+  // Strip redundant leading question number on matching questions too ("15. Information Centre" -> "Information Centre")
+  nextQuestions.forEach(q => {
+    if (
+      q?.type === 'matching' ||
+      q?.type === 'matching_information' ||
+      q?.type === 'matching_features'
+    ) {
+      const qNum = Number(q.questionNumber);
+      if (Number.isFinite(qNum) && qNum > 0 && typeof q.blankNum !== 'number') {
+        const stripped = String(q.question || '')
+          .trim()
+          .replace(new RegExp(`^${qNum}\\s*[.):\\-–]\\s*`, 'i'), '')
+          .trim();
+        if (stripped) q.question = stripped;
+      }
+    }
+  });
+
+  // Remove non-cloze stem dump lines (e.g. "15 Information Centre 16 Library 17 Museum...") from clozeText
+  if (nextCloze) {
+    const nonClozeNumSet = new Set(
+      nextQuestions
+        .filter(q => typeof q?.blankNum !== 'number' && Number.isFinite(Number(q?.questionNumber)))
+        .map(q => Number(q.questionNumber))
+    );
+    if (nonClozeNumSet.size > 0) {
+      nextCloze = nextCloze
+        .split('\n')
+        .filter(line => {
+          if (/\{\{\s*\d+\s*\}\}/.test(line)) return true;
+          const nums = [...line.matchAll(/\b(\d{1,2})\s+[A-Za-z]/g)].map(m => Number(m[1]));
+          const hits = nums.filter(n => nonClozeNumSet.has(n)).length;
+          return hits < 2;
+        })
+        .join('\n')
+        .trim();
+    }
+  }
+
+  return { clozeText: nextCloze, questions: nextQuestions };
+}
+
 export async function callGeminiGenerateJson({
   apiKey,
   promptText,
@@ -1229,7 +1326,8 @@ Return ONLY strictly valid JSON matching this schema:
     .sort((a, b) => a._sortNum - b._sortNum || a._origIdx - b._origIdx)
     .map(({ _sortNum, _origIdx, ...cleanQ }) => cleanQ);
 
-  const repaired = repairInlineWordBoxAndFlowchart(rawClozeText, normalizedQuestions);
+  const repairedFlow = repairInlineWordBoxAndFlowchart(rawClozeText, normalizedQuestions);
+  const repaired = unifyMapDiagramQuestionsAndCloze(repairedFlow.clozeText, repairedFlow.questions);
 
   return {
     title: String(parsed?.title || '').trim(),
@@ -1623,7 +1721,8 @@ export function normalizeRawExtractedListeningParts(
       });
 
       questions.sort((a, b) => (a.questionNumber || 999) - (b.questionNumber || 999));
-      const repaired = repairInlineWordBoxAndFlowchart(partClozeText, questions);
+      const repairedFlow = repairInlineWordBoxAndFlowchart(partClozeText, questions);
+      const repaired = unifyMapDiagramQuestionsAndCloze(repairedFlow.clozeText, repairedFlow.questions);
 
       return {
         title: String(part?.title || `Part ${partIdx + 1}`).trim(),
@@ -2159,4 +2258,181 @@ ${extraInstructions ? `\nADDITIONAL TEACHER NOTES:\n${extraInstructions}\n` : ''
     warnings: Array.isArray(parsed?.warnings) ? parsed.warnings.map(w => String(w || '').trim()).filter(Boolean) : [],
     usedModel
   };
+}
+
+function escapeXmlText(text = '') {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildFallbackIeltsIllustrationSvg({
+  title = 'Bankside Cultural Complex',
+  kind = 'map_diagram',
+  maxLetter = 'I',
+  landmarks = []
+} = {}) {
+  const safeTitle = escapeXmlText(String(title || (kind === 'chart' ? 'IELTS Writing Task 1 Chart' : 'IELTS Map / Diagram')).slice(0, 64));
+  if (kind === 'chart') {
+    const categories = landmarks.length >= 3
+      ? landmarks.slice(0, 5)
+      : ['2010', '2015', '2020', '2025'];
+    const seriesA = [42, 58, 74, 86];
+    const seriesB = [65, 52, 48, 39];
+    const barsXml = categories
+      .map((cat, idx) => {
+        const xBase = 135 + idx * 145;
+        const h1 = Math.round((seriesA[idx % seriesA.length] / 100) * 230);
+        const h2 = Math.round((seriesB[idx % seriesB.length] / 100) * 230);
+        const y1 = 340 - h1;
+        const y2 = 340 - h2;
+        return `
+          <rect x="${xBase}" y="${y1}" width="38" height="${h1}" rx="5" fill="#0F766E" />
+          <text x="${xBase + 19}" y="${y1 - 8}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0F766E">${seriesA[idx % seriesA.length]}%</text>
+          <rect x="${xBase + 44}" y="${y2}" width="38" height="${h2}" rx="5" fill="#F59E0B" />
+          <text x="${xBase + 63}" y="${y2 - 8}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#B45309">${seriesB[idx % seriesB.length]}%</text>
+          <text x="${xBase + 41}" y="366" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#1E293B">${escapeXmlText(String(cat).slice(0, 16))}</text>
+        `;
+      })
+      .join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" width="800" height="440">
+      <rect width="800" height="440" rx="16" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="3"/>
+      <text x="400" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#0F172A">${safeTitle}</text>
+      <line x1="95" y1="90" x2="95" y2="340" stroke="#475569" stroke-width="2"/>
+      <line x1="95" y1="340" x2="720" y2="340" stroke="#475569" stroke-width="2"/>
+      <line x1="95" y1="280" x2="720" y2="280" stroke="#E2E8F0" stroke-dasharray="4 4"/>
+      <line x1="95" y1="220" x2="720" y2="220" stroke="#E2E8F0" stroke-dasharray="4 4"/>
+      <line x1="95" y1="160" x2="720" y2="160" stroke="#E2E8F0" stroke-dasharray="4 4"/>
+      <line x1="95" y1="100" x2="720" y2="100" stroke="#E2E8F0" stroke-dasharray="4 4"/>
+      <text x="82" y="344" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#64748B">0%</text>
+      <text x="82" y="224" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#64748B">50%</text>
+      <text x="82" y="104" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#64748B">100%</text>
+      ${barsXml}
+      <rect x="260" y="392" width="16" height="16" rx="3" fill="#0F766E"/>
+      <text x="284" y="405" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#334155">Group A</text>
+      <rect x="420" y="392" width="16" height="16" rx="3" fill="#F59E0B"/>
+      <text x="444" y="405" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#334155">Group B</text>
+    </svg>`;
+  }
+
+  const maxCode = Math.max(70, Math.min(74, String(maxLetter || 'I').toUpperCase().charCodeAt(0) || 73));
+  const letters = [];
+  for (let c = 65; c <= maxCode; c += 1) letters.push(String.fromCharCode(c));
+
+  const letterPositions = [
+    { x: 145, y: 345, w: 72, h: 44 }, // A
+    { x: 120, y: 200, w: 78, h: 90 }, // B
+    { x: 135, y: 120, w: 95, h: 42 }, // C
+    { x: 325, y: 220, w: 54, h: 54, circle: true }, // D
+    { x: 310, y: 118, w: 185, h: 44 }, // E
+    { x: 420, y: 185, w: 80, h: 42 }, // F
+    { x: 545, y: 170, w: 84, h: 88 }, // G
+    { x: 345, y: 342, w: 68, h: 44 }, // H
+    { x: 280, y: 278, w: 56, h: 38 }, // I
+    { x: 515, y: 325, w: 76, h: 44 }  // J
+  ];
+
+  const boxesXml = letters
+    .map((letter, idx) => {
+      const pos = letterPositions[idx] || { x: 150 + idx * 55, y: 250, w: 60, h: 40 };
+      if (pos.circle) {
+        const cx = pos.x + pos.w / 2;
+        const cy = pos.y + pos.h / 2;
+        return `
+          <circle cx="${cx}" cy="${cy}" r="${pos.w / 2}" fill="#F9A8D4" stroke="#1E293B" stroke-width="2.5"/>
+          <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#0F172A">${letter}</text>
+        `;
+      }
+      return `
+        <rect x="${pos.x}" y="${pos.y}" width="${pos.w}" height="${pos.h}" rx="4" fill="#F9A8D4" stroke="#1E293B" stroke-width="2.5"/>
+        <text x="${pos.x + pos.w / 2}" y="${pos.y + pos.h / 2 + 6}" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#0F172A">${letter}</text>
+      `;
+    })
+    .join('');
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" width="800" height="480">
+    <rect width="800" height="480" rx="14" fill="#FFFFFF" stroke="#1E293B" stroke-width="3"/>
+    <text x="400" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#0F172A">${safeTitle}</text>
+    <!-- River at top -->
+    <rect x="60" y="56" width="600" height="44" fill="#BAE6FD" stroke="#0284C7" stroke-width="2"/>
+    <text x="360" y="83" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#0369A1">River</text>
+    <!-- Main Park Ground -->
+    <rect x="95" y="100" width="565" height="315" fill="#FEF9C3" stroke="#1E293B" stroke-width="2.5"/>
+    <!-- Roads -->
+    <rect x="60" y="100" width="35" height="335" fill="#F1F5F9" stroke="#1E293B" stroke-width="2"/>
+    <text x="82" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#334155" transform="rotate(-90 82 275)">Riverbank Lane</text>
+    <rect x="660" y="100" width="38" height="335" fill="#F1F5F9" stroke="#1E293B" stroke-width="2"/>
+    <text x="683" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#334155" transform="rotate(-90 683 275)">Bridge Road</text>
+    <rect x="60" y="415" width="638" height="36" fill="#F1F5F9" stroke="#1E293B" stroke-width="2"/>
+    <text x="450" y="438" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#334155">Grey Street</text>
+    <text x="275" y="438" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#0F766E">▲ Entrance</text>
+    <!-- Paths & Plaza -->
+    <path d="M 275 415 L 275 320 L 360 300 L 450 250 M 275 320 L 210 250" fill="none" stroke="#D97706" stroke-width="10" stroke-linecap="round"/>
+    <rect x="260" y="315" width="76" height="40" rx="6" fill="#FDE68A" stroke="#92400E" stroke-width="1.5"/>
+    <text x="298" y="339" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#78350F">Plaza</text>
+    <!-- Pond -->
+    <ellipse cx="485" cy="295" rx="46" ry="24" fill="#BAE6FD" stroke="#0284C7" stroke-width="2"/>
+    <text x="485" y="299" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0369A1">Pond</text>
+    <!-- Lettered Buildings A-I -->
+    ${boxesXml}
+    <!-- Compass Rose -->
+    <g transform="translate(745, 225)">
+      <line x1="0" y1="-26" x2="0" y2="26" stroke="#0F172A" stroke-width="2.5"/>
+      <line x1="-26" y1="0" x2="26" y2="0" stroke="#0F172A" stroke-width="2.5"/>
+      <text x="0" y="-32" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#0F172A">N</text>
+      <text x="0" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#475569">S</text>
+      <text x="-36" y="4" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#475569">W</text>
+      <text x="36" y="4" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#475569">E</text>
+    </g>
+  </svg>`;
+}
+
+/**
+ * Generates an illustrative IELTS Map / Diagram / Chart image data URL using Gemini AI (with instant SVG fallback).
+ */
+export async function generateAiIllustrationDataUrl({
+  apiKey = '',
+  prompt = '',
+  kind = 'map_diagram',
+  title = '',
+  maxLetter = 'I',
+  landmarks = []
+} = {}) {
+  const cleanPrompt = String(prompt || title || '').trim();
+  let svgMarkup = '';
+
+  try {
+    const aiPrompt = `You are an expert IELTS exam graphic designer. Generate a clean, high-contrast, self-contained SVG illustration (viewBox="0 0 800 480", width="800", height="480") for an IELTS ${
+      kind === 'chart' ? 'Writing Task 1 chart/graph/diagram' : 'Listening/Reading Map or Diagram Labelling question (with clearly labeled boxes A–' + maxLetter + ' and compass N/S/E/W)'
+    }.
+Topic / description: ${cleanPrompt || title || 'Bankside Cultural Complex Map'}
+${landmarks.length > 0 ? `Locations / labels to include: ${landmarks.join(', ')}` : ''}
+Return ONLY valid JSON with a single field "svg" containing the complete <svg xmlns="http://www.w3.org/2000/svg" ...>...</svg> string (no <script>, no external images/fonts).`;
+
+    const { parsed } = await callGeminiGenerateJson({
+      apiKey,
+      promptText: aiPrompt,
+      temperature: 0.2
+    });
+    const candidate = String(parsed?.svg || '').trim();
+    if (candidate.startsWith('<svg') && candidate.includes('</svg>') && !/<script/i.test(candidate)) {
+      svgMarkup = candidate;
+    }
+  } catch (_err) {
+    // Fallback to deterministic crisp IELTS SVG generator below
+  }
+
+  if (!svgMarkup) {
+    svgMarkup = buildFallbackIeltsIllustrationSvg({
+      title: cleanPrompt || title || (kind === 'chart' ? 'IELTS Task 1 Visual Chart' : 'Bankside Cultural Complex'),
+      kind,
+      maxLetter,
+      landmarks
+    });
+  }
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`;
 }

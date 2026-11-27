@@ -239,7 +239,8 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     await page.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
     await expect(page.getByText(/DAILY ZONE/i).first()).toBeVisible();
-    await page.locator('aside').getByRole('button', { name: /6\. Viết Task 2/i }).first().click();
+    await expect(page.getByTestId('daily-zone-set-all-private-btn')).toBeVisible();
+    await page.locator('aside').getByRole('button', { name: /Viết Task 2/i }).first().click();
     const dailyDeleteBtn = page.locator('[data-testid^="daily-delete-test-btn-"]').first();
     await expect(dailyDeleteBtn).toBeVisible();
     page.once('dialog', d => d.dismiss());

@@ -27,6 +27,7 @@ import {
   readImageFileAsDataUrl
 } from '../../utils/examHelpers';
 import { getQuestionDisplayNumber } from '../../utils/examUiHelpers';
+import { generateAiIllustrationDataUrl } from '../../utils/geminiGrader';
 import ClozeNoteSheet from '../exam/ClozeNoteSheet';
 import ExamQuestionList from '../exam/ExamQuestionList';
 import AiExamExtractorPanel from './AiExamExtractorPanel';
@@ -176,6 +177,7 @@ function QuestionScopeFilterBar({
 }
 
 function QuestionCardItem({
+  aiApiKey = '',
   groups,
   idx,
   meta,
@@ -184,8 +186,10 @@ function QuestionCardItem({
   onUpdateOption,
   onUpdateQuestion,
   q,
+  showToast = null,
   skill
 }) {
+  const [generatingAiImg, setGeneratingAiImg] = useState(false);
   const [showOptionalImageBox, setShowOptionalImageBox] = useState(false);
   const origin = getQuestionOrigin(q);
   const originStyle = ORIGIN_META[origin] || ORIGIN_META.manual;
@@ -388,6 +392,45 @@ function QuestionCardItem({
                   }}
                 />
               </label>
+              <button
+                type="button"
+                data-testid="ai-generate-image-btn"
+                disabled={generatingAiImg}
+                onClick={async () => {
+                  const defaultDesc = String(q.question || q.instruction || 'Bankside Cultural Complex Map').trim();
+                  const userPrompt =
+                    typeof window !== 'undefined' && typeof window.prompt === 'function'
+                      ? window.prompt('Nhập mô tả Bản đồ / Sơ đồ để AI tự vẽ hình minh họa:', defaultDesc)
+                      : defaultDesc;
+                  if (userPrompt === null) return;
+                  setGeneratingAiImg(true);
+                  try {
+                    const lastOptLetter =
+                      optionList
+                        .map(o => String(o || '').trim().toUpperCase())
+                        .filter(o => /^[A-L]$/.test(o))
+                        .pop() || 'I';
+                    const dataUrl = await generateAiIllustrationDataUrl({
+                      apiKey: aiApiKey,
+                      prompt: userPrompt || defaultDesc,
+                      kind: 'map_diagram',
+                      title: userPrompt || defaultDesc,
+                      maxLetter: lastOptLetter
+                    });
+                    onUpdateQuestion(q.id, 'imageUrl', dataUrl);
+                    showToast?.('✨ Đã tạo ảnh Bản đồ / Sơ đồ bằng AI!');
+                  } catch (err) {
+                    showToast?.(err?.message || 'Không thể tạo ảnh AI.', 'error');
+                  } finally {
+                    setGeneratingAiImg(false);
+                  }
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-60 text-white text-xs font-extrabold inline-flex items-center gap-1.5 transition"
+                title="Dùng AI tự động vẽ hình Bản đồ / Sơ đồ minh họa"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>{generatingAiImg ? 'Đang vẽ AI...' : '✨ Tạo AI Hình Ảnh'}</span>
+              </button>
               {q.imageUrl && (
                 <button
                   type="button"
@@ -517,6 +560,8 @@ function QuestionCardItem({
               {onSyncOptionsToGroup &&
                 optionList.length >= 2 &&
                 (typeMeta.id === 'matching' ||
+                  typeMeta.id === 'map_diagram' ||
+                  typeMeta.id === 'diagram_label' ||
                   typeMeta.id === 'summary_box' ||
                   typeMeta.id === 'matching_features' ||
                   typeMeta.id === 'matching_headings' ||
@@ -579,13 +624,18 @@ function QuestionCardItem({
                       <button
                         key={maxL}
                         type="button"
-                        onClick={() => onUpdateQuestion(q.id, 'options', presetOpts)}
+                        onClick={() => {
+                          onUpdateQuestion(q.id, 'options', presetOpts);
+                          if (typeMeta.id === 'map_diagram' || typeMeta.id === 'diagram_label') {
+                            onSyncOptionsToGroup?.(q.id, presetOpts);
+                          }
+                        }}
                         className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold border transition ${
                           isCurrent
                             ? 'bg-indigo-600 text-white border-indigo-600'
                             : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-indigo-500'
                         }`}
-                        title={`Đặt cột chữ cái A–${maxL}`}
+                        title={`Đặt cột chữ cái A–${maxL} cho cả nhóm Map/Diagram`}
                       >
                         A–{maxL}
                       </button>
@@ -963,6 +1013,34 @@ function RangeImageAssignPanel({ onAssignImageToRange, questions = [], showToast
                 }}
               />
             </label>
+            <button
+              type="button"
+              data-testid="ai-generate-range-image-btn"
+              onClick={async () => {
+                const defaultTitle = `Bankside Cultural Complex (Questions ${fromNum}–${toNum})`;
+                const userPrompt =
+                  typeof window !== 'undefined' && typeof window.prompt === 'function'
+                    ? window.prompt('Nhập tên / mô tả Bản đồ hoặc Sơ đồ muốn AI tự vẽ:', defaultTitle)
+                    : defaultTitle;
+                if (userPrompt === null) return;
+                try {
+                  const dataUrl = await generateAiIllustrationDataUrl({
+                    prompt: userPrompt || defaultTitle,
+                    kind: 'map_diagram',
+                    title: userPrompt || defaultTitle,
+                    maxLetter
+                  });
+                  setDraftImageUrl(dataUrl);
+                  showToast?.('✨ Đã tạo ảnh Bản đồ / Sơ đồ bằng AI! Bấm Gắn Ảnh bên dưới để áp dụng.');
+                } catch (err) {
+                  showToast?.(err?.message || 'Không thể tạo ảnh AI.', 'error');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-extrabold transition"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              <span>✨ Tạo AI Hình Ảnh</span>
+            </button>
             <span className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300 font-semibold">
               <ClipboardPaste className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
               hoặc bấm khung này rồi nhấn <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border font-mono text-[11px]">Ctrl+V</kbd>
@@ -1258,6 +1336,7 @@ export default function SkillQuestionWorkspace({
       {entries.map(({ q, idx }) => (
         <QuestionCardItem
           key={q.id}
+          aiApiKey={aiApiKey}
           groups={groups}
           idx={idx}
           meta={meta}
@@ -1266,6 +1345,7 @@ export default function SkillQuestionWorkspace({
           onUpdateOption={onUpdateOption}
           onUpdateQuestion={onUpdateQuestion}
           q={q}
+          showToast={showToast}
           skill={skill}
         />
       ))}

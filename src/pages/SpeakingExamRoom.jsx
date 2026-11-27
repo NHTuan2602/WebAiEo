@@ -253,7 +253,7 @@ export default function SpeakingExamRoom({
     return () => clearInterval(t);
   }, [phase, prepRemainingSec]);
 
-  // When Part 2 1-minute prep timer reaches 0, AI Examiner prompts candidate to begin speaking
+  // When Part 2 1-minute prep timer reaches 0, automatically start the 2-minute Part 2 recording
   useEffect(() => {
     const prevVal = prevPrepSecRef.current;
     prevPrepSecRef.current = prepRemainingSec;
@@ -265,14 +265,9 @@ export default function SpeakingExamRoom({
       !isRecordingRef.current &&
       !recordingsByQidRef.current?.[currentItem.id]
     ) {
-      const startLine = currentExaminerLead.part2StartSpeakingText;
-      if (startLine && (isExamRoomMode || autoSpeakPrompt)) {
-        triggerPromptPlaybackRef.current(startLine, '', {
-          allowAutoCountdown: isExamRoomMode
-        });
-      }
+      handleBeginRecordingRef.current?.();
     }
-  }, [phase, prepRemainingSec, currentItem?.id, currentItem?.part, currentExaminerLead.part2StartSpeakingText, isExamRoomMode, autoSpeakPrompt]);
+  }, [phase, prepRemainingSec, currentItem?.id, currentItem?.part]);
 
   const stopPromptPlayback = () => {
     clearAutoRecordTimers();
@@ -601,7 +596,8 @@ export default function SpeakingExamRoom({
     }
 
     const qId = currentItem.id;
-    const maxSec = currentItem.speakSec || 45;
+    const isPart2Item = currentItem.part === 2;
+    const maxSec = isPart2Item ? (Number(currentItem.speakSec) > 0 ? Number(currentItem.speakSec) : 120) : (currentItem.speakSec || 45);
     chunksRef.current = [];
     recordStartedAtRef.current = Date.now();
     setRecordElapsedSec(0);
@@ -633,6 +629,19 @@ export default function SpeakingExamRoom({
         }
       }));
       setIsRecording(false);
+      if (isPart2Item) {
+        const capturedIdx = items.findIndex(it => it.id === qId);
+        const nextPart3Idx = items.findIndex((it, i) => i > capturedIdx && it.part === 3);
+        const targetNext = nextPart3Idx !== -1 ? nextPart3Idx : capturedIdx + 1;
+        if (targetNext > capturedIdx && targetNext < items.length) {
+          showToast?.('Đã hoàn thành ghi âm Part 2 — Tự động chuyển sang Part 3!', 'info');
+          setTimeout(() => {
+            setLiveTranscript('');
+            setCurrentIdx(targetNext);
+            setPrepRemainingSec(0);
+          }, 350);
+        }
+      }
     };
 
     recorderRef.current = mediaRecorder;
@@ -641,10 +650,15 @@ export default function SpeakingExamRoom({
     recordTimerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - recordStartedAtRef.current) / 1000);
       setRecordElapsedSec(elapsed);
-      // Daily & Forecast mode: không đếm ngược / không cắt ngang ghi âm
-      if (isExamRoomMode && elapsed >= maxSec) {
+      // Part 2 always uses a 2-minute (120s) countdown and auto-transitions to Part 3
+      if ((isExamRoomMode || isPart2Item) && elapsed >= maxSec) {
         stopCurrentRecording();
-        showToast?.(`Đã hết thời gian câu ${currentIdx + 1} (${maxSec}s) - tự động lưu ghi âm!`, 'info');
+        showToast?.(
+          isPart2Item
+            ? `Đã hết 2 phút ghi âm Part 2 (${maxSec}s) - tự động lưu và chuyển qua Part 3!`
+            : `Đã hết thời gian câu ${currentIdx + 1} (${maxSec}s) - tự động lưu ghi âm!`,
+          'info'
+        );
       }
     }, 250);
   };
@@ -1308,10 +1322,10 @@ export default function SpeakingExamRoom({
                 <div className="flex items-center gap-3 text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
                   <Clock className="w-4 h-4 text-[#0F766E] dark:text-[#1EE1D6]" />
                   <span>
-                    {isExamRoomMode
+                    {isExamRoomMode || currentItem.part === 2
                       ? isRecording
-                        ? `Đang nói: ${formatSecs(recordElapsedSec)} (còn ${formatSecs(remainingSpeakSec)})`
-                        : `Giới hạn câu: ${formatSecs(maxAllowedSec)}`
+                        ? `Đếm ngược ghi âm: còn ${formatSecs(remainingSpeakSec)} (đã nói ${formatSecs(recordElapsedSec)})`
+                        : `Thời gian nói: ${formatSecs(maxAllowedSec)}`
                       : isRecording
                       ? `Đang ghi âm: ${formatSecs(recordElapsedSec)} (Không đếm ngược)`
                       : 'Tự do (Không đếm ngược · Được thu lại)'}

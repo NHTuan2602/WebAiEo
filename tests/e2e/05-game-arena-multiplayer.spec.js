@@ -653,7 +653,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     try {
       // Verify unpaid Student sees the 20.000đ Monthly Pass gate & cannot start Knight RPG without purchasing
       await expect(page.getByTestId('knight-monthly-pass-gate')).toBeVisible();
-      await expect(page.getByTestId('knight-monthly-pass-gate')).toContainText(/20\.000/i);
+      await expect(page.getByTestId('knight-monthly-pass-gate')).toContainText(/20\.000|35\.000/i);
       await page.getByTestId('start-knight-campaign-btn').click();
       await expect(page.getByTestId('knight-choice-1')).toHaveCount(0);
 

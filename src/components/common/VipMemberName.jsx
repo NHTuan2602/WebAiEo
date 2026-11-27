@@ -81,7 +81,7 @@ export default function VipMemberName({
           title="Đặc quyền Quản Trị / Giáo Viên"
         >
           <Crown className={badgeSize === 'xs' ? 'w-2.5 h-2.5 text-amber-300' : 'w-3 h-3 text-amber-300'} />
-          <span>{user?.isSuperAdmin || user?.username === 'tuanpro123s' ? 'ADMIN' : 'STAFF'}</span>
+          <span>{user?.isSuperAdmin || user?.username === 'tuanpro123s' ? 'ADMIN' : 'IMPERIAL'}</span>
         </span>
       )}
       {showTierGuide && (

@@ -2669,7 +2669,13 @@ export default function App() {
     const cleanClassIds = Array.from(new Set((Array.isArray(options?.assignedClassIds) ? options.assignedClassIds : []).filter(Boolean)));
     const mode = ['replace', 'add', 'remove'].includes(options?.mode) ? options.mode : 'replace';
     const publish = Boolean(options?.publish);
-    const notify = options?.notify !== false;
+    const explicitVisibility =
+      options?.visibility === 'private'
+        ? 'private'
+        : publish || options?.visibility === 'public'
+          ? 'public'
+          : null;
+    const notify = explicitVisibility === 'private' ? false : options?.notify !== false;
     const folderLabel = String(options?.folderLabel || 'Thư mục bài tập').trim();
     const idSet = new Set(cleanTestIds);
 
@@ -2678,7 +2684,9 @@ export default function App() {
         if (!t || !idSet.has(t.id)) return t;
         const prevClasses = Array.isArray(t.assignedClassIds) ? t.assignedClassIds : [];
         let nextAssigned;
-        if (mode === 'add') {
+        if (explicitVisibility === 'private') {
+          nextAssigned = [];
+        } else if (mode === 'add') {
           nextAssigned = cleanClassIds.length === 0 ? [] : Array.from(new Set([...prevClasses, ...cleanClassIds]));
         } else if (mode === 'remove') {
           const rem = new Set(cleanClassIds);
@@ -2689,21 +2697,24 @@ export default function App() {
         return {
           ...t,
           assignedClassIds: nextAssigned,
-          ...(publish ? { visibility: 'public' } : {})
+          ...(explicitVisibility ? { visibility: explicitVisibility } : {})
         };
       })
     );
 
     await dispatchSyncAction('ASSIGN_FOLDER_CLASSES', {
       testIds: cleanTestIds,
-      assignedClassIds: cleanClassIds,
-      mode,
-      publish,
+      assignedClassIds: explicitVisibility === 'private' ? [] : cleanClassIds,
+      mode: explicitVisibility === 'private' ? 'replace' : mode,
+      publish: explicitVisibility === 'public' || publish,
+      ...(explicitVisibility ? { visibility: explicitVisibility } : {}),
       notify,
       folderLabel
     });
 
-    if (mode === 'remove') {
+    if (explicitVisibility === 'private') {
+      showToast(`🔒 Đã bật "${folderLabel}" (${cleanTestIds.length} bài) thành Chỉ Mình Tôi! Học sinh tạm ẩn cho đến khi bạn mở/giao bài.`);
+    } else if (mode === 'remove') {
       showToast(`Đã gỡ lớp khỏi ${cleanTestIds.length} bài trong "${folderLabel}".`);
     } else {
       showToast(
@@ -2779,13 +2790,11 @@ export default function App() {
           if (targetCfg.testMode === 'single_skill') {
             const spMeta = normalizeSpeakingSection(targetTest.speaking);
             const targetTab =
-              targetCfg.focusSkill === 'speaking' && spMeta.speakingTrack === 'daily'
-                ? 'speaking_daily'
-                : targetCfg.focusSkill === 'speaking' && spMeta.speakingTrack === 'exam_room'
-                  ? 'speaking_exam_room'
-                  : targetCfg.focusSkill === 'speaking' && spMeta.isForecast
-                    ? 'forecast'
-                    : targetCfg.focusSkill || 'speaking';
+              targetCfg.focusSkill === 'speaking' && spMeta.speakingTrack === 'exam_room'
+                ? 'speaking_exam_room'
+                : targetCfg.focusSkill === 'speaking'
+                  ? 'forecast'
+                  : targetCfg.focusSkill || 'forecast';
             setSkillHubTab(targetTab);
             setView('SKILL_HUB');
           } else {
@@ -5653,30 +5662,16 @@ export default function App() {
     let extraSingleFields = {};
     const requestedDailySub = String(subOpts?.dailySubCategory || '').trim();
     if (skill === 'speaking') {
-      if (requestedDailySub === 'speaking_forecast' || (view === 'SKILL_HUB' && skillHubTab === 'forecast')) {
-        nextSpeaking = createDefaultSpeakingSection({
-          speakingTrack: 'general',
-          isForecast: true,
-          hashtags: ['#CayForecastMsNhu']
-        });
-        extraSingleFields = {
-          title: 'Cày Forecast Speaking Cùng Ms. Như Mới',
-          hashtags: ['#CayForecastMsNhu'],
-          dailySubCategory: 'speaking_forecast'
-        };
-      } else if (requestedDailySub === 'speaking_daily' || (view === 'SKILL_HUB' && skillHubTab === 'speaking_daily')) {
-        nextSpeaking = createDefaultSpeakingSection({
-          speakingTrack: 'daily',
-          dailyDate: getVietnamTodayDateKey(Date.now() + serverClockOffsetMsRef.current),
-          dailyMandatory: true,
-          hashtags: ['#DailySpeaking']
-        });
-        extraSingleFields = {
-          title: 'Daily Speaking Mới',
-          hashtags: ['#DailySpeaking'],
-          dailySubCategory: 'speaking_daily'
-        };
-      }
+      nextSpeaking = createDefaultSpeakingSection({
+        speakingTrack: 'general',
+        isForecast: true,
+        hashtags: ['#CayForecastMsNhu']
+      });
+      extraSingleFields = {
+        title: 'Cày Forecast Speaking Cùng Ms. Như Mới',
+        hashtags: ['#CayForecastMsNhu'],
+        dailySubCategory: 'speaking_forecast'
+      };
     }
     setTestForm({
       ...baseSingleForm,
@@ -7744,9 +7739,7 @@ export default function App() {
       nowMs: Date.now() + serverClockOffsetMs
     });
   })();
-  const dailySpeakingPendingCount = currentUser?.role === 'student'
-    ? (dailySpeakingCompliance.myPendingDailyTests?.length || 0)
-    : 0;
+  const dailySpeakingPendingCount = 0;
   const openSpeakingDaily = () => {
     if (currentUser?.isGuest && currentUser.role !== 'teacher') {
       showToast('Tài khoản Khách chỉ được phép mua và thi Đề Thực Chiến & Mock Test.', 'error');
@@ -7754,7 +7747,7 @@ export default function App() {
       return;
     }
     setFocusedTestId(null);
-    setSkillHubTab('speaking_daily');
+    setSkillHubTab('forecast');
     setView('SKILL_HUB');
   };
 
@@ -7985,9 +7978,9 @@ export default function App() {
           openExamBuilder={openExamBuilder}
           onRedeemRealExamCredit={handleRedeemRealExamCredit}
           openMemberProfile={openMemberProfile}
-          openSkillPracticeHub={(tab = 'speaking_daily') => {
+          openSkillPracticeHub={(tab = 'forecast') => {
             setFocusedTestId(null);
-            setSkillHubTab(tab);
+            setSkillHubTab(tab === 'speaking_daily' || tab === 'speaking' ? 'forecast' : tab);
             setView('SKILL_HUB');
           }}
           openSpeakingDaily={openSpeakingDaily}
@@ -8440,6 +8433,7 @@ export default function App() {
           handleTeacherResetLobby={handleTeacherResetLobby}
           initGameCampaign={initGameCampaign}
           notifications={sentNotifications}
+          onAssignFolderClasses={handleAssignFolderClasses}
           onAssignTestClasses={handleAssignTestClasses}
           onCreateSkillForClass={(classId, skill = 'speaking') => openSingleSkillBuilder(skill, null, [classId])}
           onCreateTestForClass={classId => openExamBuilder(null, 'general', [classId])}

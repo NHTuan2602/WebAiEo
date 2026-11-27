@@ -110,7 +110,44 @@ export default function ClozeNoteSheet({
   const parsedLines = parseClozeLines(clozeText);
   if (parsedLines.length === 0) return null;
 
-  const sections = splitClozeSections(parsedLines);
+  const nonClozeScopeQuestions = (Array.isArray(questions) ? questions : []).filter(q => {
+    if (!q || typeof q.blankNum === 'number') return false;
+    if (typeof q[scopeField] === 'number' && typeof scopeIdx === 'number' && q[scopeField] !== scopeIdx) {
+      return false;
+    }
+    return true;
+  });
+  const nonClozeNumSet = new Set(
+    nonClozeScopeQuestions
+      .map(q => Number(q?.questionNumber))
+      .filter(n => Number.isFinite(n) && n > 0)
+  );
+  const isRedundantNonClozeStemLine = (line) => {
+    if (!line || line.kind === 'spacer' || line.segments.some(seg => seg.type === 'blank')) return false;
+    if (nonClozeNumSet.size === 0) return false;
+    const plain = getLinePlainText(line);
+    if (!plain) return false;
+    // Detect flattened stem dump like "15 Information Centre 16 Library 17 Museum 18 Art Gallery 19 Restaurant 20 BBQ"
+    const numTokens = [...plain.matchAll(/\b(\d{1,2})\s+[A-Za-z]/g)].map(m => Number(m[1]));
+    const matchingNonClozeHits = numTokens.filter(n => nonClozeNumSet.has(n)).length;
+    if (matchingNonClozeHits >= 2) return true;
+    // Detect single numbered stem line matching a non-cloze question (e.g. "15 Information Centre")
+    const singleMatch = plain.match(/^(\d{1,2})[.):\-–\s]+(.+)$/);
+    if (singleMatch && nonClozeNumSet.has(Number(singleMatch[1]))) {
+      const stem = singleMatch[2].trim().toLowerCase();
+      const matchedQ = nonClozeScopeQuestions.find(q => Number(q.questionNumber) === Number(singleMatch[1]));
+      const qText = String(matchedQ?.question || '').replace(/^\d{1,2}[.):\-–\s]+/, '').trim().toLowerCase();
+      if (qText && (stem === qText || qText.startsWith(stem) || stem.startsWith(qText))) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const cleanedParsedLines = parsedLines.filter(line => !isRedundantNonClozeStemLine(line));
+  if (cleanedParsedLines.length === 0) return null;
+
+  const sections = splitClozeSections(cleanedParsedLines);
 
   const renderSection = (sectionLines, sectionIdx) => {
     // Collect choice-based blanks (e.g. summary_box with A-I Word Box) in this section
@@ -124,6 +161,14 @@ export default function ClozeNoteSheet({
         sectionBlankLinks.push({ blankNum: seg.blankNum, linkedQ });
       });
     });
+
+    if (
+      sectionBlankLinks.length === 0 &&
+      nonClozeScopeQuestions.length > 0 &&
+      !sectionLines.some(l => l.kind === 'table' || l.kind === 'flowArrow')
+    ) {
+      return null;
+    }
 
     const choiceBlanks = sectionBlankLinks.filter(
       item => Array.isArray(item.linkedQ?.options) && item.linkedQ.options.length > 0
