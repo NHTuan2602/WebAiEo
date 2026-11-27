@@ -289,4 +289,73 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     healthGuard.assertHealthy('teacher-admin-grading-profile');
   });
+
+  test('Teacher can preview a full exam with 0 Listening / 0 Reading questions without crashing ExamMode', async ({
+    page,
+    request,
+    baseURL,
+    healthGuard
+  }) => {
+    const tempTestId = `test-e2e-empty-lr-${Date.now()}`;
+    const loginRes = await request.post(`${baseURL}/api/sync/auth/login`, {
+      data: {
+        username: E2E_CREDENTIALS.teacher.username,
+        password: E2E_CREDENTIALS.teacher.password
+      }
+    });
+    expect(loginRes.ok()).toBeTruthy();
+
+    const createRes = await request.post(`${baseURL}/api/sync/action`, {
+      data: {
+        type: 'UPSERT_TEST',
+        payload: {
+          test: {
+            id: tempTestId,
+            title: 'E2E Speaking-Only Full Exam Preview Guard',
+            createdAt: '2026-11-28',
+            testMode: 'full',
+            examCategory: 'real_exam',
+            visibility: 'private',
+            maxAttempts: 1,
+            sequentialMode: true,
+            allowEarlyNextSection: true,
+            sectionOrder: ['listening', 'reading', 'writing', 'speaking'],
+            sectionDurations: { listening: 30, reading: 60, writing: 60, speaking: 14 },
+            listening: { tracks: [{ id: 't1', title: 'Part 1', audioUrl: '' }], questions: [] },
+            reading: { passages: [{ id: 'p1', title: 'Passage 1', passageText: '' }], questions: [] },
+            writing: { task1: { prompt: '', minWords: 150 }, task2: { prompt: '', minWords: 250 } },
+            speaking: {
+              part1: { enabled: true, topic: 'Accommodation', questions: [{ id: 'sp1_1', prompt: 'Where do you live?' }] },
+              part2: { enabled: true, title: 'Describe a natural place', cueCardPrompt: 'Describe a natural place', bullets: ['Where it is'] },
+              part3: { enabled: true, topic: 'Nature', questions: [{ id: 'sp3_1', prompt: 'Why protect nature?' }] }
+            }
+          }
+        }
+      }
+    });
+    expect(createRes.ok()).toBeTruthy();
+
+    try {
+      await loginViaUI(page, E2E_CREDENTIALS.teacher.username, E2E_CREDENTIALS.teacher.password);
+      await page.locator('aside').getByRole('button', { name: /Thực Chiến & Mock/i }).click();
+      const rowHeader = page.getByText('E2E Speaking-Only Full Exam Preview Guard').first();
+      await expect(rowHeader).toBeVisible({ timeout: 10_000 });
+      await rowHeader.click();
+      await page.getByRole('button', { name: /Làm Thử Đề Thi/i }).first().click();
+
+      await expect(page.getByText(/Listen and answer questions 1–1/i).first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(/SỰ CỐ HIỂN THỊ/i)).toHaveCount(0);
+      healthGuard.assertHealthy('empty-lr-full-exam-preview');
+    } finally {
+      await request.post(`${baseURL}/api/sync/auth/login`, {
+        data: {
+          username: E2E_CREDENTIALS.teacher.username,
+          password: E2E_CREDENTIALS.teacher.password
+        }
+      });
+      await request.post(`${baseURL}/api/sync/action`, {
+        data: { type: 'DELETE_TEST', payload: { testId: tempTestId } }
+      });
+    }
+  });
 });

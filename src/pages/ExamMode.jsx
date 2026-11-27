@@ -798,7 +798,7 @@ export default function ExamMode({
               {examState.skill === 'reading' &&
                 `Read the text and answer questions ${activePartRange || `1–${activePartQs.length || 1}`}`}
               {examState.skill === 'listening' &&
-                `Listen and answer questions ${activePartRange || `1–${displayedListeningQs.length || 1}`}`}
+                `Listen and answer questions ${activePartRange || `1–${activePartQs.length || 1}`}`}
               {examState.skill === 'writing' &&
                 `Read the prompt and answer questions ${activePartRange}`}
               {examState.skill === 'speaking' &&
