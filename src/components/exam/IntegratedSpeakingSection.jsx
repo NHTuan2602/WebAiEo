@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { getSpeakingQuestionItems, normalizeSpeakingSection } from '../../constants/seedData';
 import { buildSpeakingExaminerLeadIn } from '../../utils/speakingExaminerScript';
+import { uploadSpeakingRecording } from '../../utils/speakingApi';
 import AudioLevelMeter from '../speaking/AudioLevelMeter';
 
 const pickSupportedMimeType = () => {
@@ -34,11 +35,15 @@ const pickSupportedMimeType = () => {
   return '';
 };
 
+const isRecordingComplete = (rec) => Boolean(rec && (rec.blob || rec.audioUrl || rec.recorded));
+
 export default function IntegratedSpeakingSection({
   autoExaminerMode = false,
   candidateName = '',
+  initialQuestionIdx = 0,
   test,
   recordingsMap = {},
+  onQuestionIndexChange,
   onUpdateRecording,
   onSpeakingNotesChange,
   speakingNotes = {}
@@ -46,7 +51,14 @@ export default function IntegratedSpeakingSection({
   const speakingCfg = useMemo(() => normalizeSpeakingSection(test?.speaking), [test?.speaking]);
   const questions = useMemo(() => getSpeakingQuestionItems(test?.speaking, 'all'), [test?.speaking]);
 
-  const [currentIdx, setCurrentIdx] = useState(0);
+  const [currentIdx, setCurrentIdx] = useState(() => {
+    if (!questions.length) return 0;
+    const firstUnanswered = questions.findIndex(q => !isRecordingComplete(recordingsMap?.[q.id]));
+    if (firstUnanswered >= 0) {
+      return firstUnanswered;
+    }
+    return Math.min(Math.max(0, Number(initialQuestionIdx) || 0), questions.length - 1);
+  });
   const [isRecording, setIsRecording] = useState(false);
   const [recordElapsedSec, setRecordElapsedSec] = useState(0);
   const [liveTranscript, setLiveTranscript] = useState('');
@@ -80,6 +92,8 @@ export default function IntegratedSpeakingSection({
   const hasMicPermissionRef = useRef(hasMicPermission);
   const isSpeakingSectionStartedRef = useRef(isSpeakingSectionStarted);
   const recordingsMapRef = useRef(recordingsMap);
+  const isUnmountedRef = useRef(false);
+  const autoAdvanceTimerRef = useRef(null);
 
   const safeIdx = Math.min(Math.max(0, currentIdx), Math.max(0, questions.length - 1));
   const currentQ = questions[safeIdx] || null;
@@ -98,9 +112,60 @@ export default function IntegratedSpeakingSection({
   const currentQuestionIdRef = useRef(currentQ?.id || '');
   const currentRec = currentQ ? recordingsMap[currentQ.id] : null;
   const recordedCount = useMemo(
-    () => questions.filter(q => Boolean(recordingsMap[q.id]?.blob || recordingsMap[q.id]?.audioUrl)).length,
+    () => questions.filter(q => isRecordingComplete(recordingsMap[q.id])).length,
     [questions, recordingsMap]
   );
+
+  // When resuming after F5 with previously saved answers, auto-connect Mic if browser already granted permission
+  // so the student resumes directly at the next unanswered question without getting stuck on the Mic Check screen!
+  const autoResumedAfterReloadRef = useRef(false);
+  useEffect(() => {
+    if (!autoExaminerMode || isSpeakingSectionStarted || autoResumedAfterReloadRef.current) return;
+    if (recordedCount <= 0) return;
+    autoResumedAfterReloadRef.current = true;
+    let cancelled = false;
+    const tryAutoResume = async () => {
+      try {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return;
+        let canAutoOpen = false;
+        if (navigator.permissions?.query) {
+          try {
+            const status = await navigator.permissions.query({ name: 'microphone' });
+            if (status?.state === 'granted') canAutoOpen = true;
+          } catch {
+            // Safari/Firefox fallback below
+          }
+        }
+        if (!canAutoOpen || cancelled) return;
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+        mediaStreamRef.current = stream;
+        hasMicPermissionRef.current = true;
+        isSpeakingSectionStartedRef.current = true;
+        setHasMicPermission(true);
+        startMicrophoneMeter(stream);
+        setIsSpeakingSectionStarted(true);
+        const resumeIdx = questions.findIndex(q => !isRecordingComplete(recordingsMapRef.current?.[q.id]));
+        const targetIdx = resumeIdx >= 0 ? resumeIdx : Math.max(0, questions.length - 1);
+        setCurrentIdx(targetIdx);
+        onQuestionIndexChange?.(targetIdx);
+        const targetQ = questions[targetIdx] || null;
+        currentQuestionIdRef.current = targetQ?.id || '';
+        if (targetQ && !isRecordingComplete(recordingsMapRef.current?.[targetQ.id])) {
+          readPromptAndAutoRecord(targetQ, true, targetIdx);
+        }
+      } catch {
+        // Keep clean Mic Check button if browser requires an explicit click
+      }
+    };
+    tryAutoResume();
+    return () => {
+      cancelled = true;
+    };
+  }, [autoExaminerMode, isSpeakingSectionStarted, recordedCount, questions]);
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
@@ -144,8 +209,11 @@ export default function IntegratedSpeakingSection({
   }, []);
 
   useEffect(() => {
+    isUnmountedRef.current = false;
     return () => {
+      isUnmountedRef.current = true;
       promptCycleRef.current += 1;
+      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
       if (autoRecordTimerRef.current) clearInterval(autoRecordTimerRef.current);
       if (part2PrepTimerRef.current) clearInterval(part2PrepTimerRef.current);
       if (promptFallbackTimerRef.current) clearTimeout(promptFallbackTimerRef.current);
@@ -298,7 +366,7 @@ export default function IntegratedSpeakingSection({
       !questionId ||
       currentQuestionIdRef.current !== questionId ||
       isRecordingRef.current ||
-      recordingsMapRef.current?.[questionId]
+      isRecordingComplete(recordingsMapRef.current?.[questionId])
     ) {
       return;
     }
@@ -308,7 +376,7 @@ export default function IntegratedSpeakingSection({
       if (
         currentQuestionIdRef.current !== questionId ||
         isRecordingRef.current ||
-        recordingsMapRef.current?.[questionId]
+        isRecordingComplete(recordingsMapRef.current?.[questionId])
       ) {
         clearPart2PrepTimer();
         return;
@@ -346,7 +414,7 @@ export default function IntegratedSpeakingSection({
       !questionId ||
       currentQuestionIdRef.current !== questionId ||
       isRecordingRef.current ||
-      recordingsMapRef.current?.[questionId]
+      isRecordingComplete(recordingsMapRef.current?.[questionId])
     ) {
       return;
     }
@@ -356,7 +424,7 @@ export default function IntegratedSpeakingSection({
       if (
         currentQuestionIdRef.current !== questionId ||
         isRecordingRef.current ||
-        recordingsMapRef.current?.[questionId]
+        isRecordingComplete(recordingsMapRef.current?.[questionId])
       ) {
         clearAutoRecordTimer();
         return;
@@ -388,7 +456,7 @@ export default function IntegratedSpeakingSection({
     const spokenPayload = examinerScript.fullSpokenText || question.prompt || '';
     if (!question.audioUrl && speakingCfg.disableAiTts) {
       setPromptPlayBlocked(true);
-      if (question.part === 2 && !recordingsMapRef.current?.[questionId] && !part2PrepTimerRef.current) {
+      if (question.part === 2 && !isRecordingComplete(recordingsMapRef.current?.[questionId]) && !part2PrepTimerRef.current) {
         startPart2PrepTimer(questionId, question.prepSec || 60);
       }
       return;
@@ -400,11 +468,11 @@ export default function IntegratedSpeakingSection({
         promptFallbackTimerRef.current = null;
       }
       setIsSpeakingPrompt(false);
-      if (question.part === 2 && !recordingsMapRef.current?.[questionId]) {
+      if (question.part === 2 && !isRecordingComplete(recordingsMapRef.current?.[questionId])) {
         if (!part2PrepTimerRef.current) {
           startPart2PrepTimer(questionId, question.prepSec || 60);
         }
-      } else if (autoRecord && !recordingsMapRef.current?.[questionId]) {
+      } else if (autoRecord && !isRecordingComplete(recordingsMapRef.current?.[questionId])) {
         startAutoRecordCountdown(questionId);
       }
     };
@@ -508,26 +576,61 @@ export default function IntegratedSpeakingSection({
         const blobType = recorder.mimeType || mimeType || 'audio/webm';
         const blob = new Blob(audioChunksRef.current, { type: blobType });
         const previewUrl = URL.createObjectURL(blob);
-        onUpdateRecording?.(capturedQuestion.id, {
+        const baseRecPayload = {
           questionId: capturedQuestion.id,
           part: capturedQuestion.part,
           prompt: capturedQuestion.prompt || capturedQuestion.topic || '',
           blob,
           previewUrl,
           durationSec: elapsed,
-          transcript: liveTranscriptRef.current.trim()
-        });
+          transcript: liveTranscriptRef.current.trim(),
+          recorded: true,
+          savedAt: Date.now()
+        };
+        onUpdateRecording?.(capturedQuestion.id, baseRecPayload);
+
+        // Immediately upload audio to server in background so F5 never loses recorded audio!
+        if (blob.size > 0) {
+          const stableAudioId = `sp4_${String(test?.id || 'exam').replace(/[^a-zA-Z0-9_-]/g, '').slice(-12)}_${capturedQuestion.id}_${Date.now()}`;
+          uploadSpeakingRecording({
+            blob,
+            audioId: stableAudioId,
+            mimeType: blobType,
+            questionId: capturedQuestion.id
+          })
+            .then(up => {
+              if (up?.audioUrl) {
+                onUpdateRecording?.(capturedQuestion.id, {
+                  ...baseRecPayload,
+                  audioUrl: up.audioUrl,
+                  audioId: up.audioId || stableAudioId
+                });
+              }
+            })
+            .catch(() => {
+              // Keep local blob for retry during final exam submit
+            });
+        }
+
         stopHardwareAndTimers();
+        if (isUnmountedRef.current) return;
         setIsRecording(false);
+
+        const capturedIdx = questions.findIndex(q => q.id === capturedQuestion.id);
+        if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
         if (capturedQuestion.part === 2) {
-          const capturedIdx = questions.findIndex(q => q.id === capturedQuestion.id);
           const nextPart3Idx = questions.findIndex((q, i) => i > capturedIdx && q.part === 3);
           const targetNext = nextPart3Idx !== -1 ? nextPart3Idx : capturedIdx + 1;
           if (targetNext > capturedIdx && targetNext < questions.length) {
-            setTimeout(() => {
-              goQuestionRef.current?.(targetNext);
-            }, 350);
+            autoAdvanceTimerRef.current = setTimeout(() => {
+              if (!isUnmountedRef.current) goQuestionRef.current?.(targetNext);
+            }, 400);
           }
+        } else if (autoExaminerMode && capturedIdx >= 0 && capturedIdx + 1 < questions.length) {
+          // In Thực Chiến / Mock Test: automatically save & advance straight to the next question
+          autoAdvanceTimerRef.current = setTimeout(() => {
+            if (!isUnmountedRef.current) goQuestionRef.current?.(capturedIdx + 1);
+          }, 550);
         }
       };
 
@@ -580,7 +683,7 @@ export default function IntegratedSpeakingSection({
           : `Không thể mở Micro: ${err?.message || 'Lỗi thiết bị'}`
       );
     }
-  }, [autoExaminerMode, currentQ, onUpdateRecording, stopHardwareAndTimers]);
+  }, [autoExaminerMode, currentQ, onUpdateRecording, questions, stopHardwareAndTimers, test?.id]);
   const startRecordingRef = useRef(startRecording);
   useEffect(() => {
     startRecordingRef.current = startRecording;
@@ -594,12 +697,13 @@ export default function IntegratedSpeakingSection({
     const nextQ = questions[targetIdx] || null;
     currentQuestionIdRef.current = nextQ?.id || '';
     setCurrentIdx(targetIdx);
+    onQuestionIndexChange?.(targetIdx);
     if (autoExaminerMode && isSpeakingSectionStartedRef.current) {
       // In Thực Chiến / Mock Test: read examiner prompt FIRST; Part 2 1-minute prep starts ONLY in finishPrompt() after reading ends!
       readPromptAndAutoRecord(nextQ, true, targetIdx);
     } else {
       cancelPromptPlayback();
-      if (nextQ?.part === 2 && !recordingsMapRef.current?.[nextQ.id]) {
+      if (nextQ?.part === 2 && !isRecordingComplete(recordingsMapRef.current?.[nextQ.id])) {
         startPart2PrepTimer(nextQ.id, nextQ.prepSec || 60);
       }
     }
@@ -613,7 +717,7 @@ export default function IntegratedSpeakingSection({
       !isSpeakingPrompt &&
       currentQ?.part === 2 &&
       !isRecording &&
-      !currentRec &&
+      !isRecordingComplete(currentRec) &&
       part2PrepCountdown === null &&
       !part2PrepTimerRef.current
     ) {
@@ -631,13 +735,21 @@ export default function IntegratedSpeakingSection({
 
   const beginSpeakingSection = () => {
     if (!hasMicPermissionRef.current) {
-      setMicError('Hãy kiểm tra và cho phép Micro trước khi bắt đầu phần Speaking.');
+      setMicError('Hãy kiểm tra và cho phép Micro trước khi bắt đầu.');
       return;
     }
+    const firstUnanswered = questions.findIndex(q => !isRecordingComplete(recordingsMapRef.current?.[q.id]));
+    const targetIdx = firstUnanswered >= 0 ? firstUnanswered : safeIdx;
+    const targetQ = questions[targetIdx] || currentQ;
+    currentQuestionIdRef.current = targetQ?.id || '';
+    setCurrentIdx(targetIdx);
+    onQuestionIndexChange?.(targetIdx);
     isSpeakingSectionStartedRef.current = true;
     setIsSpeakingSectionStarted(true);
     setMicError('');
-    readPromptAndAutoRecord(currentQ, autoExaminerMode, safeIdx);
+    if (targetQ && !isRecordingComplete(recordingsMapRef.current?.[targetQ.id])) {
+      readPromptAndAutoRecord(targetQ, autoExaminerMode, targetIdx);
+    }
   };
 
   if (questions.length === 0) {
@@ -661,12 +773,16 @@ export default function IntegratedSpeakingSection({
             <Mic className="w-5 h-5" />
           </span>
           <div className="space-y-2">
-            <p className="text-xs font-extrabold uppercase tracking-wider text-[#0F766E] dark:text-teal-300">Speaking Thực Chiến / Mock</p>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-zinc-100">Kiểm tra Micro trước khi nói</h2>
-            <p className="text-sm text-slate-600 dark:text-zinc-400 max-w-xl mx-auto">
-              {speakingCfg.disableAiTts
-                ? 'Cho phép Micro và nói thử để kiểm tra âm lượng. File câu hỏi của giáo viên sẽ tự phát; với câu không có file, hãy đọc nội dung trên màn hình rồi tự bật Micro.'
-                : 'Cho phép Micro và nói thử để kiểm tra âm lượng. Khi bắt đầu, giám khảo sẽ đọc từng câu hỏi; sau khi đọc xong, hệ thống đếm 3 giây rồi tự bật ghi âm.'}
+            <p className="text-xs font-extrabold uppercase tracking-wider text-[#0F766E] dark:text-teal-300">Speaking</p>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-zinc-100">
+              {recordedCount > 0
+                ? `Tiếp tục từ Câu ${Math.min(questions.length, safeIdx + 1)} (Đã lưu ${recordedCount}/${questions.length} câu)`
+                : 'Kiểm tra Micro trước khi nói'}
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-zinc-400 max-w-md mx-auto">
+              {recordedCount > 0
+                ? 'Các câu bạn đã nói trước đó đã được lưu lại. Bật lại Micro để tiếp tục câu kế tiếp.'
+                : 'Cho phép Micro và nói thử để kiểm tra âm lượng trước khi bắt đầu.'}
             </p>
           </div>
 
@@ -700,7 +816,7 @@ export default function IntegratedSpeakingSection({
               onClick={beginSpeakingSection}
               className="px-5 py-2.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-extrabold disabled:opacity-50"
             >
-              Bắt đầu phần Speaking
+              {recordedCount > 0 ? `Tiếp tục Câu ${Math.min(questions.length, safeIdx + 1)}` : 'Bắt đầu phần Speaking'}
             </button>
           </div>
         </section>
@@ -716,15 +832,13 @@ export default function IntegratedSpeakingSection({
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 px-2.5 py-0.5 rounded-md mb-1.5">
-            <Mic className="w-3.5 h-3.5" /> Phần 4/4 · Speaking Thực Chiến
+            <Mic className="w-3.5 h-3.5" /> Phần 4/4 · Speaking
           </span>
           <h2 className="text-lg font-extrabold text-slate-900 dark:text-zinc-100">
-            Ghi Âm Trả Lời Speaking Trực Tiếp Trong Phòng Thi
+            Speaking Trực Tiếp
           </h2>
-          <p className="text-sm text-slate-600 dark:text-zinc-400 mt-0.5">
-            {autoExaminerMode
-              ? 'Giám khảo tự đọc câu hỏi; sau 3 giây hệ thống bật Micro. Bài làm sẽ được gửi cho Ms. Như kiểm tra sau khi bạn nộp bài.'
-              : 'Trả lời lần lượt các câu hỏi bên dưới. Toàn bộ bài làm 4 kỹ năng (Listening, Reading, Writing & Speaking) sẽ được gửi cho Ms. Như kiểm tra & trả điểm sau khi bạn bấm Nộp Bài.'}
+          <p className="text-xs text-slate-600 dark:text-zinc-400 mt-0.5">
+            Nghe câu hỏi và trả lời lần lượt. Dừng ghi âm sẽ tự lưu và chuyển sang câu tiếp theo.
           </p>
         </div>
         <div className="shrink-0 flex items-center gap-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 px-3.5 py-2 rounded-lg">
@@ -740,56 +854,39 @@ export default function IntegratedSpeakingSection({
         </div>
       </div>
 
-      {/* Question Navigator Pills (Locked sequential progress bar in Thực Chiến / Mock Test) */}
-      <div className="space-y-1.5">
-        {autoExaminerMode && (
-          <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
-            <Lock className="w-3 h-3 text-amber-500 shrink-0" />
-            <span>Chế độ Thi Thật / Mock Test: Khóa chuyển câu — thí sinh nghe và trả lời lần lượt từng câu (không thể quay lại hay bỏ qua).</span>
-          </p>
-        )}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {questions.map((q, idx) => {
-            const isDone = Boolean(recordingsMap[q.id]?.blob || recordingsMap[q.id]?.audioUrl);
-            const isActive = idx === safeIdx;
-            const isLockedPill = Boolean(autoExaminerMode);
-            return (
-              <button
-                key={q.id}
-                type="button"
-                data-testid={`speaking-nav-pill-${idx}`}
-                disabled={isLockedPill}
-                onClick={() => {
-                  if (isLockedPill) return;
-                  goQuestion(idx);
-                }}
-                title={
-                  isLockedPill
-                    ? isActive
-                      ? 'Câu hỏi đang thực hiện'
-                      : isDone
-                      ? 'Đã hoàn thành — Thi thật không cho quay lại'
-                      : 'Khóa — phải trả lời lần lượt từng câu'
-                    : `Chuyển tới Câu ${idx + 1}`
-                }
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
-                  isActive
-                    ? 'bg-[#0F766E] text-white border-[#0F766E] shadow-xs'
-                    : isDone
-                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                    : 'bg-white dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 border-slate-200 dark:border-zinc-800'
-                } ${isLockedPill ? 'cursor-not-allowed opacity-90' : 'hover:bg-slate-50 dark:hover:bg-zinc-800'}`}
-              >
-                <span>P{q.part} · Câu {idx + 1}</span>
-                {isDone ? (
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                ) : isLockedPill && !isActive ? (
-                  <Lock className="w-3 h-3 opacity-60" />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
+      {/* Question Navigator Pills */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {questions.map((q, idx) => {
+          const isDone = isRecordingComplete(recordingsMap[q.id]);
+          const isActive = idx === safeIdx;
+          const isLockedPill = Boolean(autoExaminerMode);
+          return (
+            <button
+              key={q.id}
+              type="button"
+              data-testid={`speaking-nav-pill-${idx}`}
+              disabled={isLockedPill}
+              onClick={() => {
+                if (isLockedPill) return;
+                goQuestion(idx);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
+                isActive
+                  ? 'bg-[#0F766E] text-white border-[#0F766E] shadow-xs'
+                  : isDone
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                  : 'bg-white dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 border-slate-200 dark:border-zinc-800'
+              } ${isLockedPill ? 'cursor-not-allowed opacity-90' : 'hover:bg-slate-50 dark:hover:bg-zinc-800'}`}
+            >
+              <span>P{q.part} · Câu {idx + 1}</span>
+              {isDone ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : isLockedPill && !isActive ? (
+                <Lock className="w-3 h-3 opacity-60" />
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Active Question Card */}
@@ -841,12 +938,12 @@ export default function IntegratedSpeakingSection({
             <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-zinc-100 leading-snug mt-2">
               {autoExaminerMode
                 ? (isSpeakingPrompt
-                    ? '🎧 Giám khảo AI đang đọc câu hỏi — Hãy tập trung lắng nghe!'
+                    ? '🎧 Đang đọc câu hỏi...'
                     : autoRecordCountdown !== null
-                    ? `🎙️ Tự động ghi âm sau ${autoRecordCountdown} giây...`
-                    : currentRec
-                    ? '🔒 Đã hoàn thành ghi âm câu hỏi này (Thực Chiến không cho phép ghi âm lại).'
-                    : '🎧 Chế độ Thực Chiến: Câu hỏi được ẩn — chỉ nghe Giám khảo AI đọc và tự ghi âm sau 3 giây.')
+                    ? `🎙️ Tự ghi âm sau ${autoRecordCountdown}s...`
+                    : isRecordingComplete(currentRec)
+                    ? '✅ Đã ghi âm xong'
+                    : '🎧 Nghe câu hỏi và trả lời')
                 : currentQ.prompt}
             </h3>
           </div>
@@ -1022,10 +1119,10 @@ export default function IntegratedSpeakingSection({
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               {!isRecording ? (
-                autoExaminerMode && currentRec ? (
+                autoExaminerMode && isRecordingComplete(currentRec) ? (
                   <span className="px-4 py-2.5 rounded-lg bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs sm:text-sm font-bold inline-flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Đã Ghi Âm (Thực Chiến chỉ 1 lượt — không thu lại)
+                    Đã ghi âm xong
                   </span>
                 ) : (
                   <button
@@ -1074,11 +1171,11 @@ export default function IntegratedSpeakingSection({
             </div>
           )}
 
-          {currentRec?.previewUrl && !isRecording && (
+          {(currentRec?.previewUrl || currentRec?.audioUrl) && !isRecording && (
             <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                  Nghe lại bản ghi của bạn:
+                  Nghe lại bản ghi:
                 </span>
                 {!autoExaminerMode && (
                   <button
@@ -1093,7 +1190,7 @@ export default function IntegratedSpeakingSection({
                   </button>
                 )}
               </div>
-              <audio controls src={currentRec.previewUrl} className="w-full h-9" />
+              <audio controls src={currentRec.previewUrl || currentRec.audioUrl} className="w-full h-9" />
               {currentRec.transcript && (
                 <p className="text-xs text-slate-500 dark:text-zinc-400">
                   Transcript: {currentRec.transcript}
@@ -1102,53 +1199,42 @@ export default function IntegratedSpeakingSection({
             </div>
           )}
 
-          {!currentRec && !isRecording && (
+          {!isRecordingComplete(currentRec) && !isRecording && (
             <p className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
-              <MicOff className="w-3.5 h-3.5" /> Chưa có bản ghi âm cho câu hỏi này. Bấm &quot;Bắt Đầu Ghi Âm&quot; để trả lời.
+              <MicOff className="w-3.5 h-3.5" /> Chưa ghi âm câu này.
             </p>
           )}
         </div>
 
-        {/* Prev / Next Navigation (Strict forward-only after recording in Thực Chiến / Mock Test) */}
+        {/* Prev / Next Navigation */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-zinc-800">
           {autoExaminerMode ? (
-            <span className="px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-[11px] font-bold text-slate-500 dark:text-zinc-400 inline-flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-amber-500" /> Thi thật không quay lại câu cũ
+            <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">
+              Câu {safeIdx + 1} / {questions.length}
             </span>
           ) : (
-            <button
-              type="button"
-              disabled={safeIdx === 0}
-              onClick={() => goQuestion(safeIdx - 1)}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-700 dark:text-zinc-200 disabled:opacity-40 flex items-center gap-1 transition"
-            >
-              <ChevronLeft className="w-4 h-4" /> Câu Trước
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={safeIdx === 0}
+                onClick={() => goQuestion(safeIdx - 1)}
+                className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-700 dark:text-zinc-200 disabled:opacity-40 flex items-center gap-1 transition"
+              >
+                <ChevronLeft className="w-4 h-4" /> Câu Trước
+              </button>
+              <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">
+                Câu {safeIdx + 1} / {questions.length}
+              </span>
+            </>
           )}
-          <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">
-            Câu {safeIdx + 1} / {questions.length}
-          </span>
           <button
             type="button"
             data-testid="speaking-next-question-btn"
-            disabled={safeIdx >= questions.length - 1 || (autoExaminerMode && (!currentRec || isRecording || isSpeakingPrompt))}
+            disabled={safeIdx >= questions.length - 1 || (autoExaminerMode && (!isRecordingComplete(currentRec) || isRecording || isSpeakingPrompt))}
             onClick={() => goQuestion(safeIdx + 1)}
-            title={
-              autoExaminerMode && !currentRec
-                ? 'Hãy hoàn thành ghi âm câu hiện tại trước khi sang câu tiếp theo'
-                : 'Sang câu tiếp theo'
-            }
             className="px-3.5 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition"
           >
-            {autoExaminerMode && !currentRec && safeIdx < questions.length - 1 ? (
-              <>
-                <Lock className="w-3.5 h-3.5" /> Trả lời xong mới qua câu sau
-              </>
-            ) : (
-              <>
-                Câu Tiếp Theo <ChevronRight className="w-4 h-4" />
-              </>
-            )}
+            Câu Tiếp Theo <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>

@@ -123,8 +123,16 @@ export default function ExamMode({
   const [showSubmitLockedModal, setShowSubmitLockedModal] = useState(false);
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [earlyNextConfirmOpen, setEarlyNextConfirmOpen] = useState(false);
-  const [speakingRecordingsMap, setSpeakingRecordingsMap] = useState({});
-  const [speakingNotes, setSpeakingNotes] = useState({});
+  const [speakingRecordingsMap, setSpeakingRecordingsMap] = useState(() =>
+    examState?.speakingRecordings && typeof examState.speakingRecordings === 'object'
+      ? examState.speakingRecordings
+      : {}
+  );
+  const [speakingNotes, setSpeakingNotes] = useState(() =>
+    examState?.speakingNotes && typeof examState.speakingNotes === 'object'
+      ? examState.speakingNotes
+      : {}
+  );
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
 
   const blankInputRefs = useRef({});
@@ -185,7 +193,7 @@ export default function ExamMode({
       ? 1
       : 0;
   const speakingRecordedCount = Object.values(speakingRecordingsMap).filter(
-    r => Boolean(r?.blob || r?.audioUrl)
+    r => Boolean(r?.blob || r?.audioUrl || r?.recorded)
   ).length;
   const hasSpeakingSection = cfg.order.includes('speaking');
 
@@ -1370,21 +1378,60 @@ export default function ExamMode({
           <IntegratedSpeakingSection
             autoExaminerMode={cfg.testMode === 'full_exam' && ['real_exam', 'periodic_mock'].includes(cfg.examCategory)}
             candidateName={currentUser?.name || ''}
+            initialQuestionIdx={Number(examState.speakingCurrentIdx) || 0}
             test={activeTest}
             recordingsMap={speakingRecordingsMap}
             speakingNotes={speakingNotes}
-            onUpdateRecording={(qId, recData) =>
-              setSpeakingRecordingsMap(prev => ({
+            onQuestionIndexChange={nextIdx =>
+              setExamState(prev => ({
                 ...prev,
-                [qId]: recData
+                speakingCurrentIdx: nextIdx
               }))
             }
-            onSpeakingNotesChange={(qId, text) =>
+            onUpdateRecording={(qId, recData) => {
+              setSpeakingRecordingsMap(prev => {
+                const merged = { ...(prev[qId] || {}), ...recData };
+                return { ...prev, [qId]: merged };
+              });
+              setExamState(prev => {
+                const prevMap =
+                  prev.speakingRecordings && typeof prev.speakingRecordings === 'object'
+                    ? prev.speakingRecordings
+                    : {};
+                const prevEntry = prevMap[qId] || {};
+                const cleanEntry = {
+                  questionId: recData.questionId || prevEntry.questionId || qId,
+                  part: recData.part || prevEntry.part || 1,
+                  prompt: String(recData.prompt ?? prevEntry.prompt ?? ''),
+                  audioUrl: String(recData.audioUrl || prevEntry.audioUrl || ''),
+                  audioId: String(recData.audioId || prevEntry.audioId || ''),
+                  durationSec: Math.max(0, Number(recData.durationSec ?? prevEntry.durationSec) || 0),
+                  transcript: String(recData.transcript ?? prevEntry.transcript ?? ''),
+                  recorded: true,
+                  savedAt: recData.savedAt || Date.now()
+                };
+                return {
+                  ...prev,
+                  speakingRecordings: {
+                    ...prevMap,
+                    [qId]: cleanEntry
+                  }
+                };
+              });
+            }}
+            onSpeakingNotesChange={(qId, text) => {
               setSpeakingNotes(prev => ({
                 ...prev,
                 [qId]: text
-              }))
-            }
+              }));
+              setExamState(prev => ({
+                ...prev,
+                speakingNotes: {
+                  ...(prev.speakingNotes || {}),
+                  [qId]: text
+                }
+              }));
+            }}
           />
         )}
 

@@ -44,11 +44,16 @@ export function buildInitialExamState(test = null) {
     showAllReadingQs: false,
     readingQuestionViewMode: false,
     writingTaskIdx: cfg.writingTaskScope === 'task2' ? 1 : 0,
+    speakingRecordings: {},
+    speakingNotes: {},
+    speakingCurrentIdx: 0,
     startedAt: '',
     startedAtMs: null,
     accumulatedSeconds: 0
   };
 }
+
+const VALID_EXAM_SKILLS = ['listening', 'reading', 'writing', 'speaking'];
 
 export function loadExamDraft(username, testId, testsList = []) {
   if (!testId) return null;
@@ -58,14 +63,19 @@ export function loadExamDraft(username, testId, testsList = []) {
     const parsed = JSON.parse(raw);
     const activeTest = Array.isArray(testsList) ? testsList.find(t => t.id === testId) : null;
     const cfg = normalizeExamConfig(activeTest);
-    if (!parsed || typeof parsed !== 'object' || !cfg.order.includes(parsed.skill)) {
+    // When testsList is still hydrating on F5 reload, allow all 4 IELTS skills (including speaking)
+    // so a Speaking draft is never discarded and overwritten before tests sync arrives.
+    const validOrder = activeTest ? cfg.order : VALID_EXAM_SKILLS;
+    if (!parsed || typeof parsed !== 'object' || !validOrder.includes(parsed.skill)) {
       return null;
     }
 
-    const validIdx = Math.max(0, cfg.order.indexOf(parsed.skill));
-    const restoredSkill = cfg.order[validIdx];
+    const validIdx = activeTest
+      ? Math.max(0, cfg.order.indexOf(parsed.skill))
+      : Math.max(0, typeof parsed.sectionIdx === 'number' ? parsed.sectionIdx : validOrder.indexOf(parsed.skill));
+    const restoredSkill = activeTest ? cfg.order[validIdx] : parsed.skill;
     const restoredVisited = Array.isArray(parsed.visitedSkills)
-      ? Array.from(new Set([...parsed.visitedSkills.filter(s => cfg.order.includes(s)), restoredSkill]))
+      ? Array.from(new Set([...parsed.visitedSkills.filter(s => validOrder.includes(s)), restoredSkill]))
       : [restoredSkill];
 
     return {
@@ -99,6 +109,15 @@ export function loadExamDraft(username, testId, testsList = []) {
           ? parsed.showAllReadingQs
           : false,
       writingTaskIdx: Number(parsed.writingTaskIdx) === 1 ? 1 : 0,
+      speakingRecordings:
+        parsed.speakingRecordings && typeof parsed.speakingRecordings === 'object'
+          ? parsed.speakingRecordings
+          : {},
+      speakingNotes:
+        parsed.speakingNotes && typeof parsed.speakingNotes === 'object'
+          ? parsed.speakingNotes
+          : {},
+      speakingCurrentIdx: Math.max(0, Number(parsed.speakingCurrentIdx) || 0),
       startedAt: typeof parsed.startedAt === 'string' ? parsed.startedAt : '',
       startedAtMs: Number(parsed.startedAtMs) > 0 ? Number(parsed.startedAtMs) : null,
       accumulatedSeconds: Math.max(0, Number(parsed.accumulatedSeconds) || 0)
@@ -111,10 +130,30 @@ export function loadExamDraft(username, testId, testsList = []) {
 export function saveExamDraft(username, testId, examState) {
   if (!testId || !examState) return;
   try {
+    // Strip non-serializable Blob / ephemeral blob: URLs from speakingRecordings while preserving uploaded audioUrl & metadata
+    let cleanSpeakingRecordings = undefined;
+    if (examState.speakingRecordings && typeof examState.speakingRecordings === 'object') {
+      cleanSpeakingRecordings = {};
+      Object.entries(examState.speakingRecordings).forEach(([qId, rec]) => {
+        if (!rec || typeof rec !== 'object') return;
+        cleanSpeakingRecordings[qId] = {
+          questionId: rec.questionId || qId,
+          part: rec.part || 1,
+          prompt: String(rec.prompt || ''),
+          audioUrl: String(rec.audioUrl || ''),
+          audioId: String(rec.audioId || ''),
+          durationSec: Math.max(0, Number(rec.durationSec) || 0),
+          transcript: String(rec.transcript || ''),
+          recorded: true,
+          savedAt: rec.savedAt || Date.now()
+        };
+      });
+    }
     localStorage.setItem(
       getExamDraftKey(username, testId),
       JSON.stringify({
         ...examState,
+        ...(cleanSpeakingRecordings ? { speakingRecordings: cleanSpeakingRecordings } : {}),
         savedAt: Date.now()
       })
     );
