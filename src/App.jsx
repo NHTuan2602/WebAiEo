@@ -97,7 +97,7 @@ import {
   saveBuilderDraft,
   clearBuilderDraft
 } from './utils/sessionPersistence';
-import { useExamAntiCheat } from './hooks/useExamAntiCheat';
+import { exitExamFullscreen, requestExamFullscreen, useExamAntiCheat } from './hooks/useExamAntiCheat';
 import Navbar from './components/common/Navbar';
 import ServerMaintenanceOverlay from './components/common/ServerMaintenanceOverlay';
 import GlobalModals from './components/modals/GlobalModals';
@@ -3949,9 +3949,18 @@ export default function App() {
   const activeExamCfgForAntiCheat = normalizeExamConfig(activeExamTestForAntiCheat);
   const isExamAntiCheatEnabled =
     view === 'EXAM_MODE' && activeExamCfgForAntiCheat.antiCheatEnabled;
+  const shouldEnforceExamFullscreen =
+    isExamAntiCheatEnabled && currentUser?.role !== 'teacher';
 
-  const { recordInternalCopy } = useExamAntiCheat({
+  const {
+    recordInternalCopy,
+    fullscreenRequiredLock,
+    fullscreenExitCount,
+    isWindowBlurred,
+    enterFullscreen: enterExamFullscreen
+  } = useExamAntiCheat({
     enabled: isExamAntiCheatEnabled,
+    enforceFullscreen: shouldEnforceExamFullscreen,
     allowInternalCopyPaste: activeExamCfgForAntiCheat.allowInternalCopyPaste,
     setExamState,
     showToast
@@ -4452,6 +4461,9 @@ export default function App() {
         accumulatedSeconds: 0
       });
     }
+    if (cfg.antiCheatEnabled && currentUser?.role !== 'teacher') {
+      requestExamFullscreen();
+    }
     setView('EXAM_MODE');
   };
 
@@ -4490,6 +4502,7 @@ export default function App() {
       return;
     }
     stopExamAudio();
+    exitExamFullscreen();
     setShowSubmitConfirmModal(false);
     const exitingTestId = selectedTestId;
     if (isTeacher && exitingTestId) {
@@ -4591,6 +4604,7 @@ export default function App() {
   const handleFinalExamSubmit = async (speakingRecordingsMap = null) => {
     if (examSubmitLockRef.current) return;
     stopExamAudio();
+    exitExamFullscreen();
     setShowSubmitConfirmModal(false);
     const activeTest = tests.find(t => t.id === selectedTestId);
     if (!activeTest) return;
@@ -8473,11 +8487,15 @@ export default function App() {
           audioProgress={audioProgress}
           currentUser={currentUser}
           darkMode={darkMode}
+          enterExamFullscreen={enterExamFullscreen}
           examState={examState}
+          fullscreenExitCount={fullscreenExitCount}
+          fullscreenRequiredLock={fullscreenRequiredLock}
           handleFinalExamSubmit={handleFinalExamSubmit}
           handlePassageTextSelect={handlePassageTextSelect}
           handlePlayListeningAudio={handlePlayListeningAudio}
           isPlayingAudio={isPlayingAudio}
+          isWindowBlurred={isWindowBlurred}
           onCopyInternalText={handleCopyInternalExamText}
           onDismissSelectionToolbar={dismissSelectionToolbar}
           onExitExam={handleExitExamMode}

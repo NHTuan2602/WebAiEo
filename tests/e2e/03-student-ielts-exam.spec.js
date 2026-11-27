@@ -32,7 +32,8 @@ test.describe('3. Student IELTS Exam Flow (StudentHome -> ExamMode -> ResultView
       .getByRole('button', { name: /Bắt Đầu Thi 4 Kỹ Năng|Tiếp Tục Bài Đang Làm/i })
       .click();
 
-    // Confirm ExamMode loaded on Listening
+    // Confirm ExamMode auto-entered fullscreen cleanly on startExam click
+    await expect(page.getByTestId('exam-fullscreen-lock-overlay')).toHaveCount(0, { timeout: 6_000 });
     await expect(page.getByRole('button', { name: /Nộp/i }).first()).toBeVisible();
     await assertNoHorizontalOverflow(page, 'ExamMode-Listening');
 
@@ -75,9 +76,20 @@ test.describe('3. Student IELTS Exam Flow (StudentHome -> ExamMode -> ResultView
     await page.locator('input[aria-label="Câu 2"]').first().fill('camel');
 
     // 4. Test Anti-Cheat (useExamAntiCheat.js):
-    // 4a. Right-click blocked toast
+    // 4a. Right-click blocked toast & F11 blocked
     await page.locator('[data-exam-copy-source="true"]').first().click({ button: 'right' });
     await expect(page.getByText(/Chức năng chuột phải đã bị khóa trong khi thi/i)).toBeVisible();
+    await page.keyboard.press('F11');
+
+    // 4a-2. Exiting fullscreen must immediately trigger the Fullscreen Lock Privacy Shield & re-entering unlocks it
+    await page.evaluate(async () => {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    });
+    await expect(page.getByTestId('exam-fullscreen-lock-overlay')).toBeVisible({ timeout: 6_000 });
+    await page.getByTestId('enter-exam-fullscreen-btn').click();
+    await expect(page.getByTestId('exam-fullscreen-lock-overlay')).toHaveCount(0, { timeout: 6_000 });
 
     // 4b. Simulate tab switch / visibilitychange -> hidden -> visible
     await page.evaluate(() => {

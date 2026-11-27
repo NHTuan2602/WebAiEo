@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Chỉ nhận diện nhóm tiện ích hỗ trợ Copy/Paste hoặc mở khóa chuột phải
+// Nhận diện tiện ích mở khóa Copy/Paste, chuột phải và tiện ích Dịch / Từ điển (Google Dịch, Cốc Cốc, DeepL...)
 const COPY_PASTE_EXTENSION_SIGNATURES = [
   {
     key: 'ext-rightclick-copy',
@@ -17,8 +17,97 @@ const COPY_PASTE_EXTENSION_SIGNATURES = [
       '[data-supercopy]'
     ].join(', '),
     label: 'Tiện ích Mở Khóa Chuột Phải / Hỗ trợ Copy-Paste'
+  },
+  {
+    key: 'ext-translate-dict',
+    selector: [
+      '#gtx-trans',
+      '.gtx-bubble',
+      '.goog-te-banner-frame',
+      '.goog-te-menu-frame',
+      '.skiptranslate',
+      'html.translated-ltr',
+      'html.translated-rtl',
+      '[id*="coccoc" i][id*="dict" i]',
+      '[class*="coccoc" i][class*="dict" i]',
+      '[id*="deepl" i]',
+      '[class*="deepl-popover" i]',
+      '[id*="laban" i]',
+      '[id*="translate-tooltip" i]',
+      '[class*="translate-popup" i]'
+    ].join(', '),
+    label: 'Tiện ích Google Dịch / Từ điển Cốc Cốc / DeepL'
   }
 ];
+
+export const isDocumentInFullscreen = () => {
+  if (typeof document === 'undefined') return false;
+  return Boolean(
+    document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+  );
+};
+
+export const isFullscreenApiSupported = () => {
+  if (typeof document === 'undefined') return false;
+  const el = document.documentElement;
+  return Boolean(
+    el &&
+      (typeof el.requestFullscreen === 'function' ||
+        typeof el.webkitRequestFullscreen === 'function' ||
+        typeof el.mozRequestFullScreen === 'function' ||
+        typeof el.msRequestFullscreen === 'function')
+  );
+};
+
+export const requestExamFullscreen = async () => {
+  if (typeof document === 'undefined') return false;
+  const el = document.documentElement;
+  if (!el) return false;
+  try {
+    if (!isDocumentInFullscreen()) {
+      const fn =
+        el.requestFullscreen ||
+        el.webkitRequestFullscreen ||
+        el.mozRequestFullScreen ||
+        el.msRequestFullscreen;
+      if (typeof fn === 'function') {
+        await fn.call(el);
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.keyboard && typeof navigator.keyboard.lock === 'function') {
+      try {
+        await navigator.keyboard.lock(['Escape', 'F11']);
+      } catch (_lockErr) {
+        // Keyboard Lock API optional on non-Chromium browsers
+      }
+    }
+    return isDocumentInFullscreen();
+  } catch (_err) {
+    return isDocumentInFullscreen();
+  }
+};
+
+export const exitExamFullscreen = async () => {
+  if (typeof navigator !== 'undefined' && navigator.keyboard && typeof navigator.keyboard.unlock === 'function') {
+    try {
+      navigator.keyboard.unlock();
+    } catch (_err) {}
+  }
+  if (typeof document === 'undefined' || !isDocumentInFullscreen()) return;
+  try {
+    const fn =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.mozCancelFullScreen ||
+      document.msExitFullscreen;
+    if (typeof fn === 'function') {
+      await fn.call(document);
+    }
+  } catch (_err) {}
+};
 
 const isNativeFn = (fn) =>
   typeof fn === 'function' && Function.prototype.toString.call(fn).includes('[native code]');
@@ -131,16 +220,37 @@ const extractSelectedTextForClipboard = () => {
   };
 };
 
-export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setExamState, showToast }) {
+export function useExamAntiCheat({
+  enabled,
+  enforceFullscreen = false,
+  allowInternalCopyPaste = true,
+  setExamState,
+  showToast
+}) {
   const antiCheatToastRef = useRef(null);
   const setExamStateRef = useRef(null);
   const internalClipboardRef = useRef('');
   const lastValidInternalPasteAtRef = useRef(0);
+  const hadEnteredFullscreenRef = useRef(false);
+  const [isFullscreen, setIsFullscreen] = useState(() => isDocumentInFullscreen());
+  const [fullscreenGracePending, setFullscreenGracePending] = useState(false);
+  const [fullscreenExitCount, setFullscreenExitCount] = useState(0);
+  const [isWindowBlurred, setIsWindowBlurred] = useState(false);
 
   useEffect(() => {
     antiCheatToastRef.current = showToast;
     setExamStateRef.current = setExamState;
   });
+
+  const enterFullscreen = useCallback(async () => {
+    const ok = await requestExamFullscreen();
+    if (ok) {
+      hadEnteredFullscreenRef.current = true;
+      setIsFullscreen(true);
+      setIsWindowBlurred(false);
+    }
+    return ok;
+  }, []);
 
   const recordInternalCopy = useCallback(async (rawText) => {
     const clean = normalizeInternalClipboardText(rawText);
@@ -157,7 +267,35 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      hadEnteredFullscreenRef.current = false;
+      setFullscreenGracePending(false);
+      setIsWindowBlurred(false);
+      return;
+    }
+
+    const fsSupported = isFullscreenApiSupported();
+    const initialFs = isDocumentInFullscreen();
+    if (initialFs) {
+      hadEnteredFullscreenRef.current = true;
+      setFullscreenGracePending(false);
+      if (typeof navigator !== 'undefined' && navigator.keyboard && typeof navigator.keyboard.lock === 'function') {
+        navigator.keyboard.lock(['Escape', 'F11']).catch(() => {});
+      }
+    } else if (enforceFullscreen && fsSupported) {
+      // Brief grace window while startExam's requestFullscreen() promise settles (zero flicker)
+      setFullscreenGracePending(true);
+    }
+    setIsFullscreen(initialFs);
+    setFullscreenExitCount(0);
+    setIsWindowBlurred(false);
+
+    const fsGraceTimer =
+      !initialFs && enforceFullscreen && fsSupported
+        ? setTimeout(() => {
+            setFullscreenGracePending(false);
+          }, 450)
+        : null;
 
     const seenSignatures = new Map();
     const pendingTimers = new Set();
@@ -221,6 +359,30 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       if (!document.hidden && document.hasFocus()) {
         awayAlreadyRecorded = false;
         unfocusedStreak = 0;
+        setIsWindowBlurred(false);
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      const nowFs = isDocumentInFullscreen();
+      setIsFullscreen(nowFs);
+      setFullscreenGracePending(false);
+      if (nowFs) {
+        hadEnteredFullscreenRef.current = true;
+        setIsWindowBlurred(false);
+        if (typeof navigator !== 'undefined' && navigator.keyboard && typeof navigator.keyboard.lock === 'function') {
+          navigator.keyboard.lock(['Escape', 'F11']).catch(() => {});
+        }
+      } else if (enforceFullscreen && hadEnteredFullscreenRef.current) {
+        setFullscreenExitCount(c => c + 1);
+        notifyRestricted('⚠️ Bạn vừa thoát chế độ Toàn Màn Hình! Hệ thống đã khóa đề và ghi nhận vi phạm.');
+        recordViolation('Thoát chế độ Toàn Màn Hình trong lúc thi (Đã che mờ đề & yêu cầu vào lại)', {
+          countTabSwitch: true,
+          category: 'fullscreen',
+          severity: 'high',
+          dedupKey: 'exit-fullscreen',
+          cooldownMs: 1500
+        });
       }
     };
 
@@ -233,10 +395,11 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       }
       blurConfirmTimer = trackTimer(() => {
         blurConfirmTimer = null;
-        if (awayAlreadyRecorded) return;
         if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+          if (enforceFullscreen) setIsWindowBlurred(true);
+          if (awayAlreadyRecorded) return;
           awayAlreadyRecorded = true;
-          recordViolation('Rời khỏi màn hình làm bài (Mất focus cửa sổ)', {
+          recordViolation('Rời khỏi màn hình làm bài (Mất focus cửa sổ / Mở ứng dụng khác)', {
             countTabSwitch: true,
             category: 'focus',
             severity: 'medium'
@@ -247,6 +410,7 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
 
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
+        if (enforceFullscreen) setIsWindowBlurred(true);
         if (awayAlreadyRecorded) return;
         awayAlreadyRecorded = true;
         recordViolation('Rời khỏi màn hình làm bài (Chuyển tab / Ẩn trình duyệt)', {
@@ -348,12 +512,31 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       const keyLower = (e.key || '').toLowerCase();
       const hasMod = e.ctrlKey || e.metaKey;
       const isCopyCutPasteKey = hasMod && ['c', 'v', 'x'].includes(keyLower);
+      const isFullscreenExitOrNavKey =
+        e.key === 'F11' ||
+        (enforceFullscreen && e.key === 'Escape' && isDocumentInFullscreen()) ||
+        (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) ||
+        (hasMod && ['t', 'n', 'w', 'l', 'k', 'tab'].includes(keyLower));
       const isDevToolsOrSource =
         e.key === 'F12' ||
         (hasMod && e.shiftKey && ['i', 'j', 'c'].includes(keyLower)) ||
         (hasMod && keyLower === 'u');
 
-      if (!isCopyCutPasteKey && !isDevToolsOrSource) return;
+      if (!isCopyCutPasteKey && !isDevToolsOrSource && !isFullscreenExitOrNavKey) return;
+
+      if (isFullscreenExitOrNavKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        notifyRestricted('Phím thoát Toàn Màn Hình / chuyển tab đã bị khóa trong khi thi!');
+        recordViolation(`Thử bấm phím ${e.key} để thoát toàn màn hình / chuyển cửa sổ (Đã chặn)`, {
+          category: 'fullscreen',
+          severity: 'high',
+          dedupKey: `key-fs-${e.key}`,
+          cooldownMs: 2500
+        });
+        return;
+      }
 
       if (allowInternalCopyPaste && isCopyCutPasteKey && !e.shiftKey) {
         if (keyLower === 'v') {
@@ -543,6 +726,8 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('focus', markReturnedToExam);
     document.addEventListener('visibilitychange', handleVisibility);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     window.addEventListener('contextmenu', handleContextMenuCapture, true);
     document.addEventListener('contextmenu', handleContextMenuCapture, true);
     window.addEventListener('copy', handleClipboardCapture, true);
@@ -553,6 +738,7 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
     window.addEventListener('resize', handleWindowResizeDetectSidePanel);
 
     return () => {
+      if (fsGraceTimer) clearTimeout(fsGraceTimer);
       clearInterval(heartbeatTimer);
       pendingTimers.forEach(id => clearTimeout(id));
       pendingTimers.clear();
@@ -560,6 +746,8 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('focus', markReturnedToExam);
       document.removeEventListener('visibilitychange', handleVisibility);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       window.removeEventListener('contextmenu', handleContextMenuCapture, true);
       document.removeEventListener('contextmenu', handleContextMenuCapture, true);
       window.removeEventListener('copy', handleClipboardCapture, true);
@@ -568,8 +756,23 @@ export function useExamAntiCheat({ enabled, allowInternalCopyPaste = true, setEx
       window.removeEventListener('beforeinput', handleBeforeInputCapture, true);
       window.removeEventListener('keydown', handleKeyDownCapture, true);
       window.removeEventListener('resize', handleWindowResizeDetectSidePanel);
+      if (fsSupported && enforceFullscreen) {
+        exitExamFullscreen();
+      }
     };
-  }, [enabled, allowInternalCopyPaste]);
+  }, [enabled, enforceFullscreen, allowInternalCopyPaste]);
 
-  return { recordInternalCopy };
+  const fullscreenRequiredLock = Boolean(
+    enabled && enforceFullscreen && isFullscreenApiSupported() && !isFullscreen && !fullscreenGracePending
+  );
+
+  return {
+    recordInternalCopy,
+    isFullscreen,
+    fullscreenRequiredLock,
+    fullscreenExitCount,
+    isWindowBlurred: Boolean(enabled && enforceFullscreen && isWindowBlurred),
+    enterFullscreen,
+    exitFullscreen: exitExamFullscreen
+  };
 }

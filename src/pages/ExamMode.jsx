@@ -13,6 +13,7 @@ import {
   Headphones,
   Lock,
   LogOut,
+  Maximize2,
   Menu,
   MessageSquare,
   Mic,
@@ -20,6 +21,7 @@ import {
   PenTool,
   Play,
   Send,
+  ShieldAlert,
   Sun,
   Type,
   Volume2,
@@ -67,11 +69,15 @@ export default function ExamMode({
   audioProgress = { currentTime: 0, duration: 0 },
   currentUser,
   darkMode,
+  enterExamFullscreen = null,
   examState,
+  fullscreenExitCount = 0,
+  fullscreenRequiredLock = false,
   handleFinalExamSubmit,
   handlePassageTextSelect,
   handlePlayListeningAudio,
   isPlayingAudio,
+  isWindowBlurred = false,
   onCopyInternalText,
   onDismissSelectionToolbar,
   onExitExam,
@@ -465,6 +471,61 @@ export default function ExamMode({
       onContextMenu={cfg.antiCheatEnabled ? (e) => e.preventDefault() : undefined}
       className="min-h-screen bg-[#F8FAFC] dark:bg-[#121212] text-[#111827] dark:text-[#F3F4F6] flex flex-col justify-between select-none transition-colors font-exam notranslate"
     >
+      {/* Fullscreen & Focus Lock Privacy Shield (blocks Cốc Cốc / Edge Translate Sidebar & side-by-side windows) */}
+      {(fullscreenRequiredLock || isWindowBlurred) && (
+        <div
+          data-testid="exam-fullscreen-lock-overlay"
+          className="fixed inset-0 z-[130] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-6 select-none"
+        >
+          <div className="max-w-lg w-full rounded-2xl bg-slate-900 border-2 border-amber-500/70 p-6 sm:p-7 text-center space-y-5 shadow-2xl">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border border-amber-400/50 text-amber-400 flex items-center justify-center">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[11px] font-black uppercase tracking-wider">
+                <Lock className="w-3.5 h-3.5" /> Chế Độ Phòng Thi Chống Gian Lận
+              </span>
+              <h2 className="text-lg sm:text-xl font-extrabold text-white">
+                {fullscreenRequiredLock
+                  ? fullscreenExitCount > 0
+                    ? 'Bạn Vừa Thoát Chế Độ Toàn Màn Hình!'
+                    : 'Bắt Buộc Chế Độ Toàn Màn Hình Để Làm Bài Thi'
+                  : 'Bạn Đang Rời Khỏi Cửa Sổ Làm Bài Thi!'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {fullscreenRequiredLock
+                  ? 'Để hạn chế sử dụng Google Dịch / thanh bên trình duyệt (Cốc Cốc, Edge) và các cửa sổ hỗ trợ khác, đề thi đang được che kín cho tới khi bạn bật lại Toàn Màn Hình. Đồng hồ làm bài vẫn đang tiếp tục chạy.'
+                  : 'Hệ thống phát hiện bạn vừa bấm sang cửa sổ hoặc thanh công cụ bên ngoài (Google Dịch / ứng dụng khác). Nội dung đề thi được che mờ cho tới khi bạn quay lại cửa sổ thi.'}
+              </p>
+            </div>
+
+            {(fullscreenExitCount > 0 || (examState.tabSwitchCount || 0) > 0) && (
+              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs font-bold text-rose-200">
+                Hệ thống đã ghi nhận {Math.max(fullscreenExitCount, examState.tabSwitchCount || 0)} lần rời màn hình / thoát toàn màn hình và sẽ gửi kèm báo cáo cho Ms. Như.
+              </div>
+            )}
+
+            <button
+              type="button"
+              data-testid="enter-exam-fullscreen-btn"
+              onClick={() => enterExamFullscreen?.()}
+              className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-[#007A7A] to-emerald-600 hover:from-[#065B5B] hover:to-emerald-700 text-white text-sm font-black inline-flex items-center justify-center gap-2 shadow-lg transition cursor-pointer"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>
+                {fullscreenRequiredLock
+                  ? 'Bật Toàn Màn Hình & Tiếp Tục Làm Bài Ngay'
+                  : 'Quay Lại Phòng Thi Toàn Màn Hình'}
+              </span>
+            </button>
+
+            <p className="text-[11px] text-slate-400">
+              Lưu ý: Phím <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-bold text-slate-200">F11</kbd> và <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-bold text-slate-200">Esc</kbd> đã được khóa trong suốt thời gian làm bài.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Top Computer-Delivered Header (matches Real IELTS bar) */}
       <header className="bg-white dark:bg-[#161616] text-[#111827] dark:text-white px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 border-b border-slate-200 dark:border-[#2C2C2C] sticky top-0 z-50">
         {/* Left: Golden IELTS emblem + Test Title + Minutes Remaining */}
