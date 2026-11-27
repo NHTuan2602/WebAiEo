@@ -6145,12 +6145,32 @@ export default function App() {
     const hasInlineImages = cleanList.some(
       t => typeof t?.writing?.task1?.imageUrl === 'string' && t.writing.task1.imageUrl.startsWith('data:')
     );
-    const chunkSize = hasInlineImages ? 15 : 150;
+    const maxItemsPerChunk = hasInlineImages ? 10 : 150;
+    const maxBytesPerChunk = 4.5 * 1024 * 1024;
+    const chunks = [];
+    let currentChunk = [];
+    let currentBytes = 0;
+
+    for (const item of cleanList) {
+      const approxBytes = JSON.stringify(item).length;
+      if (
+        currentChunk.length > 0 &&
+        (currentChunk.length >= maxItemsPerChunk || currentBytes + approxBytes > maxBytesPerChunk)
+      ) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentBytes = 0;
+      }
+      currentChunk.push(item);
+      currentBytes += approxBytes;
+    }
+    if (currentChunk.length > 0) chunks.push(currentChunk);
+
     let latestServerSnapshot = null;
 
-    for (let i = 0; i < cleanList.length; i += chunkSize) {
-      const chunk = cleanList.slice(i, i + chunkSize);
-      const isLastChunk = i + chunkSize >= cleanList.length;
+    for (let i = 0; i < chunks.length; i += 1) {
+      const chunk = chunks[i];
+      const isLastChunk = i === chunks.length - 1;
       const snap = await dispatchSyncAction('UPSERT_TESTS_BULK', {
         tests: chunk,
         notify: Boolean(notify && isLastChunk),

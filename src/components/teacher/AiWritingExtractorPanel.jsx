@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { extractWritingExamFromMedia } from '../../utils/geminiGrader';
 import { attachAutoCroppedWritingChart, readFileAsDataUrl } from '../../utils/pdfImageCropper';
+import { cleanEnglishTitleFromDocxFilename, extractDocxContent } from '../../utils/wordImportHelpers';
+import { compressVisualDataUrl } from '../../utils/dailyWritingBulkAi';
 
 const MAX_WRITING_PDF_BYTES = 14 * 1024 * 1024;
 
@@ -34,6 +36,7 @@ export default function AiWritingExtractorPanel({
   writingScope = 'both'
 }) {
   const [pdfFile, setPdfFile] = useState(null);
+  const [docxFile, setDocxFile] = useState(null);
   const [images, setImages] = useState([]);
   const [extraInstructions, setExtraInstructions] = useState('');
   const [extracting, setExtracting] = useState(false);
@@ -66,6 +69,17 @@ export default function AiWritingExtractorPanel({
     if (files.length === 0) return;
     setErrorMsg('');
     setLastResult(null);
+
+    const docxCandidate = files.find(
+      f =>
+        f.name?.toLowerCase().endsWith('.docx') ||
+        f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+    if (docxCandidate) {
+      setDocxFile(docxCandidate);
+    } else if (files.some(f => f.name?.toLowerCase().endsWith('.doc'))) {
+      setErrorMsg('File .doc đời cũ chưa được hỗ trợ trực tiếp — hãy mở bằng Word / Google Docs và lưu lại dạng .docx.');
+    }
 
     const pdfCandidate = files.find(f => f.name?.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf');
     if (pdfCandidate) {
@@ -101,12 +115,93 @@ export default function AiWritingExtractorPanel({
   const handleRunExtract = async () => {
     setErrorMsg('');
     setLastResult(null);
-    if (!hasGeminiAccess) {
-      setErrorMsg('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước khi dùng AI.');
+    if (!docxFile && !pdfFile && images.length === 0) {
+      setErrorMsg('Hãy tải lên file Word (.docx), file PDF đề Writing hoặc dán (Ctrl+V) ít nhất 1 ảnh đề Writing.');
       return;
     }
-    if (!pdfFile && images.length === 0) {
-      setErrorMsg('Hãy tải lên file PDF đề Writing hoặc dán (Ctrl+V) ít nhất 1 ảnh đề Writing.');
+
+    // Fast lossless path for Word (.docx) files when no PDF/extra images are combined
+    if (docxFile && !pdfFile && images.length === 0) {
+      setExtracting(true);
+      try {
+        const parsed = await extractDocxContent(docxFile, docxFile.name);
+        const compressedImg = parsed.primaryImageUrl
+          ? await compressVisualDataUrl(parsed.primaryImageUrl, { maxWidth: 1400, quality: 0.88 })
+          : '';
+        const hasText = Boolean((parsed.prompt || parsed.rawText || '').split(/\s+/).filter(Boolean).length >= 6);
+
+        // If Word doc contains only a pasted screenshot image, fall back to Gemini Vision on that image
+        if (!hasText && compressedImg) {
+          if (!hasGeminiAccess) {
+            setErrorMsg('File Word này chỉ chứa hình chụp (không có văn bản). Hãy cấu hình Gemini API Key để AI đọc chữ từ hình.');
+            return;
+          }
+          const rawExtracted = await extractWritingExamFromMedia({
+            apiKey: aiApiKey,
+            pdfDataUrl: '',
+            images: [compressedImg],
+            fileName: docxFile.name,
+            writingScope,
+            extraInstructions
+          });
+          const enriched = await attachAutoCroppedWritingChart(rawExtracted, {
+            pdfFile: null,
+            pdfDataUrl: '',
+            images: [compressedImg]
+          });
+          onApplyWritingExtraction?.(enriched, { writingScope });
+          setLastResult(enriched);
+          showToast?.('AI đã đọc ảnh chụp trong file Word & tự tạo đề Writing!');
+          return;
+        }
+
+        // Check if document contains both Task 1 and Task 2 headers
+        const fullText = parsed.rawText || '';
+        const t2SplitMatch = fullText.match(/(?:^|\n)\s*(?:WRITING\s+)?TASK\s*2\b[:.\-\s]*([\s\S]+)$/i);
+        const task2FromDoc = t2SplitMatch ? t2SplitMatch[1].trim() : '';
+        const task1FromDoc = t2SplitMatch
+          ? fullText.slice(0, t2SplitMatch.index).trim()
+          : parsed.prompt || fullText;
+
+        const directResult = {
+          title: cleanEnglishTitleFromDocxFilename(docxFile.name) || '',
+          usedModel: 'word-docx-direct',
+          warnings: !compressedImg && writingScope !== 'task2'
+            ? ['File Word chưa có hình biểu đồ nhúng — bạn có thể gắn ảnh thủ công hoặc bấm nút "Tạo AI Hình Ảnh" bên dưới.']
+            : [],
+          task1:
+            writingScope === 'task2'
+              ? { prompt: '', imageUrl: '', modelAnswer: '' }
+              : {
+                  prompt: task1FromDoc,
+                  imageUrl: compressedImg,
+                  modelAnswer: t2SplitMatch ? '' : parsed.modelAnswer || ''
+                },
+          task2:
+            writingScope === 'task1'
+              ? { prompt: '', modelAnswer: '' }
+              : {
+                  prompt: writingScope === 'task2' ? fullText : task2FromDoc,
+                  modelAnswer: ''
+                }
+        };
+
+        onApplyWritingExtraction?.(directResult, { writingScope });
+        setLastResult(directResult);
+        showToast?.(
+          `Đã nhập trực tiếp từ file Word "${docxFile.name}"${compressedImg ? ' (kèm ảnh biểu đồ sắc nét)' : ''}!`
+        );
+        return;
+      } catch (err) {
+        setErrorMsg(err?.message || 'Không thể đọc file Word (.docx) này.');
+        return;
+      } finally {
+        setExtracting(false);
+      }
+    }
+
+    if (!hasGeminiAccess) {
+      setErrorMsg('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước khi dùng AI đọc PDF / Ảnh.');
       return;
     }
 
@@ -157,11 +252,11 @@ export default function AiWritingExtractorPanel({
               <Bot className="w-3.5 h-3.5" /> AI Tạo Tự Động Writing
             </span>
             <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-              Tải PDF / Ảnh Đề Writing → Tự Tách Task 1 + Tự Cắt Ảnh Biểu Đồ + Task 2
+              Tải File Word (.docx) / PDF / Ảnh Đề Writing → Tự Tách Task 1 + Biểu Đồ + Task 2
             </span>
           </div>
           <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-            Hỗ trợ file <b>.PDF</b> (Google Docs / Cambridge / Word xuất PDF) hoặc chụp màn hình dán thẳng <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 font-bold">Ctrl+V</kbd>. AI tự chép đề Task 1 &amp; Task 2 và <b>tự động cắt hình biểu đồ / bản đồ Task 1</b> đưa thẳng vào đề.
+            Hỗ trợ file <b>Word (.docx)</b> (tự lấy nguyên chữ đề bài + ảnh biểu đồ gốc siêu nhanh), <b>.PDF</b> hoặc chụp màn hình dán thẳng <kbd className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 font-bold">Ctrl+V</kbd>.
           </p>
         </div>
 
@@ -187,17 +282,18 @@ export default function AiWritingExtractorPanel({
           </div>
           <div className="space-y-0.5">
             <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
-              Bấm chọn File PDF hoặc Ảnh Đề Writing (hoặc bấm vào đây rồi nhấn Ctrl+V)
+              Bấm chọn File Word (.docx), PDF hoặc Ảnh Đề Writing (hoặc bấm vào đây rồi nhấn Ctrl+V)
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Nhận .PDF (≤ 14MB) hoặc .PNG / .JPG / .WebP — có thể chứa cả Task 1 &amp; Task 2 trên cùng 1 trang
+              Nhận .DOCX (Word / Google Docs tải về), .PDF (≤ 14MB) hoặc .PNG / .JPG / .WebP
             </p>
           </div>
           <input
             type="file"
-            accept=".pdf,application/pdf,image/*"
+            data-testid="single-writing-file-input"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,application/pdf,image/*"
             multiple
-            aria-label="Chọn PDF hoặc ảnh đề IELTS Writing"
+            aria-label="Chọn Word, PDF hoặc ảnh đề IELTS Writing"
             onChange={handleSelectFiles}
             className="hidden"
           />
@@ -219,19 +315,19 @@ export default function AiWritingExtractorPanel({
 
           <button
             type="button"
-            disabled={extracting || (!pdfFile && images.length === 0)}
+            disabled={extracting || (!docxFile && !pdfFile && images.length === 0)}
             onClick={handleRunExtract}
             className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-sm transition"
           >
             {extracting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>AI đang đọc đề &amp; cắt ảnh biểu đồ...</span>
+                <span>Đang đọc file &amp; trích xuất đề Writing...</span>
               </>
             ) : (
               <>
                 <Wand2 className="w-4 h-4" />
-                <span>AI Đọc File &amp; Tự Động Tạo Đề Writing</span>
+                <span>{docxFile && !pdfFile && images.length === 0 ? 'Nhập Trực Tiếp Từ File Word (.docx)' : 'AI Đọc File & Tự Động Tạo Đề Writing'}</span>
               </>
             )}
           </button>
@@ -239,8 +335,23 @@ export default function AiWritingExtractorPanel({
       </div>
 
       {/* Selected files chips */}
-      {(pdfFile || images.length > 0) && (
+      {(docxFile || pdfFile || images.length > 0) && (
         <div className="flex flex-wrap items-center gap-2">
+          {docxFile && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold text-slate-800 dark:text-slate-100">
+              <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span className="max-w-[220px] truncate">{docxFile.name}</span>
+              <span className="text-[11px] text-slate-500">({formatFileSize(docxFile.size)})</span>
+              <button
+                type="button"
+                onClick={() => setDocxFile(null)}
+                className="ml-1 text-slate-400 hover:text-rose-600"
+                aria-label="Xóa file Word Writing"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
           {pdfFile && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 text-xs font-bold text-slate-800 dark:text-slate-100">
               <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />

@@ -7,6 +7,7 @@ import {
   Clock,
   FileText,
   Folder,
+  FolderOpen,
   Globe,
   Image as ImageIcon,
   Key,
@@ -17,7 +18,8 @@ import {
   Trash2,
   Upload,
   Wand2,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import {
   DAILY_WRITING_T1_SUBCATEGORIES,
@@ -26,6 +28,7 @@ import {
   getDailySubCategoryLabel
 } from '../../constants/seedData';
 import { readFileAsDataUrl } from '../../utils/pdfImageCropper';
+import { unpackUploadedWritingFiles } from '../../utils/wordImportHelpers';
 import {
   buildDailyTask1TestObjects,
   buildDailyTask2TestObjects,
@@ -57,12 +60,18 @@ export default function DailyWritingBulkModal({
   const [t1SubCategory, setT1SubCategory] = useState(initialTask1SubCategory || 'w1_dynamic');
 
   // Task 1 inputs & drafts
-  const [t1Images, setT1Images] = useState([]); // { id, name, size, dataUrl }
+  const [t1DocxItems, setT1DocxItems] = useState([]); // extracted .docx objects (from direct .docx, .zip or folder)
+  const [t1Images, setT1Images] = useState([]); // { id, name, size, dataUrl, inferredSubCategory? }
   const [t1PdfFiles, setT1PdfFiles] = useState([]); // File[]
+  const [t1DetectedFolders, setT1DetectedFolders] = useState([]); // e.g. ['w1_dynamic', 'w1_map']
+  const [t1UseAiForDocx, setT1UseAiForDocx] = useState(true);
+  const [t1Unpacking, setT1Unpacking] = useState(false);
   const [t1Drafts, setT1Drafts] = useState([]);
   const [t1Page, setT1Page] = useState(1);
+  const t1FolderInputRef = useRef(null);
 
   // Task 2 inputs & drafts
+  const [t2DocxItems, setT2DocxItems] = useState([]); // extracted .docx objects
   const [t2PdfFiles, setT2PdfFiles] = useState([]); // File[]
   const [t2RawText, setT2RawText] = useState('');
   const [t2UseAi, setT2UseAi] = useState(true);
@@ -109,10 +118,12 @@ export default function DailyWritingBulkModal({
   };
 
   // ==========================================
-  // TASK 1 FILE HANDLERS (10+ IMAGES / PDF)
+  // TASK 1 FILE HANDLERS (WORD .DOCX / GOOGLE DRIVE .ZIP / FOLDER / IMAGES / PDF)
   // ==========================================
   const appendTask1Images = async (fileList) => {
-    const imgFiles = Array.from(fileList || []).filter(f => f.type?.startsWith('image/'));
+    const imgFiles = Array.from(fileList || []).filter(
+      f => f.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name || '')
+    );
     if (imgFiles.length === 0) return;
     setErrorMsg('');
     try {
@@ -121,7 +132,8 @@ export default function DailyWritingBulkModal({
           id: `img_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
           name: f.name || `task1-chart-${idx + 1}.png`,
           size: f.size || 0,
-          dataUrl: await readFileAsDataUrl(f)
+          dataUrl: await readFileAsDataUrl(f),
+          inferredSubCategory: f._inferredSubCategory || ''
         }))
       );
       setT1Images(prev => [...prev, ...loaded]);
@@ -135,15 +147,44 @@ export default function DailyWritingBulkModal({
     e.target.value = '';
     if (files.length === 0) return;
     setErrorMsg('');
+    setT1Unpacking(true);
 
-    const pdfs = files.filter(f => f.type === 'application/pdf' || f.name?.toLowerCase().endsWith('.pdf'));
-    const imgs = files.filter(f => f.type?.startsWith('image/'));
+    try {
+      const unpacked = await unpackUploadedWritingFiles(files, {
+        onProgress: msg => setProgress({ phase: 'unpack', done: 1, total: 2, message: msg })
+      });
 
-    if (pdfs.length > 0) {
-      setT1PdfFiles(prev => [...prev, ...pdfs]);
-    }
-    if (imgs.length > 0) {
-      await appendTask1Images(imgs);
+      if (unpacked.docxItems.length > 0) {
+        setT1DocxItems(prev => [...prev, ...unpacked.docxItems]);
+      }
+      if (unpacked.pdfFiles.length > 0) {
+        setT1PdfFiles(prev => [...prev, ...unpacked.pdfFiles]);
+      }
+      if (unpacked.imageFiles.length > 0) {
+        await appendTask1Images(unpacked.imageFiles);
+      }
+      if (unpacked.skippedWarnings.length > 0) {
+        setWarnings(prev => [...prev, ...unpacked.skippedWarnings]);
+      }
+
+      if (unpacked.detectedFolders.length > 0) {
+        setT1DetectedFolders(prev => [...new Set([...prev, ...unpacked.detectedFolders])]);
+        if (unpacked.detectedFolders.length >= 2) {
+          setT1SubCategory('auto');
+          showToast?.(
+            `Đã nhận diện ${unpacked.docxItems.length + unpacked.imageFiles.length} đề từ ${unpacked.detectedFolders.length} thư mục (tự động chia đúng Map / Process / Dynamic / Static)!`,
+            'info'
+          );
+        } else if (unpacked.detectedFolders.length === 1) {
+          setT1SubCategory(unpacked.detectedFolders[0]);
+        }
+      } else if (unpacked.docxItems.length > 0) {
+        showToast?.(`Đã nạp xong ${unpacked.docxItems.length} file Word (.docx) kèm chữ & biểu đồ!`, 'info');
+      }
+    } catch (err) {
+      setErrorMsg(err?.message || 'Không thể giải nén hoặc đọc danh sách file đã chọn.');
+    } finally {
+      setT1Unpacking(false);
     }
   };
 
@@ -166,40 +207,64 @@ export default function DailyWritingBulkModal({
   };
 
   // ==========================================
-  // TASK 2 FILE HANDLERS (350+ PROMPTS PDF)
+  // TASK 2 FILE HANDLERS (WORD .DOCX / .ZIP / 350+ PROMPTS PDF)
   // ==========================================
-  const handleSelectTask2Pdfs = (e) => {
-    const files = Array.from(e.target.files || []).filter(
-      f => f.type === 'application/pdf' || f.name?.toLowerCase().endsWith('.pdf')
-    );
+  const handleSelectTask2Pdfs = async (e) => {
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
     if (files.length === 0) return;
     setErrorMsg('');
-    setT2PdfFiles(prev => [...prev, ...files]);
+    setT1Unpacking(true);
+    try {
+      const unpacked = await unpackUploadedWritingFiles(files, {
+        onProgress: msg => setProgress({ phase: 'unpack', done: 1, total: 2, message: msg })
+      });
+      if (unpacked.docxItems.length > 0) {
+        setT2DocxItems(prev => [...prev, ...unpacked.docxItems]);
+        showToast?.(`Đã nạp ${unpacked.docxItems.length} file Word (.docx) đề Task 2!`, 'info');
+      }
+      if (unpacked.pdfFiles.length > 0) {
+        setT2PdfFiles(prev => [...prev, ...unpacked.pdfFiles]);
+      }
+      if (unpacked.skippedWarnings.length > 0) {
+        setWarnings(prev => [...prev, ...unpacked.skippedWarnings]);
+      }
+    } catch (err) {
+      setErrorMsg(err?.message || 'Không thể đọc file Word / PDF Task 2.');
+    } finally {
+      setT1Unpacking(false);
+    }
   };
 
   // ==========================================
   // RUN AI PIPELINES
   // ==========================================
   const handleRunTask1Ai = async () => {
-    if (running) return;
+    if (running || t1Unpacking) return;
     setErrorMsg('');
     setWarnings([]);
-    if (t1Images.length === 0 && t1PdfFiles.length === 0) {
-      setErrorMsg('Hãy tải lên ít nhất 1 hình biểu đồ (hoặc 10+ hình cùng lúc) hoặc file PDF Task 1.');
+    if (t1DocxItems.length === 0 && t1Images.length === 0 && t1PdfFiles.length === 0) {
+      setErrorMsg('Hãy tải lên ít nhất 1 file Word (.docx), file .ZIP Google Drive, hình biểu đồ hoặc file PDF Task 1.');
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
-    setProgress({ phase: 'init', done: 0, total: t1Images.length + t1PdfFiles.length, message: 'Đang chuẩn bị dữ liệu hình ảnh / PDF...' });
+    setProgress({
+      phase: 'init',
+      done: 0,
+      total: t1DocxItems.length + t1Images.length + t1PdfFiles.length,
+      message: 'Đang chuẩn bị dữ liệu Word / hình ảnh / PDF...'
+    });
 
     try {
       const res = await runBulkTask1AiPipeline({
+        docxItems: t1DocxItems,
         visualSources: t1Images,
         pdfFiles: t1PdfFiles,
         targetSubCategory: t1SubCategory,
+        useAiForDocx: t1UseAiForDocx,
         apiKey: aiApiKey,
         aiConfigured,
         signal: controller.signal,
@@ -209,7 +274,7 @@ export default function DailyWritingBulkModal({
       setT1Page(1);
       setWarnings(res.warnings || []);
       setUsedModelLabel(res.usedModel || '');
-      showToast?.(`AI đã soạn xong ${res.items.length} đề Writing Task 1!`);
+      showToast?.(`Đã soạn xong ${res.items.length} đề Writing Task 1!`);
     } catch (err) {
       setErrorMsg(err?.message || 'Không thể xử lý hàng loạt đề Task 1.');
     } finally {
@@ -218,21 +283,22 @@ export default function DailyWritingBulkModal({
   };
 
   const handleRunTask2Ai = async () => {
-    if (running) return;
+    if (running || t1Unpacking) return;
     setErrorMsg('');
     setWarnings([]);
-    if (t2PdfFiles.length === 0 && !t2RawText.trim()) {
-      setErrorMsg('Hãy chọn file PDF chứa bộ câu hỏi Task 2 (VD: 350 đề) hoặc dán danh sách đề vào ô văn bản.');
+    if (t2DocxItems.length === 0 && t2PdfFiles.length === 0 && !t2RawText.trim()) {
+      setErrorMsg('Hãy chọn file Word (.docx), file .ZIP, file PDF bộ câu hỏi Task 2 hoặc dán danh sách đề vào ô văn bản.');
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
     setRunning(true);
-    setProgress({ phase: 'init', done: 0, total: 1, message: 'Đang quét file PDF & tách danh sách đề Task 2...' });
+    setProgress({ phase: 'init', done: 0, total: 1, message: 'Đang quét file Word / PDF & tách danh sách đề Task 2...' });
 
     try {
       const res = await runBulkTask2AiPipeline({
+        docxItems: t2DocxItems,
         pdfFiles: t2PdfFiles,
         rawPastedText: t2RawText,
         apiKey: aiApiKey,
@@ -280,8 +346,10 @@ export default function DailyWritingBulkModal({
         `Đã tạo & đăng công khai ${builtTests.length} đề Task 1 (20 phút • Làm lại nhiều lần)!`
       );
       setT1Drafts([]);
+      setT1DocxItems([]);
       setT1Images([]);
       setT1PdfFiles([]);
+      setT1DetectedFolders([]);
       onClose?.();
     } catch (err) {
       setErrorMsg(err?.message || 'Lỗi khi lưu hàng loạt đề Task 1.');
@@ -310,6 +378,7 @@ export default function DailyWritingBulkModal({
         `Đã tạo & đăng công khai ${builtTests.length} đề Task 2 (40 phút • Làm lại nhiều lần)!`
       );
       setT2Drafts([]);
+      setT2DocxItems([]);
       setT2PdfFiles([]);
       setT2RawText('');
       onClose?.();
@@ -372,8 +441,8 @@ export default function DailyWritingBulkModal({
             </div>
             <h2 className="text-base sm:text-xl font-extrabold text-[#0F172B] dark:text-white">
               {mode === 'task1'
-                ? 'Con AI Phần 1: Ném Nhiều Hình Biểu Đồ / PDF → Tự Soạn Hàng Loạt Đề Task 1'
-                : 'Con AI Phần 2: Ném PDF 350+ Câu Hỏi → Tự Phân Loại Chủ Đề · Dạng Đề & Đặt Tên Danh Từ'}
+                ? 'Con AI Phần 1: Ném Word (.docx) / ZIP Google Drive / Ảnh / PDF → Tạo Hàng Loạt Đề Task 1'
+                : 'Con AI Phần 2: Ném Word (.docx) / ZIP / PDF 350+ Câu Hỏi → Tự Phân Loại Chủ Đề · Dạng Đề'}
             </h2>
           </div>
 
@@ -419,7 +488,7 @@ export default function DailyWritingBulkModal({
               }`}
             >
               <ImageIcon className="w-4 h-4 shrink-0" />
-              <span>Phần 1: AI Task 1 — Dạng Hình Ảnh / PDF (20 phút)</span>
+              <span>Phần 1: AI Task 1 — Word (.docx) / ZIP / Ảnh / PDF (20p)</span>
             </button>
 
             <button
@@ -437,7 +506,7 @@ export default function DailyWritingBulkModal({
               }`}
             >
               <FileText className="w-4 h-4 shrink-0" />
-              <span>Phần 2: AI Task 2 — Ném PDF 350+ Câu Hỏi (40 phút)</span>
+              <span>Phần 2: AI Task 2 — Word (.docx) / PDF 350+ Đề (40p)</span>
             </button>
           </div>
 
@@ -507,47 +576,96 @@ export default function DailyWritingBulkModal({
                 </div>
               </div>
 
-              {/* Step 2: Drop 10+ Images or PDF */}
+              {/* Step 2: Drop Word (.docx), Google Drive .ZIP, Folder, Images or PDF */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
-                <label className="lg:col-span-8 cursor-pointer rounded-2xl border-2 border-dashed border-[#007A7A]/60 dark:border-teal-500/50 bg-slate-50/90 dark:bg-slate-900/70 hover:border-[#007A7A] p-5 flex flex-col items-center justify-center text-center gap-2 transition">
-                  <div className="w-11 h-11 rounded-2xl bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center">
-                    <Upload className="w-5 h-5" />
+                <div className="lg:col-span-8 flex flex-col gap-2.5">
+                  <label className="flex-1 cursor-pointer rounded-2xl border-2 border-dashed border-[#007A7A]/60 dark:border-teal-500/50 bg-slate-50/90 dark:bg-slate-900/70 hover:border-[#007A7A] p-5 flex flex-col items-center justify-center text-center gap-2 transition">
+                    <div className="w-11 h-11 rounded-2xl bg-[#EDFFFD] dark:bg-teal-500/20 text-[#007A7A] dark:text-[#1EE1D6] flex items-center justify-center">
+                      {t1Unpacking ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                    </div>
+                    <p className="text-xs sm:text-sm font-extrabold text-[#0F172B] dark:text-white">
+                      Chọn File Word (.docx), File .ZIP tải từ Google Drive, Hình Ảnh hoặc PDF Task 1
+                    </p>
+                    <p className="text-xs text-[#475569] dark:text-slate-400 max-w-xl leading-relaxed">
+                      <b>Mẹo nhanh nhất từ Google Drive:</b> Bấm chuột phải vào thư mục <b>KHO ĐỀ TASK 1</b> → <b>Tải xuống (.zip)</b> rồi ném nguyên file <code className="px-1 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 font-bold">.zip</code> vào đây! Web tự giải nén mọi file Word, lấy chữ đề bài + ảnh biểu đồ sắc nét &amp; chia đúng 4 thư mục (Map / Process / Dynamic / Static) trong vài giây!
+                    </p>
+                    <input
+                      type="file"
+                      data-testid="bulk-w1-file-input"
+                      accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.zip,application/zip,application/x-zip-compressed,image/*,.pdf,application/pdf"
+                      multiple
+                      onChange={handleSelectTask1Files}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={running || saving || t1Unpacking}
+                      onClick={() => t1FolderInputRef.current?.click()}
+                      className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-[#007A7A]/50 hover:border-[#007A7A] text-[#0F766E] dark:text-[#1EE1D6] text-xs font-extrabold inline-flex items-center gap-2 transition"
+                    >
+                      <FolderOpen className="w-4 h-4" />
+                      <span>Hoặc chọn nguyên Thư Mục từ máy tính (đã giải nén)</span>
+                    </button>
+                    <input
+                      ref={t1FolderInputRef}
+                      type="file"
+                      data-testid="bulk-w1-folder-input"
+                      webkitdirectory=""
+                      directory=""
+                      multiple
+                      onChange={handleSelectTask1Files}
+                      className="hidden"
+                    />
+                    {t1DetectedFolders.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold">
+                        <Zap className="w-3.5 h-3.5" />
+                        Tự nhận diện thư mục: {t1DetectedFolders.map(id => getDailySubCategoryLabel(id) || id).join(', ')}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs sm:text-sm font-extrabold text-[#0F172B] dark:text-white">
-                    Chọn 10+ Hình Biểu Đồ Cùng Lúc (.PNG, .JPG, .WebP) hoặc File .PDF Đề Task 1
-                  </p>
-                  <p className="text-xs text-[#475569] dark:text-slate-400 max-w-lg">
-                    Ném 10 hình vào → AI tự đọc đề (hoặc tự viết câu hỏi chuẩn Cambridge từ hình biểu đồ), tự cắt biểu đồ sạch đẹp và đặt tên theo <b>danh từ của bài</b>! Hỗ trợ cả nhấn <kbd className="font-bold">Ctrl+V</kbd> liên tiếp.
-                  </p>
-                  <input
-                    type="file"
-                    data-testid="bulk-w1-file-input"
-                    accept="image/*,.pdf,application/pdf"
-                    multiple
-                    onChange={handleSelectTask1Files}
-                    className="hidden"
-                  />
-                </label>
+                </div>
 
                 <div className="lg:col-span-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4 flex flex-col justify-between gap-3">
                   <div className="space-y-1.5 text-xs">
                     <p className="font-extrabold text-[#0F172B] dark:text-white">
-                      Đã nạp chờ xử lý: {t1Images.length} hình + {t1PdfFiles.length} file PDF
+                      Đã nạp chờ xử lý:{' '}
+                      <span className="text-[#007A7A] dark:text-[#1EE1D6]">
+                        {t1DocxItems.length} Word (.docx)
+                      </span>{' '}
+                      + {t1Images.length} hình + {t1PdfFiles.length} PDF
                     </p>
                     <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-relaxed">
                       • Thời gian mặc định: <b>20 phút / bài</b>
                       <br />• Chế độ: <b>Công khai • Làm lại nhiều lần</b>
-                      <br />• Mỗi hình hoặc mỗi trang PDF sẽ tạo thành <b>1 đề Task 1 riêng</b>.
+                      <br />• File Word (.docx) tự tách chuẩn <b>đề bài + ảnh biểu đồ gốc</b> siêu nhanh.
                     </p>
+                    {t1DocxItems.length > 0 && (
+                      <label className="flex items-start gap-2 pt-1 text-[11px] font-bold text-[#334155] dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={t1UseAiForDocx}
+                          onChange={e => setT1UseAiForDocx(e.target.checked)}
+                          className="w-3.5 h-3.5 mt-0.5 rounded accent-[#007A7A]"
+                        />
+                        <span>
+                          Dùng AI chuẩn hóa Tên Cụm Danh Từ cho file Word (bỏ chọn để nhập tức thì 100% không cần đợi AI)
+                        </span>
+                      </label>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    {(t1Images.length > 0 || t1PdfFiles.length > 0) && !running && (
+                    {(t1DocxItems.length > 0 || t1Images.length > 0 || t1PdfFiles.length > 0) && !running && (
                       <button
                         type="button"
                         onClick={() => {
+                          setT1DocxItems([]);
                           setT1Images([]);
                           setT1PdfFiles([]);
+                          setT1DetectedFolders([]);
                         }}
                         className="w-full py-1.5 px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
                       >
@@ -558,19 +676,24 @@ export default function DailyWritingBulkModal({
                     <button
                       type="button"
                       data-testid="run-bulk-w1-ai-btn"
-                      disabled={running || saving || (t1Images.length === 0 && t1PdfFiles.length === 0)}
+                      disabled={
+                        running ||
+                        saving ||
+                        t1Unpacking ||
+                        (t1DocxItems.length === 0 && t1Images.length === 0 && t1PdfFiles.length === 0)
+                      }
                       onClick={handleRunTask1Ai}
                       className="w-full py-3 px-4 rounded-xl bg-[#007A7A] hover:bg-[#065B5B] disabled:opacity-50 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md transition"
                     >
-                      {running ? (
+                      {running || t1Unpacking ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>AI đang soạn đề Task 1...</span>
+                          <span>{t1Unpacking ? 'Đang giải nén file...' : 'Đang soạn hàng loạt đề Task 1...'}</span>
                         </>
                       ) : (
                         <>
                           <Wand2 className="w-4 h-4" />
-                          <span>AI Soạn Hàng Loạt Đề Task 1 Ngay</span>
+                          <span>Soạn Hàng Loạt Đề Task 1 Ngay</span>
                         </>
                       )}
                     </button>
@@ -579,8 +702,37 @@ export default function DailyWritingBulkModal({
               </div>
 
               {/* Queued Files Strip */}
-              {(t1Images.length > 0 || t1PdfFiles.length > 0) && (
-                <div className="flex flex-wrap items-center gap-2 max-h-28 overflow-y-auto p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              {(t1DocxItems.length > 0 || t1Images.length > 0 || t1PdfFiles.length > 0) && (
+                <div className="flex flex-wrap items-center gap-2 max-h-32 overflow-y-auto p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  {t1DocxItems.map((doc, idx) => (
+                    <span
+                      key={doc.id}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold"
+                    >
+                      {doc.primaryImageUrl ? (
+                        <img
+                          src={doc.primaryImageUrl}
+                          alt={doc.fileName}
+                          className="w-6 h-6 rounded object-cover border border-slate-200"
+                        />
+                      ) : (
+                        <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      )}
+                      {doc.matchedFromFolder && (
+                        <span className="px-1.5 py-0.5 rounded bg-teal-100 dark:bg-teal-900/50 text-[#0F766E] dark:text-[#1EE1D6] text-[10px] font-black">
+                          {getDailySubCategoryLabel(doc.inferredSubCategory) || doc.inferredSubCategory}
+                        </span>
+                      )}
+                      <span className="max-w-[150px] truncate">#{idx + 1} {doc.fileName}</span>
+                      <button
+                        type="button"
+                        onClick={() => setT1DocxItems(prev => prev.filter(x => x.id !== doc.id))}
+                        className="text-slate-400 hover:text-rose-500"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  ))}
                   {t1PdfFiles.map((pdf, idx) => (
                     <span
                       key={`${pdf.name}-${idx}`}
@@ -692,12 +844,19 @@ export default function DailyWritingBulkModal({
                               <span className="text-[11px] text-slate-500 truncate max-w-[160px]">{draft.sourceLabel}</span>
                             </div>
 
-                            <div className="h-36 rounded-xl border border-slate-200 dark:border-slate-700 bg-white flex items-center justify-center p-1.5 overflow-hidden">
-                              <img
-                                src={draft.imageUrl}
-                                alt={draft.title}
-                                className="max-h-full max-w-full object-contain"
-                              />
+                            <div className="h-36 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/60 flex items-center justify-center p-1.5 overflow-hidden">
+                              {draft.imageUrl ? (
+                                <img
+                                  src={draft.imageUrl}
+                                  alt={draft.title}
+                                  className="max-h-full max-w-full object-contain"
+                                />
+                              ) : (
+                                <div className="text-center px-3 space-y-1 text-slate-400">
+                                  <ImageIcon className="w-6 h-6 mx-auto opacity-60" />
+                                  <p className="text-[11px] font-semibold">Chưa có ảnh biểu đồ trong file Word</p>
+                                </div>
+                              )}
                             </div>
 
                             {draft.croppedImageUrl && draft.fullImageUrl && (
@@ -835,23 +994,39 @@ export default function DailyWritingBulkModal({
                       <Upload className="w-5 h-5" />
                     </div>
                     <p className="text-xs sm:text-sm font-extrabold text-[#0F172B] dark:text-white">
-                      Bấm chọn File .PDF Bộ Đề Task 2 (Hỗ trợ 350+ đề / nhiều trang PDF)
+                      Bấm chọn File Word (.docx), .ZIP hoặc .PDF Bộ Đề Task 2 (Hỗ trợ 350+ đề)
                     </p>
                     <p className="text-xs text-[#475569] dark:text-slate-400 max-w-md">
-                      Tự động tách từng câu hỏi 1..350+, phân loại vào đúng <b>24 Chủ đề</b> &amp; <b>5 Dạng bài</b>, tự dán đề và đặt tên bài theo <b>Cụm Danh Từ</b>!
+                      Tự động đọc file Word / PDF, tách từng câu hỏi 1..350+, phân loại vào đúng <b>24 Chủ đề</b> &amp; <b>5 Dạng bài</b>, tự dán đề và đặt tên bài theo <b>Cụm Danh Từ</b>!
                     </p>
                     <input
                       type="file"
                       data-testid="bulk-w2-pdf-input"
-                      accept=".pdf,application/pdf"
+                      accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.zip,application/zip,application/x-zip-compressed,.pdf,application/pdf"
                       multiple
                       onChange={handleSelectTask2Pdfs}
                       className="hidden"
                     />
                   </label>
 
-                  {t2PdfFiles.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  {(t2DocxItems.length > 0 || t2PdfFiles.length > 0) && (
+                    <div className="flex flex-wrap items-center gap-2 max-h-28 overflow-y-auto p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      {t2DocxItems.map((doc, idx) => (
+                        <span
+                          key={doc.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 text-xs font-bold"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          <span className="max-w-[200px] truncate">#{idx + 1} {doc.fileName}</span>
+                          <button
+                            type="button"
+                            onClick={() => setT2DocxItems(prev => prev.filter(x => x.id !== doc.id))}
+                            className="text-slate-400 hover:text-rose-500"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ))}
                       {t2PdfFiles.map((pdf, idx) => (
                         <span
                           key={`${pdf.name}-${idx}`}
@@ -917,7 +1092,7 @@ export default function DailyWritingBulkModal({
                     <button
                       type="button"
                       data-testid="run-bulk-w2-ai-btn"
-                      disabled={running || saving || (t2PdfFiles.length === 0 && !t2RawText.trim())}
+                      disabled={running || saving || t1Unpacking || (t2DocxItems.length === 0 && t2PdfFiles.length === 0 && !t2RawText.trim())}
                       onClick={handleRunTask2Ai}
                       className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md transition"
                     >

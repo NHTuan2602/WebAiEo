@@ -22,6 +22,8 @@ import {
   extractWritingExamFromMedia
 } from '../../utils/geminiGrader';
 import { attachAutoCroppedWritingChart, readFileAsDataUrl } from '../../utils/pdfImageCropper';
+import { cleanEnglishTitleFromDocxFilename, extractDocxContent } from '../../utils/wordImportHelpers';
+import { compressVisualDataUrl } from '../../utils/dailyWritingBulkAi';
 
 const MAX_PDF_BYTES = 14 * 1024 * 1024;
 
@@ -95,10 +97,14 @@ export default function QuickThreePdfImporter({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const isPdf = file.name?.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+    const lower = String(file.name || '').toLowerCase();
+    const isDocx =
+      lower.endsWith('.docx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isPdf = lower.endsWith('.pdf') || file.type === 'application/pdf';
     const isImg = file.type?.startsWith('image/');
-    if (!isPdf && !isImg) {
-      showToast?.('Writing hỗ trợ file .PDF hoặc ảnh (.PNG/.JPG/.WebP).', 'error');
+    if (!isDocx && !isPdf && !isImg) {
+      showToast?.('Writing hỗ trợ file Word (.docx), .PDF hoặc ảnh (.PNG/.JPG/.WebP).', 'error');
       return;
     }
     if (file.size > MAX_PDF_BYTES) {
@@ -214,37 +220,68 @@ export default function QuickThreePdfImporter({
       }
     }
 
-    // 3. Writing PDF / Image
+    // 3. Writing Word (.docx) / PDF / Image
     if (writingFile) {
       setStatusMap(prev => ({
         ...prev,
-        writing: { state: 'running', message: 'AI đang tách Task 1 + cắt ảnh biểu đồ + Task 2...' }
+        writing: { state: 'running', message: 'Đang tách Task 1 + biểu đồ + Task 2...' }
       }));
       try {
-        const isPdf = writingFile.name?.toLowerCase().endsWith('.pdf') || writingFile.type === 'application/pdf';
-        const fileDataUrl = await readFileAsDataUrl(writingFile);
-        const rawExtracted = await extractWritingExamFromMedia({
-          apiKey: aiApiKey,
-          pdfDataUrl: isPdf ? fileDataUrl : '',
-          images: isPdf ? [] : [fileDataUrl],
-          fileName: writingFile.name,
-          writingScope: 'both'
-        });
-        const enriched = await attachAutoCroppedWritingChart(rawExtracted, {
-          pdfFile: isPdf ? writingFile : null,
-          pdfDataUrl: isPdf ? fileDataUrl : '',
-          images: isPdf ? [] : [fileDataUrl]
-        });
-        if (!firstDetectedTitle && enriched.title) firstDetectedTitle = enriched.title;
-        onApplyWritingExtraction?.(enriched, { writingScope: 'both' });
-        okCount += 1;
-        setStatusMap(prev => ({
-          ...prev,
-          writing: {
-            state: 'done',
-            message: `✓ Task 1${enriched.task1?.imageUrl ? ' (+ ảnh biểu đồ)' : ''} & Task 2`
-          }
-        }));
+        const lowerW = String(writingFile.name || '').toLowerCase();
+        const isDocx =
+          lowerW.endsWith('.docx') ||
+          writingFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        if (isDocx) {
+          const parsed = await extractDocxContent(writingFile, writingFile.name);
+          const compressedImg = parsed.primaryImageUrl
+            ? await compressVisualDataUrl(parsed.primaryImageUrl, { maxWidth: 1400, quality: 0.88 })
+            : '';
+          const fullText = parsed.rawText || '';
+          const t2Match = fullText.match(/(?:^|\n)\s*(?:WRITING\s+)?TASK\s*2\b[:.\-\s]*([\s\S]+)$/i);
+          const task1Prompt = t2Match ? fullText.slice(0, t2Match.index).trim() : parsed.prompt || fullText;
+          const task2Prompt = t2Match ? t2Match[1].trim() : '';
+          const enriched = {
+            title: cleanEnglishTitleFromDocxFilename(writingFile.name) || '',
+            task1: { prompt: task1Prompt, imageUrl: compressedImg, modelAnswer: t2Match ? '' : parsed.modelAnswer || '' },
+            task2: { prompt: task2Prompt, modelAnswer: '' }
+          };
+          if (!firstDetectedTitle && enriched.title) firstDetectedTitle = enriched.title;
+          onApplyWritingExtraction?.(enriched, { writingScope: 'both' });
+          okCount += 1;
+          setStatusMap(prev => ({
+            ...prev,
+            writing: {
+              state: 'done',
+              message: `✓ Word (.docx): Task 1${compressedImg ? ' (+ ảnh biểu đồ)' : ''}${task2Prompt ? ' & Task 2' : ''}`
+            }
+          }));
+        } else {
+          const isPdf = lowerW.endsWith('.pdf') || writingFile.type === 'application/pdf';
+          const fileDataUrl = await readFileAsDataUrl(writingFile);
+          const rawExtracted = await extractWritingExamFromMedia({
+            apiKey: aiApiKey,
+            pdfDataUrl: isPdf ? fileDataUrl : '',
+            images: isPdf ? [] : [fileDataUrl],
+            fileName: writingFile.name,
+            writingScope: 'both'
+          });
+          const enriched = await attachAutoCroppedWritingChart(rawExtracted, {
+            pdfFile: isPdf ? writingFile : null,
+            pdfDataUrl: isPdf ? fileDataUrl : '',
+            images: isPdf ? [] : [fileDataUrl]
+          });
+          if (!firstDetectedTitle && enriched.title) firstDetectedTitle = enriched.title;
+          onApplyWritingExtraction?.(enriched, { writingScope: 'both' });
+          okCount += 1;
+          setStatusMap(prev => ({
+            ...prev,
+            writing: {
+              state: 'done',
+              message: `✓ Task 1${enriched.task1?.imageUrl ? ' (+ ảnh biểu đồ)' : ''} & Task 2`
+            }
+          }));
+        }
       } catch (err) {
         setStatusMap(prev => ({
           ...prev,
@@ -501,7 +538,7 @@ export default function QuickThreePdfImporter({
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                    <PenTool className="w-4 h-4" /> 3. PDF / Ảnh Writing (Task 1–2)
+                    <PenTool className="w-4 h-4" /> 3. Word (.docx) / PDF / Ảnh Writing
                   </span>
                   {writingFile && (
                     <button
@@ -524,13 +561,13 @@ export default function QuickThreePdfImporter({
                   ) : (
                     <div className="space-y-1">
                       <Upload className="w-4 h-4 mx-auto text-emerald-600 dark:text-emerald-400" />
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Chọn file PDF hoặc Ảnh Writing</p>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Chọn file Word (.docx), PDF hoặc Ảnh</p>
                     </div>
                   )}
                   <input
                     type="file"
-                    accept=".pdf,application/pdf,image/*"
-                    aria-label="Tạo nhanh: chọn PDF hoặc ảnh Writing"
+                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,application/pdf,image/*"
+                    aria-label="Tạo nhanh: chọn Word, PDF hoặc ảnh Writing"
                     onChange={pickWritingFile}
                     className="hidden"
                   />

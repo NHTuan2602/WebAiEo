@@ -8,6 +8,7 @@ import {
 } from '../constants/seedData.js';
 import { callGeminiGenerateJson } from './geminiGrader.js';
 import { cropNormalizedBoxFromImage, normalizeVisionChartBox, readFileAsDataUrl } from './pdfImageCropper.js';
+import { cleanEnglishTitleFromDocxFilename } from './wordImportHelpers.js';
 
 let pdfJsModulePromise = null;
 
@@ -640,6 +641,7 @@ Return ONLY valid JSON:
  */
 export async function runBulkTask2AiPipeline({
   pdfFiles = [],
+  docxItems = [],
   rawPastedText = '',
   apiKey = '',
   aiConfigured = false,
@@ -649,6 +651,27 @@ export async function runBulkTask2AiPipeline({
 }) {
   const rawChunks = [];
   const hasAiAccess = Boolean(useAi && (String(apiKey || '').trim() || aiConfigured));
+
+  // 0. Extract prompts from uploaded Word (.docx) files (direct or unpacked from .zip)
+  for (let dIdx = 0; dIdx < docxItems.length; dIdx += 1) {
+    if (signal?.aborted) throw new Error('Đã hủy tác vụ theo yêu cầu.');
+    const doc = docxItems[dIdx];
+    const docText = String(doc?.rawText || '').trim();
+    if (!docText) continue;
+    const parsedFromDoc = parseTask2PromptsFromRawText(docText);
+    if (parsedFromDoc.length > 0) {
+      rawChunks.push(...parsedFromDoc);
+    } else {
+      // Single unnumbered prompt inside a single .docx file
+      const cleaned = cleanTask2PromptText(docText.split(/\n{2,}/).slice(0, 2).join(' '));
+      if (cleaned.split(/\s+/).length >= 8) {
+        rawChunks.push({
+          sourceNumber: rawChunks.length + 1,
+          prompt: cleaned
+        });
+      }
+    }
+  }
 
   // 1. Extract prompts from all uploaded PDFs
   for (let fIdx = 0; fIdx < pdfFiles.length; fIdx += 1) {
@@ -707,7 +730,7 @@ export async function runBulkTask2AiPipeline({
   });
 
   if (uniquePrompts.length === 0) {
-    throw new Error('Không tìm thấy câu hỏi Writing Task 2 nào trong file PDF / văn bản đã tải lên.');
+    throw new Error('Không tìm thấy câu hỏi Writing Task 2 nào trong file Word / PDF / văn bản đã tải lên.');
   }
 
   // 3. Classify & Name in parallel batches of 35 so 350+ prompts complete quickly without token truncation!
@@ -874,22 +897,219 @@ Return ONLY valid JSON:
 }
 
 /**
+ * Deterministic fallback noun-phrase title specifically tuned for IELTS Writing Task 1 prompts
+ * (e.g. "The bar chart below shows the amount of money invested..." -> "The amount of money invested...").
+ */
+function buildTask1NounTitleFromPrompt(prompt = '', fileName = '') {
+  const firstSentence = String(prompt || '')
+    .replace(/\r/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*Summarise the information.*$/i, '')
+    .replace(/\s*Summarize the information.*$/i, '')
+    .replace(/\s*You should spend about \d+ minutes[^.]*\./gi, '')
+    .replace(/\s*Write at least \d+ words\.?/gi, '')
+    .trim()
+    .split(/(?<=[.!?])\s+/)[0] || '';
+
+  const strippedLead = firstSentence
+    .replace(/[.!?]+$/, '')
+    .replace(
+      /^The\s+(?:bar\s+charts?|pie\s+charts?|line\s+graphs?|charts?|graphs?|tables?|diagrams?|maps?|plans?|flow\s*charts?|illustrations?|pictures?|figures?|data)(?:\s+and\s+(?:bar\s+charts?|pie\s+charts?|line\s+graphs?|charts?|graphs?|tables?|diagrams?|maps?))?\s*(?:below|above|given|provided)?\s+(?:show|shows|illustrate|illustrates|compare|compares|give|gives|provide|provides|present|presents|depict|depicts|describe|describes|indicate|indicates|detail|details)(?:\s+information\s+(?:about|on))?\s+/i,
+      ''
+    )
+    .trim();
+
+  if (strippedLead && strippedLead.split(/\s+/).length >= 3) {
+    const words = strippedLead.split(/\s+/).slice(0, 12);
+    const joined = words.join(' ').replace(/[,:;]+$/, '').trim();
+    if (joined.length >= 6) {
+      return joined.charAt(0).toUpperCase() + joined.slice(1);
+    }
+  }
+
+  const fromName = cleanEnglishTitleFromDocxFilename(fileName);
+  if (fromName) return fromName;
+
+  return buildFallbackNounPhraseTitle(prompt || fileName || 'IELTS Writing Task 1 Visual');
+}
+
+/**
+ * Lightweight text-only Gemini batch call to polish noun-phrase titles (and confirm subCategory when auto)
+ * for up to 35 Word (.docx) Task 1 items at once — 20x faster than per-image Vision calls.
+ */
+async function polishTask1DocxBatchWithAi(chunkItems, { apiKey }) {
+  const payloadLines = chunkItems
+    .map(
+      (it, idx) =>
+        `${idx}: [folder=${it.folderPath || 'none'}] [file=${it.fileName}] ${String(it.prompt || '').slice(0, 320)}`
+    )
+    .join('\n');
+
+  const promptText = `You are a Senior Cambridge IELTS Academic Writing Task 1 Curriculum Designer.
+For EACH Task 1 item below, generate a clean academic English NOUN-PHRASE title (5–11 words, sentence case, NO period, NO "Task 1:" prefix, ignore any Vietnamese shorthand filenames like "2 BÁNH" or "7 PTGT" and derive the title strictly from the English prompt) and confirm its chart category.
+
+ALLOWED "subCategory" IDs:
+- "w1_map" (maps, floor plans, town/site layouts)
+- "w1_process" (process diagrams, manufacturing stages, life cycles)
+- "w1_dynamic" (charts/graphs/tables showing trends across 2+ years/periods)
+- "w1_static" (charts/graphs/tables comparing categories at 1 time point or without time trends)
+
+ITEMS:
+${payloadLines}
+
+Return ONLY valid JSON:
+{
+  "items": [
+    { "idx": 0, "title": "Total sales of a pharmaceutical company across three regions", "subCategory": "w1_dynamic" }
+  ]
+}`;
+
+  const { parsed, usedModel } = await callGeminiGenerateJson({
+    apiKey,
+    promptText,
+    images: [],
+    temperature: 0.1
+  });
+
+  const outMap = new Map();
+  if (Array.isArray(parsed?.items)) {
+    parsed.items.forEach(row => {
+      const idx = Number(row?.idx);
+      if (Number.isInteger(idx) && idx >= 0 && idx < chunkItems.length) {
+        outMap.set(idx, row);
+      }
+    });
+  }
+
+  return { outMap, usedModel };
+}
+
+/**
  * Full Bulk Task 1 AI Pipeline:
- * Expands N uploaded images + pasted screenshots + PDF pages into N Task 1 exercises,
- * extracts/writes prompts, crops charts, names each exercise with a noun phrase,
- * and locks them into the chosen Task 1 folder.
+ * Expands N Word (.docx) files (direct or unpacked from Google Drive .zip / folders) + uploaded images + pasted screenshots + PDF pages
+ * into N Task 1 exercises, extracts/writes prompts, crops charts, names each exercise with a noun phrase,
+ * and routes them into the chosen or folder-detected Task 1 subfolder.
  */
 export async function runBulkTask1AiPipeline({
+  docxItems = [],
   visualSources = [],
   pdfFiles = [],
   targetSubCategory = 'w1_dynamic',
+  useAiForDocx = true,
   apiKey = '',
   aiConfigured = false,
   onProgress = null,
   signal = null
 }) {
   const hasAiAccess = Boolean(String(apiKey || '').trim() || aiConfigured);
+  const warnings = [];
+  const docxReadyDrafts = [];
   const expandedVisuals = [];
+  let usedModelName = 'word-direct-import';
+
+  // 0. Fast-path Word (.docx) items: exact prompt text + embedded chart image directly from XML/media
+  if (docxItems.length > 0) {
+    for (let i = 0; i < docxItems.length; i += 1) {
+      if (signal?.aborted) throw new Error('Đã hủy tác vụ theo yêu cầu.');
+      const doc = docxItems[i];
+      onProgress?.({
+        phase: 'docx',
+        done: i + 1,
+        total: docxItems.length,
+        message: `Đang tách chữ & ảnh từ file Word (${i + 1}/${docxItems.length}): ${doc.fileName}`
+      });
+
+      const rawPrompt = String(doc.prompt || doc.rawText || '').trim();
+      const hasPromptText = rawPrompt.split(/\s+/).filter(Boolean).length >= 6;
+      const hasImage = Boolean(doc.primaryImageUrl);
+
+      // Case A: Word file only contains a pasted screenshot (no text) -> send to Vision pipeline
+      if (!hasPromptText && hasImage) {
+        const compressed = await compressVisualDataUrl(doc.primaryImageUrl, { maxWidth: 1400, quality: 0.88 });
+        expandedVisuals.push({
+          id: `w1_docx_vis_${Date.now()}_${i}`,
+          sourceLabel: doc.folderPath ? `${doc.folderPath}/${doc.fileName}` : doc.fileName,
+          imageDataUrl: compressed,
+          inferredSubCategory: doc.inferredSubCategory,
+          matchedFromFolder: doc.matchedFromFolder
+        });
+        continue;
+      }
+
+      if (!hasPromptText && !hasImage) {
+        warnings.push(`${doc.fileName}: file Word trống (không có văn bản đề hay hình biểu đồ), đã bỏ qua.`);
+        continue;
+      }
+
+      const compressedImg = hasImage
+        ? await compressVisualDataUrl(doc.primaryImageUrl, { maxWidth: 1400, quality: 0.88 })
+        : '';
+
+      if (!hasImage) {
+        warnings.push(`${doc.fileName}: chưa có hình ảnh nhúng trong file Word — bạn có thể gắn ảnh hoặc tạo hình bằng AI sau.`);
+      }
+
+      const resolvedSub =
+        targetSubCategory && targetSubCategory !== 'auto' && VALID_T1_SUBCAT_IDS.has(targetSubCategory)
+          ? targetSubCategory
+          : VALID_T1_SUBCAT_IDS.has(doc.inferredSubCategory)
+          ? doc.inferredSubCategory
+          : 'w1_dynamic';
+
+      docxReadyDrafts.push({
+        id: doc.id || `w1_docx_${Date.now()}_${i}`,
+        fileName: doc.fileName,
+        folderPath: doc.folderPath || '',
+        sourceLabel: doc.folderPath ? `${doc.folderPath.split('/').pop()} / ${doc.fileName}` : doc.fileName,
+        title: normalizeNounPhraseTitle(buildTask1NounTitleFromPrompt(rawPrompt, doc.fileName), rawPrompt),
+        prompt: rawPrompt,
+        modelAnswer: String(doc.modelAnswer || '').trim(),
+        dailySubCategory: resolvedSub,
+        matchedFromFolder: Boolean(doc.matchedFromFolder),
+        imageUrl: compressedImg,
+        croppedImageUrl: '',
+        fullImageUrl: compressedImg,
+        usingCropped: false,
+        selected: true
+      });
+    }
+
+    // Optional ultra-fast text-only AI title polishing in batches of 35 (2s for 50 docs!)
+    if (docxReadyDrafts.length > 0 && useAiForDocx && hasAiAccess) {
+      const BATCH_SIZE = 35;
+      for (let start = 0; start < docxReadyDrafts.length; start += BATCH_SIZE) {
+        if (signal?.aborted) throw new Error('Đã hủy tác vụ theo yêu cầu.');
+        const slice = docxReadyDrafts.slice(start, start + BATCH_SIZE);
+        onProgress?.({
+          phase: 'docx-ai',
+          done: start,
+          total: docxReadyDrafts.length,
+          message: `AI đang chuẩn hóa tên Cụm Danh Từ học thuật cho ${slice.length} đề Word (${start + 1}–${start + slice.length}/${docxReadyDrafts.length})...`
+        });
+        try {
+          const { outMap, usedModel } = await polishTask1DocxBatchWithAi(slice, { apiKey });
+          if (usedModel) usedModelName = `${usedModel} (word-fast)`;
+          slice.forEach((draft, offset) => {
+            const aiRow = outMap.get(offset);
+            if (!aiRow) return;
+            if (aiRow.title) {
+              draft.title = normalizeNounPhraseTitle(aiRow.title, draft.prompt);
+            }
+            // Only let AI override subCategory when target is 'auto' AND folder name didn't already pin it
+            if (
+              targetSubCategory === 'auto' &&
+              !draft.matchedFromFolder &&
+              VALID_T1_SUBCAT_IDS.has(String(aiRow.subCategory || '').trim())
+            ) {
+              draft.dailySubCategory = String(aiRow.subCategory).trim();
+            }
+          });
+        } catch (err) {
+          warnings.push(`Nhóm file Word ${start + 1}–${start + slice.length}: giữ tên rút trích tự động (${err?.message || 'lỗi AI'}).`);
+        }
+      }
+    }
+  }
 
   // 1. Normalize uploaded / pasted image items
   for (let i = 0; i < visualSources.length; i += 1) {
@@ -901,7 +1121,9 @@ export async function runBulkTask1AiPipeline({
     expandedVisuals.push({
       id: `w1_vis_${Date.now()}_${i}`,
       sourceLabel: src.name || `Hình ${i + 1}`,
-      imageDataUrl: compressed
+      imageDataUrl: compressed,
+      inferredSubCategory: src.inferredSubCategory || src.file?._inferredSubCategory || '',
+      matchedFromFolder: Boolean(src.inferredSubCategory || src.file?._inferredSubCategory)
     });
   }
 
@@ -931,48 +1153,76 @@ export async function runBulkTask1AiPipeline({
     });
   }
 
-  if (expandedVisuals.length === 0) {
-    throw new Error('Hãy tải lên ít nhất 1 hình ảnh hoặc file PDF đề Writing Task 1.');
+  if (docxReadyDrafts.length === 0 && expandedVisuals.length === 0) {
+    throw new Error('Hãy tải lên ít nhất 1 file Word (.docx), file ZIP thư mục, hình ảnh hoặc file PDF đề Writing Task 1.');
   }
 
-  const results = new Array(expandedVisuals.length);
-  const warnings = [];
-  let completed = 0;
-  let usedModelName = hasAiAccess ? 'gemini-vision' : 'local-image-import';
-  const CONCURRENCY = 2;
-  let cursor = 0;
+  const visionResults = new Array(expandedVisuals.length);
+  if (expandedVisuals.length > 0) {
+    let completed = 0;
+    usedModelName = hasAiAccess ? 'gemini-vision' : 'local-image-import';
+    const CONCURRENCY = 2;
+    let cursor = 0;
 
-  onProgress?.({
-    phase: 'ai',
-    done: 0,
-    total: expandedVisuals.length,
-    message: hasAiAccess
-      ? `AI đang đọc biểu đồ, tự cắt hình & đặt tên danh từ cho ${expandedVisuals.length} đề Task 1...`
-      : `Đang khởi tạo ${expandedVisuals.length} đề Task 1 từ hình ảnh...`
-  });
+    onProgress?.({
+      phase: 'ai',
+      done: 0,
+      total: expandedVisuals.length,
+      message: hasAiAccess
+        ? `AI đang đọc biểu đồ, tự cắt hình & đặt tên danh từ cho ${expandedVisuals.length} đề hình ảnh / PDF...`
+        : `Đang khởi tạo ${expandedVisuals.length} đề Task 1 từ hình ảnh...`
+    });
 
-  const worker = async () => {
-    while (cursor < expandedVisuals.length) {
-      if (signal?.aborted) throw new Error('Đã hủy tác vụ theo yêu cầu.');
-      const idx = cursor;
-      cursor += 1;
-      const item = expandedVisuals[idx];
+    const worker = async () => {
+      while (cursor < expandedVisuals.length) {
+        if (signal?.aborted) throw new Error('Đã hủy tác vụ theo yêu cầu.');
+        const idx = cursor;
+        cursor += 1;
+        const item = expandedVisuals[idx];
+        const effectiveTargetSub =
+          targetSubCategory && targetSubCategory !== 'auto' && VALID_T1_SUBCAT_IDS.has(targetSubCategory)
+            ? targetSubCategory
+            : item.matchedFromFolder && VALID_T1_SUBCAT_IDS.has(item.inferredSubCategory)
+            ? item.inferredSubCategory
+            : 'auto';
 
-      if (hasAiAccess) {
-        try {
-          const analyzed = await analyzeSingleTask1VisualWithAi(item, { apiKey, targetSubCategory });
-          if (analyzed.usedModel) usedModelName = analyzed.usedModel;
-          results[idx] = analyzed;
-        } catch (err) {
-          warnings.push(`${item.sourceLabel}: dùng ảnh gốc & tiêu đề mặc định (${err?.message || 'lỗi AI'}).`);
+        if (hasAiAccess) {
+          try {
+            const analyzed = await analyzeSingleTask1VisualWithAi(item, {
+              apiKey,
+              targetSubCategory: effectiveTargetSub
+            });
+            if (analyzed.usedModel) usedModelName = analyzed.usedModel;
+            visionResults[idx] = analyzed;
+          } catch (err) {
+            warnings.push(`${item.sourceLabel}: dùng ảnh gốc & tiêu đề mặc định (${err?.message || 'lỗi AI'}).`);
+            const fallbackSub =
+              effectiveTargetSub !== 'auto' && VALID_T1_SUBCAT_IDS.has(effectiveTargetSub)
+                ? effectiveTargetSub
+                : 'w1_dynamic';
+            visionResults[idx] = {
+              id: item.id,
+              sourceLabel: item.sourceLabel,
+              title: `Visual data analysis (${item.sourceLabel.replace(/\.[^.]+$/, '')})`,
+              prompt:
+                'The chart/diagram below gives information for IELTS Academic Writing Task 1. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
+              dailySubCategory: fallbackSub,
+              imageUrl: item.imageDataUrl,
+              croppedImageUrl: '',
+              fullImageUrl: item.imageDataUrl,
+              usingCropped: false,
+              selected: true
+            };
+          }
+        } else {
           const fallbackSub =
-            targetSubCategory && targetSubCategory !== 'auto' && VALID_T1_SUBCAT_IDS.has(targetSubCategory)
-              ? targetSubCategory
+            effectiveTargetSub !== 'auto' && VALID_T1_SUBCAT_IDS.has(effectiveTargetSub)
+              ? effectiveTargetSub
               : 'w1_dynamic';
-          results[idx] = {
+          visionResults[idx] = {
             id: item.id,
             sourceLabel: item.sourceLabel,
-            title: `Visual data analysis (${item.sourceLabel.replace(/\.[^.]+$/, '')})`,
+            title: `Visual chart analysis #${idx + 1}`,
             prompt:
               'The chart/diagram below gives information for IELTS Academic Writing Task 1. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
             dailySubCategory: fallbackSub,
@@ -983,42 +1233,24 @@ export async function runBulkTask1AiPipeline({
             selected: true
           };
         }
-      } else {
-        const fallbackSub =
-          targetSubCategory && targetSubCategory !== 'auto' && VALID_T1_SUBCAT_IDS.has(targetSubCategory)
-            ? targetSubCategory
-            : 'w1_dynamic';
-        results[idx] = {
-          id: item.id,
-          sourceLabel: item.sourceLabel,
-          title: `Visual chart analysis #${idx + 1}`,
-          prompt:
-            'The chart/diagram below gives information for IELTS Academic Writing Task 1. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
-          dailySubCategory: fallbackSub,
-          imageUrl: item.imageDataUrl,
-          croppedImageUrl: '',
-          fullImageUrl: item.imageDataUrl,
-          usingCropped: false,
-          selected: true
-        };
+
+        completed += 1;
+        onProgress?.({
+          phase: 'ai',
+          done: completed,
+          total: expandedVisuals.length,
+          message: `Đã soạn xong ${completed} / ${expandedVisuals.length} đề hình ảnh / PDF...`
+        });
       }
+    };
 
-      completed += 1;
-      onProgress?.({
-        phase: 'ai',
-        done: completed,
-        total: expandedVisuals.length,
-        message: `Đã soạn xong ${completed} / ${expandedVisuals.length} đề Task 1...`
-      });
-    }
-  };
-
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, expandedVisuals.length) }, () => worker())
-  );
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, expandedVisuals.length) }, () => worker())
+    );
+  }
 
   return {
-    items: results.filter(Boolean),
+    items: [...docxReadyDrafts, ...visionResults.filter(Boolean)],
     usedModel: usedModelName,
     warnings
   };

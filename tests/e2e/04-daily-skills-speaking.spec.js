@@ -568,4 +568,183 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       }
     }
   });
+
+  test('Teacher bulk-uploads a Google Drive .zip containing Word (.docx) files across DYNAMIC CHART & MAP subfolders with embedded chart PNGs', async ({
+    page,
+    request,
+    baseURL,
+    healthGuard
+  }) => {
+    // Pure JS ZIP builder (Stored method 0) so we can construct real .docx and nested Google Drive .zip archives in E2E
+    function buildStoredZip(entries = []) {
+      const localParts = [];
+      const cdParts = [];
+      let offset = 0;
+
+      for (const entry of entries) {
+        const nameBuf = Buffer.from(entry.name, 'utf8');
+        const dataBuf = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(String(entry.data || ''), 'utf8');
+
+        // Minimal CRC32 table computation
+        let crc = 0xffffffff;
+        for (let i = 0; i < dataBuf.length; i += 1) {
+          crc ^= dataBuf[i];
+          for (let b = 0; b < 8; b += 1) {
+            crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+          }
+        }
+        crc = (crc ^ 0xffffffff) >>> 0;
+
+        const localHeader = Buffer.alloc(30);
+        localHeader.writeUInt32LE(0x04034b50, 0);
+        localHeader.writeUInt16LE(20, 4);
+        localHeader.writeUInt16LE(0x0800, 6); // UTF-8
+        localHeader.writeUInt16LE(0, 8); // Stored
+        localHeader.writeUInt32LE(crc, 14);
+        localHeader.writeUInt32LE(dataBuf.length, 18);
+        localHeader.writeUInt32LE(dataBuf.length, 22);
+        localHeader.writeUInt16LE(nameBuf.length, 26);
+        localHeader.writeUInt16LE(0, 28);
+
+        localParts.push(localHeader, nameBuf, dataBuf);
+
+        const cdHeader = Buffer.alloc(46);
+        cdHeader.writeUInt32LE(0x02014b50, 0);
+        cdHeader.writeUInt16LE(20, 4);
+        cdHeader.writeUInt16LE(20, 6);
+        cdHeader.writeUInt16LE(0x0800, 8);
+        cdHeader.writeUInt16LE(0, 10);
+        cdHeader.writeUInt32LE(crc, 16);
+        cdHeader.writeUInt32LE(dataBuf.length, 20);
+        cdHeader.writeUInt32LE(dataBuf.length, 24);
+        cdHeader.writeUInt16LE(nameBuf.length, 28);
+        cdHeader.writeUInt32LE(offset, 42);
+
+        cdParts.push(cdHeader, nameBuf);
+        offset += localHeader.length + nameBuf.length + dataBuf.length;
+      }
+
+      const cdBuf = Buffer.concat(cdParts);
+      const eocd = Buffer.alloc(22);
+      eocd.writeUInt32LE(0x06054b50, 0);
+      eocd.writeUInt16LE(entries.length, 8);
+      eocd.writeUInt16LE(entries.length, 10);
+      eocd.writeUInt32LE(cdBuf.length, 12);
+      eocd.writeUInt32LE(offset, 16);
+
+      return Buffer.concat([...localParts, cdBuf, eocd]);
+    }
+
+    function buildMinimalDocx(paragraphs = [], pngBuffer = null) {
+      const xmlParas = paragraphs
+        .map(p => `<w:p><w:r><w:t>${String(p).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</w:t></w:r></w:p>`)
+        .join('');
+      const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${xmlParas}</w:body></w:document>`;
+      const files = [{ name: 'word/document.xml', data: docXml }];
+      if (pngBuffer) {
+        files.push({ name: 'word/media/image1.png', data: pngBuffer });
+      }
+      return buildStoredZip(files);
+    }
+
+    // Valid 1x1 teal PNG (padded slightly >64 bytes via PNG tEXt chunk? Actually raw 1x1 PNG is 67 bytes!)
+    const tinyPng = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64'
+    );
+
+    const dynamicDocx = buildMinimalDocx(
+      [
+        'The bar chart below shows a drug company\'s total sales across three regions between 2002 and 2006. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.'
+      ],
+      tinyPng
+    );
+    const mapDocx = buildMinimalDocx(
+      [
+        'The two maps below show the changes in Riverside Park between 1995 and the present day. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
+        'Sample answer: Overall, Riverside Park underwent significant modernization...'
+      ],
+      tinyPng
+    );
+
+    const driveZip = buildStoredZip([
+      { name: "KHO DE TASK 1/DYNAMIC CHART/a drug company's total sales.docx", data: dynamicDocx },
+      { name: 'KHO DE TASK 1/MAP/4 AREAS CUOI.docx', data: mapDocx }
+    ]);
+
+    try {
+      await loginViaUI(page, E2E_CREDENTIALS.teacher.username, E2E_CREDENTIALS.teacher.password);
+      await page.locator('header').getByRole('tab', { name: /Daily Zone/i }).first().click();
+      await page.locator('aside').getByRole('button', { name: /Viết Task 1/i }).first().click();
+
+      await page.getByTestId('open-bulk-w1-ai-btn').click();
+      await expect(page.getByTestId('daily-writing-bulk-modal')).toBeVisible();
+
+      // Upload the single Google Drive .zip directly
+      await page.getByTestId('bulk-w1-file-input').setInputFiles([
+        { name: 'KHO DE TASK 1.zip', mimeType: 'application/zip', buffer: driveZip }
+      ]);
+
+      // Confirm both .docx items unpacked and auto-detected both folders (Dynamic + Map)
+      await expect(page.getByText(/2 Word \(\.docx\)/i)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(/Tự nhận diện thư mục:/i)).toBeVisible();
+
+      // Run pipeline (instant direct Word extraction without needing external Gemini!)
+      await page.getByTestId('run-bulk-w1-ai-btn').click();
+
+      await expect(page.getByTestId('bulk-w1-draft-card-0')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('bulk-w1-draft-card-1')).toBeVisible();
+
+      // Verify clean noun-phrase title extracted from English prompt (not "4 AREAS CUOI") and correct folder routing
+      await expect(page.getByTestId('bulk-w1-draft-card-0').locator('select')).toHaveValue('w1_dynamic');
+      await expect(page.getByTestId('bulk-w1-draft-card-1').locator('select')).toHaveValue('w1_map');
+      await expect(page.getByTestId('bulk-w1-draft-card-1').locator('input[type="text"]')).toHaveValue(
+        /Changes in Riverside Park/i
+      );
+      // Sample answer paragraph should be cleanly separated out of student prompt
+      await expect(page.getByTestId('bulk-w1-draft-card-1').locator('textarea')).not.toHaveValue(/Sample answer/i);
+
+      await page.getByTestId('confirm-save-bulk-w1-btn').click();
+      await expect(page.getByTestId('daily-writing-bulk-modal')).toHaveCount(0);
+
+      // Verify saved tests in server state have embedded images & exact folder routing
+      const loginRes = await request.post(`${baseURL}/api/sync/auth/login`, {
+        data: {
+          username: E2E_CREDENTIALS.teacher.username,
+          password: E2E_CREDENTIALS.teacher.password
+        }
+      });
+      expect(loginRes.ok()).toBeTruthy();
+      const snapRes = await request.get(`${baseURL}/api/sync/state`);
+      const snap = await snapRes.json();
+      const created = (snap?.tests || []).filter(t => String(t?.id || '').startsWith('test-w1-bulk-'));
+      expect(created.length).toBe(2);
+      const dynTest = created.find(t => t.dailySubCategory === 'w1_dynamic');
+      const mapTest = created.find(t => t.dailySubCategory === 'w1_map');
+      expect(dynTest?.writing?.task1?.imageUrl).toMatch(/^(data:image\/|\/api\/sync\/media\/)/);
+      expect(mapTest?.writing?.task1?.imageUrl).toMatch(/^(data:image\/|\/api\/sync\/media\/)/);
+      expect(mapTest?.writing?.task1?.modelAnswer).toMatch(/Sample answer/i);
+
+      healthGuard.assertHealthy('daily-writing-word-zip-import');
+    } finally {
+      await request.post(`${baseURL}/api/sync/auth/login`, {
+        data: {
+          username: E2E_CREDENTIALS.teacher.username,
+          password: E2E_CREDENTIALS.teacher.password
+        }
+      });
+      const snapRes = await request.get(`${baseURL}/api/sync/state`);
+      if (snapRes.ok()) {
+        const snap = await snapRes.json();
+        const toDelete = (snap?.tests || [])
+          .map(t => t?.id)
+          .filter(id => String(id || '').startsWith('test-w1-bulk-'));
+        for (const id of toDelete) {
+          await request.post(`${baseURL}/api/sync/action`, {
+            data: { type: 'DELETE_TEST', payload: { testId: id } }
+          });
+        }
+      }
+    }
+  });
 });
