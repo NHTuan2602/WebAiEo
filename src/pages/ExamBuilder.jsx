@@ -1553,6 +1553,63 @@ Write ONE WORD AND/OR A NUMBER for each answer.
     return { partCount: importedTracks.length, questionCount };
   };
 
+  const handleApplySpeakingExtraction = (extracted) => {
+    if (!extracted || typeof extracted !== 'object') return;
+    setTestForm(prev => {
+      const prevSp = normalizeSpeakingSection(prev.speaking);
+      const nextScripts = {
+        ...(prevSp.examinerScripts || {}),
+        enabled: true,
+        ...(extracted.examinerScripts?.part1Intro ? { part1Intro: extracted.examinerScripts.part1Intro } : {}),
+        ...(extracted.examinerScripts?.part2Intro ? { part2Intro: extracted.examinerScripts.part2Intro } : {}),
+        ...(extracted.examinerScripts?.part3Intro ? { part3Intro: extracted.examinerScripts.part3Intro } : {})
+      };
+      const nextSpeaking = normalizeSpeakingSection({
+        ...prevSp,
+        examinerScripts: nextScripts,
+        ...(Array.isArray(extracted.part1Questions) && extracted.part1Questions.length > 0
+          ? {
+              part1: {
+                ...prevSp.part1,
+                enabled: true,
+                topic: extracted.part1Topic || prevSp.part1?.topic || 'General Questions',
+                questions: extracted.part1Questions
+              }
+            }
+          : {}),
+        ...(extracted.part2CueCardPrompt || extracted.part2Title || (extracted.part2Bullets || []).length > 0
+          ? {
+              part2: {
+                ...prevSp.part2,
+                enabled: true,
+                title: extracted.part2Title || extracted.part2CueCardPrompt || prevSp.part2?.title || '',
+                cueCardPrompt: extracted.part2CueCardPrompt || extracted.part2Title || prevSp.part2?.cueCardPrompt || '',
+                bullets:
+                  Array.isArray(extracted.part2Bullets) && extracted.part2Bullets.length > 0
+                    ? extracted.part2Bullets
+                    : prevSp.part2?.bullets || [],
+                followUpQuestion: extracted.part2FollowUpQuestion ?? prevSp.part2?.followUpQuestion ?? ''
+              }
+            }
+          : {}),
+        ...(Array.isArray(extracted.part3Questions) && extracted.part3Questions.length > 0
+          ? {
+              part3: {
+                ...prevSp.part3,
+                enabled: true,
+                topic: extracted.part3Topic || prevSp.part3?.topic || 'Discussion Questions',
+                questions: extracted.part3Questions
+              }
+            }
+          : {})
+      });
+      return {
+        ...prev,
+        speaking: nextSpeaking
+      };
+    });
+  };
+
   const handleApplyWritingExtraction = (extracted, { writingScope = 'both', imageOnly = false } = {}) => {
     if (!extracted || typeof extracted !== 'object') return;
     const t1 = extracted.task1 || {};
@@ -1669,6 +1726,7 @@ Write ONE WORD AND/OR A NUMBER for each answer.
             defaultExpanded={builderTab === 'general'}
             onApplyListeningPdfExtraction={handleApplyListeningPdfExtraction}
             onApplyReadingPdfExtraction={handleApplyReadingPdfExtraction}
+            onApplySpeakingExtraction={handleApplySpeakingExtraction}
             onApplyWritingExtraction={handleApplyWritingExtraction}
             onJumpToTab={setBuilderTab}
             onSuggestExamTitle={handleSuggestExamTitle}

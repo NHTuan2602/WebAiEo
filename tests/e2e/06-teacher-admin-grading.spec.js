@@ -97,11 +97,12 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
 
     await page.getByRole('button', { name: /Thực Chiến \(100k\)/i }).first().click();
     await expect(page.getByText(/TÊN ĐỀ THI IELTS|Soạn & Chỉnh Sửa Đề/i).first()).toBeVisible({ timeout: 12_000 });
-    // Verify Quick 3-PDF Importer (Listening + Reading + Writing) & upgraded 5-step Guide Modal
+    // Verify Quick 4-File Importer (Listening + Reading + Writing + Speaking) & upgraded 5-step Guide Modal
     await expect(page.locator('[data-testid="quick-three-pdf-importer"]')).toBeVisible();
     await expect(page.locator('input[aria-label="Tạo nhanh: chọn PDF Listening"]')).toBeAttached();
     await expect(page.locator('input[aria-label="Tạo nhanh: chọn PDF Reading"]')).toBeAttached();
-    await expect(page.locator('input[aria-label="Tạo nhanh: chọn PDF hoặc ảnh Writing"]')).toBeAttached();
+    await expect(page.locator('input[aria-label="Tạo nhanh: chọn Word, PDF hoặc ảnh Writing"]')).toBeAttached();
+    await expect(page.locator('[data-testid="quick-four-speaking-input"]')).toBeAttached();
     await page.getByRole('button', { name: /Xem Hướng Dẫn Chi Tiết/i }).first().click();
     await expect(page.getByText(/Cẩm Nang Tạo Đề Thi IELTS Chi Tiết/i)).toBeVisible();
     await page.getByRole('button', { name: /Đã Hiểu, Đóng Hướng Dẫn/i }).click();
@@ -113,9 +114,34 @@ test.describe('6. Teacher Admin Dashboard, ExamBuilder, Grading Modal & Student 
     await expect(page.getByRole('button', { name: /5\. Speaking \(3 phần/i }).first()).toBeVisible();
     await page.getByRole('button', { name: /4\. Writing \(2 bài/i }).first().click();
     await expect(page.getByText(/AI Tạo Tự Động Writing/i).first()).toBeVisible();
-    await expect(page.locator('input[aria-label="Chọn PDF hoặc ảnh đề IELTS Writing"]')).toBeAttached();
+    await expect(page.locator('input[aria-label="Chọn Word, PDF hoặc ảnh đề IELTS Writing"]')).toBeAttached();
     await page.getByRole('button', { name: /5\. Speaking \(3 phần/i }).first().click();
     await expect(page.getByText(/Kịch Bản Lời Dẫn Giám Khảo AI/i).first()).toBeVisible();
+    await expect(page.getByTestId('ai-speaking-extractor-panel')).toBeVisible();
+
+    // Verify AI Speaking File/Text Extractor parses multi-topic Part 1 + Part 2 Cue Card + Part 3 cleanly
+    await page.getByTestId('ai-speaking-paste-textarea').fill([
+      "PART 1 Let's talk about ACCOMMODATION",
+      'Are you living in an apartment or a flat?',
+      'What do you like most about this place?',
+      "Let's talk about SOCIAL MEDIA",
+      'How much time do you spend on social media every day?',
+      'PART 2:',
+      "Now, I'm going to give you a topic and I'd like you to talk about it for 1-2 minutes.",
+      'YOUR TOPIC IS: DESCRIBE A natural place in your city that you enjoy visiting',
+      'You should say:',
+      '● Where it is',
+      '● How you found out about this place',
+      '● What it looks like',
+      '● And explain why you enjoy visiting it',
+      "PART 3: We've been talking about a natural place in your city that you enjoy visiting and I'd like to discuss with you in one or two more general questions related to this",
+      'Have you seen a wild animal in the city?',
+      'What are the differences between a natural place and a city?'
+    ].join('\n'));
+    await page.getByTestId('ai-speaking-extract-btn').click();
+    await expect(page.getByTestId('ai-speaking-extract-success')).toContainText(/Part 1 \(3 câu\).*Part 2 \(4 ý Cue Card\).*Part 3 \(2 câu\)/i, {
+      timeout: 10_000
+    });
 
     // Verify Listening Builder includes AI PDF extraction + side-by-side Answer Key panel & range image tool
     await page.getByRole('button', { name: /2\. Listening/i }).first().click();

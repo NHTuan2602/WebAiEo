@@ -2170,6 +2170,341 @@ Requirements:
 }
 
 /**
+ * Deterministic local parser for authentic IELTS Speaking test sheets (Part 1 multi-topic, Part 2 Cue Card, Part 3).
+ * Used for instant Word (.docx) / text import or as fallback if AI is not configured.
+ */
+export function parseSpeakingExamTextLocally(rawText = '', fileName = '') {
+  const lines = String(rawText || '')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map(l => l.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const stamp = Date.now();
+  let section = 'part1';
+  let currentP1Topic = '';
+  const p1TopicsFound = [];
+  const p1Questions = [];
+  let p2IntroLines = [];
+  let p2Title = '';
+  const p2Bullets = [];
+  let p2InBullets = false;
+  let p2FollowUp = '';
+  let p3Intro = '';
+  let p3Topic = '';
+  const p3Questions = [];
+
+  const titleCaseTopic = (str) => {
+    const clean = String(str || '').replace(/[:.\-–—]+$/, '').trim();
+    if (!clean) return '';
+    if (clean === clean.toUpperCase() && clean.length > 3) {
+      return clean
+        .toLowerCase()
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+    return clean;
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+
+    // Section headers
+    if (/^PART\s*1\b/i.test(line)) {
+      section = 'part1';
+      const topicMatch = line.match(/(?:let['’]?s\s+talk\s+about|topic\s*[:\-–]?)\s+(.+)$/i);
+      if (topicMatch) {
+        currentP1Topic = titleCaseTopic(topicMatch[1]);
+        if (currentP1Topic && !p1TopicsFound.includes(currentP1Topic)) p1TopicsFound.push(currentP1Topic);
+      }
+      continue;
+    }
+    if (/^PART\s*2\b/i.test(line)) {
+      section = 'part2';
+      p2InBullets = false;
+      const tail = line.replace(/^PART\s*2\b\s*[:.\-–—]?\s*/i, '').trim();
+      if (tail) {
+        if (/^describe\b/i.test(tail)) p2Title = tail;
+        else p2IntroLines.push(tail);
+      }
+      continue;
+    }
+    if (/^PART\s*3\b/i.test(line)) {
+      section = 'part3';
+      const tail = line.replace(/^PART\s*3\b\s*[:.\-–—]?\s*/i, '').trim();
+      if (tail) {
+        p3Intro = tail;
+        const aboutMatch = tail.match(/talking about\s+(.+?)(?:\s+and\s+I['’]?d\s+like|\s*[.,]|$)/i);
+        if (aboutMatch) p3Topic = titleCaseTopic(aboutMatch[1]);
+      }
+      continue;
+    }
+
+    if (section === 'part1') {
+      const talkMatch = line.match(/^(?:now,?\s*)?(?:let['’]?s\s+(?:move\s+on\s+to\s+|talk\s+about)|topic\s*\d*\s*[:\-–])\s*(.+)$/i);
+      if (talkMatch) {
+        currentP1Topic = titleCaseTopic(talkMatch[1]);
+        if (currentP1Topic && !p1TopicsFound.includes(currentP1Topic)) p1TopicsFound.push(currentP1Topic);
+        continue;
+      }
+      // Short standalone uppercase topic header (e.g. "ACCOMMODATION", "SOCIAL MEDIA")
+      if (line.length <= 42 && !line.includes('?') && /^[A-Z0-9\s&/-]+$/.test(line) && /[A-Z]{3,}/.test(line)) {
+        currentP1Topic = titleCaseTopic(line);
+        if (currentP1Topic && !p1TopicsFound.includes(currentP1Topic)) p1TopicsFound.push(currentP1Topic);
+        continue;
+      }
+      const cleanedQ = line.replace(/^(?:Q?\d+[.)\-:]\s*|[-•●▪]\s*)/, '').trim();
+      if (cleanedQ.length >= 8) {
+        // Merge wrapped question line if previous item didn't end with ?
+        if (
+          p1Questions.length > 0 &&
+          !p1Questions[p1Questions.length - 1].prompt.endsWith('?') &&
+          /^[a-z]/.test(cleanedQ)
+        ) {
+          p1Questions[p1Questions.length - 1].prompt = `${p1Questions[p1Questions.length - 1].prompt} ${cleanedQ}`;
+        } else {
+          p1Questions.push({
+            id: `sp1_${stamp}_${p1Questions.length + 1}`,
+            topic: currentP1Topic || p1TopicsFound[0] || '',
+            prompt: cleanedQ,
+            hint: ''
+          });
+        }
+      }
+      continue;
+    }
+
+    if (section === 'part2') {
+      if (/^you should say\b/i.test(line)) {
+        p2InBullets = true;
+        continue;
+      }
+      const topicPrefix = line.match(/^(?:your\s+topic\s+is|cue\s+card|topic)\s*[:\-–]\s*(.+)$/i);
+      if (topicPrefix) {
+        p2Title = topicPrefix[1].trim();
+        continue;
+      }
+      if (!p2Title && /^describe\b/i.test(line)) {
+        p2Title = line;
+        continue;
+      }
+      if (p2Title && !p2InBullets && !/^[●•\-*▪]/.test(line) && !/^follow[\s-]*up/i.test(line) && p2Bullets.length === 0 && line.length < 90 && !line.endsWith('?')) {
+        // Wrapped second line of cue card title (e.g. "DESCRIBE A natural place in your city" + "that you enjoy visiting")
+        p2Title = `${p2Title} ${line}`.replace(/\s+/g, ' ').trim();
+        continue;
+      }
+      if (/^[●•\-*▪]/.test(line) || p2InBullets) {
+        if (/^(?:follow[\s-]*up|rounding[\s-]*off)/i.test(line)) {
+          p2InBullets = false;
+          p2FollowUp = line.replace(/^(?:follow[\s-]*up|rounding[\s-]*off)[^:]*:\s*/i, '').trim();
+          continue;
+        }
+        const bulletText = line.replace(/^[●•\-*▪\d.)]+\s*/, '').trim();
+        if (bulletText) p2Bullets.push(bulletText);
+        continue;
+      }
+      if (/^(?:now,?\s*i['’]?m going to|before you talk|you['’]?ll have one minute)/i.test(line)) {
+        p2IntroLines.push(line);
+        continue;
+      }
+      if (p2Bullets.length > 0 && line.endsWith('?')) {
+        p2FollowUp = line;
+      }
+      continue;
+    }
+
+    if (section === 'part3') {
+      if (!p3Questions.length && /^(?:we['’]?ve been talking|i['’]?d like to discuss|one or two more general)/i.test(line)) {
+        p3Intro = [p3Intro, line].filter(Boolean).join(' ').trim();
+        continue;
+      }
+      if (p3Intro && !p3Questions.length && !line.endsWith('?') && line.length < 95 && /^[a-z]/.test(line)) {
+        p3Intro = `${p3Intro} ${line}`.trim();
+        continue;
+      }
+      const cleanedQ = line.replace(/^(?:Q?\d+[.)\-:]\s*|[-•●▪]\s*)/, '').trim();
+      if (cleanedQ.length >= 6) {
+        if (
+          p3Questions.length > 0 &&
+          !p3Questions[p3Questions.length - 1].prompt.endsWith('?') &&
+          /^[a-z]/.test(cleanedQ)
+        ) {
+          p3Questions[p3Questions.length - 1].prompt = `${p3Questions[p3Questions.length - 1].prompt} ${cleanedQ}`;
+        } else {
+          p3Questions.push({
+            id: `sp3_${stamp}_${p3Questions.length + 1}`,
+            prompt: cleanedQ,
+            hint: ''
+          });
+        }
+      }
+    }
+  }
+
+  // Normalize cue card casing if starts with "DESCRIBE A..."
+  if (p2Title) {
+    p2Title = p2Title.replace(/^DESCRIBE\b/, 'Describe');
+  }
+
+  const baseName = String(fileName || '').replace(/\.[^.]+$/, '').trim();
+  return {
+    title: p2Title ? `IELTS Speaking • ${p2Title.slice(0, 65)}` : baseName ? `IELTS Speaking • ${baseName}` : '',
+    part1Topic: p1TopicsFound.join(' & ') || 'General Questions',
+    part1Questions: p1Questions,
+    part2Title: p2Title || 'Describe a topic from the prompt',
+    part2CueCardPrompt: p2Title || '',
+    part2Bullets: p2Bullets,
+    part2FollowUpQuestion: p2FollowUp,
+    part3Topic: p3Topic || p2Title.replace(/^Describe\s+/i, '') || 'Discussion Questions',
+    part3Questions: p3Questions,
+    examinerScripts: {
+      enabled: true,
+      part2Intro: p2IntroLines.join(' ').trim(),
+      part3Intro: p3Intro.trim()
+    },
+    usedModel: 'speaking-local-parser'
+  };
+}
+
+/**
+ * Extracts a full IELTS Speaking exam (Part 1 with multi-topics, Part 2 Cue Card + bullets, Part 3 + optional examiner scripts)
+ * from PDF, Word (.docx) text, screenshots/images, or pasted text.
+ */
+export async function extractSpeakingExamFromMedia({
+  apiKey = '',
+  aiConfigured = false,
+  pdfDataUrl = '',
+  rawText = '',
+  images = [],
+  fileName = '',
+  extraInstructions = ''
+}) {
+  const hasPdf = /^data:application\/pdf;base64,/.test(String(pdfDataUrl || ''));
+  const cleanImages = Array.isArray(images) ? images.filter(Boolean) : [];
+  const cleanText = String(rawText || '').trim();
+  if (!hasPdf && cleanImages.length === 0 && !cleanText) {
+    throw new Error('Hãy chọn file PDF, file Word (.docx), ảnh chụp hoặc dán nội dung đề Speaking trước khi chạy.');
+  }
+
+  const hasGeminiAccess = Boolean(String(apiKey || '').trim() || aiConfigured);
+  // If we only have clean text (e.g. from Word .docx) and no AI key configured, parse cleanly offline!
+  if (!hasGeminiAccess && cleanText && !hasPdf && cleanImages.length === 0) {
+    const localParsed = parseSpeakingExamTextLocally(cleanText, fileName);
+    if (localParsed.part1Questions.length === 0 && !localParsed.part2CueCardPrompt && localParsed.part3Questions.length === 0) {
+      throw new Error('Không tìm thấy cấu trúc Part 1 / Part 2 / Part 3 trong nội dung đã nhập.');
+    }
+    return localParsed;
+  }
+
+  const promptText = `You are a Senior Cambridge IELTS Speaking Exam Digitizer.
+Extract EVERY question and prompt faithfully from the provided IELTS Speaking test document${fileName ? ` ("${fileName}")` : ''}.
+${extraInstructions ? `Additional teacher instructions: ${extraInstructions}` : ''}
+
+IMPORTANT RULES:
+1. PART 1 often has MULTIPLE sub-topics (e.g. "Let's talk about ACCOMMODATION", then "Let's talk about SOCIAL MEDIA").
+   - Preserve EVERY single question verbatim (do NOT drop or summarize questions!).
+   - Set each item's "topic" field to its exact sub-topic name (e.g. "Accommodation" for the first 5 questions, "Social Media" for the next 6 questions) so the examiner announces topic changes naturally!
+   - Set "part1Topic" to a concise combined label (e.g. "Accommodation & Social Media").
+2. PART 2 Cue Card:
+   - Extract "part2Title" and "part2CueCardPrompt" (e.g. "Describe a natural place in your city that you enjoy visiting").
+   - Extract ALL "You should say:" bullet points cleanly into "part2Bullets" (without leading bullet symbols ●/•/-).
+   - If an examiner lead-in script is printed (e.g. "Now, I'm going to give you a topic..."), put it in "examinerScripts.part2Intro".
+3. PART 3 Discussion:
+   - Extract EVERY Part 3 question verbatim into "part3Questions".
+   - If a Part 3 transition script is printed (e.g. "We've been talking about..."), put it in "examinerScripts.part3Intro" and set "part3Topic" cleanly.
+4. Ignore blank pages, headers, footers, or page numbers. Do NOT invent extra questions that are not in the document.
+${cleanText ? `\nSOURCE TEXT:\n${cleanText.slice(0, 20000)}\n` : ''}
+Return ONLY valid JSON:
+{
+  "title": "IELTS Speaking — Accommodation, Social Media & Natural Places",
+  "part1Topic": "Accommodation & Social Media",
+  "part1Questions": [
+    { "topic": "Accommodation", "prompt": "Are you living in an apartment or a flat?", "hint": "" }
+  ],
+  "part2Title": "Describe a natural place in your city that you enjoy visiting",
+  "part2CueCardPrompt": "Describe a natural place in your city that you enjoy visiting",
+  "part2Bullets": [
+    "Where it is",
+    "How you found out about this place",
+    "What it looks like",
+    "And explain why you enjoy visiting it"
+  ],
+  "part2FollowUpQuestion": "",
+  "part3Topic": "Natural Places & Environment",
+  "part3Questions": [
+    { "prompt": "Have you seen a wild animal in the city?", "hint": "" }
+  ],
+  "examinerScripts": {
+    "part1Intro": "",
+    "part2Intro": "",
+    "part3Intro": ""
+  }
+}`;
+
+  try {
+    const { parsed, usedModel } = await callGeminiGenerateJson({
+      apiKey,
+      promptText,
+      images: cleanImages,
+      documents: hasPdf ? [pdfDataUrl] : [],
+      temperature: 0.1
+    });
+
+    const stamp = Date.now();
+    const part1Questions = (Array.isArray(parsed?.part1Questions) ? parsed.part1Questions : [])
+      .map((q, i) => ({
+        id: `sp1_${stamp}_${i + 1}`,
+        topic: String(q?.topic || parsed?.part1Topic || '').trim(),
+        prompt: String(q?.prompt || (typeof q === 'string' ? q : '')).trim(),
+        hint: String(q?.hint || '').trim(),
+        audioUrl: '',
+        audioFileName: ''
+      }))
+      .filter(q => q.prompt);
+
+    const part3Questions = (Array.isArray(parsed?.part3Questions) ? parsed.part3Questions : [])
+      .map((q, i) => ({
+        id: `sp3_${stamp}_${i + 1}`,
+        prompt: String(q?.prompt || (typeof q === 'string' ? q : '')).trim(),
+        hint: String(q?.hint || '').trim(),
+        audioUrl: '',
+        audioFileName: ''
+      }))
+      .filter(q => q.prompt);
+
+    const part2Bullets = (Array.isArray(parsed?.part2Bullets) ? parsed.part2Bullets : [])
+      .map(b => String(b || '').replace(/^[●•\-*▪]+\s*/, '').trim())
+      .filter(Boolean);
+
+    const part2Title = String(parsed?.part2Title || parsed?.part2CueCardPrompt || '').trim();
+    const part2CueCardPrompt = String(parsed?.part2CueCardPrompt || part2Title || '').trim();
+
+    return {
+      title: String(parsed?.title || '').trim(),
+      part1Topic: String(parsed?.part1Topic || part1Questions[0]?.topic || 'General Questions').trim(),
+      part1Questions,
+      part2Title,
+      part2CueCardPrompt,
+      part2Bullets,
+      part2FollowUpQuestion: String(parsed?.part2FollowUpQuestion || '').trim(),
+      part3Topic: String(parsed?.part3Topic || 'Discussion Questions').trim(),
+      part3Questions,
+      examinerScripts: {
+        enabled: true,
+        part1Intro: String(parsed?.examinerScripts?.part1Intro || '').trim(),
+        part2Intro: String(parsed?.examinerScripts?.part2Intro || '').trim(),
+        part3Intro: String(parsed?.examinerScripts?.part3Intro || '').trim()
+      },
+      usedModel
+    };
+  } catch (err) {
+    if (cleanText && !hasPdf && cleanImages.length === 0) {
+      return parseSpeakingExamTextLocally(cleanText, fileName);
+    }
+    throw err;
+  }
+}
+
+/**
  * Extracts IELTS Writing Task 1 (prompt + chart bounding box for auto-crop + optional model answer)
  * and Task 2 (prompt + optional model answer) from a PDF file and/or uploaded screenshots.
  */

@@ -23,6 +23,7 @@ import { generateSpeakingQuestionsWithAI } from '../../utils/geminiGrader';
 import { cleanAudioMimeType } from '../../utils/speakingAiEngine';
 import { DEFAULT_EXAMINER_SCRIPTS, buildSpeakingExaminerLeadIn } from '../../utils/speakingExaminerScript';
 import { pickSupportedAudioMimeType, uploadSpeakingRecording } from '../../utils/speakingApi';
+import AiSpeakingExtractorPanel from './AiSpeakingExtractorPanel';
 
 export default function SpeakingBuilderPanel({
   aiApiKey,
@@ -278,6 +279,55 @@ export default function SpeakingBuilderPanel({
 
   const hasGeminiAccess = Boolean((aiApiKey || '').trim() || aiConfigured);
 
+  const handleApplyExtractedSpeaking = (extracted) => {
+    if (!extracted || typeof extracted !== 'object') return;
+    const nextScripts = {
+      ...(sp.examinerScripts || {}),
+      enabled: true,
+      ...(extracted.examinerScripts?.part1Intro ? { part1Intro: extracted.examinerScripts.part1Intro } : {}),
+      ...(extracted.examinerScripts?.part2Intro ? { part2Intro: extracted.examinerScripts.part2Intro } : {}),
+      ...(extracted.examinerScripts?.part3Intro ? { part3Intro: extracted.examinerScripts.part3Intro } : {})
+    };
+    patchSpeaking({
+      examinerScripts: nextScripts,
+      ...(Array.isArray(extracted.part1Questions) && extracted.part1Questions.length > 0
+        ? {
+            part1: {
+              ...sp.part1,
+              enabled: true,
+              topic: extracted.part1Topic || sp.part1?.topic || 'General Questions',
+              questions: extracted.part1Questions
+            }
+          }
+        : {}),
+      ...(extracted.part2CueCardPrompt || extracted.part2Title || (extracted.part2Bullets || []).length > 0
+        ? {
+            part2: {
+              ...sp.part2,
+              enabled: true,
+              title: extracted.part2Title || extracted.part2CueCardPrompt || sp.part2?.title || '',
+              cueCardPrompt: extracted.part2CueCardPrompt || extracted.part2Title || sp.part2?.cueCardPrompt || '',
+              bullets:
+                Array.isArray(extracted.part2Bullets) && extracted.part2Bullets.length > 0
+                  ? extracted.part2Bullets
+                  : sp.part2?.bullets || [],
+              followUpQuestion: extracted.part2FollowUpQuestion ?? sp.part2?.followUpQuestion ?? ''
+            }
+          }
+        : {}),
+      ...(Array.isArray(extracted.part3Questions) && extracted.part3Questions.length > 0
+        ? {
+            part3: {
+              ...sp.part3,
+              enabled: true,
+              topic: extracted.part3Topic || sp.part3?.topic || 'Discussion Questions',
+              questions: extracted.part3Questions
+            }
+          }
+        : {})
+    });
+  };
+
   const handleAiGenerateSpeaking = async () => {
     const cleanKey = (aiApiKey || '').trim();
     if (!hasGeminiAccess) {
@@ -346,6 +396,16 @@ export default function SpeakingBuilderPanel({
             Nạp Bộ Câu Hỏi Mẫu
           </button>
         </div>
+
+        {/* AI File Extractor (PDF / Word .docx / Image / Paste) */}
+        <AiSpeakingExtractorPanel
+          aiApiKey={aiApiKey}
+          aiConfigured={aiConfigured}
+          onApplySpeakingExtraction={handleApplyExtractedSpeaking}
+          setApiTestState={setApiTestState}
+          setShowApiKeyModal={setShowApiKeyModal}
+          showToast={showToast}
+        />
 
         {/* AI Generator Bar */}
         <div className="p-4 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-500/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">

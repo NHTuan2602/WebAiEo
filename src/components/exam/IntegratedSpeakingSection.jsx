@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Lock,
   Mic,
   MicOff,
   RotateCcw,
@@ -387,6 +388,9 @@ export default function IntegratedSpeakingSection({
     const spokenPayload = examinerScript.fullSpokenText || question.prompt || '';
     if (!question.audioUrl && speakingCfg.disableAiTts) {
       setPromptPlayBlocked(true);
+      if (question.part === 2 && !recordingsMapRef.current?.[questionId] && !part2PrepTimerRef.current) {
+        startPart2PrepTimer(questionId, question.prepSec || 60);
+      }
       return;
     }
     const finishPrompt = () => {
@@ -411,6 +415,9 @@ export default function IntegratedSpeakingSection({
       if (!spokenPayload || typeof window === 'undefined' || !('speechSynthesis' in window)) {
         setIsSpeakingPrompt(false);
         setPromptPlayBlocked(true);
+        if (question.part === 2 && !recordingsMapRef.current?.[questionId] && !part2PrepTimerRef.current) {
+          startPart2PrepTimer(questionId, question.prepSec || 60);
+        }
         return;
       }
       try {
@@ -427,6 +434,9 @@ export default function IntegratedSpeakingSection({
           promptFallbackTimerRef.current = null;
           setIsSpeakingPrompt(false);
           setPromptPlayBlocked(true);
+          if (question.part === 2 && !recordingsMapRef.current?.[questionId] && !part2PrepTimerRef.current) {
+            startPart2PrepTimer(questionId, question.prepSec || 60);
+          }
         };
         const wordCount = Math.max(1, String(spokenPayload).trim().split(/\s+/).length);
         const estimatedReadMs = Math.min(48000, Math.max(2500, wordCount * 460 + 1200));
@@ -584,20 +594,23 @@ export default function IntegratedSpeakingSection({
     const nextQ = questions[targetIdx] || null;
     currentQuestionIdRef.current = nextQ?.id || '';
     setCurrentIdx(targetIdx);
-    if (nextQ?.part === 2 && !recordingsMapRef.current?.[nextQ.id]) {
-      startPart2PrepTimer(nextQ.id, nextQ.prepSec || 60);
-    }
     if (autoExaminerMode && isSpeakingSectionStartedRef.current) {
+      // In Thực Chiến / Mock Test: read examiner prompt FIRST; Part 2 1-minute prep starts ONLY in finishPrompt() after reading ends!
       readPromptAndAutoRecord(nextQ, true, targetIdx);
     } else {
       cancelPromptPlayback();
+      if (nextQ?.part === 2 && !recordingsMapRef.current?.[nextQ.id]) {
+        startPart2PrepTimer(nextQ.id, nextQ.prepSec || 60);
+      }
     }
   };
   goQuestionRef.current = goQuestion;
 
   useEffect(() => {
     if (
+      !autoExaminerMode &&
       isSpeakingSectionStarted &&
+      !isSpeakingPrompt &&
       currentQ?.part === 2 &&
       !isRecording &&
       !currentRec &&
@@ -609,7 +622,7 @@ export default function IntegratedSpeakingSection({
     if (currentQ?.part !== 2 && part2PrepCountdown !== null) {
       clearPart2PrepTimer();
     }
-  }, [currentQ?.id, currentQ?.part, currentQ?.prepSec, isSpeakingSectionStarted, isRecording, currentRec, part2PrepCountdown]);
+  }, [autoExaminerMode, currentQ?.id, currentQ?.part, currentQ?.prepSec, isSpeakingSectionStarted, isSpeakingPrompt, isRecording, currentRec, part2PrepCountdown]);
 
   const handleReadCurrentPrompt = () => {
     if (isRecordingRef.current) stopRecording();
@@ -727,29 +740,56 @@ export default function IntegratedSpeakingSection({
         </div>
       </div>
 
-      {/* Question Navigator Pills */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {questions.map((q, idx) => {
-          const isDone = Boolean(recordingsMap[q.id]?.blob || recordingsMap[q.id]?.audioUrl);
-          const isActive = idx === safeIdx;
-          return (
-            <button
-              key={q.id}
-              type="button"
-              onClick={() => goQuestion(idx)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
-                isActive
-                  ? 'bg-[#0F766E] text-white border-[#0F766E]'
-                  : isDone
-                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                  : 'bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <span>P{q.part} · Câu {idx + 1}</span>
-              {isDone && <CheckCircle2 className="w-3.5 h-3.5" />}
-            </button>
-          );
-        })}
+      {/* Question Navigator Pills (Locked sequential progress bar in Thực Chiến / Mock Test) */}
+      <div className="space-y-1.5">
+        {autoExaminerMode && (
+          <p className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+            <Lock className="w-3 h-3 text-amber-500 shrink-0" />
+            <span>Chế độ Thi Thật / Mock Test: Khóa chuyển câu — thí sinh nghe và trả lời lần lượt từng câu (không thể quay lại hay bỏ qua).</span>
+          </p>
+        )}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {questions.map((q, idx) => {
+            const isDone = Boolean(recordingsMap[q.id]?.blob || recordingsMap[q.id]?.audioUrl);
+            const isActive = idx === safeIdx;
+            const isLockedPill = Boolean(autoExaminerMode);
+            return (
+              <button
+                key={q.id}
+                type="button"
+                data-testid={`speaking-nav-pill-${idx}`}
+                disabled={isLockedPill}
+                onClick={() => {
+                  if (isLockedPill) return;
+                  goQuestion(idx);
+                }}
+                title={
+                  isLockedPill
+                    ? isActive
+                      ? 'Câu hỏi đang thực hiện'
+                      : isDone
+                      ? 'Đã hoàn thành — Thi thật không cho quay lại'
+                      : 'Khóa — phải trả lời lần lượt từng câu'
+                    : `Chuyển tới Câu ${idx + 1}`
+                }
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-[#0F766E] text-white border-[#0F766E] shadow-xs'
+                    : isDone
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                    : 'bg-white dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 border-slate-200 dark:border-zinc-800'
+                } ${isLockedPill ? 'cursor-not-allowed opacity-90' : 'hover:bg-slate-50 dark:hover:bg-zinc-800'}`}
+              >
+                <span>P{q.part} · Câu {idx + 1}</span>
+                {isDone ? (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                ) : isLockedPill && !isActive ? (
+                  <Lock className="w-3 h-3 opacity-60" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main Active Question Card */}
@@ -885,15 +925,21 @@ export default function IntegratedSpeakingSection({
                 className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-700/70 flex flex-wrap items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shrink-0">
-                    <Clock className="w-5 h-5" />
+                  <div className={`w-10 h-10 rounded-xl font-black text-sm flex items-center justify-center shrink-0 ${
+                    isSpeakingPrompt ? 'bg-teal-600 text-white animate-pulse' : 'bg-amber-500 text-slate-950'
+                  }`}>
+                    {isSpeakingPrompt ? <Volume2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                   </div>
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-200">
-                      Đồng Hồ Đếm Ngược 1 Phút Chuẩn Bị Part 2
+                      {isSpeakingPrompt
+                        ? 'Giám Khảo Đang Đọc Đề Part 2 (Chưa Bắt Đầu Tính Giờ)'
+                        : 'Đồng Hồ Đếm Ngược 1 Phút Chuẩn Bị Part 2'}
                     </p>
                     <p className="text-xs text-amber-800/90 dark:text-amber-300/90">
-                      Hết 1 phút chuẩn bị hệ thống sẽ tự động chuyển sang <strong>Đồng hồ đếm ngược 2 phút ghi âm</strong>!
+                      {isSpeakingPrompt
+                        ? 'Hãy lắng nghe giám khảo đọc xong câu hỏi — ngay khi đọc xong, đồng hồ 1 phút chuẩn bị sẽ tự động bắt đầu đếm ngược!'
+                        : <>Hết 1 phút chuẩn bị hệ thống sẽ tự động chuyển sang <strong>Đồng hồ đếm ngược 2 phút ghi âm</strong>!</>}
                     </p>
                   </div>
                 </div>
@@ -902,19 +948,21 @@ export default function IntegratedSpeakingSection({
                     data-testid="part2-prep-timer-value"
                     className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 font-mono text-lg font-black tracking-wider"
                   >
-                    {formatMmSs(part2PrepCountdown ?? 60)}
+                    {formatMmSs(isSpeakingPrompt ? (currentQ.prepSec || 60) : (part2PrepCountdown ?? (currentQ.prepSec || 60)))}
                   </span>
                   <button
                     type="button"
                     data-testid="part2-skip-prep-record-btn"
+                    disabled={isSpeakingPrompt}
                     onClick={() => {
+                      if (isSpeakingPrompt) return;
                       clearPart2PrepTimer();
                       clearAutoRecordTimer();
                       startRecordingRef.current?.();
                     }}
-                    className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition"
+                    className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-45 disabled:cursor-not-allowed text-white text-xs font-extrabold transition"
                   >
-                    Ghi Âm 2 Phút Ngay →
+                    {isSpeakingPrompt ? 'Đang nghe đề...' : 'Ghi Âm 2 Phút Ngay →'}
                   </button>
                 </div>
               </div>
@@ -1061,26 +1109,46 @@ export default function IntegratedSpeakingSection({
           )}
         </div>
 
-        {/* Prev / Next Navigation */}
+        {/* Prev / Next Navigation (Strict forward-only after recording in Thực Chiến / Mock Test) */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-zinc-800">
-          <button
-            type="button"
-            disabled={safeIdx === 0}
-            onClick={() => goQuestion(safeIdx - 1)}
-            className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-700 dark:text-zinc-200 disabled:opacity-40 flex items-center gap-1 transition"
-          >
-            <ChevronLeft className="w-4 h-4" /> Câu Trước
-          </button>
+          {autoExaminerMode ? (
+            <span className="px-3 py-2 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-[11px] font-bold text-slate-500 dark:text-zinc-400 inline-flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-amber-500" /> Thi thật không quay lại câu cũ
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={safeIdx === 0}
+              onClick={() => goQuestion(safeIdx - 1)}
+              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs font-bold text-slate-700 dark:text-zinc-200 disabled:opacity-40 flex items-center gap-1 transition"
+            >
+              <ChevronLeft className="w-4 h-4" /> Câu Trước
+            </button>
+          )}
           <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">
             Câu {safeIdx + 1} / {questions.length}
           </span>
           <button
             type="button"
-            disabled={safeIdx >= questions.length - 1}
+            data-testid="speaking-next-question-btn"
+            disabled={safeIdx >= questions.length - 1 || (autoExaminerMode && (!currentRec || isRecording || isSpeakingPrompt))}
             onClick={() => goQuestion(safeIdx + 1)}
-            className="px-3.5 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold disabled:opacity-40 flex items-center gap-1 transition"
+            title={
+              autoExaminerMode && !currentRec
+                ? 'Hãy hoàn thành ghi âm câu hiện tại trước khi sang câu tiếp theo'
+                : 'Sang câu tiếp theo'
+            }
+            className="px-3.5 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D9488] text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition"
           >
-            Câu Tiếp Theo <ChevronRight className="w-4 h-4" />
+            {autoExaminerMode && !currentRec && safeIdx < questions.length - 1 ? (
+              <>
+                <Lock className="w-3.5 h-3.5" /> Trả lời xong mới qua câu sau
+              </>
+            ) : (
+              <>
+                Câu Tiếp Theo <ChevronRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>

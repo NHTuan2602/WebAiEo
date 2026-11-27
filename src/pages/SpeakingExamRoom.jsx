@@ -244,14 +244,14 @@ export default function SpeakingExamRoom({
   const startExamRoom3sCountdownRef = useRef(startExamRoom3sCountdown);
   startExamRoom3sCountdownRef.current = startExamRoom3sCountdown;
 
-  // Tick down Part 2 preparation timer cleanly without synchronous setState in effect
+  // Tick down Part 2 preparation timer cleanly — wait until examiner finishes reading the prompt!
   useEffect(() => {
-    if (phase !== 'ACTIVE' || prepRemainingSec <= 0) return;
+    if (phase !== 'ACTIVE' || prepRemainingSec <= 0 || isSpeakingPrompt) return;
     const t = setInterval(() => {
       setPrepRemainingSec(prev => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => clearInterval(t);
-  }, [phase, prepRemainingSec]);
+  }, [phase, prepRemainingSec, isSpeakingPrompt]);
 
   // When Part 2 1-minute prep timer reaches 0, automatically start the 2-minute Part 2 recording
   useEffect(() => {

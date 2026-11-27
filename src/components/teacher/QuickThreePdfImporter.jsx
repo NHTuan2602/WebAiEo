@@ -19,6 +19,7 @@ import {
 import {
   extractListeningExamFromPdf,
   extractReadingExamFromPdf,
+  extractSpeakingExamFromMedia,
   extractWritingExamFromMedia
 } from '../../utils/geminiGrader';
 import { attachAutoCroppedWritingChart, readFileAsDataUrl } from '../../utils/pdfImageCropper';
@@ -39,6 +40,7 @@ export default function QuickThreePdfImporter({
   defaultExpanded = true,
   onApplyListeningPdfExtraction,
   onApplyReadingPdfExtraction,
+  onApplySpeakingExtraction,
   onApplyWritingExtraction,
   onJumpToTab,
   onSuggestExamTitle,
@@ -55,17 +57,19 @@ export default function QuickThreePdfImporter({
   const [readingKeyFile, setReadingKeyFile] = useState(null);
   const [readingKeyText, setReadingKeyText] = useState('');
 
-  const [writingFile, setWritingFile] = useState(null); // PDF or image
+  const [writingFile, setWritingFile] = useState(null); // Word .docx, PDF or image
+  const [speakingFile, setSpeakingFile] = useState(null); // Word .docx, PDF or image
 
   const [running, setRunning] = useState(false);
   const [statusMap, setStatusMap] = useState({
     listening: { state: 'idle', message: '' },
     reading: { state: 'idle', message: '' },
-    writing: { state: 'idle', message: '' }
+    writing: { state: 'idle', message: '' },
+    speaking: { state: 'idle', message: '' }
   });
 
   const hasGeminiAccess = Boolean(aiApiKey?.trim() || aiConfigured);
-  const selectedCount = [listeningPdf, readingPdf, writingFile].filter(Boolean).length;
+  const selectedCount = [listeningPdf, readingPdf, writingFile, speakingFile].filter(Boolean).length;
 
   const pickPdf = (e, setter, skillName) => {
     const file = e.target.files?.[0];
@@ -114,6 +118,27 @@ export default function QuickThreePdfImporter({
     setWritingFile(file);
   };
 
+  const pickSpeakingFile = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const lower = String(file.name || '').toLowerCase();
+    const isDocx =
+      lower.endsWith('.docx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isPdf = lower.endsWith('.pdf') || file.type === 'application/pdf';
+    const isImg = file.type?.startsWith('image/');
+    if (!isDocx && !isPdf && !isImg) {
+      showToast?.('Speaking hỗ trợ file Word (.docx), .PDF hoặc ảnh (.PNG/.JPG/.WebP).', 'error');
+      return;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      showToast?.(`File Speaking quá lớn (${formatBytes(file.size)} > 14MB).`, 'error');
+      return;
+    }
+    setSpeakingFile(file);
+  };
+
   const prepareAnswerKeyPayload = async (keyFile, keyText) => {
     let answerKeyPdfDataUrl = '';
     let answerKeyImages = [];
@@ -134,13 +159,25 @@ export default function QuickThreePdfImporter({
 
   const handleRunBatchImport = async () => {
     if (running) return;
-    if (!hasGeminiAccess) {
+    const isDocxFile = (f) =>
+      Boolean(
+        f &&
+          (String(f.name || '').toLowerCase().endsWith('.docx') ||
+            f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+      );
+    const needsAiForBatch = Boolean(
+      listeningPdf ||
+        readingPdf ||
+        (writingFile && !isDocxFile(writingFile)) ||
+        (speakingFile && !isDocxFile(speakingFile))
+    );
+    if (needsAiForBatch && !hasGeminiAccess) {
       showToast?.('Chưa cấu hình Google Gemini API Key. Hãy nhập API Key trước khi chạy AI.', 'error');
       setShowApiKeyModal?.(true);
       return;
     }
     if (selectedCount === 0) {
-      showToast?.('Hãy tải lên ít nhất 1 file PDF (Listening, Reading hoặc Writing) để bắt đầu.', 'error');
+      showToast?.('Hãy tải lên ít nhất 1 file (Listening, Reading, Writing hoặc Speaking) để bắt đầu.', 'error');
       return;
     }
 
@@ -148,7 +185,8 @@ export default function QuickThreePdfImporter({
     setStatusMap({
       listening: listeningPdf ? { state: 'pending', message: 'Đang chờ xử lý...' } : { state: 'idle', message: '' },
       reading: readingPdf ? { state: 'pending', message: 'Đang chờ xử lý...' } : { state: 'idle', message: '' },
-      writing: writingFile ? { state: 'pending', message: 'Đang chờ xử lý...' } : { state: 'idle', message: '' }
+      writing: writingFile ? { state: 'pending', message: 'Đang chờ xử lý...' } : { state: 'idle', message: '' },
+      speaking: speakingFile ? { state: 'pending', message: 'Đang chờ xử lý...' } : { state: 'idle', message: '' }
     });
 
     let okCount = 0;
@@ -290,13 +328,63 @@ export default function QuickThreePdfImporter({
       }
     }
 
+    // 4. Speaking Word (.docx) / PDF / Image
+    if (speakingFile) {
+      setStatusMap(prev => ({
+        ...prev,
+        speaking: { state: 'running', message: 'Đang tách Part 1 (nhiều chủ đề) · Part 2 Cue Card · Part 3...' }
+      }));
+      try {
+        const lowerS = String(speakingFile.name || '').toLowerCase();
+        const isDocx =
+          lowerS.endsWith('.docx') ||
+          speakingFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        let extracted;
+        if (isDocx) {
+          const parsedDoc = await extractDocxContent(speakingFile, speakingFile.name);
+          extracted = await extractSpeakingExamFromMedia({
+            apiKey: aiApiKey,
+            aiConfigured,
+            rawText: parsedDoc.rawText || '',
+            images: !parsedDoc.rawText && parsedDoc.primaryImageUrl ? [parsedDoc.primaryImageUrl] : [],
+            fileName: speakingFile.name
+          });
+        } else {
+          const isPdf = lowerS.endsWith('.pdf') || speakingFile.type === 'application/pdf';
+          const fileDataUrl = await readFileAsDataUrl(speakingFile);
+          extracted = await extractSpeakingExamFromMedia({
+            apiKey: aiApiKey,
+            aiConfigured,
+            pdfDataUrl: isPdf ? fileDataUrl : '',
+            images: isPdf ? [] : [fileDataUrl],
+            fileName: speakingFile.name
+          });
+        }
+        if (!firstDetectedTitle && extracted.title) firstDetectedTitle = extracted.title;
+        onApplySpeakingExtraction?.(extracted);
+        okCount += 1;
+        setStatusMap(prev => ({
+          ...prev,
+          speaking: {
+            state: 'done',
+            message: `✓ P1 (${extracted.part1Questions?.length || 0} câu) · P2 (${extracted.part2Bullets?.length || 0} ý) · P3 (${extracted.part3Questions?.length || 0} câu)`
+          }
+        }));
+      } catch (err) {
+        setStatusMap(prev => ({
+          ...prev,
+          speaking: { state: 'error', message: err?.message || 'Lỗi đọc đề Speaking' }
+        }));
+      }
+    }
+
     if (firstDetectedTitle && onSuggestExamTitle) {
       onSuggestExamTitle(firstDetectedTitle);
     }
 
     setRunning(false);
     if (okCount > 0) {
-      showToast?.(`Hoàn tất tạo nhanh ${okCount}/${selectedCount} kỹ năng từ PDF! Chỉ còn kiểm tra audio MP3 và soạn Speaking ở Tab 5.`);
+      showToast?.(`Hoàn tất tạo nhanh ${okCount}/${selectedCount} kỹ năng từ file! Hãy kiểm tra audio MP3 (nếu có) rồi bấm Lưu Đề Thi.`);
     }
   };
 
@@ -346,14 +434,14 @@ export default function QuickThreePdfImporter({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm sm:text-base font-black text-[#0F172B] dark:text-white">
-                Tạo Đề Nhanh Từ 3 File PDF (Listening + Reading + Writing)
+                Tạo Đề Nhanh Từ 4 File (Listening + Reading + Writing + Speaking)
               </h2>
-              <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-[11px] font-extrabold">
-                Trừ Speaking (Tab 5)
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-500/40 text-[11px] font-extrabold">
+                Đủ 4 Kỹ Năng (L·R·W·S)
               </span>
             </div>
             <p className="text-xs text-[#475569] dark:text-slate-300 mt-0.5 leading-relaxed">
-              Thả sẵn cùng lúc <b>3 file PDF</b> (hoặc chỉ 1–2 file bạn có) → bấm 1 nút, AI tự tạo đồng loạt <b>Listening (4 bài/40 câu)</b>, <b>Reading (3 bài/40 câu)</b> và <b>Writing (Task 1 tự cắt ảnh biểu đồ + Task 2)</b>.
+              Thả sẵn cùng lúc <b>4 file</b> (hoặc chỉ 1–3 file bạn có) → bấm 1 nút, AI tự tạo đồng loạt <b>Listening (4 bài/40 câu)</b>, <b>Reading (3 bài/40 câu)</b>, <b>Writing (Task 1 + Task 2)</b> và <b>Speaking (Part 1 · Cue Card Part 2 · Part 3)</b>.
             </p>
           </div>
         </div>
@@ -377,14 +465,14 @@ export default function QuickThreePdfImporter({
             className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 inline-flex items-center gap-1 transition"
           >
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            <span>{expanded ? 'Thu gọn' : 'Mở Tạo Nhanh 3 PDF'}</span>
+            <span>{expanded ? 'Thu gọn' : 'Mở Tạo Nhanh 4 File'}</span>
           </button>
         </div>
       </div>
 
       {expanded && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
             {/* SLOT 1: LISTENING PDF */}
             <div className="rounded-2xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800/60 p-4 flex flex-col justify-between gap-3">
               <div className="space-y-2.5">
@@ -580,6 +668,55 @@ export default function QuickThreePdfImporter({
               </div>
               {renderStatusPill(statusMap.writing)}
             </div>
+
+            {/* SLOT 4: SPEAKING WORD / PDF / IMAGE */}
+            <div className="rounded-2xl bg-white dark:bg-slate-900 border border-teal-200 dark:border-teal-800/60 p-4 flex flex-col justify-between gap-3">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-[#0F766E] dark:text-[#1EE1D6] flex items-center gap-1.5">
+                    <Mic className="w-4 h-4" /> 4. Word / PDF / Ảnh Speaking
+                  </span>
+                  {speakingFile && (
+                    <button
+                      type="button"
+                      onClick={() => setSpeakingFile(null)}
+                      className="text-slate-400 hover:text-rose-600"
+                      aria-label="Gỡ file Speaking"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <label className="cursor-pointer block rounded-xl border-2 border-dashed border-teal-200 dark:border-teal-800 hover:border-[#007A7A] bg-teal-50/40 dark:bg-teal-950/25 p-3 text-center transition">
+                  {speakingFile ? (
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-extrabold text-[#0F766E] dark:text-teal-100 truncate">{speakingFile.name}</p>
+                      <p className="text-[11px] text-teal-700/80 dark:text-teal-300">{formatBytes(speakingFile.size)} · Bấm để đổi file</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Upload className="w-4 h-4 mx-auto text-[#007A7A] dark:text-[#1EE1D6]" />
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Chọn file Word (.docx), PDF hoặc Ảnh</p>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    data-testid="quick-four-speaking-input"
+                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,application/pdf,image/*"
+                    aria-label="Tạo nhanh: chọn Word, PDF hoặc ảnh Speaking"
+                    onChange={pickSpeakingFile}
+                    className="hidden"
+                  />
+                </label>
+
+                <div className="p-2.5 rounded-xl bg-teal-50/60 dark:bg-teal-950/25 border border-teal-100 dark:border-teal-900/50 text-[11px] text-teal-900 dark:text-teal-200 leading-relaxed">
+                  <Sparkles className="w-3.5 h-3.5 inline mr-1 text-[#007A7A] dark:text-[#1EE1D6]" />
+                  Tự tách đủ <b>Part 1 (nhiều chủ đề)</b>, <b>Part 2 Cue Card + gạch ý</b> và toàn bộ <b>Part 3</b> đưa vào Tab 5!
+                </div>
+              </div>
+              {renderStatusPill(statusMap.speaking)}
+            </div>
           </div>
 
           {/* Action Footer */}
@@ -587,15 +724,14 @@ export default function QuickThreePdfImporter({
             <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
               <FileText className="w-4 h-4 text-[#007A7A] dark:text-teal-400 shrink-0" />
               <span>
-                Đã chọn <b>{selectedCount}/3 file</b> · Phần{' '}
+                Đã chọn <b>{selectedCount}/4 file</b> · Kiểm tra &amp; tinh chỉnh từng kỹ năng sau khi tách hoặc mở{' '}
                 <button
                   type="button"
                   onClick={() => onJumpToTab?.('speaking')}
-                  className="font-extrabold text-rose-600 dark:text-rose-400 hover:underline inline-flex items-center gap-1"
+                  className="font-extrabold text-[#0F766E] dark:text-[#1EE1D6] hover:underline inline-flex items-center gap-1"
                 >
                   <Mic className="w-3 h-3" /> Speaking (Tab 5)
-                </button>{' '}
-                giữ nguyên để bạn tạo riêng.
+                </button>
               </span>
             </div>
 
@@ -609,17 +745,17 @@ export default function QuickThreePdfImporter({
               {running ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang tự động trích xuất PDF...</span>
+                  <span>Đang tự động trích xuất file...</span>
                 </>
               ) : (
                 <>
                   <Zap className="w-4 h-4 text-amber-300" />
                   <span>
-                    {selectedCount === 3
-                      ? 'Tự Động Tạo Cả 3 Phần (L + R + W) Ngay'
+                    {selectedCount === 4
+                      ? 'Tự Động Tạo Cả 4 Phần (L + R + W + S) Ngay'
                       : selectedCount > 0
                       ? `Tự Động Tạo ${selectedCount} Phần Đã Chọn Ngay`
-                      : 'Tải ít nhất 1 file PDF ở trên để tạo nhanh'}
+                      : 'Tải ít nhất 1 file ở trên để tạo nhanh'}
                   </span>
                 </>
               )}
