@@ -6088,6 +6088,8 @@ export default function App() {
       dueAt: cfg.dueAt,
       sectionOrder: cfg.order,
       sectionDurations: cfg.durations,
+      importWarning: '',
+      needsImportReview: false,
       speaking: syncedSpeaking,
       listening: {
         ...testForm.listening,

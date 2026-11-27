@@ -3,12 +3,15 @@ import {
   AlertTriangle,
   Bot,
   CheckCircle2,
+  ClipboardCopy,
   ClipboardPaste,
   Clock,
+  Edit,
   FileText,
   Folder,
   FolderOpen,
   Globe,
+  History,
   Image as ImageIcon,
   Key,
   Loader2,
@@ -30,8 +33,12 @@ import {
 import { readFileAsDataUrl } from '../../utils/pdfImageCropper';
 import { unpackUploadedWritingFiles } from '../../utils/wordImportHelpers';
 import {
+  appendBulkWritingImportHistory,
   buildDailyTask1TestObjects,
   buildDailyTask2TestObjects,
+  clearBulkWritingImportHistory,
+  deleteBulkWritingImportHistoryEntry,
+  loadBulkWritingImportHistory,
   runBulkTask1AiPipeline,
   runBulkTask2AiPipeline
 } from '../../utils/dailyWritingBulkAi';
@@ -50,14 +57,19 @@ export default function DailyWritingBulkModal({
   initialTask1SubCategory = 'w1_dynamic',
   aiApiKey = '',
   aiConfigured = false,
+  tests = [],
   onClose,
   onBulkSaveTests,
+  onOpenTestForEdit = null,
   setApiTestState,
   setShowApiKeyModal,
   showToast
 }) {
   const [mode, setMode] = useState(initialMode === 'task1' ? 'task1' : 'task2');
   const [t1SubCategory, setT1SubCategory] = useState(initialTask1SubCategory || 'w1_dynamic');
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [importHistory, setImportHistory] = useState(() => loadBulkWritingImportHistory());
+  const [t1OnlyWarnings, setT1OnlyWarnings] = useState(false);
 
   // Task 1 inputs & drafts
   const [t1DocxItems, setT1DocxItems] = useState([]); // extracted .docx objects (from direct .docx, .zip or folder)
@@ -99,6 +111,9 @@ export default function DailyWritingBulkModal({
     if (initialTask1SubCategory) {
       setT1SubCategory(initialTask1SubCategory);
     }
+    setImportHistory(loadBulkWritingImportHistory());
+    setShowHistoryPanel(false);
+    setT1OnlyWarnings(false);
     setErrorMsg('');
   }, [isOpen, initialMode, initialTask1SubCategory]);
 
@@ -342,14 +357,35 @@ export default function DailyWritingBulkModal({
           ? `Daily Writing Task 1 (${getDailySubCategoryLabel(t1SubCategory) || t1SubCategory})`
           : 'Daily Writing Task 1 (W1)';
       await onBulkSaveTests?.(builtTests, { summaryLabel: folderLabel, notify: true });
+      const warningItems = builtTests
+        .filter(t => Boolean(t.importWarning))
+        .map(t => ({
+          testId: t.id,
+          title: t.title,
+          sourceLabel: t.importSourceFile || t.title,
+          reason: t.importWarning,
+          subCategory: t.dailySubCategory
+        }));
+      const nextHistory = appendBulkWritingImportHistory({
+        mode: 'task1',
+        summaryLabel: folderLabel,
+        totalSaved: builtTests.length,
+        warningItems,
+        generalWarnings: warnings.filter(w => !warningItems.some(wi => w.includes(wi.sourceLabel)))
+      });
+      setImportHistory(nextHistory);
       showToast?.(
-        `Đã tạo & đăng công khai ${builtTests.length} đề Task 1 (20 phút • Làm lại nhiều lần)!`
+        warningItems.length > 0
+          ? `Đã đăng ${builtTests.length} đề Task 1 (${warningItems.length} đề có cảnh báo đã được đánh dấu & lưu lịch sử để bạn sửa lại)!`
+          : `Đã tạo & đăng công khai ${builtTests.length} đề Task 1 (20 phút • Làm lại nhiều lần)!`,
+        warningItems.length > 0 ? 'info' : 'success'
       );
       setT1Drafts([]);
       setT1DocxItems([]);
       setT1Images([]);
       setT1PdfFiles([]);
       setT1DetectedFolders([]);
+      setWarnings([]);
       onClose?.();
     } catch (err) {
       setErrorMsg(err?.message || 'Lỗi khi lưu hàng loạt đề Task 1.');
@@ -374,6 +410,14 @@ export default function DailyWritingBulkModal({
         summaryLabel: 'Daily Writing Task 2 (W2)',
         notify: true
       });
+      const nextHistory = appendBulkWritingImportHistory({
+        mode: 'task2',
+        summaryLabel: 'Daily Writing Task 2 (W2)',
+        totalSaved: builtTests.length,
+        warningItems: [],
+        generalWarnings: warnings
+      });
+      setImportHistory(nextHistory);
       showToast?.(
         `Đã tạo & đăng công khai ${builtTests.length} đề Task 2 (40 phút • Làm lại nhiều lần)!`
       );
@@ -381,6 +425,7 @@ export default function DailyWritingBulkModal({
       setT2DocxItems([]);
       setT2PdfFiles([]);
       setT2RawText('');
+      setWarnings([]);
       onClose?.();
     } catch (err) {
       setErrorMsg(err?.message || 'Lỗi khi lưu hàng loạt đề Task 2.');
@@ -411,10 +456,17 @@ export default function DailyWritingBulkModal({
     return true;
   });
 
-  const paginatedT1 = paginateItems(t1Drafts, t1Page, 8);
+  const t1WarningCount = t1Drafts.filter(d => Boolean(d.importWarning)).length;
+  const visibleT1Drafts = t1OnlyWarnings ? t1Drafts.filter(d => Boolean(d.importWarning)) : t1Drafts;
+  const paginatedT1 = paginateItems(visibleT1Drafts, t1Page, 8);
   const paginatedT2 = paginateItems(filteredT2Drafts, t2Page, 20);
   const selectedT1Count = t1Drafts.filter(d => d.selected !== false).length;
   const selectedT2Count = t2Drafts.filter(d => d.selected !== false).length;
+  const totalHistoryWarnings = importHistory.reduce(
+    (sum, h) => sum + (h.warningItems?.length || 0) + (h.generalWarnings?.length || 0),
+    0
+  );
+  const liveTestById = new Map((tests || []).map(t => [t.id, t]));
   const progressPct = progress.total > 0 ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : 0;
 
   return (
@@ -447,6 +499,25 @@ export default function DailyWritingBulkModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="toggle-bulk-import-history-btn"
+              onClick={() => setShowHistoryPanel(prev => !prev)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold inline-flex items-center gap-1.5 border transition ${
+                showHistoryPanel
+                  ? 'bg-amber-600 text-white border-amber-600'
+                  : totalHistoryWarnings > 0
+                  ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-600/50 hover:bg-amber-100'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
+              }`}
+              title="Xem lịch sử các lần nhập hàng loạt và danh sách những đề bị cảnh báo / lỗi để mở sửa lại"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>
+                Lịch sử &amp; Đề lỗi
+                {totalHistoryWarnings > 0 ? ` (${totalHistoryWarnings})` : importHistory.length > 0 ? ` (${importHistory.length})` : ''}
+              </span>
+            </button>
             {!hasGeminiAccess && setShowApiKeyModal && (
               <button
                 type="button"
@@ -518,6 +589,168 @@ export default function DailyWritingBulkModal({
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+          {/* Persistent Import History & Error Log Panel */}
+          {showHistoryPanel && (
+            <div
+              data-testid="bulk-import-history-panel"
+              className="rounded-2xl border border-amber-300 dark:border-amber-700/70 bg-amber-50/70 dark:bg-amber-950/25 p-4 space-y-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-amber-700 dark:text-amber-300" />
+                  <h3 className="text-xs sm:text-sm font-extrabold text-amber-950 dark:text-amber-200">
+                    Lịch Sử Nhập Đề Hàng Loạt &amp; Danh Sách Đề Bị Lỗi / Cần Sửa ({importHistory.length} đợt)
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  {importHistory.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const lines = [];
+                        importHistory.forEach(entry => {
+                          const dt = new Date(entry.createdAt).toLocaleString('vi-VN');
+                          lines.push(`[${dt}] ${entry.summaryLabel || entry.mode.toUpperCase()} — Đã lưu ${entry.totalSaved} đề`);
+                          (entry.warningItems || []).forEach(wi => {
+                            lines.push(`  - [CẦN SỬA] ${wi.sourceLabel} -> "${wi.title}": ${wi.reason}`);
+                          });
+                          (entry.generalWarnings || []).forEach(gw => {
+                            lines.push(`  - [LƯU Ý] ${gw}`);
+                          });
+                        });
+                        navigator.clipboard?.writeText(lines.join('\n'));
+                        showToast?.('Đã copy toàn bộ lịch sử lỗi nhập đề vào Clipboard!', 'info');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-[11px] font-bold text-amber-900 dark:text-amber-200 inline-flex items-center gap-1 hover:bg-amber-100/70"
+                    >
+                      <ClipboardCopy className="w-3 h-3" /> Copy log lỗi
+                    </button>
+                  )}
+                  {importHistory.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImportHistory(clearBulkWritingImportHistory());
+                        showToast?.('Đã xóa lịch sử nhập đề trên trình duyệt này.', 'info');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50"
+                    >
+                      Xóa lịch sử
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowHistoryPanel(false)}
+                    className="p-1 rounded-lg text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                    aria-label="Đóng lịch sử"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {importHistory.length === 0 ? (
+                <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
+                  Chưa có đợt nhập hàng loạt nào được lưu. Từ giờ, mỗi lần bạn bấm <b>Đăng Công Khai</b>, hệ thống sẽ tự ghi lại toàn bộ file nào bị lỗi AI / thiếu ảnh kèm nút bấm mở thẳng vào sửa đề đó.
+                </p>
+              ) : (
+                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                  {importHistory.map(entry => {
+                    const warnCount = (entry.warningItems?.length || 0) + (entry.generalWarnings?.length || 0);
+                    return (
+                      <div
+                        key={entry.id}
+                        className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 space-y-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-[#0F172B] dark:text-white">
+                              {entry.summaryLabel || (entry.mode === 'task1' ? 'Writing Task 1' : 'Writing Task 2')}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold">
+                              +{entry.totalSaved} đề
+                            </span>
+                            {warnCount > 0 ? (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] font-bold">
+                                ⚠️ {warnCount} cảnh báo
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-bold">
+                                ✓ Sạch lỗi
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                            <span>{new Date(entry.createdAt).toLocaleString('vi-VN')}</span>
+                            <button
+                              type="button"
+                              onClick={() => setImportHistory(deleteBulkWritingImportHistoryEntry(entry.id))}
+                              className="text-slate-400 hover:text-rose-500"
+                              title="Xóa mục lịch sử này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {(entry.warningItems || []).length > 0 && (
+                          <div className="space-y-1.5">
+                            {entry.warningItems.map((wi, idx) => {
+                              const liveTest = liveTestById.get(wi.testId);
+                              const alreadyFixed = liveTest && !liveTest.importWarning && !liveTest.needsImportReview;
+                              return (
+                                <div
+                                  key={`${wi.testId || idx}`}
+                                  className={`flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg border text-xs ${
+                                    alreadyFixed
+                                      ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50'
+                                      : 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60'
+                                  }`}
+                                >
+                                  <div className="min-w-0 flex-1 space-y-0.5">
+                                    <p className="font-extrabold text-[#0F172B] dark:text-white truncate">
+                                      {alreadyFixed ? '✓ Đã sửa: ' : '⚠️ '}
+                                      {wi.sourceLabel}
+                                      {wi.title && wi.title !== wi.sourceLabel ? ` → ${wi.title}` : ''}
+                                    </p>
+                                    <p className="text-[11px] text-amber-800 dark:text-amber-300">{wi.reason}</p>
+                                  </div>
+                                  {liveTest && onOpenTestForEdit && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onClose?.();
+                                        onOpenTestForEdit(liveTest);
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold inline-flex items-center gap-1 shrink-0"
+                                    >
+                                      <Edit className="w-3 h-3" /> {alreadyFixed ? 'Xem lại' : 'Mở sửa ngay'}
+                                    </button>
+                                  )}
+                                  {!liveTest && (
+                                    <span className="text-[11px] text-slate-400 italic">Đã xóa đề</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {(entry.generalWarnings || []).length > 0 && (
+                          <ul className="list-disc pl-5 text-[11px] text-amber-800 dark:text-amber-300 space-y-0.5">
+                            {entry.generalWarnings.map((gw, i) => (
+                              <li key={i}>{gw}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ========================================================== */}
           {/* MODE 1: WRITING TASK 1 (BULK IMAGES / PDF PER FOLDER)      */}
           {/* ========================================================== */}
@@ -784,7 +1017,26 @@ export default function DailyWritingBulkModal({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
+                      {t1WarningCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setT1OnlyWarnings(prev => !prev);
+                            setT1Page(1);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg font-extrabold border inline-flex items-center gap-1 transition ${
+                            t1OnlyWarnings
+                              ? 'bg-amber-600 text-white border-amber-600'
+                              : 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-600/60 hover:bg-amber-100'
+                          }`}
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>
+                            {t1OnlyWarnings ? `Đang lọc ${t1WarningCount} đề lỗi (Xem hết)` : `Chỉ xem ${t1WarningCount} đề có cảnh báo`}
+                          </span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setT1Drafts(prev => prev.map(d => ({ ...d, selected: true })))}
@@ -803,10 +1055,10 @@ export default function DailyWritingBulkModal({
                     </div>
                   </div>
 
-                  {t1Drafts.length > 8 && (
+                  {visibleT1Drafts.length > 8 && (
                     <ListPaginationBar
                       currentPage={paginatedT1.safePage}
-                      totalItems={t1Drafts.length}
+                      totalItems={visibleT1Drafts.length}
                       pageSize={8}
                       onPageChange={setT1Page}
                       itemLabel="đề Task 1"
@@ -821,11 +1073,19 @@ export default function DailyWritingBulkModal({
                           key={draft.id}
                           data-testid={`bulk-w1-draft-card-${globalIdx}`}
                           className={`rounded-xl border p-3.5 grid grid-cols-1 md:grid-cols-12 gap-3.5 transition ${
-                            draft.selected !== false
-                              ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-                              : 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-800 opacity-60'
+                            draft.selected === false
+                              ? 'bg-slate-50/60 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-800 opacity-60'
+                              : draft.importWarning
+                              ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-400 dark:border-amber-600/70'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                           }`}
                         >
+                          {draft.importWarning && (
+                            <div className="md:col-span-12 px-3 py-1.5 rounded-lg bg-amber-100/90 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 text-[11px] font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              <span>Cần kiểm tra lại ({draft.sourceLabel}): {draft.importWarning}</span>
+                            </div>
+                          )}
                           <div className="md:col-span-4 flex flex-col gap-2">
                             <div className="flex items-center justify-between gap-2">
                               <label className="inline-flex items-center gap-2 text-xs font-extrabold cursor-pointer">

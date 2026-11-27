@@ -7552,7 +7552,14 @@ async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 })
   if (!cleanKey) {
     throw new Error('Chưa cấu hình Google Gemini API Key trên máy chủ.');
   }
-  const models = await discoverServerGeminiModels(cleanKey);
+  let models = await discoverServerGeminiModels(cleanKey);
+  const hasMediaParts = Array.isArray(requestParts) && requestParts.some(p => p && p.inlineData);
+  if (hasMediaParts && models.length > 1) {
+    const multimodalModels = models.filter(
+      id => !/(^gemma|learnlm|text-bison|chat-bison|embedding)/i.test(String(id || ''))
+    );
+    if (multimodalModels.length > 0) models = multimodalModels;
+  }
   let lastErr = null;
 
   for (const modelId of models) {
@@ -7604,7 +7611,12 @@ async function callGeminiServerJson({ apiKey, requestParts, temperature = 0.2 })
     }
 
     const errText = await response.text();
-    if (response.status === 404 || /not found|not supported/i.test(errText)) {
+    if (
+      response.status === 404 ||
+      /not found|not supported|modality is not enabled|image input modality|unsupported.*modality|does not support.*image/i.test(
+        errText
+      )
+    ) {
       lastErr = new Error(errText);
       continue;
     }

@@ -485,6 +485,17 @@ export async function callGeminiGenerateJson({
     throw discoverFatalError;
   }
 
+  // When images/PDFs are attached, skip non-multimodal text-only families (e.g. gemma-*, learnlm-*)
+  const hasMediaParts = parts.length > 1;
+  if (hasMediaParts && candidates.length > 1) {
+    const multimodalOnly = candidates.filter(
+      id => !/(^gemma|learnlm|text-bison|chat-bison|embedding)/i.test(String(id || ''))
+    );
+    if (multimodalOnly.length > 0) {
+      candidates = multimodalOnly;
+    }
+  }
+
   let lastError = null;
   let sawTransientOrNetwork = false;
 
@@ -547,7 +558,12 @@ export async function callGeminiGenerateJson({
 
     const errText = await response.text();
     const formatted = formatGeminiErrorMessage(response.status, errText);
-    if (response.status === 404 || /not found|not supported for generatecontent/i.test(errText)) {
+    if (
+      response.status === 404 ||
+      /not found|not supported for generatecontent|modality is not enabled|image input modality|unsupported.*modality|does not support.*image/i.test(
+        errText
+      )
+    ) {
       lastError = new Error(formatted);
       continue;
     }
@@ -641,7 +657,12 @@ export async function callGeminiGenerateText({
 
     const errText = await response.text();
     const formatted = formatGeminiErrorMessage(response.status, errText);
-    if (response.status === 404 || /not found|not supported for generatecontent/i.test(errText)) {
+    if (
+      response.status === 404 ||
+      /not found|not supported for generatecontent|modality is not enabled|image input modality|unsupported.*modality|does not support.*image/i.test(
+        errText
+      )
+    ) {
       lastError = new Error(formatted);
       continue;
     }

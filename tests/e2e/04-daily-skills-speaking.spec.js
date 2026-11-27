@@ -666,10 +666,14 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       ],
       tinyPng
     );
+    const missingImgStaticDocx = buildMinimalDocx([
+      'The table below shows opinions of full-time students regarding campus services in 2024. Summarise the information by selecting and reporting the main features.'
+    ]);
 
     const driveZip = buildStoredZip([
       { name: "KHO DE TASK 1/DYNAMIC CHART/a drug company's total sales.docx", data: dynamicDocx },
-      { name: 'KHO DE TASK 1/MAP/4 AREAS CUOI.docx', data: mapDocx }
+      { name: 'KHO DE TASK 1/MAP/4 AREAS CUOI.docx', data: mapDocx },
+      { name: 'KHO DE TASK 1/STATIC CHART/OPINIONS OF FULL TIME AND ITS SERVICES.docx', data: missingImgStaticDocx }
     ]);
 
     try {
@@ -685,8 +689,8 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
         { name: 'KHO DE TASK 1.zip', mimeType: 'application/zip', buffer: driveZip }
       ]);
 
-      // Confirm both .docx items unpacked and auto-detected both folders (Dynamic + Map)
-      await expect(page.getByText(/2 Word \(\.docx\)/i)).toBeVisible({ timeout: 10_000 });
+      // Confirm all 3 .docx items unpacked and auto-detected folders (Dynamic + Map + Static)
+      await expect(page.getByText(/3 Word \(\.docx\)/i)).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText(/Tự nhận diện thư mục:/i)).toBeVisible();
 
       // Run pipeline (instant direct Word extraction without needing external Gemini!)
@@ -694,10 +698,12 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
 
       await expect(page.getByTestId('bulk-w1-draft-card-0')).toBeVisible({ timeout: 15_000 });
       await expect(page.getByTestId('bulk-w1-draft-card-1')).toBeVisible();
+      await expect(page.getByTestId('bulk-w1-draft-card-2')).toBeVisible();
 
       // Verify clean noun-phrase title extracted from English prompt (not "4 AREAS CUOI") and correct folder routing
       await expect(page.getByTestId('bulk-w1-draft-card-0').locator('select')).toHaveValue('w1_dynamic');
       await expect(page.getByTestId('bulk-w1-draft-card-1').locator('select')).toHaveValue('w1_map');
+      await expect(page.getByTestId('bulk-w1-draft-card-2').locator('select')).toHaveValue('w1_static');
       await expect(page.getByTestId('bulk-w1-draft-card-1').locator('input[type="text"]')).toHaveValue(
         /Changes in Riverside Park/i
       );
@@ -706,6 +712,19 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
 
       await page.getByTestId('confirm-save-bulk-w1-btn').click();
       await expect(page.getByTestId('daily-writing-bulk-modal')).toHaveCount(0);
+
+      // Verify Daily Zone shows persistent import warning banner & filter for the errored/warning test
+      await expect(page.getByTestId('daily-import-warnings-banner')).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId('daily-filter-import-warnings-btn').click();
+      await expect(page.getByText(/OPINIONS OF FULL TIME AND ITS SERVICES\.docx/i).first()).toBeVisible();
+
+      // Re-open bulk modal and verify Lịch sử & Đề lỗi persisted the warning entry
+      await page.getByTestId('open-bulk-w1-ai-btn').click();
+      await page.getByTestId('toggle-bulk-import-history-btn').click();
+      await expect(page.getByTestId('bulk-import-history-panel')).toBeVisible();
+      await expect(
+        page.getByTestId('bulk-import-history-panel').getByText(/OPINIONS OF FULL TIME AND ITS SERVICES\.docx/i).first()
+      ).toBeVisible();
 
       // Verify saved tests in server state have embedded images & exact folder routing
       const loginRes = await request.post(`${baseURL}/api/sync/auth/login`, {
@@ -718,12 +737,15 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       const snapRes = await request.get(`${baseURL}/api/sync/state`);
       const snap = await snapRes.json();
       const created = (snap?.tests || []).filter(t => String(t?.id || '').startsWith('test-w1-bulk-'));
-      expect(created.length).toBe(2);
+      expect(created.length).toBe(3);
       const dynTest = created.find(t => t.dailySubCategory === 'w1_dynamic');
       const mapTest = created.find(t => t.dailySubCategory === 'w1_map');
+      const staticWarnTest = created.find(t => t.dailySubCategory === 'w1_static');
       expect(dynTest?.writing?.task1?.imageUrl).toMatch(/^(data:image\/|\/api\/sync\/media\/)/);
       expect(mapTest?.writing?.task1?.imageUrl).toMatch(/^(data:image\/|\/api\/sync\/media\/)/);
       expect(mapTest?.writing?.task1?.modelAnswer).toMatch(/Sample answer/i);
+      expect(staticWarnTest?.needsImportReview).toBe(true);
+      expect(staticWarnTest?.importSourceFile).toContain('OPINIONS OF FULL TIME AND ITS SERVICES.docx');
 
       healthGuard.assertHealthy('daily-writing-word-zip-import');
     } finally {

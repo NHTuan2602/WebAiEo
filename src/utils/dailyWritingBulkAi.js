@@ -1056,11 +1056,16 @@ export async function runBulkTask1AiPipeline({
           ? doc.inferredSubCategory
           : 'w1_dynamic';
 
+      const sourceLabelFull = doc.folderPath ? `${doc.folderPath.split('/').pop()} / ${doc.fileName}` : doc.fileName;
       docxReadyDrafts.push({
         id: doc.id || `w1_docx_${Date.now()}_${i}`,
         fileName: doc.fileName,
         folderPath: doc.folderPath || '',
-        sourceLabel: doc.folderPath ? `${doc.folderPath.split('/').pop()} / ${doc.fileName}` : doc.fileName,
+        sourceLabel: sourceLabelFull,
+        importSourceFile: sourceLabelFull,
+        importWarning: !hasImage
+          ? 'File Word chưa có hình biểu đồ nhúng — cần gắn ảnh hoặc tạo hình bằng AI.'
+          : '',
         title: normalizeNounPhraseTitle(buildTask1NounTitleFromPrompt(rawPrompt, doc.fileName), rawPrompt),
         prompt: rawPrompt,
         modelAnswer: String(doc.modelAnswer || '').trim(),
@@ -1193,9 +1198,14 @@ export async function runBulkTask1AiPipeline({
               targetSubCategory: effectiveTargetSub
             });
             if (analyzed.usedModel) usedModelName = analyzed.usedModel;
-            visionResults[idx] = analyzed;
+            visionResults[idx] = {
+              ...analyzed,
+              importSourceFile: item.sourceLabel,
+              importWarning: ''
+            };
           } catch (err) {
-            warnings.push(`${item.sourceLabel}: dùng ảnh gốc & tiêu đề mặc định (${err?.message || 'lỗi AI'}).`);
+            const warnReason = `dùng ảnh gốc & tiêu đề mặc định (${err?.message || 'lỗi AI'})`;
+            warnings.push(`${item.sourceLabel}: ${warnReason}.`);
             const fallbackSub =
               effectiveTargetSub !== 'auto' && VALID_T1_SUBCAT_IDS.has(effectiveTargetSub)
                 ? effectiveTargetSub
@@ -1203,6 +1213,8 @@ export async function runBulkTask1AiPipeline({
             visionResults[idx] = {
               id: item.id,
               sourceLabel: item.sourceLabel,
+              importSourceFile: item.sourceLabel,
+              importWarning: warnReason,
               title: `Visual data analysis (${item.sourceLabel.replace(/\.[^.]+$/, '')})`,
               prompt:
                 'The chart/diagram below gives information for IELTS Academic Writing Task 1. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
@@ -1222,6 +1234,8 @@ export async function runBulkTask1AiPipeline({
           visionResults[idx] = {
             id: item.id,
             sourceLabel: item.sourceLabel,
+            importSourceFile: item.sourceLabel,
+            importWarning: 'Chưa cấu hình AI — dùng ảnh gốc & câu hỏi mặc định, cần chỉnh lại đề.',
             title: `Visual chart analysis #${idx + 1}`,
             prompt:
               'The chart/diagram below gives information for IELTS Academic Writing Task 1. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.',
@@ -1298,6 +1312,9 @@ export function buildDailyTask1TestObjects(
         dueAt: null,
         assignedClassIds: Array.isArray(assignedClassIds) ? assignedClassIds : [],
         hashtags: normalizedTags,
+        importWarning: String(it.importWarning || '').trim(),
+        importSourceFile: String(it.importSourceFile || it.sourceLabel || '').trim(),
+        needsImportReview: Boolean(String(it.importWarning || '').trim()),
         antiCheatEnabled: false,
         allowInternalCopyPaste: true,
         allowViewAnswers: true,
@@ -1372,6 +1389,9 @@ export function buildDailyTask2TestObjects(
         dueAt: null,
         assignedClassIds: Array.isArray(assignedClassIds) ? assignedClassIds : [],
         hashtags: normalizedTags,
+        importWarning: String(it.importWarning || '').trim(),
+        importSourceFile: String(it.importSourceFile || it.sourceLabel || '').trim(),
+        needsImportReview: Boolean(String(it.importWarning || '').trim()),
         antiCheatEnabled: false,
         allowInternalCopyPaste: true,
         allowViewAnswers: true,
@@ -1392,4 +1412,61 @@ export function buildDailyTask2TestObjects(
         }
       };
     });
+}
+
+// ==========================================
+// PERSISTENT BULK IMPORT ERROR / AUDIT HISTORY (localStorage)
+// ==========================================
+export const BULK_IMPORT_HISTORY_STORAGE_KEY = 'ielts_bulk_writing_import_history_v1';
+
+export function loadBulkWritingImportHistory() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const raw = window.localStorage.getItem(BULK_IMPORT_HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+export function appendBulkWritingImportHistory(entry = {}) {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const current = loadBulkWritingImportHistory();
+    const record = {
+      id: entry.id || `imp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: entry.createdAt || new Date().toISOString(),
+      mode: entry.mode === 'task1' ? 'task1' : 'task2',
+      summaryLabel: String(entry.summaryLabel || '').trim(),
+      totalSaved: Number(entry.totalSaved || 0),
+      warningItems: Array.isArray(entry.warningItems) ? entry.warningItems : [],
+      generalWarnings: Array.isArray(entry.generalWarnings) ? entry.generalWarnings : []
+    };
+    const next = [record, ...current].slice(0, 35);
+    window.localStorage.setItem(BULK_IMPORT_HISTORY_STORAGE_KEY, JSON.stringify(next));
+    return next;
+  } catch (_err) {
+    return loadBulkWritingImportHistory();
+  }
+}
+
+export function deleteBulkWritingImportHistoryEntry(entryId) {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const next = loadBulkWritingImportHistory().filter(item => item?.id !== entryId);
+    window.localStorage.setItem(BULK_IMPORT_HISTORY_STORAGE_KEY, JSON.stringify(next));
+    return next;
+  } catch (_err) {
+    return [];
+  }
+}
+
+export function clearBulkWritingImportHistory() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    window.localStorage.removeItem(BULK_IMPORT_HISTORY_STORAGE_KEY);
+  } catch (_err) {}
+  return [];
 }

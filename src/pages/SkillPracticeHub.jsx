@@ -145,6 +145,7 @@ export default function SkillPracticeHub({
     task1SubCategory: 'w1_dynamic'
   });
   const [skillSearchQuery, setSkillSearchQuery] = useState('');
+  const [onlyImportWarnings, setOnlyImportWarnings] = useState(false);
   const [skillListPageState, setSkillListPageState] = useState({ scopeKey: '', page: 1 });
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
@@ -625,6 +626,32 @@ export default function SkillPracticeHub({
                           <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                             {test.title}
                           </h2>
+                          {isTeacher && (test.needsImportReview || test.importWarning) && (
+                            <div
+                              data-testid={`daily-card-import-warning-${test.id}`}
+                              className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-700/70 text-[11px] text-amber-900 dark:text-amber-200 space-y-1"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-extrabold inline-flex items-center gap-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                                  Cần kiểm tra / sửa đề (Lỗi nhập tự động)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenSkillBuilder?.(test.focusSkill || 'speaking', test)}
+                                  className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0"
+                                >
+                                  Sửa ngay
+                                </button>
+                              </div>
+                              {test.importSourceFile && (
+                                <p className="font-mono text-[10px] text-amber-800/90 dark:text-amber-300/90 truncate">
+                                  File gốc: {test.importSourceFile}
+                                </p>
+                              )}
+                              {test.importWarning && <p>{test.importWarning}</p>}
+                            </div>
+                          )}
                           {renderTestHashtagPills(test, {
                             onSelectTag: nextTag =>
                               setSelectedSpeakingHashtag(prev =>
@@ -1217,10 +1244,17 @@ export default function SkillPracticeHub({
             });
           });
           const availableHashtagFilters = Array.from(tagCountsMap.values());
+          const importWarningCount = isTeacher
+            ? list.filter(t => Boolean(t.needsImportReview || t.importWarning)).length
+            : 0;
+          const activeOnlyImportWarnings = Boolean(isTeacher && onlyImportWarnings && importWarningCount > 0);
+          const warningFilteredList = activeOnlyImportWarnings
+            ? list.filter(t => Boolean(t.needsImportReview || t.importWarning))
+            : displayedList;
           const hashtagFilteredList =
-            selectedSpeakingHashtag === 'all' || Boolean(focusedMatch)
-              ? displayedList
-              : displayedList.filter(t =>
+            selectedSpeakingHashtag === 'all' || Boolean(focusedMatch) || activeOnlyImportWarnings
+              ? warningFilteredList
+              : warningFilteredList.filter(t =>
                   getEffectiveTestHashtags(t).some(
                     h => h.tag.toLowerCase() === selectedSpeakingHashtag.toLowerCase()
                   )
@@ -1233,9 +1267,10 @@ export default function SkillPracticeHub({
                   const inTitle = String(t.title || '').toLowerCase().includes(trimmedSkillSearch);
                   const inPrompt1 = String(t.writing?.task1?.prompt || '').toLowerCase().includes(trimmedSkillSearch);
                   const inPrompt2 = String(t.writing?.task2?.prompt || '').toLowerCase().includes(trimmedSkillSearch);
-                  return inTitle || inPrompt1 || inPrompt2;
+                  const inSource = String(t.importSourceFile || '').toLowerCase().includes(trimmedSkillSearch);
+                  return inTitle || inPrompt1 || inPrompt2 || inSource;
                 });
-          const pageScopeKey = `${hashtagScopeKey}:${selectedSpeakingHashtag}:${trimmedSkillSearch}`;
+          const pageScopeKey = `${hashtagScopeKey}:${selectedSpeakingHashtag}:${trimmedSkillSearch}:${activeOnlyImportWarnings ? 'warn' : 'all'}`;
           const activeSkillPage = skillListPageState.scopeKey === pageScopeKey ? skillListPageState.page : 1;
           const setActiveSkillPage = nextPage =>
             setSkillListPageState({ scopeKey: pageScopeKey, page: nextPage });
@@ -1243,6 +1278,31 @@ export default function SkillPracticeHub({
 
           return (
             <>
+              {isTeacher && importWarningCount > 0 && !focusedMatch && (
+                <div
+                  data-testid="daily-import-warnings-banner"
+                  className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/70"
+                >
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-amber-900 dark:text-amber-200">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>
+                      Có {importWarningCount} đề tạo hàng loạt đang được đánh dấu cần rà soát lại (lỗi đọc AI / thiếu ảnh biểu đồ). Khi bạn bấm Sửa &amp; Lưu, nhãn cảnh báo sẽ tự động tắt.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="daily-filter-import-warnings-btn"
+                    onClick={() => setOnlyImportWarnings(prev => !prev)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-extrabold border transition shrink-0 ${
+                      activeOnlyImportWarnings
+                        ? 'bg-amber-600 text-white border-amber-600'
+                        : 'bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-200 border-amber-400 dark:border-amber-600 hover:bg-amber-100'
+                    }`}
+                  >
+                    {activeOnlyImportWarnings ? '← Xem tất cả đề' : `Lọc ${importWarningCount} đề bị lỗi để sửa ngay`}
+                  </button>
+                </div>
+              )}
               {(availableHashtagFilters.length > 0 || list.length > 6) && !focusedMatch && (
                 <div className="flex flex-wrap items-center justify-between gap-2.5 p-2.5 rounded-lg bg-white dark:bg-[#0F172B] border border-slate-200 dark:border-slate-800">
                   {availableHashtagFilters.length > 0 ? (
@@ -1469,6 +1529,32 @@ export default function SkillPracticeHub({
                           <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                             {test.title}
                           </h2>
+                          {isTeacher && (test.needsImportReview || test.importWarning) && (
+                            <div
+                              data-testid={`daily-card-import-warning-${test.id}`}
+                              className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-700/70 text-[11px] text-amber-900 dark:text-amber-200 space-y-1"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-extrabold inline-flex items-center gap-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                                  Cần kiểm tra / sửa đề (Lỗi nhập tự động)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenSkillBuilder?.(actualSkill, test)}
+                                  className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0"
+                                >
+                                  Sửa ngay
+                                </button>
+                              </div>
+                              {test.importSourceFile && (
+                                <p className="font-mono text-[10px] text-amber-800/90 dark:text-amber-300/90 truncate">
+                                  File gốc: {test.importSourceFile}
+                                </p>
+                              )}
+                              {test.importWarning && <p>{test.importWarning}</p>}
+                            </div>
+                          )}
                           {renderTestHashtagPills(test, {
                             onSelectTag: nextTag =>
                               setSelectedSpeakingHashtag(prev =>
@@ -2432,8 +2518,10 @@ export default function SkillPracticeHub({
         initialTask1SubCategory={bulkWritingModalState.task1SubCategory}
         aiApiKey={aiApiKey}
         aiConfigured={aiConfigured}
+        tests={tests}
         onClose={() => setBulkWritingModalState(prev => ({ ...prev, open: false }))}
         onBulkSaveTests={onBulkCreateTests}
+        onOpenTestForEdit={testObj => onOpenSkillBuilder?.(testObj?.focusSkill || 'writing', testObj)}
         setApiTestState={setApiTestState}
         setShowApiKeyModal={setShowApiKeyModal}
         showToast={showToast}
