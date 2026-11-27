@@ -95,6 +95,7 @@ export default function GameArena({
   currentUser,
   customTitles = [],
   customVocabTopics = [],
+  hiddenPresetVocabKeys = [],
   dailyRankTitles = null,
   darkMode = false,
   freezeCharges,
@@ -297,6 +298,7 @@ export default function GameArena({
         canAccessKnightGame={canAccessPracticeGame}
         currentUser={currentUser}
         customVocabTopics={customVocabTopics}
+        hiddenPresetVocabKeys={hiddenPresetVocabKeys}
         darkMode={darkMode}
         gamePracticeLeaderboard={gamePracticeLeaderboard}
         knightPvpLeaderboard={knightPvpLeaderboard}
@@ -1164,11 +1166,13 @@ export default function GameArena({
                           className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
                         >
                           <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
-                          {Object.entries(VOCAB_PRESETS || {}).map(([key, preset]) => (
-                            <option key={key} value={key}>
-                              📚 {preset.label}
-                            </option>
-                          ))}
+                          {Object.entries(VOCAB_PRESETS || {})
+                            .filter(([key]) => !(hiddenPresetVocabKeys || []).includes(key))
+                            .map(([key, preset]) => (
+                              <option key={key} value={key}>
+                                📚 {preset.label}
+                              </option>
+                            ))}
                           {(customVocabTopics || []).map(t => (
                             <option key={t.id} value={`custom:${t.id}`}>
                               ⭐ {t.label}

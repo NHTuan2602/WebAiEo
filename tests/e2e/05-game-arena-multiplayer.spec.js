@@ -146,6 +146,13 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await page.getByTestId('lobby-edit-vocab-btn').click();
     await expect(page.getByTestId('game-vocab-bank-modal')).toBeVisible({ timeout: 8_000 });
 
+    // Verify teacher can delete a built-in preset vocab bank and restore it cleanly
+    const firstDeletePresetBtn = page.locator('[data-testid^="vocab-delete-preset-btn-"]').first();
+    await expect(firstDeletePresetBtn).toBeVisible();
+    await firstDeletePresetBtn.click();
+    await expect(page.getByTestId('vocab-restore-presets-btn')).toBeVisible();
+    await page.getByTestId('vocab-restore-presets-btn').click();
+
     // Clear all existing items safely (2-click confirm) so Round 4 deterministically serves our exact test question
     await page.getByRole('button', { name: /Xóa hết/i }).click();
     await page.getByRole('button', { name: 'Xóa', exact: true }).click();
@@ -222,7 +229,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
 
     // Check Inventory tab: 10 distinct hero sprites load & locked heroes cannot be purchased directly with Gold
     await page.getByTestId('gacha-tab-inventory').click();
-    await expect(page.getByText(/Thánh Mèo Mồm Chữ O Pop Cat/i)).toBeVisible();
+    await expect(page.getByText(/Thánh Mèo Chữ O Pop Cat/i)).toBeVisible();
     await expect(page.getByText(/Thánh Nhây Trollface Huyền Thoại/i)).toBeVisible();
     await expect(page.getByText(/Kiếm Sĩ Thông Thái Chỉ Đầu Roll Safe/i)).toBeVisible();
     await expect(page.getByText(/Quý Ngài Gấu Pooh Đế Vương Tuxedo/i)).toBeVisible();
@@ -471,7 +478,7 @@ test.describe('5. Game Arena Multiplayer Sync (2 Separate BrowserContexts)', () 
     await expect(page.getByText(/Chuột Hamster Bản Năng Vô Cực/i)).toBeVisible();
     await expect(page.getByText(/Đại Pháp Sư Não To Vũ Trụ Galaxy Brain/i)).toBeVisible();
     await expect(page.getByText(/Thánh Nữ Tính Toán Vũ Trụ Math Lady/i)).toBeVisible();
-    await expect(page.getByText(/Lôi Đế Chuột Vàng Há Mồm Kinh Ngạc/i)).toBeVisible();
+    await expect(page.getByText(/Lôi Đế Chuột Vàng Tròn Mắt Kinh Ngạc/i)).toBeVisible();
     const swordEquipBtn = page.locator('[data-testid^="equip-hero-wp-knight_arthur-"]').first();
     if (await swordEquipBtn.isVisible().catch(() => false)) {
       await swordEquipBtn.click();

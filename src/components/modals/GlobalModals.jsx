@@ -49,6 +49,10 @@ export default function GlobalModals({
   currentUser,
   customVocabInput,
   customVocabTopics = [],
+  hiddenPresetVocabKeys = [],
+  handleHidePresetVocabKey = null,
+  handleHideAllPresetVocabKeys = null,
+  handleRestorePresetVocabKeys = null,
   dispatchSyncAction,
   editingStudentAccount,
   editingTargetUser,
@@ -657,9 +661,11 @@ export default function GlobalModals({
                 className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               >
                 <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
-                {Object.entries(VOCAB_PRESETS || {}).map(([key, preset]) => (
-                  <option key={key} value={key}>📚 {preset.label}</option>
-                ))}
+                {Object.entries(VOCAB_PRESETS || {})
+                  .filter(([key]) => !(hiddenPresetVocabKeys || []).includes(key))
+                  .map(([key, preset]) => (
+                    <option key={key} value={key}>📚 {preset.label}</option>
+                  ))}
                 {(customVocabTopics || []).map(t => (
                   <option key={t.id} value={`custom:${t.id}`}>⭐ {t.label}</option>
                 ))}
@@ -711,6 +717,10 @@ export default function GlobalModals({
         currentUser={currentUser}
         customVocabInput={customVocabInput}
         customVocabTopics={customVocabTopics}
+        hiddenPresetVocabKeys={hiddenPresetVocabKeys}
+        onHidePresetVocabKey={handleHidePresetVocabKey}
+        onHideAllPresetVocabKeys={handleHideAllPresetVocabKeys}
+        onRestorePresetVocabKeys={handleRestorePresetVocabKeys}
         onClose={() => setShowVocabModal(false)}
         onDeleteCustomVocabTopic={handleDeleteCustomVocabTopic}
         onSaveCustomVocabTopic={handleSaveCustomVocabTopic}

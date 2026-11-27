@@ -127,6 +127,7 @@ export default function KnightDragonGame({
   canAccessKnightGame = false,
   currentUser,
   customVocabTopics = [],
+  hiddenPresetVocabKeys = [],
   darkMode = false,
   dispatchSyncAction = null,
   gamePracticeLeaderboard = [],
@@ -3120,10 +3121,12 @@ export default function KnightDragonGame({
           topicId={topicId}
           topicOptions={[
             { id: 'core', title: '🎯 IELTS Core Academic' },
-            ...Object.entries(VOCAB_PRESETS || {}).map(([k, preset]) => ({
-              id: k,
-              title: `📚 ${preset.label}`
-            })),
+            ...Object.entries(VOCAB_PRESETS || {})
+              .filter(([k]) => !(hiddenPresetVocabKeys || []).includes(k))
+              .map(([k, preset]) => ({
+                id: k,
+                title: `📚 ${preset.label}`
+              })),
             ...(customVocabTopics || []).map(t => ({
               id: `custom:${t.id}`,
               title: `⭐ ${t.label}`
@@ -3281,11 +3284,13 @@ export default function KnightDragonGame({
                   className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172B] dark:text-white"
                 >
                   <option value="core">🎯 IELTS Core Academic (Mặc định)</option>
-                  {Object.entries(VOCAB_PRESETS || {}).map(([k, preset]) => (
-                    <option key={k} value={k}>
-                      📚 {preset.label}
-                    </option>
-                  ))}
+                  {Object.entries(VOCAB_PRESETS || {})
+                    .filter(([k]) => !(hiddenPresetVocabKeys || []).includes(k))
+                    .map(([k, preset]) => (
+                      <option key={k} value={k}>
+                        📚 {preset.label}
+                      </option>
+                    ))}
                   {(customVocabTopics || []).map(t => (
                     <option key={t.id} value={`custom:${t.id}`}>
                       ⭐ {t.label}

@@ -1562,6 +1562,7 @@ function createInitialStore(audioDir = '', mediaDir = '') {
     teacherNotes: {},
     users: {},
     customVocabTopics: [],
+    hiddenPresetVocabKeys: [],
     speakingForecast: createDefaultSpeakingForecastBank(),
     customTitles: [],
     gamePracticeLeaderboard: [],
@@ -2122,6 +2123,11 @@ function applyParsedStoreSnapshot(store, parsed) {
   }
   if (Array.isArray(parsed.customVocabTopics)) {
     store.customVocabTopics = parsed.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
+  }
+  if (Array.isArray(parsed.hiddenPresetVocabKeys)) {
+    store.hiddenPresetVocabKeys = Array.from(
+      new Set(parsed.hiddenPresetVocabKeys.map(k => String(k || '').trim()).filter(Boolean))
+    );
   }
   if (parsed.speakingForecast && typeof parsed.speakingForecast === 'object') {
     store.speakingForecast = normalizeSpeakingForecastBank(parsed.speakingForecast);
@@ -3499,6 +3505,7 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: {},
       users: {},
       customVocabTopics: [],
+      hiddenPresetVocabKeys: [],
       speakingForecast: null,
       customTitles: [],
       gamePracticeLeaderboard: [],
@@ -3587,6 +3594,7 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: store.teacherNotes || {},
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
+      hiddenPresetVocabKeys: Array.isArray(store.hiddenPresetVocabKeys) ? store.hiddenPresetVocabKeys : [],
       speakingForecast: normalizeSpeakingForecastBank(store.speakingForecast),
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
       gamePracticeLeaderboard: Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : [],
@@ -3649,6 +3657,7 @@ function getSnapshotForViewer(store, viewer = null) {
       teacherNotes: {},
       users: selfClean,
       customVocabTopics: [],
+      hiddenPresetVocabKeys: [],
       speakingForecast: null,
       customTitles: [],
       gamePracticeLeaderboard: [],
@@ -3791,6 +3800,7 @@ function getSnapshotForViewer(store, viewer = null) {
     teacherNotes: myNote !== undefined ? { [viewer.username]: myNote } : {},
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
+    hiddenPresetVocabKeys: Array.isArray(store.hiddenPresetVocabKeys) ? store.hiddenPresetVocabKeys : [],
     speakingForecast: filterSpeakingForecastForViewer(store.speakingForecast, Array.from(viewerClassSet), false),
     customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
     gamePracticeLeaderboard: (Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : []).filter(entry => {
@@ -3857,6 +3867,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'UPSERT_NOTE',
     'UPSERT_VOCAB_TOPIC',
     'DELETE_VOCAB_TOPIC',
+    'SET_HIDDEN_PRESET_VOCAB_KEYS',
     'UPSERT_SPEAKING_FORECAST',
     'SET_AI_CONFIG',
     'CREATE_NOTIFICATION',
@@ -6635,6 +6646,19 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       break;
     }
 
+    case 'SET_HIDDEN_PRESET_VOCAB_KEYS': {
+      const rawKeys = Array.isArray(payload.hiddenKeys) ? payload.hiddenKeys : [];
+      const nextHidden = Array.from(
+        new Set(rawKeys.map(k => String(k || '').trim()).filter(Boolean))
+      ).slice(0, 60);
+      const prevHidden = Array.isArray(store.hiddenPresetVocabKeys) ? store.hiddenPresetVocabKeys : [];
+      if (JSON.stringify(prevHidden) !== JSON.stringify(nextHidden)) {
+        store.hiddenPresetVocabKeys = nextHidden;
+        changed = true;
+      }
+      break;
+    }
+
     case 'UPSERT_SPEAKING_FORECAST': {
       const nextBank = normalizeSpeakingForecastBank(payload?.bank || payload?.speakingForecast || payload);
       store.speakingForecast = nextBank;
@@ -7670,6 +7694,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'CONFIRM_PAYMENT_TRANSACTION',
   'DELETE_PAYMENT_TRANSACTION',
   'UPDATE_PAYMENT_CONFIG',
+  'SET_HIDDEN_PRESET_VOCAB_KEYS',
   'UPSERT_SPEAKING_FORECAST',
   'UPSERT_ATTEMPT',
   'ADMIN_GRANT_GACHA_WISHES',

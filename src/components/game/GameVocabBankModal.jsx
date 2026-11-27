@@ -99,8 +99,12 @@ export default function GameVocabBankModal({
   currentUser = null,
   customVocabInput = '',
   customVocabTopics = [],
+  hiddenPresetVocabKeys = [],
   onClose,
   onDeleteCustomVocabTopic,
+  onHideAllPresetVocabKeys = null,
+  onHidePresetVocabKey = null,
+  onRestorePresetVocabKeys = null,
   onSaveCustomVocabTopic,
   onSaveRoomVocab,
   setCustomVocabInput,
@@ -634,37 +638,98 @@ export default function GameVocabBankModal({
                   </div>
                 )}
 
-                {/* 14 Built-in IELTS Presets */}
-                <div className="space-y-1">
-                  <p className="px-1 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    14 Kho Chuẩn IELTS
-                  </p>
-                  {Object.entries(VOCAB_PRESETS || {}).map(([key, preset]) => (
-                    <div
-                      key={key}
-                      className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-400 p-2 flex items-center justify-between gap-1 transition"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleLoadSourceText(preset.text, preset.label, 'replace', '')}
-                        className="flex-1 text-left min-w-0"
-                        title="Bấm để nạp thay thế danh sách hiện tại"
-                      >
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                          {preset.label}
+                {/* Built-in IELTS Presets (Teacher can delete individual or all sample banks) */}
+                {(() => {
+                  const hiddenSet = new Set(Array.isArray(hiddenPresetVocabKeys) ? hiddenPresetVocabKeys : []);
+                  const allPresetEntries = Object.entries(VOCAB_PRESETS || {});
+                  const visiblePresetEntries = allPresetEntries.filter(([key]) => !hiddenSet.has(key));
+                  const hiddenCount = allPresetEntries.length - visiblePresetEntries.length;
+
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="px-1 flex items-center justify-between gap-1 flex-wrap">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Kho Mẫu IELTS ({visiblePresetEntries.length})
                         </p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleLoadSourceText(preset.text, preset.label, 'append', activeTopicId)}
-                        className="px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-500/15 hover:bg-purple-100 text-purple-700 dark:text-purple-300 text-[10px] font-extrabold shrink-0"
-                        title="Ghép thêm vào danh sách hiện tại"
-                      >
-                        + Ghép
-                      </button>
+                        {isTeacher && (
+                          <div className="flex items-center gap-1">
+                            {visiblePresetEntries.length > 0 && onHideAllPresetVocabKeys && (
+                              <button
+                                type="button"
+                                data-testid="vocab-hide-all-presets-btn"
+                                onClick={() => {
+                                  if (window.confirm(`Xóa toàn bộ ${visiblePresetEntries.length} kho từ vựng mẫu để giáo viên tự tạo kho riêng? (Vẫn có thể bấm Khôi phục bất kỳ lúc nào)`)) {
+                                    onHideAllPresetVocabKeys();
+                                  }
+                                }}
+                                className="px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 dark:hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 text-[10px] font-extrabold transition"
+                                title="Xóa toàn bộ các kho mẫu có sẵn"
+                              >
+                                Xóa tất cả mẫu
+                              </button>
+                            )}
+                            {hiddenCount > 0 && onRestorePresetVocabKeys && (
+                              <button
+                                type="button"
+                                data-testid="vocab-restore-presets-btn"
+                                onClick={onRestorePresetVocabKeys}
+                                className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-extrabold inline-flex items-center gap-0.5 transition"
+                                title="Khôi phục lại các kho mẫu đã xóa"
+                              >
+                                <RotateCcw className="w-2.5 h-2.5" /> Khôi phục ({hiddenCount})
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {visiblePresetEntries.length === 0 ? (
+                        <div className="px-2.5 py-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 text-center">
+                          Đã ẩn toàn bộ kho mẫu. Hãy bấm <strong>Lưu Kho</strong> ở trên để tạo kho từ vựng riêng của giáo viên!
+                        </div>
+                      ) : (
+                        visiblePresetEntries.map(([key, preset]) => (
+                          <div
+                            key={key}
+                            className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-400 p-2 flex items-center justify-between gap-1 transition"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleLoadSourceText(preset.text, preset.label, 'replace', '')}
+                              className="flex-1 text-left min-w-0"
+                              title="Bấm để nạp thay thế danh sách hiện tại"
+                            >
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                                {preset.label}
+                              </p>
+                            </button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleLoadSourceText(preset.text, preset.label, 'append', activeTopicId)}
+                                className="px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-500/15 hover:bg-purple-100 text-purple-700 dark:text-purple-300 text-[10px] font-extrabold shrink-0"
+                                title="Ghép thêm vào danh sách hiện tại"
+                              >
+                                + Ghép
+                              </button>
+                              {isTeacher && onHidePresetVocabKey && (
+                                <button
+                                  type="button"
+                                  data-testid={`vocab-delete-preset-btn-${key}`}
+                                  onClick={() => onHidePresetVocabKey(key, preset.label)}
+                                  className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/20 transition"
+                                  title={`Xóa kho mẫu "${preset.label}"`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
               </div>
             </aside>
           )}

@@ -1361,6 +1361,15 @@ export default function App() {
       return [];
     }
   });
+  const [hiddenPresetVocabKeys, setHiddenPresetVocabKeys] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ielts_hidden_preset_vocab_keys_v1');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.map(k => String(k || '').trim()).filter(Boolean) : [];
+    } catch (_e) {
+      return [];
+    }
+  });
   const [speakingForecast, setSpeakingForecast] = useState(() => createDefaultSpeakingForecastBank());
   const [transientSpeakingTest, setTransientSpeakingTest] = useState(null);
 
@@ -1507,6 +1516,10 @@ export default function App() {
     }
     syncChannelRef.current?.postMessage({ key: 'ielts_custom_vocab_topics_v1', payload: customVocabTopics });
   }, [customVocabTopics]);
+
+  useEffect(() => {
+    localStorage.setItem('ielts_hidden_preset_vocab_keys_v1', JSON.stringify(hiddenPresetVocabKeys));
+  }, [hiddenPresetVocabKeys]);
 
   useEffect(() => {
     localStorage.setItem('ielts_teacher_notes', JSON.stringify(teacherNotes));
@@ -1689,6 +1702,10 @@ export default function App() {
       const validTopics = snap.customVocabTopics.filter(t => t?.id && t?.label && typeof t?.text === 'string');
       skipNextVocabTopicsBroadcastRef.current = true;
       setCustomVocabTopics(prev => (JSON.stringify(prev) === JSON.stringify(validTopics) ? prev : validTopics));
+    }
+    if (Array.isArray(snap.hiddenPresetVocabKeys)) {
+      const validHidden = Array.from(new Set(snap.hiddenPresetVocabKeys.map(k => String(k || '').trim()).filter(Boolean)));
+      setHiddenPresetVocabKeys(prev => (JSON.stringify(prev) === JSON.stringify(validHidden) ? prev : validHidden));
     }
     if (snap.speakingForecast && typeof snap.speakingForecast === 'object') {
       const normBank = normalizeSpeakingForecastBank(snap.speakingForecast);
@@ -3720,6 +3737,30 @@ export default function App() {
     setCustomVocabTopics(prev => prev.filter(t => t.id !== topic.id));
     dispatchSyncAction('DELETE_VOCAB_TOPIC', { topicId: topic.id });
     showToast(`Đã xóa chủ đề "${topic.label}".`, 'info');
+  };
+
+  const handleHidePresetVocabKey = (presetKey, label = '') => {
+    const cleanKey = String(presetKey || '').trim();
+    if (!cleanKey) return;
+    setHiddenPresetVocabKeys(prev => {
+      const next = Array.from(new Set([...(Array.isArray(prev) ? prev : []), cleanKey]));
+      dispatchSyncAction('SET_HIDDEN_PRESET_VOCAB_KEYS', { hiddenKeys: next });
+      return next;
+    });
+    showToast(`Đã xóa kho mẫu "${label || cleanKey}".`, 'info');
+  };
+
+  const handleHideAllPresetVocabKeys = () => {
+    const allKeys = Object.keys(VOCAB_PRESETS || {});
+    setHiddenPresetVocabKeys(allKeys);
+    dispatchSyncAction('SET_HIDDEN_PRESET_VOCAB_KEYS', { hiddenKeys: allKeys });
+    showToast('Đã xóa toàn bộ các kho từ vựng mẫu. Giáo viên có thể tự tạo kho riêng của mình!', 'info');
+  };
+
+  const handleRestorePresetVocabKeys = () => {
+    setHiddenPresetVocabKeys([]);
+    dispatchSyncAction('SET_HIDDEN_PRESET_VOCAB_KEYS', { hiddenKeys: [] });
+    showToast('Đã khôi phục lại toàn bộ 14 kho chuẩn IELTS!', 'success');
   };
 
   const openMemberProfile = (username, fromView = view) => {
@@ -8146,6 +8187,7 @@ export default function App() {
           currentUser={currentUser}
           customTitles={customTitles}
           customVocabTopics={customVocabTopics}
+          hiddenPresetVocabKeys={hiddenPresetVocabKeys}
           dailyRankTitles={dailyRankTitles}
           darkMode={darkMode}
           freezeCharges={freezeCharges}
@@ -8544,6 +8586,10 @@ export default function App() {
         currentUser={currentUser}
         customVocabInput={customVocabInput}
         customVocabTopics={customVocabTopics}
+        hiddenPresetVocabKeys={hiddenPresetVocabKeys}
+        handleHidePresetVocabKey={handleHidePresetVocabKey}
+        handleHideAllPresetVocabKeys={handleHideAllPresetVocabKeys}
+        handleRestorePresetVocabKeys={handleRestorePresetVocabKeys}
         dispatchSyncAction={dispatchSyncAction}
         editingStudentAccount={editingStudentAccount}
         editingTargetUser={editingTargetUser}

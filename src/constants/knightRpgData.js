@@ -194,7 +194,7 @@ export const KNIGHT_CHARACTER_SKINS = [
   // ---- 4★ STANDARD POOL ----
   {
     id: 'valkyrie_freya',
-    name: 'Thánh Mèo Mồm Chữ O Pop Cat',
+    name: 'Thánh Mèo Chữ O Pop Cat',
     gender: 'Meme',
     genderBadge: '😮 Meme',
     rarity: '4★ Thường',
@@ -204,8 +204,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'sword',
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
-    weaponName: 'Song Kiếm Mồm Rộng POP-POP-POP',
-    memeQuote: '“POP! POP! POP! Mở mồm 1 cái bay hết đáp án sai!”',
+    weaponName: 'Song Kiếm Âm Thanh POP-POP-POP',
+    memeQuote: '“POP! POP! POP! Tung chiêu 1 nhịp bay hết đáp án sai!”',
     passiveText: '+15% Vàng khi hạ quái • Sức mạnh POP liên hoàn',
     spriteUrl: '/assets/knight-rpg/valkyrie_freya.svg',
     slashStyle: 'holy',
@@ -234,7 +234,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
     weaponName: 'Đại Kiếm Tấu Hài (Problem, Boss Rồng?)',
-    memeQuote: '“Ủa Boss Rồng cay cú à? Problem? Hahaha!”',
+    memeQuote: '“Ủa Boss Rồng bất ngờ chưa? Problem? Hahaha!”',
     passiveText: '+18% Vàng khi hạ quái • Nụ cười chọc tức Boss',
     spriteUrl: '/assets/knight-rpg/paladin_leon.svg',
     slashStyle: 'solar',
@@ -292,7 +292,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
     weaponName: 'Quyền Trượng Giữ Chuỗi Streak 365 Ngày',
-    memeQuote: '“23:59 rồi mà chưa học từ mới hả?? Chết với ta!”',
+    memeQuote: '“23:59 rồi mà chưa học từ mới hả?? Vào ôn bài ngay!”',
     passiveText: '+20% Vàng • +3 giây mỗi câu (Áp lực nhắc học bài)',
     spriteUrl: '/assets/knight-rpg/mage_selena.svg',
     slashStyle: 'arcane',
@@ -553,7 +553,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
     weaponName: 'Bàn Tay Vàng Chỉ Điểm Quái Vật',
-    memeQuote: '“Hahaha Boss Rồng né hụt kìa quê chữ ê kéo dài!!”',
+    memeQuote: '“Hahaha Boss Rồng đánh hụt rồi kìa, ngại quá đi!!”',
     passiveText: '+24% Vàng • +1 giây mỗi câu (Sát thương tâm lý cực mạnh)',
     spriteUrl: '/assets/knight-rpg/pointing_laugh_cat.svg',
     slashStyle: 'crimson',
@@ -887,7 +887,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
     weaponName: 'Hỏa Kiếm 2 Đầu Nghiêm Túc + 1 Đầu Lè Lưỡi',
-    memeQuote: '“Hai đầu trái phải đang gồng ngầu lòi, đầu thứ 3 thì... blep 😛!”',
+    memeQuote: '“Hai đầu trái phải đang cực kỳ nghiêm túc, đầu thứ 3 thì... blep 😛!”',
     passiveText: '+50% Vàng • +3 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/dragon_empress.svg',
     slashStyle: 'dragon',
@@ -995,7 +995,7 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'emperor_raiden',
-    name: 'Lôi Đế Chuột Vàng Há Mồm Kinh Ngạc',
+    name: 'Lôi Đế Chuột Vàng Tròn Mắt Kinh Ngạc',
     gender: 'Meme',
     genderBadge: '⚡ Meme',
     rarity: '5★ Giới Hạn',
@@ -1007,7 +1007,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClassLabel: 'Hệ Kiếm',
     priceGold: null,
     weaponName: 'Lôi Thần Kiếm Ơ Kìa Bất Ngờ Chưa?!',
-    memeQuote: '“Quái vật vừa khè lửa xong thấy mình trả lời đúng liền há hốc mồm :O!”',
+    memeQuote: '“Quái vật vừa khè lửa xong thấy mình trả lời đúng liền tròn mắt kinh ngạc :O!”',
     passiveText: '+45% Vàng • +2 giây mỗi câu',
     spriteUrl: '/assets/knight-rpg/emperor_raiden.svg',
     slashStyle: 'crimson',
@@ -1247,7 +1247,7 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClassLabel: 'Hệ Pháp Khí',
     priceGold: null,
     weaponName: 'Sóng Âm Nằm Im Xoay 360 Độ',
-    memeQuote: '“Nằm nguyên một cục xoay vòng cũng dọn sạch 4 ải.”',
+    memeQuote: '“Chỉ cần xoay vòng 360 độ cũng dọn sạch 4 ải!”',
     passiveText: '+52% Vàng • +3 giây mỗi câu (Quỹ đạo Mèo 3D)',
     spriteUrl: '/assets/knight-rpg/maxwell_spinning_cat.svg',
     slashStyle: 'arcane',
@@ -1265,7 +1265,7 @@ export const KNIGHT_CHARACTER_SKINS = [
   },
   {
     id: 'coffin_dance_captain',
-    name: 'Đội Trưởng Khiêng Hòm Kính Đen',
+    name: 'Đội Trưởng Nhạc Hội Kính Đen',
     gender: 'Meme',
     genderBadge: '🕶️ Meme',
     rarity: '5★ Giới Hạn',
@@ -1276,8 +1276,8 @@ export const KNIGHT_CHARACTER_SKINS = [
     weaponClass: 'claymore',
     weaponClassLabel: 'Hệ Trọng Kiếm',
     priceGold: null,
-    weaponName: 'Nhạc Lễ Tiễn Quái Lên Đường',
-    memeQuote: '“Quái vật dám chặn đường? Nhạc nổi lên tiễn đi ngay!”',
+    weaponName: 'Nhạc Hội Vũ Điệu Tiễn Quái',
+    memeQuote: '“Quái vật dám chặn đường? Nhạc nổi lên tiễn về sảnh ngay!”',
     passiveText: '+55% Vàng • +3 giây mỗi câu (Vũ điệu tiễn biệt)',
     spriteUrl: '/assets/knight-rpg/coffin_dance_captain.svg',
     slashStyle: 'holy',
@@ -1438,9 +1438,9 @@ export const KNIGHT_LIMITED_BANNERS = [
   {
     id: 'limited_raiden',
     featuredHeroId: 'emperor_raiden',
-    bannerTitle: 'Banner Giới Hạn: Lôi Đế Chuột Vàng Há Mồm',
+    bannerTitle: 'Banner Giới Hạn: Lôi Đế Chuột Vàng Kinh Ngạc',
     featured4StarIds: ['stonks_meme_man', 'pointing_laugh_cat', 'samurai_tomoe']
-  }  ,
+  },
   {
     id: 'limited_capybara_minister',
     featuredHeroId: 'capybara_chill_minister',
@@ -1468,7 +1468,7 @@ export const KNIGHT_LIMITED_BANNERS = [
   {
     id: 'limited_coffin_captain',
     featuredHeroId: 'coffin_dance_captain',
-    bannerTitle: 'Banner Giới Hạn: Đội Trưởng Khiêng Hòm Kính Đen',
+    bannerTitle: 'Banner Giới Hạn: Đội Trưởng Nhạc Hội Kính Đen',
     featured4StarIds: ['paladin_leon', 'stonks_meme_man', 'cheems_bonk']
   },
   {
@@ -1905,14 +1905,14 @@ function buildWhiffMemeSvg(emojiText = '💀', accent = '#64748b') {
 export const MEME_WHIFF_3STAR_POOL = [
   {
     id: 'whiff_cai_nit',
-    name: 'Tạch Gacha: Còn Đúng Cái Nịt',
+    name: 'Tạch Gacha: Hộp Quà Trống Rỗng',
     starRarity: 3,
     rarityLabel: 'Tạch Gacha (3★)',
     isWhiff: true,
     consolationGold: KNIGHT_GACHA_WHIFF_3STAR_REFUND_GOLD,
-    memeQuote: '“Quay tay cực mạnh nhưng... còn đúng cái nịt!”',
+    memeQuote: '“Mở hộp đầy hy vọng nhưng bên trong chỉ có... làn gió mát!”',
     passiveText: 'Tạch 3★ • Hoàn an ủi +500 Vàng',
-    iconUrl: buildWhiffMemeSvg('ゴム', '#f43f5e').replace('ゴム', '🪹')
+    iconUrl: buildWhiffMemeSvg('📦', '#f43f5e')
   },
   {
     id: 'whiff_dep_to_ong',
