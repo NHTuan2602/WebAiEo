@@ -1470,3 +1470,61 @@ export function clearBulkWritingImportHistory() {
   } catch (_err) {}
   return [];
 }
+
+/**
+ * Detects whether a test has an explicit import warning OR retroactive signs of a failed bulk import
+ * (e.g. default fallback title "Visual data analysis (...)", generic fallback prompt, or missing Task 1 chart image).
+ */
+export function detectTestImportIssue(test) {
+  if (!test || typeof test !== 'object') {
+    return { hasIssue: false, reason: '', sourceFile: '' };
+  }
+  const explicitWarn = String(test.importWarning || '').trim();
+  const sourceFile = String(test.importSourceFile || '').trim();
+  if (explicitWarn) {
+    return { hasIssue: true, reason: explicitWarn, sourceFile };
+  }
+  if (test.needsImportReview) {
+    return {
+      hasIssue: true,
+      reason: 'Đề được đánh dấu cần kiểm tra lại sau khi nhập tự động.',
+      sourceFile
+    };
+  }
+
+  // Retroactive heuristic for previously imported Writing Task 1 tests before explicit warning tags existed
+  const isWritingTask1 =
+    test.focusSkill === 'writing' &&
+    test.writingTaskScope !== 'task2' &&
+    test.dailySubCategory !== 'w2_essay';
+  if (isWritingTask1) {
+    const title = String(test.title || '').trim();
+    const prompt1 = String(test.writing?.task1?.prompt || '').trim();
+    const img1 = String(test.writing?.task1?.imageUrl || '').trim();
+
+    if (/^Visual\s+(?:data|chart)\s+analysis\b/i.test(title)) {
+      const m = title.match(/\(([^)]+)\)\s*$/);
+      return {
+        hasIssue: true,
+        reason: 'AI bị lỗi lúc đọc ảnh nên đang dùng tiêu đề & câu hỏi mặc định — cần sửa lại đề.',
+        sourceFile: sourceFile || (m ? m[1].trim() : '')
+      };
+    }
+    if (/^The chart\/diagram below gives information for IELTS Academic Writing Task 1\./i.test(prompt1)) {
+      return {
+        hasIssue: true,
+        reason: 'Đề đang dùng câu hỏi mặc định do AI chưa đọc được chữ từ ảnh — cần nhập lại đề bài.',
+        sourceFile
+      };
+    }
+    if (!img1) {
+      return {
+        hasIssue: true,
+        reason: 'Đề Writing Task 1 chưa có hình ảnh biểu đồ / bản đồ — cần gắn ảnh hoặc tạo hình bằng AI.',
+        sourceFile
+      };
+    }
+  }
+
+  return { hasIssue: false, reason: '', sourceFile: '' };
+}

@@ -718,9 +718,8 @@ test.describe('4. Daily 4-Skill Practice & Speaking Room (Mocked Paid APIs)', ()
       await page.getByTestId('daily-filter-import-warnings-btn').click();
       await expect(page.getByText(/OPINIONS OF FULL TIME AND ITS SERVICES\.docx/i).first()).toBeVisible();
 
-      // Re-open bulk modal and verify Lịch sử & Đề lỗi persisted the warning entry
-      await page.getByTestId('open-bulk-w1-ai-btn').click();
-      await page.getByTestId('toggle-bulk-import-history-btn').click();
+      // Click "Lịch sử & Đề lỗi" directly on the Daily Zone toolbar and verify history + live broken test panel opens immediately
+      await page.getByTestId('daily-open-import-history-btn').click();
       await expect(page.getByTestId('bulk-import-history-panel')).toBeVisible();
       await expect(
         page.getByTestId('bulk-import-history-panel').getByText(/OPINIONS OF FULL TIME AND ITS SERVICES\.docx/i).first()

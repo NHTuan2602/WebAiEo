@@ -18,6 +18,7 @@ import {
   HardDrive,
   Hash,
   Headphones,
+  History,
   KeyRound,
   Layers,
   Lock,
@@ -75,6 +76,7 @@ import SpeakingHeatmapCard from '../components/speaking/SpeakingHeatmapCard';
 import SpeakingForecastZone from '../components/speaking/SpeakingForecastZone';
 import AssignFolderModal from '../components/modals/AssignFolderModal';
 import DailyWritingBulkModal from '../components/teacher/DailyWritingBulkModal';
+import { detectTestImportIssue } from '../utils/dailyWritingBulkAi';
 import ListPaginationBar, { paginateItems } from '../components/common/ListPaginationBar';
 import VerticalPodiumLeaderboard from '../components/common/VerticalPodiumLeaderboard';
 import WritingTask2FilterBar from '../components/common/WritingTask2FilterBar';
@@ -142,7 +144,8 @@ export default function SkillPracticeHub({
   const [bulkWritingModalState, setBulkWritingModalState] = useState({
     open: false,
     mode: 'task2',
-    task1SubCategory: 'w1_dynamic'
+    task1SubCategory: 'w1_dynamic',
+    showHistory: false
   });
   const [skillSearchQuery, setSkillSearchQuery] = useState('');
   const [onlyImportWarnings, setOnlyImportWarnings] = useState(false);
@@ -886,11 +889,12 @@ export default function SkillPracticeHub({
                     setBulkWritingModalState({
                       open: true,
                       mode: 'task1',
-                      task1SubCategory: activeSubCatFilter !== 'all' ? activeSubCatFilter : 'auto'
+                      task1SubCategory: activeSubCatFilter !== 'all' ? activeSubCatFilter : 'auto',
+                      showHistory: false
                     })
                   }
                   className="px-3.5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
-                  title="Ném nhiều hình biểu đồ hoặc file PDF để AI tự tạo hàng loạt đề Task 1 vào thư mục này"
+                  title="Ném file Word (.docx), file .ZIP Google Drive, hình ảnh hoặc PDF để tạo hàng loạt đề Task 1"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
                   <span>
@@ -908,16 +912,43 @@ export default function SkillPracticeHub({
                     setBulkWritingModalState({
                       open: true,
                       mode: 'task2',
-                      task1SubCategory: 'w1_dynamic'
+                      task1SubCategory: 'w1_dynamic',
+                      showHistory: false
                     })
                   }
                   className="px-3.5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
-                  title="Tải file PDF bộ đề (VD: 350 câu Task 2) để AI tự phân loại Chủ đề, Dạng bài và đặt tên theo Danh từ"
+                  title="Tải file Word (.docx) hoặc PDF bộ đề (VD: 350 câu Task 2) để AI tự phân loại Chủ đề, Dạng bài và đặt tên theo Danh từ"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
                   <span>Tạo Đề Task 2 Nhanh (AI PDF)</span>
                 </button>
               )}
+              {(tabKey === 'writing_task1' || tabKey === 'writing_task2') && onBulkCreateTests && (() => {
+                const tabIssueCount = list.filter(t => detectTestImportIssue(t).hasIssue).length;
+                return (
+                  <button
+                    type="button"
+                    data-testid="daily-open-import-history-btn"
+                    onClick={() =>
+                      setBulkWritingModalState({
+                        open: true,
+                        mode: tabKey === 'writing_task1' ? 'task1' : 'task2',
+                        task1SubCategory: activeSubCatFilter !== 'all' ? activeSubCatFilter : 'auto',
+                        showHistory: true
+                      })
+                    }
+                    className={`px-3.5 py-2.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 border transition ${
+                      tabIssueCount > 0
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-sm'
+                        : 'bg-white dark:bg-slate-800 hover:border-amber-400 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+                    }`}
+                    title="Xem lịch sử các lần nhập hàng loạt & danh sách các đề bị lỗi / thiếu ảnh để mở sửa ngay"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>Lịch sử &amp; Đề lỗi{tabIssueCount > 0 ? ` (${tabIssueCount})` : ''}</span>
+                  </button>
+                );
+              })()}
               <button
                 type="button"
                 onClick={() =>
@@ -1054,8 +1085,8 @@ export default function SkillPracticeHub({
                         {subCount === 0 ? (
                           <span className="text-[10px] text-slate-400">Trống</span>
                         ) : assignedClsObjs.length === 0 ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                            <Globe className="w-2.5 h-2.5" /> Tất cả
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+                            <Globe className="w-2.5 h-2.5 shrink-0" /> Tất cả
                           </span>
                         ) : (
                           <>
@@ -1245,11 +1276,11 @@ export default function SkillPracticeHub({
           });
           const availableHashtagFilters = Array.from(tagCountsMap.values());
           const importWarningCount = isTeacher
-            ? list.filter(t => Boolean(t.needsImportReview || t.importWarning)).length
+            ? list.filter(t => detectTestImportIssue(t).hasIssue).length
             : 0;
           const activeOnlyImportWarnings = Boolean(isTeacher && onlyImportWarnings && importWarningCount > 0);
           const warningFilteredList = activeOnlyImportWarnings
-            ? list.filter(t => Boolean(t.needsImportReview || t.importWarning))
+            ? list.filter(t => detectTestImportIssue(t).hasIssue)
             : displayedList;
           const hashtagFilteredList =
             selectedSpeakingHashtag === 'all' || Boolean(focusedMatch) || activeOnlyImportWarnings
@@ -1529,32 +1560,36 @@ export default function SkillPracticeHub({
                           <h2 className="text-base font-extrabold text-[#0F172B] dark:text-white leading-snug">
                             {test.title}
                           </h2>
-                          {isTeacher && (test.needsImportReview || test.importWarning) && (
-                            <div
-                              data-testid={`daily-card-import-warning-${test.id}`}
-                              className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-700/70 text-[11px] text-amber-900 dark:text-amber-200 space-y-1"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-extrabold inline-flex items-center gap-1">
-                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                                  Cần kiểm tra / sửa đề (Lỗi nhập tự động)
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => onOpenSkillBuilder?.(actualSkill, test)}
-                                  className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0"
-                                >
-                                  Sửa ngay
-                                </button>
+                          {isTeacher && (() => {
+                            const issue = detectTestImportIssue(test);
+                            if (!issue.hasIssue) return null;
+                            return (
+                              <div
+                                data-testid={`daily-card-import-warning-${test.id}`}
+                                className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/35 border border-amber-300 dark:border-amber-700/70 text-[11px] text-amber-900 dark:text-amber-200 space-y-1"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-extrabold inline-flex items-center gap-1">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                                    Cần kiểm tra / sửa đề (Lỗi nhập tự động)
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenSkillBuilder?.(actualSkill, test)}
+                                    className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0"
+                                  >
+                                    Sửa ngay
+                                  </button>
+                                </div>
+                                {issue.sourceFile && (
+                                  <p className="font-mono text-[10px] text-amber-800/90 dark:text-amber-300/90 truncate">
+                                    File gốc: {issue.sourceFile}
+                                  </p>
+                                )}
+                                {issue.reason && <p>{issue.reason}</p>}
                               </div>
-                              {test.importSourceFile && (
-                                <p className="font-mono text-[10px] text-amber-800/90 dark:text-amber-300/90 truncate">
-                                  File gốc: {test.importSourceFile}
-                                </p>
-                              )}
-                              {test.importWarning && <p>{test.importWarning}</p>}
-                            </div>
-                          )}
+                            );
+                          })()}
                           {renderTestHashtagPills(test, {
                             onSelectTag: nextTag =>
                               setSelectedSpeakingHashtag(prev =>
@@ -2516,6 +2551,7 @@ export default function SkillPracticeHub({
         isOpen={bulkWritingModalState.open}
         initialMode={bulkWritingModalState.mode}
         initialTask1SubCategory={bulkWritingModalState.task1SubCategory}
+        initialShowHistory={bulkWritingModalState.showHistory}
         aiApiKey={aiApiKey}
         aiConfigured={aiConfigured}
         tests={tests}

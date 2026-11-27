@@ -38,6 +38,7 @@ import {
   buildDailyTask2TestObjects,
   clearBulkWritingImportHistory,
   deleteBulkWritingImportHistoryEntry,
+  detectTestImportIssue,
   loadBulkWritingImportHistory,
   runBulkTask1AiPipeline,
   runBulkTask2AiPipeline
@@ -55,6 +56,7 @@ export default function DailyWritingBulkModal({
   isOpen = false,
   initialMode = 'task2', // 'task1' | 'task2'
   initialTask1SubCategory = 'w1_dynamic',
+  initialShowHistory = false,
   aiApiKey = '',
   aiConfigured = false,
   tests = [],
@@ -67,7 +69,7 @@ export default function DailyWritingBulkModal({
 }) {
   const [mode, setMode] = useState(initialMode === 'task1' ? 'task1' : 'task2');
   const [t1SubCategory, setT1SubCategory] = useState(initialTask1SubCategory || 'w1_dynamic');
-  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(Boolean(initialShowHistory));
   const [importHistory, setImportHistory] = useState(() => loadBulkWritingImportHistory());
   const [t1OnlyWarnings, setT1OnlyWarnings] = useState(false);
 
@@ -112,10 +114,10 @@ export default function DailyWritingBulkModal({
       setT1SubCategory(initialTask1SubCategory);
     }
     setImportHistory(loadBulkWritingImportHistory());
-    setShowHistoryPanel(false);
+    setShowHistoryPanel(Boolean(initialShowHistory));
     setT1OnlyWarnings(false);
     setErrorMsg('');
-  }, [isOpen, initialMode, initialTask1SubCategory]);
+  }, [isOpen, initialMode, initialTask1SubCategory, initialShowHistory]);
 
   useEffect(() => {
     return () => {
@@ -467,6 +469,11 @@ export default function DailyWritingBulkModal({
     0
   );
   const liveTestById = new Map((tests || []).map(t => [t.id, t]));
+  const liveBrokenWritingTests = (tests || [])
+    .filter(t => t?.focusSkill === 'writing')
+    .map(t => ({ test: t, issue: detectTestImportIssue(t) }))
+    .filter(x => x.issue.hasIssue);
+  const totalBadgeErrorCount = Math.max(liveBrokenWritingTests.length, totalHistoryWarnings);
   const progressPct = progress.total > 0 ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : 0;
 
   return (
@@ -506,7 +513,7 @@ export default function DailyWritingBulkModal({
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold inline-flex items-center gap-1.5 border transition ${
                 showHistoryPanel
                   ? 'bg-amber-600 text-white border-amber-600'
-                  : totalHistoryWarnings > 0
+                  : totalBadgeErrorCount > 0
                   ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-600/50 hover:bg-amber-100'
                   : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-[#007A7A]'
               }`}
@@ -515,7 +522,7 @@ export default function DailyWritingBulkModal({
               <History className="w-3.5 h-3.5" />
               <span>
                 Lịch sử &amp; Đề lỗi
-                {totalHistoryWarnings > 0 ? ` (${totalHistoryWarnings})` : importHistory.length > 0 ? ` (${importHistory.length})` : ''}
+                {totalBadgeErrorCount > 0 ? ` (${totalBadgeErrorCount})` : importHistory.length > 0 ? ` (${importHistory.length})` : ''}
               </span>
             </button>
             {!hasGeminiAccess && setShowApiKeyModal && (
@@ -648,6 +655,49 @@ export default function DailyWritingBulkModal({
                   </button>
                 </div>
               </div>
+
+              {liveBrokenWritingTests.length > 0 && (
+                <div className="rounded-xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700/70 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      Đề Writing hiện có trên hệ thống đang bị lỗi / thiếu ảnh ({liveBrokenWritingTests.length} bài):
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {liveBrokenWritingTests.map(({ test, issue }) => (
+                      <div
+                        key={test.id}
+                        className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs"
+                      >
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <p className="font-extrabold text-[#0F172B] dark:text-white truncate">
+                            [{getDailySubCategoryLabel(test.dailySubCategory) || 'Writing'}] {test.title}
+                          </p>
+                          {issue.sourceFile && (
+                            <p className="font-mono text-[10px] text-slate-600 dark:text-slate-400 truncate">
+                              File gốc: {issue.sourceFile}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-amber-800 dark:text-amber-300">{issue.reason}</p>
+                        </div>
+                        {onOpenTestForEdit && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose?.();
+                              onOpenTestForEdit(test);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-[11px] font-bold inline-flex items-center gap-1 shrink-0"
+                          >
+                            <Edit className="w-3 h-3" /> Mở sửa ngay
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {importHistory.length === 0 ? (
                 <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
