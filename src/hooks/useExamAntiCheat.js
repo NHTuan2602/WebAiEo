@@ -528,7 +528,6 @@ export function useExamAntiCheat({
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        notifyRestricted('Phím thoát Toàn Màn Hình / chuyển tab đã bị khóa trong khi thi!');
         recordViolation(`Thử bấm phím ${e.key} để thoát toàn màn hình / chuyển cửa sổ (Đã chặn)`, {
           category: 'fullscreen',
           severity: 'high',
@@ -559,9 +558,6 @@ export function useExamAntiCheat({
       e.stopPropagation();
       e.stopImmediatePropagation();
       const label = isDevToolsOrSource ? 'mở DevTools / Kiểm tra mã nguồn' : `phím tắt (${e.key.toUpperCase()})`;
-      if (isDevToolsOrSource) {
-        notifyRestricted('Phím tắt này đã bị khóa trong khi làm bài thi!');
-      }
       recordViolation(`Thử dùng ${label} (Đã chặn)`, {
         category: isDevToolsOrSource ? 'extension' : 'interaction',
         severity: isDevToolsOrSource ? 'high' : 'medium',

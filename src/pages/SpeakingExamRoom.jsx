@@ -1018,11 +1018,11 @@ export default function SpeakingExamRoom({
 
             {isExamRoomMode ? (
               <div className="px-4 py-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/35 text-xs font-bold text-rose-700 dark:text-rose-200 leading-relaxed">
-                ⏱️ <strong>Phòng Thi Thực Chiến (Part 1 · 2 · 3):</strong> Hệ thống dùng giọng Giám khảo AI (hoặc file Giáo viên) đọc toàn bộ câu hỏi, sau khi đọc xong sẽ tự đếm ngược <strong>3 giây</strong> rồi <strong>tự động bật Micro ghi âm</strong>!
+                ⏱️ <strong>Phòng Thi (Part 1 · 2 · 3):</strong> Giám khảo sẽ đọc câu hỏi, sau đó tự đếm ngược <strong>3 giây</strong> rồi <strong>bật Micro ghi âm</strong>.
               </div>
             ) : (
               <div className="px-4 py-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-500/30 text-xs font-bold text-indigo-800 dark:text-indigo-200 leading-relaxed">
-                🎙️ <strong>Chế độ Test Thử / Tự Luyện:</strong> AI sẽ đọc toàn bộ câu hỏi bằng tiếng Anh, sau đó bạn chủ động bấm nút <strong>Bắt Đầu Trả Lời &amp; Ghi Âm</strong> bất kỳ lúc nào sẵn sàng.
+                🎙️ <strong>Chế độ Tự Luyện:</strong> Giám khảo đọc câu hỏi bằng tiếng Anh, sau đó bạn bấm <strong>Bắt Đầu Trả Lời &amp; Ghi Âm</strong> khi sẵn sàng.
               </div>
             )}
 
@@ -1030,7 +1030,7 @@ export default function SpeakingExamRoom({
               <div className="px-3.5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/35 text-xs font-bold text-emerald-700 dark:text-emerald-300">
                 {allHaveTeacherAudio
                   ? `🎧 Tất cả ${teacherAudioCount}/${items.length} câu dùng file ghi âm chuẩn của Giáo viên.`
-                  : `🎧 Đề có ${teacherAudioCount}/${items.length} câu dùng file ghi âm của Giáo viên - các câu còn lại dùng giọng Giám khảo AI đọc chuẩn IELTS.`}
+                  : `🎧 Đề có ${teacherAudioCount}/${items.length} câu dùng file ghi âm của Giáo viên - các câu còn lại dùng giọng Giám khảo đọc chuẩn IELTS.`}
               </div>
             )}
 
@@ -1047,7 +1047,7 @@ export default function SpeakingExamRoom({
                     ? 'Tự động phát file ghi âm câu hỏi của Giáo viên khi sang câu mới'
                     : hasTeacherAudioAny
                       ? 'Tự động đọc câu hỏi khi sang câu mới (ưu tiên file ghi âm Giáo viên)'
-                      : 'Giám khảo AI tự đọc toàn bộ câu hỏi bằng tiếng Anh khi sang câu mới'}
+                      : 'Giám khảo tự đọc toàn bộ câu hỏi bằng tiếng Anh khi sang câu mới'}
                 </span>
               </label>
             )}
@@ -1183,7 +1183,7 @@ export default function SpeakingExamRoom({
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-[11px] font-black uppercase tracking-wider text-[#0F766E] dark:text-teal-300 flex items-center gap-1.5">
                       <Volume2 className="w-3.5 h-3.5" />
-                      Lời dẫn Giám khảo AI (IELTS Examiner Script)
+                      Lời dẫn Giám khảo
                     </span>
                     <span className="text-[11px] font-semibold text-teal-800/80 dark:text-teal-200/80">
                       Tự động đọc trước câu hỏi
@@ -1191,7 +1191,7 @@ export default function SpeakingExamRoom({
                   </div>
                   {hideQuestionTextNow ? (
                     <p className="text-xs sm:text-sm italic text-teal-900 dark:text-teal-100">
-                      🎧 Giám khảo AI đang dẫn vào Part {currentItem.part} và đọc câu hỏi theo chuẩn IELTS...
+                      🎧 Giám khảo đang dẫn vào Part {currentItem.part} và đọc câu hỏi...
                     </p>
                   ) : (
                     <p className="text-xs sm:text-sm text-slate-800 dark:text-teal-50 leading-relaxed italic">
@@ -1217,10 +1217,10 @@ export default function SpeakingExamRoom({
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-snug">
                 {hideQuestionTextNow
                   ? (isSpeakingPrompt
-                      ? '🎧 Giám khảo AI đang đọc câu hỏi — Hãy tập trung lắng nghe!'
+                      ? '🎧 Giám khảo đang đọc câu hỏi — Hãy tập trung lắng nghe!'
                       : autoRecordCountdown !== null
                       ? `🎙️ Chuẩn bị trả lời — Tự bật ghi âm sau ${autoRecordCountdown} giây...`
-                      : '🎧 Chế độ Thực Chiến: Không hiển thị văn bản câu hỏi. Nghe AI đọc câu hỏi và trả lời trực tiếp.')
+                      : '🎧 Nghe Giám khảo đọc câu hỏi và trả lời trực tiếp.')
                   : currentItem.prompt}
               </h2>
 

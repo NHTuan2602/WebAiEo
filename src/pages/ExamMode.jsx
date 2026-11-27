@@ -508,12 +508,6 @@ export default function ExamMode({
               </p>
             </div>
 
-            {(fullscreenExitCount > 0 || (examState.tabSwitchCount || 0) > 0) && (
-              <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-xs font-bold text-rose-200">
-                Hệ thống đã ghi nhận {Math.max(fullscreenExitCount, examState.tabSwitchCount || 0)} lần rời màn hình / thoát toàn màn hình và sẽ gửi kèm báo cáo cho Ms. Như.
-              </div>
-            )}
-
             <button
               type="button"
               data-testid="enter-exam-fullscreen-btn"
@@ -527,10 +521,6 @@ export default function ExamMode({
                   : 'Quay Lại Phòng Thi Toàn Màn Hình'}
               </span>
             </button>
-
-            <p className="text-[11px] text-slate-400">
-              Lưu ý: Phím <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-bold text-slate-200">F11</kbd> và <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-bold text-slate-200">Esc</kbd> đã được khóa trong suốt thời gian làm bài.
-            </p>
           </div>
         </div>
       )}

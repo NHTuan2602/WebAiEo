@@ -908,11 +908,11 @@ export default function IntegratedSpeakingSection({
               <div className="mt-2.5 p-3 rounded-lg bg-teal-50/85 dark:bg-teal-950/35 border border-teal-200 dark:border-teal-800/70 space-y-1">
                 <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F766E] dark:text-teal-300 flex items-center gap-1.5">
                   <Volume2 className="w-3.5 h-3.5" />
-                  Lời dẫn Giám khảo AI (tự động đọc trước câu hỏi)
+                  Lời dẫn Giám khảo
                 </p>
                 {autoExaminerMode ? (
                   <p className="text-xs italic text-teal-900 dark:text-teal-100">
-                    🎧 Giám khảo AI đang dẫn đề Part {currentQ.part} theo kịch bản IELTS chuẩn và đọc câu hỏi...
+                    🎧 Giám khảo đang dẫn đề Part {currentQ.part} và đọc câu hỏi...
                   </p>
                 ) : (
                   <p className="text-xs text-slate-800 dark:text-teal-50 leading-relaxed italic">
