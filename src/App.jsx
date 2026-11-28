@@ -1372,6 +1372,7 @@ export default function App() {
     }
   });
   const [speakingForecast, setSpeakingForecast] = useState(() => createDefaultSpeakingForecastBank());
+  const [dailyFolderLabels, setDailyFolderLabels] = useState({});
   const [transientSpeakingTest, setTransientSpeakingTest] = useState(null);
 
   // ==========================================
@@ -1707,6 +1708,9 @@ export default function App() {
     if (Array.isArray(snap.hiddenPresetVocabKeys)) {
       const validHidden = Array.from(new Set(snap.hiddenPresetVocabKeys.map(k => String(k || '').trim()).filter(Boolean)));
       setHiddenPresetVocabKeys(prev => (JSON.stringify(prev) === JSON.stringify(validHidden) ? prev : validHidden));
+    }
+    if (snap.dailyFolderLabels && typeof snap.dailyFolderLabels === 'object' && !Array.isArray(snap.dailyFolderLabels)) {
+      setDailyFolderLabels(prev => (JSON.stringify(prev) === JSON.stringify(snap.dailyFolderLabels) ? prev : snap.dailyFolderLabels));
     }
     if (snap.speakingForecast && typeof snap.speakingForecast === 'object') {
       const normBank = normalizeSpeakingForecastBank(snap.speakingForecast);
@@ -4259,6 +4263,48 @@ export default function App() {
     const normalized = normalizeSpeakingForecastBank(nextBank);
     setSpeakingForecast(normalized);
     dispatchSyncAction('UPSERT_SPEAKING_FORECAST', { bank: normalized });
+  };
+
+  const handleRenameDailyFolder = async ({ folderId = '', label = '', subCategory = '', oldFolderName = '', newFolderName = '', testIds = [] } = {}) => {
+    if (folderId) {
+      const cleanLabel = String(label || '').trim().slice(0, 100);
+      setDailyFolderLabels(prev => {
+        const next = { ...(prev || {}) };
+        if (cleanLabel) next[folderId] = cleanLabel;
+        else delete next[folderId];
+        return next;
+      });
+      await dispatchSyncAction('RENAME_DAILY_FOLDER', { folderId, label: cleanLabel });
+      showToast(cleanLabel ? `Đã đổi tên thư mục thành "${cleanLabel}"!` : 'Đã khôi phục tên thư mục mặc định!');
+      return true;
+    }
+
+    const cleanNew = String(newFolderName || '').trim().slice(0, 100);
+    const oldNorm = String(oldFolderName || '').trim().normalize('NFKC').toLocaleLowerCase();
+    const idSet = new Set((Array.isArray(testIds) ? testIds : []).filter(Boolean));
+    setTests(prev =>
+      prev.map(t => {
+        const cfg = t?.examConfig || {};
+        const matchId = idSet.size > 0 && idSet.has(t.id);
+        const matchSub =
+          Boolean(subCategory) &&
+          String(cfg.dailySubCategory || '') === subCategory &&
+          String(cfg.dailyFolderName || '').trim().normalize('NFKC').toLocaleLowerCase() === oldNorm;
+        if (!matchId && !matchSub) return t;
+        return {
+          ...t,
+          examConfig: { ...cfg, dailyFolderName: cleanNew }
+        };
+      })
+    );
+    await dispatchSyncAction('RENAME_DAILY_FOLDER', {
+      subCategory,
+      oldFolderName,
+      newFolderName: cleanNew,
+      testIds: Array.from(idSet)
+    });
+    showToast(cleanNew ? `Đã đổi tên thư mục con thành "${cleanNew}"!` : 'Đã bỏ tên thư mục con!');
+    return true;
   };
 
   const handleStartSpeakingPracticeTest = (practiceTestObj, partMode = 'full') => {
@@ -8163,6 +8209,8 @@ export default function App() {
           onBulkUpdateTestHashtags={handleBulkUpdateTestHashtags}
           onBackToTeacherDashboard={() => setView('TEACHER_DASHBOARD')}
           onBulkCreateTests={handleBulkCreateTests}
+          dailyFolderLabels={dailyFolderLabels}
+          onRenameDailyFolder={handleRenameDailyFolder}
           onSaveSpeakingForecast={handleSaveSpeakingForecast}
           onSpeakingRoomUnlocked={handleSpeakingRoomUnlocked}
           onStartSingleSkillExam={testId => startExam(testId)}

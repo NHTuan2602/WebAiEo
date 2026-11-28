@@ -4,11 +4,13 @@ import {
   ArrowLeft,
   BookOpen,
   Calendar,
+  Check,
   CheckCircle2,
   ChevronRight,
   Clock,
   Crown,
   Edit,
+  Edit3,
   EyeOff,
   FileAudio,
   Flame,
@@ -88,6 +90,7 @@ export default function SkillPracticeHub({
   attempts = [],
   classesDb = {},
   currentUser,
+  dailyFolderLabels = {},
   focusedTestId = null,
   onAssignFolderClasses = null,
   onBulkUpdateTestHashtags = null,
@@ -101,6 +104,7 @@ export default function SkillPracticeHub({
   onOpenFullExamCatalog,
   onOpenResult,
   onOpenSkillBuilder,
+  onRenameDailyFolder = null,
   onSaveSpeakingForecast = null,
   onSpeakingRoomUnlocked,
   onStartSingleSkillExam,
@@ -153,7 +157,16 @@ export default function SkillPracticeHub({
   const [showBulkHashtagBar, setShowBulkHashtagBar] = useState(false);
   const [bulkHashtagInput, setBulkHashtagInput] = useState('');
   const [bulkHashtagBusy, setBulkHashtagBusy] = useState(false);
+  const [editingSubFolderId, setEditingSubFolderId] = useState(null);
+  const [editingSubFolderLabel, setEditingSubFolderLabel] = useState('');
+  const [editingChildFolderKey, setEditingChildFolderKey] = useState(null);
+  const [editingChildFolderName, setEditingChildFolderName] = useState('');
   const [skillListPageState, setSkillListPageState] = useState({ scopeKey: '', page: 1 });
+  const resolveSubCatLabel = (subId, fallback = '') => {
+    const custom = String(dailyFolderLabels?.[subId] || '').trim();
+    if (custom) return custom;
+    return getDailySubCategoryLabel(subId) || fallback || subId;
+  };
   const [roomPassInput, setRoomPassInput] = useState('');
   const [roomPassError, setRoomPassError] = useState('');
   const [verifyingRoomPass, setVerifyingRoomPass] = useState(false);
@@ -903,7 +916,7 @@ export default function SkillPracticeHub({
                   <Wand2 className="w-3.5 h-3.5" />
                   <span>
                     {activeSubCatFilter !== 'all'
-                      ? `Tạo Hàng Loạt W1 • ${getDailySubCategoryLabel(activeSubCatFilter)} (AI)`
+                      ? `Tạo Hàng Loạt W1 • ${resolveSubCatLabel(activeSubCatFilter)} (AI)`
                       : 'Tạo Hàng Loạt W1 Nhanh (AI)'}
                   </span>
                 </button>
@@ -1019,7 +1032,12 @@ export default function SkillPracticeHub({
                       }`}
                     >
                       <FolderOpen className="w-4 h-4" />
-                      <span>{meta.subCategories.find(s => s.id === activeSubCatFilter)?.label || activeSubCatFilter}</span>
+                      <span>
+                        {resolveSubCatLabel(
+                          activeSubCatFilter,
+                          meta.subCategories.find(s => s.id === activeSubCatFilter)?.label || activeSubCatFilter
+                        )}
+                      </span>
                     </button>
                   </>
                 )}
@@ -1040,82 +1058,186 @@ export default function SkillPracticeHub({
             </div>
 
             {/* Drive Folder Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+            <div
+              className={
+                tabKey === 'writing_task1'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3'
+                  : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'
+              }
+            >
               {meta.subCategories.map(sub => {
+                const displayLabel = resolveSubCatLabel(sub.id, sub.label);
                 const subTests = list.filter(t => normalizeExamConfig(t).dailySubCategory === sub.id);
                 const subCount = subTests.length;
                 const isSelected = activeSubCatFilter === sub.id;
+                const isEditingSub = editingSubFolderId === sub.id;
                 const unionClassIds = Array.from(
                   new Set(subTests.flatMap(t => normalizeExamConfig(t).assignedClassIds || []))
                 );
                 const assignedClsObjs = getAssignedClassNames(unionClassIds, classesDb);
                 const hasPublicToAll = subCount > 0 && subTests.some(t => (normalizeExamConfig(t).assignedClassIds || []).length === 0);
+                const hasW1BulkBtn = isTeacher && tabKey === 'writing_task1' && Boolean(onBulkCreateTests);
+                const hasAssignBtn = isTeacher && subCount > 0 && Boolean(onAssignFolderClasses);
+
+                const commitSubRename = async () => {
+                  const trimmed = String(editingSubFolderLabel || '').trim();
+                  setEditingSubFolderId(null);
+                  if (!onRenameDailyFolder) return;
+                  if (trimmed === displayLabel) return;
+                  await onRenameDailyFolder({
+                    folderId: sub.id,
+                    label: trimmed === sub.label ? '' : trimmed
+                  });
+                };
 
                 return (
                   <div
                     key={sub.id}
-                    className={`rounded-xl border p-3 flex flex-col justify-between gap-2 transition ${
+                    className={`group rounded-2xl border p-3.5 flex flex-col justify-between gap-2.5 transition shadow-2xs ${
                       isSelected
                         ? 'bg-teal-50/90 dark:bg-teal-500/15 border-[#007A7A] dark:border-[#1EE1D6] ring-1 ring-[#007A7A]/30'
-                        : 'bg-slate-50/75 dark:bg-slate-900/75 border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
+                        : 'bg-slate-50/80 dark:bg-slate-900/75 border-slate-200 dark:border-slate-800 hover:border-[#007A7A]/70 hover:bg-white dark:hover:bg-slate-900'
                     }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setActiveSubCatFilter(isSelected ? 'all' : sub.id)}
-                      className="flex items-start gap-2.5 text-left w-full"
-                    >
-                      <span
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
+                    {/* Top row: Icon + Folder Name (or inline rename) + Rename trigger */}
+                    <div className="flex items-start gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubCatFilter(isSelected ? 'all' : sub.id)}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition ${
                           isSelected
                             ? 'bg-[#007A7A] text-white border-[#007A7A]'
-                            : 'bg-amber-100/80 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+                            : 'bg-amber-100/80 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30 group-hover:scale-105'
                         }`}
+                        title={`Mở thư mục ${displayLabel}`}
                       >
                         {isSelected ? <FolderOpen className="w-4 h-4" /> : <Folder className="w-4 h-4 fill-current/20" />}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
-                          {sub.label}
-                        </p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          {subCount > 0 ? `${subCount} bài tập` : 'Chưa có bài'}
-                        </p>
-                      </div>
-                    </button>
+                      </button>
 
-                    <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-800">
-                      <div className="flex flex-wrap items-center gap-1 min-w-0">
-                        {subCount === 0 ? (
-                          <span className="text-[10px] text-slate-400">Trống</span>
-                        ) : assignedClsObjs.length === 0 ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
-                            <Globe className="w-2.5 h-2.5 shrink-0" /> Tất cả
-                          </span>
+                      <div className="min-w-0 flex-1">
+                        {isEditingSub ? (
+                          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingSubFolderLabel}
+                              onChange={e => setEditingSubFolderLabel(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') commitSubRename();
+                                if (e.key === 'Escape') setEditingSubFolderId(null);
+                              }}
+                              placeholder={sub.label}
+                              className="w-full min-w-0 px-2 py-1 rounded-lg bg-white dark:bg-slate-950 border border-[#007A7A] text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={commitSubRename}
+                              className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 transition"
+                              title="Lưu tên thư mục"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubFolderId(null)}
+                              className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0 transition"
+                              title="Hủy"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         ) : (
-                          <>
-                            {assignedClsObjs.slice(0, 2).map(cls => (
-                              <span
-                                key={cls.id}
-                                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 truncate max-w-[90px]"
+                          <div className="flex items-start justify-between gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveSubCatFilter(isSelected ? 'all' : sub.id)}
+                              className="text-left min-w-0 flex-1"
+                            >
+                              <p
+                                className="text-xs sm:text-[13px] font-extrabold text-slate-900 dark:text-white group-hover:text-[#0F766E] dark:group-hover:text-[#1EE1D6] truncate leading-snug"
+                                title={displayLabel}
                               >
-                                {cls.name}
-                              </span>
-                            ))}
-                            {assignedClsObjs.length > 2 && (
-                              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
-                                +{assignedClsObjs.length - 2}
-                              </span>
+                                {displayLabel}
+                              </p>
+                              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                                {subCount > 0 ? `${subCount} bài tập` : 'Chưa có bài'}
+                              </p>
+                            </button>
+                            {isTeacher && onRenameDailyFolder && (
+                              <button
+                                type="button"
+                                data-testid={`rename-folder-btn-${sub.id}`}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setEditingSubFolderId(sub.id);
+                                  setEditingSubFolderLabel(displayLabel);
+                                }}
+                                className="p-1 rounded-lg text-slate-400 hover:text-[#0F766E] dark:hover:text-[#1EE1D6] hover:bg-slate-200/70 dark:hover:bg-slate-800 shrink-0 transition"
+                                title={`Đổi tên thư mục "${displayLabel}"`}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
                             )}
-                            {hasPublicToAll && (
-                              <span className="text-[10px] text-slate-400">+chung</span>
-                            )}
-                          </>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status & Actions Footer: clean separated rows so badges never collide with buttons */}
+                    <div className="pt-2 border-t border-slate-200/70 dark:border-slate-800/90 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1 min-w-0">
+                          {subCount === 0 ? (
+                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                              Trống
+                            </span>
+                          ) : assignedClsObjs.length === 0 ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
+                              <Globe className="w-2.5 h-2.5 shrink-0" /> Tất cả HS
+                            </span>
+                          ) : (
+                            <>
+                              {assignedClsObjs.slice(0, 2).map(cls => (
+                                <span
+                                  key={cls.id}
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 border border-indigo-200/70 dark:border-indigo-500/30 truncate max-w-[96px]"
+                                >
+                                  {cls.name}
+                                </span>
+                              ))}
+                              {assignedClsObjs.length > 2 && (
+                                <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300 whitespace-nowrap">
+                                  +{assignedClsObjs.length - 2}
+                                </span>
+                              )}
+                              {hasPublicToAll && (
+                                <span className="text-[10px] text-slate-400 whitespace-nowrap">+chung</span>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {!hasW1BulkBtn && hasAssignBtn && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setBulkFolderAssignTarget({
+                                label: `${meta.name} / ${displayLabel}`,
+                                testIds: subTests.map(t => t.id),
+                                initialClassIds: unionClassIds
+                              });
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 border border-indigo-200/70 dark:border-indigo-500/30 text-[11px] font-extrabold inline-flex items-center gap-1 whitespace-nowrap shrink-0 transition"
+                            title={`Giao toàn bộ ${subCount} bài trong ${displayLabel} cho lớp`}
+                          >
+                            <Share2 className="w-3 h-3 shrink-0" /> Giao lớp
+                          </button>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
-                        {isTeacher && tabKey === 'writing_task1' && onBulkCreateTests && (
+                      {hasW1BulkBtn && (
+                        <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             data-testid={`w1-folder-bulk-ai-${sub.id}`}
@@ -1128,30 +1250,30 @@ export default function SkillPracticeHub({
                                 task1SubCategory: sub.id
                               });
                             }}
-                            className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/35 text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-500/40 text-[11px] font-extrabold inline-flex items-center gap-1 transition"
-                            title={`Ném nhiều hình / PDF để AI tạo hàng loạt đề vào thẳng thư mục ${sub.label}`}
+                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/30 text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-500/35 text-[11px] font-extrabold inline-flex items-center justify-center gap-1 whitespace-nowrap transition"
+                            title={`Ném nhiều hình / file Word / PDF để AI tạo hàng loạt đề vào thẳng thư mục ${displayLabel}`}
                           >
-                            <Wand2 className="w-3 h-3" /> + AI Hàng Loạt
+                            <Wand2 className="w-3 h-3 shrink-0" /> Tạo AI
                           </button>
-                        )}
-                        {isTeacher && subCount > 0 && onAssignFolderClasses && (
-                          <button
-                            type="button"
-                            onClick={e => {
-                              e.stopPropagation();
-                              setBulkFolderAssignTarget({
-                                label: `${meta.name} / ${sub.label}`,
-                                testIds: subTests.map(t => t.id),
-                                initialClassIds: unionClassIds
-                              });
-                            }}
-                            className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0 transition"
-                            title={`Giao toàn bộ ${subCount} bài trong ${sub.label} cho lớp`}
-                          >
-                            <Share2 className="w-3 h-3" /> Giao lớp
-                          </button>
-                        )}
-                      </div>
+                          {hasAssignBtn && (
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setBulkFolderAssignTarget({
+                                  label: `${meta.name} / ${displayLabel}`,
+                                  testIds: subTests.map(t => t.id),
+                                  initialClassIds: unionClassIds
+                                });
+                              }}
+                              className="flex-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/30 text-indigo-700 dark:text-indigo-200 border border-indigo-200/80 dark:border-indigo-500/35 text-[11px] font-extrabold inline-flex items-center justify-center gap-1 whitespace-nowrap transition"
+                              title={`Giao toàn bộ ${subCount} bài trong ${displayLabel} cho lớp`}
+                            >
+                              <Share2 className="w-3 h-3 shrink-0" /> Giao lớp
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1177,62 +1299,136 @@ export default function SkillPracticeHub({
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {dailyFolderOptions.map(option => {
                 const isSelected = selectedDailyFolder === option.folderKey;
+                const isEditingChild = editingChildFolderKey === option.folderKey;
                 const folderTests = subFilteredList.filter(test => {
                   const fn = getDailyFolderName(test);
                   const sc = normalizeExamConfig(test).dailySubCategory;
                   const fk = `${sc}:${fn ? fn.normalize('NFKC').toLocaleLowerCase() : '__unfiled__'}`;
                   return fk === option.folderKey;
                 });
+                const subLabel = resolveSubCatLabel(option.subCategory);
                 const fLabel = option.folderName
-                  ? `${activeSubCatFilter === 'all' ? `${getDailySubCategoryLabel(option.subCategory)} • ` : ''}${option.folderName}`
-                  : `Chưa xếp thư mục${activeSubCatFilter === 'all' ? ` • ${getDailySubCategoryLabel(option.subCategory)}` : ''}`;
+                  ? `${activeSubCatFilter === 'all' ? `${subLabel} • ` : ''}${option.folderName}`
+                  : `Chưa xếp thư mục${activeSubCatFilter === 'all' ? ` • ${subLabel}` : ''}`;
                 const unionIds = Array.from(new Set(folderTests.flatMap(t => normalizeExamConfig(t).assignedClassIds || [])));
+
+                const commitChildRename = async () => {
+                  const nextName = String(editingChildFolderName || '').trim();
+                  setEditingChildFolderKey(null);
+                  if (!onRenameDailyFolder) return;
+                  if (nextName === String(option.folderName || '').trim()) return;
+                  await onRenameDailyFolder({
+                    subCategory: option.subCategory,
+                    oldFolderName: option.folderName || '',
+                    newFolderName: nextName,
+                    testIds: folderTests.map(t => t.id)
+                  });
+                  if (isSelected) {
+                    const nextKey = `${option.subCategory}:${nextName ? nextName.normalize('NFKC').toLocaleLowerCase() : '__unfiled__'}`;
+                    setActiveDailyFolderFilter(nextKey);
+                  }
+                };
 
                 return (
                   <div
                     key={option.folderKey}
-                    className={`rounded-xl border px-3 py-2.5 flex items-center justify-between gap-2 transition ${
+                    className={`rounded-xl border px-3.5 py-3 flex items-center justify-between gap-2 transition ${
                       isSelected
                         ? 'bg-teal-50 dark:bg-teal-500/15 border-[#007A7A] dark:border-[#1EE1D6]'
                         : 'bg-slate-50/80 dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-[#007A7A]'
                     }`}
                   >
-                    <button
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => setActiveDailyFolderFilter(isSelected ? 'all' : option.folderKey)}
-                      className="flex items-center gap-2 text-left min-w-0 flex-1"
-                    >
-                      {isSelected ? (
-                        <FolderOpen className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
-                      ) : (
-                        <Folder className="w-4 h-4 text-amber-500 shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{fLabel}</p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{option.count} bài</p>
+                    {isEditingChild ? (
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          autoFocus
+                          value={editingChildFolderName}
+                          onChange={e => setEditingChildFolderName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitChildRename();
+                            if (e.key === 'Escape') setEditingChildFolderKey(null);
+                          }}
+                          placeholder="Nhập tên thư mục con..."
+                          className="w-full min-w-0 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-950 border border-[#007A7A] text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={commitChildRename}
+                          className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                          title="Lưu tên"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingChildFolderKey(null)}
+                          className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0"
+                          title="Hủy"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                    </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => setActiveDailyFolderFilter(isSelected ? 'all' : option.folderKey)}
+                          className="flex items-center gap-2.5 text-left min-w-0 flex-1"
+                        >
+                          {isSelected ? (
+                            <FolderOpen className="w-4 h-4 text-[#007A7A] dark:text-[#1EE1D6] shrink-0" />
+                          ) : (
+                            <Folder className="w-4 h-4 text-amber-500 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate" title={fLabel}>
+                              {fLabel}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{option.count} bài</p>
+                          </div>
+                        </button>
 
-                    {isTeacher && folderTests.length > 0 && onAssignFolderClasses && (
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          setBulkFolderAssignTarget({
-                            label: fLabel,
-                            testIds: folderTests.map(t => t.id),
-                            initialClassIds: unionIds
-                          });
-                        }}
-                        className="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 text-[11px] font-extrabold inline-flex items-center gap-1 shrink-0"
-                        title={`Giao toàn bộ ${folderTests.length} bài trong thư mục này cho lớp`}
-                      >
-                        <Share2 className="w-3 h-3" /> Giao lớp
-                      </button>
+                        {isTeacher && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            {onRenameDailyFolder && (
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setEditingChildFolderKey(option.folderKey);
+                                  setEditingChildFolderName(option.folderName || '');
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-[#0F766E] dark:hover:text-[#1EE1D6] hover:bg-slate-200/70 dark:hover:bg-slate-800 transition"
+                                title="Đổi tên thư mục con"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {folderTests.length > 0 && onAssignFolderClasses && (
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setBulkFolderAssignTarget({
+                                    label: fLabel,
+                                    testIds: folderTests.map(t => t.id),
+                                    initialClassIds: unionIds
+                                  });
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/35 text-indigo-700 dark:text-indigo-200 border border-indigo-200/70 dark:border-indigo-500/30 text-[11px] font-extrabold inline-flex items-center gap-1 whitespace-nowrap shrink-0 transition"
+                                title={`Giao toàn bộ ${folderTests.length} bài trong thư mục này cho lớp`}
+                              >
+                                <Share2 className="w-3 h-3 shrink-0" /> Giao lớp
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -1488,7 +1684,7 @@ export default function SkillPracticeHub({
                   {isTeacher && showBulkHashtagBar && onBulkUpdateTestHashtags && finalSkillList.length > 0 && (() => {
                     const targetScopeLabel =
                       activeSubCatFilter !== 'all'
-                        ? getDailySubCategoryLabel(activeSubCatFilter) || activeSubCatFilter
+                        ? resolveSubCatLabel(activeSubCatFilter)
                         : meta.name;
                     const targetIds = finalSkillList.map(t => t.id);
                     const presetTags = ['#ThiThật', '#DailyZone', '#TeamSắpThi', '#Forecast'];
@@ -1660,7 +1856,7 @@ export default function SkillPracticeHub({
                       : isSuperHomeworkTab && selectedDailyFolder !== 'all'
                       ? `Chưa có bài nào trong thư mục ${dailyFolderOptions.find(option => option.folderKey === selectedDailyFolder)?.folderName || 'chưa xếp thư mục'}`
                       : activeSubCatFilter !== 'all'
-                      ? `Chưa có bài tập nào trong mục ${getDailySubCategoryLabel(activeSubCatFilter)}`
+                      ? `Chưa có bài tập nào trong mục ${resolveSubCatLabel(activeSubCatFilter)}`
                       : `Chưa có bài tập ${meta.name} nào`}
                   </h2>
                   <p className="text-sm text-[#475569] dark:text-slate-400 max-w-md mx-auto">
@@ -1684,7 +1880,7 @@ export default function SkillPracticeHub({
                     const isLocked = isExhausted || (!isTeacher && schedule.lockedBySchedule);
                     const hasExamPass = Boolean(cfg.hasExamPassword || cfg.examPassword);
                     const isPassUnlocked = isTeacher || !hasExamPass || Boolean(examUnlockTokens?.[test.id]);
-                    const subCatLabel = getDailySubCategoryLabel(cfg.dailySubCategory);
+                    const subCatLabel = resolveSubCatLabel(cfg.dailySubCategory);
                     const lockText = isExhausted
                       ? 'Đã hết lượt'
                       : schedule.notYetOpen

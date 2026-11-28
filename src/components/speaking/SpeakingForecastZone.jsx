@@ -767,7 +767,7 @@ export default function SpeakingForecastZone({
                   </p>
                 </div>
               ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5">
                   {filteredGroups.map(g => {
                     const folderCount = (g.folders || []).length;
                     const qCount = (g.folders || []).reduce((sum, f) => sum + (f.questions?.length || 0), 0);
@@ -846,12 +846,12 @@ export default function SpeakingForecastZone({
                         </div>
 
                         {/* Drive Card Actions */}
-                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-800">
-                          <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-200/80 dark:border-slate-800">
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               type="button"
                               onClick={() => setOpenedGroupIdByPart(prev => ({ ...prev, [activePartKey]: g.id }))}
-                              className="px-2.5 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold transition"
+                              className="px-3 py-1.5 rounded-lg bg-[#007A7A] hover:bg-[#065B5B] text-white text-xs font-bold whitespace-nowrap transition"
                             >
                               Mở thư mục
                             </button>
@@ -859,16 +859,16 @@ export default function SpeakingForecastZone({
                               <button
                                 type="button"
                                 onClick={() => handleStartGroupRandomPractice(g)}
-                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold inline-flex items-center gap-1 transition"
+                                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold inline-flex items-center gap-1 whitespace-nowrap transition"
                                 title="Luyện random câu hỏi trong nhóm này"
                               >
-                                <Shuffle className="w-3 h-3" /> Random
+                                <Shuffle className="w-3 h-3 shrink-0" /> Random
                               </button>
                             )}
                           </div>
 
                           {isTeacher && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -881,10 +881,10 @@ export default function SpeakingForecastZone({
                                     initialClassIds: g.assignedClassIds || []
                                   })
                                 }
-                                className="px-2 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 text-xs font-bold inline-flex items-center gap-1 transition"
+                                className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-500/30 text-xs font-bold inline-flex items-center gap-1 whitespace-nowrap transition"
                                 title="Giao cả thư mục này cho lớp"
                               >
-                                <Share2 className="w-3.5 h-3.5" /> Giao lớp
+                                <Share2 className="w-3.5 h-3.5 shrink-0" /> Giao lớp
                               </button>
                               <button
                                 type="button"
@@ -892,7 +892,7 @@ export default function SpeakingForecastZone({
                                   setEditingGroupId(g.id);
                                   setEditingGroupName(g.name);
                                 }}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition"
                                 title="Đổi tên thư mục"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -901,7 +901,7 @@ export default function SpeakingForecastZone({
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteGroup(g.id)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/20"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/20 transition"
                                   title="Xóa thư mục"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />

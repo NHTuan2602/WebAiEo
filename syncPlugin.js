@@ -1563,6 +1563,7 @@ function createInitialStore(audioDir = '', mediaDir = '') {
     users: {},
     customVocabTopics: [],
     hiddenPresetVocabKeys: [],
+    dailyFolderLabels: {},
     speakingForecast: createDefaultSpeakingForecastBank(),
     customTitles: [],
     gamePracticeLeaderboard: [],
@@ -2128,6 +2129,15 @@ function applyParsedStoreSnapshot(store, parsed) {
     store.hiddenPresetVocabKeys = Array.from(
       new Set(parsed.hiddenPresetVocabKeys.map(k => String(k || '').trim()).filter(Boolean))
     );
+  }
+  if (parsed.dailyFolderLabels && typeof parsed.dailyFolderLabels === 'object' && !Array.isArray(parsed.dailyFolderLabels)) {
+    const cleanLabels = {};
+    Object.entries(parsed.dailyFolderLabels).forEach(([k, v]) => {
+      const key = String(k || '').trim().slice(0, 80);
+      const val = String(v || '').trim().slice(0, 100);
+      if (key && val) cleanLabels[key] = val;
+    });
+    store.dailyFolderLabels = cleanLabels;
   }
   if (parsed.speakingForecast && typeof parsed.speakingForecast === 'object') {
     store.speakingForecast = normalizeSpeakingForecastBank(parsed.speakingForecast);
@@ -3506,6 +3516,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: {},
       customVocabTopics: [],
       hiddenPresetVocabKeys: [],
+      dailyFolderLabels: {},
       speakingForecast: null,
       customTitles: [],
       gamePracticeLeaderboard: [],
@@ -3595,6 +3606,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: sanitizedUsers,
       customVocabTopics: store.customVocabTopics || [],
       hiddenPresetVocabKeys: Array.isArray(store.hiddenPresetVocabKeys) ? store.hiddenPresetVocabKeys : [],
+      dailyFolderLabels: store.dailyFolderLabels && typeof store.dailyFolderLabels === 'object' ? store.dailyFolderLabels : {},
       speakingForecast: normalizeSpeakingForecastBank(store.speakingForecast),
       customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
       gamePracticeLeaderboard: Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : [],
@@ -3658,6 +3670,7 @@ function getSnapshotForViewer(store, viewer = null) {
       users: selfClean,
       customVocabTopics: [],
       hiddenPresetVocabKeys: [],
+      dailyFolderLabels: {},
       speakingForecast: null,
       customTitles: [],
       gamePracticeLeaderboard: [],
@@ -3801,6 +3814,7 @@ function getSnapshotForViewer(store, viewer = null) {
     users: sanitizedUsers,
     customVocabTopics: store.customVocabTopics || [],
     hiddenPresetVocabKeys: Array.isArray(store.hiddenPresetVocabKeys) ? store.hiddenPresetVocabKeys : [],
+    dailyFolderLabels: store.dailyFolderLabels && typeof store.dailyFolderLabels === 'object' ? store.dailyFolderLabels : {},
     speakingForecast: filterSpeakingForecastForViewer(store.speakingForecast, Array.from(viewerClassSet), false),
     customTitles: Array.isArray(store.customTitles) ? store.customTitles : [],
     gamePracticeLeaderboard: (Array.isArray(store.gamePracticeLeaderboard) ? store.gamePracticeLeaderboard : []).filter(entry => {
@@ -3862,6 +3876,7 @@ function authorizeSyncAction(store, type, payload = {}, viewer = null) {
     'UPDATE_CLASS_MEMBERS',
     'ASSIGN_TEST_CLASSES',
     'ASSIGN_FOLDER_CLASSES',
+    'RENAME_DAILY_FOLDER',
     'BULK_UPDATE_TEST_HASHTAGS',
     'DELETE_ATTEMPT',
     'PURGE_ORPHAN_ATTEMPTS',
@@ -6727,6 +6742,53 @@ function applySyncAction(store, type, payload = {}, viewer = null) {
       break;
     }
 
+    case 'RENAME_DAILY_FOLDER': {
+      const folderId = String(payload?.folderId || '').trim().slice(0, 80);
+      if (folderId) {
+        const nextLabel = String(payload?.label || '').trim().slice(0, 100);
+        if (!store.dailyFolderLabels || typeof store.dailyFolderLabels !== 'object') {
+          store.dailyFolderLabels = {};
+        }
+        if (nextLabel) {
+          store.dailyFolderLabels[folderId] = nextLabel;
+        } else {
+          delete store.dailyFolderLabels[folderId];
+        }
+        changed = true;
+        break;
+      }
+
+      const subCategory = String(payload?.subCategory || '').trim();
+      const oldFolderName = String(payload?.oldFolderName || '').trim();
+      const newFolderName = String(payload?.newFolderName || '').trim().slice(0, 100);
+      const targetIdsSet = new Set(
+        (Array.isArray(payload?.testIds) ? payload.testIds : []).map(id => String(id || '').trim()).filter(Boolean)
+      );
+      if (subCategory || targetIdsSet.size > 0) {
+        const oldNorm = oldFolderName.normalize('NFKC').toLocaleLowerCase();
+        store.tests = (store.tests || []).map(t => {
+          if (!t) return t;
+          const cfg = t.examConfig || {};
+          const matchesId = targetIdsSet.size > 0 && targetIdsSet.has(t.id);
+          const curFolder = String(cfg.dailyFolderName || '').trim();
+          const matchesSubAndName =
+            Boolean(subCategory) &&
+            String(cfg.dailySubCategory || '') === subCategory &&
+            curFolder.normalize('NFKC').toLocaleLowerCase() === oldNorm;
+          if (!matchesId && !matchesSubAndName) return t;
+          changed = true;
+          return {
+            ...t,
+            examConfig: {
+              ...cfg,
+              dailyFolderName: newFolderName
+            }
+          };
+        });
+      }
+      break;
+    }
+
     case 'SET_AI_CONFIG': {
       const nextKey = String(payload.geminiApiKey ?? '').trim().replace(/^['"]|['"]$/g, '');
       const prevKey = String(store.aiConfig?.geminiApiKey || '');
@@ -7756,6 +7818,7 @@ const IMMEDIATE_PERSIST_ACTIONS = new Set([
   'UPDATE_CLASS_MEMBERS',
   'ASSIGN_TEST_CLASSES',
   'ASSIGN_FOLDER_CLASSES',
+  'RENAME_DAILY_FOLDER',
   'BULK_UPDATE_TEST_HASHTAGS',
   'UPSERT_CUSTOM_TITLE',
   'DELETE_CUSTOM_TITLE',
